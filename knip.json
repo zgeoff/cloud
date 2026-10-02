@@ -6,5 +6,6 @@
     }
   },
   "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],
-  "ignoreBinaries": ["go", "gofmt"]
+  "ignoreBinaries": ["go", "gofmt", "pulumi"],
+  "ignoreWorkspaces": ["sdk/*"]
 }
