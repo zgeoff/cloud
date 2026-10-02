@@ -65,17 +65,22 @@
     enable = true;
     # public: nothing but Tailscale. Everything else is reached over the tailnet.
     allowedUDPPorts = [ 41641 ];
-    # trusted as a source, in input and forward: the tailnet, k3s pods, and Docker's
-    # bridge, which carries the imp-host container and its microVMs' egress
+    # trusted as a source, in input and forward: the tailnet and k3s pods (pods
+    # reach the API server and kubelet on the host)
     trustedInterfaces = [
       "tailscale0"
       "cni0"
       "flannel.1"
-      "docker0"
     ];
     # filter forwarded traffic too, so nothing public reaches a pod or a NodePort
     # unless a rule allows it
     filterForward = true;
+    # Docker's bridge carries imp-host and its microVMs' egress. Forward only, never
+    # input: a trusted docker0 would let any open imp reach the host's closed ports
+    # (6443, 10250, ...). imp's module takes this over with its own bridge (imp#84).
+    extraForwardRules = ''
+      iifname "docker0" accept
+    '';
   };
 
   services.openssh = {
