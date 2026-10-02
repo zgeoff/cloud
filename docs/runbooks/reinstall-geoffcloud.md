@@ -6,12 +6,13 @@ holds imp's ZFS pool, and NixOS imports it.
 ## Before you start
 
 - The imp session agrees on the time. imp's node and microVMs go down.
-- imp's bootstrap has created the pool `tank` on `vdb`. NixOS imports it through
-  `boot.zfs.extraPools`.
+- imp's bootstrap has created the pool `tank` on `vdb`. NixOS imports it through imp's module
+  (`services.imp.zfs.pool`).
 - A Tailscale auth key for `tag:cloud` exists: the `hostAuthKey` stack output (Pulumi `TailnetKey`).
 
-**CAUTION:** The reinstall erases the root disk. Take an Onidel snapshot first, through the API or
-the panel, so that you can restore the Ubuntu host.
+**CAUTION:** The reinstall erases the root disk. Take an Onidel snapshot first, so that you can
+restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<team>` with the body
+`{"name": "...", "team_id": "<team>"}`. Wait until `GET /snapshots` shows it as `available`.
 
 ## Steps
 
@@ -47,7 +48,16 @@ the panel, so that you can restore the Ubuntu host.
    imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
    warns.
 
-4. Install. `nixos-anywhere` runs from any machine with Nix or Docker:
+4. Stop imp on the old host, and export its pool, so that NixOS imports `tank` cleanly:
+
+   ```sh
+   ssh root@104.250.100.18 'docker stop imp-host && zpool export tank'
+   ```
+
+   If the export reports the pool as busy, find the process that holds it, stop it, and export
+   again. Do not skip the export.
+
+5. Install. `nixos-anywhere` runs from any machine with Nix:
 
    ```sh
    nix run github:nix-community/nixos-anywhere -- \
@@ -56,10 +66,15 @@ the panel, so that you can restore the Ubuntu host.
      root@104.250.100.18
    ```
 
-5. Remove the staged key: `rm -rf /tmp/geoffcloud-extra`.
-6. Check the host over the tailnet: `ssh root@geoffcloud`, then `zpool status`,
-   `k3s kubectl get nodes`, and `tailscale status`.
-7. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
+   **NOTE:** Without local Nix, run it in the `nixos/nix` image. Mount the repo, the staged
+   directory and a copy of the SSH key and `known_hosts` that root owns (SSH refuses a mounted
+   `~/.ssh` with another owner). Enable `nix-command flakes`, and add `safe.directory = *` to root's
+   git config, because the mounted repo has another owner.
+
+6. Remove the staged key: `rm -rf /tmp/geoffcloud-extra`.
+7. Check the host over the tailnet: `ssh root@geoffcloud`, then `zpool status`,
+   `k3s kubectl get nodes`, `tailscale status` and `imp status`.
+8. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
 
 ## Connect Pulumi to k3s
 
