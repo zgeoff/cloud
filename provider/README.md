@@ -97,3 +97,12 @@ Set the key with `pulumi config set --secret onidel:apiKey`, or export `ONIDEL_A
 - **Previews with unknown inputs.** The Vm's custom diff sees an unknown value (such as the
   `firewallGroupId` of a group created in the same update) as unset, so the preview may omit that
   change. The real update sees the known value and applies it.
+
+## Live API behaviour (checked 2026-10-02)
+
+- Writes need `team_id`: without it a create answers 401 and a delete 404. The provider sends the
+  configured `teamId`, or the API key's only team, on every call.
+- A firewall rule create answers `subnet_size` as a string; a GET answers a number. `FlexInt`
+  decodes both.
+- Bursts of reads answer 503. GET, PUT and DELETE retry with exponential backoff; POST and PATCH
+  never retry.

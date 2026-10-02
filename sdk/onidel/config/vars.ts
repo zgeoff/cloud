@@ -30,7 +30,7 @@ Object.defineProperty(exports, "endpoint", {
 });
 
 /**
- * Team ID to act in. When unset, the API's default team is used; SSH keys, which need an explicit team, use the caller's only team.
+ * Team ID to act in. When unset, the provider uses the API key's only team.
  */
 export declare const teamId: string | undefined;
 Object.defineProperty(exports, "teamId", {

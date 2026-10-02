@@ -10,4 +10,5 @@ mv sdk/.gen/nodejs sdk/onidel
 rm -rf sdk/.gen
 jq '.main = "bin/index.js" | .types = "bin/index.d.ts"' sdk/onidel/package.json > sdk/onidel/package.json.tmp
 mv sdk/onidel/package.json.tmp sdk/onidel/package.json
+bun install
 bun run sdk:build

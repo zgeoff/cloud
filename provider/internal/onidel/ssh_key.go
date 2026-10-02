@@ -60,7 +60,7 @@ func (SSHKey) Read(
 	ctx context.Context, req infer.ReadRequest[SSHKeyArgs, SSHKeyState],
 ) (infer.ReadResponse[SSHKeyArgs, SSHKeyState], error) {
 	api, cfg := getClient(ctx)
-	key, err := api.ReadSSHKey(ctx, req.ID, cfg.TeamID)
+	key, err := api.ReadSSHKey(ctx, req.ID, cfg.teamID)
 	if client.IsNotFound(err) {
 		return infer.ReadResponse[SSHKeyArgs, SSHKeyState]{}, nil
 	}
@@ -96,7 +96,7 @@ func (SSHKey) Update(
 // Delete removes the key.
 func (SSHKey) Delete(ctx context.Context, req infer.DeleteRequest[SSHKeyState]) (infer.DeleteResponse, error) {
 	api, cfg := getClient(ctx)
-	err := api.RemoveSSHKey(ctx, req.ID, cfg.TeamID)
+	err := api.RemoveSSHKey(ctx, req.ID, cfg.teamID)
 	if client.IsNotFound(err) {
 		err = nil
 	}

@@ -37,6 +37,8 @@ type Client struct {
 	http    *http.Client
 	// PollInterval is how long the wait helpers sleep between reads.
 	PollInterval time.Duration
+	// RetryBase is the first backoff for a retried request; it doubles per retry.
+	RetryBase time.Duration
 }
 
 // New returns a client for baseURL (DefaultBaseURL when empty).
@@ -49,6 +51,7 @@ func New(baseURL, apiKey string) *Client {
 		apiKey:       apiKey,
 		http:         &http.Client{Timeout: 60 * time.Second},
 		PollInterval: DefaultPollInterval,
+		RetryBase:    500 * time.Millisecond,
 	}
 }
 
@@ -79,7 +82,46 @@ func IsNotFound(err error) bool {
 // non-nil, receives the decoded response. The raw response bytes are returned only
 // for callers in this package that must sniff an undocumented body; they are never
 // logged or put into an error.
+//
+// Onidel answers bursts (a parallel Pulumi refresh) with 503. Idempotent requests
+// (GET, PUT, DELETE) retry on 429, 502, 503 and 504 with exponential backoff; a POST
+// or PATCH never retries, so it cannot run twice.
 func (c *Client) sendRequest(
+	ctx context.Context, method, path string, query url.Values, body, out any,
+) ([]byte, error) {
+	for attempt := 0; ; attempt++ {
+		raw, err := c.sendOnce(ctx, method, path, query, body, out)
+		if !shouldRetry(method, err) || attempt >= maxRetries {
+			return raw, err
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(c.RetryBase << attempt):
+		}
+	}
+}
+
+const maxRetries = 4
+
+func shouldRetry(method string, err error) bool {
+	var apiErr *APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	switch method {
+	case http.MethodGet, http.MethodPut, http.MethodDelete:
+	default:
+		return false
+	}
+	switch apiErr.Status {
+	case http.StatusTooManyRequests, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout:
+		return true
+	}
+	return false
+}
+
+func (c *Client) sendOnce(
 	ctx context.Context, method, path string, query url.Values, body, out any,
 ) ([]byte, error) {
 	target := c.baseURL + path

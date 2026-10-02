@@ -60,7 +60,7 @@ func (FirewallRule) Create(
 	api, cfg := getClient(ctx)
 	in := req.Inputs
 	rule, err := api.CreateFirewallRule(ctx, in.FirewallID, client.FirewallRuleInput{
-		TeamID:      cfg.TeamID,
+		TeamID:      cfg.teamID,
 		Protocol:    in.Protocol,
 		Port:        getOrDefault(in.Port, ""),
 		Subnet:      in.Subnet,
@@ -85,7 +85,7 @@ func (FirewallRule) Read(
 		return infer.ReadResponse[FirewallRuleArgs, FirewallRuleState]{}, err
 	}
 	api, cfg := getClient(ctx)
-	rule, err := api.ReadFirewallRule(ctx, firewallID, ruleID, cfg.TeamID)
+	rule, err := api.ReadFirewallRule(ctx, firewallID, ruleID, cfg.teamID)
 	if client.IsNotFound(err) {
 		return infer.ReadResponse[FirewallRuleArgs, FirewallRuleState]{}, nil
 	}
@@ -112,7 +112,7 @@ func (FirewallRule) Update(
 		return infer.UpdateResponse[FirewallRuleState]{}, err
 	}
 	api, cfg := getClient(ctx)
-	err = api.UpdateFirewallRuleDescription(ctx, firewallID, ruleID, cfg.TeamID, getOrDefault(req.Inputs.Description, ""))
+	err = api.UpdateFirewallRuleDescription(ctx, firewallID, ruleID, cfg.teamID, getOrDefault(req.Inputs.Description, ""))
 	if err != nil {
 		return infer.UpdateResponse[FirewallRuleState]{}, err
 	}
@@ -126,7 +126,7 @@ func (FirewallRule) Delete(ctx context.Context, req infer.DeleteRequest[Firewall
 		return infer.DeleteResponse{}, err
 	}
 	api, cfg := getClient(ctx)
-	err = api.RemoveFirewallRule(ctx, firewallID, ruleID, cfg.TeamID)
+	err = api.RemoveFirewallRule(ctx, firewallID, ruleID, cfg.teamID)
 	if client.IsNotFound(err) {
 		err = nil
 	}
@@ -168,7 +168,7 @@ func buildFirewallRuleState(in FirewallRuleArgs, firewallID string, rule client.
 			Protocol:    protocol,
 			Port:        port,
 			Subnet:      rule.Subnet,
-			SubnetSize:  rule.SubnetSize,
+			SubnetSize:  int(rule.SubnetSize),
 			Description: desc,
 		},
 		RuleID: rule.ID,

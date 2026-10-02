@@ -32,8 +32,7 @@ type Config struct {
 func (c *Config) Annotate(a infer.Annotator) {
 	a.Describe(&c.APIKey, "Onidel API key. Falls back to the "+APIKeyEnv+" environment variable.")
 	a.SetDefault(&c.APIKey, nil, APIKeyEnv)
-	a.Describe(&c.TeamID, "Team ID to act in. When unset, the API's default team is used; "+
-		"SSH keys, which need an explicit team, use the caller's only team.")
+	a.Describe(&c.TeamID, "Team ID to act in. When unset, the provider uses the API key's only team.")
 	a.Describe(&c.Endpoint, "API base URL. Defaults to "+client.DefaultBaseURL+".")
 }
 
@@ -49,19 +48,24 @@ func (c *Config) Configure(context.Context) error {
 	return nil
 }
 
-// getClient returns the configured API client and the configured team.
+// getClient returns the configured API client and the config, with the team
+// resolved. Onidel rejects writes without a team_id (401 on create, 404 on
+// delete), so every call carries one. A failed lookup leaves the team empty, and
+// the call then fails with the API's own error.
 func getClient(ctx context.Context) (*client.Client, *Config) {
 	cfg := infer.GetConfig[*Config](ctx)
+	_, _ = cfg.resolveTeamID(ctx)
 	return cfg.client, cfg
 }
 
 // resolveTeamID returns the team for endpoints that require one: the configured
 // teamId, or the caller's only team.
 func (c *Config) resolveTeamID(ctx context.Context) (string, error) {
-	if c.TeamID != "" {
-		return c.TeamID, nil
-	}
 	c.teamOnce.Do(func() {
+		if c.TeamID != "" {
+			c.teamID = c.TeamID
+			return
+		}
 		teams, err := c.client.ReadTeams(ctx)
 		switch {
 		case err != nil:

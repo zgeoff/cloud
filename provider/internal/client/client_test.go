@@ -108,3 +108,43 @@ func TestWaitForVMReadyFailsOnTerminalStatus(t *testing.T) {
 	_, err := c.WaitForVMReady(context.Background(), "x", "")
 	require.ErrorContains(t, err, "awaiting_payment")
 }
+
+func TestSendRequestRetriesIdempotentRequestsOn503(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		if calls < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "key")
+	c.RetryBase = time.Millisecond
+
+	if _, err := c.ReadTeams(context.Background()); err != nil {
+		t.Fatalf("ReadTeams after two 503s: %v", err)
+	}
+	if calls != 3 {
+		t.Fatalf("calls = %d, want 3", calls)
+	}
+}
+
+func TestSendRequestNeverRetriesAPost(t *testing.T) {
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+	c := New(srv.URL, "key")
+	c.RetryBase = time.Millisecond
+
+	if _, err := c.CreateFirewallGroup(context.Background(), FirewallGroupInput{Description: "x"}); err == nil {
+		t.Fatal("CreateFirewallGroup succeeded on 503")
+	}
+	if calls != 1 {
+		t.Fatalf("calls = %d, want 1", calls)
+	}
+}

@@ -16,9 +16,12 @@ export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
   },
+
+  // Each tag also owns itself: Pulumi's OAuth client carries tag:cloud and tag:imp,
+  // and a client may mint keys only for tags its own tags own.
   tagOwners: {
-    'tag:cloud': ['autogroup:admin'],
-    'tag:imp': ['autogroup:admin'],
+    'tag:cloud': ['autogroup:admin', 'tag:cloud'],
+    'tag:imp': ['autogroup:admin', 'tag:imp'],
   },
   grants: [
     // members reach every device; tagged nodes get only what a grant gives them

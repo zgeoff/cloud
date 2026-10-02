@@ -28,7 +28,7 @@ export class Provider extends pulumi.ProviderResource {
      */
     declare public readonly endpoint: pulumi.Output<string | undefined>;
     /**
-     * Team ID to act in. When unset, the API's default team is used; SSH keys, which need an explicit team, use the caller's only team.
+     * Team ID to act in. When unset, the provider uses the API key's only team.
      */
     declare public readonly teamId: pulumi.Output<string | undefined>;
 
@@ -67,7 +67,7 @@ export interface ProviderArgs {
      */
     endpoint?: pulumi.Input<string | undefined>;
     /**
-     * Team ID to act in. When unset, the API's default team is used; SSH keys, which need an explicit team, use the caller's only team.
+     * Team ID to act in. When unset, the provider uses the API key's only team.
      */
     teamId?: pulumi.Input<string | undefined>;
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -170,6 +171,11 @@ func newFakeAPI(t *testing.T) (*fakeAPI, *httptest.Server) {
 
 	mux.HandleFunc("POST /network/firewalls", f.withLock(func(w http.ResponseWriter, r *http.Request) {
 		body := f.record(r)
+		// the live API answers 401, not 400, when team_id is missing (checked 2026-10-02)
+		if body["team_id"] == nil || body["team_id"] == "" {
+			writeFakeJSON(w, 401, map[string]any{"err": "UNAUTHORIZED"})
+			return
+		}
 		group := map[string]any{
 			"id": f.nextID(), "description": body["description"], "created": "2026-10-02T00:00:00Z",
 			"updated": "2026-10-02T00:00:00Z", "instance_count": 0, "rule_count": 0,
@@ -219,7 +225,10 @@ func newFakeAPI(t *testing.T) (*fakeAPI, *httptest.Server) {
 			"desc": body["desc"],
 		}
 		f.rules[rule["id"].(string)] = rule
-		writeFakeJSON(w, 201, map[string]any{"firewall_rule": rule})
+		// the live API answers a create with subnet_size as a string (checked 2026-10-02)
+		created := maps.Clone(rule)
+		created["subnet_size"] = fmt.Sprint(rule["subnet_size"])
+		writeFakeJSON(w, 201, map[string]any{"firewall_rule": created})
 	}))
 	mux.HandleFunc("GET /network/firewalls/{id}/rules/{rule}", f.withLock(func(w http.ResponseWriter, r *http.Request) {
 		f.record(r)

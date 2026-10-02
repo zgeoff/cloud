@@ -48,7 +48,7 @@ func (RDNS) Create(ctx context.Context, req infer.CreateRequest[RDNSArgs]) (infe
 		return infer.CreateResponse[RDNSState]{Output: state}, nil
 	}
 	api, cfg := getClient(ctx)
-	if err := api.UpdateRDNS(ctx, req.Inputs.VMID, cfg.TeamID, req.Inputs.IP, req.Inputs.Domain); err != nil {
+	if err := api.UpdateRDNS(ctx, req.Inputs.VMID, cfg.teamID, req.Inputs.IP, req.Inputs.Domain); err != nil {
 		return infer.CreateResponse[RDNSState]{}, err
 	}
 	return infer.CreateResponse[RDNSState]{ID: req.Inputs.VMID + "/" + req.Inputs.IP, Output: state}, nil
@@ -63,7 +63,7 @@ func (RDNS) Read(
 		return infer.ReadResponse[RDNSArgs, RDNSState]{}, err
 	}
 	api, cfg := getClient(ctx)
-	records, err := api.ReadRDNS(ctx, vmID, cfg.TeamID)
+	records, err := api.ReadRDNS(ctx, vmID, cfg.teamID)
 	if client.IsNotFound(err) {
 		return infer.ReadResponse[RDNSArgs, RDNSState]{}, nil
 	}
@@ -90,7 +90,7 @@ func (RDNS) Update(
 		return infer.UpdateResponse[RDNSState]{Output: state}, nil
 	}
 	api, cfg := getClient(ctx)
-	if err := api.UpdateRDNS(ctx, req.Inputs.VMID, cfg.TeamID, req.Inputs.IP, req.Inputs.Domain); err != nil {
+	if err := api.UpdateRDNS(ctx, req.Inputs.VMID, cfg.teamID, req.Inputs.IP, req.Inputs.Domain); err != nil {
 		return infer.UpdateResponse[RDNSState]{}, err
 	}
 	return infer.UpdateResponse[RDNSState]{Output: state}, nil
@@ -103,7 +103,7 @@ func (RDNS) Delete(ctx context.Context, req infer.DeleteRequest[RDNSState]) (inf
 		return infer.DeleteResponse{}, err
 	}
 	api, cfg := getClient(ctx)
-	err = api.RemoveRDNS(ctx, vmID, cfg.TeamID, ip)
+	err = api.RemoveRDNS(ctx, vmID, cfg.teamID, ip)
 	if client.IsNotFound(err) {
 		err = nil
 	}

@@ -44,7 +44,7 @@ export const tailnetPolicyID = policy.id;
 const hostKey = new TailnetKey(
   'geoffcloud-host',
   {
-    description: 'geoffcloud host join (#6)',
+    description: 'geoffcloud host join',
     tags: ['tag:cloud'],
     reusable: false,
     ephemeral: false,

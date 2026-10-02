@@ -58,15 +58,15 @@ func (c *Client) RemoveFirewallGroup(ctx context.Context, id, teamID string) err
 
 // FirewallRule is one allow rule in a group.
 type FirewallRule struct {
-	ID          string `json:"id"`
-	Group       string `json:"group"`
-	IPType      string `json:"ip_type"`
-	Action      string `json:"action"`
-	Protocol    string `json:"protocol"`
-	Port        string `json:"port"`
-	Subnet      string `json:"subnet"`
-	SubnetSize  int    `json:"subnet_size"`
-	Description string `json:"desc"`
+	ID          string  `json:"id"`
+	Group       string  `json:"group"`
+	IPType      string  `json:"ip_type"`
+	Action      string  `json:"action"`
+	Protocol    string  `json:"protocol"`
+	Port        string  `json:"port"`
+	Subnet      string  `json:"subnet"`
+	SubnetSize  FlexInt `json:"subnet_size"`
+	Description string  `json:"desc"`
 }
 
 // FirewallRuleInput is the body of a rule create.

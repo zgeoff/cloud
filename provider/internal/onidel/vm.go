@@ -101,7 +101,7 @@ func (VM) Create(ctx context.Context, req infer.CreateRequest[VMArgs]) (infer.Cr
 
 	api, cfg := getClient(ctx)
 	vm, err := api.CreateVM(ctx, client.VMInput{
-		TeamID:             cfg.TeamID,
+		TeamID:             cfg.teamID,
 		Name:               in.Name,
 		PaymentCycle:       getOrDefault(in.PaymentCycle, ""),
 		InstanceType:       getOrDefault(in.InstanceType, ""),
@@ -133,7 +133,7 @@ func (VM) Create(ctx context.Context, req infer.CreateRequest[VMArgs]) (infer.Cr
 // Read refreshes the VM, or adopts one by ID for `pulumi import`.
 func (VM) Read(ctx context.Context, req infer.ReadRequest[VMArgs, VMState]) (infer.ReadResponse[VMArgs, VMState], error) {
 	api, cfg := getClient(ctx)
-	vm, err := api.ReadVM(ctx, req.ID, cfg.TeamID)
+	vm, err := api.ReadVM(ctx, req.ID, cfg.teamID)
 	if client.IsNotFound(err) {
 		return infer.ReadResponse[VMArgs, VMState]{}, nil
 	}
@@ -218,8 +218,8 @@ func (VM) Update(ctx context.Context, req infer.UpdateRequest[VMArgs, VMState]) 
 	}
 
 	api, cfg := getClient(ctx)
-	patches := planVMPatches(old, next, cfg.TeamID)
-	vm, err := api.ReadVM(ctx, req.ID, cfg.TeamID)
+	patches := planVMPatches(old, next, cfg.teamID)
+	vm, err := api.ReadVM(ctx, req.ID, cfg.teamID)
 	for _, patch := range patches {
 		if err != nil {
 			break
@@ -235,7 +235,7 @@ func (VM) Update(ctx context.Context, req infer.UpdateRequest[VMArgs, VMState]) 
 // Delete destroys the VM and waits until it is gone.
 func (VM) Delete(ctx context.Context, req infer.DeleteRequest[VMState]) (infer.DeleteResponse, error) {
 	api, cfg := getClient(ctx)
-	return infer.DeleteResponse{}, api.RemoveVM(ctx, req.ID, cfg.TeamID)
+	return infer.DeleteResponse{}, api.RemoveVM(ctx, req.ID, cfg.teamID)
 }
 
 // planVMPatches turns an input change into the PATCH actions that apply it.
