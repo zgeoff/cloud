@@ -189,13 +189,17 @@ func (c *Client) RemoveVM(ctx context.Context, id, teamID string) error {
 		return err
 	}
 	return c.waitFor(ctx, VMWaitTimeout, func() (bool, error) {
-		_, err := c.ReadVM(ctx, id, teamID)
+		vm, err := c.ReadVM(ctx, id, teamID)
 		if IsNotFound(err) {
 			return true, nil
 		}
-		return false, err
+		// Undocumented: a destroyed VM may stay listed under a terminal status.
+		return err == nil && goneVMStatuses[vm.Status], err
 	})
 }
+
+// VM statuses that mean the VM is destroyed, should the API keep listing it.
+var goneVMStatuses = map[string]bool{"terminated": true, "deleted": true, "destroyed": true}
 
 // VM statuses that settle into active on their own.
 var transientVMStatuses = map[string]bool{
