@@ -5,10 +5,12 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-03): A1 is done: geoffcloud runs imp 0.17.0 (system-6, fccc6fc), with impd
-healthy, `inet imp-forward` live and k3s unchanged. B3 has run once, ahead of B2, with the 2.10.0
-stand-in binary (run 37044948105). C3's R2 bucket, key and restic password exist in 1Password; C4's
-GitHub token exists, unused. Nothing else below has run. Published, both public:
+Current state (2026-10-03): A1 is done: geoffcloud runs imp 0.20.0 (system-7, a2c5fdb), with impd
+healthy, the Firecracker jailer on, `inet imp-forward` live and k3s unchanged. A copy of impd's
+0.17.0 database is in `/root/imp-db-backups/` on the host, for a rollback to `system-6`. B3 has run
+once, ahead of B2, with the 2.10.0 stand-in binary (run 37044948105). C3's R2 bucket, key and restic
+password exist in 1Password; C4's GitHub token exists, unused. Nothing else below has run.
+Published, both public:
 
 - `ghcr.io/zgeoff/atc-gateway:2.10.0@sha256:86cd2af8f297cb5143cee19e71b921d6ba0bc3e3a004d6498be7533b34a068be`
   **FIXTURE STAND-IN, NOT USABLE AS THE PRODUCTION GATEWAY.** It holds atc 2.10.0's `atc` binary.
