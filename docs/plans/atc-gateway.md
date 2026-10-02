@@ -1,13 +1,41 @@
 # Plan: atc-gateway on geoffcloud
 
-Status: **plan only, provisional.** The gateway does not exist yet (atc builds it as layer 7 of its
-integration stack). Nothing here is deployed. Every step that adds a listener, a credential, a
-tailnet grant, a DNS record or an OAuth change waits for Geoff's approval of the exact setup; the
-[approval list](#approval-list-for-geoff) collects them.
+Status: **validated package, not deployed.** The gateway binary does not exist yet (atc builds it as
+layer 7 of its integration stack). The package below is validated locally and in CI, with atc
+2.10.0's `atc mcp --http` standing in for the gateway. Every step that adds a listener, a
+credential, a tailnet grant, a DNS record or an OAuth change waits for Geoff's approval:
+[the operator checklist](../runbooks/atc-gateway-operator-checklist.md) orders them.
 
 Sources: atc's provisional interface facts and imp's answers from imp main 43f22974 (2026-10-03),
 and the live cluster as checked on 2026-10-03. Facts marked _draft_ come from designs that are not
 merged.
+
+## The package
+
+| Part                                                  | File                                                                                                                                    | Validated by                                       |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Pins (atc release, checksum, base and restic digests) | `deploy/atc-gateway/versions.env`                                                                                                       | the fixture test                                   |
+| Gateway image                                         | `deploy/atc-gateway/Dockerfile`, `scripts/fetch-atc-release.sh`                                                                         | the fixture test                                   |
+| Backup image and script                               | `deploy/atc-gateway/backup/`                                                                                                            | the fixture test (backup, wipe, restore)           |
+| k3s workload, off by default                          | `infra/atc-gateway.ts`, `infra/build-atc-gateway-spec.ts`, `infra/create-atc-gateway-backup-job.ts`, `infra/load-atc-gateway-inputs.ts` | `bun run preview`, off and on                      |
+| Restore Job                                           | `deploy/atc-gateway/restore-job.yaml`                                                                                                   | client dry run                                     |
+| Cloud daemon, off and not imported                    | `nixos/modules/atc-daemon.nix`                                                                                                          | `nix build ./nixos#checks.x86_64-linux.atc-daemon` |
+| Image CI, publish on demand                           | `.github/workflows/atc-gateway-images.yml`                                                                                              | its own run                                        |
+| Readiness checks                                      | `scripts/check-atc-gateway-readiness.sh`                                                                                                | run against the live cluster                       |
+| Backup and restore                                    | `docs/runbooks/atc-gateway-backup-restore.md`                                                                                           | the fixture test                                   |
+| Operator checklist                                    | `docs/runbooks/atc-gateway-operator-checklist.md`                                                                                       | —                                                  |
+
+### Contract facts found in atc's code (2.10.0)
+
+- The server answers only requests whose Host is its public host, `127.0.0.1:<port>`,
+  `localhost:<port>` or an allowed host; any other Host gets 403. So the probes send the public
+  Host, and cloudflared keeps sending it (`httpHostHeader`).
+- A non-loopback bind needs an https public URL behind a TLS-terminating proxy or tunnel.
+- State lives in `$HOME/.local/state/atc` (`mcp-auth.db`, `atc.db`); config in `$HOME/.config/atc`,
+  which atc writes at start; sockets in `$XDG_RUNTIME_DIR`. With a read-only root, each needs its
+  own writable volume.
+- A compiled Bun binary extracts native code to `/tmp` and maps it, so `/tmp` must allow exec. A
+  Docker tmpfs does not by default; a k8s emptyDir does.
 
 ## Shape
 
@@ -77,7 +105,7 @@ Two SQLite files, each under 100 MB, both secret-bearing:
 | ---------------------------------- | ------ | --------------------------------------------- |
 | `--public-url`                     | no     | `https://atc.geoff.cloud`                     |
 | `--host`, `--port`                 | no     | pod IP (`0.0.0.0`), 8414                      |
-| state dir                          | no     | `/var/lib/atc-gateway` (the PVC)              |
+| state dir                          | no     | `/home/nonroot/.local/state/atc` (the claim)  |
 | daemon registry (name → host:port) | no     | ConfigMap from Pulumi                         |
 | default daemon                     | no     | ConfigMap                                     |
 | bearer token per daemon            | yes    | 1Password `cloud` vault → k8s Secret (Pulumi) |
@@ -158,36 +186,11 @@ no subscription credentials copied from the PC.
 - **Harness login.** imp's `anthropic` broker kind is an API key, not a subscription login. How a
   harness signs in is open and researched separately in the integration review.
 
-## Order of work
+## Order of work and approvals
 
-1. **Now (no approval needed):** this plan, the templates below, and the readiness check script.
-2. **When atc's gateway PR lands:** fill in env var names and ports; build and push the image (CI in
-   this repo). Nothing runs yet.
-3. **After Geoff approves the exact setup:** in one Pulumi change, with a preview first: namespace,
-   StorageClass, PVC, Secret, ConfigMap, Deployment, Service, the tailnet tag and grants, the tunnel
-   ingress, the DNS record, the backup CronJob. Then the restore test.
-4. **Cutover (atc and Geoff):** re-add the OAuth clients against the new issuer, move the clients,
-   retire the PC origin.
-
-## Approval list for Geoff
-
-Each item is a separate yes or no. None is done.
-
-1. **New hostname** `atc.geoff.cloud` on the existing tunnel (DNS record + tunnel ingress). Free.
-2. **OAuth issuer move** to `https://atc.geoff.cloud`: every client re-registers and grants are
-   issued again (atc's step, your access change).
-3. **Tailnet grants:** `tag:cloud → tag:imp:7070` (the cloud daemon drives impd). Later, for the PC
-   daemon: a new `tag:atc-daemon` and `tag:cloud → tag:atc-daemon:8415`.
-4. **New listener** on each daemon host: tailnet tcp 8415.
-5. **New credentials**, all in the `cloud` vault:
-   - one bearer token per daemon (gateway → daemon);
-   - an impd token `atc-cloud`, scope `manage`, imps `harness-*`;
-   - a GitHub token for imp's broker, if imps self-clone (whose account, which repos, read-only);
-   - for the gateway's backups: a restic password, and either a new bucket with its own R2 key (R2
-     keys scope to a bucket, not a prefix) or the existing backups key (simpler, broader).
-6. **Snapshots** will contain the gateway's OAuth state once it runs. Accept, as for the k3s
-   datastore today, or decide otherwise.
-7. **Harness login method:** open; separate integration review.
+[The operator checklist](../runbooks/atc-gateway-operator-checklist.md) holds the ordered steps,
+what each waits on, the approval each needs and its effect. It is the single list; this plan does
+not repeat it.
 
 ## Readiness checks
 
@@ -196,120 +199,4 @@ exists, what is missing, nothing secret. It changes nothing.
 
 ## Templates
 
-These are the shapes for step 3. They are not wired into the Pulumi program.
-
-### Template: image build
-
-```dockerfile
-# docker/atc-gateway/Dockerfile — built by CI for a pinned atc release
-FROM gcr.io/distroless/cc-debian12:nonroot
-COPY atc-gateway /usr/local/bin/atc-gateway
-USER nonroot
-EXPOSE 8414
-ENTRYPOINT ["/usr/local/bin/atc-gateway"]
-```
-
-### Template: k3s workload (Pulumi, TypeScript)
-
-```ts
-// infra/atc-gateway.ts — sketch; flag names and env vars follow atc's gateway PR
-const ns = new k8s.core.v1.Namespace('atc', { metadata: { name: 'atc' } }, opts);
-
-const retain = new k8s.storage.v1.StorageClass(
-  'local-path-retain',
-  {
-    metadata: { name: 'local-path-retain' },
-    provisioner: 'rancher.io/local-path',
-    reclaimPolicy: 'Retain',
-    volumeBindingMode: 'WaitForFirstConsumer',
-  },
-  opts,
-);
-
-const state = new k8s.core.v1.PersistentVolumeClaim(
-  'atc-gateway-state',
-  {
-    metadata: { namespace: ns.metadata.name, name: 'atc-gateway-state' },
-    spec: {
-      storageClassName: retain.metadata.name,
-      accessModes: ['ReadWriteOnce'],
-      resources: { requests: { storage: '1Gi' } },
-    },
-  },
-  opts,
-);
-
-const tokens = new k8s.core.v1.Secret(
-  'atc-gateway-daemon-tokens',
-  {
-    metadata: { namespace: ns.metadata.name, name: 'atc-gateway-daemon-tokens' },
-    stringData: {
-      /* one entry per daemon, from op:// references */
-    },
-  },
-  opts,
-);
-
-new k8s.apps.v1.Deployment(
-  'atc-gateway',
-  {
-    metadata: { namespace: ns.metadata.name, name: 'atc-gateway' },
-    spec: {
-      replicas: 1,
-      strategy: { type: 'Recreate' },
-      selector: { matchLabels: { app: 'atc-gateway' } },
-      template: {
-        metadata: { labels: { app: 'atc-gateway' } },
-        spec: {
-          securityContext: { runAsNonRoot: true, fsGroup: 65532 },
-          containers: [
-            {
-              name: 'atc-gateway',
-              image: `ghcr.io/zgeoff/atc-gateway:${atcVersion}`,
-              args: [
-                '--host',
-                '0.0.0.0',
-                '--port',
-                '8414',
-                '--public-url',
-                'https://atc.geoff.cloud',
-              ],
-              ports: [{ containerPort: 8414 }],
-              envFrom: [{ secretRef: { name: tokens.metadata.name } }],
-              volumeMounts: [{ name: 'state', mountPath: '/var/lib/atc-gateway' }],
-              livenessProbe: { httpGet: { path: '/healthz', port: 8414 } },
-              readinessProbe: { httpGet: { path: '/readyz', port: 8414 } },
-              resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '256Mi' } },
-              securityContext: { readOnlyRootFilesystem: true, allowPrivilegeEscalation: false },
-            },
-          ],
-          volumes: [{ name: 'state', persistentVolumeClaim: { claimName: state.metadata.name } }],
-        },
-      },
-    },
-  },
-  opts,
-);
-```
-
-### Template: tunnel ingress and DNS
-
-```ts
-// added before the catch-all 404 in infra/index.ts
-{ hostname: 'atc.geoff.cloud', service: 'http://atc-gateway.atc.svc.cluster.local:8414' },
-
-new DnsRecord('atc', { zoneId, name: 'atc.geoff.cloud', type: 'CNAME',
-  content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`), proxied: true, ttl: 1 });
-```
-
-### Template: tailnet policy
-
-```ts
-tagOwners: { 'tag:atc-daemon': ['autogroup:admin', 'tag:atc-daemon'] },
-grants: [
-  // the cloud daemon (on the host, as tag:cloud) drives impd
-  { src: ['tag:cloud'], dst: ['tag:imp'], ip: ['tcp:7070'] },
-  // later: the gateway reaches a daemon on another machine (the PC)
-  { src: ['tag:cloud'], dst: ['tag:atc-daemon'], ip: ['tcp:8415'] },
-],
-```
+The sketches that stood here are replaced by the validated files in [the package](#the-package).

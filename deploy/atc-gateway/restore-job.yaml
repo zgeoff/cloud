@@ -1,0 +1,53 @@
+# One-off restore (or snapshot list) for the atc gateway's state. Stop the gateway
+# first (docs/runbooks/atc-gateway-backup-restore.md), set the image digest, the
+# command and SNAPSHOT, then:
+#   ssh root@geoffcloud k3s kubectl apply -f - < deploy/atc-gateway/restore-job.yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: atc-gateway-restore-
+  namespace: atc
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: restore
+          image: ghcr.io/zgeoff/atc-gateway-backup@sha256:REPLACE
+          # restore, or ls to list snapshots
+          args: ['restore']
+          env:
+            - name: STATE_DIR
+              value: /state
+            - name: HOME
+              value: /tmp
+            - name: SNAPSHOT
+              value: latest
+          envFrom:
+            - secretRef:
+                name: atc-gateway-backup
+          volumeMounts:
+            - name: state
+              mountPath: /state
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ['ALL']
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: atc-gateway-state
+        - name: tmp
+          emptyDir: {}
