@@ -5,5 +5,13 @@
     "node": true,
     "es2024": true
   },
-  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"]
+  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
+  "overrides": [
+    {
+      "files": ["infra/**/*.ts"],
+      "rules": {
+        "typescript/prefer-readonly-parameter-types": "off"
+      }
+    }
+  ]
 }

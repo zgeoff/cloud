@@ -9,6 +9,7 @@ import {
 import { secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
+import { createClusterWorkloads } from './cluster-workloads.ts';
 import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
@@ -176,3 +177,12 @@ export const mcpURL = mcpRecord.name.apply((name) => `https://${name}`);
 export const tunnelToken = secret(
   getZeroTrustTunnelCloudflaredTokenOutput({ accountId: accountID, tunnelId: tunnel.id }).token,
 );
+
+// k3s workloads, once the cluster exists (#6). K3S_KUBECONFIG comes from
+// op://cloud/k3s-kubeconfig; without it the program skips the cluster.
+const kubeconfig = process.env['K3S_KUBECONFIG'];
+
+export const cluster =
+  kubeconfig === undefined || kubeconfig === ''
+    ? undefined
+    : createClusterWorkloads({ kubeconfig, tunnelToken });
