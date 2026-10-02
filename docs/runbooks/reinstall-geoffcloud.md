@@ -18,15 +18,24 @@ the panel, so that you can restore the Ubuntu host.
 1. Turn off Secure Boot for the VM in the Onidel panel, then reboot the VM through the API. With
    Secure Boot on, kernel lockdown blocks the kexec that `nixos-anywhere` uses.
 2. Check from the host: `mokutil --sb-state` prints `SecureBoot disabled`.
-3. Run `bun run up -- --yes` first: the host key expires after 7 days, and an apply mints a fresh
-   one. Then stage the host's Tailscale key outside the repo:
+3. Run `bun run up -- --yes` first: the host keys expire after 7 days, and an apply mints fresh
+   ones. Then stage both tailnet keys outside the repo. The host's own node uses `hostAuthKey`
+   (tag:cloud). imp's node uses `impHostAuthKey` (tag:imp, not ephemeral), at the path that
+   `services.imp.tailscaleAuthKeyFile` expects:
 
    ```sh
-   mkdir -p /tmp/geoffcloud-extra/var/lib/tailscale
+   x=/tmp/geoffcloud-extra
+   mkdir -p $x/var/lib/tailscale $x/var/lib/imp-host/secrets
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets hostAuthKey) \
-     > /tmp/geoffcloud-extra/var/lib/tailscale/authkey
-   chmod 600 /tmp/geoffcloud-extra/var/lib/tailscale/authkey
+     > $x/var/lib/tailscale/authkey
+   (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impHostAuthKey) \
+     > $x/var/lib/imp-host/secrets/tailscale-authkey
+   chmod 600 $x/var/lib/tailscale/authkey
+   chmod 400 $x/var/lib/imp-host/secrets/tailscale-authkey
    ```
+
+   imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
+   warns.
 
 4. Install. `nixos-anywhere` runs from any machine with Nix or Docker:
 
