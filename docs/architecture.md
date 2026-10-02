@@ -55,8 +55,9 @@ ones:
   path because imp's bootstrap targets it; NixOS wins on reproducibility and on having modules for
   every part (ZFS, Docker, k3s, Tailscale). Talos was ruled out: it hosts only Kubernetes, and imp
   needs a mutable host with Docker, KVM and ZFS.
-- **Install:** `nixos-anywhere` over SSH, with `disko` for `vda` only. `vdb` is never in the disko
-  layout; NixOS imports imp's existing pool.
+- **Install:** `nixos-anywhere` over SSH, with `disko` for `vda` only. The runbook is
+  [reinstall-geoffcloud.md](./runbooks/reinstall-geoffcloud.md). `vdb` is never in the disko layout;
+  NixOS imports imp's existing pool.
 - **Kernel:** pinned to a version that the ZFS module supports.
 
 ### Workloads: imp on the host, the rest in k3s
@@ -109,9 +110,11 @@ start from an import of the live policy, with the diff reviewed by Geoff. Existi
 
 - **Outside the VM:** Onidel's cloud firewall allows Tailscale's UDP port (41641) and ICMP, and
   nothing else. It needs no host cooperation, so it cannot conflict with imp or k3s.
-- **On the host:** this repo owns the nftables table `inet cloud_host`. It never runs
-  `flush ruleset`. imp owns `inet imp_host` and `inet imp_egress`. k3s owns its own chains. The host
-  `FORWARD` chain is shared by Docker and k3s; imp checks it on the first NixOS boot.
+- **On the host:** the NixOS firewall, in its own table `inet nixos-fw`. It allows Tailscale's UDP
+  port in public and trusts `tailscale0` and the k3s interfaces. `networking.nftables.flushRuleset`
+  stays off, because the NixOS default flushes every table on reload. imp owns `inet imp_host` and
+  `inet imp_egress`, and k3s and Docker own their own chains. The host `FORWARD` chain is shared by
+  Docker and k3s; imp checks it on the first NixOS boot.
 
 ### Infrastructure as code: Pulumi in TypeScript, on Bun
 
@@ -167,11 +170,12 @@ committed: the repo is public, and gitleaks runs in lefthook and in CI.
 | Consumer            | RAM          |
 | ------------------- | ------------ |
 | imp guests and impd | 20 GiB       |
+| ZFS ARC (imp pool)  | about 3 GiB  |
 | NixOS host          | about 1 GiB  |
 | k3s                 | about 1 GiB  |
 | Observability       | about 1 GiB  |
 | cloudflared         | about 50 MiB |
-| Spare               | about 8 GiB  |
+| Spare               | about 5 GiB  |
 
 ## Repo layout
 
@@ -196,8 +200,9 @@ docs/          this page and the runbooks
 
 ## Risks and open questions
 
-- **kexec on Onidel.** `nixos-anywhere` boots its installer with kexec. Onidel offers measured boot,
-  which can block kexec. Fallback: upload a NixOS ISO through Onidel's API and install over noVNC.
+- **Secure Boot.** The VM boots UEFI with Secure Boot on. Kernel lockdown blocks the unsigned kexec
+  that `nixos-anywhere` uses, and the NixOS ISO is unsigned. Secure Boot goes off in the Onidel
+  panel for the install. `lanzaboote` can turn it back on later with our own keys.
 - **The ZFS kernel pin** can hold the kernel back behind the NixOS default.
 - **The shared `FORWARD` chain** between Docker and k3s may need an explicit rule.
 - **The ingress hop to the PC** needs the PC online and `tailscale serve` running. That is accepted

@@ -3,5 +3,10 @@
   "private": true,
   "description": "Pulumi program for geoff.cloud",
   "type": "module",
-  "main": "index.ts"
+  "main": "index.ts",
+  "dependencies": {
+    "@pulumi/cloudflare": "6.21.0",
+    "@pulumi/pulumi": "3.264.0",
+    "@pulumi/tailscale": "0.29.1"
+  }
 }

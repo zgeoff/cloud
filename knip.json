@@ -2,9 +2,11 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     "infra": {
-      "project": ["**/*.ts"]
+      "project": ["**/*.ts"],
+      "ignoreDependencies": ["@pulumi/pulumi"]
     }
   },
   "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],
-  "ignoreBinaries": ["go", "gofmt"]
+  "ignoreBinaries": ["go", "gofmt", "op", "pulumi"],
+  "ignore": [".claude/**"]
 }
