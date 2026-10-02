@@ -121,7 +121,7 @@
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned: the module's default is imp-host:latest, which moves on every imp release
     # and is not tied to the flake's pin of the module
-    image = "ghcr.io/zgeoff/imp-host:0.17.0@sha256:6de4e5a93d7392f40ecf6d20bd5711715ac7e14a55c90ff97c354677682d1185";
+    image = "ghcr.io/zgeoff/imp-host:0.20.0@sha256:87a9a5a30ff6c8987c7075602861414d56e4e3218d4ec387109263bb2f2ad3f6";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
