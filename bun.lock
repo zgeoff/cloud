@@ -26,6 +26,7 @@
         "@pulumi/cloudflare": "6.21.0",
         "@pulumi/kubernetes": "4.34.2",
         "@pulumi/pulumi": "3.264.0",
+        "@pulumi/random": "4.21.2",
         "@pulumi/tailscale": "0.29.1",
         "@zgeoff/pulumi-onidel": "workspace:*",
       },
@@ -400,6 +401,8 @@
     "@pulumi/kubernetes": ["@pulumi/kubernetes@4.34.2", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0", "glob": "^12.0.0", "shell-quote": "^1.6.1" } }, "sha512-OcIe8OUwivkEngmjinrmke54INbJ0L6u/CWm8mLh6F7pmIDXyHGTM8PzcZsg5QbSm24HnNUHLl2tEUoOBxDo3w=="],
 
     "@pulumi/pulumi": ["@pulumi/pulumi@3.264.0", "", { "dependencies": { "@grpc/grpc-js": "^1.10.1", "@logdna/tail-file": "^2.0.6", "@npmcli/arborist": "^9.0.0", "@opentelemetry/api": "^1.9", "@opentelemetry/core": "^2.9", "@opentelemetry/exporter-trace-otlp-grpc": "^0.220", "@opentelemetry/exporter-zipkin": "^2.9", "@opentelemetry/instrumentation": "^0.220", "@opentelemetry/instrumentation-grpc": "^0.220", "@opentelemetry/resources": "^2.9", "@opentelemetry/sdk-trace-base": "^2.9", "@opentelemetry/sdk-trace-node": "^2.9", "@opentelemetry/semantic-conventions": "^1.42", "@types/google-protobuf": "^3.15.5", "@types/semver": "^7.5.6", "execa": "^5.1.0", "google-protobuf": "^3.21.4", "ini": "^2.0.0", "js-yaml": "^4.3.2", "minimist": "^1.2.6", "normalize-package-data": "^6.0.0", "require-from-string": "^2.0.1", "semver": "^7.5.2", "source-map-support": "^0.5.6", "upath": "^1.1.0" }, "peerDependencies": { "ts-node": ">= 7.0.1 < 12", "typescript": ">= 3.8.3 < 7" }, "optionalPeers": ["ts-node", "typescript"] }, "sha512-XU9xl05RwO8J7UobJXKxGcmE063GNescXjKrQnUSdvAgbKXxdnSVqcglUPwyDyRFRlGdJ6HkuN26gdR9cEzfTA=="],
+
+    "@pulumi/random": ["@pulumi/random@4.21.2", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-yQVSPeQE55oqL4KHoWwKqTTTjx3jYGaJ3RCXnlUOcqmGW5zT3hmKWqAS+5nBYCtrVPA8J06UqjC1ZOrQP+Q5yg=="],
 
     "@pulumi/tailscale": ["@pulumi/tailscale@0.29.1", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-z+3emtm0ED4HiDEH+uR8v9MlZp7jchrVGpTpGshAZ4AaG0GEzAJ04HqEJM2n6GMcaGa15BIrwfKymFVrxm+Wlg=="],
 

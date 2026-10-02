@@ -1,8 +1,10 @@
 import { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import { Namespace, Secret } from '@pulumi/kubernetes/core/v1';
+import type { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { createObservability } from './observability.ts';
 
 // cloudflared's release; bump deliberately
 const cloudflaredImage = 'cloudflare/cloudflared:2026.9.3';
@@ -15,6 +17,9 @@ interface ClusterInputs {
 interface ClusterOutputs {
   readonly ingressNamespace: Output<string>;
   readonly cloudflared: Deployment;
+  readonly logShipper: Chart;
+  readonly grafanaURL: string;
+  readonly grafanaAdminPassword: Output<string>;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7, #8). Pulumi reaches the k3s API
@@ -48,7 +53,9 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     { provider: cluster },
   );
 
-  return { ingressNamespace: ingress.metadata.name, cloudflared };
+  const observability = createObservability(cluster);
+
+  return { ingressNamespace: ingress.metadata.name, cloudflared, ...observability };
 }
 
 function buildCloudflaredSpec(tokenSecret: Output<string>): input.apps.v1.DeploymentSpec {
