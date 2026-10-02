@@ -123,6 +123,8 @@
     tailscaleAuthKeyFile = "/var/lib/imp-host/secrets/tailscale-authkey";
     environmentFile = "/var/lib/imp-host/secrets/imp-host.env";
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
+    # the module's default ("imp") is taken in the tailnet
+    settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
   };
 
   services.k3s = {
