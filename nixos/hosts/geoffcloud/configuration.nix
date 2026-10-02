@@ -18,8 +18,6 @@
     supportedFilesystems = [ "zfs" ];
     # root is ext4; never force-import a pool another host may own
     zfs.forceImportRoot = false;
-    # imp's pool on vdb, created by imp's bootstrap (impd's root is tank/imp)
-    zfs.extraPools = [ "tank" ];
   };
 
   # Onidel gives a static address; no DHCP on this network
@@ -108,8 +106,20 @@
     useRoutingFeatures = "client";
   };
 
-  # imp-host runs on Docker, outside k3s
-  virtualisation.docker.enable = true;
+  # imp: impd and Firecracker in the imp-host container, outside k3s. The module
+  # runs Docker and imports tank (vdb); the secrets are staged at install (runbook).
+  services.imp = {
+    enable = true;
+    zfs = {
+      pool = "tank";
+      arcMaxMiB = 3206;
+    };
+    ramBudgetMiB = 20480;
+    hostFirewall = "none";
+    tailscaleAuthKeyFile = "/var/lib/imp-host/secrets/tailscale-authkey";
+    environmentFile = "/var/lib/imp-host/secrets/imp-host.env";
+    backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
+  };
 
   services.k3s = {
     enable = true;

@@ -7,18 +7,21 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # imp ships nixosModules.imp from its flake (in progress in zgeoff/imp).
-    # Uncomment once it exists, and import it in hosts/geoffcloud.
-    # imp.url = "github:zgeoff/imp";
+    # imp's host module (zgeoff/imp docs/guides/nixos.md); pinned by flake.lock
+    imp = {
+      url = "github:zgeoff/imp/48995873";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    { nixpkgs, disko, ... }:
+    { nixpkgs, disko, imp, ... }:
     {
       nixosConfigurations.geoffcloud = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         modules = [
           disko.nixosModules.disko
+          imp.nixosModules.imp
           ./hosts/geoffcloud/configuration.nix
           ./hosts/geoffcloud/disko.nix
         ];

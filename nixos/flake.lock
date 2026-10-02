@@ -20,6 +20,27 @@
         "type": "github"
       }
     },
+    "imp": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1790946858,
+        "narHash": "sha256-RHn19C+J9GE4H8rcgS+i55oS45LyvZwrlk45XKtAADE=",
+        "owner": "zgeoff",
+        "repo": "imp",
+        "rev": "48995873b9bbf1eb75755e77a252cb6615ef63f0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zgeoff",
+        "ref": "48995873",
+        "repo": "imp",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1790870687,
@@ -39,6 +60,7 @@
     "root": {
       "inputs": {
         "disko": "disko",
+        "imp": "imp",
         "nixpkgs": "nixpkgs"
       }
     }
