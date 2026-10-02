@@ -30,9 +30,19 @@ the panel, so that you can restore the Ubuntu host.
      > $x/var/lib/tailscale/authkey
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impHostAuthKey) \
      > $x/var/lib/imp-host/secrets/tailscale-authkey
+   op read op://cloud/imp-restic/password > $x/var/lib/imp-host/secrets/backup-password
+   printf '%s\n' \
+     "IMP_BACKUP_REPOSITORY=s3:$(op read op://cloud/r2-backups/endpoint)/geoff-cloud-backups/imp/geoffcloud" \
+     "AWS_ACCESS_KEY_ID=$(op read op://cloud/r2-backups/access-key-id)" \
+     "AWS_SECRET_ACCESS_KEY=$(op read op://cloud/r2-backups/secret-access-key)" \
+     "AWS_DEFAULT_REGION=auto" \
+     > $x/var/lib/imp-host/secrets/imp-host.env
    chmod 600 $x/var/lib/tailscale/authkey
-   chmod 400 $x/var/lib/imp-host/secrets/tailscale-authkey
+   chmod 400 $x/var/lib/imp-host/secrets/*
    ```
+
+   The three imp files map to `services.imp.tailscaleAuthKeyFile`, `services.imp.environmentFile` (a
+   Docker env file: `KEY=value`, no quotes) and `services.imp.backupPasswordFile`.
 
    imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
    warns.
