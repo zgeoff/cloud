@@ -26,5 +26,9 @@
           ./hosts/geoffcloud/disko.nix
         ];
       };
+
+      # atc's daemon, for a later host change (docs/plans/atc-gateway.md)
+      nixosModules.atc-daemon = ./modules/atc-daemon.nix;
+      checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs; };
     };
 }
