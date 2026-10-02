@@ -4,6 +4,10 @@
     "infra": {
       "project": ["**/*.ts"],
       "ignoreDependencies": ["@pulumi/pulumi"]
+    },
+    ".": {
+      "entry": ["workers/*/index.ts"],
+      "project": ["workers/**/*.ts"]
     }
   },
   "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],

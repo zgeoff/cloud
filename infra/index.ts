@@ -10,6 +10,7 @@ import { secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { createClusterWorkloads } from './cluster-workloads.ts';
+import { createHealthCheck } from './health-check.ts';
 import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
@@ -191,3 +192,13 @@ const workloads =
 
 export const grafanaURL = workloads?.grafanaURL;
 export const grafanaAdminPassword = workloads?.grafanaAdminPassword;
+
+// External health check (#8). ALERT_WEBHOOK_URL is optional; without it, state
+// changes show only in the Worker's logs.
+const healthCheck = await createHealthCheck({
+  accountID,
+  targets: [{ name: 'mcp', url: `https://${mcpHostname}/.well-known/oauth-protected-resource` }],
+  alertURL: process.env['ALERT_WEBHOOK_URL'],
+});
+
+export const healthCheckCron = healthCheck.schedules;

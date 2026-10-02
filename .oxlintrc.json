@@ -8,7 +8,7 @@
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [
     {
-      "files": ["infra/**/*.ts"],
+      "files": ["infra/**/*.ts", "workers/**/*.ts"],
       "rules": {
         "typescript/prefer-readonly-parameter-types": "off"
       }
