@@ -18,11 +18,12 @@
     "deadcode": "knip",
     "lint": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "lint:fix": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error --fix",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p sdk/onidel/tsconfig.json --noEmit",
     "format": "oxfmt . && format-codemod --quiet .",
     "format:check": "oxfmt --check . && format-codemod --check --quiet .",
     "provider:build": "cd provider && go build -o bin/pulumi-resource-onidel ./cmd/pulumi-resource-onidel",
     "provider:check": "test ! -f provider/go.mod || (cd provider && test -z \"$(gofmt -l .)\" && go vet ./... && go test ./...)",
+    "sdk:gen": "bun run provider:build && rm -rf sdk/onidel sdk/.gen && pulumi package gen-sdk ./provider/bin/pulumi-resource-onidel --language nodejs --version 0.1.0 --out sdk/.gen && mv sdk/.gen/nodejs sdk/onidel && rm -rf sdk/.gen",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
     "preview": "cd infra && op run --env-file=../.env -- pulumi preview --stack prod",
     "up": "cd infra && op run --env-file=../.env -- pulumi up --stack prod"

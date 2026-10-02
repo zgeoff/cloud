@@ -8,5 +8,6 @@
   },
   "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],
   "ignoreBinaries": ["go", "gofmt", "op", "pulumi"],
-  "ignore": [".claude/**"]
+  "ignore": [".claude/**"],
+  "ignoreWorkspaces": ["sdk/*"]
 }

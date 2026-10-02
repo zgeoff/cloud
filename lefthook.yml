@@ -14,6 +14,10 @@ pre-commit:
       stage_fixed: true
     - name: format-codemod
       glob: '*.ts'
+      # the generated SDK is in .formatignore; with only SDK files staged,
+      # format-codemod would exit 2 on "no files matched"
+      exclude:
+        - 'sdk/**'
       run: node_modules/.bin/format-codemod --quiet {staged_files}
       stage_fixed: true
     - name: gofmt

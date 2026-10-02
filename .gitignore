@@ -3,3 +3,5 @@ node_modules/
 .claude/settings.local.json
 .worktrees/
 .claude/worktrees/
+provider/bin/
+sdk/.gen/
