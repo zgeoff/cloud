@@ -12,6 +12,8 @@ export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs
     return {};
   }
 
+  requireRealGateway(config.image);
+
   const tokens = parseTokens(process.env['ATC_GATEWAY_DAEMON_TOKENS'] ?? '{}');
   const backup = findBackupSecrets();
 
@@ -26,6 +28,16 @@ export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs
       },
     },
   };
+}
+
+// atc-gateway:2.10.0 holds atc 2.10.0's `atc` binary, published for the fixture
+// only; it is not the gateway
+const standInDigest = 'sha256:86cd2af8f297cb5143cee19e71b921d6ba0bc3e3a004d6498be7533b34a068be';
+
+function requireRealGateway(image: string): void {
+  if (image.includes(standInDigest) || image.endsWith('atc-gateway:2.10.0')) {
+    throw new Error(`${image} is the fixture stand-in, not the gateway; wait for atc's release`);
+  }
 }
 
 function parseTokens(raw: string): Record<string, string> {
