@@ -46,20 +46,24 @@ the panel, so that you can restore the Ubuntu host.
 
 The Pulumi program skips every k3s workload until `K3S_KUBECONFIG` is set.
 
-1. Store the kubeconfig in 1Password, with the server set to the host's tailnet name:
-
-   ```sh
-   ssh root@geoffcloud cat /etc/rancher/k3s/k3s.yaml \
-     | sed 's#https://127.0.0.1:6443#https://geoffcloud:6443#' \
-     | op document create --vault cloud --title k3s-kubeconfig --file-name kubeconfig.yaml -
-   ```
-
-2. Add `K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml` to `.env`. A document resolves by
-   its file name. Do this only after the item exists: `op run` fails on a reference it cannot
-   resolve.
-3. `bun run up -- --yes` deploys cloudflared, Prometheus, Grafana, Loki and Alloy.
-4. Grafana is at `http://geoffcloud:30300` on the tailnet. The admin password is the
+1. Run `bash scripts/connect-k3s.sh`. It stores the kubeconfig as the document
+   `op://cloud/k3s-kubeconfig/kubeconfig.yaml`, with the server set to `https://geoffcloud:6443`,
+   and adds the reference to `.env`.
+2. Run `bun run up -- --yes`. It deploys cloudflared, Prometheus, Grafana, Loki and Alloy.
+3. Grafana is at `http://geoffcloud:30300` on the tailnet. The admin password is the
    `grafanaAdminPassword` stack output.
+
+## Close public SSH
+
+Do this only after `ssh root@geoffcloud` works over the tailnet.
+
+**CAUTION:** Onidel's firewall semantics are not tested: if it drops reply traffic, the host can
+lose its public network. Take an Onidel snapshot first, and keep the noVNC console at hand.
+
+1. `cd infra && op run --env-file=../.env -- pulumi config set --stack prod hostOnTailnet true`
+2. `bun run up -- --yes`. It attaches the `edge` firewall to the VM and removes its SSH rules.
+3. Check: `ssh root@geoffcloud` still works, `ssh root@104.250.100.18` times out, and
+   `tailscale ping geoffcloud` answers.
 
 ## If kexec still fails
 

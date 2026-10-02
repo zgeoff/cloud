@@ -7,7 +7,7 @@ import {
   getZoneOutput,
 } from '@pulumi/cloudflare';
 import { Command } from '@pulumi/command/local';
-import { secret } from '@pulumi/pulumi';
+import { Config, secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { createClusterWorkloads } from './cluster-workloads.ts';
@@ -91,6 +91,16 @@ export const impKeySyncID = impKeySync.id;
 // The Onidel VM, made by hand on 2026-10-02 and adopted here (#4). Every input but
 // the name replaces the VM, so protect and retainOnDelete keep a typo from
 // destroying it. vdb (the 200 GB volume for imp's pool) has no API and is manual.
+// Set once the NixOS host answers tailnet SSH (`pulumi config set hostOnTailnet true`):
+// the edge firewall attaches to the VM and public SSH leaves it.
+const hostOnTailnet = new Config().getBoolean('hostOnTailnet') ?? false;
+
+// Onidel's cloud firewall, outside the VM. Attaching it closes every port it does
+// not list.
+const edge = new FirewallGroup('edge', { description: 'geoff.cloud edge' });
+
+export const edgeFirewallID = edge.id;
+
 const geoffcloud = new Vm(
   'geoffcloud',
   {
@@ -102,6 +112,7 @@ const geoffcloud = new Vm(
 
     // Ubuntu 26.04 LTS x64; the NixOS reinstall (#6) does not go through this field
     os: 24,
+    ...(hostOnTailnet ? { firewallGroupId: edge.id } : {}),
   },
   {
     import: '0f289413-258f-4115-ac81-252000998fe0',
@@ -112,12 +123,6 @@ const geoffcloud = new Vm(
 
 export const geoffcloudIPv4 = geoffcloud.mainIpv4;
 
-// Onidel's cloud firewall, outside the VM. Not attached yet: attaching it to the
-// VM (firewallGroupId) closes every port it does not list.
-const edge = new FirewallGroup('edge', { description: 'geoff.cloud edge' });
-
-export const edgeFirewallID = edge.id;
-
 interface EdgeRule {
   readonly name: string;
   readonly protocol: string;
@@ -127,7 +132,9 @@ interface EdgeRule {
 
 const edgeRules: readonly EdgeRule[] = [
   // SSH stays public until tailnet SSH works on the NixOS host (#6)
-  { name: 'ssh', protocol: 'tcp', port: '22', description: 'SSH, until tailnet SSH (#6)' },
+  ...(hostOnTailnet
+    ? []
+    : [{ name: 'ssh', protocol: 'tcp', port: '22', description: 'SSH, until tailnet SSH (#6)' }]),
   {
     name: 'tailscale',
     protocol: 'udp',
