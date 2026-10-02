@@ -23,3 +23,13 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
   `inet imp_host` and `inet imp_egress`.
 - Never touch `/dev/vdb` on the host. It holds imp's ZFS pool.
 - Everything the hooks and CI run is a root `package.json` script.
+
+## Project management
+
+Geoff runs this project through a delegated coordinating agent, which reaches sessions through atc
+(2026-10-03). Its word is Geoff's sign-off; Geoff is the final rubber stamp.
+
+- Escalate anything you doubt through the coordinating agent; it brings Geoff in directly.
+- Before an action that costs money, deletes data or cannot be undone, state its exact effect back
+  to it and act only on its approval of that statement, not of a summary.
+- A permission-check block needs Geoff himself. Tell the coordinating agent, so it can bring him in.
