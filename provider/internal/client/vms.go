@@ -15,19 +15,19 @@ import (
 // `password`. VM deliberately has no field for it, so encoding/json drops it at decode
 // time. Do not add one, and do not decode a VM into a map.
 type VM struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	VCPU            int     `json:"vcpu"`
-	RAM             int     `json:"ram"`
-	Disk            int     `json:"disk"`
-	Location        string  `json:"location"`
-	MainIPv4        string  `json:"main_ipv4"`
-	MainIPv6        string  `json:"main_ipv6"`
-	Template        string  `json:"template"`
-	FirewallGroupID *string `json:"firewall_group_id"`
-	BGPEnabled      bool    `json:"bgp_enabled"`
-	Status          string  `json:"status"`
-	CreatedAt       string  `json:"created_at"`
+	ID              string     `json:"id"`
+	Name            string     `json:"name"`
+	VCPU            int        `json:"vcpu"`
+	RAM             int        `json:"ram"`
+	Disk            int        `json:"disk"`
+	Location        string     `json:"location"`
+	MainIPv4        string     `json:"main_ipv4"`
+	MainIPv6        string     `json:"main_ipv6"`
+	Template        string     `json:"template"`
+	FirewallGroupID FlexString `json:"firewall_group_id"`
+	BGPEnabled      bool       `json:"bgp_enabled"`
+	Status          string     `json:"status"`
+	CreatedAt       string     `json:"created_at"`
 	// ActiveActionID is non-null while an async action (rename, firewall attach, ...)
 	// runs; its type is undocumented, so it is kept opaque.
 	ActiveActionID json.RawMessage `json:"active_action_id"`

@@ -150,8 +150,9 @@ func (VM) Read(ctx context.Context, req infer.ReadRequest[VMArgs, VMState]) (inf
 	args.RAM = vm.RAM
 	args.Disk = vm.Disk
 	args.FirewallGroupID = nil
-	if vm.FirewallGroupID != nil && *vm.FirewallGroupID != "" {
-		args.FirewallGroupID = vm.FirewallGroupID
+	if vm.FirewallGroupID != "" {
+		id := string(vm.FirewallGroupID)
+		args.FirewallGroupID = &id
 	}
 	if args.IPv6 != nil || isImport {
 		enabled := vm.MainIPv6 != ""

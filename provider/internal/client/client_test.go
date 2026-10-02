@@ -41,7 +41,7 @@ func TestReadVMDropsPassword(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "geoffcloud", vm.Name)
 	assert.Equal(t, "Melbourne", vm.Location)
-	assert.Nil(t, vm.FirewallGroupID)
+	assert.Empty(t, vm.FirewallGroupID)
 	assert.False(t, vm.hasActiveAction())
 
 	encoded, err := json.Marshal(vm)
