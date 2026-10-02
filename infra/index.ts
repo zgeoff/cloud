@@ -6,6 +6,7 @@ import {
   getZeroTrustTunnelCloudflaredTokenOutput,
   getZoneOutput,
 } from '@pulumi/cloudflare';
+import { Command } from '@pulumi/command/local';
 import { secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
@@ -58,6 +59,34 @@ const hostKey = new TailnetKey(
 );
 
 export const hostAuthKey = hostKey.key;
+
+// imp's key (tag:imp) for impd nodes: dev, e2e and hosts. imp's scripts read it from
+// op://cloud/imp-tailscale-authkey, so Pulumi writes each new key into that item.
+// Expiry is Tailscale's 90-day maximum; an apply after expiry mints a fresh one.
+const impKey = new TailnetKey(
+  'imp',
+  {
+    description: 'impd nodes',
+    tags: ['tag:imp'],
+    reusable: true,
+    ephemeral: true,
+    preauthorized: true,
+    expiry: 90 * 24 * 60 * 60,
+    recreateIfInvalid: 'always',
+  },
+  { dependsOn: [policy] },
+);
+
+const impKeySync = new Command('imp-key-to-1password', {
+  // op treats a piped stdin as a JSON template, so read the key first
+  create:
+    'key=$(cat) && op item edit imp-tailscale-authkey --vault cloud "credential=$key" < /dev/null > /dev/null',
+  stdin: impKey.key,
+  triggers: [impKey.id],
+  logging: 'none',
+});
+
+export const impKeySyncID = impKeySync.id;
 
 // The Onidel VM, made by hand on 2026-10-02 and adopted here (#4). Every input but
 // the name replaces the VM, so protect and retainOnDelete keep a typo from
