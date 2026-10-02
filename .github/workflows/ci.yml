@@ -61,17 +61,18 @@ jobs:
   provider:
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: hashFiles('provider/go.mod') != ''
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Setup Go
+        if: hashFiles('provider/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: provider/go.mod
 
       - name: Check
+        if: hashFiles('provider/go.mod') != ''
         working-directory: provider
         run: |
           test -z "$(gofmt -l .)"
