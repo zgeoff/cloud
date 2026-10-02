@@ -78,7 +78,9 @@
     # Docker's bridge carries imp-host and its microVMs' egress. Forward only, never
     # input: a trusted docker0 would let any open imp reach the host's closed ports
     # (6443, 10250, ...). imp's module takes this over with its own bridge (imp#84).
+    # imps are agent sandboxes: they must not reach the k3s pod and service CIDRs.
     extraForwardRules = ''
+      iifname "docker0" ip daddr { 10.42.0.0/16, 10.43.0.0/16 } drop
       iifname "docker0" accept
     '';
   };
