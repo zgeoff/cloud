@@ -5,7 +5,15 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-03): nothing below has run. The package is validated locally:
+Current state (2026-10-03): B3 has run once, ahead of B2, with the 2.10.0 stand-in binary (run
+37044948105). Nothing else below has run. Published, both public:
+
+- `ghcr.io/zgeoff/atc-gateway:2.10.0@sha256:86cd2af8f297cb5143cee19e71b921d6ba0bc3e3a004d6498be7533b34a068be`
+  (atc 2.10.0's `atc` binary as a stand-in, not the gateway; do not deploy it as the gateway)
+- `ghcr.io/zgeoff/atc-gateway-backup:2.10.0@sha256:cc9d89b9f72fdc8ee0f209e101031e8d3f7620e3a527cfc2608c57d143977c6d`
+  (restic and sqlite3; usable as is, and pinned in `restore-job.yaml`)
+
+B3 runs again after B2 to publish the real gateway image. The package is validated locally:
 
 | Check                                                                                                                                                                                                | Result                               |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |

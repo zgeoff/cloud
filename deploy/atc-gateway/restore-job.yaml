@@ -23,7 +23,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: restore
-          image: ghcr.io/zgeoff/atc-gateway-backup@sha256:REPLACE
+          image: ghcr.io/zgeoff/atc-gateway-backup@sha256:cc9d89b9f72fdc8ee0f209e101031e8d3f7620e3a527cfc2608c57d143977c6d
           # restore, or ls to list snapshots
           args: ['restore']
           env:
