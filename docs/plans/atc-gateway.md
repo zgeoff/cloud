@@ -5,8 +5,9 @@ integration stack). Nothing here is deployed. Every step that adds a listener, a
 tailnet grant, a DNS record or an OAuth change waits for Geoff's approval of the exact setup; the
 [approval list](#approval-list-for-geoff) collects them.
 
-Sources: atc's provisional interface facts and imp's lease contract (2026-10-03), and the live
-cluster as checked on 2026-10-03. Facts marked _draft_ come from designs that are not merged.
+Sources: atc's provisional interface facts and imp's answers from imp main 43f22974 (2026-10-03),
+and the live cluster as checked on 2026-10-03. Facts marked _draft_ come from designs that are not
+merged.
 
 ## Shape
 
@@ -87,17 +88,15 @@ Env var names arrive with atc's gateway PR. Secrets follow the existing pattern:
 
 ### 5. Tailnet
 
-The gateway runs in a pod, so its tailnet traffic leaves through the host's node (`tag:cloud`). Two
-ways to give it daemon access:
+The gateway pod's tailnet traffic leaves through the host's node, as `tag:cloud`.
 
-| Option                                | How                                                                                              | New credential       | Blast radius                                                                                |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------- | ------------------------------------------------------------------------------------------- |
-| A. Host identity (recommended for v1) | grant `tag:cloud → tag:atc-daemon:8415`                                                          | none                 | any pod on geoffcloud can reach the daemon port; the per-daemon bearer token still gates it |
-| B. Own identity                       | Tailscale sidecar in the pod as `tag:atc-gateway`; grant `tag:atc-gateway → tag:atc-daemon:8415` | a Tailscale auth key | the gateway pod only                                                                        |
-
-Either way, daemons get `tag:atc-daemon` (new tag, owned by `autogroup:admin` and itself). The PC
-daemon later joins as `tag:atc-daemon` too; today home-wsl is a member device, so that needs either
-a tagged second node on the PC or a host alias grant like the existing `home-pc` one.
+- **Cloud daemon** (on geoffcloud): reached locally, with no grant (section 7).
+- **PC daemon** (later): a grant `tag:cloud → tag:atc-daemon:8415`, and a new tag `tag:atc-daemon`
+  (owned by `autogroup:admin` and itself). home-wsl is a member device today, so the PC daemon needs
+  a tagged node of its own, or a host-alias grant like the existing `home-pc` one.
+- **Narrower option:** a Tailscale sidecar gives the gateway pod its own `tag:atc-gateway`, so only
+  that pod (not every pod on the host) reaches daemons. It costs one more auth key. Worth it once a
+  second daemon exists.
 
 ### 6. Public route
 
@@ -111,14 +110,53 @@ a tagged second node on the PC or a host alias grant like the existing `home-pc`
 
 ### 7. Cloud daemon
 
-atc has not named the cloud daemon host. On geoffcloud it runs as a NixOS service (not in k3s): it
-needs the tailnet listener on 8415 and impd access. It joins as `tag:atc-daemon`, which needs a
-grant `tag:atc-daemon → tag:imp:7070` for impd. Details wait for imp's contract below.
+atc has not named the cloud daemon host. On geoffcloud it runs as a NixOS service next to imp-host,
+not in k3s, with its listener on the host's tailnet address, tcp 8415.
+
+- **Identity.** On the host it shares the host's tailnet node, so its traffic leaves as `tag:cloud`.
+  The gateway pod reaches it on the same host without crossing the tailnet, so that hop needs no
+  grant; the per-daemon bearer token still gates it. Only a daemon on another machine (the PC later)
+  needs `tag:atc-daemon` and a grant from the gateway.
+- **impd access.** impd's oRPC API is at `/rpc` on tag:imp tcp 7070 (wake proxy 7080), with the
+  `@zgeoff/imp-client` SDK. Requests need a Host header naming impd. The daemon needs a grant
+  `tag:cloud → tag:imp:7070`, and one of:
+  - **a named impd token** (recommended):
+    `imp token new atc-cloud --scope manage --imps 'harness-*'`. `manage` is the least scope that
+    can create and destroy; the pattern confines it to harness imps. A pattern token must name each
+    imp it creates, and cannot pass `--net`. Stored in 1Password, injected through a root-only file.
+  - **tailnet identity** (no token): `IMP_TAILNET_IDENTITIES` matching `tag:cloud`. Simpler, but
+    every pod and service on geoffcloud then gets that scope over impd. Not recommended.
+- **Leases.** imp adds generic `leases.acquire/renew/release/list` (owner = the caller's identity
+  plus a label, ttl 10–3600 s, scope `exec`). imp stays generic: no harness-specific API. Until
+  leases land, `imps.hold` is one shared value and not a lease.
 
 ### 8. Harness imps
 
-_Pending imp's reply._ One imp per harness, materialized from a reusable image plus a clean repo
-checkout. No dirty-directory transfer, and no subscription credentials copied from the PC.
+One imp per harness, from a reusable image plus a clean checkout. No dirty-directory transfer, and
+no subscription credentials copied from the PC.
+
+- **Image.** A harness image is any Dockerfile; it lives in the atc repo (imp stays harness-unaware)
+  and is built on the host with `imp image build <dir> --name <n>`, which runs `docker build`
+  through impd. There is no registry import flow. imp's `images/dev` (Node, Bun, Go, Python, a
+  harness CLI) is the likely base.
+- **Clean checkout**, one of:
+  - **self-clone through imp's broker** (recommended): `imp secret add github --kind github` and
+    `imp grant <imp> github`. The broker injects auth for git over HTTPS to github.com; the guest
+    sees only a placeholder. HTTPS only, no deploy keys. Needs a GitHub token: whose, and which
+    scope, is Geoff's call. A fine-grained token, read-only on the named repos, is the least.
+  - **host push**: `imp cp ./dir imp:/path` (needs `manage`). Only from a clean checkout the daemon
+    makes itself, never from the PC's working tree.
+  - **template**: set up one imp, remove its secrets, `imp template create`, then
+    `imp new --image <template>` (a ZFS clone; machine-id and SSH host keys reset on first boot).
+    Fast start, but the checkout ages; pair it with a `git fetch` on start.
+- **Bounds.** Per imp: `--cpus 2 --memory 2048 --disk 32` (the defaults) to start. The host's RAM
+  budget is 20 GiB (`IMP_RAM_BUDGET_MIB=20480`), so about 9 awake harnesses at 2 GiB with headroom;
+  idle imps sleep to disk and cost no RAM. A boot that does not fit fails with
+  `RAM_BUDGET_EXCEEDED`.
+- **Egress.** `--policy box --allow` the git host, the package registries and the model endpoints.
+  Broker-granted hosts stay reachable under every policy.
+- **Harness login.** imp's `anthropic` broker kind is an API key, not a subscription login. How a
+  harness signs in is open and researched separately in the integration review.
 
 ## Order of work
 
@@ -138,14 +176,18 @@ Each item is a separate yes or no. None is done.
 1. **New hostname** `atc.geoff.cloud` on the existing tunnel (DNS record + tunnel ingress). Free.
 2. **OAuth issuer move** to `https://atc.geoff.cloud`: every client re-registers and grants are
    issued again (atc's step, your access change).
-3. **New tailnet tag** `tag:atc-daemon`, and grants `tag:cloud → tag:atc-daemon:8415` (option A) or
-   a new `tag:atc-gateway` with its own auth key (option B), plus `tag:atc-daemon → tag:imp:7070`.
-4. **New credentials** in the `cloud` vault: one bearer token per daemon; a restic password and an
-   R2 key scoped to the `atc-gateway/` prefix for the gateway's backups (or reuse the existing
-   backups key, which already reaches the bucket: simpler, broader).
-5. **New listener** on each daemon host: tailnet tcp 8415.
+3. **Tailnet grants:** `tag:cloud → tag:imp:7070` (the cloud daemon drives impd). Later, for the PC
+   daemon: a new `tag:atc-daemon` and `tag:cloud → tag:atc-daemon:8415`.
+4. **New listener** on each daemon host: tailnet tcp 8415.
+5. **New credentials**, all in the `cloud` vault:
+   - one bearer token per daemon (gateway → daemon);
+   - an impd token `atc-cloud`, scope `manage`, imps `harness-*`;
+   - a GitHub token for imp's broker, if imps self-clone (whose account, which repos, read-only);
+   - for the gateway's backups: a restic password, and either a new bucket with its own R2 key (R2
+     keys scope to a bucket, not a prefix) or the existing backups key (simpler, broader).
 6. **Snapshots** will contain the gateway's OAuth state once it runs. Accept, as for the k3s
    datastore today, or decide otherwise.
+7. **Harness login method:** open; separate integration review.
 
 ## Readiness checks
 
@@ -265,9 +307,9 @@ new DnsRecord('atc', { zoneId, name: 'atc.geoff.cloud', type: 'CNAME',
 ```ts
 tagOwners: { 'tag:atc-daemon': ['autogroup:admin', 'tag:atc-daemon'] },
 grants: [
-  // option A: the gateway pod leaves through the host's node
+  // the cloud daemon (on the host, as tag:cloud) drives impd
+  { src: ['tag:cloud'], dst: ['tag:imp'], ip: ['tcp:7070'] },
+  // later: the gateway reaches a daemon on another machine (the PC)
   { src: ['tag:cloud'], dst: ['tag:atc-daemon'], ip: ['tcp:8415'] },
-  // the cloud daemon drives impd
-  { src: ['tag:atc-daemon'], dst: ['tag:imp'], ip: ['tcp:7070'] },
 ],
 ```
