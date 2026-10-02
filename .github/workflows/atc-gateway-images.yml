@@ -1,0 +1,71 @@
+name: atc-gateway images
+
+# Runs the fixture test on every change to the images. Publishing to GHCR happens
+# only on a manual run with push: true, an operator step in
+# docs/runbooks/atc-gateway-operator-checklist.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/atc-gateway/**
+      - scripts/fetch-atc-release.sh
+      - scripts/test-atc-gateway-fixture.sh
+      - .github/workflows/atc-gateway-images.yml
+  pull_request:
+    paths:
+      - deploy/atc-gateway/**
+      - scripts/fetch-atc-release.sh
+      - scripts/test-atc-gateway-fixture.sh
+  workflow_dispatch:
+    inputs:
+      push:
+        description: Publish both images to ghcr.io/zgeoff after the fixture test
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Fixture test
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/test-atc-gateway-fixture.sh
+
+  publish:
+    needs: fixture
+    if: github.event_name == 'workflow_dispatch' && inputs.push
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Build and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          source deploy/atc-gateway/versions.env
+          version="${ATC_RELEASE##*@}"
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          bash scripts/fetch-atc-release.sh context
+          cp deploy/atc-gateway/Dockerfile context/
+          docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "ghcr.io/zgeoff/atc-gateway:$version" context
+          docker build --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "ghcr.io/zgeoff/atc-gateway-backup:$version" \
+            deploy/atc-gateway/backup
+          for image in atc-gateway atc-gateway-backup; do
+            docker push "ghcr.io/zgeoff/$image:$version"
+            echo "$image: $(docker inspect --format '{{index .RepoDigests 0}}' "ghcr.io/zgeoff/$image:$version")" \
+              >> "$GITHUB_STEP_SUMMARY"
+          done
