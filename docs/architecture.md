@@ -42,7 +42,7 @@ ones:
  └──────────────────────────────────────────────────────────────────────────────┘
                                      │ tailnet (WireGuard)
                                      ▼
- Geoff's PC: atc daemon (unix socket) ◀── atc mcp --http 127.0.0.1:8414 ◀── tailscale serve
+ Geoff's PC: atc daemon (unix socket) ◀── atc mcp --http on <tailnet IP>:8414
 ```
 
 ## Decisions
@@ -77,8 +77,10 @@ ones:
 
 - `cloudflared` runs in k3s and holds an outbound-only tunnel. The host opens no inbound port for
   it.
-- The tunnel routes every path on `mcp.geoff.cloud` over the tailnet to Geoff's PC. On the PC,
-  `tailscale serve` forwards to `atc mcp --http` on `127.0.0.1:8414`.
+- The tunnel routes every path on `mcp.geoff.cloud` over the tailnet to Geoff's PC, where
+  `atc mcp --http` binds to the PC's tailnet address on port 8414. The hop is plain HTTP inside
+  WireGuard; the tailnet policy lets only `tag:cloud` (and Geoff's own devices) reach the port. No
+  `tailscale serve` runs on the PC.
 - **Auth is atc's.** atc runs its own OAuth 2.1 server: protected-resource metadata, CIMD and DCR,
   PKCE S256, RFC 8707 resource binding, RFC 9207 `iss`, per-tool scopes, and local revocation.
   Cloudflare Access must not front the hostname, because the OAuth endpoints (`/.well-known/*`,
@@ -86,19 +88,16 @@ ones:
 - The route passes `Host: mcp.geoff.cloud` (atc rejects unknown hosts to block DNS rebinding) and
   does not buffer responses, so SSE works.
 - The route targets the PC's tailnet IP, not its MagicDNS name: CoreDNS in k3s does not forward to
-  Tailscale's resolver. `tailscale serve` on the PC terminates TLS with the PC's `*.ts.net`
-  certificate, so the route sets `originRequest.originServerName: <pc>.<tailnet>.ts.net` for SNI and
-  certificate checks. The tailnet needs HTTPS certificates turned on for that.
-- atc documents the PC side (`tailscale serve` and
-  `atc mcp --http --public-url https://mcp.geoff.cloud`) in its exposure guide. The PC is not
-  managed from this repo.
+  Tailscale's resolver.
+- atc documents the PC side (the bind address and `--public-url https://mcp.geoff.cloud`) in its
+  exposure guide. The PC is not managed from this repo.
 
 ### Tailnet
 
-| Tag         | Holder                                                | May reach                                     |
-| ----------- | ----------------------------------------------------- | --------------------------------------------- |
-| `tag:cloud` | the host's own tailscaled, and the cloudflared egress | Geoff's PC on the `tailscale serve` port only |
-| `tag:imp`   | impd nodes (host, dev, e2e)                           | nothing: imp's isolation goal                 |
+| Tag         | Holder                                                | May reach                                |
+| ----------- | ----------------------------------------------------- | ---------------------------------------- |
+| `tag:cloud` | the host's own tailscaled, and the cloudflared egress | Geoff's PC on atc's MCP port (8414) only |
+| `tag:imp`   | impd nodes (host, dev, e2e)                           | nothing: imp's isolation goal            |
 
 - Members reach `tag:cloud` (SSH, the k3s API, Grafana) and `tag:imp` on any port.
 - MagicDNS stays on. imp prints `<node>.<tailnet>.ts.net` URLs.
@@ -213,6 +212,6 @@ docs/          this page and the runbooks
   panel for the install. `lanzaboote` can turn it back on later with our own keys.
 - **The ZFS kernel pin** can hold the kernel back behind the NixOS default.
 - **The shared `FORWARD` chain** between Docker and k3s may need an explicit rule.
-- **The ingress hop to the PC** needs the PC online and `tailscale serve` running. That is accepted
+- **The ingress hop to the PC** needs the PC online and `atc mcp --http` running. That is accepted
   until the daemon moves to the cloud.
 - **Pulumi `Acl` takeover**: see the caution under Tailnet.

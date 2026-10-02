@@ -195,9 +195,9 @@ const tunnel = new ZeroTrustTunnelCloudflared('edge', {
 
 const mcpHostname = `mcp.${domain}`;
 
-// mcp.geoff.cloud: atc's MCP on Geoff's PC, over the tailnet. `tailscale serve` on
-// the PC terminates TLS with its *.ts.net certificate, hence originServerName. atc
-// owns OAuth, so no Cloudflare Access on this hostname.
+// mcp.geoff.cloud: atc's MCP on Geoff's PC, bound to the PC's tailnet address. The
+// hop is plain HTTP inside WireGuard, and the tailnet policy lets only tag:cloud
+// reach the port. atc owns OAuth, so no Cloudflare Access on this hostname.
 const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
   accountId: accountID,
   tunnelId: tunnel.id,
@@ -207,11 +207,8 @@ const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
         hostname: mcpHostname,
 
         // the IP, not the MagicDNS name: CoreDNS in k3s does not forward to 100.100.100.100
-        service: `https://${homePC.ip}`,
-        originRequest: {
-          httpHostHeader: mcpHostname,
-          originServerName: homePC.dnsName,
-        },
+        service: `http://${homePC.ip}:${homePC.mcpPort}`,
+        originRequest: { httpHostHeader: mcpHostname },
       },
       { service: 'http_status:404' },
     ],
