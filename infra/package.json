@@ -1,0 +1,7 @@
+{
+  "name": "@zgeoff/cloud-infra",
+  "private": true,
+  "description": "Pulumi program for geoff.cloud",
+  "type": "module",
+  "main": "index.ts"
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    "infra": {
+      "project": ["**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],
+  "ignoreBinaries": ["go", "gofmt"]
+}

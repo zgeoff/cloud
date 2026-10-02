@@ -1,0 +1,9 @@
+# pnpm-style symlinked node_modules — no phantom dependencies
+[install]
+linker = "isolated"
+
+# bun add saves exact versions, no ^/~ ranges
+exact = true
+
+# supply-chain guard: only install versions published >= 7 days ago
+minimumReleaseAge = 604800
