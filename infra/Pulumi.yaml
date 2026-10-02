@@ -1,3 +1,8 @@
 name: geoff-cloud
 description: Every cloud resource for geoff.cloud. State lives in Cloudflare R2.
 runtime: bun
+plugins:
+  providers:
+    # the partial Onidel provider in ../provider, built by `bun run provider:build`
+    - name: onidel
+      path: ../provider/bin

@@ -1,25 +1,27 @@
 {
-    "name": "@zgeoff/pulumi-onidel",
-    "version": "0.1.0",
-    "keywords": [
-        "onidel",
-        "category/cloud"
-    ],
-    "repository": "https://github.com/zgeoff/cloud",
-    "license": "MIT",
-    "scripts": {
-        "build": "tsc"
-    },
-    "dependencies": {
-        "@pulumi/pulumi": "3.251.0"
-    },
-    "devDependencies": {
-        "@types/node": "24.13.6",
-        "typescript": "7.0.2"
-    },
-    "pulumi": {
-        "resource": true,
-        "name": "onidel",
-        "version": "0.1.0"
-    }
+  "name": "@zgeoff/pulumi-onidel",
+  "version": "0.1.0",
+  "keywords": [
+    "onidel",
+    "category/cloud"
+  ],
+  "repository": "https://github.com/zgeoff/cloud",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "3.251.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "typescript": "7.0.2"
+  },
+  "pulumi": {
+    "resource": true,
+    "name": "onidel",
+    "version": "0.1.0"
+  },
+  "main": "bin/index.js",
+  "types": "bin/index.d.ts"
 }

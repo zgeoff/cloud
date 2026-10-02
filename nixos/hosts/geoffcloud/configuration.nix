@@ -6,8 +6,9 @@
 
   system.stateVersion = "26.05";
   networking.hostName = "geoffcloud";
-  # ZFS needs a stable host ID; any 8 hex digits, fixed for the host's life
-  networking.hostId = "9e0c1f2a";
+  # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
+  # so NixOS imports tank without -f
+  networking.hostId = "5ca71846";
   time.timeZone = "Australia/Melbourne";
 
   boot = {
