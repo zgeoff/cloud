@@ -18,6 +18,8 @@
     supportedFilesystems = [ "zfs" ];
     # root is ext4; never force-import a pool another host may own
     zfs.forceImportRoot = false;
+    # virtio disks have no serial, so /dev/disk/by-id (the default) has no vdb link
+    zfs.devNodes = "/dev/disk/by-partuuid";
   };
 
   # Onidel gives a static address; no DHCP on this network
