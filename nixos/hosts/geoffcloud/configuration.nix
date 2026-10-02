@@ -70,6 +70,9 @@
       "cni0"
       "flannel.1"
     ];
+    # filter forwarded traffic too, so nothing public reaches a pod or a NodePort
+    # unless a rule allows it
+    filterForward = true;
   };
 
   services.openssh = {
@@ -107,6 +110,9 @@
       "--disable=servicelb"
       "--write-kubeconfig-mode=0600"
       "--tls-san=geoffcloud"
+      # NodePorts (Grafana on 30300) bind to the tailnet address only. kube-proxy
+      # DNATs them through FORWARD, which the input firewall does not cover.
+      "--kube-proxy-arg=nodeport-addresses=100.64.0.0/10"
     ];
   };
 

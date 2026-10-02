@@ -149,7 +149,9 @@ const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
     ingresses: [
       {
         hostname: mcpHostname,
-        service: `https://${homePC.dnsName}`,
+
+        // the IP, not the MagicDNS name: CoreDNS in k3s does not forward to 100.100.100.100
+        service: `https://${homePC.ip}`,
         originRequest: {
           httpHostHeader: mcpHostname,
           originServerName: homePC.dnsName,
@@ -182,7 +184,10 @@ export const tunnelToken = secret(
 // op://cloud/k3s-kubeconfig; without it the program skips the cluster.
 const kubeconfig = process.env['K3S_KUBECONFIG'];
 
-export const cluster =
+const workloads =
   kubeconfig === undefined || kubeconfig === ''
     ? undefined
     : createClusterWorkloads({ kubeconfig, tunnelToken });
+
+export const grafanaURL = workloads?.grafanaURL;
+export const grafanaAdminPassword = workloads?.grafanaAdminPassword;

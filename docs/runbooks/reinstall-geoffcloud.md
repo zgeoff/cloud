@@ -18,7 +18,8 @@ the panel, so that you can restore the Ubuntu host.
 1. Turn off Secure Boot for the VM in the Onidel panel, then reboot the VM through the API. With
    Secure Boot on, kernel lockdown blocks the kexec that `nixos-anywhere` uses.
 2. Check from the host: `mokutil --sb-state` prints `SecureBoot disabled`.
-3. Stage the host's Tailscale key outside the repo:
+3. Run `bun run up -- --yes` first: the host key expires after 7 days, and an apply mints a fresh
+   one. Then stage the host's Tailscale key outside the repo:
 
    ```sh
    mkdir -p /tmp/geoffcloud-extra/var/lib/tailscale
@@ -50,14 +51,15 @@ The Pulumi program skips every k3s workload until `K3S_KUBECONFIG` is set.
    ```sh
    ssh root@geoffcloud cat /etc/rancher/k3s/k3s.yaml \
      | sed 's#https://127.0.0.1:6443#https://geoffcloud:6443#' \
-     | op document create --vault cloud --title k3s-kubeconfig -
+     | op document create --vault cloud --title k3s-kubeconfig --file-name kubeconfig.yaml -
    ```
 
-2. Add `K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/k3s-kubeconfig` to `.env`. Do this only after the
-   item exists: `op run` fails on a reference it cannot resolve.
+2. Add `K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml` to `.env`. A document resolves by
+   its file name. Do this only after the item exists: `op run` fails on a reference it cannot
+   resolve.
 3. `bun run up -- --yes` deploys cloudflared, Prometheus, Grafana, Loki and Alloy.
 4. Grafana is at `http://geoffcloud:30300` on the tailnet. The admin password is the
-   `grafanaAdminPassword` part of the `cluster` stack output.
+   `grafanaAdminPassword` stack output.
 
 ## If kexec still fails
 
