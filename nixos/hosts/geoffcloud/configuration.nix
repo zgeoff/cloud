@@ -75,14 +75,10 @@
     # filter forwarded traffic too, so nothing public reaches a pod or a NodePort
     # unless a rule allows it
     filterForward = true;
-    # Docker's bridge carries imp-host and its microVMs' egress. Forward only, never
-    # input: a trusted docker0 would let any open imp reach the host's closed ports
-    # (6443, 10250, ...). imp's module takes this over with its own bridge (imp#84).
-    # imps are agent sandboxes: they must not reach the k3s pod and service CIDRs.
     # Pods (cni0, flannel.1) need forward too: trustedInterfaces covers input only.
+    # imp's module accepts imp-host's own bridge, and drops its traffic to the k3s
+    # ranges (services.imp.forwardDeny below).
     extraForwardRules = ''
-      iifname "docker0" ip daddr { 10.42.0.0/16, 10.43.0.0/16 } drop
-      iifname "docker0" accept
       iifname { "cni0", "flannel.1" } accept
     '';
   };
@@ -125,6 +121,11 @@
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
+    # imps are agent sandboxes: they must not reach the k3s pod and service ranges
+    forwardDeny = [
+      "10.42.0.0/16"
+      "10.43.0.0/16"
+    ];
   };
 
   services.k3s = {
