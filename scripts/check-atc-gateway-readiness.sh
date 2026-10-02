@@ -65,11 +65,28 @@ else
   print_check missing "DNS record atc.geoff.cloud"
 fi
 
-# the tailnet policy, as code
-if grep -q "tag:atc-daemon" "$repo/infra/tailnet-policy.ts"; then
-  print_check ok "tailnet policy defines tag:atc-daemon"
+# the tailnet policy, as code: the cloud daemon (tag:cloud) drives impd
+if grep -A2 "src: \['tag:cloud'\]" "$repo/infra/tailnet-policy.ts" | grep -q "tag:imp" &&
+  grep -q "tcp:7070" "$repo/infra/tailnet-policy.ts"; then
+  print_check ok "tailnet grant tag:cloud -> tag:imp:7070"
 else
-  print_check missing "tailnet tag:atc-daemon and its grants"
+  print_check missing "tailnet grant tag:cloud -> tag:imp:7070"
+fi
+
+# the cloud daemon on the host
+if ssh -o BatchMode=yes "root@$host" systemctl is-active --quiet atc-daemon 2>/dev/null; then
+  print_check ok "atc-daemon is active on $host"
+else
+  print_check missing "atc-daemon service on $host"
+fi
+
+# the gateway answers in the cluster with its public Host (any other Host gets 403)
+if run_kubectl -n atc get deploy atc-gateway > /dev/null; then
+  code=$(run_kubectl -n atc run readiness-probe --rm -i --restart=Never --quiet \
+    --image=curlimages/curl:8.16.0 -- curl -s -o /dev/null -w '%{http_code}' \
+    -H 'Host: atc.geoff.cloud' \
+    http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp)
+  print_check "$([ "$code" = 200 ] && echo ok || echo FAIL)" "gateway in-cluster metadata: $code"
 fi
 
 exit "$failures"
