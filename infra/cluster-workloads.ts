@@ -4,6 +4,8 @@ import { Namespace, Secret } from '@pulumi/kubernetes/core/v1';
 import type { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import type { ATCGatewayInputs } from './atc-gateway.ts';
+import { createATCGateway } from './atc-gateway.ts';
 import { createObservability } from './observability.ts';
 
 // cloudflared's release; bump deliberately
@@ -12,6 +14,9 @@ const cloudflaredImage = 'cloudflare/cloudflared:2026.9.3';
 interface ClusterInputs {
   readonly kubeconfig: string;
   readonly tunnelToken: Output<string>;
+
+  // set only after the operator checklist's approval step
+  readonly atcGateway?: ATCGatewayInputs;
 }
 
 interface ClusterOutputs {
@@ -20,6 +25,7 @@ interface ClusterOutputs {
   readonly logShipper: Chart;
   readonly grafanaURL: string;
   readonly grafanaAdminPassword: Output<string>;
+  readonly atcGatewayServiceURL?: Output<string>;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7, #8). Pulumi reaches the k3s API
@@ -55,7 +61,15 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
 
   const observability = createObservability(cluster);
 
-  return { ingressNamespace: ingress.metadata.name, cloudflared, ...observability };
+  const gateway =
+    inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);
+
+  return {
+    ingressNamespace: ingress.metadata.name,
+    cloudflared,
+    ...observability,
+    ...(gateway === undefined ? {} : { atcGatewayServiceURL: gateway.serviceURL }),
+  };
 }
 
 function buildCloudflaredSpec(tokenSecret: Output<string>): input.apps.v1.DeploymentSpec {

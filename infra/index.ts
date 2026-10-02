@@ -13,6 +13,7 @@ import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { createClusterWorkloads } from './cluster-workloads.ts';
 import { createHealthCheck } from './health-check.ts';
+import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
 import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
@@ -251,10 +252,11 @@ const kubeconfig = process.env['K3S_KUBECONFIG'];
 const workloads =
   kubeconfig === undefined || kubeconfig === ''
     ? undefined
-    : createClusterWorkloads({ kubeconfig, tunnelToken });
+    : createClusterWorkloads({ kubeconfig, tunnelToken, ...loadATCGatewayInputs() });
 
 export const grafanaURL = workloads?.grafanaURL;
 export const grafanaAdminPassword = workloads?.grafanaAdminPassword;
+export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 
 // External health check (#8). ALERT_WEBHOOK_URL is optional; without it, state
 // changes show only in the Worker's logs.
