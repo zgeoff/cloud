@@ -7,6 +7,7 @@ import (
 	"os"
 	"sync"
 
+	p "github.com/pulumi/pulumi-go-provider"
 	"github.com/pulumi/pulumi-go-provider/infer"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
@@ -34,6 +35,23 @@ func (c *Config) Annotate(a infer.Annotator) {
 	a.SetDefault(&c.APIKey, nil, APIKeyEnv)
 	a.Describe(&c.TeamID, "Team ID to act in. When unset, the provider uses the API key's only team.")
 	a.Describe(&c.Endpoint, "API base URL. Defaults to "+client.DefaultBaseURL+".")
+}
+
+// Diff updates the provider in place on any config change. infer's default replaces
+// the provider, and a replaced provider replaces every resource it manages: rotating
+// the API key would plan a replace of the VM.
+func (c *Config) Diff(_ context.Context, req infer.DiffRequest[*Config, *Config]) (infer.DiffResponse, error) {
+	diff := map[string]p.PropertyDiff{}
+	for key, values := range map[string][2]string{
+		"apiKey":   {req.State.APIKey, req.Inputs.APIKey},
+		"teamId":   {req.State.TeamID, req.Inputs.TeamID},
+		"endpoint": {req.State.Endpoint, req.Inputs.Endpoint},
+	} {
+		if values[0] != values[1] {
+			diff[key] = p.PropertyDiff{Kind: p.Update, InputDiff: true}
+		}
+	}
+	return infer.DiffResponse{HasChanges: len(diff) > 0, DetailedDiff: diff}, nil
 }
 
 // Configure builds the API client.

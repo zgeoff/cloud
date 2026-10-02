@@ -3,6 +3,7 @@ import {
   R2Bucket,
   ZeroTrustTunnelCloudflared,
   ZeroTrustTunnelCloudflaredConfig,
+  ZoneSetting,
   getZeroTrustTunnelCloudflaredTokenOutput,
   getZoneOutput,
 } from '@pulumi/cloudflare';
@@ -227,6 +228,16 @@ const mcpRecord = new DnsRecord('mcp', {
 });
 
 export const mcpURL = mcpRecord.name.apply((name) => `https://${name}`);
+
+// Redirect plain http to https on every hostname: a misconfigured client must not send
+// a bearer token or an authorization code over http, even only as far as the edge.
+const alwaysHTTPS = new ZoneSetting('always-use-https', {
+  zoneId: zone.zoneId,
+  settingId: 'always_use_https',
+  value: 'on',
+});
+
+export const alwaysHTTPSValue = alwaysHTTPS.value;
 
 // cloudflared's credential; it becomes a k3s Secret once the cluster exists (#6)
 export const tunnelToken = secret(

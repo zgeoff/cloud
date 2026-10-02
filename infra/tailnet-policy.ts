@@ -29,6 +29,9 @@ export const tailnetPolicy = {
 
     // cloudflared on a cloud host → atc's MCP on the PC
     { src: ['tag:cloud'], dst: ['home-pc'], ip: [`tcp:${homePC.mcpPort}`] },
+
+    // impd nodes reach each other's API: moves between hosts and imp's two-node e2e
+    { src: ['tag:imp'], dst: ['tag:imp'], ip: ['tcp:7070'] },
   ],
   ssh: [
     {
