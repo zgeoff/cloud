@@ -1,7 +1,15 @@
-import { R2Bucket, getZoneOutput } from '@pulumi/cloudflare';
+import {
+  DnsRecord,
+  R2Bucket,
+  ZeroTrustTunnelCloudflared,
+  ZeroTrustTunnelCloudflaredConfig,
+  getZeroTrustTunnelCloudflaredTokenOutput,
+  getZoneOutput,
+} from '@pulumi/cloudflare';
+import { secret } from '@pulumi/pulumi';
 import { Acl } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
-import { tailnetPolicy } from './tailnet-policy.ts';
+import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
 
@@ -101,3 +109,52 @@ for (const rule of edgeRules) {
     );
   }
 }
+
+// Public ingress (#7). One tunnel for every public hostname under geoff.cloud;
+// cloudflared runs in k3s with the token below. Each workload brings its own auth.
+const tunnel = new ZeroTrustTunnelCloudflared('edge', {
+  accountId: accountID,
+  name: 'geoff-cloud',
+  configSrc: 'cloudflare',
+});
+
+const mcpHostname = `mcp.${domain}`;
+
+// mcp.geoff.cloud: atc's MCP on Geoff's PC, over the tailnet. `tailscale serve` on
+// the PC terminates TLS with its *.ts.net certificate, hence originServerName. atc
+// owns OAuth, so no Cloudflare Access on this hostname.
+const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
+  accountId: accountID,
+  tunnelId: tunnel.id,
+  config: {
+    ingresses: [
+      {
+        hostname: mcpHostname,
+        service: `https://${homePC.dnsName}`,
+        originRequest: {
+          httpHostHeader: mcpHostname,
+          originServerName: homePC.dnsName,
+        },
+      },
+      { service: 'http_status:404' },
+    ],
+  },
+});
+
+export const tunnelConfigVersion = tunnelConfig.version;
+
+const mcpRecord = new DnsRecord('mcp', {
+  zoneId: zone.zoneId,
+  name: mcpHostname,
+  type: 'CNAME',
+  content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
+  proxied: true,
+  ttl: 1,
+});
+
+export const mcpURL = mcpRecord.name.apply((name) => `https://${name}`);
+
+// cloudflared's credential; it becomes a k3s Secret once the cluster exists (#6)
+export const tunnelToken = secret(
+  getZeroTrustTunnelCloudflaredTokenOutput({ accountId: accountID, tunnelId: tunnel.id }).token,
+);
