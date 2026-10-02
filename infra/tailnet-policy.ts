@@ -38,9 +38,10 @@ export const tailnetPolicy = {
       users: ['autogroup:nonroot', 'root'],
     },
 
-    // tailnet SSH to cloud hosts, admins only
+    // tailnet SSH to cloud hosts, admins only. accept, not check: scripts and agents
+    // SSH unattended, and check mode asks for a browser login every 12 hours.
     {
-      action: 'check',
+      action: 'accept',
       src: ['autogroup:admin'],
       dst: ['tag:cloud'],
       users: ['autogroup:nonroot', 'root'],
