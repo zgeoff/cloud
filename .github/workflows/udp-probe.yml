@@ -1,0 +1,20 @@
+# One-off diagnostic for #12: send UDP to geoffcloud from outside Geoff's home
+# network, while the cloud session captures on the host. Remove after the test.
+name: udp-probe
+on: workflow_dispatch
+permissions: {}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send UDP to geoffcloud
+        run: |
+          echo "runner $(curl -s https://api.ipify.org)"
+          python3 - <<'PY'
+          import socket, time
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          for _ in range(40):
+              for port in (41641, 41642):
+                  s.sendto(b"udp-probe", ("104.250.100.18", port))
+              time.sleep(1)
+          PY
