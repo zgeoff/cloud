@@ -65,10 +65,13 @@
     enable = true;
     # public: nothing but Tailscale. Everything else is reached over the tailnet.
     allowedUDPPorts = [ 41641 ];
+    # trusted as a source, in input and forward: the tailnet, k3s pods, and Docker's
+    # bridge, which carries the imp-host container and its microVMs' egress
     trustedInterfaces = [
       "tailscale0"
       "cni0"
       "flannel.1"
+      "docker0"
     ];
     # filter forwarded traffic too, so nothing public reaches a pod or a NodePort
     # unless a rule allows it
