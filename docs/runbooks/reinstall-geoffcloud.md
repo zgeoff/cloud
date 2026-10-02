@@ -8,7 +8,7 @@ holds imp's ZFS pool, and NixOS imports it.
 - The imp session agrees on the time. imp's node and microVMs go down.
 - imp's bootstrap has created the pool `tank` on `vdb`. NixOS imports it through
   `boot.zfs.extraPools`.
-- A Tailscale auth key for `tag:cloud` exists (Pulumi `TailnetKey`, #5).
+- A Tailscale auth key for `tag:cloud` exists: the `hostAuthKey` stack output (Pulumi `TailnetKey`).
 
 **CAUTION:** The reinstall erases the root disk. Take an Onidel snapshot first, through the API or
 the panel, so that you can restore the Ubuntu host.
@@ -22,7 +22,8 @@ the panel, so that you can restore the Ubuntu host.
 
    ```sh
    mkdir -p /tmp/geoffcloud-extra/var/lib/tailscale
-   op read op://cloud/geoffcloud-tailscale-authkey/credential > /tmp/geoffcloud-extra/var/lib/tailscale/authkey
+   (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets hostAuthKey) \
+     > /tmp/geoffcloud-extra/var/lib/tailscale/authkey
    chmod 600 /tmp/geoffcloud-extra/var/lib/tailscale/authkey
    ```
 

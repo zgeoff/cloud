@@ -7,7 +7,7 @@ import {
   getZoneOutput,
 } from '@pulumi/cloudflare';
 import { secret } from '@pulumi/pulumi';
-import { Acl } from '@pulumi/tailscale';
+import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
@@ -38,6 +38,24 @@ const policy = new Acl('tailnet-policy', {
 });
 
 export const tailnetPolicyID = policy.id;
+
+// The host's own tailnet node (tag:cloud), joined once by the NixOS install (#6).
+// Single-use and preauthorized; the node keeps its identity in /var/lib/tailscale.
+const hostKey = new TailnetKey(
+  'geoffcloud-host',
+  {
+    description: 'geoffcloud host join (#6)',
+    tags: ['tag:cloud'],
+    reusable: false,
+    ephemeral: false,
+    preauthorized: true,
+    expiry: 7 * 24 * 60 * 60,
+    recreateIfInvalid: 'always',
+  },
+  { dependsOn: [policy] },
+);
+
+export const hostAuthKey = hostKey.key;
 
 // The Onidel VM, made by hand on 2026-10-02 and adopted here (#4). Every input but
 // the name replaces the VM, so protect and retainOnDelete keep a typo from
