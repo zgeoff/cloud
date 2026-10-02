@@ -172,8 +172,9 @@ this file as its guidelines. A repo that runs another review bot names it and it
 
 # cloud
 
-Infrastructure as code for `geoff.cloud`, Geoff's general-purpose private cloud on the tailnet: today
-one Onidel VM running a single-node k3s cluster, with imp microVMs on the host as the first workload. `docs/architecture.md` is the design; issue #1 tracks the work.
+Infrastructure as code for `geoff.cloud`, Geoff's general-purpose private cloud on the tailnet:
+today one Onidel VM running a single-node k3s cluster, with imp microVMs on the host as the first
+workload. `docs/architecture.md` is the design; issue #1 tracks the work.
 
 ## Layout
 
