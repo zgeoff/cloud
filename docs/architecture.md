@@ -85,8 +85,10 @@ ones:
   `/authorize`, `/token`, `/register`) must stay reachable without a login.
 - The route passes `Host: mcp.geoff.cloud` (atc rejects unknown hosts to block DNS rebinding) and
   does not buffer responses, so SSE works.
-- `tailscale serve` on the PC terminates TLS with the PC's `*.ts.net` certificate, so the route sets
-  `originRequest.originServerName: <pc>.<tailnet>.ts.net` for SNI and certificate checks.
+- The route targets the PC's tailnet IP, not its MagicDNS name: CoreDNS in k3s does not forward to
+  Tailscale's resolver. `tailscale serve` on the PC terminates TLS with the PC's `*.ts.net`
+  certificate, so the route sets `originRequest.originServerName: <pc>.<tailnet>.ts.net` for SNI and
+  certificate checks. The tailnet needs HTTPS certificates turned on for that.
 - atc documents the PC side (`tailscale serve` and
   `atc mcp --http --public-url https://mcp.geoff.cloud`) in its exposure guide. The PC is not
   managed from this repo.
@@ -110,6 +112,8 @@ start from an import of the live policy, with the diff reviewed by Geoff. Existi
 
 - **Outside the VM:** Onidel's cloud firewall allows Tailscale's UDP port (41641) and ICMP, and
   nothing else. It needs no host cooperation, so it cannot conflict with imp or k3s.
+- **Onidel edge firewall:** the group `edge` allows SSH, Tailscale UDP and ICMP. It attaches to the
+  VM once tailnet SSH works on NixOS, then SSH leaves the list.
 - **On the host:** the NixOS firewall, in its own table `inet nixos-fw`. It allows Tailscale's UDP
   port in public and trusts `tailscale0` and the k3s interfaces. `networking.nftables.flushRuleset`
   stays off, because the NixOS default flushes every table on reload. imp owns `inet imp_host` and
@@ -155,9 +159,13 @@ committed: the repo is public, and gitleaks runs in lefthook and in CI.
 
 - **Self-hosted** in k3s: Prometheus, Loki, Grafana and Alloy. Budget about 1 GiB RAM and under 30
   GB of disk, with 30 days of retention.
-- **External check:** monitoring on the same host cannot report that the host is down. A Cloudflare
-  Worker on a cron trigger probes the host and the MCP hostname and alerts on failure. Cloudflare's
-  standalone Health Checks may need a paid plan; the Worker does not.
+- **Grafana** is a NodePort (30300) bound to the tailnet range only, at `http://geoffcloud:30300`.
+  NixOS also filters forwarded traffic, so no NodePort is public.
+- **External check:** monitoring on the same host cannot report that the host is down. The Worker
+  `geoff-cloud-health-check` (`workers/health-check/`) runs every 5 minutes from Cloudflare's edge
+  and probes `mcp.geoff.cloud`. A 530 means the tunnel or the host is down, a 502 or 504 means the
+  PC or atc is down. It keeps the last state per target in an R2 bucket, and on a change it logs and
+  posts to `ALERT_WEBHOOK_URL` when that is set. It has no public URL.
 
 ### Backups
 
