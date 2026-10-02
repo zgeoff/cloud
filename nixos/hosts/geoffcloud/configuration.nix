@@ -79,9 +79,11 @@
     # input: a trusted docker0 would let any open imp reach the host's closed ports
     # (6443, 10250, ...). imp's module takes this over with its own bridge (imp#84).
     # imps are agent sandboxes: they must not reach the k3s pod and service CIDRs.
+    # Pods (cni0, flannel.1) need forward too: trustedInterfaces covers input only.
     extraForwardRules = ''
       iifname "docker0" ip daddr { 10.42.0.0/16, 10.43.0.0/16 } drop
       iifname "docker0" accept
+      iifname { "cni0", "flannel.1" } accept
     '';
   };
 
@@ -135,8 +137,15 @@
       # NodePorts (Grafana on 30300) bind to the tailnet address only. kube-proxy
       # DNATs them through FORWARD, which the input firewall does not cover.
       "--kube-proxy-arg=nodeport-addresses=100.64.0.0/10"
+      # the host resolves through MagicDNS (100.100.100.100), which pods cannot reach
+      "--resolv-conf=/etc/k3s-resolv.conf"
     ];
   };
+
+  environment.etc."k3s-resolv.conf".text = ''
+    nameserver 1.1.1.1
+    nameserver 9.9.9.9
+  '';
 
   environment.systemPackages = with pkgs; [
     git

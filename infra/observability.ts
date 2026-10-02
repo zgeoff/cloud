@@ -74,6 +74,11 @@ function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unk
     kubeControllerManager: { enabled: false },
     kubeScheduler: { enabled: false },
     kubeProxy: { enabled: false },
+
+    // a Helm hook Job makes the webhook's TLS secret, and Pulumi does not run Helm
+    // hooks, so the operator waits on that secret forever. One node, one operator:
+    // the webhook only validates rules, so go without it.
+    prometheusOperator: { admissionWebhooks: { enabled: false }, tls: { enabled: false } },
     prometheus: {
       prometheusSpec: {
         retention: '30d',
