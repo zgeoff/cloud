@@ -88,6 +88,25 @@ const impKeySync = new Command('imp-key-to-1password', {
 
 export const impKeySyncID = impKeySync.id;
 
+// imp's node on geoffcloud is long-lived, so it must not be ephemeral: Tailscale
+// removes an offline ephemeral node, and a long reboot would lose imp-geoffcloud.
+// Single-use, for the reinstall only; tank/imp keeps the node state after that.
+const impHostKey = new TailnetKey(
+  'imp-geoffcloud',
+  {
+    description: 'imp node on geoffcloud',
+    tags: ['tag:imp'],
+    reusable: false,
+    ephemeral: false,
+    preauthorized: true,
+    expiry: 7 * 24 * 60 * 60,
+    recreateIfInvalid: 'always',
+  },
+  { dependsOn: [policy] },
+);
+
+export const impHostAuthKey = impHostKey.key;
+
 // The Onidel VM, made by hand on 2026-10-02 and adopted here (#4). Every input but
 // the name replaces the VM, so protect and retainOnDelete keep a typo from
 // destroying it. vdb (the 200 GB volume for imp's pool) has no API and is manual.
