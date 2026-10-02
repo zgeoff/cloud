@@ -2,3 +2,5 @@ node_modules/
 .env.secrets
 .claude/settings.local.json
 .worktrees/
+provider/bin/
+sdk/.gen/
