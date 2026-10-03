@@ -185,16 +185,40 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 
 ## Rules
 
-- Commits go straight to `main` for this repo; Geoff authorised that on 2026-10-02.
+- Every change lands through a squash PR. The `main protection` ruleset blocks a direct push to
+  `main` and needs the `checks` and `gitleaks` checks green.
+- CodeRabbit is not installed on this repo, so a PR here gets no bot review.
 - This repo is public. Never commit a secret. Secrets live in the 1Password `cloud` vault; `.env`
   holds only `op://` references, resolved with `op run --env-file=.env -- <command>`.
 - Never print a secret, and never log a whole Onidel VM object: the API returns the root password.
 - No live change without a preview first. The Tailscale policy file in particular: Pulumi's `Acl`
   replaces the whole file, so Geoff reviews the diff before an apply that changes it.
-- The host's nftables rules live in the table `inet cloud_host`. Never `flush ruleset`: imp owns
-  `inet imp_host` and `inet imp_egress`.
+- The host's firewall is NixOS's table `inet nixos-fw`. imp's module adds `inet imp-forward`, and
+  k3s and Docker add their own tables; imp's `inet imp_egress` lives inside the imp-host container.
+  Never `flush ruleset`, and keep `networking.nftables.flushRuleset` off.
 - Never touch `/dev/vdb` on the host. It holds imp's ZFS pool.
 - Everything the hooks and CI run is a root `package.json` script.
+
+## Host operations
+
+- Switch geoffcloud from a `nixos/nix` container on the host network; Tailscale SSH authenticates
+  `root@geoffcloud`. Build first with `nixos-rebuild build`, then switch from a clean checkout of
+  `main`:
+
+  ```sh
+  docker run --rm --network host -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro \
+    -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro -w /src -e NIX_SSHOPTS="-o BatchMode=yes" \
+    nixos/nix sh -c 'nix --extra-experimental-features "nix-command flakes" \
+      shell nixpkgs#openssh nixpkgs#nixos-rebuild -c nixos-rebuild switch \
+      --flake path:./nixos#geoffcloud --target-host root@geoffcloud'
+  ```
+
+- Before a switch that changes imp, copy impd's database: `docker exec imp-host` tar the
+  `imp.sqlite*` files out of `/var/lib/imp/db` into `/root/imp-db-backups/<version>-<UTC time>/`,
+  then run `PRAGMA integrity_check` on the copy. The host's `/var/lib/imp` is empty: `tank/imp` has
+  a legacy mountpoint inside imp-host.
+- impd owns the DNS records `imps.geoff.cloud`, `*.imps.geoff.cloud` and
+  `_acme-challenge.imps.geoff.cloud`. Pulumi must never declare them.
 
 ## Project management
 
