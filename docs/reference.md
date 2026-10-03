@@ -172,10 +172,14 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 | `ImpdLocalHealthStale`     | the probe is over 5 minutes old, or its metric is absent, for 2 minutes                                       | warning  |
 | `TargetDown`               | any scrape target has `up == 0` for 5 minutes                                                                 | warning  |
 | `CloudflaredNoConnections` | both cloudflared pods hold 0 connections, the metric is absent, or no cloudflared target is up, for 5 minutes | critical |
+| `ATCDaemonUnreachable`     | **PENDING.** the TCP probe of `atcGateway.daemonAddress` fails, or its metric is absent, for 5 minutes        | critical |
 
 - `TargetDown` is per target, and replaces the chart's ratio-based rule of the same name. One
   cloudflared pod down shows as `TargetDown`; the tunnel serves while either pod is connected.
 - Alertmanager drops the chart's always-firing `Watchdog` and its `InfoInhibitor` helper.
+- `ATCDaemonUnreachable` and its probe exist only while `atcGateway` is set. The probe is the
+  blackbox exporter (`atc-daemon-probe` in `observability`): a TCP connect from a pod every 30
+  seconds, on the gateway's own path to the daemon.
 
 ## scripts/
 

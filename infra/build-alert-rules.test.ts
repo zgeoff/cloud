@@ -49,6 +49,30 @@ describe('buildAlertRules', () => {
   });
 });
 
+describe('buildAlertRules with the atc gateway', () => {
+  test('leaves out ATCDaemonUnreachable while the atc gateway is unset', () => {
+    expect(rules.map((rule) => rule.alert)).not.toContain('ATCDaemonUnreachable');
+    expect(buildAlertRules({ atcDaemonAddress: undefined })).toEqual(buildAlertRules());
+  });
+
+  test('alerts on a failed or missing atc daemon probe for 5 minutes, naming the address', () => {
+    const withGateway = buildAlertRules({ atcDaemonAddress: '100.69.47.33:8415' });
+    const rule = withGateway.flatMap((group) => group.rules).at(-1);
+
+    expect(withGateway.flatMap((group) => group.rules).slice(0, -1)).toEqual(rules);
+
+    expect(rule).toEqual({
+      alert: 'ATCDaemonUnreachable',
+      expr: 'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
+      for: '5m',
+      labels: { severity: 'critical' },
+      annotations: {
+        summary: "atc's daemon at 100.69.47.33:8415 is unreachable from the cluster.",
+      },
+    });
+  });
+});
+
 function getRule(name: string): (typeof rules)[number] {
   const rule = rules.find((candidate) => candidate.alert === name);
 

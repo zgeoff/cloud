@@ -11,13 +11,23 @@ interface AlertRuleGroup {
   readonly rules: readonly AlertRule[];
 }
 
+interface AlertRuleInputs {
+  // the daemon's host:port, set only while the stack config sets atcGateway
+  readonly atcDaemonAddress?: string | undefined;
+}
+
 // geoff.cloud's own alerts (#29), as Prometheus rule groups: the `spec.groups` of a
 // PrometheusRule, and also a valid rule file for `promtool check rules`.
 //
 // A missing metric must alert, never read as healthy: each check that rests on one
 // metric also fires when that metric is absent.
-export function buildAlertRules(): readonly AlertRuleGroup[] {
-  return [{ name: 'geoff-cloud', rules: [...impdRules, targetDownRule, cloudflaredRule] }];
+export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
+  const atcRules =
+    inputs.atcDaemonAddress === undefined ? [] : [buildATCDaemonRule(inputs.atcDaemonAddress)];
+
+  return [
+    { name: 'geoff-cloud', rules: [...impdRules, targetDownRule, cloudflaredRule, ...atcRules] },
+  ];
 }
 
 // impd's loopback probe, written every minute by a host timer to node-exporter's
@@ -64,3 +74,23 @@ const cloudflaredRule: AlertRule = {
   labels: { severity: 'critical' },
   annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
 };
+
+// the probe target name of atc's daemon, which the probe's ServiceMonitor stamps on
+// its series as the `target` label (create-atc-daemon-probe.ts)
+export const atcDaemonProbeTarget = 'atc-daemon';
+
+// The blackbox exporter's TCP connect to atc's daemon fails, or reports nothing: no
+// gateway call can reach the daemon then. Only while the gateway is configured, so an
+// unset gateway, which has no probe, fires nothing. The address is in the summary
+// itself: the absent() series carries no instance label.
+function buildATCDaemonRule(address: string): AlertRule {
+  const series = `probe_success{target="${atcDaemonProbeTarget}"}`;
+
+  return {
+    alert: 'ATCDaemonUnreachable',
+    expr: `${series} == 0 or absent(${series})`,
+    for: '5m',
+    labels: { severity: 'critical' },
+    annotations: { summary: `atc's daemon at ${address} is unreachable from the cluster.` },
+  };
+}
