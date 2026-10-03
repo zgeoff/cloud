@@ -106,7 +106,9 @@ const impHostKey = new TailnetKey(
     ephemeral: false,
     preauthorized: true,
     expiry: 7 * 24 * 60 * 60,
-    recreateIfInvalid: 'always',
+
+    // as for the host's key: a reinstall replaces it on purpose (runbook step 3)
+    recreateIfInvalid: 'never',
   },
   { dependsOn: [policy] },
 );

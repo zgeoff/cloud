@@ -19,8 +19,16 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 1. Turn off Secure Boot for the VM in the Onidel panel, then reboot the VM through the API. With
    Secure Boot on, kernel lockdown blocks the kexec that `nixos-anywhere` uses.
 2. Check from the host: `mokutil --sb-state` prints `SecureBoot disabled`.
-3. Run `bun run up -- --yes` first: the host keys expire after 7 days, and an apply mints fresh
-   ones. Then stage both tailnet keys outside the repo. The host's own node uses `hostAuthKey`
+3. Mint fresh host keys first. Both are single-use and keep their used or expired state
+   (`recreateIfInvalid: 'never'`), so only a replace makes new ones:
+
+   ```sh
+   bun run up -- --yes \
+     --replace 'urn:pulumi:prod::geoff-cloud::tailscale:index/tailnetKey:TailnetKey::geoffcloud-host' \
+     --replace 'urn:pulumi:prod::geoff-cloud::tailscale:index/tailnetKey:TailnetKey::imp-geoffcloud'
+   ```
+
+   Then stage both tailnet keys outside the repo. The host's own node uses `hostAuthKey`
    (tag:cloud). imp's node uses `impHostAuthKey` (tag:imp, not ephemeral), at the path that
    `services.imp.tailscaleAuthKeyFile` expects:
 
