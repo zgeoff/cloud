@@ -1,6 +1,14 @@
 # geoffcloud: Onidel VM, Melbourne. 8 vCPU (EPYC 7513, nested KVM), 31 GiB RAM.
 # vda: root (disko.nix). vdb: imp's ZFS pool, imported, never formatted here.
 { modulesPath, pkgs, ... }:
+let
+  # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
+  atcDaemonAddress = "100.69.47.33";
+  atcDaemonPort = 8415;
+  # k3s's default cluster CIDR (no --cluster-cidr override below); services.imp.forwardDeny
+  # names the same range
+  k3sPodCIDR = "10.42.0.0/16";
+in
 {
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
 
@@ -86,6 +94,25 @@
     '';
   };
 
+  # atc's daemon port, k3s pods only. tailscale0 is trusted above, so nixos-fw alone would
+  # accept 8415 from every tailnet device the policy lets reach geoffcloud (today every
+  # member, through autogroup:member -> *). This table narrows it to the gateway's path: the
+  # pod dials the host's tailnet address, so the packet enters on cni0 from a pod address,
+  # and local delivery skips flannel's masquerade in postrouting. Every other source, the
+  # tailnet and the host's own loopback included, is dropped. A drop in any input chain is
+  # final, and the accept here only passes the packet on to nixos-fw, which trusts cni0.
+  # Any pod on the host can still reach 8415; the daemon's bearer token gates the rest.
+  networking.nftables.tables.cloud_host = {
+    family = "inet";
+    content = ''
+      chain input {
+        type filter hook input priority filter - 10; policy accept;
+        tcp dport ${toString atcDaemonPort} iifname "cni0" ip saddr ${k3sPodCIDR} ip daddr ${atcDaemonAddress} accept
+        tcp dport ${toString atcDaemonPort} drop
+      }
+    '';
+  };
+
   services.openssh = {
     enable = true;
     # reachable on the tailnet only once Onidel's cloud firewall closes 22 (#4)
@@ -141,6 +168,27 @@
       "10.42.0.0/16"
       "10.43.0.0/16"
     ];
+  };
+
+  # atc's daemon for the atc gateway (docs/plans/atc-gateway.md section 7). The token files
+  # are root-only and staged by hand (operator checklist C1); systemd passes them in as
+  # credentials. principals is set and empty, so atc lists no client and grants none a
+  # target until the gateway's client IDs exist.
+  services.atc-daemon = {
+    enable = true;
+    package = pkgs.callPackage ../../packages/atc.nix { };
+    listen = "${atcDaemonAddress}:${toString atcDaemonPort}";
+    tokenFile = "/var/lib/atc-daemon-secrets/gateway-token";
+    impTokenFile = "/var/lib/atc-daemon-secrets/imp-token";
+    targets.geoffcloud = {
+      provider = "imp";
+      # impd on the host's loopback
+      url = "http://127.0.0.1:7070";
+      tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+      impPrefix = "harness-";
+    };
+    defaultTarget = "geoffcloud";
+    principals = { };
   };
 
   services.k3s = {

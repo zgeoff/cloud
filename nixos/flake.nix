@@ -23,6 +23,7 @@
           disko.nixosModules.disko
           imp.nixosModules.imp
           ./modules/impd-local-health.nix
+          ./modules/atc-daemon.nix
           ./hosts/geoffcloud/configuration.nix
           ./hosts/geoffcloud/disko.nix
         ];

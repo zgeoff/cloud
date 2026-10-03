@@ -1,8 +1,8 @@
 # atc's daemon on a cloud host, for the atc gateway to dial (docs/plans/atc-gateway.md).
 # It runs `atc daemon --listen <addr> --token-file <credential>`: a gateway presents the
 # token, and `principals` decides which execution targets each client reaches. Off by
-# default, and not imported by any host yet; enabling it opens a listener and needs
-# approval (docs/runbooks/atc-gateway-operator-checklist.md).
+# default; geoffcloud enables it. Enabling it opens a listener and needs approval
+# (docs/runbooks/atc-gateway-operator-checklist.md).
 {
   config,
   lib,
