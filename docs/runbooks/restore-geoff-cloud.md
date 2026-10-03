@@ -94,10 +94,12 @@ imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd
    current one), starts imp-host and checks that imp-host runs the copy's image. On an error it says
    how far it got; if the switch or the start had begun, it stops both units again.
 
-   **CAUTION:** At start, impd deletes every secret value that no database row names. A copy older
-   than a secret loses that secret's value. The script saves the values first, in `secrets/` of the
-   saved directory; re-add any secret the copy lacks with `imp secret add`, from that saved value or
-   from its source.
+   **CAUTION:** A database-only restore is an incomplete recovery. At start, impd deletes every
+   secret value that no database row names, so a copy older than a secret loses that secret's value,
+   and the grants that used it break. The script saves the stopped secret values first, in
+   `secrets/` of the saved directory (root-only, never printed); re-add any secret the copy lacks
+   with `imp secret add`, reading the value from that file or from its source. Until imp ships
+   `imp db copy` and its documented restore (imp #171), this runbook is the recovery contract.
 
 4. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
    copy, and `https://imps.geoff.cloud/health` returns 200.
