@@ -57,7 +57,11 @@ step "check the copy"
 [ -f "$copy/COPY-INFO" ] || fail "$copy/COPY-INFO is missing; only a copy-impd-db.sh copy is restorable"
 [ "$("$sqlite" "$copy/imp.sqlite" 'PRAGMA integrity_check;')" = ok ] || fail "the copy fails integrity_check"
 copy_image="$(sed -n 's/^image //p' "$copy/COPY-INFO")"
-copy_migration="$(sed -n 's/^migration //p' "$copy/COPY-INFO")"
+# lastMigration, as `imp db copy --json` names it (imp #171); copies from before that rename say migration
+copy_migration="$(sed -n 's/^lastMigration //p' "$copy/COPY-INFO")"
+if [ -z "$copy_migration" ]; then
+  copy_migration="$(sed -n 's/^migration //p' "$copy/COPY-INFO")"
+fi
 [ -n "$copy_image" ] && [ -n "$copy_migration" ] || fail "COPY-INFO lacks the image or the migration"
 [ "$("$sqlite" "$copy/imp.sqlite" 'SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1;')" = "$copy_migration" ] ||
   fail "the copy's newest migration differs from COPY-INFO"

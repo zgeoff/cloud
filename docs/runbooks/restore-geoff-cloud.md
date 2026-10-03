@@ -48,15 +48,21 @@ template.
 ## 2. Roll impd's database back
 
 Every imp upgrade takes a copy first with `bash scripts/copy-impd-db.sh <label>`. The copy is one
-`imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: the imp
-version, the image, the newest schema migration and the integrity check.
-`scripts/restore-impd-db.sh` puts a copy back.
+`imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: `path`,
+`sizeBytes`, `lastMigration`, `impVersion`, `createdAt` and `integrity`, the names
+`imp db copy --json` returns (imp #171), plus `image`, which impd cannot know. Copies from before
+those names say `imp` and `migration`; the restore script reads both. `scripts/restore-impd-db.sh`
+puts a copy back.
 
 **CAUTION:** A restore discards every change impd made after the copy. It is one-way: impd runs
 migrations forward only, and an older binary refuses a newer database. Disks and checkpoints made
-after the copy stay on the pool as orphans; impd keeps them, but those imps leave `imp ls` until
-someone repairs them by hand. Copies taken by `tar` of a running impd, before the copy script, have
-no `COPY-INFO` and may be torn; the restore script refuses them.
+after the copy stay on the pool as orphans: impd may log them at start, keeps them, and
+`imp gc --dry-run` lists them. That log is expected, not a failure. Those imps leave `imp ls` until
+someone repairs them by hand. Tokens follow the database too: a token minted after the copy stops
+working, and a token revoked after it works again. The root `token` file, `broker/` and `tls/` are
+not in the database and stay valid. Re-mint any token minted after the copy, such as `atc-cloud`.
+Copies taken by `tar` of a running impd, before the copy script, have no `COPY-INFO` and may be
+torn; the restore script refuses them.
 
 **CAUTION:** Never switch generations while impd's database and image disagree. A switch starts
 imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd/system` outrank
@@ -82,6 +88,10 @@ imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd
    ssh root@geoffcloud nix --extra-experimental-features "'nix-command flakes'" \
      shell nixpkgs#sqlite -c bash /root/restore-impd-db.sh /root/imp-db-backups/<copy> <generation>
    ```
+
+   The copy's newest migration must be at or below the newest migration of the image that starts; a
+   newer copy fails at start. Matching the image in `COPY-INFO` to the generation's image meets
+   that.
 
    It fails closed. Before it changes anything it checks the copy (integrity, `COPY-INFO`, its
    migration), reads both units' state and requires `inactive` or `failed`, checks that no
@@ -117,12 +127,13 @@ directory's files the same way.
 consistent copies while it wrote. The restore script ran in a privileged throwaway container with a
 fake pool, fake generations and stubbed `systemctl`, `docker`, `mount` and `nix-env`: a restore on
 the current generation and a rollback to an older one each restored the copy, saved the secrets,
-switched when needed, started and ran the copy's image. An active or activating unit, an unreadable
-unit state, a running container, an image mismatch, a missing generation, a missing `COPY-INFO`, a
-corrupt copy, a migration mismatch, a failed copy into the pool and a failed unmount each stopped
-with nothing started or switched. A failed switch and a wrong image after the start each stopped
-both units again. **Untested:** the real ZFS mount of `tank/imp`, a real generation switch during a
-restore, and any restore on geoffcloud.
+switched when needed, started and ran the copy's image; a copy with the old `COPY-INFO` names and
+one with the new names each restored. An active or activating unit, an unreadable unit state, a
+running container, an image mismatch, a missing generation, a missing `COPY-INFO`, a corrupt copy, a
+migration mismatch, a failed copy into the pool and a failed unmount each stopped with nothing
+started or switched. A failed switch and a wrong image after the start each stopped both units
+again. **Untested:** the real ZFS mount of `tank/imp`, a real generation switch during a restore,
+and any restore on geoffcloud.
 
 ## 3. Roll the host back one generation
 
