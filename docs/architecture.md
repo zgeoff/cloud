@@ -31,7 +31,7 @@ ones:
  ┌──────────── geoffcloud (Onidel, NixOS) ──────────────────────────────────────┐
  │  k3s (single node)                                                           │
  │   ├─ cloudflared          public ingress (today: mcp.geoff.cloud → PC)       │
- │   ├─ observability        Prometheus, Loki, Grafana, Alloy                   │
+ │   ├─ observability        Prometheus, Alertmanager, Loki, Grafana, Alloy     │
  │   ├─ system               coredns, local-path, metrics-server                │
  │   └─ future workloads     anything else Geoff runs                           │
  │                                                                              │
@@ -165,6 +165,37 @@ committed: the repo is public, and gitleaks runs in lefthook and in CI.
   and probes `mcp.geoff.cloud`. A 530 means the tunnel or the host is down, a 502 or 504 means the
   PC or atc is down. It keeps the last state per target in an R2 bucket, and on a change it logs and
   posts to `ALERT_WEBHOOK_URL` when that is set. It has no public URL.
+
+### Alerting
+
+Prometheus evaluates the PrometheusRule `geoff-cloud-alerts` (`infra/build-alert-rules.ts`) and
+sends to Alertmanager, both from kube-prometheus-stack (#29). A missing metric alerts; it never
+reads as healthy.
+
+| Alert                      | Fires when                                                                                                    | Severity |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------- | -------- |
+| `ImpdLocalHealthDown`      | `impd_local_health_up == 0` for 2 minutes                                                                     | critical |
+| `ImpdLocalHealthStale`     | the probe is over 5 minutes old, or its metric is absent                                                      | warning  |
+| `TargetDown`               | any scrape target has `up == 0` for 5 minutes                                                                 | warning  |
+| `CloudflaredNoConnections` | both cloudflared pods hold 0 connections, the metric is absent, or no cloudflared target is up, for 5 minutes | critical |
+
+- `CloudflaredNoConnections` sums both pods: the tunnel serves while either pod is connected. One
+  pod down shows as `TargetDown`. Our `TargetDown` is per target and replaces the chart's
+  ratio-based rule of the same name. The chart's default rules still run.
+- **The Discord receiver is gated off.** With the stack config `discordAlerts` unset or false,
+  Alertmanager routes every alert to a null receiver and sends nothing, and no Secret holds the
+  webhook. Alerts still show in Prometheus and Alertmanager.
+- With `discordAlerts` true, Pulumi writes `ALERT_WEBHOOK_URL` into the Secret
+  `observability/alertmanager-discord`. Alertmanager reads it as `webhook_url_file` and sends every
+  alert to Discord, except the chart's always-firing `Watchdog` and its `InfoInhibitor` helper. The
+  run fails if the flag is on and `ALERT_WEBHOOK_URL` is empty. The external health check's Worker
+  uses the same webhook and does not change.
+- To enable it, run `pulumi config set --stack prod discordAlerts true` in `infra/`, which adds
+  `geoff-cloud:discordAlerts: 'true'` to `infra/Pulumi.prod.yaml`, and land that through a PR. Then
+  `bun run preview` shows the new Secret, and `bun run up` applies it. The live enable and a test
+  alert each need Geoff's approval first. `pulumi config rm --stack prod discordAlerts` turns it
+  off.
+- Grafana has no Alertmanager datasource (#28): it does no alerting here.
 
 ### Backups
 
