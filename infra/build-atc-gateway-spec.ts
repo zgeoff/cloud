@@ -5,7 +5,13 @@ import type { ATCGatewayConfig } from './atc-gateway.ts';
 export const atcGatewayPort = 8414;
 export const atcGatewayLabels = { app: 'atc-gateway' };
 const nonrootID = 65_532;
-const metadataPath = '/.well-known/oauth-protected-resource/mcp';
+
+// the registry ConfigMap's key, mounted read-only under registryDir
+export const atcGatewayRegistryFile = 'registry.json';
+const registryDir = '/etc/atc-gateway';
+
+// $HOME/.local/state/atc, until atc's packaging names the gateway's state path
+const defaultStateDir = '/home/nonroot/.local/state/atc';
 
 interface GatewaySpecInputs {
   readonly config: ATCGatewayConfig;
@@ -14,8 +20,9 @@ interface GatewaySpecInputs {
   readonly registry: Output<string>;
 }
 
-// The gateway's Deployment spec. atc keeps its state under $HOME/.local/state/atc,
-// its config under $HOME/.config/atc and its sockets in $XDG_RUNTIME_DIR. A Bun
+// The gateway's Deployment spec. `atc-gateway serve` keeps gateway.db and
+// mcp-auth.db in --state-dir (the volume) and reads the daemons from --registry;
+// atc writes its config under $HOME/.config/atc and its sockets in $XDG_RUNTIME_DIR. A Bun
 // binary extracts native code to /tmp and maps it, so /tmp must allow exec, which an
 // emptyDir does.
 export function buildATCGatewaySpec(inputs: GatewaySpecInputs): input.apps.v1.DeploymentSpec {
@@ -56,32 +63,41 @@ export function buildATCPodSecurity(): input.core.v1.PodSecurityContext {
 function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Container {
   const publicHost = new URL(inputs.config.publicURL).host;
 
+  const stateDir = inputs.config.stateDir ?? defaultStateDir;
+
   return {
     name: 'atc-gateway',
     image: inputs.config.image,
     args: [
-      ...(inputs.config.args ?? ['--host', '0.0.0.0', '--port', String(atcGatewayPort)]),
+      'serve',
+      '--host',
+      '0.0.0.0',
+      '--port',
+      String(atcGatewayPort),
       '--public-url',
       inputs.config.publicURL,
+      '--registry',
+      `${registryDir}/${atcGatewayRegistryFile}`,
+      '--state-dir',
+      stateDir,
     ],
     ports: [{ name: 'http', containerPort: atcGatewayPort }],
+
+    // ATC_GATEWAY_TOKEN_<DAEMON>, which the registry's daemons need
     envFrom: [{ secretRef: { name: inputs.tokens } }],
     volumeMounts: [
-      { name: 'state', mountPath: '/home/nonroot/.local/state/atc' },
+      { name: 'state', mountPath: stateDir },
       { name: 'config', mountPath: '/home/nonroot/.config' },
       { name: 'runtime', mountPath: '/run/atc' },
       { name: 'tmp', mountPath: '/tmp' },
-      { name: 'registry', mountPath: '/etc/atc-gateway', readOnly: true },
+      { name: 'registry', mountPath: registryDir, readOnly: true },
     ],
     livenessProbe: {
-      ...buildProbe(inputs.config.livenessPath ?? metadataPath, publicHost),
+      ...buildProbe('/healthz', publicHost),
       periodSeconds: 20,
       failureThreshold: 3,
     },
-    readinessProbe: {
-      ...buildProbe(inputs.config.readinessPath ?? metadataPath, publicHost),
-      periodSeconds: 10,
-    },
+    readinessProbe: { ...buildProbe('/readyz', publicHost), periodSeconds: 10 },
     resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '256Mi' } },
     securityContext: {
       readOnlyRootFilesystem: true,
