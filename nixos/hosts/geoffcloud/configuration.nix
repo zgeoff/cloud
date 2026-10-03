@@ -56,7 +56,7 @@
   networking.usePredictableInterfaceNames = false;
 
   # Firewall: NixOS's own table (inet nixos-fw). flushRuleset must stay off:
-  # imp owns inet imp_host and inet imp_egress, and k3s and Docker add their own.
+  # imp's module adds inet imp-forward, and k3s and Docker add their own.
   networking.nftables = {
     enable = true;
     flushRuleset = false;
