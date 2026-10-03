@@ -134,6 +134,11 @@ function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unk
       additionalDataSources: [
         { name: 'Loki', type: 'loki', url: 'http://loki.observability.svc:3100', access: 'proxy' },
       ],
+
+      // alertmanager is disabled above, so its datasource only fails its health check
+      // (#28); deleteDatasources removes the copy Grafana already provisioned
+      sidecar: { datasources: { alertmanager: { enabled: false } } },
+      deleteDatasources: [{ name: 'Alertmanager', orgId: 1 }],
     },
   };
 }
