@@ -46,6 +46,11 @@ cat > "$work/bin/ssh" << 'EOF'
 #!/usr/bin/env bash
 printf 'ssh %s\n' "$*" >> "$STUB_LOG"
 shift 3
+# STUB_REMOVE_TOKEN removes the saved token just before step 3's check, after preflight
+# listed it
+case "$*" in
+  *tokens/whoami*) [ -z "${STUB_REMOVE_TOKEN:-}" ] || rm -f "$ATC_CREDENTIALS_DIR/imp-token" ;;
+esac
 # everything the host command prints goes to the log too, for the token check
 PATH="$STUB_HOST_BIN:$PATH" bash -c "$*" | tee -a "$STUB_LOG.host"
 exit "${PIPESTATUS[0]}"
@@ -99,8 +104,9 @@ chmod +x "$work"/bin/* "$work"/host-bin/*
 
 host_bin="$work/host-bin"
 
-# runs one rerun; $1 is the case name, $2 the imp-token file's content (- for empty,
-# @no-newline for the good token without a trailing newline), the rest are stub settings
+# runs one rerun; $1 is the case name, $2 the imp-token file's content (- for empty, @dir
+# for a directory in its place, @no-newline for the good token without a trailing
+# newline), the rest are stub settings
 run_case() {
   local name="$1" content="$2"
   shift 2
@@ -109,6 +115,8 @@ run_case() {
   printf '%s\n' "$bearer" > "$dir/gateway-token"
   if [ "$content" = - ]; then
     : > "$dir/imp-token"
+  elif [ "$content" = @dir ]; then
+    mkdir "$dir/imp-token"
   elif [ "$content" = @no-newline ]; then
     printf '%s' "$good_token" > "$dir/imp-token"
   else
@@ -213,6 +221,21 @@ check_unchecked impd-403 "impd answered HTTP 403, so"
 
 run_case impd-garbage "$good_token" STUB_IMPD=garbage
 check_unchecked impd-garbage "impd answered HTTP 200 without an identity"
+
+# a saved token the host cannot read is unchecked too, and impd is never asked
+check_unreadable() {
+  check_unchecked "$1" "the saved token is not a readable regular file on the host"
+  if grep -q '^curl' "$work/$1.log"; then
+    echo "FAIL: $1: called impd without reading the token"
+    failures=$((failures + 1))
+  fi
+}
+
+run_case removed "$good_token" STUB_REMOVE_TOKEN=1
+check_unreadable removed
+
+run_case directory @dir
+check_unreadable directory
 
 # Real curl against a local impd stand-in, under a hostile curl config: .curlrc files in
 # HOME, CURL_HOME and XDG_CONFIG_HOME that turn on -v and --trace-ascii and set a proxy,
