@@ -65,6 +65,8 @@ in
         A root-only file holding the bearer tokens a gateway may present: one, or two during
         a rotation, one per line, each at least 32 bytes. It is passed in with systemd
         LoadCredential as `gateway-token`, so the service user never reads the file itself.
+        systemd copies the file when the service starts, so after a rotation run
+        `systemctl restart atc-daemon`: SIGHUP rereads only that copy, not this file.
       '';
     };
 
@@ -75,7 +77,8 @@ in
       description = ''
         impd's named token for the daemon (scope manage, imps harness-*), passed in with
         LoadCredential as `imp-token`. An imp target reads it at
-        /run/credentials/atc-daemon.service/imp-token.
+        /run/credentials/atc-daemon.service/imp-token. As with tokenFile, a new token reaches
+        the daemon only after `systemctl restart atc-daemon`.
       '';
     };
 

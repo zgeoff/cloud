@@ -143,9 +143,11 @@ The gateway pod's tailnet traffic leaves through the host's node, as `tag:cloud`
 On geoffcloud it runs as a NixOS service next to imp-host (`nixos/modules/atc-daemon.nix`), not in
 k3s: `atc daemon --listen 100.69.47.33:8415 --token-file $CREDENTIALS_DIRECTORY/gateway-token`, on
 the host's tailnet address. The token file holds one or two tokens (two during a rotation), one per
-line, each at least 32 bytes. Its config sets one execution target, `geoffcloud` (provider `imp`,
-`http://127.0.0.1:7070`, imp prefix `harness-`, impd's token from the `imp-token` credential), and
-`principals`, which grant each gateway client ID its targets.
+line, each at least 32 bytes. systemd's `LoadCredential` copies both token files when the service
+starts, so a rotation needs `systemctl restart atc-daemon`: SIGHUP rereads only the copy. Its config
+sets one execution target, `geoffcloud` (provider `imp`, `http://127.0.0.1:7070`, imp prefix
+`harness-`, impd's token from the `imp-token` credential), and `principals`, which grant each
+gateway client ID its targets.
 
 - **Identity.** On the host it shares the host's tailnet node, so its traffic leaves as `tag:cloud`.
   The gateway pod reaches it on the same host without crossing the tailnet, so that hop needs no
