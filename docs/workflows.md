@@ -184,20 +184,21 @@ alert, each need Geoff's approval first.
 3. `bun run up` applies it. Alertmanager then sends every alert to Discord, except the chart's
    always-firing `Watchdog` and its `InfoInhibitor` helper.
 
-`pulumi config rm --stack prod discordAlerts` turns it off again. The external health check uses the
-same webhook either way.
+To turn it off again, run `op run --env-file=../.env -- pulumi config rm --stack prod discordAlerts`
+in `infra/`, and land it the same way. The external health check uses the same webhook either way.
 
 ## Rotate a credential
 
 Store the new value in its 1Password item first, then deliver it.
 
-| Credential                    | Deliver it with                                                                    |
-| ----------------------------- | ---------------------------------------------------------------------------------- |
-| Anything `.env` references    | the next `bun run up`; Pulumi pushes it to the resource or k8s Secret              |
-| imp's Cloudflare DNS token    | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart         |
-| the k3s kubeconfig            | `bash scripts/connect-k3s.sh`                                                      |
-| imp's tailnet key (`tag:imp`) | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey` |
-| the Onidel API key            | the Onidel panel, then the `onidel-api` item                                       |
+| Credential                                                     | Deliver it with                                                                                       |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| a provider credential: Onidel, Cloudflare, Tailscale, R2 state | nothing: the next run reads the new value through `op run`. Revoke the old one at its source          |
+| `ALERT_WEBHOOK_URL`                                            | `bun run up`, which updates the Worker's secret, and Alertmanager's Secret when `discordAlerts` is on |
+| `PULUMI_CONFIG_PASSPHRASE`                                     | do not replace the item: the stack's secrets are encrypted with it. Changing it needs a migration     |
+| imp's Cloudflare DNS token                                     | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart                            |
+| the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                               |
+| imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                    |
 
 **PENDING:** the atc daemon is not deployed. Once it runs, a rotation of its gateway or imp token
 needs `systemctl restart atc-daemon` on the host. systemd's `LoadCredential` copies the token files

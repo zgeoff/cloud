@@ -4,16 +4,16 @@ This page sets up a machine to work on geoff.cloud, and ends with a preview of t
 
 ## Prerequisites
 
-| Tool                      | Version or source                  | Used for                                                    |
-| ------------------------- | ---------------------------------- | ----------------------------------------------------------- |
-| Bun                       | `.bun-version` (1.4.2)             | every root script, and the Pulumi program's runtime         |
-| Go                        | `provider/go.mod` (1.26.6)         | building the Onidel provider, which every preview builds    |
-| Pulumi CLI                | current                            | `preview`, `up`, `drift`, stack config                      |
-| 1Password CLI (`op`)      | with a token for the `cloud` vault | resolving `.env`                                            |
-| Tailscale                 | a member device of the tailnet     | the k3s API, Grafana, and SSH to `root@geoffcloud`          |
-| Docker                    | current                            | NixOS builds and switches (`nixos/nix` image), fixture test |
-| gitleaks                  | on `PATH`                          | the pre-commit hook                                         |
-| `jq`, `gh`, `ssh`, `curl` | current                            | the scripts in `scripts/`                                   |
+| Tool                      | Version or source                  | Used for                                                                |
+| ------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
+| Bun                       | `.bun-version` (1.4.2)             | every root script, and the Pulumi program's runtime                     |
+| Go                        | `provider/go.mod` (1.26.6)         | building the Onidel provider, which every preview builds                |
+| Pulumi CLI                | current                            | `preview`, `up`, `drift`, stack config                                  |
+| 1Password CLI (`op`)      | with a token for the `cloud` vault | resolving `.env`                                                        |
+| Tailscale                 | a tailnet admin's device           | the k3s API and Grafana (any member), SSH to `root@geoffcloud` (admins) |
+| Docker                    | current                            | NixOS builds and switches (`nixos/nix` image), fixture test             |
+| gitleaks                  | on `PATH`                          | the pre-commit hook                                                     |
+| `jq`, `gh`, `ssh`, `curl` | current                            | the scripts in `scripts/`                                               |
 
 You need no local Nix: every Nix command here runs in the `nixos/nix` image.
 
