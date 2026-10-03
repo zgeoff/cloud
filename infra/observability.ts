@@ -1,13 +1,12 @@
 import type { Provider } from '@pulumi/kubernetes';
-import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
-import { createAlertRules } from './create-alert-rules.ts';
 import { createAlertWebhook } from './create-alert-webhook.ts';
 import { createDashboards } from './create-dashboards.ts';
+import { createMonitors } from './create-monitors.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
 // and opens no public port, so http://geoffcloud:30300 works from the tailnet alone.
@@ -21,10 +20,12 @@ interface ObservabilityOutputs {
 
 // Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
 // (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
-// when alertWebhookURL is set (#29); otherwise it sends nothing.
+// when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemonAddress, set
+// only with the atc gateway, adds a TCP probe of atc's daemon and its alert.
 export function createObservability(
   cluster: Provider,
   alertWebhookURL: string | undefined,
+  atcDaemonAddress: string | undefined,
 ): ObservabilityOutputs {
   const opts = { provider: cluster };
 
@@ -51,8 +52,7 @@ export function createObservability(
 
   const shipper = createLogShipper(ns, [logs, metrics], cluster);
 
-  createCloudflaredMonitor(ns, metrics, cluster);
-  createAlertRules(ns, metrics, cluster);
+  createMonitors(ns, atcDaemonAddress, { provider: cluster, dependsOn: [metrics] });
   createDashboards(ns, cluster);
 
   return {
@@ -104,28 +104,6 @@ function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider):
       values: alloyValues,
     },
     { provider: cluster, dependsOn },
-  );
-}
-
-// cloudflared serves Prometheus metrics on its `metrics` port (cluster-workloads.ts)
-function createCloudflaredMonitor(
-  ns: Namespace,
-  metrics: Chart,
-  cluster: Provider,
-): CustomResource {
-  return new CustomResource(
-    'cloudflared',
-    {
-      apiVersion: 'monitoring.coreos.com/v1',
-      kind: 'PodMonitor',
-      metadata: { name: 'cloudflared', namespace: ns.metadata.name },
-      spec: {
-        namespaceSelector: { matchNames: ['ingress'] },
-        selector: { matchLabels: { app: 'cloudflared' } },
-        podMetricsEndpoints: [{ port: 'metrics' }],
-      },
-    },
-    { provider: cluster, dependsOn: [metrics] },
   );
 }
 

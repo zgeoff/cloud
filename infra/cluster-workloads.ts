@@ -69,7 +69,8 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     process.env['ALERT_WEBHOOK_URL'],
   );
 
-  const observability = createObservability(cluster, alertWebhookURL);
+  const atcDaemonAddress = inputs.atcGateway?.daemon.address;
+  const observability = createObservability(cluster, alertWebhookURL, atcDaemonAddress);
 
   const gateway =
     inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);

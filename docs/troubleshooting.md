@@ -102,3 +102,17 @@ No cloudflared pod holds a tunnel connection, or Prometheus cannot scrape cloudf
 Check the pods with `ssh root@geoffcloud k3s kubectl -n ingress get pods`, and their logs in Loki.
 If the tunnel is down, the external health check reports it from outside as `tunnel-down`; if only
 the metrics fail, the external check stays healthy.
+
+### `ATCDaemonUnreachable` fires
+
+A pod cannot open a TCP connection to the atc daemon at `atcGateway.daemonAddress`, or the probe
+reports nothing. The gateway cannot reach the daemon then either. Three causes:
+
+1. The daemon is down. Check `ssh root@geoffcloud systemctl status atc-daemon`.
+2. The host firewall drops the pod's path: port 8415 from `cni0`, source `10.42.0.0/16`. Check
+   `ssh root@geoffcloud nft list table inet cloud_host`.
+3. `atcGateway.daemonAddress` is wrong. Compare it with the address the daemon listens on, from
+   `ssh root@geoffcloud ss -tlnp`.
+
+If the probe reports nothing, check the `atc-daemon-probe` pods with
+`ssh root@geoffcloud k3s kubectl -n observability get pods`.
