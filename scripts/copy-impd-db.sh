@@ -43,7 +43,11 @@ integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")
 migration=$("$sqlite" "$dir/imp.sqlite" "SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1;")
 version=$(docker exec imp-host imp info | sed -n "s/^version *//p")
 image=$(docker inspect imp-host --format "{{.Config.Image}}")
-printf "imp %s\nimage %s\nmigration %s\nintegrity %s\n" "$version" "$image" "$migration" "$integrity" > "$dir/COPY-INFO"
+created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+size=$(stat -c %s "$dir/imp.sqlite")
+# the field names match `imp db copy --json` (imp #171); impd cannot know the image, so cloud adds it
+printf "path %s\nsizeBytes %s\nlastMigration %s\nimpVersion %s\ncreatedAt %s\nintegrity %s\nimage %s\n" \
+  "$dir/imp.sqlite" "$size" "$migration" "$version" "$created" "$integrity" "$image" > "$dir/COPY-INFO"
 cat "$dir/COPY-INFO"
 echo "copy: $dir ($(stat -c "%s bytes, mode %a" "$dir/imp.sqlite"))"
 test "$integrity" = ok'
