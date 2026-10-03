@@ -103,10 +103,10 @@ reach 8415 (a grant from `tag:cloud` only, in place of members) is optional and 
 
 ## Deferred, not dropped
 
-- A documentation pass over cloud, lighter than atc's and imp's and coordinated with them: getting
-  started, concepts, common workflows, and reference and troubleshooting; prune stale implementation
-  history. It starts once F2 and G4 are done: the gateway serves atc.geoff.cloud as the issuer, and
-  a harness smoke run passes end to end.
+- A documentation rewrite of cloud, done last, once almost everything has settled. It stands alone
+  for an outside reader: getting started, concepts, common workflows, reference and troubleshooting.
+  Agree its structure with Geoff before writing, then write it with the writing-guidelines skill.
+  Tracked in its own issue; do not open another.
 - A Tailscale sidecar giving the gateway pod its own `tag:atc-gateway`, once a second daemon exists.
 - The PC daemon and `tag:atc-daemon` (D2).
 - An encryption and backup design for impd's state on the pool.
