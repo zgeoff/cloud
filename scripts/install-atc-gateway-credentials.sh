@@ -56,8 +56,14 @@ host_files="$(on_host "ls $dir")"
 echo "ok: 1Password vault $vault, atc-key, ssh $host, impd grantableTokens, $dir"
 
 step "1/3 impd secret glm (api.z.ai, authorization: Bearer)"
+glm_rules='[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}]'
 if jq -e 'any(.[]; .name == "glm")' <<< "$secrets" > /dev/null; then
-  echo "skip: glm exists"
+  if ! jq -e --argjson r "$glm_rules" 'any(.[]; .name == "glm" and .kind == "custom" and .rules == $r)' \
+    <<< "$secrets" > /dev/null; then
+    echo "glm exists with other rules; fix it by hand, then rerun" >&2
+    exit 1
+  fi
+  echo "skip: glm exists with the expected rules"
 else
   key="$(atc-key zai)"
   if [ -z "$key" ]; then
@@ -75,15 +81,22 @@ step "2/3 daemon bearer: 1Password $vault/$item and $host:$dir/gateway-token"
 has_file=false
 grep -qx gateway-token <<< "$host_files" && has_file=true
 if [ "$has_item" = true ] && [ "$has_file" = true ]; then
-  echo "skip: both exist"
+  item_sum="$(op read "op://$vault/$item/credential" | sha256sum | cut -d' ' -f1)"
+  host_sum="$(on_host "sha256sum $dir/gateway-token" | cut -d' ' -f1)"
+  if [ "$item_sum" != "$host_sum" ]; then
+    echo "the 1Password item and the host file differ; fix by hand, then rerun" >&2
+    exit 1
+  fi
+  echo "skip: both exist and match"
 elif [ "$has_item" = true ] || [ "$has_file" = true ]; then
   echo "only one copy exists (item: $has_item, host file: $has_file); fix by hand, then rerun" >&2
   exit 1
 else
   bearer="$(openssl rand 48 | basenc --base64url -w0 | tr -d '=')"
-  jq -n --arg t "$item" --arg v "$bearer" \
+  # the bearer reaches jq on stdin (printf is a builtin), never in jq's argv
+  printf '%s\n' "$bearer" | jq -R --arg t "$item" \
     '{title: $t, category: "API_CREDENTIAL",
-      fields: [{id: "credential", type: "CONCEALED", label: "credential", value: $v}]}' |
+      fields: [{id: "credential", type: "CONCEALED", label: "credential", value: .}]}' |
     op item create --vault "$vault" - --format json | jq -r '"1Password: \(.title) (\(.id))"'
   # shellcheck disable=SC2016 # expanded on the host
   printf '%s\n' "$bearer" | on_host "umask 077; t=\$(mktemp $dir/.gateway-token.XXXXXX);
@@ -105,7 +118,12 @@ has_token="$(jq 'any(.[]; .name == "atc-cloud")' <<< "$tokens")"
 has_file=false
 grep -qx imp-token <<< "$host_files" && has_file=true
 if [ "$has_token" = true ] && [ "$has_file" = true ]; then
-  echo "skip: both exist"
+  if ! jq -e 'any(.[]; .name == "atc-cloud" and .scope == "manage"
+      and .imps == ["harness-*"] and .grantable == ["glm"])' <<< "$tokens" > /dev/null; then
+    echo "atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun" >&2
+    exit 1
+  fi
+  echo "skip: both exist, and atc-cloud has the expected limits"
 elif [ "$has_token" = true ] || [ "$has_file" = true ]; then
   echo "only one exists (token: $has_token, host file: $has_file). impd shows a token once," >&2
   echo "so run 'imp token rm atc-cloud' in imp-host and remove $dir/imp-token, then rerun" >&2
