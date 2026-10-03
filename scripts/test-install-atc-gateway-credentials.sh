@@ -67,26 +67,30 @@ cat > "$work/host-bin/install" << 'EOF'
 printf 'install %s\n' "$*" >> "$STUB_LOG"
 mkdir -p "${!#}"
 EOF
-# impd's tokens.whoami. With STUB_IMPD set to down it refuses the connection; otherwise a
-# known token gets its identity, named STUB_NAME, and any other bearer gets impd's 401
+# impd's tokens.whoami, answering as curl -w '\n%{http_code}' prints it. STUB_IMPD picks a
+# failure: down (connection refused, exit 7), reset (exit 56), 500 or 403 (that status), or
+# garbage (200 with a body that is not JSON). Otherwise a known token gets its identity,
+# named STUB_NAME, and any other bearer gets impd's 401.
 cat > "$work/host-bin/curl" << 'EOF'
 #!/usr/bin/env bash
 printf 'curl %s\n' "$*" >> "$STUB_LOG"
-if [ "${STUB_IMPD:-up}" = down ]; then
-  echo "curl: (7) Failed to connect to 127.0.0.1 port 7070" >&2
-  exit 7
-fi
 header="$(cat)"
 case "$*" in
-  *"-H @-"*"http://127.0.0.1:7070/rpc/tokens/whoami"*) ;;
+  *"-H @-"*"-w \n%{http_code} http://127.0.0.1:7070/rpc/tokens/whoami") ;;
   *) echo "curl stub: unexpected $*" >&2; exit 2 ;;
 esac
+case "${STUB_IMPD:-up}" in
+  down) echo "curl: (7) Failed to connect to 127.0.0.1 port 7070" >&2; exit 7 ;;
+  reset) echo "curl: (56) Recv failure: Connection reset by peer" >&2; exit 56 ;;
+  500) printf '{"json":{"code":"INTERNAL_SERVER_ERROR","status":500}}\n500'; exit 0 ;;
+  403) printf '{"json":{"code":"FORBIDDEN","status":403}}\n403'; exit 0 ;;
+  garbage) printf '<html>bad gateway</html>\n200'; exit 0 ;;
+esac
 if [ "$header" = "Authorization: Bearer $STUB_GOOD_TOKEN" ]; then
-  printf '{"json":{"kind":"token","name":"%s","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}\n' \
+  printf '{"json":{"kind":"token","name":"%s","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}\n200' \
     "${STUB_NAME:-atc-cloud}"
 else
-  echo '{"json":{"defined":false,"code":"UNAUTHORIZED","status":401,"message":"Unauthorized"}}'
-  exit 22
+  printf '{"error":"unauthorized"}\n401'
 fi
 EOF
 chmod +x "$work"/bin/* "$work"/host-bin/*
@@ -150,8 +154,30 @@ check stale 1 "does not authenticate to impd as the token atc-cloud"
 run_case wrong-identity "$good_token" STUB_NAME=atc-other
 check wrong-identity 1 "does not authenticate to impd as the token atc-cloud"
 
+# impd's failures leave the file unchecked: no advice to remove it or revoke atc-cloud
+check_unchecked() {
+  local name="$1" want_text="$2"
+  check "$name" 1 "$want_text"
+  if grep -qF "imp token rm" "$work/$name.out"; then
+    echo "FAIL: $name: advised removing a token impd never rejected"
+    failures=$((failures + 1))
+  fi
+}
+
 run_case impd-down "$good_token" STUB_IMPD=down
-check impd-down 1 "impd did not answer on the host's 127.0.0.1:7070"
+check_unchecked impd-down "the check on the host exited 7"
+
+run_case impd-reset "$good_token" STUB_IMPD=reset
+check_unchecked impd-reset "the check on the host exited 56"
+
+run_case impd-500 "$good_token" STUB_IMPD=500
+check_unchecked impd-500 "impd answered HTTP 500, so"
+
+run_case impd-403 "$good_token" STUB_IMPD=403
+check_unchecked impd-403 "impd answered HTTP 403, so"
+
+run_case impd-garbage "$good_token" STUB_IMPD=garbage
+check_unchecked impd-garbage "impd answered HTTP 200 without an identity"
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures case(s) failed" >&2

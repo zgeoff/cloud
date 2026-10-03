@@ -125,27 +125,43 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   fi
   # the metadata cannot show the file is right, so ask impd who the saved token is: impd's
   # tokens.whoami on loopback. The token goes from the file to curl's stdin on the host,
-  # never into argv or back here; only impd's answer, which names the token, returns.
-  # Exit 3: the file holds no token. Curl exits 7 or 28 when impd does not answer.
+  # never into argv or back here; only impd's answer and its HTTP status return. Only an
+  # empty file (exit 3), impd's 401 for an unknown token, or a clear answer naming another
+  # caller means the file is bad; anything else leaves it unchecked and changes nothing.
   whoami_status=0
   # shellcheck disable=SC2016 # expanded on the host
-  identity="$(on_host "set -euo pipefail; v=''
+  answer="$(on_host "set -euo pipefail; v=''
     IFS= read -r v < $dir/imp-token || true
     test -n \"\$v\" || exit 3
     printf 'Authorization: Bearer %s\n' \"\$v\" |
-      curl -sS --fail-with-body --max-time 10 -H @- -H 'content-type: application/json' \
-        --data '{\"json\":{}}' http://127.0.0.1:7070/rpc/tokens/whoami")" || whoami_status=$?
-  case "$whoami_status" in
-    0) ;;
-    7 | 28)
-      echo "impd did not answer on the host's 127.0.0.1:7070, so $dir/imp-token is unchecked;" >&2
-      echo "nothing changed. Start impd, then rerun" >&2
-      exit 1
-      ;;
-    *) identity="" ;;
-  esac
-  if ! jq -e '.json.kind == "token" and .json.name == "atc-cloud"' <<< "${identity:-null}" \
-    > /dev/null 2>&1; then
+      curl -sS --max-time 10 -H @- -H 'content-type: application/json' \
+        --data '{\"json\":{}}' -w '\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami")" ||
+    whoami_status=$?
+  http_status="${answer##*$'\n'}"
+  identity="${answer%$'\n'*}"
+  unset answer
+  bad_file=false
+  unchecked=""
+  if [ "$whoami_status" -eq 3 ]; then
+    bad_file=true
+  elif [ "$whoami_status" -ne 0 ]; then
+    unchecked="the check on the host exited $whoami_status (curl's exit code, or 255 from ssh)"
+  elif [ "$http_status" = 401 ]; then
+    bad_file=true
+  elif [[ ! "$http_status" =~ ^2[0-9][0-9]$ ]]; then
+    unchecked="impd answered HTTP $http_status"
+  elif ! jq -e '.json | type == "object" and (.kind | type) == "string" and (.name | type) == "string"' \
+    <<< "$identity" > /dev/null 2>&1; then
+    unchecked="impd answered HTTP $http_status without an identity"
+  elif ! jq -e '.json.kind == "token" and .json.name == "atc-cloud"' <<< "$identity" > /dev/null; then
+    bad_file=true
+  fi
+  if [ -n "$unchecked" ]; then
+    echo "$unchecked, so $dir/imp-token is unchecked; nothing changed." >&2
+    echo "Check impd on the host's 127.0.0.1:7070, then rerun" >&2
+    exit 1
+  fi
+  if [ "$bad_file" = true ]; then
     echo "$dir/imp-token does not authenticate to impd as the token atc-cloud (empty, stale" >&2
     echo "or another token). impd shows a token once, so remove $dir/imp-token and run" >&2
     echo "'imp token rm atc-cloud' in imp-host, then rerun to mint a new one" >&2
