@@ -137,7 +137,7 @@ Items that `.env` does not reference:
 | tcp 30300 | `geoffcloud`, tailnet address only  | the tailnet                                | Grafana (NodePort)               |
 | tcp 7070  | host loopback, and `imp-geoffcloud` | the host; tailnet members; `tag:imp` nodes | impd's API and `/health`         |
 | tcp 8414  | Geoff's PC (`home-pc`)              | tailnet members; `tag:cloud`               | `atc mcp --http`                 |
-| tcp 8415  | `geoffcloud`, tailnet address       | **PENDING**                                | the atc daemon                   |
+| tcp 8415  | `geoffcloud`, tailnet address       | k3s pods only (`inet cloud_host`)          | the atc daemon (**PENDING**)     |
 | tcp 2000  | cloudflared pods                    | the cluster                                | cloudflared metrics and `/ready` |
 | tcp 3100  | `loki.observability.svc`            | the cluster                                | Loki                             |
 
