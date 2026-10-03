@@ -94,6 +94,36 @@ func TestVMImportAdoptsWithoutReplace(t *testing.T) {
 	assert.Equal(t, p.UpdateReplace, diff.DetailedDiff["cpu"].Kind)
 }
 
+func TestVMReadKeepsFirewallUUIDOverNumericID(t *testing.T) {
+	server, api := setupTestServer(t)
+	const id = "0f289413-258f-4115-ac81-252000998fe0"
+	const groupID = "f036620a-90df-4ba0-b7f0-54b4b5488bd2"
+	vm := liveShapedVM(id)
+	vm["firewall_group_id"] = 1581
+	api.vms[id] = vm
+	api.firewalls[groupID] = map[string]any{
+		"id": groupID, "description": "geoff.cloud edge", "instance_count": 1, "rule_count": 4,
+	}
+	program := vmProgramInputs()
+	program["firewallGroupId"] = groupID
+	urn := buildURN(vmToken, "geoffcloud")
+
+	read, err := server.Read(p.ReadRequest{ID: id, Urn: urn, Inputs: buildProps(program)})
+	require.NoError(t, err)
+	assert.Equal(t, groupID, toPlain(read.Inputs)["firewallGroupId"])
+	diff, err := server.Diff(p.DiffRequest{
+		ID: id, Urn: urn, State: read.Properties, OldInputs: read.Inputs, Inputs: buildProps(program),
+	})
+	require.NoError(t, err)
+	assert.False(t, diff.HasChanges, "unexpected diff: %v", diff.DetailedDiff)
+
+	// With no instance on the program's group, the VM is on some other group.
+	api.firewalls[groupID]["instance_count"] = 0
+	read, err = server.Read(p.ReadRequest{ID: id, Urn: urn, Inputs: buildProps(program)})
+	require.NoError(t, err)
+	assert.Equal(t, "1581", toPlain(read.Inputs)["firewallGroupId"])
+}
+
 func TestVMLifecycle(t *testing.T) {
 	server, api := setupTestServer(t)
 	urn := buildURN(vmToken, "web")

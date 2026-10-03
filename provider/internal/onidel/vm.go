@@ -149,11 +149,11 @@ func (VM) Read(ctx context.Context, req infer.ReadRequest[VMArgs, VMState]) (inf
 	args.CPU = vm.VCPU
 	args.RAM = vm.RAM
 	args.Disk = vm.Disk
-	args.FirewallGroupID = nil
-	if vm.FirewallGroupID != "" {
-		id := string(vm.FirewallGroupID)
-		args.FirewallGroupID = &id
+	firewallGroupID, err := readFirewallGroupID(ctx, api, req.Inputs.FirewallGroupID, string(vm.FirewallGroupID))
+	if err != nil {
+		return infer.ReadResponse[VMArgs, VMState]{}, err
 	}
+	args.FirewallGroupID = firewallGroupID
 	if args.IPv6 != nil || isImport {
 		enabled := vm.MainIPv6 != ""
 		args.IPv6 = &enabled
@@ -272,6 +272,35 @@ func buildVMState(args VMArgs, vm client.VM) VMState {
 		BGPEnabled: vm.BGPEnabled,
 		CreatedAt:  vm.CreatedAt,
 	}
+}
+
+// readFirewallGroupID reconciles the VM's reported firewall group with the prior input.
+// GET /vm reports the group by a numeric internal ID, while groups are created, read
+// and attached by UUID, and no endpoint maps one to the other (checked 2026-10-03).
+// The prior UUID stands while that group still has an instance attached; otherwise
+// the reported ID stands, and the next diff re-attaches the program's group.
+func readFirewallGroupID(ctx context.Context, api *client.Client, prior *string, reported string) (*string, error) {
+	if reported == "" {
+		return nil, nil
+	}
+	if prior == nil || *prior == "" || *prior == reported || !isNumericID(reported) {
+		return &reported, nil
+	}
+	group, err := api.ReadFirewallGroup(ctx, *prior)
+	if client.IsNotFound(err) {
+		return &reported, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if group.InstanceCount > 0 {
+		return prior, nil
+	}
+	return &reported, nil
+}
+
+func isNumericID(id string) bool {
+	return id != "" && strings.Trim(id, "0123456789") == ""
 }
 
 // findOSTemplateID resolves a template name, as GET /vm reports it, to its ID.

@@ -14,6 +14,15 @@ interface HealthCheckInputs {
 
 const scriptName = 'geoff-cloud-health-check';
 
+// The API's full defaults: a bare { enabled: true } reads back expanded and shows as
+// drift on every preview.
+const observability = {
+  enabled: true,
+  headSamplingRate: 1,
+  logs: { enabled: true, headSamplingRate: 1, invocationLogs: true, persist: true },
+  traces: { enabled: false, headSamplingRate: 1, persist: true },
+};
+
 // The external health check (#8): a Worker on a 5-minute cron, bundled from
 // workers/health-check by Bun at deploy time. Its state lives in an R2 bucket.
 export async function createHealthCheck(inputs: HealthCheckInputs): Promise<WorkersCronTrigger> {
@@ -32,7 +41,7 @@ export async function createHealthCheck(inputs: HealthCheckInputs): Promise<Work
     content,
     mainModule: 'index.js',
     compatibilityDate: '2026-09-01',
-    observability: { enabled: true },
+    observability,
     bindings: [
       { name: 'STATE', type: 'r2_bucket', bucketName: state.name },
       { name: 'TARGETS', type: 'plain_text', text: JSON.stringify(inputs.targets) },
