@@ -150,7 +150,15 @@ docker run --rm --device /dev/kvm -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro
   build --no-link -L --impure -f nixos/tests/impd-restore.nix
 ```
 
-**Untested:** any restore on geoffcloud, and the image comparison with a digest-pinned image.
+Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
+`imp-host.service` and the one `docker inspect` reports for the running imp-host are the same
+digest-pinned string (`imp-host:0.29.0@sha256:4e6f0cf6…`), and so is the `image` line of the copy
+`imp-0.29.0-consistent-20261003T181942`. **Untested:** any restore on geoffcloud.
+
+**CAUTION:** Only copies with `COPY-INFO` are restorable. The copy taken before the 0.29.0 upgrade,
+`imp-0.27.0-pre-0.29.0-20261003T171605`, is a tar copy without one, so the script refuses it and no
+supported path returns the database to 0.27.0. Before each imp upgrade, take a copy with
+`scripts/copy-impd-db.sh`; that copy is the upgrade's rollback.
 
 ## 3. Roll the host back one generation
 
