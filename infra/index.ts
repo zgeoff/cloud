@@ -17,6 +17,10 @@ import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
 import { requireKubeconfig } from './require-kubeconfig.ts';
 import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
+// K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig. The stack's "cluster" config says
+// whether the cluster is managed, so a missing kubeconfig fails the run before any resource
+// registers, instead of planning to delete the cluster's resources.
+const kubeconfig = requireKubeconfig(new Config().get('cluster'), process.env['K3S_KUBECONFIG']);
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
 
 if (accountID === undefined) {
@@ -252,11 +256,7 @@ export const tunnelToken = secret(
   getZeroTrustTunnelCloudflaredTokenOutput({ accountId: accountID, tunnelId: tunnel.id }).token,
 );
 
-// k3s workloads (#6). K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig. The stack's
-// "cluster" config says whether the cluster is managed, so a missing kubeconfig fails the
-// run instead of planning to delete the cluster's resources.
-const kubeconfig = requireKubeconfig(new Config().get('cluster'), process.env['K3S_KUBECONFIG']);
-
+// k3s workloads (#6), with the kubeconfig checked at the top of the program
 const workloads =
   kubeconfig === undefined
     ? undefined
