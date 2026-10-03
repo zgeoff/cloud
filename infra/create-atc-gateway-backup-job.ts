@@ -39,6 +39,10 @@ export function createATCGatewayBackupJob(cluster: Provider, inputs: BackupJobIn
       spec: {
         schedule: '30 3 * * *',
         timeZone: 'Australia/Melbourne',
+
+        // Suspended: backups run only as manual Jobs from this template until Geoff
+        // approves the nightly schedule. Flipping this starts recurring R2 writes.
+        suspend: true,
         concurrencyPolicy: 'Forbid',
         jobTemplate: {
           spec: {
