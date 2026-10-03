@@ -200,7 +200,9 @@ loki.source.kubernetes "pods" {
 // of the host, which no pod log covers
 loki.source.journal "host" {
   path          = "/var/log/journal"
-  max_age       = "12h"
+  // Loki rejects entries more than an hour behind a stream's newest; a restart
+  // re-reads from max_age, since the read position is not persisted
+  max_age       = "1h"
   relabel_rules = loki.relabel.journal.rules
   labels        = { job = "journal" }
   forward_to    = [loki.write.default.receiver]
