@@ -7,6 +7,11 @@ on:
       - 'infra/**'
       - 'provider/**'
       - 'sdk/**'
+      # the health-check Worker is bundled from here into a managed resource
+      - 'workers/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.bun-version'
       - '.github/workflows/drift.yml'
   schedule:
     # daily: console drift arrives with no commit, so no push can catch it
