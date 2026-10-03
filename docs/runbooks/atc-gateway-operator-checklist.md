@@ -5,12 +5,15 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-03): A1 is done: geoffcloud runs imp 0.24.0 (system-8, 5a1b7d9) with an
-unprivileged imp-host, impd healthy, the Firecracker jailer on, `inet imp-forward` live and k3s
-unchanged. Copies of impd's database from before each upgrade are in `/root/imp-db-backups/` on the
-host, for a rollback. B3 has run once, ahead of B2, with the 2.10.0 stand-in binary (run
-37044948105). C3's R2 bucket, key and restic password exist in 1Password; C4's GitHub token exists,
-unused. Nothing else below has run. Published, both public:
+Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.0 (system-15). Copies of impd's
+database from before each upgrade are in `/root/imp-db-backups/` on the host, for a rollback. B1 is
+done: atc 2.24.0 ships `atc-gateway-linux-x64` and holds atc #242. B2 is done: the pins track
+2.24.0, and the fixture test passes against the real gateway binary. C1 and C2 are done: the
+gateway's daemon bearer and impd's `atc-cloud` token are in 1Password and on the host. C3's R2
+bucket, key and restic password exist in 1Password; C4's GitHub token exists, unused. Nothing else
+below has run.
+
+B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
 - `ghcr.io/zgeoff/atc-gateway:2.10.0@sha256:86cd2af8f297cb5143cee19e71b921d6ba0bc3e3a004d6498be7533b34a068be`
   **FIXTURE STAND-IN, NOT USABLE AS THE PRODUCTION GATEWAY.** It holds atc 2.10.0's `atc` binary.
@@ -18,39 +21,22 @@ unused. Nothing else below has run. Published, both public:
 - `ghcr.io/zgeoff/atc-gateway-backup:2.10.0@sha256:cc9d89b9f72fdc8ee0f209e101031e8d3f7620e3a527cfc2608c57d143977c6d`
   (restic and sqlite3; usable as is, and pinned in `restore-job.yaml`)
 
-B3 runs again after B2 to publish the real gateway image. The package is validated locally:
+B3 runs again to publish the 2.24.0 gateway image. The fixture test runs the real gateway with the
+Deployment's flags: `serve --host --port --public-url --registry --state-dir`. The gateway refuses
+any other flag, and exits when `--state-dir` and `ATC_GATEWAY_STATE_DIR` disagree; the Deployment
+sets both to the same path. The fixture does not prove gateway-to-daemon transport (its registry
+names a dead address), R2, or anything in k3s.
 
-| Check                                                                                                                                                                                                | Result                               |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| `scripts/test-atc-gateway-fixture.sh`: images build from the pinned, checksum-verified binary; nonroot on a read-only root; Host rule; OAuth state survives a restart and a backup, wipe and restore | pass (local and CI)                  |
-| `bun run preview` with `atcGateway` unset                                                                                                                                                            | no change                            |
-| `bun run preview` with `atcGateway` set (scratch config file)                                                                                                                                        | creates only the 9 gateway resources |
-| `nix build ./nixos#checks.x86_64-linux.atc-daemon`                                                                                                                                                   | builds                               |
-| geoffcloud's system with the flake changes                                                                                                                                                           | unchanged                            |
-| `deploy/atc-gateway/restore-job.yaml`, client dry run                                                                                                                                                | valid                                |
+The package is validated:
 
-The fixture uses atc 2.10.0's `atc mcp --http` as a stand-in for the gateway binary. It does not
-prove gateway-to-daemon transport, `/healthz` and `/readyz`, R2, or anything in k3s.
-
-## Two access choices for approval
-
-Neither is applied. Each needs an explicit yes to the exact statement below.
-
-| Choice                    | Source                                         | Destination                                | Port     | Auth beyond the network                                     | Effect                                                                          |
-| ------------------------- | ---------------------------------------------- | ------------------------------------------ | -------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| D1: impd grant            | `tag:cloud` (geoffcloud, pods included)        | `tag:imp` (impd, `imp-geoffcloud`)         | tcp 7070 | impd token `atc-cloud`: scope manage, `harness-*` imps only | one grant added to the tailnet policy; no access removed; preview diff reviewed |
-| E2: cloud daemon listener | today `autogroup:member` (every member device) | geoffcloud's tailnet address, `atc-daemon` | tcp 8415 | per-daemon bearer token (gateway → daemon)                  | a new listener on the tailnet only; the edge firewall keeps it off the internet |
-
-The gateway pod reaches the daemon on the same host, so E2 needs no new grant. Narrowing who can
-reach 8415 (a grant from `tag:cloud` only, in place of members) is optional and can follow.
-
-## A. Maintenance, independent of the gateway
-
-| #   | Step                                                                                                                                                                                                                                                                       | Waits on                | Approval                                            | Effect                                                                                                                                                                                                                                                                                                                                                                                              |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | Merge branch `imp-0.17` and `nixos-rebuild switch` geoffcloud. First `imp ls` on the host, and `imp sleep` each awake imp (none on 2026-10-03)                                                                                                                             | nothing (built)         | yes: it changes live forward rules and restarts imp | imp-host goes from 0.12.0 (the `:latest` it pulled on 2026-10-02) to 0.17.0, with module and image both pinned by digest (imp#109 tracks the module's `:latest` default); impd runs 4 additive migrations at start, with no manual step; a few minutes of imp downtime; the docker0 → k3s deny moves into imp's `imp-forward` table, same effect; k3s keeps running; rollback: switch to `system-5` |
-| A2  | imp #90 (orphan-cleanup safety) and leases (#96, 0.15.0) on the host                                                                                                                                                                                                       | in 0.17.0               | covered by A1                                       | no manual state migration                                                                                                                                                                                                                                                                                                                                                                           |
-| A3  | imp's next release with #83 (Docker API proxy): pin the module and the image to its tag together, copy impd's database, switch; then check that imp-host has no `docker.sock` bind, that `imp-docker-proxy` runs as uid 65534 with no network, and that a test imp creates | imp's tag (not cut yet) | covered by the imp-host delegation                  | the module adds `imp-host-image.service` and the proxy unit; no `upgrade.sh` on NixOS                                                                                                                                                                                                                                                                                                               |
+| Check                                                                                                                                                                                                                                                               | Result                               |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `scripts/test-atc-gateway-fixture.sh` against atc-gateway 2.24.0: images build from the pinned, checksum-verified binary; nonroot on a read-only root; Host rule on the metadata, `/healthz` and `/readyz`; state survives a restart and a backup, wipe and restore | pass (local and CI)                  |
+| `bun run preview` with `atcGateway` unset                                                                                                                                                                                                                           | no change                            |
+| `bun run preview` with `atcGateway` set (scratch config file)                                                                                                                                                                                                       | creates only the 9 gateway resources |
+| `nix build ./nixos#checks.x86_64-linux.atc-daemon`                                                                                                                                                                                                                  | builds                               |
+| geoffcloud's system with the flake changes                                                                                                                                                                                                                          | unchanged                            |
+| `deploy/atc-gateway/restore-job.yaml`, client dry run                                                                                                                                                                                                               | valid                                |
 
 ## B. Build and publish
 

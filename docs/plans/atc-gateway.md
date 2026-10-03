@@ -1,9 +1,10 @@
 # Plan: atc-gateway on geoffcloud
 
-Status: **validated package, not deployed.** The gateway binary does not exist yet (atc builds it as
-layer 7 of its integration stack). The package below is validated locally and in CI, with atc
-2.10.0's `atc mcp --http` standing in for the gateway. Every step that adds a listener, a
-credential, a tailnet grant, a DNS record or an OAuth change waits for Geoff's approval:
+Status: **validated package, not deployed.** atc 2.24.0 ships the gateway binary, and the package
+below is validated locally and in CI against it. 2.24.0 lacks atc's runtime-auth lifecycle (#249)
+and guest settings (#247), so it refuses a GLM auth session on every target; a plain imp spawn
+works. Every step that adds a listener, a credential, a tailnet grant, a DNS record or an OAuth
+change waits for Geoff's approval:
 [the operator checklist](../runbooks/atc-gateway-operator-checklist.md) orders them.
 
 Sources: atc's provisional interface facts and imp's answers from imp main 43f22974 (2026-10-03),
