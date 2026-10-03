@@ -22,6 +22,7 @@ Run with `bun run <script>` from the repo root. Hooks and CI call these too.
 | `lint:fix`       | the same, writing fixes                                                           |
 | `typecheck`      | `sdk:build`, then `tsc --noEmit`                                                  |
 | `test`           | `bun test`                                                                        |
+| `test:scripts`   | the stub test of `install-atc-gateway-credentials.sh` (no host)                   |
 | `deadcode`       | `knip`                                                                            |
 | `audit`          | `bun audit`                                                                       |
 | `build:agents`   | regenerates `AGENTS.md` from `agents/shared.md` and `agents/project.md`           |
@@ -30,15 +31,15 @@ Pass Pulumi flags after `--`: `bun run up -- --yes`.
 
 ## Checks
 
-| Where                | Runs                                                                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------- |
-| pre-commit           | `oxlint --fix`, `oxfmt`, `format-codemod`, `gofmt` on staged files, then `gitleaks`                 |
-| commit-msg           | commitlint (Conventional Commits)                                                                   |
-| pre-push             | `format:check`, `lint`, `typecheck`, `test`, `deadcode`, `provider:check`                           |
-| CI `checks`          | the `AGENTS.md` drift check, `format:check`, `lint`, `typecheck`, `test`, `deadcode`                |
-| CI `provider`        | `gofmt`, `go vet`, `go test`                                                                        |
-| CI `gitleaks`        | gitleaks over the whole history                                                                     |
-| `atc-gateway images` | the gateway fixture test on image changes; publishes to GHCR only on a manual run with `push: true` |
+| Where                | Runs                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| pre-commit           | `oxlint --fix`, `oxfmt`, `format-codemod`, `gofmt` on staged files, then `gitleaks`                  |
+| commit-msg           | commitlint (Conventional Commits)                                                                    |
+| pre-push             | `format:check`, `lint`, `typecheck`, `test`, `deadcode`, `provider:check`                            |
+| CI `checks`          | the `AGENTS.md` drift check, `format:check`, `lint`, `typecheck`, `test`, `test:scripts`, `deadcode` |
+| CI `provider`        | `gofmt`, `go vet`, `go test`                                                                         |
+| CI `gitleaks`        | gitleaks over the whole history                                                                      |
+| `atc-gateway images` | the gateway fixture test on image changes; publishes to GHCR only on a manual run with `push: true`  |
 
 The `main protection` ruleset needs `checks` and `gitleaks` green.
 
