@@ -63,6 +63,17 @@ describe('requireATCGatewayInputs daemon', () => {
       requireATCGatewayInputs({ image, daemonID, daemonAddress: '100.69.47.33' }, env),
     ).toThrow('atcGateway.daemonAddress');
 
+    for (const outOfRange of ['100.69.47.33:0', '100.69.47.33:65536']) {
+      expect(() =>
+        requireATCGatewayInputs({ image, daemonID, daemonAddress: outOfRange }, env),
+      ).toThrow('atcGateway.daemonAddress');
+    }
+
+    expect(
+      requireATCGatewayInputs({ image, daemonID, daemonAddress: '100.69.47.33:65535' }, env)
+        .daemonAddress,
+    ).toBe('100.69.47.33:65535');
+
     expect(
       requireATCGatewayInputs({ image, daemonID, daemonAddress: '[fd7a::1]:8415' }, env)
         .daemonAddress,

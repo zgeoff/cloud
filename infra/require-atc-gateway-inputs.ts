@@ -58,10 +58,13 @@ function requireDaemonID(daemonID: string | undefined): string {
 }
 
 // `<host>:<port>`, with an IPv6 host in brackets
-const addressPattern = /^(?:\[[^\]]+\]|[^:[\]]+):\d{1,5}$/u;
+const addressPattern = /^(?:\[[^\]]+\]|[^:[\]]+):(?<port>\d{1,5})$/u;
 
 function requireDaemonAddress(address: string | undefined): string {
-  if (address === undefined || !addressPattern.test(address)) {
+  const port = Number(addressPattern.exec(address ?? '')?.groups?.['port'] ?? 0);
+
+  // atc's registry parser takes ports 1–65535
+  if (address === undefined || port < 1 || port > 65_535) {
     throw new Error(
       "atcGateway.daemonAddress must be the daemon's tailnet host:port, such as 100.69.47.33:8415",
     );

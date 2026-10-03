@@ -159,7 +159,9 @@ function createConfigObjects(
   const tokens = new Secret(
     'atc-gateway-daemon-tokens',
     {
-      metadata: { name: 'atc-gateway-daemon-tokens', namespace },
+      // no fixed name: Pulumi names it and replaces it on a change, so the Deployment
+      // rolls and the gateway, which reads both only at start, picks the change up
+      metadata: { namespace },
       stringData: { [atcGatewayTokenVariable]: inputs.secrets.token },
     },
     { provider: cluster },
@@ -168,7 +170,7 @@ function createConfigObjects(
   const registry = new ConfigMap(
     'atc-gateway-registry',
     {
-      metadata: { name: 'atc-gateway-registry', namespace },
+      metadata: { namespace },
       data: {
         [atcGatewayRegistryFile]: JSON.stringify(buildATCGatewayRegistry(inputs.daemon), null, 2),
       },
