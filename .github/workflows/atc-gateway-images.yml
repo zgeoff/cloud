@@ -64,11 +64,16 @@ jobs:
           backup="ghcr.io/zgeoff/atc-gateway-backup:$BACKUP_IMAGE_TAG"
           docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway" context
           docker build --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup" deploy/atc-gateway/backup
-          # a published tag is immutable: skip it, and never push over it
+          # a published tag is immutable: skip it, and push only when the registry confirms
+          # the tag is missing; any other lookup error stops the run
           for ref in "$gateway" "$backup"; do
-            if docker manifest inspect "$ref" > /dev/null 2>&1; then
+            if lookup=$(docker manifest inspect "$ref" 2>&1); then
               echo "$ref: already published, not replaced" >> "$GITHUB_STEP_SUMMARY"
               continue
+            fi
+            if ! grep -qiE 'no such manifest|manifest unknown' <<< "$lookup"; then
+              echo "cannot tell whether $ref exists: $lookup" >&2
+              exit 1
             fi
             docker push "$ref"
             echo "$ref: $(docker inspect --format '{{index .RepoDigests 0}}' "$ref")" >> "$GITHUB_STEP_SUMMARY"
