@@ -12,6 +12,8 @@ export const homePC = {
 //   PC's atc MCP port, for the mcp.geoff.cloud route (#7).
 // - tag:imp — impd nodes. Members reach them on any port (one port per imp);
 //   they reach nothing, which is imp's isolation goal.
+// - tag:ci — ephemeral GitHub Actions runners (the drift workflow). They reach only
+//   the k3s API on cloud hosts, so a refresh can read the cluster.
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
@@ -22,6 +24,7 @@ export const tailnetPolicy = {
   tagOwners: {
     'tag:cloud': ['autogroup:admin', 'tag:cloud'],
     'tag:imp': ['autogroup:admin', 'tag:imp'],
+    'tag:ci': ['autogroup:admin'],
   },
   grants: [
     // members reach every device; tagged nodes get only what a grant gives them
@@ -32,6 +35,9 @@ export const tailnetPolicy = {
 
     // impd nodes reach each other's API: moves between hosts and imp's two-node e2e
     { src: ['tag:imp'], dst: ['tag:imp'], ip: ['tcp:7070'] },
+
+    // the drift workflow's runner → the k3s API, for a refresh preview
+    { src: ['tag:ci'], dst: ['tag:cloud'], ip: ['tcp:6443'] },
   ],
   ssh: [
     {

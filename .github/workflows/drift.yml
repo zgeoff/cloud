@@ -1,0 +1,118 @@
+name: drift
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - 'provider/**'
+      - 'sdk/**'
+      - '.github/workflows/drift.yml'
+  schedule:
+    # daily: console drift arrives with no commit, so no push can catch it
+    - cron: '23 20 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # the tailnet join uses GitHub's OIDC token (Tailscale workload identity federation)
+  id-token: write
+
+# every trigger previews the same prod stack, one at a time
+concurrency:
+  group: drift-prod
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LEFTHOOK: 0
+      HAS_CI_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN != '' }}
+    steps:
+      - name: Skip Without Credentials
+        if: env.HAS_CI_TOKEN != 'true'
+        run: echo "::notice::OP_SERVICE_ACCOUNT_TOKEN is not set; drift check skipped"
+
+      - name: Checkout
+        if: env.HAS_CI_TOKEN == 'true'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        if: env.HAS_CI_TOKEN == 'true'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Setup Go
+        if: env.HAS_CI_TOKEN == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+
+      - name: Install
+        if: env.HAS_CI_TOKEN == 'true'
+        run: bun install --frozen-lockfile
+
+      - name: Build Provider and SDK
+        if: env.HAS_CI_TOKEN == 'true'
+        run: bun run provider:build && bun run sdk:build
+
+      # read-only service account on the cloud-ci vault: copies of the items .env names
+      - name: Load Credentials
+        if: env.HAS_CI_TOKEN == 'true'
+        uses: 1password/load-secrets-action@3a12b0ab99d9cd590a3e9b5a90ea017210ed9556 # v4.0.1
+        with:
+          export-env: true
+          version: 2.34.1
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          ONIDEL_API_KEY: op://cloud-ci/onidel-api/credential
+          CLOUDFLARE_API_TOKEN: op://cloud-ci/cloudflare-api/credential
+          CLOUDFLARE_ACCOUNT_ID: op://cloud-ci/cloudflare-api/account-id
+          AWS_ACCESS_KEY_ID: op://cloud-ci/r2-pulumi-state/access-key-id
+          AWS_SECRET_ACCESS_KEY: op://cloud-ci/r2-pulumi-state/secret-access-key
+          PULUMI_BACKEND_URL: op://cloud-ci/r2-pulumi-state/backend-url
+          PULUMI_CONFIG_PASSPHRASE: op://cloud-ci/pulumi-passphrase/credential
+          TAILSCALE_OAUTH_CLIENT_ID: op://cloud-ci/tailscale-oauth/client-id
+          TAILSCALE_OAUTH_CLIENT_SECRET: op://cloud-ci/tailscale-oauth/client-secret
+          TAILSCALE_TAILNET: op://cloud-ci/tailscale-oauth/tailnet
+          ALERT_WEBHOOK_URL: op://cloud-ci/alert-webhook/credential
+          K3S_KUBECONFIG: op://cloud-ci/k3s-kubeconfig/kubeconfig.yaml
+          CI_TAILNET_CLIENT_ID: op://cloud-ci/tailscale-ci/client-id
+          CI_TAILNET_AUDIENCE: op://cloud-ci/tailscale-ci/audience
+
+      # the k3s API (geoffcloud:6443) answers on the tailnet only
+      - name: Join Tailnet
+        if: env.HAS_CI_TOKEN == 'true'
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ env.CI_TAILNET_CLIENT_ID }}
+          audience: ${{ env.CI_TAILNET_AUDIENCE }}
+          tags: tag:ci
+
+      - name: Preview
+        if: env.HAS_CI_TOKEN == 'true'
+        uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
+        with:
+          command: preview
+          stack-name: prod
+          work-dir: infra
+          cloud-url: ${{ env.PULUMI_BACKEND_URL }}
+          expect-no-changes: true
+          refresh: true
+          pulumi-version: 3.251.0
+
+      - name: Alert on Drift
+        if: failure() && env.HAS_CI_TOKEN == 'true' && env.ALERT_WEBHOOK_URL != ''
+        env:
+          RUN_URL:
+            ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          message="geoff.cloud: the prod drift check failed: $RUN_URL"
+          jq -n --arg m "$message" '{content: $m, text: $m, message: $m}' |
+            curl -fsS -X POST -H 'content-type: application/json' --data @- "$ALERT_WEBHOOK_URL"
