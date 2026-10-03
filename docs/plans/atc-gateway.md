@@ -101,18 +101,20 @@ Two SQLite files, each under 100 MB, both secret-bearing:
 
 ### 4. Config and secrets
 
-| Setting                            | Secret | Source                                        |
-| ---------------------------------- | ------ | --------------------------------------------- |
-| `--public-url`                     | no     | `https://atc.geoff.cloud`                     |
-| `--host`, `--port`                 | no     | pod IP (`0.0.0.0`), 8414                      |
-| state dir                          | no     | `/home/nonroot/.local/state/atc` (the claim)  |
-| daemon registry (name → host:port) | no     | ConfigMap from Pulumi                         |
-| default daemon                     | no     | ConfigMap                                     |
-| bearer token per daemon            | yes    | 1Password `cloud` vault → k8s Secret (Pulumi) |
-| better-auth secret, if any         | yes    | 1Password → k8s Secret                        |
+| Setting                                     | Secret | Source                                                                                             |
+| ------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
+| `--public-url` (the OAuth issuer)           | no     | `https://atc.geoff.cloud`                                                                          |
+| `--host`, `--port`                          | no     | pod IP (`0.0.0.0`), 8414                                                                           |
+| `--state-dir` (`gateway.db`, `mcp-auth.db`) | no     | stack config `atcGateway.stateDir`, default `/home/nonroot/.local/state/atc` (the claim)           |
+| `--registry`: daemons and `defaultDaemon`   | no     | ConfigMap from Pulumi: `geoffcloud` at `atcGateway.daemonAddress`, pinned to `atcGateway.daemonID` |
+| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`              | yes    | 1Password `op://cloud/atc-daemon-token/credential` → k8s Secret (Pulumi)                           |
+| better-auth secret, if any                  | yes    | 1Password → k8s Secret                                                                             |
 
-Env var names arrive with atc's gateway PR. Secrets follow the existing pattern: 1Password item →
-`op run` → Pulumi secret → k8s Secret. Never in the repo, never logged.
+The registry is atc's format:
+`{"daemons": {"geoffcloud": {"address": "100.69.47.33:8415", "daemonID": "<pinned>"}}, "defaultDaemon": "geoffcloud"}`.
+Each daemon's token is in `ATC_GATEWAY_TOKEN_<NAME>`, a single token with no trailing newline. The
+probes are `/healthz` and `/readyz`. Secrets follow the existing pattern: 1Password item → `op run`
+→ Pulumi secret → k8s Secret. Never in the repo, never logged.
 
 ### 5. Tailnet
 
@@ -138,8 +140,12 @@ The gateway pod's tailnet traffic leaves through the host's node, as `tag:cloud`
 
 ### 7. Cloud daemon
 
-atc has not named the cloud daemon host. On geoffcloud it runs as a NixOS service next to imp-host,
-not in k3s, with its listener on the host's tailnet address, tcp 8415.
+On geoffcloud it runs as a NixOS service next to imp-host (`nixos/modules/atc-daemon.nix`), not in
+k3s: `atc daemon --listen 100.69.47.33:8415 --token-file $CREDENTIALS_DIRECTORY/gateway-token`, on
+the host's tailnet address. The token file holds one or two tokens (two during a rotation), one per
+line, each at least 32 bytes. Its config sets one execution target, `geoffcloud` (provider `imp`,
+`http://127.0.0.1:7070`, imp prefix `harness-`, impd's token from the `imp-token` credential), and
+`principals`, which grant each gateway client ID its targets.
 
 - **Identity.** On the host it shares the host's tailnet node, so its traffic leaves as `tag:cloud`.
   The gateway pod reaches it on the same host without crossing the tailnet, so that hop needs no
