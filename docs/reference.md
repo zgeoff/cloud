@@ -88,23 +88,24 @@ Read one with `pulumi stack output --stack prod <name>` from `infra/`, through `
 
 `.env` holds `op://` references only. Each item is in the 1Password vault `cloud`.
 
-| Variable                                                                          | Item                | Used by                                                          |
-| --------------------------------------------------------------------------------- | ------------------- | ---------------------------------------------------------------- |
-| `ONIDEL_API_KEY`                                                                  | `onidel-api`        | the Onidel provider, `snapshot-geoffcloud.sh`                    |
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`                                   | `cloudflare-api`    | the Cloudflare provider                                          |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                      | `r2-pulumi-state`   | the Pulumi state backend on R2                                   |
-| `PULUMI_BACKEND_URL`                                                              | `r2-pulumi-state`   | the state bucket's `s3://` URL                                   |
-| `AWS_REGION`                                                                      | none: `auto`        | R2                                                               |
-| `PULUMI_CONFIG_PASSPHRASE`                                                        | `pulumi-passphrase` | Pulumi's secrets provider                                        |
-| `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET`, `TAILSCALE_TAILNET` | `tailscale-oauth`   | the Tailscale provider                                           |
-| `ALERT_WEBHOOK_URL`                                                               | `alert-webhook`     | the health-check Worker; Alertmanager when `discordAlerts` is on |
-| `K3S_KUBECONFIG`                                                                  | `k3s-kubeconfig`    | the Kubernetes provider                                          |
-| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`                                                    | `atc-daemon-token`  | **PENDING.** The gateway's bearer for the daemon                 |
+| Variable                                                                                                               | Item                    | Used by                                                          |
+| ---------------------------------------------------------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
+| `ONIDEL_API_KEY`                                                                                                       | `onidel-api`            | the Onidel provider, `snapshot-geoffcloud.sh`                    |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`                                                                        | `cloudflare-api`        | the Cloudflare provider                                          |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                                                           | `r2-pulumi-state`       | the Pulumi state backend on R2                                   |
+| `PULUMI_BACKEND_URL`                                                                                                   | `r2-pulumi-state`       | the state bucket's `s3://` URL                                   |
+| `AWS_REGION`                                                                                                           | none: `auto`            | R2                                                               |
+| `PULUMI_CONFIG_PASSPHRASE`                                                                                             | `pulumi-passphrase`     | Pulumi's secrets provider                                        |
+| `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET`, `TAILSCALE_TAILNET`                                      | `tailscale-oauth`       | the Tailscale provider                                           |
+| `ALERT_WEBHOOK_URL`                                                                                                    | `alert-webhook`         | the health-check Worker; Alertmanager when `discordAlerts` is on |
+| `K3S_KUBECONFIG`                                                                                                       | `k3s-kubeconfig`        | the Kubernetes provider                                          |
+| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`                                                                                         | `atc-daemon-token`      | **PENDING.** The gateway's bearer for the daemon                 |
+| `ATC_GATEWAY_RESTIC_PASSWORD`                                                                                          | `atc-gateway-restic`    | **PENDING.** The gateway backup's restic password                |
+| `ATC_GATEWAY_R2_ACCESS_KEY_ID`, `ATC_GATEWAY_R2_SECRET_ACCESS_KEY`, `ATC_GATEWAY_R2_ENDPOINT`, `ATC_GATEWAY_R2_BUCKET` | `r2-atc-gateway-backup` | **PENDING.** The gateway backup's R2 bucket and key              |
 
-**PENDING:** the gateway's backup also reads `ATC_GATEWAY_RESTIC_REPOSITORY`,
-`ATC_GATEWAY_RESTIC_PASSWORD`, `ATC_GATEWAY_R2_ACCESS_KEY_ID` and
-`ATC_GATEWAY_R2_SECRET_ACCESS_KEY`. `.env` does not reference them yet. Without all four, the
-gateway deploys with no backup CronJob.
+The gateway's backup builds its restic repository as `s3:<endpoint>/<bucket>/atc-gateway`. With none
+of the five backup variables set, the gateway deploys with no backup CronJob; with only some set,
+the preview fails and names the missing ones.
 
 Items that `.env` does not reference:
 
