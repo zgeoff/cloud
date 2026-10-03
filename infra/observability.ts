@@ -193,6 +193,15 @@ discovery.relabel "pods" {
 
 loki.source.kubernetes "pods" {
   targets    = discovery.relabel.pods.output
+  forward_to = [loki.process.pods.receiver]
+}
+
+// the atc gateway's OAuth approval lines stay in kubectl logs only, never in Loki
+loki.process "pods" {
+  stage.match {
+    selector = "{namespace=\\"atc\\", container=\\"atc-gateway\\"} |~ \\"^atc-approval\\""
+    action   = "drop"
+  }
   forward_to = [loki.write.default.receiver]
 }
 
