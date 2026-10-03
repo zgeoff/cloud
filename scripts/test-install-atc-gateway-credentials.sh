@@ -46,7 +46,9 @@ cat > "$work/bin/ssh" << 'EOF'
 #!/usr/bin/env bash
 printf 'ssh %s\n' "$*" >> "$STUB_LOG"
 shift 3
-PATH="$STUB_HOST_BIN:$PATH" exec bash -c "$*"
+# everything the host command prints goes to the log too, for the token check
+PATH="$STUB_HOST_BIN:$PATH" bash -c "$*" | tee -a "$STUB_LOG.host"
+exit "${PIPESTATUS[0]}"
 EOF
 
 # host stubs: impd with glm and atc-cloud, install without chown
@@ -76,7 +78,7 @@ cat > "$work/host-bin/curl" << 'EOF'
 printf 'curl %s\n' "$*" >> "$STUB_LOG"
 header="$(cat)"
 case "$*" in
-  *"-H @-"*"-w \n%{http_code} http://127.0.0.1:7070/rpc/tokens/whoami") ;;
+  "-q --noproxy * "*"-H @-"*"-w \n%{http_code} http://127.0.0.1:7070/rpc/tokens/whoami") ;;
   *) echo "curl stub: unexpected $*" >&2; exit 2 ;;
 esac
 case "${STUB_IMPD:-up}" in
@@ -95,8 +97,10 @@ fi
 EOF
 chmod +x "$work"/bin/* "$work"/host-bin/*
 
-# runs one rerun; $1 is the case name, $2 the imp-token file's content (- for empty), the
-# rest are stub settings
+host_bin="$work/host-bin"
+
+# runs one rerun; $1 is the case name, $2 the imp-token file's content (- for empty,
+# @no-newline for the good token without a trailing newline), the rest are stub settings
 run_case() {
   local name="$1" content="$2"
   shift 2
@@ -105,15 +109,32 @@ run_case() {
   printf '%s\n' "$bearer" > "$dir/gateway-token"
   if [ "$content" = - ]; then
     : > "$dir/imp-token"
+  elif [ "$content" = @no-newline ]; then
+    printf '%s' "$good_token" > "$dir/imp-token"
   else
     printf '%s\n' "$content" > "$dir/imp-token"
   fi
   : > "$work/$name.log"
   status=0
-  env "$@" PATH="$work/bin:$PATH" STUB_HOST_BIN="$work/host-bin" STUB_LOG="$work/$name.log" \
+  env "$@" PATH="$work/bin:$PATH" STUB_HOST_BIN="$host_bin" STUB_LOG="$work/$name.log" \
     STUB_BEARER="$bearer" STUB_GOOD_TOKEN="$good_token" OP_SERVICE_ACCOUNT_TOKEN=fixture \
     ATC_CREDENTIALS_DIR="$dir" bash "$repo/scripts/install-atc-gateway-credentials.sh" \
     > "$work/$name.out" 2>&1 || status=$?
+}
+
+# whether any of the files holds the token, also across curl's trace, which wraps a line
+# every 64 bytes behind an offset ("0040: ")
+has_token() {
+  local token="$1" file
+  shift
+  for file in "$@"; do
+    [ -f "$file" ] || continue
+    if grep -qF -- "$token" "$file" ||
+      sed -E 's/^[0-9a-f]{4}: //' "$file" | tr -d '\n' | grep -qF -- "$token"; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 check() {
@@ -125,7 +146,7 @@ check() {
     problems+=("minted or removed a token")
   fi
   for token in "$good_token" "$stale_token"; do
-    if grep -qF -- "$token" "$work/$name.log" "$work/$name.out"; then
+    if has_token "$token" "$work/$name.log" "$work/$name.log.host" "$work/$name.out"; then
       problems+=("a token reached argv or output")
     fi
   done
@@ -141,12 +162,26 @@ check() {
 run_case valid "$good_token"
 check valid 0 "skip: both exist, atc-cloud has the expected limits, and the file authenticates as it"
 
+run_case no-newline @no-newline
+check no-newline 0 "skip: both exist, atc-cloud has the expected limits, and the file authenticates as it"
+
 run_case empty -
 check empty 1 "does not authenticate to impd as the token atc-cloud"
 if grep -q '^curl' "$work/empty.log"; then
   echo "FAIL: empty: called impd with no token"
   failures=$((failures + 1))
 fi
+
+# atc reads the whole file less one trailing newline, so more than one line is a bad
+# token even when the first line is good; impd is never asked
+for bad in multiline:"$good_token"$'\nextra' crlf:"$good_token"$'\r' blank-line:"$good_token"$'\n'; do
+  run_case "${bad%%:*}" "${bad#*:}"
+  check "${bad%%:*}" 1 "does not authenticate to impd as the token atc-cloud"
+  if grep -q '^curl' "$work/${bad%%:*}.log"; then
+    echo "FAIL: ${bad%%:*}: called impd with a token atc would not send"
+    failures=$((failures + 1))
+  fi
+done
 
 run_case stale "$stale_token"
 check stale 1 "does not authenticate to impd as the token atc-cloud"
@@ -178,6 +213,125 @@ check_unchecked impd-403 "impd answered HTTP 403, so"
 
 run_case impd-garbage "$good_token" STUB_IMPD=garbage
 check_unchecked impd-garbage "impd answered HTTP 200 without an identity"
+
+# Real curl against a local impd stand-in, under a hostile curl config: .curlrc files in
+# HOME, CURL_HOME and XDG_CONFIG_HOME that turn on -v and --trace-ascii and set a proxy,
+# and every proxy variable pointing at a listener that records what reaches it. The
+# token must reach impd's stand-in only: no output, no trace, nothing at the proxy.
+cat > "$work/listen.py" << 'EOF'
+import os, socket, sys, threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+work = sys.argv[1]
+
+class Impd(BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get("content-length", 0)))
+        good = self.headers.get("authorization") == "Bearer " + os.environ["STUB_GOOD_TOKEN"]
+        if self.path == "/rpc/tokens/whoami" and good:
+            status, body = 200, b'{"json":{"kind":"token","name":"atc-cloud"}}'
+        else:
+            status, body = 401, b'{"error":"unauthorized"}'
+        self.send_response(status)
+        self.send_header("content-length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+def run_proxy(server):
+    while True:
+        conn, _ = server.accept()
+        conn.settimeout(2)
+        with open(os.path.join(work, "proxy.bytes"), "ab") as out:
+            out.write(b"connection\n")
+            try:
+                out.write(conn.recv(65536))
+            except OSError:
+                pass
+        conn.close()
+
+proxy = socket.socket()
+proxy.bind(("127.0.0.1", 0))
+proxy.listen()
+threading.Thread(target=run_proxy, args=(proxy,), daemon=True).start()
+impd = ThreadingHTTPServer(("127.0.0.1", 0), Impd)
+with open(os.path.join(work, "ports.tmp"), "w") as out:
+    out.write(f"{impd.server_address[1]} {proxy.getsockname()[1]}\n")
+os.rename(os.path.join(work, "ports.tmp"), os.path.join(work, "ports"))
+impd.serve_forever()
+EOF
+STUB_GOOD_TOKEN="$good_token" python3 "$work/listen.py" "$work" &
+listener=$!
+trap 'kill "$listener" 2> /dev/null || true; teardown' EXIT
+for _ in $(seq 50); do
+  [ -f "$work/ports" ] && break
+  sleep 0.1
+done
+read -r impd_port proxy_port < "$work/ports"
+proxy_url="http://127.0.0.1:$proxy_port"
+
+mkdir -p "$work/home" "$work/curl-home" "$work/xdg"
+for rc in "$work/home/.curlrc" "$work/curl-home/.curlrc" "$work/xdg/curlrc"; do
+  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "$proxy_url" > "$rc"
+done
+printf 'trace-ascii = %s\n' "$work/trace.txt" >> "$work/curl-home/.curlrc"
+hostile=(HOME="$work/home" CURL_HOME="$work/curl-home" XDG_CONFIG_HOME="$work/xdg"
+  http_proxy="$proxy_url" HTTP_PROXY="$proxy_url" https_proxy="$proxy_url"
+  HTTPS_PROXY="$proxy_url" all_proxy="$proxy_url" ALL_PROXY="$proxy_url" NO_PROXY= no_proxy=)
+
+# the controls: plain curl under that config goes through the proxy, and with
+# --noproxy alone still traces the token, so a clean real run below proves the
+# installer's isolation, not a dead config
+printf 'Authorization: Bearer %s\n' "$stale_token" |
+  env "${hostile[@]}" curl -sS --max-time 5 -H @- "http://127.0.0.1:$impd_port/rpc/tokens/whoami" \
+    > "$work/control.out" 2>&1 || true
+if ! grep -q connection "$work/proxy.bytes" 2> /dev/null; then
+  echo "FAIL: control: the hostile curl config did not reach the proxy"
+  failures=$((failures + 1))
+fi
+printf 'Authorization: Bearer %s\n' "$stale_token" |
+  env "${hostile[@]}" curl --noproxy '*' -sS --max-time 5 -H @- \
+    "http://127.0.0.1:$impd_port/rpc/tokens/whoami" > "$work/control.out" 2>&1 || true
+if ! has_token "$stale_token" "$work/trace.txt"; then
+  echo "FAIL: control: the hostile curl config did not trace the token"
+  failures=$((failures + 1))
+fi
+rm -f "$work/proxy.bytes" "$work/trace.txt"
+
+cp -r "$work/host-bin" "$work/host-bin-real"
+rm "$work/host-bin-real/curl"
+host_bin="$work/host-bin-real"
+
+# a real run must leave no trace file holding a token and send nothing to the proxy
+check_isolated() {
+  local name="$1"
+  if [ -s "$work/proxy.bytes" ]; then
+    echo "FAIL: $name: the proxy received a connection"
+    failures=$((failures + 1))
+  fi
+  if has_token "$good_token" "$work/trace.txt" || has_token "$stale_token" "$work/trace.txt"; then
+    echo "FAIL: $name: a token reached curl's trace"
+    failures=$((failures + 1))
+  fi
+  rm -f "$work/proxy.bytes" "$work/trace.txt"
+}
+
+# CURL_HOME's .curlrc traces to a file
+run_case real-curl-valid "$good_token" "${hostile[@]}" ATC_IMPD_PORT="$impd_port"
+check real-curl-valid 0 "skip: both exist, atc-cloud has the expected limits, and the file authenticates as it"
+check_isolated real-curl-valid
+
+run_case real-curl-stale "$stale_token" "${hostile[@]}" ATC_IMPD_PORT="$impd_port"
+check real-curl-stale 1 "does not authenticate to impd as the token atc-cloud"
+check_isolated real-curl-stale
+
+# HOME's .curlrc alone traces to stdout, which the host command returns here
+run_case real-curl-home "$good_token" "${hostile[@]}" CURL_HOME= XDG_CONFIG_HOME= \
+  ATC_IMPD_PORT="$impd_port"
+check real-curl-home 0 "skip: both exist, atc-cloud has the expected limits, and the file authenticates as it"
+check_isolated real-curl-home
 
 if [ "$failures" -ne 0 ]; then
   echo "$failures case(s) failed" >&2

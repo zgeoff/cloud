@@ -23,6 +23,7 @@ host="${ATC_CREDENTIALS_HOST:-root@geoffcloud}"
 vault="${ATC_CREDENTIALS_VAULT:-cloud}"
 item="${ATC_DAEMON_TOKEN_ITEM:-atc-daemon-token}"
 dir="${ATC_CREDENTIALS_DIR:-/var/lib/atc-daemon-secrets}"
+impd_port="${ATC_IMPD_PORT:-7070}"
 op_settings="${CLOUD_OP_SETTINGS:-$HOME/projects/cloud/.claude/settings.local.json}"
 
 if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
@@ -125,17 +126,29 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   fi
   # the metadata cannot show the file is right, so ask impd who the saved token is: impd's
   # tokens.whoami on loopback. The token goes from the file to curl's stdin on the host,
-  # never into argv or back here; only impd's answer and its HTTP status return. Only an
-  # empty file (exit 3), impd's 401 for an unknown token, or a clear answer naming another
-  # caller means the file is bad; anything else leaves it unchecked and changes nothing.
+  # never into argv or back here; only impd's answer and its HTTP status return. Only a
+  # file atc cannot use (exit 3), impd's 401 for an unknown token, or a clear answer naming
+  # another caller means the file is bad; anything else leaves it unchecked and changes
+  # nothing.
+  #
+  # atc 2.24.0 reads the whole file and drops one trailing newline (readImpToken); the rest
+  # is the token. So the check takes the same token, and a file whose token is empty or
+  # holds a byte that is not printable, non-space ASCII (a second line, a CR, a space, a
+  # NUL) is bad. curl runs with -q first (no .curlrc), --noproxy '*' and no proxy
+  # variables, so no config on the host can trace the request or route it off loopback.
   whoami_status=0
   # shellcheck disable=SC2016 # expanded on the host
-  answer="$(on_host "set -euo pipefail; v=''
-    IFS= read -r v < $dir/imp-token || true
-    test -n \"\$v\" || exit 3
+  answer="$(on_host "set -euo pipefail; export LC_ALL=C
+    size=\$(wc -c < $dir/imp-token || true)
+    v=\$(cat $dir/imp-token || true; printf x); v=\${v%x}
+    test \"\${#v}\" = \"\$size\" || exit 3
+    v=\${v%\$'\\n'}
+    [[ \"\$v\" =~ ^[[:graph:]]+\$ ]] || exit 3
     printf 'Authorization: Bearer %s\n' \"\$v\" |
-      curl -sS --max-time 10 -H @- -H 'content-type: application/json' \
-        --data '{\"json\":{}}' -w '\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami")" ||
+      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy \
+        -u ALL_PROXY -u no_proxy -u NO_PROXY \
+        curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json' \
+        --data '{\"json\":{}}' -w '\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami")" ||
     whoami_status=$?
   http_status="${answer##*$'\n'}"
   identity="${answer%$'\n'*}"
@@ -158,13 +171,14 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   fi
   if [ -n "$unchecked" ]; then
     echo "$unchecked, so $dir/imp-token is unchecked; nothing changed." >&2
-    echo "Check impd on the host's 127.0.0.1:7070, then rerun" >&2
+    echo "Check impd on the host's 127.0.0.1:$impd_port, then rerun" >&2
     exit 1
   fi
   if [ "$bad_file" = true ]; then
-    echo "$dir/imp-token does not authenticate to impd as the token atc-cloud (empty, stale" >&2
-    echo "or another token). impd shows a token once, so remove $dir/imp-token and run" >&2
-    echo "'imp token rm atc-cloud' in imp-host, then rerun to mint a new one" >&2
+    echo "$dir/imp-token does not authenticate to impd as the token atc-cloud (empty, more" >&2
+    echo "than one line, stale or another token). impd shows a token once, so remove" >&2
+    echo "$dir/imp-token and run 'imp token rm atc-cloud' in imp-host, then rerun to mint" >&2
+    echo "a new one" >&2
     exit 1
   fi
   echo "skip: both exist, atc-cloud has the expected limits, and the file authenticates as it"
