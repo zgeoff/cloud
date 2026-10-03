@@ -31,7 +31,12 @@
 
       # atc's daemon (docs/plans/atc-gateway.md), and the release binary geoffcloud runs it from
       nixosModules.atc-daemon = ./modules/atc-daemon.nix;
-      packages.x86_64-linux.atc = nixpkgs.legacyPackages.x86_64-linux.callPackage ./packages/atc.nix { };
+      packages.x86_64-linux = rec {
+        atc = nixpkgs.legacyPackages.x86_64-linux.callPackage ./packages/atc.nix { };
+        atc-interactive = nixpkgs.legacyPackages.x86_64-linux.callPackage ./packages/atc-interactive.nix {
+          inherit atc;
+        };
+      };
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs; };
       checks.x86_64-linux.impd-local-health = import ./checks/impd-local-health.nix { inherit nixpkgs; };
     };

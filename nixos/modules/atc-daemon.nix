@@ -46,7 +46,11 @@ in
 
     package = lib.mkOption {
       type = lib.types.package;
-      description = "A package whose bin/atc is a pinned atc release (deploy/atc-gateway/versions.env).";
+      description = ''
+        A package whose bin/atc is a pinned atc release, byte-identical and unpatched: an
+        imp target copies it into each guest. The service binds glibc's loader at
+        /lib64/ld-linux-x86-64.so.2 for it.
+      '';
     };
 
     listen = lib.mkOption {
@@ -172,6 +176,8 @@ in
         StateDirectory = "atc-daemon";
         StateDirectoryMode = "0700";
         RuntimeDirectory = "atc-daemon";
+        # the release binary asks for the standard loader, which NixOS has nowhere else
+        BindReadOnlyPaths = [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2:/lib64/ld-linux-x86-64.so.2" ];
         LoadCredential = [
           "gateway-token:${cfg.tokenFile}"
         ]

@@ -8,6 +8,7 @@ let
   # k3s's default cluster CIDR (no --cluster-cidr override below); services.imp.forwardDeny
   # names the same range
   k3sPodCIDR = "10.42.0.0/16";
+  atc = pkgs.callPackage ../../packages/atc.nix { };
 in
 {
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
@@ -176,7 +177,7 @@ in
   # target until the gateway's client IDs exist.
   services.atc-daemon = {
     enable = true;
-    package = pkgs.callPackage ../../packages/atc.nix { };
+    package = atc;
     listen = "${atcDaemonAddress}:${toString atcDaemonPort}";
     tokenFile = "/var/lib/atc-daemon-secrets/gateway-token";
     impTokenFile = "/var/lib/atc-daemon-secrets/imp-token";
@@ -214,6 +215,8 @@ in
   '';
 
   environment.systemPackages = with pkgs; [
+    # a patched copy for `atc daemon id`; the service runs the unpatched release
+    (callPackage ../../packages/atc-interactive.nix { inherit atc; })
     git
     htop
     k9s
