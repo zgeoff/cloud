@@ -64,9 +64,11 @@ not in the database and stay valid. Re-mint any token minted after the copy, suc
 Copies taken by `tar` of a running impd, before the copy script, have no `COPY-INFO` and may be
 torn; the restore script refuses them.
 
-**CAUTION:** Never switch generations while impd's database and image disagree. A switch starts
-imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd/system` outrank
-`/run`. So restore the database first, with impd stopped, and switch after.
+**CAUTION:** Never switch generations while impd's database and image disagree. Do not rely on a
+switch to leave imp-host stopped: in the VM rehearsal a clean switch left a stopped imp-host
+stopped, but a failed switch started a container. A runtime mask cannot hold it down on NixOS
+either: the units in `/etc/systemd/system` outrank `/run`. So restore the database first, with impd
+stopped, and switch after.
 
 1. Choose the copy, and read its `COPY-INFO`. Find the NixOS generation that runs its image:
 
@@ -97,12 +99,13 @@ imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd
    migration), reads both units' state and requires `inactive` or `failed`, checks that no
    `imp-host` or `imp-docker-proxy` container runs, that the generation exists and runs the copy's
    image, and that the dataset is not mounted. Then it mounts `tank/imp` and saves the stopped
-   database, its WAL files and impd's secret values to
+   database, its WAL files and impd's secret values, root-only, to
    `/root/imp-db-backups/pre-restore-<UTC time>/`, flushes that filesystem and compares every saved
    file with its original. Only then does it stage the copy beside the database, check it, and
    publish it with one rename. After a clean unmount it activates the generation (when it is not the
-   current one), starts imp-host and checks that imp-host runs the copy's image. On an error it says
-   how far it got; if the switch or the start had begun, it stops both units again.
+   current one), starts imp-host, waits up to 60 s for its container, and checks that it runs the
+   copy's image. On an error it says how far it got; if the switch or the start had begun, it stops
+   both units again.
 
    **CAUTION:** A database-only restore is an incomplete recovery. At start, impd deletes every
    secret value that no database row names, so a copy older than a secret loses that secret's value,
@@ -132,8 +135,30 @@ one with the new names each restored. An active or activating unit, an unreadabl
 running container, an image mismatch, a missing generation, a missing `COPY-INFO`, a corrupt copy, a
 migration mismatch, a failed copy into the pool and a failed unmount each stopped with nothing
 started or switched. A failed switch and a wrong image after the start each stopped both units
-again. **Untested:** the real ZFS mount of `tank/imp`, a real generation switch during a restore,
-and any restore on geoffcloud.
+again. A container that never appeared within the wait also stopped both units again.
+
+Rehearsed in a KVM NixOS VM, 2026-10-04 (`nixos/tests/impd-restore.nix`): the real ZFS mount of a
+legacy `tank/imp` holding a WAL database and secrets, and a real generation switch. A restore to an
+older generation saved the database, its WAL files and the secrets root-only, put the copy in place,
+unmounted, switched, and started imp-host on the copy's image; a real switch failure stopped both
+units again. The stand-ins: busybox containers that only sleep, images tagged without a digest, and
+generations that are the VM's own specialisations. Run it on a machine with KVM:
+
+```sh
+docker run --rm --device /dev/kvm -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro -w /src nixos/nix \
+  nix --extra-experimental-features "nix-command flakes" --option system-features "kvm nixos-test" \
+  build --no-link -L --impure -f nixos/tests/impd-restore.nix
+```
+
+Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
+`imp-host.service` and the one `docker inspect` reports for the running imp-host are the same
+digest-pinned string (`imp-host:0.29.0@sha256:4e6f0cf6…`), and so is the `image` line of the copy
+`imp-0.29.0-consistent-20261003T181942`. **Untested:** any restore on geoffcloud.
+
+**CAUTION:** Only copies with `COPY-INFO` are restorable. The copy taken before the 0.29.0 upgrade,
+`imp-0.27.0-pre-0.29.0-20261003T171605`, is a tar copy without one, so the script refuses it and no
+supported path returns the database to 0.27.0. Before each imp upgrade, take a copy with
+`scripts/copy-impd-db.sh`; that copy is the upgrade's rollback.
 
 ## 3. Roll the host back one generation
 

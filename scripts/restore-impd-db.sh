@@ -21,6 +21,7 @@ profiles="${NIX_PROFILES_DIR:-/nix/var/nix/profiles}"
 dataset="${IMPD_DATASET:-tank/imp}"
 backups="${IMPD_BACKUPS:-/root/imp-db-backups}"
 sqlite="${SQLITE3:-sqlite3}"
+start_wait="${IMPD_START_WAIT_SECONDS:-60}"
 units=(imp-host imp-docker-proxy)
 
 # what has happened so far, for the error message
@@ -115,6 +116,7 @@ mkdir -m 0700 "$saved"
 for file in imp.sqlite imp.sqlite-wal imp.sqlite-shm; do
   if [ -e "$db/$file" ]; then
     cp -p "$db/$file" "$saved/$file"
+    chmod go= "$saved/$file"
   fi
 done
 # impd deletes, at start, every secret value no database row names: an older copy would lose
@@ -172,7 +174,15 @@ fi
 
 step "start"
 systemctl start imp-host
-running_image="$(docker inspect imp-host --format '{{.Config.Image}}')"
+# imp-host is Type=exec: the start returns once docker run has begun, before the container
+# exists, so wait for it
+running_image=""
+for _ in $(seq "$start_wait"); do
+  running_image="$(docker inspect imp-host --format '{{.Config.Image}}' 2> /dev/null)" && break
+  running_image=""
+  sleep 1
+done
+[ -n "$running_image" ] || fail "no imp-host container appeared within $start_wait s of the start"
 [ "$running_image" = "$copy_image" ] ||
   fail "imp-host runs $running_image, not the copy's $copy_image"
 echo "restored $copy (migration $copy_migration) on generation $generation; the replaced database is in $saved"
