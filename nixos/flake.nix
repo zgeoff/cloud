@@ -22,6 +22,7 @@
         modules = [
           disko.nixosModules.disko
           imp.nixosModules.imp
+          ./modules/impd-local-health.nix
           ./hosts/geoffcloud/configuration.nix
           ./hosts/geoffcloud/disko.nix
         ];
@@ -30,5 +31,6 @@
       # atc's daemon, for a later host change (docs/plans/atc-gateway.md)
       nixosModules.atc-daemon = ./modules/atc-daemon.nix;
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs; };
+      checks.x86_64-linux.impd-local-health = import ./checks/impd-local-health.nix { inherit nixpkgs; };
     };
 }

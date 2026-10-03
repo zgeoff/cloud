@@ -5,6 +5,9 @@
   imports = [ (modulesPath + "/profiles/qemu-guest.nix") ];
 
   system.stateVersion = "26.05";
+
+  # impd local health as a node-exporter textfile metric (#29): loopback only, not HTTPS
+  services.impd-local-health.enable = true;
   networking.hostName = "geoffcloud";
   # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
   # so NixOS imports tank without -f
