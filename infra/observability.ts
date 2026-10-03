@@ -1,4 +1,5 @@
 import type { Provider } from '@pulumi/kubernetes';
+import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
@@ -58,11 +59,35 @@ export function createObservability(cluster: Provider): ObservabilityOutputs {
     { ...opts, dependsOn: [logs, metrics] },
   );
 
+  createCloudflaredMonitor(ns, metrics, cluster);
+
   return {
     logShipper: shipper,
     grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
     grafanaAdminPassword: adminPassword.result,
   };
+}
+
+// cloudflared serves Prometheus metrics on its `metrics` port (cluster-workloads.ts)
+function createCloudflaredMonitor(
+  ns: Namespace,
+  metrics: Chart,
+  cluster: Provider,
+): CustomResource {
+  return new CustomResource(
+    'cloudflared',
+    {
+      apiVersion: 'monitoring.coreos.com/v1',
+      kind: 'PodMonitor',
+      metadata: { name: 'cloudflared', namespace: ns.metadata.name },
+      spec: {
+        namespaceSelector: { matchNames: ['ingress'] },
+        selector: { matchLabels: { app: 'cloudflared' } },
+        podMetricsEndpoints: [{ port: 'metrics' }],
+      },
+    },
+    { provider: cluster, dependsOn: [metrics] },
+  );
 }
 
 function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unknown> {
@@ -141,7 +166,7 @@ const lokiValues = {
   test: { enabled: false },
 };
 
-// Alloy as a DaemonSet: tail every pod's logs and push them to Loki
+// Alloy as a DaemonSet: tail every pod's logs and the host's journal, and push them to Loki
 const alloyValues = {
   alloy: {
     configMap: {
@@ -171,6 +196,24 @@ loki.source.kubernetes "pods" {
   forward_to = [loki.write.default.receiver]
 }
 
+// the host's journal: impd (imp-host logs to journald), k3s, tailscaled and the rest
+// of the host, which no pod log covers
+loki.source.journal "host" {
+  path          = "/var/log/journal"
+  max_age       = "12h"
+  relabel_rules = loki.relabel.journal.rules
+  labels        = { job = "journal" }
+  forward_to    = [loki.write.default.receiver]
+}
+
+loki.relabel "journal" {
+  forward_to = []
+  rule {
+    source_labels = ["__journal__systemd_unit"]
+    target_label  = "unit"
+  }
+}
+
 loki.write "default" {
   endpoint {
     url = "http://loki.observability.svc:3100/loki/api/v1/push"
@@ -178,6 +221,9 @@ loki.write "default" {
 }
 `,
     },
+
+    // /var/log from the host, read-only, for the journal
+    mounts: { varlog: true },
     resources: { requests: { cpu: '20m', memory: '64Mi' }, limits: { memory: '192Mi' } },
   },
 };
