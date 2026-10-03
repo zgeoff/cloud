@@ -124,6 +124,13 @@
     image = "ghcr.io/zgeoff/imp-host:0.24.0@sha256:bd0185ef254aacf082faade121abe6e717a9028523357c03914eba9eeda47194";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
+    # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
+    # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
+    # for both names at the host's tailnet IP. imp.geoff.cloud stays free for imp's
+    # public MCP route. The token and the ACME email live in environmentFile, installed by
+    # scripts/install-imp-dns-token.sh before this reaches the host.
+    settings.IMP_DOMAIN = "imps.geoff.cloud";
+    settings.IMP_DNS_PROVIDER = "cloudflare";
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
     forwardDeny = [
       "10.42.0.0/16"
