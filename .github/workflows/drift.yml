@@ -25,10 +25,15 @@ concurrency:
 
 jobs:
   preview:
+    # the secret lives in this environment, which accepts the main branch only: a pushed
+    # branch or a dispatch on one cannot read it
+    environment: drift
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       LEFTHOOK: 0
+      # R2 takes any region; Pulumi's S3 backend needs one set
+      AWS_REGION: auto
       HAS_CI_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN != '' }}
     steps:
       - name: Skip Without Credentials
@@ -62,7 +67,8 @@ jobs:
         if: env.HAS_CI_TOKEN == 'true'
         run: bun run provider:build && bun run sdk:build
 
-      # read-only service account on the cloud-ci vault: copies of the items .env names
+      # read-only service account on the cloud-ci vault, holding read-only tokens where the
+      # service offers them
       - name: Load Credentials
         if: env.HAS_CI_TOKEN == 'true'
         uses: 1password/load-secrets-action@3a12b0ab99d9cd590a3e9b5a90ea017210ed9556 # v4.0.1
