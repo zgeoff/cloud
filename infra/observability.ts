@@ -4,6 +4,9 @@ import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
+import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
+import { createAlertRules } from './create-alert-rules.ts';
+import { createAlertWebhook } from './create-alert-webhook.ts';
 import { createDashboards } from './create-dashboards.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
@@ -16,24 +19,22 @@ interface ObservabilityOutputs {
   readonly grafanaAdminPassword: Output<string>;
 }
 
-// Prometheus, Grafana, Loki and Alloy, sized for about 1 GiB on one node (#8).
-// Retention is 30 days for metrics and logs.
-export function createObservability(cluster: Provider): ObservabilityOutputs {
+// Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
+// (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
+// when alertWebhookURL is set (#29); otherwise it sends nothing.
+export function createObservability(
+  cluster: Provider,
+  alertWebhookURL: string | undefined,
+): ObservabilityOutputs {
   const opts = { provider: cluster };
 
   const ns = new Namespace('observability', { metadata: { name: 'observability' } }, opts);
   const adminPassword = new RandomPassword('grafana-admin', { length: 32, special: false });
 
-  const metrics = new Chart(
-    'kube-prometheus-stack',
-    {
-      namespace: ns.metadata.name,
-      chart: 'kube-prometheus-stack',
-      version: '91.8.2',
-      repositoryOpts: { repo: 'https://prometheus-community.github.io/helm-charts' },
-      values: buildMetricsValues(adminPassword.result),
-    },
-    opts,
+  const metrics = createMetrics(
+    ns,
+    { grafanaPassword: adminPassword.result, alertWebhookURL },
+    cluster,
   );
 
   const logs = new Chart(
@@ -51,6 +52,7 @@ export function createObservability(cluster: Provider): ObservabilityOutputs {
   const shipper = createLogShipper(ns, [logs, metrics], cluster);
 
   createCloudflaredMonitor(ns, metrics, cluster);
+  createAlertRules(ns, metrics, cluster);
   createDashboards(ns, cluster);
 
   return {
@@ -58,6 +60,36 @@ export function createObservability(cluster: Provider): ObservabilityOutputs {
     grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
     grafanaAdminPassword: adminPassword.result,
   };
+}
+
+interface MetricsInputs {
+  readonly grafanaPassword: Output<string>;
+  readonly alertWebhookURL: string | undefined;
+}
+
+// kube-prometheus-stack: Prometheus, Alertmanager, Grafana and the exporters
+function createMetrics(ns: Namespace, inputs: MetricsInputs, cluster: Provider): Chart {
+  const webhook =
+    inputs.alertWebhookURL === undefined
+      ? undefined
+      : createAlertWebhook(ns, inputs.alertWebhookURL, cluster);
+
+  return new Chart(
+    'kube-prometheus-stack',
+    {
+      namespace: ns.metadata.name,
+      chart: 'kube-prometheus-stack',
+      version: '91.8.2',
+      repositoryOpts: { repo: 'https://prometheus-community.github.io/helm-charts' },
+      values: {
+        ...buildMetricsValues(inputs.grafanaPassword),
+        alertmanager: buildAlertmanagerValues(webhook),
+      },
+    },
+
+    // the Alertmanager pod mounts the webhook's Secret, so the Secret comes first
+    { provider: cluster, dependsOn: webhook === undefined ? [] : [webhook.resource] },
+  );
 }
 
 // Alloy ships pod logs and the host journal to Loki (alloyValues)
@@ -105,9 +137,11 @@ const nodeExporterArgs = [
   '--collector.textfile.directory=/host/root/var/lib/node-exporter/textfile',
 ];
 
+// the chart's values but Alertmanager's, which buildAlertmanagerValues gives
 function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unknown> {
   return {
-    alertmanager: { enabled: false },
+    // buildAlertRules has a per-target TargetDown in place of the chart's ratio-based one
+    defaultRules: { disabled: { TargetDown: true } },
 
     // k3s runs these inside the k3s binary; there is nothing separate to scrape
     kubeEtcd: { enabled: false },
@@ -125,9 +159,10 @@ function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unk
         retentionSize: '8GB',
         resources: { requests: { cpu: '100m', memory: '256Mi' }, limits: { memory: '512Mi' } },
 
-        // pick up every ServiceMonitor and PodMonitor, not only the chart's own
+        // pick up every ServiceMonitor, PodMonitor and PrometheusRule, not only the chart's own
         serviceMonitorSelectorNilUsesHelmValues: false,
         podMonitorSelectorNilUsesHelmValues: false,
+        ruleSelectorNilUsesHelmValues: false,
         storageSpec: {
           volumeClaimTemplate: {
             spec: { accessModes: ['ReadWriteOnce'], resources: { requests: { storage: '10Gi' } } },
@@ -145,8 +180,9 @@ function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unk
         { name: 'Loki', type: 'loki', url: 'http://loki.observability.svc:3100', access: 'proxy' },
       ],
 
-      // alertmanager is disabled above, so its datasource only fails its health check
-      // (#28); deleteDatasources removes the copy Grafana already provisioned
+      // no Alertmanager datasource: Grafana does no alerting here, and alerts show in
+      // Prometheus and Alertmanager themselves (#28, #29); deleteDatasources removes the
+      // copy Grafana provisioned while Alertmanager was off
       sidecar: { datasources: { alertmanager: { enabled: false } } },
       deleteDatasources: [{ name: 'Alertmanager', orgId: 1 }],
     },

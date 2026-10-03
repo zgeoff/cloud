@@ -4,9 +4,11 @@ import { Namespace, Secret } from '@pulumi/kubernetes/core/v1';
 import type { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { Config } from '@pulumi/pulumi';
 import type { ATCGatewayInputs } from './atc-gateway.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import { createObservability } from './observability.ts';
+import { requireAlertWebhook } from './require-alert-webhook.ts';
 
 // cloudflared's release; bump deliberately
 const cloudflaredImage = 'cloudflare/cloudflared:2026.9.3';
@@ -59,7 +61,15 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     { provider: cluster },
   );
 
-  const observability = createObservability(cluster);
+  // In-cluster alerts reach Discord only after `pulumi config set discordAlerts true`
+  // (#29); until then no Secret holds the webhook and Alertmanager sends nothing. The
+  // external health check (health-check.ts) reads the same webhook on its own.
+  const alertWebhookURL = requireAlertWebhook(
+    new Config().getBoolean('discordAlerts') ?? false,
+    process.env['ALERT_WEBHOOK_URL'],
+  );
+
+  const observability = createObservability(cluster, alertWebhookURL);
 
   const gateway =
     inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);
