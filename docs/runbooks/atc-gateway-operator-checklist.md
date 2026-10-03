@@ -5,14 +5,16 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.0 (system-15). Copies of impd's
-database from before each upgrade are in `/root/imp-db-backups/` on the host, for a rollback. B1 is
-done: atc 2.24.0 ships `atc-gateway-linux-x64` and holds atc #242. B2 is done: the pins track
-2.24.0, and the fixture test passes against the real gateway binary. C1 and C2 are done: the
-gateway's daemon bearer and impd's `atc-cloud` token are in 1Password and on the host. C3's R2
-bucket, key and restic password exist in 1Password; C4's GitHub token exists, unused. E2's Nix code
-is on `main` (`nixos/packages/atc.nix`, atc 2.24.0, and `services.atc-daemon` in geoffcloud's
-config) but not switched. Nothing else below has run.
+Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.0. Copies of impd's database
+from before each upgrade are in `/root/imp-db-backups/` on the host. B1 is done: atc 2.24.0 ships
+`atc-gateway-linux-x64` and holds atc #242. B2 and B3 are done: the pins track 2.24.0, the fixture
+test passes against the real gateway binary, and both images are published by digest. C1 and C2 are
+done: the gateway's daemon bearer and impd's `atc-cloud` token are in 1Password and on the host.
+C3's R2 bucket, key and restic password exist in 1Password and `.env` references them; C4's GitHub
+token exists, unused. E2 is done (system-16): atc-daemon 2.24.0 runs on `100.69.47.33:8415` with
+daemonID `087031fd-6df6-42fb-a2e9-76e1f0e363d9`, and `inet cloud_host` is loaded. A pod reaches
+8415; the host's own TCP and direct tailnet access time out; a wrong bearer gets `unauthorized`;
+with the right bearer, a request as an unlisted principal is refused. Nothing else below has run.
 
 B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
@@ -20,13 +22,25 @@ B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published
   **FIXTURE STAND-IN, NOT USABLE AS THE PRODUCTION GATEWAY.** It holds atc 2.10.0's `atc` binary.
   `infra/require-atc-gateway-inputs.ts` refuses it.
 - `ghcr.io/zgeoff/atc-gateway-backup:2.10.0@sha256:cc9d89b9f72fdc8ee0f209e101031e8d3f7620e3a527cfc2608c57d143977c6d`
-  (restic and sqlite3; usable as is, and pinned in `restore-job.yaml`)
+  (restic and sqlite3). **Historical:** its retention never aged out snapshots; superseded by
+  `2.24.0-r2` below (#53).
 
-B3 runs again to publish the 2.24.0 gateway image. The fixture test runs the real gateway with the
-Deployment's flags: `serve --host --port --public-url --registry --state-dir`. The gateway refuses
-any other flag, and exits when `--state-dir` and `ATC_GATEWAY_STATE_DIR` disagree; the Deployment
-sets both to the same path. The fixture does not prove gateway-to-daemon transport (its registry
-names a dead address), R2, or anything in k3s.
+B3 ran again for 2.24.0 (run 37148747359), and once more for the backup fix in #53 (run 37152438663,
+which skipped the published gateway tag). E3 and `restore-job.yaml` use:
+
+- `ghcr.io/zgeoff/atc-gateway:2.24.0@sha256:4cfadbde011c20976ab5f6f4bb4ae2985172e162964159dd0d2d0ae42963479b`
+- `ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377`
+  (its sqlite package comes from Alpine's repository at build time, so a rebuild can differ)
+
+**Historical, do not deploy:**
+`ghcr.io/zgeoff/atc-gateway-backup:2.24.0@sha256:b9ad915f3aaaff109148c143e1463fabadeb413868d5705a2b158410ed5d8627`.
+Its backup used a new path each run, so retention never removed a snapshot (#53).
+
+The fixture test runs the real gateway with the Deployment's flags:
+`serve --host --port --public-url --registry --state-dir`. The gateway refuses any other flag, and
+exits when `--state-dir` and `ATC_GATEWAY_STATE_DIR` disagree; the Deployment sets both to the same
+path. The fixture does not prove gateway-to-daemon transport (its registry names a dead address),
+R2, or anything in k3s.
 
 The package is validated:
 
@@ -39,9 +53,10 @@ The package is validated:
 | geoffcloud's system with the flake changes                                                                                                                                                                                                                          | unchanged                                                                                  |
 | `deploy/atc-gateway/restore-job.yaml`, client dry run                                                                                                                                                                                                               | valid                                                                                      |
 
-## Two access choices for approval
+## Two access choices
 
-Neither is applied. Each needs an explicit yes to the exact statement below.
+E2 is applied (Geoff approved it; live since 2026-10-04). D1 is not applied and is not needed for
+the cloud daemon; it would need an explicit yes to the exact statement below.
 
 | Choice                                | Source                                                                       | Destination                                | Port     | Auth beyond the network                                     | Effect                                                                                                                                                    |
 | ------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ | -------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -55,11 +70,11 @@ narrows it.
 
 ## A. Maintenance, independent of the gateway
 
-| #   | Step                                                                                                                                                                                                                                                                       | Waits on                | Approval                                            | Effect                                                                                                                                                                                                                                                                                                                                                                                              |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A1  | Merge branch `imp-0.17` and `nixos-rebuild switch` geoffcloud. First `imp ls` on the host, and `imp sleep` each awake imp (none on 2026-10-03)                                                                                                                             | nothing (built)         | yes: it changes live forward rules and restarts imp | imp-host goes from 0.12.0 (the `:latest` it pulled on 2026-10-02) to 0.17.0, with module and image both pinned by digest (imp#109 tracks the module's `:latest` default); impd runs 4 additive migrations at start, with no manual step; a few minutes of imp downtime; the docker0 → k3s deny moves into imp's `imp-forward` table, same effect; k3s keeps running; rollback: switch to `system-5` |
-| A2  | imp #90 (orphan-cleanup safety) and leases (#96, 0.15.0) on the host                                                                                                                                                                                                       | in 0.17.0               | covered by A1                                       | no manual state migration                                                                                                                                                                                                                                                                                                                                                                           |
-| A3  | imp's next release with #83 (Docker API proxy): pin the module and the image to its tag together, copy impd's database, switch; then check that imp-host has no `docker.sock` bind, that `imp-docker-proxy` runs as uid 65534 with no network, and that a test imp creates | imp's tag (not cut yet) | covered by the imp-host delegation                  | the module adds `imp-host-image.service` and the proxy unit; no `upgrade.sh` on NixOS                                                                                                                                                                                                                                                                                                               |
+| #   | Step                                                                                                                                                                                                                                                                       | Waits on                | Approval                                            | Effect                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A1  | Merge branch `imp-0.17` and `nixos-rebuild switch` geoffcloud. First `imp ls` on the host, and `imp sleep` each awake imp (none on 2026-10-03)                                                                                                                             | nothing (built)         | yes: it changes live forward rules and restarts imp | imp-host goes from 0.12.0 (the `:latest` it pulled on 2026-10-02) to 0.17.0, with module and image both pinned by digest (imp#109 tracks the module's `:latest` default); impd runs 4 additive migrations at start, with no manual step; a few minutes of imp downtime; the docker0 → k3s deny moves into imp's `imp-forward` table, same effect; k3s keeps running. Done; for a rollback, follow [the restore runbook](./restore-geoff-cloud.md), not an old generation |
+| A2  | imp #90 (orphan-cleanup safety) and leases (#96, 0.15.0) on the host                                                                                                                                                                                                       | in 0.17.0               | covered by A1                                       | no manual state migration                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| A3  | imp's next release with #83 (Docker API proxy): pin the module and the image to its tag together, copy impd's database, switch; then check that imp-host has no `docker.sock` bind, that `imp-docker-proxy` runs as uid 65534 with no network, and that a test imp creates | imp's tag (not cut yet) | covered by the imp-host delegation                  | the module adds `imp-host-image.service` and the proxy unit; no `upgrade.sh` on NixOS                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## B. Build and publish
 
