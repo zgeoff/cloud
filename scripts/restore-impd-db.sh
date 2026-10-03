@@ -26,12 +26,27 @@ units=(imp-host imp-docker-proxy)
 # what has happened so far, for the error message
 state="nothing was changed"
 
+# set once the switch or start may have started impd: a failure then stops it again
+starting=false
+
 fail() {
-  echo "restore-impd-db: $*; $state" >&2
+  echo "restore-impd-db: $*" >&2
+  stop_after_failure
+  echo "restore-impd-db: $state" >&2
   exit 1
 }
 
-trap 'echo "restore-impd-db: failed at line $LINENO; $state" >&2' ERR
+stop_after_failure() {
+  if [ "$starting" = true ]; then
+    if systemctl stop "${units[@]}"; then
+      state="$state; imp-host and imp-docker-proxy are stopped again"
+    else
+      state="$state; stopping imp-host and imp-docker-proxy FAILED, check them by hand"
+    fi
+  fi
+}
+
+trap 'fail "failed at line $LINENO"' ERR
 
 step() {
   printf '== %s\n' "$*"
@@ -49,8 +64,16 @@ copy_migration="$(sed -n 's/^migration //p' "$copy/COPY-INFO")"
 
 step "check the host"
 for unit in "${units[@]}"; do
-  if systemctl is-active --quiet "$unit"; then
-    fail "$unit is running; run: systemctl stop ${units[*]}"
+  unit_state="$(systemctl show -p ActiveState --value "$unit")" || fail "cannot read $unit's state"
+  case "$unit_state" in
+    inactive | failed) ;;
+    *) fail "$unit is $unit_state, not stopped; run: systemctl stop ${units[*]}" ;;
+  esac
+done
+containers="$(docker ps --format '{{.Names}}')" || fail "cannot list docker containers"
+for unit in "${units[@]}"; do
+  if grep -qx "$unit" <<< "$containers"; then
+    fail "the $unit container still runs; stop it before a restore"
   fi
 done
 [[ "$generation" =~ ^[0-9]+$ ]] || fail "the generation must be a number, such as 14"
@@ -88,6 +111,22 @@ mkdir -m 0700 "$saved"
 for file in imp.sqlite imp.sqlite-wal imp.sqlite-shm; do
   if [ -e "$db/$file" ]; then
     cp -p "$db/$file" "$saved/$file"
+  fi
+done
+# impd deletes, at start, every secret value no database row names: an older copy would lose
+# newer secrets, so their values are saved too, to re-add by hand (imp #171)
+if [ -d "$mnt/secrets" ]; then
+  cp -a "$mnt/secrets" "$saved/secrets"
+  chmod -R go= "$saved/secrets"
+fi
+# flush the backups filesystem (not tank/imp) before anything on the pool changes, then
+# compare each saved file with its original again
+sync -f "$saved"
+if [ -d "$mnt/secrets" ]; then
+  diff -r "$mnt/secrets" "$saved/secrets" > /dev/null || fail "the saved secrets differ from the originals"
+fi
+for file in imp.sqlite imp.sqlite-wal imp.sqlite-shm; do
+  if [ -e "$db/$file" ]; then
     cmp -s "$db/$file" "$saved/$file" || fail "the saved $file differs from the original"
   fi
 done
@@ -118,6 +157,7 @@ mounted=false
 rmdir "$mnt"
 
 state="the copy is in place (the original is in $saved); the switch or start did not finish"
+starting=true
 step "activate generation $generation"
 if [ "$(readlink "$profiles/system")" != "system-$generation-link" ]; then
   nix-env -p "$profiles/system" --set "$target"
@@ -128,5 +168,5 @@ step "start"
 systemctl start imp-host
 running_image="$(docker inspect imp-host --format '{{.Config.Image}}')"
 [ "$running_image" = "$copy_image" ] ||
-  fail "imp-host runs $running_image, not the copy's $copy_image; stop it and investigate"
+  fail "imp-host runs $running_image, not the copy's $copy_image"
 echo "restored $copy (migration $copy_migration) on generation $generation; the replaced database is in $saved"

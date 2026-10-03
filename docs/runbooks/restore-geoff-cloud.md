@@ -84,13 +84,20 @@ imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd
    ```
 
    It fails closed. Before it changes anything it checks the copy (integrity, `COPY-INFO`, its
-   migration), that both units are stopped, that the generation exists and runs the copy's image,
-   and that the dataset is not mounted. Then it mounts `tank/imp`, saves the stopped database and
-   its WAL files to `/root/imp-db-backups/pre-restore-<UTC time>/`, stages the copy beside the
-   database, checks it, and publishes it with one rename. After a clean unmount it activates the
-   generation (when it is not the current one), starts imp-host and checks that imp-host runs the
-   copy's image. On an error it stops and says how far it got; it never starts impd or switches
-   before the database is in place.
+   migration), reads both units' state and requires `inactive` or `failed`, checks that no
+   `imp-host` or `imp-docker-proxy` container runs, that the generation exists and runs the copy's
+   image, and that the dataset is not mounted. Then it mounts `tank/imp` and saves the stopped
+   database, its WAL files and impd's secret values to
+   `/root/imp-db-backups/pre-restore-<UTC time>/`, flushes that filesystem and compares every saved
+   file with its original. Only then does it stage the copy beside the database, check it, and
+   publish it with one rename. After a clean unmount it activates the generation (when it is not the
+   current one), starts imp-host and checks that imp-host runs the copy's image. On an error it says
+   how far it got; if the switch or the start had begun, it stops both units again.
+
+   **CAUTION:** At start, impd deletes every secret value that no database row names. A copy older
+   than a secret loses that secret's value. The script saves the values first, in `secrets/` of the
+   saved directory; re-add any secret the copy lacks with `imp secret add`, from that saved value or
+   from its source.
 
 4. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
    copy, and `https://imps.geoff.cloud/health` returns 200.
@@ -102,12 +109,14 @@ fresh copy choice.
 
 **Evidence.** Synthetic only, 2026-10-04: an isolated bun:sqlite WAL writer in Docker gave five
 consistent copies while it wrote. The restore script ran in a privileged throwaway container with a
-fake pool, fake generations and stubbed `systemctl`, `mount` and `nix-env`: a restore on the current
-generation and a rollback to an older one each restored the copy, switched when needed, started and
-ran the copy's image. A running unit, an image mismatch, a missing generation, a missing
-`COPY-INFO`, a corrupt copy, a migration mismatch, a failed copy into the pool and a failed unmount
-each stopped with nothing started or switched. **Untested:** the real ZFS mount of `tank/imp`, a
-real generation switch during a restore, and any restore on geoffcloud.
+fake pool, fake generations and stubbed `systemctl`, `docker`, `mount` and `nix-env`: a restore on
+the current generation and a rollback to an older one each restored the copy, saved the secrets,
+switched when needed, started and ran the copy's image. An active or activating unit, an unreadable
+unit state, a running container, an image mismatch, a missing generation, a missing `COPY-INFO`, a
+corrupt copy, a migration mismatch, a failed copy into the pool and a failed unmount each stopped
+with nothing started or switched. A failed switch and a wrong image after the start each stopped
+both units again. **Untested:** the real ZFS mount of `tank/imp`, a real generation switch during a
+restore, and any restore on geoffcloud.
 
 ## 3. Roll the host back one generation
 
