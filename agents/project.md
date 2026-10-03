@@ -41,10 +41,12 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
       --flake path:./nixos#geoffcloud --target-host root@geoffcloud'
   ```
 
-- Before a switch that changes imp, copy impd's database: `docker exec imp-host` tar the
-  `imp.sqlite*` files out of `/var/lib/imp/db` into `/root/imp-db-backups/<version>-<UTC time>/`,
-  then run `PRAGMA integrity_check` on the copy. The host's `/var/lib/imp` is empty: `tank/imp` has
-  a legacy mountpoint inside imp-host.
+- Before a switch that changes imp, copy impd's database with
+  `bash scripts/copy-impd-db.sh <label>`: a `VACUUM INTO` copy taken inside imp-host while impd
+  runs, with its integrity check, schema migration and imp version in `COPY-INFO`. Never tar the
+  live `imp.sqlite*` files: impd runs in WAL mode, so such a copy can tear. A restore is one-way
+  (migrations run forward only), needs approval, and follows the restore runbook (#9). The host's
+  `/var/lib/imp` is empty: `tank/imp` has a legacy mountpoint inside imp-host.
 - Drift checks are manual. Before and after every `bun run up`, run `bun run drift` from a clean
   `main`: a refresh preview that exits non-zero on any change. Record its result. A scheduled CI
   check is parked until scoped credentials exist (#19): Onidel offers only full-account keys.
