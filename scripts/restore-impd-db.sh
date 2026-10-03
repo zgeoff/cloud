@@ -159,7 +159,9 @@ rmdir "$mnt"
 state="the copy is in place (the original is in $saved); the switch or start did not finish"
 starting=true
 step "activate generation $generation"
-if [ "$(readlink "$profiles/system")" != "system-$generation-link" ]; then
+# compare with the running system, not the profile: after `nixos-rebuild boot` the profile can
+# name the target while the host still runs a newer generation
+if [ "$(readlink -f "${CURRENT_SYSTEM:-/run/current-system}")" != "$(readlink -f "$target")" ]; then
   nix-env -p "$profiles/system" --set "$target"
   "$target/bin/switch-to-configuration" switch
 fi

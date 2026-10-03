@@ -102,10 +102,14 @@ imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd
 4. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
    copy, and `https://imps.geoff.cloud/health` returns 200.
 
-**Reboot window.** If the host reboots between step 2 and the end of step 3, imp-host starts on the
-current generation. If the database is still the original, nothing changed. If the copy is already
-in place and the current image is newer, impd migrates the copy forward. Rerun from step 1 with a
-fresh copy choice.
+**Reboot window.** If the host reboots during step 3, imp-host starts on the current generation,
+against whatever the dataset holds then. Do not assume nothing changed: check the script's output
+for how far it got, and the saved directory. Before the saved files are flushed, the original
+database is untouched. After the WAL files are removed but before the rename, `db/imp.sqlite` is the
+original without its last WAL writes, beside a staged `imp.sqlite.restore`; the full original is in
+the saved directory. After the rename, the copy is in place, and a newer image migrates it forward.
+In every case, stop impd and rerun from step 1; to return to the original, restore the saved
+directory's files the same way.
 
 **Evidence.** Synthetic only, 2026-10-04: an isolated bun:sqlite WAL writer in Docker gave five
 consistent copies while it wrote. The restore script ran in a privileged throwaway container with a
@@ -134,6 +138,11 @@ changes, restore the matching database copy too (section 2).
 ## 4. Recover the root disk
 
 **Untested.** No snapshot restore or reinstall has been rehearsed since geoffcloud went live.
+
+**CAUTION:** A snapshot restores `vda` only. impd's database lives on `vdb`, so a snapshot from
+before an imp upgrade brings back an older image beside a newer database, and impd refuses to start.
+Before impd starts, either switch to a generation whose image matches the database, or restore a
+database copy that matches the snapshot's image (section 2).
 
 `vda` holds NixOS. `vdb` holds imp's ZFS pool and is never part of these steps.
 
