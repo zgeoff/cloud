@@ -22,13 +22,19 @@ B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published
   **FIXTURE STAND-IN, NOT USABLE AS THE PRODUCTION GATEWAY.** It holds atc 2.10.0's `atc` binary.
   `infra/require-atc-gateway-inputs.ts` refuses it.
 - `ghcr.io/zgeoff/atc-gateway-backup:2.10.0@sha256:cc9d89b9f72fdc8ee0f209e101031e8d3f7620e3a527cfc2608c57d143977c6d`
-  (restic and sqlite3; usable as is, and pinned in `restore-job.yaml`)
+  (restic and sqlite3). **Historical:** its retention never aged out snapshots; superseded by
+  `2.24.0-r2` below (#53).
 
-B3 ran again for 2.24.0 (run 37148747359). E3 uses these digests:
+B3 ran again for 2.24.0 (run 37148747359), and once more for the backup fix in #53 (run 37152438663,
+which skipped the published gateway tag). E3 and `restore-job.yaml` use:
 
 - `ghcr.io/zgeoff/atc-gateway:2.24.0@sha256:4cfadbde011c20976ab5f6f4bb4ae2985172e162964159dd0d2d0ae42963479b`
-- `ghcr.io/zgeoff/atc-gateway-backup:2.24.0@sha256:b9ad915f3aaaff109148c143e1463fabadeb413868d5705a2b158410ed5d8627`
+- `ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377`
   (its sqlite package comes from Alpine's repository at build time, so a rebuild can differ)
+
+**Historical, do not deploy:**
+`ghcr.io/zgeoff/atc-gateway-backup:2.24.0@sha256:b9ad915f3aaaff109148c143e1463fabadeb413868d5705a2b158410ed5d8627`.
+Its backup used a new path each run, so retention never removed a snapshot (#53).
 
 The fixture test runs the real gateway with the Deployment's flags:
 `serve --host --port --public-url --registry --state-dir`. The gateway refuses any other flag, and
@@ -47,9 +53,10 @@ The package is validated:
 | geoffcloud's system with the flake changes                                                                                                                                                                                                                          | unchanged                                                                                  |
 | `deploy/atc-gateway/restore-job.yaml`, client dry run                                                                                                                                                                                                               | valid                                                                                      |
 
-## Two access choices for approval
+## Two access choices
 
-Neither is applied. Each needs an explicit yes to the exact statement below.
+E2 is applied (Geoff approved it; live since 2026-10-04). D1 is not applied and is not needed for
+the cloud daemon; it would need an explicit yes to the exact statement below.
 
 | Choice                                | Source                                                                       | Destination                                | Port     | Auth beyond the network                                     | Effect                                                                                                                                                    |
 | ------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------ | -------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
