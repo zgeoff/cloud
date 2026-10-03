@@ -55,7 +55,11 @@ const hostKey = new TailnetKey(
     ephemeral: false,
     preauthorized: true,
     expiry: 7 * 24 * 60 * 60,
-    recreateIfInvalid: 'always',
+
+    // single use: the host joined once, so the key reads as used. 'always' would mint a
+    // fresh key on every apply and show as drift on every preview. A reinstall that needs
+    // a new key replaces this resource on purpose (`pulumi up --replace`).
+    recreateIfInvalid: 'never',
   },
   { dependsOn: [policy] },
 );
