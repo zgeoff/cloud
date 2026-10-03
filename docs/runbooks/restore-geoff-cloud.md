@@ -50,41 +50,62 @@ template.
 Every imp upgrade takes a copy first with `bash scripts/copy-impd-db.sh <label>`. The copy is one
 `imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: the imp
 version, the image, the newest schema migration and the integrity check.
+`scripts/restore-impd-db.sh` puts a copy back.
 
 **CAUTION:** A restore discards every change impd made after the copy. It is one-way: impd runs
-migrations forward only, and an older binary refuses a newer database. Restore a copy only with the
-imp image named in its `COPY-INFO`. Disks and checkpoints made after the copy stay on the pool as
-orphans; impd keeps them, but those imps leave `imp ls` until someone repairs them by hand.
+migrations forward only, and an older binary refuses a newer database. Disks and checkpoints made
+after the copy stay on the pool as orphans; impd keeps them, but those imps leave `imp ls` until
+someone repairs them by hand. Copies taken by `tar` of a running impd, before the copy script, have
+no `COPY-INFO` and may be torn; the restore script refuses them.
 
-Copies taken before the copy script by `tar` of a running impd may be torn. Prefer a copy with a
-`COPY-INFO`.
+**CAUTION:** Mask impd before you switch generations. A switch restarts imp-host, and an older image
+started against a newer database fails or, worse, runs against it.
 
-1. Switch back to the NixOS generation whose imp image matches the copy (section 3).
-2. Stop impd, so nothing writes during the restore:
+1. Choose the copy, and read its `COPY-INFO`. Find the NixOS generation that runs its image:
 
    ```sh
+   grep -o 'ghcr.io/zgeoff/imp-host:[^ ;]*' /nix/var/nix/profiles/system-*-link/etc/systemd/system/imp-host.service
+   ```
+
+2. Stop impd and keep it stopped through the switch:
+
+   ```sh
+   systemctl mask --runtime imp-host imp-docker-proxy
    systemctl stop imp-host imp-docker-proxy
    ```
 
-3. Mount the pool's dataset on the host, put the copy in place, and remove the WAL files (**untested
-   on the host**; the file steps were rehearsed on an isolated WAL database):
+3. If the generation differs, switch to it (section 3). The units stay masked, so the switch cannot
+   start impd.
+4. Copy the script to the host and run it there with sqlite from nixpkgs (the host has none):
 
    ```sh
-   mkdir -p /mnt/imp-restore
-   mount -t zfs tank/imp /mnt/imp-restore
-   cp /root/imp-db-backups/<copy>/imp.sqlite /mnt/imp-restore/db/imp.sqlite
-   rm -f /mnt/imp-restore/db/imp.sqlite-wal /mnt/imp-restore/db/imp.sqlite-shm
-   umount /mnt/imp-restore
-   systemctl start imp-host
+   scp scripts/restore-impd-db.sh root@geoffcloud:/root/
+   ssh root@geoffcloud nix --extra-experimental-features "'nix-command flakes'" \
+     shell nixpkgs#sqlite -c bash /root/restore-impd-db.sh /root/imp-db-backups/<copy>
    ```
 
-4. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
+   It fails closed. It checks the copy (integrity, `COPY-INFO`, its migration) and the host (both
+   units masked and stopped, this generation's image equal to the copy's, the dataset not mounted)
+   before it changes anything. Then it mounts `tank/imp`, saves the stopped database and its WAL
+   files to `/root/imp-db-backups/pre-restore-<UTC time>/`, stages the copy beside the database,
+   checks it, and publishes it with one rename. It unmasks and starts imp-host only after a clean
+   unmount. On any error it starts nothing and leaves both units masked.
+
+5. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
    copy, and `https://imps.geoff.cloud/health` returns 200.
 
-Rehearsed 2026-10-04 on an isolated bun:sqlite WAL writer in Docker: five copies taken while it
-wrote were all `ok`, and a stop, replace, drop -wal/-shm, start restore resumed from the copy.
+**Evidence.** Synthetic only, 2026-10-04: an isolated bun:sqlite WAL writer in Docker gave five
+consistent copies while it wrote. The restore script ran in a privileged throwaway container with a
+fake pool and stubbed `systemctl` and `mount`: the success path restored the copy and started; a
+missing mask, a running unit, an image mismatch, a missing `COPY-INFO`, a corrupt copy, a migration
+mismatch, a failed copy into the pool and a failed unmount each stopped with nothing started.
+**Untested:** the real ZFS mount of `tank/imp`, systemd masking during a real generation switch, and
+any restore on geoffcloud.
 
 ## 3. Roll the host back one generation
+
+**Untested** as a recovery step. Generation switches forward are routine; no rollback has been
+rehearsed. If imp's image changes, mask impd first (section 2, step 2).
 
 ```sh
 ssh root@geoffcloud nixos-rebuild switch --rollback
@@ -94,6 +115,8 @@ ssh root@geoffcloud nixos-rebuild switch --rollback
 changes, restore the matching database copy too (section 2).
 
 ## 4. Recover the root disk
+
+**Untested.** No snapshot restore or reinstall has been rehearsed since geoffcloud went live.
 
 `vda` holds NixOS. `vdb` holds imp's ZFS pool and is never part of these steps.
 
@@ -116,9 +139,10 @@ that only lived in the cluster. **What survives:** imps (ZFS on `vdb`, outside k
 `.env` resolving through the `cloud` 1Password profile; Pulumi state in R2; the Helm repositories
 and images reachable.
 
-**CAUTION:** With `K3S_KUBECONFIG` empty, the program skips the cluster, and a preview plans to
-delete every cluster resource from state (read from `infra/index.ts`; not rehearsed). Check the
-preview before any apply.
+**CAUTION:** With stack config `cluster: managed`, an empty `K3S_KUBECONFIG` stops the program
+before it registers any resource (`infra/require-kubeconfig.ts`), so a run without the kubeconfig
+fails instead of planning to delete the cluster. Never switch `cluster` to `none` to get past it:
+that does plan to delete every cluster resource. Check the preview before any apply.
 
 1. Put the new kubeconfig in `op://cloud/k3s-kubeconfig`. With the old one, every run fails with
    `x509: certificate signed by unknown authority` and changes nothing.
