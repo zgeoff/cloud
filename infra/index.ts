@@ -14,6 +14,7 @@ import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { createClusterWorkloads } from './cluster-workloads.ts';
 import { createHealthCheck } from './health-check.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
+import { requireKubeconfig } from './require-kubeconfig.ts';
 import { homePC, tailnetPolicy } from './tailnet-policy.ts';
 
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
@@ -251,12 +252,13 @@ export const tunnelToken = secret(
   getZeroTrustTunnelCloudflaredTokenOutput({ accountId: accountID, tunnelId: tunnel.id }).token,
 );
 
-// k3s workloads, once the cluster exists (#6). K3S_KUBECONFIG comes from
-// op://cloud/k3s-kubeconfig; without it the program skips the cluster.
-const kubeconfig = process.env['K3S_KUBECONFIG'];
+// k3s workloads (#6). K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig. The stack's
+// "cluster" config says whether the cluster is managed, so a missing kubeconfig fails the
+// run instead of planning to delete the cluster's resources.
+const kubeconfig = requireKubeconfig(new Config().get('cluster'), process.env['K3S_KUBECONFIG']);
 
 const workloads =
-  kubeconfig === undefined || kubeconfig === ''
+  kubeconfig === undefined
     ? undefined
     : createClusterWorkloads({ kubeconfig, tunnelToken, ...loadATCGatewayInputs() });
 

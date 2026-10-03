@@ -43,6 +43,8 @@ pre-push:
       run: bun run lint
     - name: typecheck
       run: bun run typecheck
+    - name: test
+      run: bun run test
     - name: deadcode
       run: bun run deadcode
     - name: provider
