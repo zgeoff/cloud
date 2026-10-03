@@ -184,7 +184,8 @@ reads as healthy.
   ratio-based rule of the same name. The chart's default rules still run.
 - **The Discord receiver is gated off.** With the stack config `discordAlerts` unset or false,
   Alertmanager routes every alert to a null receiver and sends nothing, and no Secret holds the
-  webhook. Alerts still show in Prometheus and Alertmanager.
+  webhook. Firing alerts still show in Prometheus and Alertmanager, which have no NodePort: reach
+  them with `kubectl -n observability port-forward`.
 - With `discordAlerts` true, Pulumi writes `ALERT_WEBHOOK_URL` into the Secret
   `observability/alertmanager-discord`. Alertmanager reads it as `webhook_url_file` and sends every
   alert to Discord, except the chart's always-firing `Watchdog` and its `InfoInhibitor` helper. The
