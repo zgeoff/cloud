@@ -62,6 +62,16 @@ run_backup() {
     atc-gateway-backup:fixture "$@"
 }
 
+run_restic() {
+  docker run --rm --user 0 -v "$run_id-repo:/repo" -e RESTIC_REPOSITORY=/repo \
+    -e RESTIC_PASSWORD=fixture-only --entrypoint /bin/sh "$RESTIC_IMAGE" -c "$1"
+}
+
+count_snapshots() {
+  docker run --rm -v "$run_id-repo:/repo" -e RESTIC_REPOSITORY=/repo -e RESTIC_PASSWORD=fixture-only \
+    "$RESTIC_IMAGE" snapshots --json "$@" | grep -o '"short_id"' | wc -l | tr -d ' '
+}
+
 count_clients() {
   docker exec "$run_id" /usr/local/bin/atc-gateway clients list 2>/dev/null | grep -c fixture-client || true
 }
@@ -103,6 +113,21 @@ expect "the client survives a restart (state is on the volume)" 1 "$(count_clien
 echo "== backup and restore"
 docker volume create "$run_id-repo" > /dev/null
 run_backup backup > /dev/null 2>&1 && print_check ok "backup of the live databases" || print_check FAIL "backup"
+
+# Retention: snapshots from two other source paths, as an image with a per-run temp path
+# made them, plus one snapshot that is not the gateway's. A backup's forget must group
+# the gateway's snapshots across paths and leave the other snapshot alone. All are from
+# today, so one group keeps 2: the newest, and the oldest, which restic keeps while
+# keep-daily is not used up. Grouped by path, each of the 4 would keep itself.
+run_restic 'for d in /tmp/old-a /tmp/old-b; do mkdir -p "$d" && echo old > "$d/gateway.db" &&
+  (cd "$d" && restic backup -q --tag atc-gateway --host atc-gateway .); done' > /dev/null
+run_restic 'mkdir -p /tmp/other && echo other > /tmp/other/f &&
+  cd /tmp/other && restic backup -q --tag other --host other .' > /dev/null
+expect "gateway snapshots before retention" 3 "$(count_snapshots --tag atc-gateway --host atc-gateway)"
+run_backup backup > /dev/null 2>&1 && print_check ok "a second backup" || print_check FAIL "second backup"
+expect "retention groups the gateway's snapshots across source paths" 2 \
+  "$(count_snapshots --tag atc-gateway --host atc-gateway)"
+expect "retention leaves another tool's snapshot alone" 1 "$(count_snapshots --tag other)"
 docker stop "$run_id" > /dev/null
 docker run --rm --user 0 --entrypoint /bin/sh -v "$run_id-state:/s" "$RESTIC_IMAGE" -c 'rm -f /s/*.db*'
 docker rm "$run_id" > /dev/null
