@@ -57,15 +57,19 @@ jobs:
         run: |
           set -euo pipefail
           source deploy/atc-gateway/versions.env
-          version="${ATC_RELEASE##*@}"
           echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           bash scripts/fetch-atc-release.sh context
           cp deploy/atc-gateway/Dockerfile context/
-          docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "ghcr.io/zgeoff/atc-gateway:$version" context
-          docker build --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "ghcr.io/zgeoff/atc-gateway-backup:$version" \
-            deploy/atc-gateway/backup
-          for image in atc-gateway atc-gateway-backup; do
-            docker push "ghcr.io/zgeoff/$image:$version"
-            echo "$image: $(docker inspect --format '{{index .RepoDigests 0}}' "ghcr.io/zgeoff/$image:$version")" \
-              >> "$GITHUB_STEP_SUMMARY"
+          gateway="ghcr.io/zgeoff/atc-gateway:$GATEWAY_IMAGE_TAG"
+          backup="ghcr.io/zgeoff/atc-gateway-backup:$BACKUP_IMAGE_TAG"
+          docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway" context
+          docker build --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup" deploy/atc-gateway/backup
+          # a published tag is immutable: skip it, and never push over it
+          for ref in "$gateway" "$backup"; do
+            if docker manifest inspect "$ref" > /dev/null 2>&1; then
+              echo "$ref: already published, not replaced" >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
+            docker push "$ref"
+            echo "$ref: $(docker inspect --format '{{index .RepoDigests 0}}' "$ref")" >> "$GITHUB_STEP_SUMMARY"
           done
