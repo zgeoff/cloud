@@ -136,11 +136,14 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   # holds a byte that is not printable, non-space ASCII (a second line, a CR, a space, a
   # NUL) is bad. curl runs with -q first (no .curlrc), --noproxy '*' and no proxy
   # variables, so no config on the host can trace the request or route it off loopback.
+  # A path that is not a readable regular file, or that cannot be read, exits 120 (above
+  # curl's and below ssh's codes): unchecked, not bad.
   whoami_status=0
   # shellcheck disable=SC2016 # expanded on the host
   answer="$(on_host "set -euo pipefail; export LC_ALL=C
-    size=\$(wc -c < $dir/imp-token || true)
-    v=\$(cat $dir/imp-token || true; printf x); v=\${v%x}
+    test -f $dir/imp-token && test -r $dir/imp-token || exit 120
+    size=\$(wc -c < $dir/imp-token) || exit 120
+    v=\$(cat $dir/imp-token && printf x) || exit 120; v=\${v%x}
     test \"\${#v}\" = \"\$size\" || exit 3
     v=\${v%\$'\\n'}
     [[ \"\$v\" =~ ^[[:graph:]]+\$ ]] || exit 3
@@ -155,8 +158,12 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   unset answer
   bad_file=false
   unchecked=""
+  unchecked_fix="Check impd on the host's 127.0.0.1:$impd_port, then rerun"
   if [ "$whoami_status" -eq 3 ]; then
     bad_file=true
+  elif [ "$whoami_status" -eq 120 ]; then
+    unchecked="the saved token is not a readable regular file on the host"
+    unchecked_fix="Check $dir/imp-token on the host, then rerun"
   elif [ "$whoami_status" -ne 0 ]; then
     unchecked="the check on the host exited $whoami_status (curl's exit code, or 255 from ssh)"
   elif [ "$http_status" = 401 ]; then
@@ -171,7 +178,7 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   fi
   if [ -n "$unchecked" ]; then
     echo "$unchecked, so $dir/imp-token is unchecked; nothing changed." >&2
-    echo "Check impd on the host's 127.0.0.1:$impd_port, then rerun" >&2
+    echo "$unchecked_fix" >&2
     exit 1
   fi
   if [ "$bad_file" = true ]; then
