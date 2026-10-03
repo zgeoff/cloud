@@ -58,8 +58,9 @@ after the copy stay on the pool as orphans; impd keeps them, but those imps leav
 someone repairs them by hand. Copies taken by `tar` of a running impd, before the copy script, have
 no `COPY-INFO` and may be torn; the restore script refuses them.
 
-**CAUTION:** Mask impd before you switch generations. A switch restarts imp-host, and an older image
-started against a newer database fails or, worse, runs against it.
+**CAUTION:** Never switch generations while impd's database and image disagree. A switch starts
+imp-host, and a runtime mask cannot stop it on NixOS: the units in `/etc/systemd/system` outrank
+`/run`. So restore the database first, with impd stopped, and switch after.
 
 1. Choose the copy, and read its `COPY-INFO`. Find the NixOS generation that runs its image:
 
@@ -67,45 +68,52 @@ started against a newer database fails or, worse, runs against it.
    grep -o 'ghcr.io/zgeoff/imp-host:[^ ;]*' /nix/var/nix/profiles/system-*-link/etc/systemd/system/imp-host.service
    ```
 
-2. Stop impd and keep it stopped through the switch:
+2. Stop impd:
 
    ```sh
-   systemctl mask --runtime imp-host imp-docker-proxy
    systemctl stop imp-host imp-docker-proxy
    ```
 
-3. If the generation differs, switch to it (section 3). The units stay masked, so the switch cannot
-   start impd.
-4. Copy the script to the host and run it there with sqlite from nixpkgs (the host has none):
+3. Copy the script to the host and run it with the copy and that generation, using sqlite from
+   nixpkgs (the host has none):
 
    ```sh
    scp scripts/restore-impd-db.sh root@geoffcloud:/root/
    ssh root@geoffcloud nix --extra-experimental-features "'nix-command flakes'" \
-     shell nixpkgs#sqlite -c bash /root/restore-impd-db.sh /root/imp-db-backups/<copy>
+     shell nixpkgs#sqlite -c bash /root/restore-impd-db.sh /root/imp-db-backups/<copy> <generation>
    ```
 
-   It fails closed. It checks the copy (integrity, `COPY-INFO`, its migration) and the host (both
-   units masked and stopped, this generation's image equal to the copy's, the dataset not mounted)
-   before it changes anything. Then it mounts `tank/imp`, saves the stopped database and its WAL
-   files to `/root/imp-db-backups/pre-restore-<UTC time>/`, stages the copy beside the database,
-   checks it, and publishes it with one rename. It unmasks and starts imp-host only after a clean
-   unmount. On any error it starts nothing and leaves both units masked.
+   It fails closed. Before it changes anything it checks the copy (integrity, `COPY-INFO`, its
+   migration), that both units are stopped, that the generation exists and runs the copy's image,
+   and that the dataset is not mounted. Then it mounts `tank/imp`, saves the stopped database and
+   its WAL files to `/root/imp-db-backups/pre-restore-<UTC time>/`, stages the copy beside the
+   database, checks it, and publishes it with one rename. After a clean unmount it activates the
+   generation (when it is not the current one), starts imp-host and checks that imp-host runs the
+   copy's image. On an error it stops and says how far it got; it never starts impd or switches
+   before the database is in place.
 
-5. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
+4. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
    copy, and `https://imps.geoff.cloud/health` returns 200.
+
+**Reboot window.** If the host reboots between step 2 and the end of step 3, imp-host starts on the
+current generation. If the database is still the original, nothing changed. If the copy is already
+in place and the current image is newer, impd migrates the copy forward. Rerun from step 1 with a
+fresh copy choice.
 
 **Evidence.** Synthetic only, 2026-10-04: an isolated bun:sqlite WAL writer in Docker gave five
 consistent copies while it wrote. The restore script ran in a privileged throwaway container with a
-fake pool and stubbed `systemctl` and `mount`: the success path restored the copy and started; a
-missing mask, a running unit, an image mismatch, a missing `COPY-INFO`, a corrupt copy, a migration
-mismatch, a failed copy into the pool and a failed unmount each stopped with nothing started.
-**Untested:** the real ZFS mount of `tank/imp`, systemd masking during a real generation switch, and
-any restore on geoffcloud.
+fake pool, fake generations and stubbed `systemctl`, `mount` and `nix-env`: a restore on the current
+generation and a rollback to an older one each restored the copy, switched when needed, started and
+ran the copy's image. A running unit, an image mismatch, a missing generation, a missing
+`COPY-INFO`, a corrupt copy, a migration mismatch, a failed copy into the pool and a failed unmount
+each stopped with nothing started or switched. **Untested:** the real ZFS mount of `tank/imp`, a
+real generation switch during a restore, and any restore on geoffcloud.
 
 ## 3. Roll the host back one generation
 
 **Untested** as a recovery step. Generation switches forward are routine; no rollback has been
-rehearsed. If imp's image changes, mask impd first (section 2, step 2).
+rehearsed. If imp's image changes, restore the matching database with section 2, which switches for
+you; do not switch first.
 
 ```sh
 ssh root@geoffcloud nixos-rebuild switch --rollback

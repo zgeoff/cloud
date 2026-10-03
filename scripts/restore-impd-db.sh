@@ -1,30 +1,37 @@
 #!/usr/bin/env bash
 # Put a copy of impd's database back on geoffcloud (#9). Runs ON THE HOST, as root, after
-# imp-host and imp-docker-proxy are masked and stopped, and after the host runs the NixOS
-# generation whose imp image matches the copy (docs/runbooks/restore-geoff-cloud.md, section 2):
+# imp-host and imp-docker-proxy are stopped (docs/runbooks/restore-geoff-cloud.md, section 2):
 #
-#   restore-impd-db.sh /root/imp-db-backups/<copy>
+#   restore-impd-db.sh /root/imp-db-backups/<copy> <generation>
 #
-# It fails closed: every check runs before anything changes, and on any error it leaves both
-# services masked and stopped, so impd never starts against a half-restored database. It
-# changes nothing it has not first preserved: the stopped database and its WAL files go to
-# /root/imp-db-backups/pre-restore-<UTC time>/. It stages the copy beside the database,
-# checks it there, and publishes it with one rename. It unmasks and starts imp-host only
-# after a clean unmount. A copy needs COPY-INFO from scripts/copy-impd-db.sh.
+# <generation> is the NixOS generation whose imp-host image matches the copy's COPY-INFO. The
+# order pairs them safely: restore the database while impd is stopped, then activate that
+# generation, then start imp-host and check it runs the copy's image. A runtime mask cannot
+# hold impd down through a switch on NixOS (the units in /etc outrank /run), so nothing here
+# relies on one. It fails closed: every check runs before anything changes, and on any error
+# it starts nothing and switches nothing. It preserves the stopped database and its WAL files
+# in /root/imp-db-backups/pre-restore-<UTC time>/, stages the copy beside the database,
+# checks it there, publishes it with one rename, and moves on only after a clean unmount.
+# A copy needs COPY-INFO from scripts/copy-impd-db.sh.
 set -euo pipefail
 
-copy="${1:?usage: restore-impd-db.sh /root/imp-db-backups/<copy>}"
+copy="${1:?usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>}"
+generation="${2:?usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>}"
+profiles="${NIX_PROFILES_DIR:-/nix/var/nix/profiles}"
 dataset="${IMPD_DATASET:-tank/imp}"
 backups="${IMPD_BACKUPS:-/root/imp-db-backups}"
 sqlite="${SQLITE3:-sqlite3}"
 units=(imp-host imp-docker-proxy)
 
+# what has happened so far, for the error message
+state="nothing was changed"
+
 fail() {
-  echo "restore-impd-db: $*; nothing was started, and both services stay masked" >&2
+  echo "restore-impd-db: $*; $state" >&2
   exit 1
 }
 
-trap 'echo "restore-impd-db: failed at line $LINENO; nothing was started, and both services stay masked" >&2' ERR
+trap 'echo "restore-impd-db: failed at line $LINENO; $state" >&2' ERR
 
 step() {
   printf '== %s\n' "$*"
@@ -42,15 +49,16 @@ copy_migration="$(sed -n 's/^migration //p' "$copy/COPY-INFO")"
 
 step "check the host"
 for unit in "${units[@]}"; do
-  [ "$(systemctl is-enabled "$unit" 2>/dev/null || true)" = masked-runtime ] ||
-    fail "$unit is not runtime-masked; run: systemctl mask --runtime ${units[*]}"
   if systemctl is-active --quiet "$unit"; then
     fail "$unit is running; run: systemctl stop ${units[*]}"
   fi
 done
-unit_image="$(grep -o 'ghcr.io/zgeoff/imp-host:[^ ;]*' /etc/systemd/system/imp-host.service | head -1)"
-[ "$unit_image" = "$copy_image" ] ||
-  fail "this generation runs $unit_image, but the copy is from $copy_image; switch generations first"
+[[ "$generation" =~ ^[0-9]+$ ]] || fail "the generation must be a number, such as 14"
+target="$profiles/system-$generation-link"
+[ -x "$target/bin/switch-to-configuration" ] || fail "generation $generation does not exist"
+target_image="$(grep -o 'ghcr.io/zgeoff/imp-host:[^ ;]*' "$target/etc/systemd/system/imp-host.service" | head -1)"
+[ "$target_image" = "$copy_image" ] ||
+  fail "generation $generation runs $target_image, but the copy is from $copy_image"
 if findmnt -rn -S "$dataset" > /dev/null; then
   fail "$dataset is already mounted"
 fi
@@ -84,6 +92,7 @@ for file in imp.sqlite imp.sqlite-wal imp.sqlite-shm; do
   fi
 done
 echo "saved: $saved"
+state="the original database is saved in $saved; nothing was started or switched"
 
 step "stage and check the copy"
 staged="$db/imp.sqlite.restore"
@@ -100,6 +109,7 @@ rm -f "$db/imp.sqlite-wal" "$db/imp.sqlite-shm"
 mv -f "$staged" "$db/imp.sqlite"
 sync -f "$db/imp.sqlite"
 cmp -s "$copy/imp.sqlite" "$db/imp.sqlite" || fail "the published database differs from the copy"
+state="the copy is in place (the original is in $saved); nothing was started or switched"
 
 step "unmount"
 trap - EXIT
@@ -107,7 +117,16 @@ umount "$mnt" || fail "cannot unmount $mnt"
 mounted=false
 rmdir "$mnt"
 
+state="the copy is in place (the original is in $saved); the switch or start did not finish"
+step "activate generation $generation"
+if [ "$(readlink "$profiles/system")" != "system-$generation-link" ]; then
+  nix-env -p "$profiles/system" --set "$target"
+  "$target/bin/switch-to-configuration" switch
+fi
+
 step "start"
-systemctl unmask --runtime "${units[@]}"
 systemctl start imp-host
-echo "restored $copy (migration $copy_migration); the replaced database is in $saved"
+running_image="$(docker inspect imp-host --format '{{.Config.Image}}')"
+[ "$running_image" = "$copy_image" ] ||
+  fail "imp-host runs $running_image, not the copy's $copy_image; stop it and investigate"
+echo "restored $copy (migration $copy_migration) on generation $generation; the replaced database is in $saved"
