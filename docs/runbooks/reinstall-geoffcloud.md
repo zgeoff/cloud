@@ -86,7 +86,10 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
 ## Connect Pulumi to k3s
 
-The Pulumi program skips every k3s workload until `K3S_KUBECONFIG` is set.
+The stack config `cluster` says whether Pulumi manages k3s. With `none`, the program leaves every
+k3s workload out. With `managed` (the `prod` setting), a run without `K3S_KUBECONFIG` fails before
+any resource registers. Keep `cluster: none` until step 1 has stored the kubeconfig, then set
+`pulumi config set cluster managed`.
 
 1. Run `bash scripts/connect-k3s.sh`. It stores the kubeconfig as the document
    `op://cloud/k3s-kubeconfig/kubeconfig.yaml`, with the server set to `https://geoffcloud:6443`,
