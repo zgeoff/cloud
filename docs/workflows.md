@@ -105,8 +105,9 @@ imp is pinned in two places, and both move together:
    bash scripts/copy-impd-db.sh imp-<old version>-pre-<new version>
    ```
 
-   The copy and its `COPY-INFO` land in `/root/imp-db-backups/`. The restore runbook (being added in
-   #43) puts a copy back.
+   The copy and its `COPY-INFO` land in `/root/imp-db-backups/`.
+   [The restore runbook](./runbooks/restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy
+   back.
 
 3. [Switch the host](#switch-the-host). The switch restarts impd.
 4. Check: `ssh root@geoffcloud docker exec imp-host imp info` shows the new version,
@@ -216,6 +217,6 @@ on `vdb` survives.
 
 ## Recover
 
-The restore runbook (being added in #43) covers imps, impd's database, the host, the root disk and
-the cluster. The atc gateway (PENDING) has
+[The restore runbook](./runbooks/restore-geoff-cloud.md) covers imps, impd's database, the host, the
+root disk and the cluster. The atc gateway (PENDING) has
 [its own backup and restore runbook](./runbooks/atc-gateway-backup-restore.md).

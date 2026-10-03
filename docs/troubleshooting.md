@@ -37,7 +37,8 @@ with `op run --env-file=../.env --` from `infra/`.
 
 The kubeconfig in `k3s-kubeconfig` does not match the cluster, such as after k3s was rebuilt. The
 run fails and changes nothing. Store the new kubeconfig with `bash scripts/connect-k3s.sh`. After a
-cluster rebuild, follow the cluster section of the restore runbook (being added in #43).
+cluster rebuild, follow
+[the cluster section of the restore runbook](./runbooks/restore-geoff-cloud.md#5-rebuild-the-cluster).
 
 ### `atcGateway.daemonID is unset`, or another `atcGateway` error
 

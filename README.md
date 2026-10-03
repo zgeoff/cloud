@@ -15,6 +15,7 @@ manages every cloud resource. The first workload is an agent platform built on
 | [Reference](./docs/reference.md)                             | look up scripts, config keys, secrets, paths, ports and alerts     |
 | [Troubleshooting](./docs/troubleshooting.md)                 | fix a known failure                                                |
 | [Reinstall runbook](./docs/runbooks/reinstall-geoffcloud.md) | reinstall the host as NixOS                                        |
+| [Restore runbook](./docs/runbooks/restore-geoff-cloud.md)    | recover imps, impd's database, the host or the cluster             |
 | [atc gateway plan](./docs/plans/atc-gateway.md)              | follow the pending atc gateway deploy                              |
 | [Onidel provider](./provider/README.md)                      | work on the Pulumi provider for Onidel                             |
 
