@@ -223,8 +223,8 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
   so it passes only when `main` is fully applied. Before merging an infrastructure change, run it
   from a clean `main` as the baseline. After the merge, `bun run preview -- --refresh` must show
   only the changes reviewed on the PR; apply them with `bun run up`, then run `bun run drift` again.
-  Record both drift results. A scheduled CI
-  check is parked until scoped credentials exist (#19): Onidel offers only full-account keys.
+  Record both drift results. A scheduled CI check is parked until scoped credentials exist (#19):
+  Onidel offers only full-account keys.
 - impd owns the DNS records `imps.geoff.cloud`, `*.imps.geoff.cloud` and
   `_acme-challenge.imps.geoff.cloud`. Pulumi must never declare them.
 
