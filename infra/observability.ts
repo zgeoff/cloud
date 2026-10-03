@@ -4,6 +4,7 @@ import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
+import { createDashboards } from './create-dashboards.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
 // and opens no public port, so http://geoffcloud:30300 works from the tailnet alone.
@@ -47,7 +48,21 @@ export function createObservability(cluster: Provider): ObservabilityOutputs {
     opts,
   );
 
-  const shipper = new Chart(
+  const shipper = createLogShipper(ns, [logs, metrics], cluster);
+
+  createCloudflaredMonitor(ns, metrics, cluster);
+  createDashboards(ns, cluster);
+
+  return {
+    logShipper: shipper,
+    grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
+    grafanaAdminPassword: adminPassword.result,
+  };
+}
+
+// Alloy ships pod logs and the host journal to Loki (alloyValues)
+function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider): Chart {
+  return new Chart(
     'alloy',
     {
       namespace: ns.metadata.name,
@@ -56,16 +71,8 @@ export function createObservability(cluster: Provider): ObservabilityOutputs {
       repositoryOpts: { repo: 'https://grafana.github.io/helm-charts' },
       values: alloyValues,
     },
-    { ...opts, dependsOn: [logs, metrics] },
+    { provider: cluster, dependsOn },
   );
-
-  createCloudflaredMonitor(ns, metrics, cluster);
-
-  return {
-    logShipper: shipper,
-    grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
-    grafanaAdminPassword: adminPassword.result,
-  };
 }
 
 // cloudflared serves Prometheus metrics on its `metrics` port (cluster-workloads.ts)
