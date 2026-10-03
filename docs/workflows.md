@@ -19,21 +19,31 @@ cannot be undone needs Geoff's approval of its exact effect.
    Read every replace and delete. If the preview changes the tailnet policy, Geoff reviews the diff
    first: Pulumi replaces the whole policy file.
 
-3. After the PR merges, from a clean `main`, check that nothing has drifted:
+3. Before the PR merges, check the baseline from a clean `main`, which does not have the change yet:
 
    ```sh
    bun run drift
    ```
 
-   It exits non-zero on any change. Resolve drift before you apply.
+   It exits non-zero on any change, so it passes only when `main` is fully applied. Resolve drift
+   before you merge. After the merge, the same command fails on purpose: it sees the unapplied
+   change.
 
-4. Apply:
+4. After the merge, from a clean `main`, preview against the live state:
+
+   ```sh
+   bun run preview -- --refresh
+   ```
+
+   Expect exactly the changes you reviewed in step 2, and nothing else.
+
+5. Apply:
 
    ```sh
    bun run up
    ```
 
-5. Run `bun run drift` again, and expect 0 changes. Record both results on the PR or issue.
+6. Run `bun run drift` again, and expect 0 changes. Record both drift results on the PR or issue.
 
 Pass Pulumi flags after `--`, such as `bun run preview -- --diff`.
 

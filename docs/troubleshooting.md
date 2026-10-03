@@ -48,9 +48,10 @@ message names its fix. The gateway's order of steps is in
 
 ### The preview shows changes on a clean `main`
 
-That is drift: the live resources differ from the code. `bun run drift` fails on it. Find the cause
-before an apply. A change to the tailnet policy needs Geoff's review, because the apply replaces the
-whole policy file.
+If every merged change is applied, that is drift: the live resources differ from the code, and
+`bun run drift` fails on it. A merged change that nobody has applied yet shows the same way; compare
+the changes with the ones reviewed on its PR. Find the cause before an apply. A change to the
+tailnet policy needs Geoff's review, because the apply replaces the whole policy file.
 
 ## 1Password
 

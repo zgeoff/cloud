@@ -30,9 +30,9 @@ runs gitleaks. pre-push runs the CI checks except the `AGENTS.md` drift check.
 
 ## Secrets
 
-The repo is public, so it holds no secret. Every secret lives in the 1Password vault `cloud`. The
-committed `.env` holds only `op://` references, and each command that needs them runs through
-`op run`:
+The repo is public, so it holds no secret. Every deployment input lives in the 1Password vault
+`cloud`. Some secrets live elsewhere: see [Secrets](./architecture.md#secrets). The committed `.env`
+holds only `op://` references, and each command that needs them runs through `op run`:
 
 ```sh
 op run --env-file=.env -- <command>
@@ -66,8 +66,8 @@ The Pulumi program lives in `infra/`, with one stack, `prod`. Its state lives in
    bun run drift
    ```
 
-   It refreshes from the live APIs and exits non-zero on any change. On a clean `main`, expect 0
-   changes.
+   It refreshes from the live APIs and exits non-zero on any change. On a clean `main` that is fully
+   applied, expect 0 changes; a merged change that nobody has applied yet also fails it.
 
 Both need the tailnet: the program reaches the k3s API at `https://geoffcloud:6443`.
 

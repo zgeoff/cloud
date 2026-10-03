@@ -84,7 +84,9 @@ daemon on `geoffcloud`. [The gateway plan](./plans/atc-gateway.md) holds its des
 - The route sends `Host: mcp.geoff.cloud`, because atc rejects unknown hosts to block DNS rebinding.
 - The route targets the PC's tailnet IP, not its MagicDNS name: CoreDNS in k3s does not forward to
   Tailscale's resolver.
-- The zone redirects plain HTTP to HTTPS on every hostname, so no client sends a token over HTTP.
+- The zone redirects plain HTTP to HTTPS on every hostname. The redirect cannot protect a token in a
+  plain HTTP request, because that first request already carries it. Clients must use `https://`
+  URLs directly.
 - atc documents the PC side in its exposure guide. This repo does not manage the PC.
 
 ## Tailnet
@@ -142,10 +144,20 @@ One Pulumi program, `infra/`, owns every cloud resource:
 
 ## Secrets
 
-Every secret lives in the 1Password vault `cloud`. The committed `.env` holds only `op://`
-references, resolved with `op run`. Pulumi keeps its own secrets encrypted in state. Host-side
-secrets sit in root-only files under `/var/lib/` on `geoffcloud`, staged by the reinstall or by a
-script in `scripts/`. gitleaks runs in the pre-commit hook and in CI. See
+Every deployment input lives in the 1Password vault `cloud`. The committed `.env` holds only `op://`
+references, resolved with `op run`. Three kinds of secret live elsewhere, and 1Password cannot
+restore them:
+
+- Secrets that Pulumi generates, such as Grafana's admin password, exist only in Pulumi state,
+  encrypted, in R2.
+- impd's own secrets live in its dataset `tank/imp` on `vdb`: the root `token`, the broker CA in
+  `broker/`, its TLS files in `tls/` and the secret values in `secrets/`. impd's database holds its
+  tokens and secret names.
+- Host-side secrets sit in root-only files under `/var/lib/` on `geoffcloud`, staged by the
+  reinstall or by a script in `scripts/`.
+
+[The restore runbook](./runbooks/restore-geoff-cloud.md#2-roll-impds-database-back) says what a
+database restore loses. gitleaks runs in the pre-commit hook and in CI. See
 [the reference](./reference.md#env) for each item.
 
 ## Observability
@@ -182,7 +194,7 @@ Prometheus and Alertmanager. Grafana does no alerting.
 | impd's database             | a copy on the host before each imp upgrade, in `/root/imp-db-backups/`         |
 | the root disk (`vda`)       | an Onidel snapshot before a risky change (`scripts/snapshot-geoffcloud.sh`)    |
 | k3s objects                 | none: Pulumi recreates them. Loki's and Prometheus's volumes are not backed up |
-| Pulumi state, secrets       | R2 and 1Password are the sources                                               |
+| Pulumi state, secrets       | R2 holds the state; 1Password holds the deployment inputs                      |
 | atc gateway state (PENDING) | restic to R2; see [its runbook](./runbooks/atc-gateway-backup-restore.md)      |
 
 ## RAM budget
