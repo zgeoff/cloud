@@ -35,6 +35,6 @@ Live:
 - Public connector sign-in through the gateway's OAuth issuer.
 - `imp.geoff.cloud/mcp`, imp's public MCP endpoint.
 - Discord delivery of in-cluster alerts. It is built but off.
-- A scheduled drift check in CI (#19).
+- A scheduled drift check in CI (#19). It is parked: run `bun run drift` by hand instead.
 
 The [tracking issue](https://github.com/zgeoff/cloud/issues/1) lists the remaining work.

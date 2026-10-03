@@ -26,7 +26,7 @@ bun install
 ```
 
 `bun install` also installs the lefthook git hooks. pre-commit fixes and checks staged files and
-runs gitleaks. pre-push runs the same checks as CI.
+runs gitleaks. pre-push runs the CI checks except the `AGENTS.md` drift check.
 
 ## Secrets
 

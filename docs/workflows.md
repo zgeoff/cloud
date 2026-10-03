@@ -99,12 +99,17 @@ imp is pinned in two places, and both move together:
 | the `imp-host` image | `services.imp.image` in `nixos/hosts/geoffcloud/configuration.nix`, by tag and digest |
 
 1. Update both pins in a PR. Read imp's release notes for migrations and new host settings.
-2. Before the switch, list the imps with `ssh root@geoffcloud docker exec imp-host imp ls`, and
-   `imp sleep` each awake one the same way. The switch restarts impd.
-3. Copy impd's database. The procedure lives in the restore runbook (being added in #43) and
-   `scripts/copy-impd-db.sh` (#40). Follow them; this page does not repeat their steps.
-4. [Switch the host](#switch-the-host).
-5. Check: `ssh root@geoffcloud docker exec imp-host imp info` shows the new version,
+2. Copy impd's database. Never tar the live files:
+
+   ```sh
+   bash scripts/copy-impd-db.sh imp-<old version>-pre-<new version>
+   ```
+
+   The copy and its `COPY-INFO` land in `/root/imp-db-backups/`. The restore runbook (being added in
+   #43) puts a copy back.
+
+3. [Switch the host](#switch-the-host). The switch restarts impd.
+4. Check: `ssh root@geoffcloud docker exec imp-host imp info` shows the new version,
    `https://imps.geoff.cloud/health` answers 200 from the tailnet, and the `imp` dashboard in
    Grafana shows impd's logs.
 

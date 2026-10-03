@@ -128,35 +128,36 @@ Items that `.env` does not reference:
 
 ## Ports
 
-| Port      | Where                               | Reachable from                 | Service                          |
-| --------- | ----------------------------------- | ------------------------------ | -------------------------------- |
-| udp 41641 | `geoffcloud`, public                | the internet                   | Tailscale direct connections     |
-| tcp 22    | `geoffcloud`                        | tailnet admins (Tailscale SSH) | SSH                              |
-| tcp 6443  | `geoffcloud`                        | the tailnet                    | the k3s API                      |
-| tcp 30300 | `geoffcloud`, tailnet address only  | the tailnet                    | Grafana (NodePort)               |
-| tcp 7070  | host loopback, and `imp-geoffcloud` | the host; `tag:imp` nodes      | impd's API and `/health`         |
-| tcp 8414  | Geoff's PC (`home-pc`)              | `tag:cloud`                    | `atc mcp --http`                 |
-| tcp 8415  | `geoffcloud`, tailnet address       | **PENDING**                    | the atc daemon                   |
-| tcp 2000  | cloudflared pods                    | the cluster                    | cloudflared metrics and `/ready` |
-| tcp 3100  | `loki.observability.svc`            | the cluster                    | Loki                             |
+| Port      | Where                               | Reachable from                             | Service                          |
+| --------- | ----------------------------------- | ------------------------------------------ | -------------------------------- |
+| udp 41641 | `geoffcloud`, public                | the internet                               | Tailscale direct connections     |
+| tcp 22    | `geoffcloud`                        | tailnet admins (Tailscale SSH)             | SSH                              |
+| tcp 6443  | `geoffcloud`                        | the tailnet                                | the k3s API                      |
+| tcp 30300 | `geoffcloud`, tailnet address only  | the tailnet                                | Grafana (NodePort)               |
+| tcp 7070  | host loopback, and `imp-geoffcloud` | the host; tailnet members; `tag:imp` nodes | impd's API and `/health`         |
+| tcp 8414  | Geoff's PC (`home-pc`)              | tailnet members; `tag:cloud`               | `atc mcp --http`                 |
+| tcp 8415  | `geoffcloud`, tailnet address       | **PENDING**                                | the atc daemon                   |
+| tcp 2000  | cloudflared pods                    | the cluster                                | cloudflared metrics and `/ready` |
+| tcp 3100  | `loki.observability.svc`            | the cluster                                | Loki                             |
 
 ## Host paths
 
 On `geoffcloud`.
 
-| Path                                                   | Holds                                                          |
-| ------------------------------------------------------ | -------------------------------------------------------------- |
-| `/var/lib/tailscale/authkey`                           | the host's tailnet join key, staged at install                 |
-| `/var/lib/imp-host/secrets/tailscale-authkey`          | imp's tailnet join key                                         |
-| `/var/lib/imp-host/secrets/imp-host.env`               | imp-host's environment: backup repository, R2 keys, ACME email |
-| `/var/lib/imp-host/secrets/backup-password`            | imp's restic password                                          |
-| `/var/lib/imp-host/secrets/dns-api-token`              | imp's Cloudflare DNS token                                     |
-| `/var/lib/node-exporter/textfile/`                     | `impd_local_health.prom`, read by node-exporter                |
-| `/etc/rancher/k3s/k3s.yaml`                            | the k3s kubeconfig (server `127.0.0.1`)                        |
-| `/etc/k3s-resolv.conf`                                 | DNS for pods: 1.1.1.1 and 9.9.9.9                              |
-| `/root/imp-db-backups/`                                | copies of impd's database from before imp upgrades             |
-| `tank/imp` (ZFS)                                       | impd's state; a legacy mount inside imp-host only              |
-| `/var/lib/atc-daemon/`, `/var/lib/atc-daemon-secrets/` | **PENDING.** The atc daemon's home and token files             |
+| Path                                          | Holds                                                          |
+| --------------------------------------------- | -------------------------------------------------------------- |
+| `/var/lib/tailscale/authkey`                  | the host's tailnet join key, staged at install                 |
+| `/var/lib/imp-host/secrets/tailscale-authkey` | imp's tailnet join key                                         |
+| `/var/lib/imp-host/secrets/imp-host.env`      | imp-host's environment: backup repository, R2 keys, ACME email |
+| `/var/lib/imp-host/secrets/backup-password`   | imp's restic password                                          |
+| `/var/lib/imp-host/secrets/dns-api-token`     | imp's Cloudflare DNS token                                     |
+| `/var/lib/node-exporter/textfile/`            | `impd_local_health.prom`, read by node-exporter                |
+| `/etc/rancher/k3s/k3s.yaml`                   | the k3s kubeconfig (server `127.0.0.1`)                        |
+| `/etc/k3s-resolv.conf`                        | DNS for pods: 1.1.1.1 and 9.9.9.9                              |
+| `/root/imp-db-backups/`                       | copies of impd's database from before imp upgrades             |
+| `tank/imp` (ZFS)                              | impd's state; a legacy mount inside imp-host only              |
+| `/var/lib/atc-daemon-secrets/`                | the atc daemon's token files: `gateway-token`, `imp-token`     |
+| `/var/lib/atc-daemon/`                        | **PENDING.** The atc daemon's home                             |
 
 Never touch `/dev/vdb`: it holds the pool `tank`.
 
@@ -177,17 +178,18 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 
 ## scripts/
 
-| Script                                  | What it does                                                                 |
-| --------------------------------------- | ---------------------------------------------------------------------------- |
-| `snapshot-geoffcloud.sh <name>`         | takes an Onidel snapshot of `vda` and lists snapshots. Run through `op run`  |
-| `connect-k3s.sh [host]`                 | stores the host's kubeconfig in `k3s-kubeconfig` and references it in `.env` |
-| `install-imp-dns-token.sh`              | installs imp's DNS token and ACME email on the host; also the rotation path  |
-| `gen-sdk.sh`                            | `sdk:gen`: regenerates the Onidel SDK                                        |
-| `build-agents-md.sh`                    | `build:agents`: concatenates the agent rules partials                        |
-| `check-atc-gateway-readiness.sh [host]` | **PENDING.** Read-only readiness checks for the atc gateway                  |
-| `install-atc-gateway-credentials.sh`    | **PENDING.** Installs the gateway's and the daemon's first credentials       |
-| `fetch-atc-release.sh <dir>`            | downloads and checksums the pinned atc release for the gateway image         |
-| `test-atc-gateway-fixture.sh`           | the gateway image fixture test, locally in Docker                            |
+| Script                                  | What it does                                                                                                |
+| --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `snapshot-geoffcloud.sh <name>`         | takes an Onidel snapshot of `vda` and lists snapshots. Run through `op run`                                 |
+| `connect-k3s.sh [host]`                 | stores the host's kubeconfig in `k3s-kubeconfig` and references it in `.env`                                |
+| `install-imp-dns-token.sh`              | installs imp's DNS token and ACME email on the host; also the rotation path                                 |
+| `gen-sdk.sh`                            | `sdk:gen`: regenerates the Onidel SDK                                                                       |
+| `build-agents-md.sh`                    | `build:agents`: concatenates the agent rules partials                                                       |
+| `check-atc-gateway-readiness.sh [host]` | **PENDING.** Readiness checks for the atc gateway; once it is deployed, they run a temporary probe pod      |
+| `install-atc-gateway-credentials.sh`    | creates the impd secret `glm`, the impd token `atc-cloud` and the daemon bearer; skips each one that exists |
+| `copy-impd-db.sh <label>`               | takes a consistent copy of impd's database, with `COPY-INFO`, into `/root/imp-db-backups/`                  |
+| `fetch-atc-release.sh <dir>`            | downloads and checksums the pinned atc release for the gateway image                                        |
+| `test-atc-gateway-fixture.sh`           | the gateway image fixture test, locally in Docker                                                           |
 
 ## Repo layout
 

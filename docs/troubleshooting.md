@@ -96,6 +96,7 @@ Check `ssh root@geoffcloud systemctl status imp-host` and impd's logs in Loki.
 
 ### `CloudflaredNoConnections` fires
 
-No cloudflared pod holds a tunnel connection. Check the pods with
-`ssh root@geoffcloud k3s kubectl -n ingress get pods`, and their logs in Loki. The external health
-check reports the same outage from outside as `tunnel-down`.
+No cloudflared pod holds a tunnel connection, or Prometheus cannot scrape cloudflared's metrics.
+Check the pods with `ssh root@geoffcloud k3s kubectl -n ingress get pods`, and their logs in Loki.
+If the tunnel is down, the external health check reports it from outside as `tunnel-down`; if only
+the metrics fail, the external check stays healthy.
