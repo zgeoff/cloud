@@ -1,11 +1,12 @@
 import { Config, secret } from '@pulumi/pulumi';
 import type { ATCGatewayBackupSecrets, ATCGatewayConfig, ATCGatewayInputs } from './atc-gateway.ts';
+import { findATCGatewayBackup } from './find-atc-gateway-backup.ts';
 import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
 
 // The atc gateway's inputs, or nothing while the stack config leaves atcGateway
 // unset; setting it is an approval step in docs/runbooks/atc-gateway-operator-checklist.md.
 // Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_GEOFFCLOUD (the
-// daemon's bearer token) and the ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
+// daemon's bearer token) and the backup's ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
 export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs } {
   const config = new Config().getObject<ATCGatewayConfig>('atcGateway');
 
@@ -28,27 +29,18 @@ export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs
   };
 }
 
-const backupVariables = {
-  repository: 'ATC_GATEWAY_RESTIC_REPOSITORY',
-  password: 'ATC_GATEWAY_RESTIC_PASSWORD',
-  accessKeyID: 'ATC_GATEWAY_R2_ACCESS_KEY_ID',
-  secretAccessKey: 'ATC_GATEWAY_R2_SECRET_ACCESS_KEY',
-} as const;
-
-// all four set, or no backup
+// all set, or no backup; findATCGatewayBackup throws on a partial set
 function findBackupSecrets(): ATCGatewayBackupSecrets | undefined {
-  const values = Object.values(backupVariables).map((name) => process.env[name] ?? '');
+  const backup = findATCGatewayBackup(process.env);
 
-  if (values.includes('')) {
+  if (backup === undefined) {
     return undefined;
   }
 
-  const [repository = '', password = '', accessKeyID = '', secretAccessKey = ''] = values;
-
   return {
-    repository: secret(repository),
-    password: secret(password),
-    accessKeyID: secret(accessKeyID),
-    secretAccessKey: secret(secretAccessKey),
+    repository: secret(backup.repository),
+    password: secret(backup.password),
+    accessKeyID: secret(backup.accessKeyID),
+    secretAccessKey: secret(backup.secretAccessKey),
   };
 }
