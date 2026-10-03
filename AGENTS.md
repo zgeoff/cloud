@@ -218,9 +218,8 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
   then run `PRAGMA integrity_check` on the copy. The host's `/var/lib/imp` is empty: `tank/imp` has
   a legacy mountpoint inside imp-host.
 - Drift checks are manual. Before and after every `bun run up`, run `bun run drift` from a clean
-  `main`: a refresh preview that exits non-zero on any change. Record its result. A
-  scheduled CI check is parked until scoped credentials exist (#19): Onidel offers only full-account
-  keys.
+  `main`: a refresh preview that exits non-zero on any change. Record its result. A scheduled CI
+  check is parked until scoped credentials exist (#19): Onidel offers only full-account keys.
 - impd owns the DNS records `imps.geoff.cloud`, `*.imps.geoff.cloud` and
   `_acme-challenge.imps.geoff.cloud`. Pulumi must never declare them.
 
