@@ -56,6 +56,7 @@ pkgs.runCommand "impd-local-health-check"
     expect 'impd_local_health_status_code 404'
 
     kill $server
+    wait $server || true
     run http://127.0.0.1:18080/health
     expect 'impd_local_health_up 0'
     expect 'impd_local_health_status_code 0'
