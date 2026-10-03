@@ -39,7 +39,7 @@ daemon on `geoffcloud`. [The gateway plan](./plans/atc-gateway.md) holds its des
  │  imp-host container (Docker) — outside k3s                                   │
  │   └─ impd + firecracker ×N   ZFS pool on vdb   own tailnet node (tag:imp)    │
  │                                                                              │
- │  host: tailscaled (tag:cloud)   nftables: inet nixos-fw, imp-forward, k3s    │
+ │  host: tailscaled (tag:cloud)   nftables: nixos-fw, cloud_host, imp-forward  │
  └──────────────────────────────────────────────────────────────────────────────┘
                                      │ tailnet (WireGuard)
                                      ▼
@@ -114,6 +114,8 @@ Pulumi owns the whole tailnet policy file (`infra/tailnet-policy.ts`).
 - **On the host:** the NixOS firewall in its own table, `inet nixos-fw`. It allows only UDP 41641 in
   public, trusts `tailscale0`, `cni0` and `flannel.1`, and filters forwarded traffic, so no public
   packet reaches a pod or a NodePort.
+- `inet cloud_host` admits tcp 8415 (the atc daemon) only from k3s pods, since `inet nixos-fw`
+  trusts `tailscale0`.
 - imp's module adds the table `inet imp-forward`, which stops imps from reaching the k3s pod and
   service ranges. imp's egress table, `inet imp_egress`, lives inside the imp-host container. k3s
   and Docker add their own tables.
