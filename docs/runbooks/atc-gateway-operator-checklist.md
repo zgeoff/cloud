@@ -103,6 +103,13 @@ reach 8415 (a grant from `tag:cloud` only, in place of members) is optional and 
 
 ## Deferred, not dropped
 
+- `imp.geoff.cloud/mcp`: imp's MCP endpoint, public through the existing tunnel, separate from the
+  atc gateway and its issuer. It waits on imp's own OAuth boundary (independent of atc, keeping
+  imp's caller scopes and audit) and starts after the current atc and imp integration. Then: a
+  proxied CNAME to the tunnel, a tunnel route for `/mcp` and the OAuth paths only (no other imp API
+  route), and a path from cloudflared to impd, which binds the host's loopback today (D1's tailnet
+  grant, or a connector on the host). Each needs its own approval. It does not use imp's wildcard
+  app domain or its Let's Encrypt DNS-01 token.
 - A documentation rewrite of cloud, done last, once almost everything has settled. It stands alone
   for an outside reader: getting started, concepts, common workflows, reference and troubleshooting.
   Agree its structure with Geoff before writing, then write it with the writing-guidelines skill.
