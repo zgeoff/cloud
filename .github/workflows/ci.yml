@@ -62,6 +62,10 @@ jobs:
       - name: Test
         run: bun run test
 
+      # bash, jq and openssl, all on ubuntu-latest's image
+      - name: Test Scripts
+        run: bun run test:scripts
+
       - name: Dead Code
         run: bun run deadcode
 

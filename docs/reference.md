@@ -22,6 +22,7 @@ Run with `bun run <script>` from the repo root. Hooks and CI call these too.
 | `lint:fix`       | the same, writing fixes                                                           |
 | `typecheck`      | `sdk:build`, then `tsc --noEmit`                                                  |
 | `test`           | `bun test`                                                                        |
+| `test:scripts`   | the stub test of `install-atc-gateway-credentials.sh` (no host)                   |
 | `deadcode`       | `knip`                                                                            |
 | `audit`          | `bun audit`                                                                       |
 | `build:agents`   | regenerates `AGENTS.md` from `agents/shared.md` and `agents/project.md`           |
@@ -30,15 +31,15 @@ Pass Pulumi flags after `--`: `bun run up -- --yes`.
 
 ## Checks
 
-| Where                | Runs                                                                                                |
-| -------------------- | --------------------------------------------------------------------------------------------------- |
-| pre-commit           | `oxlint --fix`, `oxfmt`, `format-codemod`, `gofmt` on staged files, then `gitleaks`                 |
-| commit-msg           | commitlint (Conventional Commits)                                                                   |
-| pre-push             | `format:check`, `lint`, `typecheck`, `test`, `deadcode`, `provider:check`                           |
-| CI `checks`          | the `AGENTS.md` drift check, `format:check`, `lint`, `typecheck`, `test`, `deadcode`                |
-| CI `provider`        | `gofmt`, `go vet`, `go test`                                                                        |
-| CI `gitleaks`        | gitleaks over the whole history                                                                     |
-| `atc-gateway images` | the gateway fixture test on image changes; publishes to GHCR only on a manual run with `push: true` |
+| Where                | Runs                                                                                                 |
+| -------------------- | ---------------------------------------------------------------------------------------------------- |
+| pre-commit           | `oxlint --fix`, `oxfmt`, `format-codemod`, `gofmt` on staged files, then `gitleaks`                  |
+| commit-msg           | commitlint (Conventional Commits)                                                                    |
+| pre-push             | `format:check`, `lint`, `typecheck`, `test`, `deadcode`, `provider:check`                            |
+| CI `checks`          | the `AGENTS.md` drift check, `format:check`, `lint`, `typecheck`, `test`, `test:scripts`, `deadcode` |
+| CI `provider`        | `gofmt`, `go vet`, `go test`                                                                         |
+| CI `gitleaks`        | gitleaks over the whole history                                                                      |
+| `atc-gateway images` | the gateway fixture test on image changes; publishes to GHCR only on a manual run with `push: true`  |
 
 The `main protection` ruleset needs `checks` and `gitleaks` green.
 
@@ -183,18 +184,19 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 
 ## scripts/
 
-| Script                                  | What it does                                                                                                |
-| --------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `snapshot-geoffcloud.sh <name>`         | takes an Onidel snapshot of `vda` and lists snapshots. Run through `op run`                                 |
-| `connect-k3s.sh [host]`                 | stores the host's kubeconfig in `k3s-kubeconfig` and references it in `.env`                                |
-| `install-imp-dns-token.sh`              | installs imp's DNS token and ACME email on the host; also the rotation path                                 |
-| `gen-sdk.sh`                            | `sdk:gen`: regenerates the Onidel SDK                                                                       |
-| `build-agents-md.sh`                    | `build:agents`: concatenates the agent rules partials                                                       |
-| `check-atc-gateway-readiness.sh [host]` | **PENDING.** Readiness checks for the atc gateway; once it is deployed, they run a temporary probe pod      |
-| `install-atc-gateway-credentials.sh`    | creates the impd secret `glm`, the impd token `atc-cloud` and the daemon bearer; skips each one that exists |
-| `copy-impd-db.sh <label>`               | takes a consistent copy of impd's database, with `COPY-INFO`, into `/root/imp-db-backups/`                  |
-| `fetch-atc-release.sh <dir>`            | downloads and checksums the pinned atc release for the gateway image                                        |
-| `test-atc-gateway-fixture.sh`           | the gateway image fixture test, locally in Docker                                                           |
+| Script                                    | What it does                                                                                                                                                                 |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `snapshot-geoffcloud.sh <name>`           | takes an Onidel snapshot of `vda` and lists snapshots. Run through `op run`                                                                                                  |
+| `connect-k3s.sh [host]`                   | stores the host's kubeconfig in `k3s-kubeconfig` and references it in `.env`                                                                                                 |
+| `install-imp-dns-token.sh`                | installs imp's DNS token and ACME email on the host; also the rotation path                                                                                                  |
+| `gen-sdk.sh`                              | `sdk:gen`: regenerates the Onidel SDK                                                                                                                                        |
+| `build-agents-md.sh`                      | `build:agents`: concatenates the agent rules partials                                                                                                                        |
+| `check-atc-gateway-readiness.sh [host]`   | **PENDING.** Readiness checks for the atc gateway; once it is deployed, they run a temporary probe pod                                                                       |
+| `install-atc-gateway-credentials.sh`      | creates the impd secret `glm`, the impd token `atc-cloud` and the daemon bearer; skips each one that exists, the saved impd token only after it authenticates as `atc-cloud` |
+| `copy-impd-db.sh <label>`                 | takes a consistent copy of impd's database, with `COPY-INFO`, into `/root/imp-db-backups/`                                                                                   |
+| `fetch-atc-release.sh <dir>`              | downloads and checksums the pinned atc release for the gateway image                                                                                                         |
+| `test-atc-gateway-fixture.sh`             | the gateway image fixture test, locally in Docker                                                                                                                            |
+| `test-install-atc-gateway-credentials.sh` | stub test of the credential script's rerun check on the saved impd token; no host                                                                                            |
 
 ## Repo layout
 
