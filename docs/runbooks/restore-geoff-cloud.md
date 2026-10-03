@@ -157,8 +157,11 @@ digest-pinned string (`imp-host:0.29.0@sha256:4e6f0cf6…`), and so is the `imag
 
 **CAUTION:** Only copies with `COPY-INFO` are restorable. The copy taken before the 0.29.0 upgrade,
 `imp-0.27.0-pre-0.29.0-20261003T171605`, is a tar copy without one, so the script refuses it and no
-supported path returns the database to 0.27.0. Before each imp upgrade, take a copy with
-`scripts/copy-impd-db.sh`; that copy is the upgrade's rollback.
+supported path returns the database to 0.27.0. Keep it on the host as legacy, unvalidated material:
+do not add a `COPY-INFO` to it, and do not restore from it. The supported recovery point is the
+integrity-checked copy `imp-0.29.0-consistent-20261003T181942` with a generation that runs the same
+imp-host image. Before each imp upgrade, take a copy with `scripts/copy-impd-db.sh`; that copy is
+the upgrade's rollback.
 
 ## 3. Roll the host back one generation
 
