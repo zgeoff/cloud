@@ -85,6 +85,10 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
 
     // ATC_GATEWAY_TOKEN_<DAEMON>, which the registry's daemons need
     envFrom: [{ secretRef: { name: inputs.tokens } }],
+
+    // for `kubectl exec … atc-gateway clients`, which has no --state-dir of its own here;
+    // it must equal --state-dir, or atc-gateway exits on the conflict
+    env: [{ name: 'ATC_GATEWAY_STATE_DIR', value: stateDir }],
     volumeMounts: [
       { name: 'state', mountPath: stateDir },
       { name: 'config', mountPath: '/home/nonroot/.config' },
