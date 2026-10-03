@@ -123,7 +123,35 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
     echo "atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun" >&2
     exit 1
   fi
-  echo "skip: both exist, and atc-cloud has the expected limits"
+  # the metadata cannot show the file is right, so ask impd who the saved token is: impd's
+  # tokens.whoami on loopback. The token goes from the file to curl's stdin on the host,
+  # never into argv or back here; only impd's answer, which names the token, returns.
+  # Exit 3: the file holds no token. Curl exits 7 or 28 when impd does not answer.
+  whoami_status=0
+  # shellcheck disable=SC2016 # expanded on the host
+  identity="$(on_host "set -euo pipefail; v=''
+    IFS= read -r v < $dir/imp-token || true
+    test -n \"\$v\" || exit 3
+    printf 'Authorization: Bearer %s\n' \"\$v\" |
+      curl -sS --fail-with-body --max-time 10 -H @- -H 'content-type: application/json' \
+        --data '{\"json\":{}}' http://127.0.0.1:7070/rpc/tokens/whoami")" || whoami_status=$?
+  case "$whoami_status" in
+    0) ;;
+    7 | 28)
+      echo "impd did not answer on the host's 127.0.0.1:7070, so $dir/imp-token is unchecked;" >&2
+      echo "nothing changed. Start impd, then rerun" >&2
+      exit 1
+      ;;
+    *) identity="" ;;
+  esac
+  if ! jq -e '.json.kind == "token" and .json.name == "atc-cloud"' <<< "${identity:-null}" \
+    > /dev/null 2>&1; then
+    echo "$dir/imp-token does not authenticate to impd as the token atc-cloud (empty, stale" >&2
+    echo "or another token). impd shows a token once, so remove $dir/imp-token and run" >&2
+    echo "'imp token rm atc-cloud' in imp-host, then rerun to mint a new one" >&2
+    exit 1
+  fi
+  echo "skip: both exist, atc-cloud has the expected limits, and the file authenticates as it"
 elif [ "$has_token" = true ] || [ "$has_file" = true ]; then
   echo "only one exists (token: $has_token, host file: $has_file). impd shows a token once," >&2
   echo "so run 'imp token rm atc-cloud' in imp-host and remove $dir/imp-token, then rerun" >&2
