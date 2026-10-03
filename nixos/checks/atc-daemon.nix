@@ -18,8 +18,17 @@ let
           services.atc-daemon = {
             enable = true;
             package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
+            targets.geoffcloud = {
+              provider = "imp";
+              url = "http://127.0.0.1:7070";
+              tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+              impPrefix = "harness-";
+            };
+            defaultTarget = "geoffcloud";
+            principals.fixture-client.targets = [ "geoffcloud" ];
           };
         }
       )

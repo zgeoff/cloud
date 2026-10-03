@@ -1,10 +1,11 @@
 import { Config, secret } from '@pulumi/pulumi';
 import type { ATCGatewayBackupSecrets, ATCGatewayConfig, ATCGatewayInputs } from './atc-gateway.ts';
+import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
 
 // The atc gateway's inputs, or nothing while the stack config leaves atcGateway
 // unset; setting it is an approval step in docs/runbooks/atc-gateway-operator-checklist.md.
-// Secrets come from .env's op:// references: ATC_GATEWAY_DAEMON_TOKENS (a JSON
-// object, env var → token) and the ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
+// Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_GEOFFCLOUD (the
+// daemon's bearer token) and the ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
 export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs } {
   const config = new Config().getObject<ATCGatewayConfig>('atcGateway');
 
@@ -12,51 +13,19 @@ export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs
     return {};
   }
 
-  requireRealGateway(config.image);
-
-  const tokens = parseTokens(process.env['ATC_GATEWAY_DAEMON_TOKENS'] ?? '{}');
+  const checked = requireATCGatewayInputs(config, process.env);
   const backup = findBackupSecrets();
 
   return {
     atcGateway: {
       config,
+      daemon: { address: checked.daemonAddress, daemonID: checked.daemonID },
       secrets: {
-        daemonTokens: Object.fromEntries(
-          Object.entries(tokens).map(([name, value]) => [name, secret(value)]),
-        ),
+        token: secret(checked.token),
         ...(backup === undefined ? {} : { backup }),
       },
     },
   };
-}
-
-// atc-gateway:2.10.0 holds atc 2.10.0's `atc` binary, published for the fixture
-// only; it is not the gateway
-const standInDigest = 'sha256:86cd2af8f297cb5143cee19e71b921d6ba0bc3e3a004d6498be7533b34a068be';
-
-function requireRealGateway(image: string): void {
-  if (image.includes(standInDigest) || image.endsWith('atc-gateway:2.10.0')) {
-    throw new Error(`${image} is the fixture stand-in, not the gateway; wait for atc's release`);
-  }
-}
-
-function parseTokens(raw: string): Record<string, string> {
-  const parsed: unknown = JSON.parse(raw);
-
-  if (!isStringRecord(parsed)) {
-    throw new Error('ATC_GATEWAY_DAEMON_TOKENS must be a JSON object of env var → token');
-  }
-
-  return parsed;
-}
-
-function isStringRecord(value: unknown): value is Record<string, string> {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    !Array.isArray(value) &&
-    Object.values(value).every((item) => typeof item === 'string')
-  );
 }
 
 const backupVariables = {
