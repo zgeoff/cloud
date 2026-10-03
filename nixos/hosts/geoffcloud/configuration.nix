@@ -121,15 +121,17 @@
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned: the module's default is imp-host:latest, which moves on every imp release
     # and is not tied to the flake's pin of the module
-    image = "ghcr.io/zgeoff/imp-host:0.25.0@sha256:6216c0b21a3fd2f78d09565660ba812cb09ef6e6f6f4e0af3f5adb9f2ac7946d";
+    image = "ghcr.io/zgeoff/imp-host:0.26.0@sha256:8a4d6cf6b971f043907f2ce1cf430f6fca11c93c20b5f9e9c4435a11d5109437";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
     # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
     # for both names at the host's tailnet IP. imp.geoff.cloud stays free for imp's
-    # public MCP route. The token and the ACME email live in environmentFile, installed by
-    # scripts/install-imp-dns-token.sh before this reaches the host.
+    # public MCP route. The token lives in dnsApiTokenFile (root-only, re-read on change, so
+    # a rotation needs no restart) and the ACME email in environmentFile, both installed by
+    # scripts/install-imp-dns-token.sh. environmentFile must not also set IMP_DNS_API_TOKEN.
     settings.IMP_DOMAIN = "imps.geoff.cloud";
+    dnsApiTokenFile = "/var/lib/imp-host/secrets/dns-api-token";
     settings.IMP_DNS_PROVIDER = "cloudflare";
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
     forwardDeny = [
