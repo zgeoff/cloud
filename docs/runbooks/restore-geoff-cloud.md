@@ -179,6 +179,12 @@ fixes (imp #196): a crafted imported image can overwrite host files. Before roll
 stop all image imports and builds (`imp image add`, `imp image build`, templates from a new image,
 BuildKit), and keep them stopped until a fixed imp runs again.
 
+A rollback from 0.30.0 needs a database restore: 0.30.0 adds the migration
+`021_add_broker_sessions`, and 0.29.1 refuses a database that holds it. Restore the copy
+`pre-0.30.0-20261004T030409` with section 2; its generation runs 0.29.1 at the digest in its
+`COPY-INFO`. **CAUTION:** the restore drops every change impd made after 03:04Z on 2026-10-04 (UTC),
+including imps, grants and tokens.
+
 `nix-env -p /nix/var/nix/profiles/system --list-generations` lists the generations. If imp's version
 changes, restore the matching database copy too (section 2).
 

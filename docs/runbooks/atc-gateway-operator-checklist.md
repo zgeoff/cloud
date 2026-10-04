@@ -5,10 +5,11 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.1 (the image.json fix), pinned
-by digest. Copies of impd's database from before each upgrade are in `/root/imp-db-backups/` on the
-host. B1–B3 are done: atc 2.24.0 ships `atc-gateway-linux-x64`, the fixture test passes against it,
-and both images are published by digest. C1–C3 are done; C4's GitHub token exists, unused.
+Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.30.0, pinned by digest
+(`imp-host:0.30.0@sha256:9a89451b…`), with `execRequire` on. Copies of impd's database from before
+each upgrade are in `/root/imp-db-backups/` on the host. B1–B3 are done: atc 2.24.0 ships
+`atc-gateway-linux-x64`, the fixture test passes against it, and both images are published by
+digest. C1–C3 are done; C4's GitHub token exists, unused.
 
 - E2 is done: atc-daemon runs 2.26.0 on `100.69.47.33:8415` (daemonID
   `087031fd-6df6-42fb-a2e9-76e1f0e363d9`) behind `inet cloud_host`. A wrong bearer is refused, and
@@ -23,8 +24,13 @@ and both images are published by digest. C1–C3 are done; C4's GitHub token exi
 - The registry also holds `home-pc`, Geoff's PC daemon (atc 2.26.0 as a systemd user unit, listening
   on its tailnet address; its unreachable alert is a warning, since the PC sleeps). A read through
   the hosted connector listed sessions on both daemons.
+- imp 0.30.0's acceptance passed `exec --require broker`, fresh disk usage, grants on a scoped fork,
+  the proxy's refusal text, and stopping an on-host build when its client leaves. **Known limit:** a
+  build that prints nothing for about 300 s fails (`INTERNAL_SERVER_ERROR`), on both the upload and
+  the on-host path. A build that ends sooner, or prints at least once every 300 s, is not affected.
+  The fix is an imp release; rerun those two checks on it.
 - Not yet: any spawn or write through the gateway, F2 and F3, G1 and G4 (no harness image), and
-  brokered runtime auth, which needs imp 0.30.
+  brokered runtime auth, which waits on atc #262.
 
 B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
