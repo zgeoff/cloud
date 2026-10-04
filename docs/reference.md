@@ -61,9 +61,18 @@ Stack `prod`, file `infra/Pulumi.prod.yaml`, namespace `geoff-cloud`.
 | `image`         | yes      | the gateway image, by digest. The fixture stand-in `atc-gateway:2.10.0` is refused |
 | `backupImage`   | yes      | the backup image, by digest                                                        |
 | `publicURL`     | yes      | the public origin and OAuth issuer                                                 |
-| `daemonAddress` | yes      | the daemon's tailnet `host:port`, such as `100.69.47.33:8415`                      |
-| `daemonID`      | yes      | the lowercase UUID that `atc daemon id` prints on the host                         |
+| `daemons`       | yes      | the daemons the gateway dials, by name, each with `address` and `daemonID`         |
+| `defaultDaemon` | yes      | the daemon a call without one goes to; one of `daemons`                            |
 | `stateDir`      | no       | where the state volume mounts; defaults to `$HOME`'s state directory               |
+
+Each entry of `atcGateway.daemons`:
+
+- Its name is a lowercase DNS label of at most 31 characters, starting with a letter, such as
+  `geoffcloud` or `home-pc`.
+- `address` is the daemon's tailnet `host:port`, such as `100.69.47.33:8415`.
+- `daemonID` is the lowercase UUID that `atc daemon id` prints on the daemon's host.
+- Its bearer token comes from `ATC_GATEWAY_TOKEN_<NAME>`, the name upper-cased with `-` as `_`, such
+  as `ATC_GATEWAY_TOKEN_HOME_PC`.
 
 The Onidel provider reads `onidel:apiKey` (falls back to `ONIDEL_API_KEY`), `onidel:teamId` and
 `onidel:endpoint`. This stack sets none of them. See [the provider README](../provider/README.md).
@@ -173,14 +182,14 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 | `ImpdLocalHealthStale`     | the probe is over 5 minutes old, or its metric is absent, for 2 minutes                                       | warning  |
 | `TargetDown`               | any scrape target has `up == 0` for 5 minutes                                                                 | warning  |
 | `CloudflaredNoConnections` | both cloudflared pods hold 0 connections, the metric is absent, or no cloudflared target is up, for 5 minutes | critical |
-| `ATCDaemonUnreachable`     | **PENDING.** the TCP probe of `atcGateway.daemonAddress` fails, or its metric is absent, for 5 minutes        | critical |
+| `ATCDaemonUnreachable`     | **PENDING.** the TCP probe of a daemon in `atcGateway.daemons` fails, or its metric is absent, for 5 minutes  | critical |
 
 - `TargetDown` is per target, and replaces the chart's ratio-based rule of the same name. One
   cloudflared pod down shows as `TargetDown`; the tunnel serves while either pod is connected.
 - Alertmanager drops the chart's always-firing `Watchdog` and its `InfoInhibitor` helper.
 - `ATCDaemonUnreachable` and its probe exist only while `atcGateway` is set. The probe is the
-  blackbox exporter (`atc-daemon-probe` in `observability`): a TCP connect from a pod every 30
-  seconds, on the gateway's own path to the daemon.
+  blackbox exporter (`atc-daemon-probe` in `observability`): a TCP connect from a pod to each daemon
+  every 30 seconds, on the gateway's own path to it, and one rule per daemon.
 
 ## scripts/
 

@@ -3,6 +3,7 @@ import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
+import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
 import { createAlertWebhook } from './create-alert-webhook.ts';
 import { createDashboards } from './create-dashboards.ts';
@@ -20,12 +21,12 @@ interface ObservabilityOutputs {
 
 // Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
 // (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
-// when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemonAddress, set
-// only with the atc gateway, adds a TCP probe of atc's daemon and its alert.
+// when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemons, set only
+// with the atc gateway, adds a TCP probe of each of atc's daemons and its alert.
 export function createObservability(
   cluster: Provider,
   alertWebhookURL: string | undefined,
-  atcDaemonAddress: string | undefined,
+  atcDaemons: readonly ATCDaemonEndpoint[] | undefined,
 ): ObservabilityOutputs {
   const opts = { provider: cluster };
 
@@ -52,7 +53,7 @@ export function createObservability(
 
   const shipper = createLogShipper(ns, [logs, metrics], cluster);
 
-  createMonitors(ns, atcDaemonAddress, { provider: cluster, dependsOn: [metrics] });
+  createMonitors(ns, atcDaemons, { provider: cluster, dependsOn: [metrics] });
   createDashboards(ns, cluster);
 
   return {

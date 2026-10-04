@@ -1,23 +1,24 @@
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import type { CustomResourceOptions } from '@pulumi/pulumi';
+import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { createAlertRules } from './create-alert-rules.ts';
 import { createATCDaemonProbe } from './create-atc-daemon-probe.ts';
 
 // What Prometheus watches beyond kube-prometheus-stack's own targets: cloudflared,
-// geoff.cloud's alert rules and, only with the atc gateway, a TCP probe of atc's
-// daemon. opts carries the cluster and the dependency on the stack, which brings the
+// geoff.cloud's alert rules and, only with the atc gateway, a TCP probe of each of
+// atc's daemons. opts carries the cluster and the dependency on the stack, which brings the
 // CRDs.
 export function createMonitors(
   ns: Namespace,
-  atcDaemonAddress: string | undefined,
+  atcDaemons: readonly ATCDaemonEndpoint[] | undefined,
   opts: CustomResourceOptions,
 ): void {
   createCloudflaredMonitor(ns, opts);
-  createAlertRules(ns, atcDaemonAddress, opts);
+  createAlertRules(ns, atcDaemons, opts);
 
-  if (atcDaemonAddress !== undefined) {
-    createATCDaemonProbe(ns, atcDaemonAddress, opts);
+  if (atcDaemons !== undefined) {
+    createATCDaemonProbe(ns, atcDaemons, opts);
   }
 }
 

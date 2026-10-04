@@ -1,3 +1,5 @@
+import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
+
 interface AlertRule {
   readonly alert: string;
   readonly expr: string;
@@ -11,9 +13,15 @@ interface AlertRuleGroup {
   readonly rules: readonly AlertRule[];
 }
 
+// one of atc's daemons the gateway dials: its name in the registry and its host:port
+export interface ATCDaemonEndpoint {
+  readonly name: string;
+  readonly address: string;
+}
+
 interface AlertRuleInputs {
-  // the daemon's host:port, set only while the stack config sets atcGateway
-  readonly atcDaemonAddress?: string | undefined;
+  // the gateway's daemons, set only while the stack config sets atcGateway
+  readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
 }
 
 // geoff.cloud's own alerts (#29), as Prometheus rule groups: the `spec.groups` of a
@@ -22,8 +30,7 @@ interface AlertRuleInputs {
 // A missing metric must alert, never read as healthy: each check that rests on one
 // metric also fires when that metric is absent.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
-  const atcRules =
-    inputs.atcDaemonAddress === undefined ? [] : [buildATCDaemonRule(inputs.atcDaemonAddress)];
+  const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
   return [
     { name: 'geoff-cloud', rules: [...impdRules, targetDownRule, cloudflaredRule, ...atcRules] },
@@ -75,22 +82,20 @@ const cloudflaredRule: AlertRule = {
   annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
 };
 
-// the probe target name of atc's daemon, which the probe's ServiceMonitor stamps on
-// its series as the `target` label (create-atc-daemon-probe.ts)
-export const atcDaemonProbeTarget = 'atc-daemon';
-
-// The blackbox exporter's TCP connect to atc's daemon fails, or reports nothing: no
-// gateway call can reach the daemon then. Only while the gateway is configured, so an
-// unset gateway, which has no probe, fires nothing. The address is in the summary
-// itself: the absent() series carries no instance label.
-function buildATCDaemonRule(address: string): AlertRule {
-  const series = `probe_success{target="${atcDaemonProbeTarget}"}`;
+// The blackbox exporter's TCP connect to one of atc's daemons fails, or reports
+// nothing: no gateway call can reach that daemon then. One rule per daemon, only while
+// the gateway is configured, so an unset gateway, which has no probe, fires nothing.
+// The address is in the summary itself: the absent() series carries no instance label.
+function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
+  const series = `probe_success{target="${toATCDaemonProbeTarget(daemon.name)}"}`;
 
   return {
     alert: 'ATCDaemonUnreachable',
     expr: `${series} == 0 or absent(${series})`,
     for: '5m',
     labels: { severity: 'critical' },
-    annotations: { summary: `atc's daemon at ${address} is unreachable from the cluster.` },
+    annotations: {
+      summary: `atc's daemon at ${daemon.address} is unreachable from the cluster.`,
+    },
   };
 }

@@ -7,6 +7,7 @@ import type { Output } from '@pulumi/pulumi';
 import { Config } from '@pulumi/pulumi';
 import type { ATCGatewayInputs, ATCGatewayOutputs } from './atc-gateway.ts';
 import { createATCGateway } from './atc-gateway.ts';
+import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { createObservability } from './observability.ts';
 import { requireAlertWebhook } from './require-alert-webhook.ts';
 
@@ -78,8 +79,8 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     process.env['ALERT_WEBHOOK_URL'],
   );
 
-  const atcDaemonAddress = inputs.atcGateway?.daemon.address;
-  const observability = createObservability(cluster, alertWebhookURL, atcDaemonAddress);
+  const atcDaemons = buildATCDaemonEndpoints(inputs.atcGateway);
+  const observability = createObservability(cluster, alertWebhookURL, atcDaemons);
 
   const gateway =
     inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);
@@ -90,6 +91,20 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     ...observability,
     ...(gateway === undefined ? {} : buildGatewayOutputs(gateway)),
   };
+}
+
+// the gateway's daemons, for the probe and its alert; none without the gateway
+function buildATCDaemonEndpoints(
+  gateway: ATCGatewayInputs | undefined,
+): readonly ATCDaemonEndpoint[] | undefined {
+  if (gateway === undefined) {
+    return undefined;
+  }
+
+  return Object.entries(gateway.daemons).map(([name, daemon]) => ({
+    name,
+    address: daemon.address,
+  }));
 }
 
 interface GatewayOutputs {
