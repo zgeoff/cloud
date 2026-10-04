@@ -7,6 +7,7 @@ describe('buildAlertRules', () => {
   test('defines each alert once, with a severity and a summary', () => {
     expect(rules.map((rule) => rule.alert).toSorted()).toEqual([
       'CloudflaredNoConnections',
+      'ImpHealthUnreachable',
       'ImpdLocalHealthDown',
       'ImpdLocalHealthStale',
       'TargetDown',
@@ -49,6 +50,16 @@ describe('buildAlertRules', () => {
   });
 });
 
+describe('buildAlertRules for imp over the tailnet', () => {
+  test('alerts on a failed or missing imp health probe after 5 minutes', () => {
+    expect(getRule('ImpHealthUnreachable')).toMatchObject({
+      expr: 'probe_success{target="imp-health"} == 0 or absent(probe_success{target="imp-health"})',
+      for: '5m',
+      labels: { severity: 'critical' },
+    });
+  });
+});
+
 const geoffcloud = {
   name: 'geoffcloud',
   address: '100.69.47.33:8415',
@@ -69,9 +80,10 @@ describe('buildAlertRules with the atc gateway', () => {
 
   test("keeps geoffcloud's rule as it was with one daemon: target atc-daemon, its address", () => {
     const withGateway = buildAlertRules({ atcDaemons: [geoffcloud] });
-    const rule = withGateway.flatMap((group) => group.rules).at(-1);
+    const all = withGateway.flatMap((group) => group.rules);
+    const rule = all.find((r) => r.alert === 'ATCDaemonUnreachable');
 
-    expect(withGateway.flatMap((group) => group.rules).slice(0, -1)).toEqual(rules);
+    expect(all.filter((r) => r.alert !== 'ATCDaemonUnreachable')).toEqual(rules);
 
     expect(rule).toEqual({
       alert: 'ATCDaemonUnreachable',

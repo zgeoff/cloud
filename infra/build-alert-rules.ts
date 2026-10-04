@@ -1,3 +1,4 @@
+import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
 interface AlertRule {
@@ -36,7 +37,10 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
   return [
-    { name: 'geoff-cloud', rules: [...impdRules, targetDownRule, cloudflaredRule, ...atcRules] },
+    {
+      name: 'geoff-cloud',
+      rules: [...impdRules, targetDownRule, cloudflaredRule, ...atcRules, impHealthRule],
+    },
   ];
 }
 
@@ -60,6 +64,19 @@ const impdRules: readonly AlertRule[] = [
     annotations: { summary: 'impd health probe has not reported for over 5 minutes.' },
   },
 ];
+
+// The probe of imp's /health over the tailnet (create-imp-health-probe.ts) fails, or
+// reports nothing: clients cannot reach impd then, though the loopback check above may
+// pass. A failed TLS check or a body without "ready": true fails it too.
+const impHealthRule: AlertRule = {
+  alert: 'ImpHealthUnreachable',
+  expr: `probe_success{target="${impHealthProbeTarget}"} == 0 or absent(probe_success{target="${impHealthProbeTarget}"})`,
+  for: '5m',
+  labels: { severity: 'critical' },
+  annotations: {
+    summary: 'https://imps.geoff.cloud/health fails from the cluster over the tailnet.',
+  },
+};
 
 // per target, so one dead exporter is named; replaces the chart's ratio-based TargetDown
 const targetDownRule: AlertRule = {
