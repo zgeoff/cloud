@@ -49,6 +49,10 @@ function requireRealGateway(image: string): void {
   }
 }
 
+// atc 2.24.0's MAX_REGISTRY_DAEMONS (src/federation/max-registry-daemons.ts): the most
+// daemons whose events cursor fits 4096 bytes. Recheck it when the gateway's atc moves.
+const maxDaemons = 34;
+
 function requireDaemons(
   daemons: GatewayConfigFields['daemons'],
   env: Readonly<Record<string, string | undefined>>,
@@ -58,6 +62,12 @@ function requireDaemons(
   if (entries.length === 0) {
     throw new Error(
       'atcGateway.daemons is unset or empty: give each daemon as atcGateway.daemons.<name> with its address and daemonID (they replace atcGateway.daemonAddress and daemonID)',
+    );
+  }
+
+  if (entries.length > maxDaemons) {
+    throw new Error(
+      `atcGateway.daemons lists ${entries.length} daemons, over atc's limit of ${maxDaemons}: the gateway refuses such a registry and exits at start`,
     );
   }
 

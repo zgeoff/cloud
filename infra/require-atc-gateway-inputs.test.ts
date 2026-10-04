@@ -104,6 +104,21 @@ describe('requireATCGatewayInputs daemons', () => {
   });
 });
 
+describe('requireATCGatewayInputs daemon count', () => {
+  test("takes atc's limit of 34 daemons and refuses 35", () => {
+    const atLimit = buildManyDaemons(34);
+    const overLimit = buildManyDaemons(35);
+
+    expect(Object.keys(requireATCGatewayInputs(atLimit.config, atLimit.env).daemons)).toHaveLength(
+      34,
+    );
+
+    expect(() => requireATCGatewayInputs(overLimit.config, overLimit.env)).toThrow(
+      "atcGateway.daemons lists 35 daemons, over atc's limit of 34",
+    );
+  });
+});
+
 describe('requireATCGatewayInputs daemon', () => {
   test('refuses to deploy without a pinned daemonID', () => {
     expect(() => requireATCGatewayInputs(buildConfig({ address }), env)).toThrow(
@@ -179,3 +194,19 @@ describe('requireATCGatewayInputs token', () => {
     ).toThrow('ATC_GATEWAY_TOKEN_HOME_PC is empty');
   });
 });
+
+// count daemons named d0, d1 and on, each with its token, d0 the default
+function buildManyDaemons(count: number) {
+  const names = Array.from({ length: count }, (_, index) => `d${index}`);
+
+  return {
+    config: {
+      image,
+      daemons: Object.fromEntries(names.map((name) => [name, { address, daemonID }])),
+      defaultDaemon: 'd0',
+    },
+    env: Object.fromEntries(
+      names.map((name) => [`ATC_GATEWAY_TOKEN_${name.toUpperCase()}`, token]),
+    ),
+  };
+}
