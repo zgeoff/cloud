@@ -104,6 +104,7 @@ function buildATCDaemonEndpoints(
   return Object.entries(gateway.daemons).map(([name, daemon]) => ({
     name,
     address: daemon.address,
+    alertSeverity: daemon.alertSeverity,
   }));
 }
 

@@ -25,7 +25,11 @@ export function loadATCGatewayInputs(): { readonly atcGateway?: ATCGatewayInputs
       daemons: Object.fromEntries(
         daemons.map(([name, daemon]) => [
           name,
-          { address: daemon.address, daemonID: daemon.daemonID },
+          {
+            address: daemon.address,
+            daemonID: daemon.daemonID,
+            alertSeverity: daemon.alertSeverity,
+          },
         ]),
       ),
       defaultDaemon: checked.defaultDaemon,

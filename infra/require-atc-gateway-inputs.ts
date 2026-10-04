@@ -1,9 +1,11 @@
+import type { ATCDaemonAlertSeverity } from './build-alert-rules.ts';
 import { toATCGatewayTokenVariable } from './to-atc-gateway-token-variable.ts';
 
 // one daemon's stack config fields; see ATCGatewayConfig
 interface DaemonConfigFields {
   readonly address?: string;
   readonly daemonID?: string;
+  readonly alertSeverity?: string;
 }
 
 // the stack config fields this check reads; see ATCGatewayConfig
@@ -16,6 +18,7 @@ interface GatewayConfigFields {
 interface CheckedDaemon {
   readonly address: string;
   readonly daemonID: string;
+  readonly alertSeverity: ATCDaemonAlertSeverity;
   readonly token: string;
 }
 
@@ -96,6 +99,7 @@ function requireDaemon(
   return {
     address: requireDaemonAddress(field, daemon?.address),
     daemonID: requireDaemonID(field, daemon?.daemonID),
+    alertSeverity: requireAlertSeverity(field, daemon?.alertSeverity),
     token: requireToken(toATCGatewayTokenVariable(name), env),
   };
 }
@@ -131,6 +135,18 @@ function requireDaemonID(field: string, daemonID: string | undefined): string {
   }
 
   return daemonID;
+}
+
+function requireAlertSeverity(field: string, severity: string | undefined): ATCDaemonAlertSeverity {
+  if (severity === undefined) {
+    return 'critical';
+  }
+
+  if (severity !== 'critical' && severity !== 'warning') {
+    throw new Error(`${field}.alertSeverity must be critical or warning, got ${severity}`);
+  }
+
+  return severity;
 }
 
 // atc's daemon takes a token of at least 32 bytes
