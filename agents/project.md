@@ -30,18 +30,11 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 
 ## Host operations
 
-- Switch geoffcloud from a `nixos/nix` container on the host network; Tailscale SSH authenticates
-  `root@geoffcloud`. Build first with `nixos-rebuild build`, then switch from a clean checkout of
-  `main`:
-
-  ```sh
-  docker run --rm --network host -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro \
-    -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro -w /src -e NIX_SSHOPTS="-o BatchMode=yes" \
-    nixos/nix sh -c 'nix --extra-experimental-features "nix-command flakes" \
-      shell nixpkgs#openssh nixpkgs#nixos-rebuild -c nixos-rebuild switch \
-      --flake path:./nixos#geoffcloud --target-host root@geoffcloud'
-  ```
-
+- Switch geoffcloud with `bash scripts/switch-geoffcloud.sh` from a clean checkout of `main`. It
+  builds with `nix build --no-link` in a `nixos/nix` container (the repo mounts read-only, so never
+  `nixos-rebuild build`), switches only after the build exits 0, then checks that the host runs the
+  built system. Tailscale SSH authenticates `root@geoffcloud`. `--build-only` stops after the build.
+  Never switch by hand after a build that failed.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`: a `VACUUM INTO` copy taken inside imp-host while impd
   runs, with its integrity check, schema migration and imp version in `COPY-INFO`. Never tar the

@@ -67,27 +67,24 @@ run in a `nixos/nix` container on the host network, so you need no local Nix. Ta
 authenticates `root@geoffcloud`. The Docker volume `geoffcloud-nix-store` keeps the Nix store
 between runs.
 
-1. Build. The repo mounts read-only, so build with `--no-link` rather than `nixos-rebuild build`,
-   which writes a `result` link into the working directory:
+Run the script, which builds, then switches only after the build exits 0:
 
-   ```sh
-   docker run --rm --network host -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro -w /src \
-     nixos/nix nix --extra-experimental-features "nix-command flakes" build --no-link \
-       path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel
-   ```
+```sh
+bash scripts/switch-geoffcloud.sh               # build, switch, check the host runs the build
+bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
+```
 
-2. Switch:
+1. It refuses a branch other than `main`, uncommitted changes, or a `main` behind `origin/main`.
+2. It builds with `nix build --no-link`, because the repo mounts read-only and `nixos-rebuild build`
+   writes a `result` link into the working directory. A failed build stops the script, and nothing
+   reaches the host.
+3. It runs `nixos-rebuild switch --target-host root@geoffcloud` in the same container.
+4. It fails unless the host's `/run/current-system` is the built path, then prints
+   `systemctl --failed`, which should list nothing.
 
-   ```sh
-   docker run --rm --network host -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro \
-     -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro -w /src -e NIX_SSHOPTS="-o BatchMode=yes" \
-     nixos/nix sh -c 'nix --extra-experimental-features "nix-command flakes" \
-       shell nixpkgs#openssh nixpkgs#nixos-rebuild -c nixos-rebuild switch \
-       --flake path:./nixos#geoffcloud --target-host root@geoffcloud'
-   ```
-
-3. Check: `ssh root@geoffcloud systemctl --failed` lists nothing, and
-   `ssh root@geoffcloud k3s kubectl get nodes` shows the node `Ready`.
+`bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gate with stub
+`docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show the node
+`Ready`.
 
 Before a risky host change, take an Onidel snapshot of the root disk:
 
