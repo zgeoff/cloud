@@ -203,10 +203,11 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 ## Host operations
 
 - Switch geoffcloud with `bash scripts/switch-geoffcloud.sh` from a clean checkout of `main`. It
-  builds with `nix build --no-link` in a `nixos/nix` container (the repo mounts read-only, so never
-  `nixos-rebuild build`), switches only after the build exits 0, then checks that the host runs the
-  built system. Tailscale SSH authenticates `root@geoffcloud`. `--build-only` stops after the build.
-  Never switch by hand after a build that failed.
+  builds a `git archive` snapshot of the commit with `nix build --no-link` in a `nixos/nix`
+  container (never `nixos-rebuild build`: the repo mounts read-only), and only after the build
+  exits 0 copies that exact store path to the host and activates it. Tailscale SSH authenticates
+  `root@geoffcloud`. `--build-only` stops after the build. Never switch by hand after a failed
+  build, and never re-evaluate the flake to switch.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`: a `VACUUM INTO` copy taken inside imp-host while impd
   runs, with its integrity check, schema migration and imp version in `COPY-INFO`. Never tar the

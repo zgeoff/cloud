@@ -74,11 +74,14 @@ bash scripts/switch-geoffcloud.sh               # build, switch, check the host 
 bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 ```
 
-1. It refuses a branch other than `main`, uncommitted changes, or a `main` behind `origin/main`.
-2. It builds with `nix build --no-link`, because the repo mounts read-only and `nixos-rebuild build`
-   writes a `result` link into the working directory. A failed build stops the script, and nothing
+1. It refuses a branch other than `main`, uncommitted changes, a `main` behind `origin/main`, or any
+   git command that fails.
+2. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
+   and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-3. It runs `nixos-rebuild switch --target-host root@geoffcloud` in the same container.
+3. It copies the built store path to the host with `nix copy`, sets the system profile to it and
+   runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
+   is not evaluated again.
 4. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
 
