@@ -5,16 +5,23 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.0. Copies of impd's database
-from before each upgrade are in `/root/imp-db-backups/` on the host. B1 is done: atc 2.24.0 ships
-`atc-gateway-linux-x64` and holds atc #242. B2 and B3 are done: the pins track 2.24.0, the fixture
-test passes against the real gateway binary, and both images are published by digest. C1 and C2 are
-done: the gateway's daemon bearer and impd's `atc-cloud` token are in 1Password and on the host.
-C3's R2 bucket, key and restic password exist in 1Password and `.env` references them; C4's GitHub
-token exists, unused. E2 is done (system-16): atc-daemon 2.24.0 runs on `100.69.47.33:8415` with
-daemonID `087031fd-6df6-42fb-a2e9-76e1f0e363d9`, and `inet cloud_host` is loaded. A pod reaches
-8415; the host's own TCP and direct tailnet access time out; a wrong bearer gets `unauthorized`;
-with the right bearer, a request as an unlisted principal is refused. Nothing else below has run.
+Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.1 (the image.json fix), pinned
+by digest. Copies of impd's database from before each upgrade are in `/root/imp-db-backups/` on the
+host. B1–B3 are done: atc 2.24.0 ships `atc-gateway-linux-x64`, the fixture test passes against it,
+and both images are published by digest. C1–C3 are done; C4's GitHub token exists, unused.
+
+- E2 is done: atc-daemon runs 2.26.0 on `100.69.47.33:8415` (daemonID
+  `087031fd-6df6-42fb-a2e9-76e1f0e363d9`) behind `inet cloud_host`. A wrong bearer is refused, and
+  each start and refusal is logged to journald and Loki (`unit="atc-daemon.service"`).
+- E3 is done: the gateway runs 2.24.0 in k3s, its state on a `local-path-retain` claim, and the
+  nightly backup CronJob is active.
+- E4 is done with real state: a backup restored into a scratch claim matched the live `mcp-auth.db`
+  row for row, and a scratch gateway on it listed the registered client.
+- F1 is done: `atc.geoff.cloud` routes through the tunnel and the external health check probes it.
+  One client, a ChatGPT connector, is registered and listed in the daemon's `principals`; it signed
+  in and its read calls succeed.
+- Not yet: F2 and F3, G1 and G4 (no harness image), and brokered runtime auth, which needs imp 0.30.
+  The PC's own daemon is not in the gateway's registry.
 
 B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
