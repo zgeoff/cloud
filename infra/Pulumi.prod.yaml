@@ -8,3 +8,4 @@ config:
     publicURL: https://atc.geoff.cloud
     daemonAddress: 100.69.47.33:8415
     daemonID: 087031fd-6df6-42fb-a2e9-76e1f0e363d9
+  geoff-cloud:discordAlerts: 'true'
