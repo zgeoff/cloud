@@ -69,10 +69,13 @@ export interface ATCGatewayInputs {
   readonly secrets: ATCGatewaySecrets;
 }
 
-interface ATCGatewayOutputs {
+export interface ATCGatewayOutputs {
   readonly deployment: Deployment;
   readonly backupJob?: CronJob;
   readonly serviceURL: Output<string>;
+
+  // the host of the gateway's public URL, which the tunnel routes to serviceURL
+  readonly publicHost: string;
 }
 
 export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): ATCGatewayOutputs {
@@ -118,6 +121,7 @@ export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): A
     serviceURL: service.metadata.apply(
       (meta) => `http://${meta.name}.${meta.namespace}.svc.cluster.local:${atcGatewayPort}`,
     ),
+    publicHost: new URL(inputs.config.publicURL).host,
   };
 }
 
