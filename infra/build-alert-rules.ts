@@ -39,7 +39,14 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
   return [
     {
       name: 'geoff-cloud',
-      rules: [...impdRules, targetDownRule, cloudflaredRule, ...atcRules, impHealthRule],
+      rules: [
+        ...impdRules,
+        targetDownRule,
+        cloudflaredRule,
+        ...atcRules,
+        impHealthRule,
+        oomKilledRule,
+      ],
     },
   ];
 }
@@ -75,6 +82,24 @@ const impHealthRule: AlertRule = {
   labels: { severity: 'critical' },
   annotations: {
     summary: 'https://imps.geoff.cloud/health fails from the cluster over the tailnet.',
+  },
+};
+
+// A container restarted in the last 10 minutes and its last end was an OOM kill: Grafana
+// at its old 256Mi limit restarted 9 times this way with no alert, since KubePodCrashLooping
+// needs a back-off that spaced restarts never hold. One alert per container.
+const oomKilledRule: AlertRule = {
+  alert: 'ContainerOOMKilled',
+  expr: [
+    'increase(kube_pod_container_status_restarts_total[10m]) > 0',
+    'and on (namespace, pod, container)',
+    'kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1',
+  ].join(' '),
+  for: '0m',
+  labels: { severity: 'warning' },
+  annotations: {
+    summary:
+      'Container {{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed.',
   },
 };
 

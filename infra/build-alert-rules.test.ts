@@ -7,6 +7,7 @@ describe('buildAlertRules', () => {
   test('defines each alert once, with a severity and a summary', () => {
     expect(rules.map((rule) => rule.alert).toSorted()).toEqual([
       'CloudflaredNoConnections',
+      'ContainerOOMKilled',
       'ImpHealthUnreachable',
       'ImpdLocalHealthDown',
       'ImpdLocalHealthStale',
@@ -47,6 +48,18 @@ describe('buildAlertRules', () => {
       'absent(cloudflared_tunnel_ha_connections)',
       'absent(up{namespace="ingress", pod=~"cloudflared-.*"} == 1)',
     ]);
+  });
+});
+
+describe('buildAlertRules for OOM kills', () => {
+  test('alerts at once on a container restarted after an OOM kill', () => {
+    const rule = getRule('ContainerOOMKilled');
+
+    expect(rule).toMatchObject({ for: '0m', labels: { severity: 'warning' } });
+
+    expect(rule.expr).toBe(
+      'increase(kube_pod_container_status_restarts_total[10m]) > 0 and on (namespace, pod, container) kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1',
+    );
   });
 });
 
