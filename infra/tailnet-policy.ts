@@ -1,15 +1,18 @@
 // The whole tailnet policy file. Pulumi's tailscale.Acl replaces the live file
 // with this one, so every rule the tailnet relies on must be here.
 //
-// Geoff's PC (the WSL node, home-wsl), where atc's MCP listens on its tailnet address.
+// Geoff's PC (the WSL node, home-wsl), where atc's MCP and atc's daemon listen on its
+// tailnet address.
 export const homePC = {
   ip: '100.67.122.120',
   mcpPort: 8414,
+  daemonPort: 8415,
 };
 
 // Tags:
-// - tag:cloud — cloud hosts and their egress (cloudflared). It reaches only the
-//   PC's atc MCP port, for the mcp.geoff.cloud route (#7).
+// - tag:cloud — cloud hosts and their egress (cloudflared, the atc gateway). It reaches
+//   only the PC's atc MCP port, for the mcp.geoff.cloud route (#7), and the PC's atc
+//   daemon port, for the gateway.
 // - tag:imp — impd nodes. Members reach them on any port (one port per imp);
 //   they reach nothing, which is imp's isolation goal.
 export const tailnetPolicy = {
@@ -32,6 +35,10 @@ export const tailnetPolicy = {
 
     // impd nodes reach each other's API: moves between hosts and imp's two-node e2e
     { src: ['tag:imp'], dst: ['tag:imp'], ip: ['tcp:7070'] },
+
+    // the atc gateway on a cloud host → atc's daemon on the PC; last, so adding it
+    // shifts no other grant
+    { src: ['tag:cloud'], dst: ['home-pc'], ip: [`tcp:${homePC.daemonPort}`] },
   ],
   ssh: [
     {
