@@ -116,6 +116,10 @@ const nodeExporterArgs = [
   '--collector.textfile.directory=/host/root/var/lib/node-exporter/textfile',
 ];
 
+// Grafana idles near 240Mi, and each query and each plugin backend it installs at start adds
+// to that: at a 256Mi limit, Explore got it OOM-killed.
+const grafanaResources = { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '768Mi' } };
+
 // the chart's values but Alertmanager's, which buildAlertmanagerValues gives
 function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unknown> {
   return {
@@ -154,7 +158,7 @@ function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unk
     grafana: {
       adminPassword: grafanaPassword,
       service: { type: 'NodePort', nodePort: grafanaNodePort },
-      resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '256Mi' } },
+      resources: grafanaResources,
       additionalDataSources: [
         { name: 'Loki', type: 'loki', url: 'http://loki.observability.svc:3100', access: 'proxy' },
       ],
