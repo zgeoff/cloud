@@ -5,10 +5,12 @@ what it waits on, the approval it needs, and its effect. "Approval" means Geoff'
 step; nothing here is approved by default. Steps marked **upstream** wait on atc or imp work that
 does not exist yet.
 
-Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.29.1 (the image.json fix), pinned
-by digest. Copies of impd's database from before each upgrade are in `/root/imp-db-backups/` on the
-host. B1–B3 are done: atc 2.24.0 ships `atc-gateway-linux-x64`, the fixture test passes against it,
-and both images are published by digest. C1–C3 are done; C4's GitHub token exists, unused.
+Current state (2026-10-04): A1–A3 are done: geoffcloud runs imp 0.30.0, pinned by digest
+(`ghcr.io/zgeoff/imp-host:0.30.0@sha256:9a89451bb63e9426a16239f5729075df4fd411ddc60f5734ad6b5617c0cf2205`,
+the `image` line in `nixos/hosts/geoffcloud/configuration.nix`), with `execRequire` on. Copies of
+impd's database from before each upgrade are in `/root/imp-db-backups/` on the host. B1–B3 are done:
+atc 2.24.0 ships `atc-gateway-linux-x64`, the fixture test passes against it, and both images are
+published by digest. C1–C3 are done; C4's GitHub token exists, unused.
 
 - E2 is done: atc-daemon runs 2.26.0 on `100.69.47.33:8415` (daemonID
   `087031fd-6df6-42fb-a2e9-76e1f0e363d9`) behind `inet cloud_host`. A wrong bearer is refused, and
@@ -22,9 +24,17 @@ and both images are published by digest. C1–C3 are done; C4's GitHub token exi
   in and its read calls succeed.
 - The registry also holds `home-pc`, Geoff's PC daemon (atc 2.26.0 as a systemd user unit, listening
   on its tailnet address; its unreachable alert is a warning, since the PC sleeps). A read through
-  the hosted connector listed sessions on both daemons.
-- Not yet: any spawn or write through the gateway, F2 and F3, G1 and G4 (no harness image), and
-  brokered runtime auth, which needs imp 0.30.
+  the hosted connector listed sessions on both daemons, and a `session_message` through it reached a
+  session on `home-pc`, whose agent confirmed receipt.
+- imp 0.30.0's acceptance passed `exec --require broker`, fresh disk usage, grants on a scoped fork,
+  the proxy's refusal text, and stopping an on-host build when its client leaves. **Known limit:** a
+  build with a silent 420 s step failed on both paths. The upload build failed at 360 s, when
+  imp-docker-proxy's call to the engine raised `TimeoutError`. The on-host build failed at about 305
+  s with `INTERNAL_SERVER_ERROR` and no log line; its cause is still being diagnosed. Whether
+  periodic build output avoids either failure is untested. Rerun both checks on imp's fix release.
+- Not yet: any spawn through the gateway, including an imp spawn on the cloud daemon, any write to
+  the cloud daemon, F2 and F3, G1 and G4 (no harness image), and brokered runtime auth, which waits
+  on atc #262.
 
 B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
