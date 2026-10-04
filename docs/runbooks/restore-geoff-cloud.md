@@ -182,8 +182,10 @@ BuildKit), and keep them stopped until a fixed imp runs again.
 A rollback from 0.30.0 needs a database restore: 0.30.0 adds the migration
 `021_add_broker_sessions`, and 0.29.1 refuses a database that holds it. Restore the copy
 `pre-0.30.0-20261004T030409` with section 2; its generation runs 0.29.1 at the digest in its
-`COPY-INFO`. **CAUTION:** the restore drops every change impd made after 03:04Z on 2026-10-04 (UTC),
-including imps, grants and tokens.
+`COPY-INFO`. **CAUTION:** the restore returns impd's database state only. It drops every metadata,
+grant and token change impd made after 03:04Z on 2026-10-04 (UTC). It does not rewind disks,
+checkpoints or images on the pool or the engine: those made later stay, and may need the
+reconciliation that section 2's caution describes.
 
 `nix-env -p /nix/var/nix/profiles/system --list-generations` lists the generations. If imp's version
 changes, restore the matching database copy too (section 2).
