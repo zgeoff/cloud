@@ -14,9 +14,12 @@ interface AlertRuleGroup {
 }
 
 // one of atc's daemons the gateway dials: its name in the registry and its host:port
+export type ATCDaemonAlertSeverity = 'critical' | 'warning';
+
 export interface ATCDaemonEndpoint {
   readonly name: string;
   readonly address: string;
+  readonly alertSeverity: ATCDaemonAlertSeverity;
 }
 
 interface AlertRuleInputs {
@@ -93,7 +96,7 @@ function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
     alert: 'ATCDaemonUnreachable',
     expr: `${series} == 0 or absent(${series})`,
     for: '5m',
-    labels: { severity: 'critical' },
+    labels: { severity: daemon.alertSeverity },
     annotations: {
       summary: `atc's daemon at ${daemon.address} is unreachable from the cluster.`,
     },

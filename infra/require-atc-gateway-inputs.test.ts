@@ -10,6 +10,7 @@ const env = { ATC_GATEWAY_TOKEN_GEOFFCLOUD: token };
 interface DaemonFields {
   readonly address?: string;
   readonly daemonID?: string;
+  readonly alertSeverity?: string;
 }
 
 // one daemon named geoffcloud, with the given fields
@@ -22,7 +23,7 @@ const config = buildConfig({ address, daemonID });
 describe('requireATCGatewayInputs', () => {
   test('returns each daemon with its token, and the default, when every input is set', () => {
     expect(requireATCGatewayInputs(config, env)).toEqual({
-      daemons: { geoffcloud: { address, daemonID, token } },
+      daemons: { geoffcloud: { address, daemonID, alertSeverity: 'critical', token } },
       defaultDaemon: 'geoffcloud',
     });
   });
@@ -41,8 +42,8 @@ describe('requireATCGatewayInputs', () => {
     );
 
     expect(checked.daemons).toEqual({
-      geoffcloud: { address, daemonID, token },
-      'home-pc': { ...homePC, token: homeToken },
+      geoffcloud: { address, daemonID, alertSeverity: 'critical', token },
+      'home-pc': { ...homePC, alertSeverity: 'critical', token: homeToken },
     });
   });
 
@@ -210,3 +211,18 @@ function buildManyDaemons(count: number) {
     ),
   };
 }
+
+describe('requireATCGatewayInputs alertSeverity', () => {
+  test("takes a daemon's alertSeverity, and refuses any but critical or warning", () => {
+    const warned = requireATCGatewayInputs(
+      buildConfig({ address, daemonID, alertSeverity: 'warning' }),
+      env,
+    );
+
+    expect(warned.daemons['geoffcloud']?.alertSeverity).toBe('warning');
+
+    expect(() =>
+      requireATCGatewayInputs(buildConfig({ address, daemonID, alertSeverity: 'page' }), env),
+    ).toThrow('atcGateway.daemons.geoffcloud.alertSeverity must be critical or warning, got page');
+  });
+});

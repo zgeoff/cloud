@@ -49,8 +49,17 @@ describe('buildAlertRules', () => {
   });
 });
 
-const geoffcloud = { name: 'geoffcloud', address: '100.69.47.33:8415' };
-const homePC = { name: 'home-pc', address: '100.67.122.120:8415' };
+const geoffcloud = {
+  name: 'geoffcloud',
+  address: '100.69.47.33:8415',
+  alertSeverity: 'critical',
+} as const;
+
+const homePC = {
+  name: 'home-pc',
+  address: '100.67.122.120:8415',
+  alertSeverity: 'warning',
+} as const;
 
 describe('buildAlertRules with the atc gateway', () => {
   test('leaves out ATCDaemonUnreachable while the atc gateway is unset', () => {
@@ -84,6 +93,8 @@ describe('buildAlertRules with the atc gateway', () => {
       'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
       'probe_success{target="atc-daemon-home-pc"} == 0 or absent(probe_success{target="atc-daemon-home-pc"})',
     ]);
+
+    expect(atcRules.map((rule) => rule.labels.severity)).toEqual(['critical', 'warning']);
 
     expect(atcRules[1]?.annotations.summary).toBe(
       "atc's daemon at 100.67.122.120:8415 is unreachable from the cluster.",

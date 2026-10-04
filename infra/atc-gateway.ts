@@ -30,6 +30,10 @@ import { toATCGatewayTokenVariable } from './to-atc-gateway-token-variable.ts';
 interface ATCGatewayDaemonConfig {
   readonly address?: string;
   readonly daemonID?: string;
+
+  // ATCDaemonUnreachable's severity for this daemon; critical when unset. A host that
+  // sleeps, such as Geoff's PC, takes warning.
+  readonly alertSeverity?: string;
 }
 
 export interface ATCGatewayConfig {
@@ -69,6 +73,7 @@ interface ATCGatewaySecrets {
 interface ATCGatewayDaemon {
   readonly address: string;
   readonly daemonID: string;
+  readonly alertSeverity: 'critical' | 'warning';
 }
 
 export interface ATCGatewayInputs {

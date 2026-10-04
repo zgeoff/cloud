@@ -10,5 +10,9 @@ config:
       geoffcloud:
         address: 100.69.47.33:8415
         daemonID: 087031fd-6df6-42fb-a2e9-76e1f0e363d9
+      home-pc:
+        address: 100.67.122.120:8415
+        daemonID: 66b7b2ec-c98d-4cca-bb92-e52c5a58b863
+        alertSeverity: warning
     defaultDaemon: geoffcloud
   geoff-cloud:discordAlerts: 'true'
