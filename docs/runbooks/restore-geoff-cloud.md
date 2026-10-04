@@ -173,6 +173,12 @@ you; do not switch first.
 ssh root@geoffcloud nixos-rebuild switch --rollback
 ```
 
+Exception: imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0
+generation needs no database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1
+fixes (imp #196): a crafted imported image can overwrite host files. Before rolling back to 0.29.0,
+stop all image imports and builds (`imp image add`, `imp image build`, templates from a new image,
+BuildKit), and keep them stopped until a fixed imp runs again.
+
 `nix-env -p /nix/var/nix/profiles/system --list-generations` lists the generations. If imp's version
 changes, restore the matching database copy too (section 2).
 
