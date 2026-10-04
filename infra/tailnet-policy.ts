@@ -9,15 +9,24 @@ export const homePC = {
   daemonPort: 8415,
 };
 
+// imp's own tailnet node on geoffcloud (imp-geoffcloud, tag:imp), where impd serves
+// https://imps.geoff.cloud. A long-lived node, so its address is stable; a host alias
+// names this one node, where tag:imp would also take in any later impd node.
+const impNode = {
+  ip: '100.75.9.119',
+  httpsPort: 443,
+};
+
 // Tags:
 // - tag:cloud — cloud hosts and their egress (cloudflared, the atc gateway). It reaches
 //   only the PC's atc MCP port, for the mcp.geoff.cloud route (#7), and the PC's atc
-//   daemon port, for the gateway.
+//   daemon port, for the gateway; and imp's node on 443 only, for the health probe.
 // - tag:imp — impd nodes. Members reach them on any port (one port per imp);
 //   they reach nothing, which is imp's isolation goal.
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
+    'imp-geoffcloud': impNode.ip,
   },
 
   // Each tag also owns itself: Pulumi's OAuth client carries tag:cloud and tag:imp,
@@ -39,6 +48,10 @@ export const tailnetPolicy = {
     // the atc gateway on a cloud host → atc's daemon on the PC; last, so adding it
     // shifts no other grant
     { src: ['tag:cloud'], dst: ['home-pc'], ip: [`tcp:${homePC.daemonPort}`] },
+
+    // the cluster's probe of imp's /health (#29) → imp's node, 443 only; last, so
+    // adding it shifts no other grant
+    { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: [`tcp:${impNode.httpsPort}`] },
   ],
   ssh: [
     {
