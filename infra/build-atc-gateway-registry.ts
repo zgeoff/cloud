@@ -1,10 +1,3 @@
-// The one daemon the gateway dials today: atc's daemon on geoffcloud.
-const atcGatewayDaemonName = 'geoffcloud';
-
-// atc reads each daemon's bearer token from ATC_GATEWAY_TOKEN_<NAME>, the name
-// upper-cased with `-` as `_`
-export const atcGatewayTokenVariable = `ATC_GATEWAY_TOKEN_${atcGatewayDaemonName.toUpperCase().replaceAll('-', '_')}`;
-
 interface RegistryDaemon {
   // the daemon's tailnet host:port
   readonly address: string;
@@ -19,11 +12,19 @@ interface ATCGatewayRegistry {
   readonly defaultDaemon: string;
 }
 
-// The gateway's registry file, in atc's format: the daemons it dials and the one a
-// call without a daemon goes to.
-export function buildATCGatewayRegistry(daemon: RegistryDaemon): ATCGatewayRegistry {
+// The gateway's registry file, in atc's format: the daemons it dials, by name, and the
+// one a call without a daemon goes to.
+export function buildATCGatewayRegistry(
+  daemons: Readonly<Record<string, RegistryDaemon>>,
+  defaultDaemon: string,
+): ATCGatewayRegistry {
   return {
-    daemons: { [atcGatewayDaemonName]: { address: daemon.address, daemonID: daemon.daemonID } },
-    defaultDaemon: atcGatewayDaemonName,
+    daemons: Object.fromEntries(
+      Object.entries(daemons).map(([name, daemon]) => [
+        name,
+        { address: daemon.address, daemonID: daemon.daemonID },
+      ]),
+    ),
+    defaultDaemon,
   };
 }

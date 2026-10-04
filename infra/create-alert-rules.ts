@@ -1,15 +1,16 @@
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import type { CustomResourceOptions } from '@pulumi/pulumi';
+import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { buildAlertRules } from './build-alert-rules.ts';
 
 // buildAlertRules' groups as a PrometheusRule (#29). Prometheus picks up every
 // PrometheusRule (ruleSelectorNilUsesHelmValues: false in observability.ts); the chart
-// brings the CRD, so opts makes this wait for it. atcDaemonAddress, set only with the
-// atc gateway, adds ATCDaemonUnreachable.
+// brings the CRD, so opts makes this wait for it. atcDaemons, set only with the atc
+// gateway, adds ATCDaemonUnreachable for each daemon.
 export function createAlertRules(
   ns: Namespace,
-  atcDaemonAddress: string | undefined,
+  atcDaemons: readonly ATCDaemonEndpoint[] | undefined,
   opts: CustomResourceOptions,
 ): CustomResource {
   return new CustomResource(
@@ -18,7 +19,7 @@ export function createAlertRules(
       apiVersion: 'monitoring.coreos.com/v1',
       kind: 'PrometheusRule',
       metadata: { name: 'geoff-cloud-alerts', namespace: ns.metadata.name },
-      spec: { groups: buildAlertRules({ atcDaemonAddress }) },
+      spec: { groups: buildAlertRules({ atcDaemons }) },
     },
     opts,
   );

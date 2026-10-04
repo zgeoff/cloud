@@ -102,14 +102,14 @@ Two SQLite files, each under 100 MB, both secret-bearing:
 
 ### 4. Config and secrets
 
-| Setting                                     | Secret | Source                                                                                             |
-| ------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------- |
-| `--public-url` (the OAuth issuer)           | no     | `https://atc.geoff.cloud`                                                                          |
-| `--host`, `--port`                          | no     | pod IP (`0.0.0.0`), 8414                                                                           |
-| `--state-dir` (`gateway.db`, `mcp-auth.db`) | no     | stack config `atcGateway.stateDir`, default `/home/nonroot/.local/state/atc` (the claim)           |
-| `--registry`: daemons and `defaultDaemon`   | no     | ConfigMap from Pulumi: `geoffcloud` at `atcGateway.daemonAddress`, pinned to `atcGateway.daemonID` |
-| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`              | yes    | 1Password `op://cloud/atc-daemon-token/credential` → k8s Secret (Pulumi)                           |
-| better-auth secret, if any                  | yes    | 1Password → k8s Secret                                                                             |
+| Setting                                     | Secret | Source                                                                                      |
+| ------------------------------------------- | ------ | ------------------------------------------------------------------------------------------- |
+| `--public-url` (the OAuth issuer)           | no     | `https://atc.geoff.cloud`                                                                   |
+| `--host`, `--port`                          | no     | pod IP (`0.0.0.0`), 8414                                                                    |
+| `--state-dir` (`gateway.db`, `mcp-auth.db`) | no     | stack config `atcGateway.stateDir`, default `/home/nonroot/.local/state/atc` (the claim)    |
+| `--registry`: daemons and `defaultDaemon`   | no     | ConfigMap from Pulumi: each daemon in `atcGateway.daemons`, with `atcGateway.defaultDaemon` |
+| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`              | yes    | 1Password `op://cloud/atc-daemon-token/credential` → k8s Secret (Pulumi)                    |
+| better-auth secret, if any                  | yes    | 1Password → k8s Secret                                                                      |
 
 The registry is atc's format:
 `{"daemons": {"geoffcloud": {"address": "100.69.47.33:8415", "daemonID": "<pinned>"}}, "defaultDaemon": "geoffcloud"}`.

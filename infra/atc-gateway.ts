@@ -10,7 +10,7 @@ import {
 } from '@pulumi/kubernetes/core/v1';
 import { StorageClass } from '@pulumi/kubernetes/storage/v1';
 import type { Output } from '@pulumi/pulumi';
-import { atcGatewayTokenVariable, buildATCGatewayRegistry } from './build-atc-gateway-registry.ts';
+import { buildATCGatewayRegistry } from './build-atc-gateway-registry.ts';
 import {
   atcGatewayLabels,
   atcGatewayPort,
@@ -18,11 +18,19 @@ import {
   buildATCGatewaySpec,
 } from './build-atc-gateway-spec.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
+import { toATCGatewayTokenVariable } from './to-atc-gateway-token-variable.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
 // daemons (docs/plans/atc-gateway.md). Off until the stack config sets atcGateway;
 // setting it is an operator step that needs Geoff's approval
 // (docs/runbooks/atc-gateway-operator-checklist.md).
+
+// one daemon the gateway dials: its tailnet host:port and the daemonID `atc daemon id`
+// prints there. Both are required; the deploy refuses without them.
+interface ATCGatewayDaemonConfig {
+  readonly address?: string;
+  readonly daemonID?: string;
+}
 
 export interface ATCGatewayConfig {
   // a digest-pinned image built from deploy/atc-gateway
@@ -32,10 +40,10 @@ export interface ATCGatewayConfig {
   // the origin clients reach, and the OAuth issuer
   readonly publicURL: string;
 
-  // geoffcloud's daemon: its tailnet host:port and the daemonID `atc daemon id`
-  // prints there. Both are required; the deploy refuses without them.
-  readonly daemonAddress?: string;
-  readonly daemonID?: string;
+  // the daemons the gateway dials, by name, and the one a call without a daemon goes
+  // to. Each name's bearer token comes from ATC_GATEWAY_TOKEN_<NAME>.
+  readonly daemons?: Readonly<Record<string, ATCGatewayDaemonConfig>>;
+  readonly defaultDaemon?: string;
 
   // where the state volume mounts and --state-dir points: gateway.db and
   // mcp-auth.db. atc's packaging fixes the path; the default is $HOME's state dir.
@@ -50,8 +58,8 @@ export interface ATCGatewayBackupSecrets {
 }
 
 interface ATCGatewaySecrets {
-  // the bearer token the gateway presents to geoffcloud's daemon
-  readonly token: Output<string>;
+  // the bearer token the gateway presents to each daemon, by daemon name
+  readonly tokens: Readonly<Record<string, Output<string>>>;
 
   // restic to R2; without it there is no backup CronJob
   readonly backup?: ATCGatewayBackupSecrets;
@@ -65,7 +73,8 @@ interface ATCGatewayDaemon {
 
 export interface ATCGatewayInputs {
   readonly config: ATCGatewayConfig;
-  readonly daemon: ATCGatewayDaemon;
+  readonly daemons: Readonly<Record<string, ATCGatewayDaemon>>;
+  readonly defaultDaemon: string;
   readonly secrets: ATCGatewaySecrets;
 }
 
@@ -166,7 +175,12 @@ function createConfigObjects(
       // no fixed name: Pulumi names it and replaces it on a change, so the Deployment
       // rolls and the gateway, which reads both only at start, picks the change up
       metadata: { namespace },
-      stringData: { [atcGatewayTokenVariable]: inputs.secrets.token },
+      stringData: Object.fromEntries(
+        Object.entries(inputs.secrets.tokens).map(([name, token]) => [
+          toATCGatewayTokenVariable(name),
+          token,
+        ]),
+      ),
     },
     { provider: cluster },
   );
@@ -176,7 +190,11 @@ function createConfigObjects(
     {
       metadata: { namespace },
       data: {
-        [atcGatewayRegistryFile]: JSON.stringify(buildATCGatewayRegistry(inputs.daemon), null, 2),
+        [atcGatewayRegistryFile]: JSON.stringify(
+          buildATCGatewayRegistry(inputs.daemons, inputs.defaultDaemon),
+          null,
+          2,
+        ),
       },
     },
     { provider: cluster },

@@ -49,14 +49,17 @@ describe('buildAlertRules', () => {
   });
 });
 
+const geoffcloud = { name: 'geoffcloud', address: '100.69.47.33:8415' };
+const homePC = { name: 'home-pc', address: '100.67.122.120:8415' };
+
 describe('buildAlertRules with the atc gateway', () => {
   test('leaves out ATCDaemonUnreachable while the atc gateway is unset', () => {
     expect(rules.map((rule) => rule.alert)).not.toContain('ATCDaemonUnreachable');
-    expect(buildAlertRules({ atcDaemonAddress: undefined })).toEqual(buildAlertRules());
+    expect(buildAlertRules({ atcDaemons: undefined })).toEqual(buildAlertRules());
   });
 
-  test('alerts on a failed or missing atc daemon probe for 5 minutes, naming the address', () => {
-    const withGateway = buildAlertRules({ atcDaemonAddress: '100.69.47.33:8415' });
+  test("keeps geoffcloud's rule as it was with one daemon: target atc-daemon, its address", () => {
+    const withGateway = buildAlertRules({ atcDaemons: [geoffcloud] });
     const rule = withGateway.flatMap((group) => group.rules).at(-1);
 
     expect(withGateway.flatMap((group) => group.rules).slice(0, -1)).toEqual(rules);
@@ -70,6 +73,21 @@ describe('buildAlertRules with the atc gateway', () => {
         summary: "atc's daemon at 100.69.47.33:8415 is unreachable from the cluster.",
       },
     });
+  });
+
+  test('alerts on each daemon, its target labelled by its name', () => {
+    const atcRules = buildAlertRules({ atcDaemons: [geoffcloud, homePC] })
+      .flatMap((group) => group.rules)
+      .filter((rule) => rule.alert === 'ATCDaemonUnreachable');
+
+    expect(atcRules.map((rule) => rule.expr)).toEqual([
+      'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
+      'probe_success{target="atc-daemon-home-pc"} == 0 or absent(probe_success{target="atc-daemon-home-pc"})',
+    ]);
+
+    expect(atcRules[1]?.annotations.summary).toBe(
+      "atc's daemon at 100.67.122.120:8415 is unreachable from the cluster.",
+    );
   });
 });
 

@@ -40,7 +40,7 @@ run fails and changes nothing. Store the new kubeconfig with `bash scripts/conne
 cluster rebuild, follow
 [the cluster section of the restore runbook](./runbooks/restore-geoff-cloud.md#5-rebuild-the-cluster).
 
-### `atcGateway.daemonID is unset`, or another `atcGateway` error
+### `atcGateway.daemons.<name>.daemonID is unset`, or another `atcGateway` error
 
 **PENDING.** These come from `infra/require-atc-gateway-inputs.ts` when `atcGateway` is set. Each
 message names its fix. The gateway's order of steps is in
@@ -105,14 +105,16 @@ the metrics fail, the external check stays healthy.
 
 ### `ATCDaemonUnreachable` fires
 
-A pod cannot open a TCP connection to the atc daemon at `atcGateway.daemonAddress`, or the probe
-reports nothing. The gateway cannot reach the daemon then either. Three causes:
+A pod cannot open a TCP connection to an atc daemon in `atcGateway.daemons`, or the probe reports
+nothing. The alert's summary names the daemon's address; the probe's `target` label is `atc-daemon`
+for geoffcloud and `atc-daemon-<name>` for any other. The gateway cannot reach that daemon then
+either. For geoffcloud's daemon, three causes:
 
 1. The daemon is down. Check `ssh root@geoffcloud systemctl status atc-daemon`.
 2. The host firewall drops the pod's path: port 8415 from `cni0`, source `10.42.0.0/16`. Check
    `ssh root@geoffcloud nft list table inet cloud_host`.
-3. `atcGateway.daemonAddress` is wrong. Compare it with the address the daemon listens on, from
-   `ssh root@geoffcloud ss -tlnp`.
+3. The daemon's `address` in `atcGateway.daemons` is wrong. Compare it with the address the daemon
+   listens on, from `ssh root@geoffcloud ss -tlnp`.
 
 If the probe reports nothing, check the `atc-daemon-probe` pods with
 `ssh root@geoffcloud k3s kubectl -n observability get pods`.
