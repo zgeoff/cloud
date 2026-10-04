@@ -5,7 +5,7 @@ import type { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 import { Config } from '@pulumi/pulumi';
-import type { ATCGatewayInputs } from './atc-gateway.ts';
+import type { ATCGatewayInputs, ATCGatewayOutputs } from './atc-gateway.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import { createObservability } from './observability.ts';
 import { requireAlertWebhook } from './require-alert-webhook.ts';
@@ -21,6 +21,14 @@ interface ClusterInputs {
   readonly atcGateway?: ATCGatewayInputs;
 }
 
+// the tunnel ingress for the gateway's public hostname, and the URL the external health
+// check probes there
+interface ATCGatewayRoute {
+  readonly hostname: string;
+  readonly service: Output<string>;
+  readonly healthURL: string;
+}
+
 interface ClusterOutputs {
   readonly ingressNamespace: Output<string>;
   readonly cloudflared: Deployment;
@@ -28,6 +36,7 @@ interface ClusterOutputs {
   readonly grafanaURL: string;
   readonly grafanaAdminPassword: Output<string>;
   readonly atcGatewayServiceURL?: Output<string>;
+  readonly atcGatewayRoute?: ATCGatewayRoute;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7, #8). Pulumi reaches the k3s API
@@ -79,7 +88,23 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     ingressNamespace: ingress.metadata.name,
     cloudflared,
     ...observability,
-    ...(gateway === undefined ? {} : { atcGatewayServiceURL: gateway.serviceURL }),
+    ...(gateway === undefined ? {} : buildGatewayOutputs(gateway)),
+  };
+}
+
+interface GatewayOutputs {
+  readonly atcGatewayServiceURL: Output<string>;
+  readonly atcGatewayRoute: ATCGatewayRoute;
+}
+
+function buildGatewayOutputs(gateway: ATCGatewayOutputs): GatewayOutputs {
+  return {
+    atcGatewayServiceURL: gateway.serviceURL,
+    atcGatewayRoute: {
+      hostname: gateway.publicHost,
+      service: gateway.serviceURL,
+      healthURL: `https://${gateway.publicHost}/.well-known/oauth-protected-resource/mcp`,
+    },
   };
 }
 

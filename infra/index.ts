@@ -208,39 +208,6 @@ const tunnel = new ZeroTrustTunnelCloudflared('edge', {
 
 const mcpHostname = `mcp.${domain}`;
 
-// mcp.geoff.cloud: atc's MCP on Geoff's PC, bound to the PC's tailnet address. The
-// hop is plain HTTP inside WireGuard, and the tailnet policy lets only tag:cloud
-// reach the port. atc owns OAuth, so no Cloudflare Access on this hostname.
-const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
-  accountId: accountID,
-  tunnelId: tunnel.id,
-  config: {
-    ingresses: [
-      {
-        hostname: mcpHostname,
-
-        // the IP, not the MagicDNS name: CoreDNS in k3s does not forward to 100.100.100.100
-        service: `http://${homePC.ip}:${homePC.mcpPort}`,
-        originRequest: { httpHostHeader: mcpHostname },
-      },
-      { service: 'http_status:404' },
-    ],
-  },
-});
-
-export const tunnelConfigVersion = tunnelConfig.version;
-
-const mcpRecord = new DnsRecord('mcp', {
-  zoneId: zone.zoneId,
-  name: mcpHostname,
-  type: 'CNAME',
-  content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
-  proxied: true,
-  ttl: 1,
-});
-
-export const mcpURL = mcpRecord.name.apply((name) => `https://${name}`);
-
 // Redirect plain http to https on every hostname: a misconfigured client must not send
 // a bearer token or an authorization code over http, even only as far as the edge.
 const alwaysHTTPS = new ZoneSetting('always-use-https', {
@@ -262,6 +229,59 @@ const workloads =
     ? undefined
     : createClusterWorkloads({ kubeconfig, tunnelToken, ...loadATCGatewayInputs() });
 
+// atc.geoff.cloud: the atc gateway in k3s, on its public URL's host through the same
+// tunnel. The gateway owns OAuth, so no Cloudflare Access here either.
+const atcRoute = workloads?.atcGatewayRoute;
+
+// mcp.geoff.cloud: atc's MCP on Geoff's PC, bound to the PC's tailnet address. The
+// hop is plain HTTP inside WireGuard, and the tailnet policy lets only tag:cloud
+// reach the port. atc owns OAuth, so no Cloudflare Access on this hostname.
+const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
+  accountId: accountID,
+  tunnelId: tunnel.id,
+  config: {
+    ingresses: [
+      {
+        hostname: mcpHostname,
+
+        // the IP, not the MagicDNS name: CoreDNS in k3s does not forward to 100.100.100.100
+        service: `http://${homePC.ip}:${homePC.mcpPort}`,
+        originRequest: { httpHostHeader: mcpHostname },
+      },
+      ...(atcRoute === undefined
+        ? []
+        : [{ hostname: atcRoute.hostname, service: atcRoute.service }]),
+      { service: 'http_status:404' },
+    ],
+  },
+});
+
+export const tunnelConfigVersion = tunnelConfig.version;
+
+const mcpRecord = new DnsRecord('mcp', {
+  zoneId: zone.zoneId,
+  name: mcpHostname,
+  type: 'CNAME',
+  content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
+  proxied: true,
+  ttl: 1,
+});
+
+export const mcpURL = mcpRecord.name.apply((name) => `https://${name}`);
+
+const atcRecord =
+  atcRoute === undefined
+    ? undefined
+    : new DnsRecord('atc', {
+        zoneId: zone.zoneId,
+        name: atcRoute.hostname,
+        type: 'CNAME',
+        content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
+        proxied: true,
+        ttl: 1,
+      });
+
+export const atcURL = atcRecord?.name.apply((name) => `https://${name}`);
 export const grafanaURL = workloads?.grafanaURL;
 export const grafanaAdminPassword = workloads?.grafanaAdminPassword;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
@@ -270,7 +290,10 @@ export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 // changes show only in the Worker's logs.
 const healthCheck = await createHealthCheck({
   accountID,
-  targets: [{ name: 'mcp', url: `https://${mcpHostname}/.well-known/oauth-protected-resource` }],
+  targets: [
+    { name: 'mcp', url: `https://${mcpHostname}/.well-known/oauth-protected-resource` },
+    ...(atcRoute === undefined ? [] : [{ name: 'atc', url: atcRoute.healthURL }]),
+  ],
   alertURL: process.env['ALERT_WEBHOOK_URL'],
 });
 
