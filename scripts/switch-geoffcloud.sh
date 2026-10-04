@@ -32,7 +32,8 @@ teardown() {
 }
 trap teardown EXIT
 
-# Each git result is a checked assignment, so a failing git stops the script (set -e)
+# Sets verified_commit, the exact commit it checked; the build archives that value and never
+# reads HEAD again. Each git result is a checked assignment, so a failing git stops the script (set -e)
 # rather than reading as clean. Untracked files are allowed: the build reads only the
 # commit's `git archive`, so nothing outside the commit can reach it.
 require_clean_main() {
@@ -54,10 +55,12 @@ require_clean_main() {
     echo "main is not origin/main; pull first" >&2
     exit 1
   fi
+  verified_commit="$head"
 }
 
+verified_commit=""
 require_clean_main
-commit="$(git -C "$repo" rev-parse HEAD)"
+commit="$verified_commit"
 git -C "$repo" archive -o "$snapshot.tar" "$commit"
 tar -x -f "$snapshot.tar" -C "$snapshot"
 rm -f "$snapshot.tar"

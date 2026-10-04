@@ -56,13 +56,21 @@ case "$*" in
   *) echo "ssh stub: unexpected $*" >&2; exit 1 ;;
 esac
 EOF
-# git: the real git, except that `status` fails when STUB_GIT_STATUS_FAIL is set
+# git: the real git, except that `status` fails when STUB_GIT_STATUS_FAIL is set, and with
+# STUB_MOVE_HEAD the guard's last read (rev-parse origin/main) commits a new marker right
+# after it answers, so HEAD moves between the check and the build
 real_git="$(command -v git)"
 cat > "$work/bin/git" << EOF
 #!/usr/bin/env bash
 if [[ -n "\${STUB_GIT_STATUS_FAIL:-}" && " \$* " == *" status "* ]]; then
   echo "fatal: status failed" >&2
   exit 128
+fi
+if [[ -n "\${STUB_MOVE_HEAD:-}" && " \$* " == *" rev-parse origin/main "* ]]; then
+  "$real_git" "\$@"
+  echo "moved" > "\$STUB_REPO/nixos/marker"
+  "$real_git" -C "\$STUB_REPO" -c user.name=t -c user.email=t@t commit -qam moved
+  exit 0
 fi
 exec "$real_git" "\$@"
 EOF
@@ -114,6 +122,9 @@ run_case "an untracked file in nixos/ never reaches the build" 0 "$ok_calls"
 rm "$work/clone/nixos/untracked.nix"
 
 run_case "a failing git status never builds" fail "" STUB_GIT_STATUS_FAIL=1
+
+run_case "a commit made after the check never reaches the build" 0 "$ok_calls" STUB_MOVE_HEAD=1
+git -C "$work/clone" reset -q --hard origin/main
 
 git -C "$work/clone" checkout -q -b topic
 run_case "a branch other than main never builds" fail ""
