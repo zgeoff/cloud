@@ -173,8 +173,8 @@ in
 
   # atc's daemon for the atc gateway (docs/plans/atc-gateway.md section 7). The token files
   # are root-only and staged by hand (operator checklist C1); systemd passes them in as
-  # credentials. principals is set and empty, so atc lists no client and grants none a
-  # target until the gateway's client IDs exist.
+  # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
+  # the targets it may reach; a client not listed here is refused every request.
   services.atc-daemon = {
     enable = true;
     package = atc;
@@ -189,7 +189,10 @@ in
       impPrefix = "harness-";
     };
     defaultTarget = "geoffcloud";
-    principals = { };
+    principals = {
+      # ChatGPT's connector, added 2026-10-04
+      "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
+    };
   };
 
   services.k3s = {
