@@ -20,8 +20,11 @@ and both images are published by digest. C1–C3 are done; C4's GitHub token exi
 - F1 is done: `atc.geoff.cloud` routes through the tunnel and the external health check probes it.
   One client, a ChatGPT connector, is registered and listed in the daemon's `principals`; it signed
   in and its read calls succeed.
-- Not yet: F2 and F3, G1 and G4 (no harness image), and brokered runtime auth, which needs imp 0.30.
-  The PC's own daemon is not in the gateway's registry.
+- The registry also holds `home-pc`, Geoff's PC daemon (atc 2.26.0 as a systemd user unit, listening
+  on its tailnet address; its unreachable alert is a warning, since the PC sleeps). A read through
+  the hosted connector listed sessions on both daemons.
+- Not yet: any spawn or write through the gateway, F2 and F3, G1 and G4 (no harness image), and
+  brokered runtime auth, which needs imp 0.30.
 
 B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
