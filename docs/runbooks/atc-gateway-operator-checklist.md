@@ -15,14 +15,15 @@ published by digest. C1–C3 are done; C4's GitHub token exists, unused.
 - E2 is done: atc-daemon runs 2.26.0 on `100.69.47.33:8415` (daemonID
   `087031fd-6df6-42fb-a2e9-76e1f0e363d9`) behind `inet cloud_host`. A wrong bearer is refused, and
   each start and refusal is logged to journald and Loki (`unit="atc-daemon.service"`).
-- E3 is done: the gateway runs 2.24.0 in k3s, its state on a `local-path-retain` claim, and the
-  nightly backup CronJob is active.
+- E3 is done: the gateway runs 2.27.0 in k3s (upgraded from 2.24.0 on 2026-10-05, after a manual
+  backup), its state on a `local-path-retain` claim, and the nightly backup CronJob is active. The
+  registered client's grant survived the upgrade.
 - E4 is done with real state: a backup restored into a scratch claim matched the live `mcp-auth.db`
   row for row, and a scratch gateway on it listed the registered client.
 - F1 is done: `atc.geoff.cloud` routes through the tunnel and the external health check probes it.
   One client, a ChatGPT connector, is registered and listed in the daemon's `principals`; it signed
   in and its read calls succeed.
-- The registry also holds `home-pc`, Geoff's PC daemon (atc 2.26.0 as a systemd user unit, listening
+- The registry also holds `home-pc`, Geoff's PC daemon (atc 2.27.0 as a systemd user unit, listening
   on its tailnet address; its unreachable alert is a warning, since the PC sleeps). A read through
   the hosted connector listed sessions on both daemons, and a `session_message` through it reached a
   session on `home-pc`, whose agent confirmed receipt.
@@ -45,10 +46,11 @@ B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published
   (restic and sqlite3). **Historical:** its retention never aged out snapshots; superseded by
   `2.24.0-r2` below (#53).
 
-B3 ran again for 2.24.0 (run 37148747359), and once more for the backup fix in #53 (run 37152438663,
-which skipped the published gateway tag). E3 and `restore-job.yaml` use:
+B3 ran again for 2.24.0 (run 37148747359), once more for the backup fix in #53 (run 37152438663,
+which skipped the published gateway tag), and for 2.27.0 (run 37261005654, #77). E3 and
+`restore-job.yaml` use:
 
-- `ghcr.io/zgeoff/atc-gateway:2.24.0@sha256:4cfadbde011c20976ab5f6f4bb4ae2985172e162964159dd0d2d0ae42963479b`
+- `ghcr.io/zgeoff/atc-gateway:2.27.0@sha256:b53896a326e7c407167a5973736526b68ca6f30500d00558f1a7350869d91867`
 - `ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377`
   (its sqlite package comes from Alpine's repository at build time, so a rebuild can differ)
 
