@@ -28,7 +28,9 @@ imp image build images/agent --name "agent-$(cat images/agent/VERSION)"
 imp image ls
 ```
 
-`imp image build` prints the image's digest. Record the commit, the name and the digest on the PR.
+`imp image ls` shows a short digest. Read the full one with
+`imp image ls --json | jq -r '.[] | select(.name == "agent-<VERSION>") | .digest'`, and record the
+commit, the name and the digest on the PR.
 
 ## Check
 
@@ -61,7 +63,8 @@ The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs
 "cloud": { "provider": "imp", "image": "agent-1", "...": "..." }
 ```
 
-1. Copy the file to `config.json.bak-<UTC stamp>-pre-agent-<VERSION>`.
+1. Copy the file to `config.json.bak-<UTC stamp>-pre-<issue or agent-VERSION>`. Other sessions can
+   write the same file, so read it again just before the edit.
 2. Set `targets.cloud.image` and change nothing else:
 
    ```sh
