@@ -20,6 +20,7 @@
     "lint:fix": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error --fix",
     "test": "bun test",
     "test:scripts": "bash scripts/test-install-atc-gateway-credentials.sh && bash scripts/test-switch-geoffcloud.sh",
+    "test:agent-image": "docker build -t cloud/agent-image images/agent && bash scripts/check-agent-image.sh --docker cloud/agent-image",
     "typecheck": "bun run sdk:build && tsc -p tsconfig.json --noEmit",
     "format": "oxfmt . && format-codemod --quiet .",
     "format:check": "oxfmt --check . && format-codemod --check --quiet .",

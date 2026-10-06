@@ -7,17 +7,18 @@ manages every cloud resource. The first workload is an agent platform built on
 
 ## Documentation
 
-| Page                                                         | Read it to                                                         |
-| ------------------------------------------------------------ | ------------------------------------------------------------------ |
-| [Getting started](./docs/getting-started.md)                 | set up the tools and secrets, and run a first preview              |
-| [Architecture](./docs/architecture.md)                       | understand the host, k3s, imp, the tailnet, ingress and monitoring |
-| [Workflows](./docs/workflows.md)                             | change infrastructure, switch the host, upgrade imp, observe       |
-| [Reference](./docs/reference.md)                             | look up scripts, config keys, secrets, paths, ports and alerts     |
-| [Troubleshooting](./docs/troubleshooting.md)                 | fix a known failure                                                |
-| [Reinstall runbook](./docs/runbooks/reinstall-geoffcloud.md) | reinstall the host as NixOS                                        |
-| [Restore runbook](./docs/runbooks/restore-geoff-cloud.md)    | recover imps, impd's database, the host or the cluster             |
-| [atc gateway plan](./docs/plans/atc-gateway.md)              | follow the pending atc gateway deploy                              |
-| [Onidel provider](./provider/README.md)                      | work on the Pulumi provider for Onidel                             |
+| Page                                                         | Read it to                                                            |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| [Getting started](./docs/getting-started.md)                 | set up the tools and secrets, and run a first preview                 |
+| [Architecture](./docs/architecture.md)                       | understand the host, k3s, imp, the tailnet, ingress and monitoring    |
+| [Workflows](./docs/workflows.md)                             | change infrastructure, switch the host, upgrade imp, observe          |
+| [Reference](./docs/reference.md)                             | look up scripts, config keys, secrets, paths, ports and alerts        |
+| [Troubleshooting](./docs/troubleshooting.md)                 | fix a known failure                                                   |
+| [Reinstall runbook](./docs/runbooks/reinstall-geoffcloud.md) | reinstall the host as NixOS                                           |
+| [Restore runbook](./docs/runbooks/restore-geoff-cloud.md)    | recover imps, impd's database, the host or the cluster                |
+| [Agent image runbook](./docs/runbooks/agent-image.md)        | build, check, switch or roll back the imp image agent sessions run on |
+| [atc gateway plan](./docs/plans/atc-gateway.md)              | follow the pending atc gateway deploy                                 |
+| [Onidel provider](./provider/README.md)                      | work on the Pulumi provider for Onidel                                |
 
 ## Status
 

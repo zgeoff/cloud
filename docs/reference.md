@@ -206,6 +206,7 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 | `fetch-atc-release.sh <dir>`              | downloads and checksums the pinned atc release for the gateway image                                                                                                         |
 | `test-atc-gateway-fixture.sh`             | the gateway image fixture test, locally in Docker                                                                                                                            |
 | `test-install-atc-gateway-credentials.sh` | stub test of the credential script's rerun check on the saved impd token; no host                                                                                            |
+| `check-agent-image.sh --imp <name>`       | checks the agent image in a running imp (or `--docker <image>`): login state, a gitleaks scan, each pinned version                                                           |
 
 ## Repo layout
 

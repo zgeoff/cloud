@@ -1,0 +1,22 @@
+# gitleaks config for scripts/check-agent-image.sh: the default rules, less the upstream
+# files in the agent image that match a rule but hold no credential. Each entry names
+# the files and why; keep it narrow, so a real leak anywhere else still fails the check.
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "upstream test vectors and identifiers, not credentials"
+paths = [
+  # Go's source tree and docs: crypto test keys and vectors (crypto/*/testdata, x509,
+  # mlkem, hpke), build-info fixtures and the GODEBUG reference
+  '''^/usr/local/go/(src|doc)/''',
+  # Linux UAPI headers: enum names such as NFTA_TUNNEL_KEY_* and NL80211_KEY_*
+  '''^/usr/include/linux/''',
+  # Node's headers: V8 constants such as kApiTaggedSize
+  '''^/usr/local/include/node/''',
+  # setuptools' MSVC compiler module: the RegEnumKey alias
+  '''^/usr/lib/python3/dist-packages/setuptools/_distutils/msvccompiler\.py$''',
+  # perl's core headers: apidoc markup
+  '''^/usr/lib/x86_64-linux-gnu/perl/[0-9.]+/CORE/cop\.h$''',
+]
