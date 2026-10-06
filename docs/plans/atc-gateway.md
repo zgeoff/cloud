@@ -172,10 +172,12 @@ gateway client ID its targets.
 One imp per harness, from a reusable image plus a clean checkout. No dirty-directory transfer, and
 no subscription credentials copied from the PC.
 
-- **Image.** A harness image is any Dockerfile; it lives in the atc repo (imp stays harness-unaware)
-  and is built on the host with `imp image build <dir> --name <n>`, which runs `docker build`
-  through impd. There is no registry import flow. imp's `images/dev` (Node, Bun, Go, Python, a
-  harness CLI) is the likely base.
+- **Image.** Harness imps run the agent image, `images/agent` in this repo, built `FROM imp-base` on
+  the host with `imp image build images/agent --name agent-<VERSION>`, which runs `docker build`
+  through impd. imp stays harness-unaware and ships `imp-base` only; atc holds no image. The image
+  holds binaries only, and atc sets up each session at launch.
+  [The agent image runbook](../runbooks/agent-image.md) covers the build, the check, the switch and
+  a rollback.
 - **Clean checkout**, one of:
   - **self-clone through imp's broker** (recommended): `imp secret add github --kind github` and
     `imp grant <imp> github`. The broker injects auth for git over HTTPS to github.com; the guest

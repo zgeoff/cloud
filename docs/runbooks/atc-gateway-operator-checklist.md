@@ -34,8 +34,7 @@ published by digest. C1–C3 are done; C4's GitHub token exists, unused.
   s with `INTERNAL_SERVER_ERROR` and no log line; its cause is still being diagnosed. Whether
   periodic build output avoids either failure is untested. Rerun both checks on imp's fix release.
 - Not yet: any spawn through the gateway, including an imp spawn on the cloud daemon, any write to
-  the cloud daemon, F2 and F3, G1 and G4 (no harness image), and brokered runtime auth, which waits
-  on atc #262.
+  the cloud daemon, F2 and F3, G4, and brokered runtime auth, which waits on atc #262.
 
 B3 has run once, with the 2.10.0 stand-in binary (run 37044948105). It published, both public:
 
@@ -141,12 +140,12 @@ narrows it.
 
 ## G. Harness smoke test
 
-| #   | Step                                                                                                           | Waits on                        | Approval            | Effect                                                                                             |
-| --- | -------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
-| G1  | **upstream** harness image in the atc repo, built on the host with `imp image build`                           | atc                             | none for cloud      | the image exists on geoffcloud                                                                     |
-| G2  | **upstream** harness login method                                                                              | the separate integration review | yes                 | open                                                                                               |
-| G3  | imp's generic leases (`leases.acquire/renew/release/list`)                                                     | A1 (0.17.0 ships them)          | covered by A1       | owned leases (`exec` scope; the `atc-cloud` token's `manage` covers it) instead of the shared hold |
-| G4  | Smoke: the gateway starts a harness in a fresh `harness-smoke-*` imp, its output is read, the imp is destroyed | E2, E3, G1–G3                   | yes: first live run | the first end-to-end evidence; until then, the deployment is unproven                              |
+| #   | Step                                                                                                                                        | Waits on                        | Approval            | Effect                                                                                             |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------- |
+| G1  | harness image: the agent image in this repo (`images/agent`), built on the host with `imp image build`; see [its runbook](./agent-image.md) | none                            | none for cloud      | the image exists on geoffcloud                                                                     |
+| G2  | **upstream** harness login method                                                                                                           | the separate integration review | yes                 | open                                                                                               |
+| G3  | imp's generic leases (`leases.acquire/renew/release/list`)                                                                                  | A1 (0.17.0 ships them)          | covered by A1       | owned leases (`exec` scope; the `atc-cloud` token's `manage` covers it) instead of the shared hold |
+| G4  | Smoke: the gateway starts a harness in a fresh `harness-smoke-*` imp, its output is read, the imp is destroyed                              | E2, E3, G1–G3                   | yes: first live run | the first end-to-end evidence; until then, the deployment is unproven                              |
 
 ## Deferred, not dropped
 
