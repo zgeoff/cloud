@@ -1,0 +1,38 @@
+name: agent image
+
+# Builds images/agent and checks it on every change to the image or its check. The image
+# that agent sessions run is built on the imp host with `imp image build`, not here; see
+# docs/runbooks/agent-image.md.
+on:
+  push:
+    branches: [main]
+    paths:
+      - images/agent/**
+      - scripts/check-agent-image.sh
+      - scripts/agent-image-gitleaks.toml
+      - .github/workflows/agent-image.yml
+  pull_request:
+    paths:
+      - images/agent/**
+      - scripts/check-agent-image.sh
+      - scripts/agent-image-gitleaks.toml
+      - .github/workflows/agent-image.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Build and check
+        run: bun run test:agent-image

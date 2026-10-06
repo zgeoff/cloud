@@ -85,7 +85,8 @@ A switch changes new imps only. An imp keeps the image it was created from.
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
    above its pin.
 2. Add one to `images/agent/VERSION`.
-3. Run `bun run test:agent-image`, and open a PR.
+3. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
+   its check; run it locally first to find a failure sooner.
 4. After CI passes, build and check the new image on the host, as above, and record the digest.
 5. Switch the `cloud` target.
 6. Keep the image the target ran before, for a rollback. Remove an older one with
