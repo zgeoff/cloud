@@ -152,7 +152,7 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned: the module's default is imp-host:latest, which moves on every imp release
     # and is not tied to the flake's pin of the module
-    image = "ghcr.io/zgeoff/imp-host:0.32.1@sha256:4f87cd0efe0dd52cebcebb1fe1d59105369b7812e73e4af3d9ba3a5fc74da913";
+    image = "ghcr.io/zgeoff/imp-host:0.37.0@sha256:f0f339d4534db250e7265224f11ee06fdeca26d95b32fcd9c0759af359fd49ac";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
