@@ -33,6 +33,7 @@ daemon on `geoffcloud`. [The gateway plan](./plans/atc-gateway.md) holds its des
  │  k3s (single node)                                                           │
  │   ├─ cloudflared          public ingress (today: mcp.geoff.cloud → PC)       │
  │   ├─ observability        Prometheus, Alertmanager, Loki, Grafana, Alloy     │
+ │   ├─ onepassword          1Password Connect for imps (PENDING)               │
  │   ├─ system               coredns, local-path, metrics-server                │
  │   └─ future workloads     anything else Geoff runs                           │
  │                                                                              │
@@ -70,6 +71,27 @@ daemon on `geoffcloud`. [The gateway plan](./plans/atc-gateway.md) holds its des
   none. A second node, or a move to bare metal, joins the same cluster.
 - **Deploys:** Pulumi's Kubernetes provider applies the k3s workloads through the k3s API on the
   tailnet. One `pulumi preview` covers cloud resources and cluster resources.
+
+## Secrets for imps: 1Password Connect
+
+**PENDING:** Connect runs in k3s, in the namespace `onepassword`, so imps can read vault items
+through imp's credential broker. The broker swaps a placeholder bearer for the real Connect token on
+requests to a granted host, and forwards them to `https://<host>` with the system's trust roots. So
+Connect has a public name with a publicly trusted certificate: `op-connect.geoff.cloud`, a route on
+the tunnel.
+
+- **Allowlist.** An nginx proxy is the only port on Connect's Service. It admits a request only when
+  `Cf-Connecting-Ip` is geoffcloud's public IPv4 (the address imp-host egresses from; IPv4 only),
+  and returns 403 otherwise. Cloudflare's edge sets that header, and cloudflared is the only path
+  from outside the cluster to the Service. The Cloudflare token has no WAF permission, so the
+  allowlist lives at the origin.
+- **Read-only.** The proxy passes GET and HEAD and returns 405 for any other method.
+- **Caveat.** A pod in the cluster can still reach Connect's own ports and skip the proxy. It still
+  needs the bearer token. No NetworkPolicy covers this yet.
+- **Token.** The Connect token lives only in impd, as the custom secret `op-connect`. Neither the
+  repo nor Pulumi holds it. The Connect server's credentials file is the Pulumi input.
+
+[The runbook](./runbooks/onepassword-connect.md) covers setup, rotation and failures.
 
 ## Public ingress: Cloudflare Tunnel, the app owns OAuth
 

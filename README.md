@@ -17,6 +17,7 @@ manages every cloud resource. The first workload is an agent platform built on
 | [Reinstall runbook](./docs/runbooks/reinstall-geoffcloud.md) | reinstall the host as NixOS                                           |
 | [Restore runbook](./docs/runbooks/restore-geoff-cloud.md)    | recover imps, impd's database, the host or the cluster                |
 | [Agent image runbook](./docs/runbooks/agent-image.md)        | build, check, switch or roll back the imp image agent sessions run on |
+| [Connect runbook](./docs/runbooks/onepassword-connect.md)    | set up, rotate or debug 1Password Connect for imps                    |
 | [atc gateway plan](./docs/plans/atc-gateway.md)              | follow the pending atc gateway deploy                                 |
 | [Onidel provider](./provider/README.md)                      | work on the Pulumi provider for Onidel                                |
 
@@ -34,6 +35,8 @@ Live:
 
 - The atc gateway at `atc.geoff.cloud/mcp`, and the atc daemon on `geoffcloud`. The package is built
   and validated; see [the plan](./docs/plans/atc-gateway.md).
+- 1Password Connect for imps at `op-connect.geoff.cloud`; see
+  [the runbook](./docs/runbooks/onepassword-connect.md).
 - Public connector sign-in through the gateway's OAuth issuer.
 - `imp.geoff.cloud/mcp`, imp's public MCP endpoint.
 - Discord delivery of in-cluster alerts. It is built but off.
