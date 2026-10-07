@@ -171,6 +171,7 @@ mkdir -p /tmp/other && echo other > /tmp/other/f
 sqlite3 /state/gateway.db 'CREATE TABLE fixture (x); INSERT INTO fixture VALUES (1);'
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json --tag other' > "$tree/other-before"
+  jq -e 'length == 1' "$tree/other-before" > /dev/null
 
   run_backup "$name" "$backup_image" backup > "$tree/backup.out" 2> "$tree/backup.err"
 
@@ -199,7 +200,6 @@ ID  NOW  atc-gateway  atc-gateway  daily snapshot          /tmp/atc-gateway-back
 3 snapshots
 
 EOF
-  jq -e 'length == 1' "$tree/other-before" > /dev/null
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json --tag other' > "$tree/other-after"
   jq -S . "$tree/other-before" > "$tree/other-before.json"
   jq -S . "$tree/other-after" > "$tree/other-after.json"
