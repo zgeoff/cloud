@@ -2,12 +2,12 @@
 # against a stand-in impd (start-stub-impd.py) in the build sandbox. Each case runs on its own,
 # with its own stand-in on an ephemeral port and its own textfile directory, and reports ok or
 # not ok (case-helpers.sh); the check fails when any case fails.
-# Run: nix build ./nixos#checks.x86_64-linux.impd-local-health
-{ nixpkgs }:
+# Run: bun run test:nixos impd-local-health
+{ nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs; };
+  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
 
   # evaluates a minimal system with the module and one services.impd-local-health config
   evalHealth =

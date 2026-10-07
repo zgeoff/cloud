@@ -1,0 +1,41 @@
+name: NixOS checks
+
+# Builds the NixOS flake's checks, including the impd restore rehearsal, which boots a VM and
+# needs KVM on the runner.
+on:
+  push:
+    branches: [main]
+    paths:
+      - nixos/**
+      - scripts/**
+      - package.json
+      - .bun-version
+      - .gitignore
+      - .github/workflows/nixos-checks.yml
+  pull_request:
+    paths:
+      - nixos/**
+      - scripts/**
+      - package.json
+      - .bun-version
+      - .gitignore
+      - .github/workflows/nixos-checks.yml
+
+permissions:
+  contents: read
+
+jobs:
+  nixos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: NixOS checks
+        run: bun run test:nixos

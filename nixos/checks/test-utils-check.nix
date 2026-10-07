@@ -2,12 +2,13 @@
 # start-stub-impd.py. The checks that use them build this first, so a broken utility fails
 # every check that relies on it instead of passing silently. It cannot use case-helpers.sh to
 # test case-helpers.sh, so each test is plain bash that stops the build at its first failure.
-{ pkgs }:
+{ pkgs, imp }:
 pkgs.runCommand "test-utils-check"
   {
     nativeBuildInputs = [
       pkgs.curl
       pkgs.diffutils
+      pkgs.jq
       pkgs.python3
     ];
   }
@@ -154,6 +155,13 @@ pkgs.runCommand "test-utils-check"
     [ "$(head -1 bare.headers | tr -d '\r')" = "HTTP/1.0 404 Not Found" ] || { cat bare.headers; exit 1; }
     ! grep -qi '^content-type:' bare.headers || { cat bare.headers; exit 1; }
     [ "$(cat bare.body)" = NOT_FOUND ] || { cat bare.body; exit 1; }
+
+    echo "it answers as the pinned imp's /health handler does, on that imp's Elysia version"
+    handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \
+      ${imp}/packages/daemon/src/build-app.ts || true)
+    [ "$handlers" = 1 ] || { echo "imp's build-app.ts has $handlers such /health handlers"; exit 1; }
+    elysia=$(jq '.workspaces.catalog.elysia' ${imp}/package.json)
+    [ "$elysia" = '"1.4.29"' ] || { echo "imp's Elysia version is $elysia"; exit 1; }
 
     touch $out
   ''

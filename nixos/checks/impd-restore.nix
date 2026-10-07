@@ -10,10 +10,11 @@
 # One VM boots once. setup_case() returns it to the same boot state before each subtest: the
 # 0.29.0 system running, its image pulled fresh, an empty tank/imp, generations 1 to 3. Each
 # subtest writes its own database, secret, copy and COPY-INFO, so every subtest stands alone. It
-# needs KVM; the run command is in docs/runbooks/restore-geoff-cloud.md, section 2.
+# needs KVM, and it reads scripts/ beside nixos/, so it builds only from the repo root: run
+# `bun run test:nixos impd-restore`.
+{ nixpkgs, imp }:
 let
-  flake = builtins.getFlake "path:${toString ../.}";
-  pkgs = flake.inputs.nixpkgs.legacyPackages.x86_64-linux;
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = pkgs.lib;
 
   # imp-docker-proxy's command in imp's image: here it only opens the socket the module waits for
@@ -66,7 +67,7 @@ pkgs.testers.runNixOSTest {
   nodes.machine =
     { config, ... }:
     {
-      imports = [ flake.inputs.imp.nixosModules.imp ];
+      imports = [ imp.nixosModules.imp ];
       networking.hostId = "5ca71846";
       # imp-host's docker run passes --device /dev/kvm
       boot.kernelModules = [
@@ -94,12 +95,25 @@ pkgs.testers.runNixOSTest {
         before = [ "imp-host-image.service" ];
         requires = [ "docker-registry.service" ];
         after = [ "docker-registry.service" ];
-        path = [ pkgs.skopeo ];
+        path = [
+          pkgs.curl
+          pkgs.skopeo
+        ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
         };
+        # docker-registry is Type=simple, so "after" orders on its start, not on its port: wait
+        # until it answers before the first copy
         script = ''
+          deadline=$((SECONDS + 30))
+          until curl -sf -o /dev/null http://ghcr.io/v2/; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "the registry did not answer within 30 s" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
           skopeo --insecure-policy copy --preserve-digests --dest-tls-verify=false \
             oci:${layout28}:0.28.0 docker://ghcr.io/zgeoff/imp-host:0.28.0
           skopeo --insecure-policy copy --preserve-digests --dest-tls-verify=false \
@@ -143,6 +157,9 @@ pkgs.testers.runNixOSTest {
     import re
 
     machine.wait_for_unit("multi-user.target")
+    # setup_case resets failed units, so a unit that failed at boot shows only here
+    failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
+    assert failed == "", f"units failed at boot: {failed}"
 
 
     def setup_case():
@@ -553,7 +570,7 @@ pkgs.testers.runNixOSTest {
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again"
         ), err
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units[0] != "active" and units[1] != "active", f"the units are {units}"
+        assert units == ["failed", "failed"], f"the units are {units}"
         machine.fail("findmnt -rn -S tank/imp")
         # the activation ran; only a unit failed
         current = machine.succeed("readlink -f /run/current-system").strip()
@@ -844,7 +861,7 @@ pkgs.testers.runNixOSTest {
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
         ], err
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units[0] != "active" and units[1] != "active", f"the units are {units}"
+        assert units == ["inactive", "failed"], f"the units are {units}"
         containers = machine.succeed("docker ps -a --format '{{.Names}}'").split()
         assert containers == [], f"the containers are {containers}"
         machine.fail("findmnt -rn -S tank/imp")
