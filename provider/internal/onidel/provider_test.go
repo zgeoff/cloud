@@ -1,12 +1,10 @@
 package onidel_test
 
 import (
-	"context"
 	"encoding/json"
 	"maps"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/blang/semver"
 	p "github.com/pulumi/pulumi-go-provider"
@@ -28,7 +26,7 @@ func setupTest(t *testing.T) struct {
 	api := onideltest.StartStubOnidelAPI(t)
 
 	// The API client polls every ten seconds; return from each sleep at once.
-	prov, err := onidel.NewWithOptions(onidel.Options{Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }})
+	prov, err := onidel.NewWithOptions(onidel.Options{Sleep: onideltest.BuildStubSleep().Sleep})
 	require.NoError(t, err)
 	server, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(prov))
 	require.NoError(t, err)

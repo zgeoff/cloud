@@ -215,7 +215,7 @@ func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
-	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, *ctx.sleeps})
+	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, ctx.sleep.GetDurations()})
 }
 
 func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
@@ -241,7 +241,7 @@ func TestCreateVMReturnsTheIDOfAVMThatNeverBecomesReady(t *testing.T) {
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Equal(t, []any{client.VM{ID: "00000000-0000-4000-8000-000000000001"}, slices.Repeat([]time.Duration{10 * time.Second}, 180)},
-		[]any{vm, *ctx.sleeps})
+		[]any{vm, ctx.sleep.GetDurations()})
 }
 
 func TestWaitForVMReadyWaitsForAnActiveVMWithNoActionInFlight(t *testing.T) {
@@ -446,10 +446,7 @@ func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
 	ctx.api.SetAutoSettle(false)
 	callCtx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error {
-		cancel()
-		return sleepCtx.Err()
-	}
+	ctx.client.Sleep = onideltest.BuildStubCancelingSleep(cancel).Sleep
 
 	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
 
