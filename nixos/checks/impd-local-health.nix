@@ -2,8 +2,8 @@
 # against a stand-in impd (start-stub-impd.py) in the build sandbox. Each case runs on its own,
 # with its own stand-in on an ephemeral port and its own textfile directory, and reports ok or
 # not ok (case-helpers.sh); the check fails when any case fails.
-# Run: nix build ./nixos#checks.x86_64-linux.impd-local-health
-{ nixpkgs }:
+# Run: bun run test:nixos impd-local-health
+{ nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
@@ -61,6 +61,17 @@ let
   stub = ./start-stub-impd.py;
 
   cases = [
+    {
+      title = "it stubs impd with the /health handler and the Elysia version of the pinned imp";
+      dir = "impd-shape";
+      script = ''
+        handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \
+          ${imp}/packages/daemon/src/build-app.ts || true)
+        assert_equals 1 "$handlers" "the /health handlers in imp's build-app.ts"
+        assert_equals '"1.4.29"' "$(jq '.workspaces.catalog.elysia' ${imp}/package.json)" \
+          "imp's Elysia version"
+      '';
+    }
     {
       title = "it runs the probe each minute as impd-health, against loopback only, by default";
       dir = "units-default";
