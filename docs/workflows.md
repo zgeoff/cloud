@@ -95,9 +95,10 @@ Before a risky host change, take an Onidel snapshot of the root disk:
 op run --env-file=.env -- bash scripts/snapshot-geoffcloud.sh pre-<change>
 ```
 
-The flake also has build checks for its modules: `checks.x86_64-linux.impd-local-health` and
-`checks.x86_64-linux.atc-daemon`. Build them the same way as step 1, such as
-`nix build --no-link path:./nixos#checks.x86_64-linux.impd-local-health`.
+The flake also has checks: `atc-daemon` and `impd-local-health` for its modules, and `impd-restore`,
+a NixOS VM rehearsal of `scripts/restore-impd-db.sh` that needs KVM. `bun run test:nixos` builds all
+three in the same `nixos/nix` container, from a snapshot of the working tree's tracked and unignored
+files; `bun run test:nixos atc-daemon` builds one.
 
 ## Upgrade imp
 

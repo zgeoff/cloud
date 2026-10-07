@@ -137,17 +137,19 @@ migration mismatch, a failed copy into the pool and a failed unmount each stoppe
 started or switched. A failed switch and a wrong image after the start each stopped both units
 again. A container that never appeared within the wait also stopped both units again.
 
-Rehearsed in a KVM NixOS VM, 2026-10-04 (`nixos/tests/impd-restore.nix`): the real ZFS mount of a
-legacy `tank/imp` holding a WAL database and secrets, and a real generation switch. A restore to an
-older generation saved the database, its WAL files and the secrets root-only, put the copy in place,
-unmounted, switched, and started imp-host on the copy's image; a real switch failure stopped both
-units again. The stand-ins: busybox containers that only sleep, images tagged without a digest, and
-generations that are the VM's own specialisations. Run it on a machine with KVM:
+Rehearsed in a KVM NixOS VM, 2026-10-04, and again on 2026-10-07 under imp's own NixOS module
+(`nixos/checks/impd-restore.nix`): the real ZFS mount of the module's legacy `tank/imp` holding a
+WAL database and secrets, and a real generation switch. A restore to an older generation saved the
+database, its WAL files and the secrets root-only, put the copy in place, unmounted, switched, and
+started imp-host on the copy's image; a real switch failure stopped both units again. It refused,
+with nothing changed, while imp-host ran, while `tank/imp` was mounted, for a copy without
+`COPY-INFO` or with a different migration, and for a generation that was not a number, did not exist
+or ran another image. The stand-ins: busybox containers that only sleep, a proxy that only opens its
+socket, images tagged without a digest, and generations that are the VM's own specialisations. Run
+it on a machine with KVM:
 
 ```sh
-docker run --rm --device /dev/kvm -v geoffcloud-nix-store:/nix -v "$PWD":/src:ro -w /src nixos/nix \
-  nix --extra-experimental-features "nix-command flakes" --option system-features "kvm nixos-test" \
-  build --no-link -L --impure -f nixos/tests/impd-restore.nix
+bun run test:nixos impd-restore
 ```
 
 Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
