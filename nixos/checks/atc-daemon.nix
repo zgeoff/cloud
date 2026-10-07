@@ -1,15 +1,19 @@
-# Evaluates services.atc-daemon apart from any host's config, with a stand-in atc binary, and
+# Evaluates services.atc-daemon apart from any host's config, with the pinned atc release, and
 # checks the service, the config.json it links and the module's assertions. Each case evaluates
-# its own config, runs on its own and reports ok or not ok (case-helpers.sh); the check fails when
-# any case fails. Run: bun run test:nixos atc-daemon
+# its own config and runs on its own, in a fresh directory, under scripts/test-lib/run-cases.sh,
+# which reports each case and fails the check when any case fails.
+# Run: bun run test:nixos atc-daemon
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
+  testLib = ../../scripts/test-lib;
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
+  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
 
   # evaluates a minimal system with the module and one services.atc-daemon config
-  evalDaemon =
+  buildDaemonSystem =
     daemon:
     lib.nixosSystem {
       system = "x86_64-linux";
@@ -28,61 +32,57 @@ let
       ];
     };
 
-  # the messages of every assertion that fails, in the order the system lists them
-  failedAssertions =
-    system: map (a: a.message) (lib.filter (a: !a.assertion) system.config.assertions);
-
-  # the service's own settings; NixOS adds PATH to every service's environment
-  serviceOf =
-    system:
-    let
-      service = system.config.systemd.services.atc-daemon;
-    in
-    {
-      inherit (service) wantedBy after wants;
-      environment = removeAttrs service.environment [ "PATH" ];
-      # ExecStartPre is the link script, a store path the module builds; case
-      # it-links-config-json checks what it runs
-      serviceConfig = removeAttrs service.serviceConfig [ "ExecStartPre" ];
-    };
-
-  linkScriptOf = system: system.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre;
-
   cases = [
     {
-      title = "it runs atc daemon on the listen address with both tokens as credentials, hardened";
-      dir = "service";
+      title = "it runs atc daemon on the listen address with both tokens as credentials, hardened, restarting when config.json changes";
       script =
         let
-          atc = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
-          system = evalDaemon {
-            enable = true;
-            package = atc;
-            listen = "100.64.0.1:8415";
-            tokenFile = "/run/fixture/gateway-token";
-            impTokenFile = "/run/fixture/imp-token";
-            targets.geoffcloud = {
-              provider = "imp";
-              url = "http://127.0.0.1:7070";
-              tokenFile = "/run/credentials/atc-daemon.service/imp-token";
-              impPrefix = "harness-";
-            };
-            defaultTarget = "geoffcloud";
-            principals.fixture-client.targets = [ "geoffcloud" ];
-          };
+          atc = pkgs.callPackage ../packages/atc.nix { };
+          service =
+            (buildDaemonSystem {
+              enable = true;
+              package = atc;
+              listen = "100.64.0.1:8415";
+              tokenFile = "/run/fixture/gateway-token";
+              impTokenFile = "/run/fixture/imp-token";
+              targets.geoffcloud = {
+                provider = "imp";
+                url = "http://127.0.0.1:7070";
+                tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+                impPrefix = "harness-";
+              };
+              defaultTarget = "geoffcloud";
+              principals.fixture-client.targets = [ "geoffcloud" ];
+            }).config.systemd.services.atc-daemon;
         in
         ''
-          jq -S . > actual <<'EOF'
-          ${builtins.toJSON (serviceOf system)}
+          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${service.serviceConfig.ExecStartPre})
+          # NixOS adds PATH to every service's environment; ExecStartPre is the link script, a
+          # store path the module builds, whose content case "it links a config.json ..." checks
+          jq -S . <<'EOF' | sed "s|$config|CONFIG|g" > actual
+          ${builtins.toJSON {
+            inherit (service)
+              description
+              wantedBy
+              after
+              wants
+              restartTriggers
+              ;
+            environment = removeAttrs service.environment [ "PATH" ];
+            serviceConfig = removeAttrs service.serviceConfig [ "ExecStartPre" ];
+          }}
           EOF
           jq -S . > expected <<'EOF'
           ${builtins.toJSON {
+            description = "atc daemon";
             wantedBy = [ "multi-user.target" ];
             after = [
               "network-online.target"
               "tailscaled.service"
             ];
             wants = [ "network-online.target" ];
+            # the config.json the link script links
+            restartTriggers = [ "CONFIG" ];
             environment = {
               HOME = "/var/lib/atc-daemon";
               XDG_RUNTIME_DIR = "/run/atc-daemon";
@@ -125,12 +125,11 @@ let
     }
     {
       title = "it links a config.json of the targets, principals and default target where atc reads it";
-      dir = "link-config";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
@@ -145,7 +144,7 @@ let
           };
         in
         ''
-          script=${linkScriptOf system}
+          script=${system.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre}
           config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) /var/lib/atc-daemon/\.config/atc/config\.json$|\1|p' "$script")
           sed "s|$config|CONFIG|" "$script" > actual-script
           cat > expected-script <<'EOF'
@@ -176,12 +175,11 @@ let
     }
     {
       title = "it passes only the gateway token when impTokenFile is null";
-      dir = "no-imp-token";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = null;
@@ -203,12 +201,11 @@ let
     }
     {
       title = "it leaves defaultTarget out of config.json, and fails no assertion, when it is null";
-      dir = "no-default-target";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
@@ -223,7 +220,7 @@ let
           };
         in
         ''
-          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${linkScriptOf system})
+          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${system.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre})
           jq -S . "$config" > actual
           jq -S . > expected <<'EOF'
           {
@@ -239,17 +236,16 @@ let
           }
           EOF
           assert_files_equal expected actual
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (failedAssertions system))} "failed assertions"
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {
       title = "it fails no assertion for a valid config";
-      dir = "valid";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
@@ -264,17 +260,16 @@ let
           };
         in
         ''
-          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (failedAssertions system))} "failed assertions"
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {
       title = "it rejects a principal granted a target that is not defined";
-      dir = "unknown-grant";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
@@ -298,17 +293,16 @@ let
                 "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: fixture-client -> elsewhere"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (failedAssertions system))} "failed assertions"
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {
       title = "it names every undefined grant of every principal in one message";
-      dir = "unknown-grants";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
@@ -334,17 +328,16 @@ let
                 "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: alpha-client -> nowhere, beta-client -> elsewhere, beta-client -> faraway"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (failedAssertions system))} "failed assertions"
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {
       title = "it rejects a default target that is not defined";
-      dir = "unknown-default-target";
       script =
         let
-          system = evalDaemon {
+          system = buildDaemonSystem {
             enable = true;
-            package = pkgs.writeShellScriptBin "atc" "exec sleep infinity";
+            package = pkgs.callPackage ../packages/atc.nix { };
             listen = "100.64.0.1:8415";
             tokenFile = "/run/fixture/gateway-token";
             impTokenFile = "/run/fixture/imp-token";
@@ -365,15 +358,14 @@ let
                 "services.atc-daemon.defaultTarget must name one of services.atc-daemon.targets"
               ]
             )
-          } ${lib.escapeShellArg (builtins.toJSON (failedAssertions system))} "failed assertions"
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {
       title = "it adds no service, user or group, and fails no assertion, when it is off";
-      dir = "disabled";
       script =
         let
-          system = evalDaemon { enable = false; };
+          system = buildDaemonSystem { enable = false; };
         in
         ''
           assert_equals ${
@@ -391,7 +383,7 @@ let
                 service = system.config.systemd.services ? atc-daemon;
                 user = system.config.users.users ? atc;
                 group = system.config.users.groups ? atc;
-                failedAssertions = failedAssertions system;
+                failedAssertions = collectFailedAssertions system;
               }
             )
           } "what the module adds"
@@ -410,13 +402,10 @@ pkgs.runCommand "atc-daemon-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${./case-helpers.sh}
-    ${lib.concatMapStrings (c: ''
-      case_${lib.replaceStrings [ "-" ] [ "_" ] c.dir}() {
-      ${c.script}
-      }
-      run_case ${lib.escapeShellArg c.title} ${c.dir} case_${lib.replaceStrings [ "-" ] [ "_" ] c.dir}
-    '') cases}
-    require_cases_passed
+    source ${testLib}/run-cases.sh
+    source ${testLib}/assert-equals.sh
+    source ${testLib}/assert-files-equal.sh
+    source ${pkgs.writeText "atc-daemon-cases.sh" (renderCases cases)}
+    run_cases
     touch $out
   ''

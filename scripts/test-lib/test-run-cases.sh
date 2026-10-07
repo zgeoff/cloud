@@ -216,7 +216,8 @@ it_runs_its_cases_in_a_bash_without_programmable_completion() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   cat > "$tree/suite.sh" << EOF
-enable -n compgen complete
+# a bash built without them, as the Nix sandbox's is, has nothing to turn off
+enable -n compgen complete 2> /dev/null || true
 source "$lib"
 it_passes() { true; }
 run_cases
