@@ -25,7 +25,7 @@ func TestReadVMDropsTheRootPassword(t *testing.T) {
 		"created_at": "2026-10-02T05:48:53.632641Z",
 	})
 
-	vm, err := ctx.client.ReadVM(t.Context(), "0f289413-258f-4115-ac81-252000998fe0", onideltest.TeamID)
+	vm, err := ctx.client.ReadVM(t.Context(), "0f289413-258f-4115-ac81-252000998fe0", "team-a")
 
 	require.NoError(t, err)
 	assert.Equal(t, client.VM{
@@ -71,7 +71,7 @@ func TestCreateVMFindsTheNewVMByListingAfterABodylessCreate(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "old", "name": "web", "status": "active", "created_at": "2026-01-01T00:00:00Z"})
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{
-		TeamID: onideltest.TeamID, Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
+		TeamID: "team-a", Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
 	})
 
 	require.NoError(t, err)

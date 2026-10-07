@@ -197,12 +197,13 @@ func TestClientRetriesAGETOnATransientStatus(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
+			ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 			ctx.api.RegisterResponse("GET /teams", row.status, "", 2)
 
 			teams, err := ctx.client.ReadTeams(t.Context())
 
 			require.NoError(t, err)
-			assert.Equal(t, []client.Team{{ID: onideltest.TeamID, Name: "team", Role: "Team Owner"}}, teams)
+			assert.Equal(t, []client.Team{{ID: "team-a", Name: "team", Role: "Team Owner"}}, teams)
 			assert.Equal(t, []onideltest.Request{
 				{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"},
 			}, ctx.api.GetRequests())

@@ -13,6 +13,7 @@ import (
 
 func TestRDNSCreateSetsThePTRRecordForTheVMsIP(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetVM(map[string]any{"id": "0f289413-258f-4115-ac81-252000998fe0", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8:4:17f::"})
 
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -30,7 +31,7 @@ func TestRDNSCreateSetsThePTRRecordForTheVMsIP(t *testing.T) {
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0/rdns", Body: map[string]any{
-				"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "example.com",
+				"team_id": "team-a", "ip_addr": "203.0.113.18", "domain": "example.com",
 			}},
 		},
 	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRDNS(), ctx.api.GetRequests()})
@@ -305,6 +306,7 @@ func TestRDNSUpdateFailsWhenTheAPIRefuses(t *testing.T) {
 
 func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -319,8 +321,8 @@ func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 		map[string]map[string]string{"v": {}},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "example.com"}},
-			{Method: "DELETE", Path: "/vm/v/rdns/203.0.113.18", Query: "team_id=" + onideltest.TeamID},
+			{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{"team_id": "team-a", "ip_addr": "203.0.113.18", "domain": "example.com"}},
+			{Method: "DELETE", Path: "/vm/v/rdns/203.0.113.18", Query: "team_id=team-a"},
 		},
 	}, []any{ctx.api.GetRDNS(), ctx.api.GetRequests()})
 }

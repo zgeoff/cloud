@@ -15,6 +15,7 @@ import (
 
 func TestFirewallRuleCreateKeepsTheProgramsICMPSpellingOnAV6Subnet(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -32,7 +33,7 @@ func TestFirewallRuleCreateKeepsTheProgramsICMPSpellingOnAV6Subnet(t *testing.T)
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": onideltest.TeamID, "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
+				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
 			}},
 		},
 	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
@@ -113,6 +114,7 @@ func TestFirewallRuleRefreshShowsNoDriftForICMPOnAV6Subnet(t *testing.T) {
 
 func TestFirewallRuleImportAdoptsTheAPIsSpellingByCompositeID(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -128,11 +130,11 @@ func TestFirewallRuleImportAdoptsTheAPIsSpellingByCompositeID(t *testing.T) {
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": onideltest.TeamID, "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
+				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
 			}},
 			{
 				Method: "GET", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-				Query: "team_id=" + onideltest.TeamID,
+				Query: "team_id=team-a",
 			},
 		},
 	}, []any{onideltest.ToPlain(imported.Inputs), ctx.api.GetRequests()})
@@ -308,6 +310,7 @@ func TestFirewallRuleDiffUpdatesOnlyTheDescriptionInPlace(t *testing.T) {
 
 func TestFirewallRuleUpdateChangesTheDescription(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -330,11 +333,11 @@ func TestFirewallRuleUpdateChangesTheDescription(t *testing.T) {
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": onideltest.TeamID, "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
+				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
 			}},
 			{
 				Method: "PATCH", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-				Body: map[string]any{"team_id": onideltest.TeamID, "desc": "ping"},
+				Body: map[string]any{"team_id": "team-a", "desc": "ping"},
 			},
 		},
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
@@ -382,6 +385,7 @@ func TestFirewallRuleUpdateFailsWhenTheRuleIsGone(t *testing.T) {
 
 func TestFirewallRuleDeleteRemovesTheRuleFromTheTeam(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -397,11 +401,11 @@ func TestFirewallRuleDeleteRemovesTheRuleFromTheTeam(t *testing.T) {
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": onideltest.TeamID, "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
+				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
 			}},
 			{
 				Method: "DELETE", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-				Query: "team_id=" + onideltest.TeamID,
+				Query: "team_id=team-a",
 			},
 		},
 	}, []any{ctx.api.GetFirewallRules(), ctx.api.GetRequests()})

@@ -55,16 +55,15 @@ type StubOnidelAPI struct {
 	cans      *http.ServeMux
 }
 
-// TeamID is the one team the stub API starts with, as GET /teams lists it.
-const TeamID = "169b0175-361a-4ea7-b31f-d82f42bc43b1"
-
-// StartStubOnidelAPI starts a stub API with one team and no resources. When the test ends,
-// it fails the test on any problem left undrained, then stops the server.
+// StartStubOnidelAPI starts a stub API with no teams and no resources: the spec does
+// not document what a fresh account lists, so a test that needs a team sets it with
+// SetTeams. When the test ends, it fails the test on any problem left undrained, then
+// stops the server.
 func StartStubOnidelAPI(t testing.TB) *StubOnidelAPI {
 	t.Helper()
 	f := &StubOnidelAPI{
 		autoSettle: true,
-		teams:      []map[string]any{{"id": TeamID, "name": "team", "role": "Team Owner"}},
+		teams:      []map[string]any{},
 		sshKeys:    map[string]map[string]any{},
 		vms:        map[string]map[string]any{},
 		firewalls:  map[string]map[string]any{},
@@ -120,11 +119,11 @@ func (f *StubOnidelAPI) SetAutoSettle(enabled bool) {
 	f.autoSettle = enabled
 }
 
-// SetTeams replaces the teams GET /teams lists.
+// SetTeams replaces the teams GET /teams lists. With no teams, it lists an empty array.
 func (f *StubOnidelAPI) SetTeams(teams ...map[string]any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.teams = teams
+	f.teams = append([]map[string]any{}, teams...)
 }
 
 // SetVM stores vm under its "id", replacing any VM with that ID.

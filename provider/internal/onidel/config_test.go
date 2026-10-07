@@ -99,6 +99,7 @@ func TestConfigUsesTheConfiguredTeamWithoutListingTeams(t *testing.T) {
 
 func TestConfigListsTeamsOnlyOnce(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	_, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "a"),
 		Properties: onideltest.BuildProps(map[string]any{"description": "a"}),
@@ -113,8 +114,8 @@ func TestConfigListsTeamsOnlyOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{
 		{Method: "GET", Path: "/teams"},
-		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "a"}},
-		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "b"}},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "a"}},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "b"}},
 	}, ctx.api.GetRequests())
 }
 

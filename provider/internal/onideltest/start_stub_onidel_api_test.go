@@ -25,24 +25,34 @@ func setupTest(t *testing.T) struct {
 	}{api: onideltest.StartStubOnidelAPI(t)}
 }
 
-func TestStubOnidelAPIListsItsOneTeamAsABareArray(t *testing.T) {
+func TestStubOnidelAPIListsNoTeamsAsAnEmptyArrayWhenStarted(t *testing.T) {
 	ctx := setupTest(t)
 
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/teams", "")
 
-	assert.Equal(t, http.StatusOK, status)
-	assert.JSONEq(t, `[{"id":"169b0175-361a-4ea7-b31f-d82f42bc43b1","name":"team","role":"Team Owner"}]`, body)
+	assert.Equal(t, []any{http.StatusOK, "[]\n"}, []any{status, body})
 }
 
-func TestStubOnidelAPIListsTheTeamsATestSets(t *testing.T) {
+func TestStubOnidelAPIListsAnEmptyArrayAfterATestSetsNoTeams(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
+	ctx.api.SetTeams()
+
+	_, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/teams", "")
+
+	assert.Equal(t, "[]\n", body)
+}
+
+func TestStubOnidelAPIListsTheTeamsATestSetsAsABareArray(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(
 		map[string]any{"id": "team-a", "name": "a", "role": "Team Owner"},
 		map[string]any{"id": "team-b", "name": "b", "role": "Team Member"},
 	)
 
-	_, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/teams", "")
+	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/teams", "")
 
+	assert.Equal(t, http.StatusOK, status)
 	assert.JSONEq(t, `[{"id":"team-a","name":"a","role":"Team Owner"},{"id":"team-b","name":"b","role":"Team Member"}]`, body)
 }
 
@@ -737,6 +747,7 @@ func TestStubOnidelAPICountsAVMCreatedInAFirewallGroup(t *testing.T) {
 
 func TestStubOnidelAPISendsRegisteredResponsesInOrderBeforeItsRoute(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.RegisterResponse("GET /teams", http.StatusServiceUnavailable, "", 1)
 	ctx.api.RegisterResponse("GET /teams", http.StatusOK, `[]`, 1)
 
@@ -746,7 +757,7 @@ func TestStubOnidelAPISendsRegisteredResponsesInOrderBeforeItsRoute(t *testing.T
 
 	assert.Equal(t, []any{
 		http.StatusServiceUnavailable, http.StatusOK, `[]`, http.StatusOK,
-		`[{"id":"169b0175-361a-4ea7-b31f-d82f42bc43b1","name":"team","role":"Team Owner"}]` + "\n",
+		`[{"id":"team-a","name":"team","role":"Team Owner"}]` + "\n",
 	}, []any{first, second, secondBody, third, thirdBody})
 }
 
