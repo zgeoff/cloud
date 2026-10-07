@@ -1,11 +1,10 @@
-package onidel
+package onidel_test
 
 import (
 	"net/http"
 	"testing"
 
 	p "github.com/pulumi/pulumi-go-provider"
-	"github.com/pulumi/pulumi-go-provider/integration"
 	presource "github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -102,9 +101,12 @@ func TestFirewallRuleRefreshShowsNoDriftForICMPOnAV6Subnet(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		created.ID,
+		"g1/00000000-0000-4000-8000-000000000001",
 		map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0.0},
-		onideltest.ToPlain(created.Properties),
+		map[string]any{
+			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0.0,
+			"ruleId": "00000000-0000-4000-8000-000000000001", "ipType": "v6", "action": "allow",
+		},
 	}, []any{read.ID, onideltest.ToPlain(read.Inputs), onideltest.ToPlain(read.Properties)})
 }
 
@@ -146,67 +148,98 @@ func TestFirewallRuleReadReportsADeletedRuleAsGone(t *testing.T) {
 
 func TestFirewallRuleReadFailsWhenTheAPIFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /network/firewalls/{id}/rules/{rule}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /network/firewalls/{id}/rules/{rule}", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Read(p.ReadRequest{ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r")})
 
 	assert.EqualError(t, err, "onidel: GET /network/firewalls/g1/rules/r1: HTTP 500")
 }
 
-func TestFirewallRuleRejectsAMalformedID(t *testing.T) {
+func TestFirewallRuleReadRejectsAMalformedID(t *testing.T) {
 	rows := []struct {
 		name string
 		id   string
-		call func(server integration.Server, id string) error
 	}{
-		{"it rejects a read of an ID without a slash", "no-slash", func(server integration.Server, id string) error {
-			_, err := server.Read(p.ReadRequest{ID: id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r")})
-			return err
-		}},
-		{"it rejects a read of an ID without a group", "/r1", func(server integration.Server, id string) error {
-			_, err := server.Read(p.ReadRequest{ID: id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r")})
-			return err
-		}},
-		{"it rejects a read of an ID without a rule", "g1/", func(server integration.Server, id string) error {
-			_, err := server.Read(p.ReadRequest{ID: id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r")})
-			return err
-		}},
-		{"it rejects an update of an ID without a slash", "no-slash", func(server integration.Server, id string) error {
-			_, err := server.Update(p.UpdateRequest{
-				ID: id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r"),
-				State: onideltest.BuildProps(map[string]any{
-					"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0,
-					"ruleId": "r1", "ipType": "v4", "action": "allow",
-				}),
-				OldInputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0}),
-				Inputs: onideltest.BuildProps(map[string]any{
-					"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0, "description": "web",
-				}),
-			})
-			return err
-		}},
-		{"it rejects a delete of an ID without a slash", "no-slash", func(server integration.Server, id string) error {
-			return server.Delete(p.DeleteRequest{
-				ID: id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r"),
-				Properties: onideltest.BuildProps(map[string]any{
-					"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0,
-					"ruleId": "r1", "ipType": "v4", "action": "allow",
-				}),
-			})
-		}},
+		{"it rejects an ID without a slash", "no-slash"},
+		{"it rejects an ID without a group", "/r1"},
+		{"it rejects an ID without a rule", "g1/"},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
 
-			err := row.call(ctx.server, row.id)
+			_, err := ctx.server.Read(p.ReadRequest{ID: row.id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r")})
 
 			assert.EqualError(t, err, `onidel: firewall rule ID "`+row.id+`" is not <firewallId>/<ruleId>`)
 			assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 		})
 	}
+}
+
+func TestFirewallRuleUpdateRejectsAMalformedID(t *testing.T) {
+	ctx := setupTest(t)
+
+	_, err := ctx.server.Update(p.UpdateRequest{
+		ID: "no-slash", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r"),
+		State: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v4", "action": "allow",
+		}),
+		OldInputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0}),
+		Inputs: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0, "description": "web",
+		}),
+	})
+
+	assert.EqualError(t, err, `onidel: firewall rule ID "no-slash" is not <firewallId>/<ruleId>`)
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
+}
+
+func TestFirewallRuleDeleteRejectsAMalformedID(t *testing.T) {
+	ctx := setupTest(t)
+
+	err := ctx.server.Delete(p.DeleteRequest{
+		ID: "no-slash", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r"),
+		Properties: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v4", "action": "allow",
+		}),
+	})
+
+	assert.EqualError(t, err, `onidel: firewall rule ID "no-slash" is not <firewallId>/<ruleId>`)
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
+}
+
+func TestFirewallRuleReadDropsAPortTheAPIReportsOnAnICMPRule(t *testing.T) {
+	ctx := setupTest(t)
+	// Not seen live: covers the program leaving the port unset on an ICMP rule the
+	// API reports with one.
+	ctx.api.RegisterResponse("GET /network/firewalls/{id}/rules/{rule}", http.StatusOK,
+		`{"firewall_rule":{"id":"r1","group":"g1","ip_type":"v4","action":"allow","protocol":"icmp","port":"0",`+
+			`"subnet":"0.0.0.0","subnet_size":0,"desc":""}}`, 1)
+
+	read, err := ctx.server.Read(p.ReadRequest{
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp"),
+		Inputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "0.0.0.0", "subnetSize": 0}),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "0.0.0.0", "subnetSize": 0.0}, onideltest.ToPlain(read.Inputs))
+}
+
+func TestFirewallRuleDeleteFailsWhenTheAPIRefuses(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("DELETE /network/firewalls/{id}/rules/{rule}", http.StatusUnauthorized, "", 1)
+
+	err := ctx.server.Delete(p.DeleteRequest{
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r"),
+		Properties: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "0.0.0.0", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v4", "action": "allow",
+		}),
+	})
+
+	assert.EqualError(t, err, "onidel: DELETE /network/firewalls/g1/rules/r1: HTTP 401")
 }
 
 func TestFirewallRuleDiffUpdatesOnlyTheDescriptionInPlace(t *testing.T) {

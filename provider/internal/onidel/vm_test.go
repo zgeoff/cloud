@@ -1,4 +1,4 @@
-package onidel
+package onidel_test
 
 import (
 	"net/http"
@@ -62,9 +62,7 @@ func TestVMImportLeavesOSUnsetForAnUnknownTemplate(t *testing.T) {
 func TestVMReadFailsWhenTheOSTemplatesCannotBeRead(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "location": "Sydney", "template": "Ubuntu 26.04 LTS x64", "status": "active"})
-	ctx.api.RegisterHandler("GET /os_templates", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /os_templates", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Read(p.ReadRequest{ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "web")})
 
@@ -103,9 +101,7 @@ func TestVMReadReportsADeletedVMAsGone(t *testing.T) {
 
 func TestVMReadFailsWhenTheAPIFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /vm/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Read(p.ReadRequest{ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "web")})
 
@@ -165,9 +161,7 @@ func TestVMReadReportsTheNumericFirewallIDWhenTheProgramsGroupIsNotInUse(t *test
 func TestVMReadFailsWhenTheProgramsFirewallGroupCannotBeRead(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "location": "Sydney", "firewall_group_id": 1581, "status": "active"})
-	ctx.api.RegisterHandler("GET /network/firewalls/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /network/firewalls/{id}", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Read(p.ReadRequest{
 		ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "web"),
@@ -204,34 +198,84 @@ func TestVMDiffAdoptsInputsTheAPICannotReportAfterAnImport(t *testing.T) {
 
 func TestVMDiffReportsEachChangedInput(t *testing.T) {
 	rows := []struct {
-		name    string
-		changes map[string]any
-		want    map[string]p.PropertyDiff
+		name   string
+		inputs map[string]any
+		want   p.DiffResponse
 	}{
-		{"it replaces for a new OS", map[string]any{"os": 3}, map[string]p.PropertyDiff{"os": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it replaces for a new CPU count", map[string]any{"cpu": 4}, map[string]p.PropertyDiff{"cpu": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it replaces for a new location", map[string]any{"location": "Sydney"}, map[string]p.PropertyDiff{"location": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it replaces for more RAM", map[string]any{"ram": 65536}, map[string]p.PropertyDiff{"ram": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it replaces for a bigger disk", map[string]any{"disk": 480}, map[string]p.PropertyDiff{"disk": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it compares the location without case", map[string]any{"location": "melbourne"}, map[string]p.PropertyDiff{}},
-		{"it replaces for a new payment cycle", map[string]any{"paymentCycle": "hourly"}, map[string]p.PropertyDiff{"paymentCycle": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it ignores the order of SSH keys", map[string]any{"sshKeys": []any{"k2", "k1"}}, map[string]p.PropertyDiff{}},
-		{"it replaces for a new SSH key", map[string]any{"sshKeys": []any{"k1", "k3"}}, map[string]p.PropertyDiff{"sshKeys": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it renames in place", map[string]any{"name": "edge-2"}, map[string]p.PropertyDiff{"name": {Kind: p.Update, InputDiff: true}}},
-		{"it toggles IPv6 in place", map[string]any{"ipv6": false}, map[string]p.PropertyDiff{"ipv6": {Kind: p.Update, InputDiff: true}}},
-		{"it leaves IPv6 alone when the program unsets it", map[string]any{"ipv6": nil}, map[string]p.PropertyDiff{}},
-		{"it attaches a firewall group in place", map[string]any{"firewallGroupId": "g1"}, map[string]p.PropertyDiff{"firewallGroupId": {Kind: p.Add, InputDiff: true}}},
+		{
+			"it replaces for a new OS",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 3, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"os": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it replaces for a new CPU count",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 4, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"cpu": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it replaces for a CPU count of zero",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 0, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"cpu": {Kind: p.DeleteReplace, InputDiff: true}}},
+		},
+		{
+			"it replaces for a new location",
+			map[string]any{"name": "edge", "location": "Sydney", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"location": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it replaces for more RAM",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 65536, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"ram": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it replaces for a bigger disk",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 480, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"disk": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it compares the location without case",
+			map[string]any{"name": "edge", "location": "melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}},
+		},
+		{
+			"it replaces for a new payment cycle",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "hourly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"paymentCycle": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it ignores the order of SSH keys",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k2", "k1"}, "ipv6": true},
+			p.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}},
+		},
+		{
+			"it replaces for a new SSH key",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k3"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"sshKeys": {Kind: p.UpdateReplace, InputDiff: true}}},
+		},
+		{
+			"it renames in place",
+			map[string]any{"name": "edge-2", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"name": {Kind: p.Update, InputDiff: true}}},
+		},
+		{
+			"it toggles IPv6 in place",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": false},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"ipv6": {Kind: p.Update, InputDiff: true}}},
+		},
+		{
+			"it leaves IPv6 alone when the program unsets it",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}},
+			p.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}},
+		},
+		{
+			"it attaches a firewall group in place",
+			map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true, "firewallGroupId": "g1"},
+			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"firewallGroupId": {Kind: p.Add, InputDiff: true}}},
+		},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
-			inputs := map[string]any{
-				"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
-				"paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true,
-			}
-			for key, value := range row.changes {
-				inputs[key] = value
-			}
 
 			diff, err := ctx.server.Diff(p.DiffRequest{
 				ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "edge"),
@@ -241,13 +285,45 @@ func TestVMDiffReportsEachChangedInput(t *testing.T) {
 					"status": "active", "mainIpv4": "203.0.113.18", "mainIpv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
 					"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53.632641Z",
 				}),
-				Inputs: onideltest.BuildProps(inputs),
+				Inputs: onideltest.BuildProps(row.inputs),
 			})
 
 			require.NoError(t, err)
-			assert.Equal(t, p.DiffResponse{HasChanges: len(row.want) > 0, DetailedDiff: row.want}, diff)
+			assert.Equal(t, row.want, diff)
 		})
 	}
+}
+
+func TestVMDiffReplacesForAnInputSetWhereStateHadNone(t *testing.T) {
+	ctx := setupTest(t)
+
+	diff, err := ctx.server.Diff(p.DiffRequest{
+		ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "edge"),
+		State: onideltest.BuildProps(map[string]any{
+			"name": "edge", "location": "Melbourne", "cpu": 0, "ram": 32768, "disk": 240, "os": 24,
+			"status": "active", "mainIpv4": "", "mainIpv6": "", "template": "", "bgpEnabled": false, "createdAt": "",
+		}),
+		Inputs: onideltest.BuildProps(map[string]any{"name": "edge", "location": "Melbourne", "cpu": 4, "ram": 32768, "disk": 240, "os": 24}),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"cpu": {Kind: p.AddReplace, InputDiff: true}}}, diff)
+}
+
+func TestVMDiffDetachesAFirewallGroupTheProgramDrops(t *testing.T) {
+	ctx := setupTest(t)
+
+	diff, err := ctx.server.Diff(p.DiffRequest{
+		ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "edge"),
+		State: onideltest.BuildProps(map[string]any{
+			"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "firewallGroupId": "g1",
+			"status": "active", "mainIpv4": "", "mainIpv6": "", "template": "", "bgpEnabled": false, "createdAt": "",
+		}),
+		Inputs: onideltest.BuildProps(map[string]any{"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24}),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"firewallGroupId": {Kind: p.Delete, InputDiff: true}}}, diff)
 }
 
 func TestVMCreateProvisionsTheVMAndWaitsUntilItIsActive(t *testing.T) {
@@ -363,9 +439,7 @@ func TestVMCreateKeepsAVMThatNeverBecomesReadyInState(t *testing.T) {
 
 func TestVMCreateFailsWithoutStateWhenTheAPIRefuses(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("POST /vm", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusPaymentRequired)
-	})
+	ctx.api.RegisterResponse("POST /vm", http.StatusPaymentRequired, "", 1)
 
 	created, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:Vm", "web"),
@@ -561,4 +635,72 @@ func TestVMReadAfterDeleteReportsTheVMAsGone(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "", read.ID)
+}
+
+func TestVMReadReportsTheFirewallGroupAsIsWithoutAPriorOne(t *testing.T) {
+	rows := []struct {
+		name     string
+		reported any
+		prior    map[string]any
+		want     map[string]any
+	}{
+		{
+			"it takes the numeric ID on import",
+			1581,
+			map[string]any{"name": "web", "location": "Sydney", "cpu": 0, "ram": 0, "disk": 0, "snapshotId": "s1"},
+			map[string]any{"name": "web", "location": "Sydney", "cpu": 0.0, "ram": 0.0, "disk": 0.0, "snapshotId": "s1", "firewallGroupId": "1581"},
+		},
+		{
+			"it keeps a prior ID the API reports unchanged",
+			"g-uuid",
+			map[string]any{"name": "web", "location": "Sydney", "cpu": 0, "ram": 0, "disk": 0, "snapshotId": "s1", "firewallGroupId": "g-uuid"},
+			map[string]any{"name": "web", "location": "Sydney", "cpu": 0.0, "ram": 0.0, "disk": 0.0, "snapshotId": "s1", "firewallGroupId": "g-uuid"},
+		},
+		{
+			"it takes a reported UUID that differs from the prior one",
+			"g-other",
+			map[string]any{"name": "web", "location": "Sydney", "cpu": 0, "ram": 0, "disk": 0, "snapshotId": "s1", "firewallGroupId": "g-uuid"},
+			map[string]any{"name": "web", "location": "Sydney", "cpu": 0.0, "ram": 0.0, "disk": 0.0, "snapshotId": "s1", "firewallGroupId": "g-other"},
+		},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "location": "Sydney", "firewall_group_id": row.reported, "status": "active"})
+
+			read, err := ctx.server.Read(p.ReadRequest{
+				ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "web"), Inputs: onideltest.BuildProps(row.prior),
+			})
+
+			require.NoError(t, err)
+			assert.Equal(t, []any{
+				row.want,
+				[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=" + onideltest.TeamID}},
+			}, []any{onideltest.ToPlain(read.Inputs), ctx.api.GetRequests()})
+		})
+	}
+}
+
+func TestVMUpdateStopsAtTheFirstPatchThatFails(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "location": "Sydney", "main_ipv6": "", "status": "active", "active_action_id": nil})
+	ctx.api.RegisterResponse("PATCH /vm/{id}", http.StatusBadRequest, "", 1)
+
+	_, err := ctx.server.Update(p.UpdateRequest{
+		ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "web"),
+		State: onideltest.BuildProps(map[string]any{
+			"name": "web", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40, "os": 24, "ipv6": false,
+			"status": "active", "mainIpv4": "", "mainIpv6": "", "template": "", "bgpEnabled": false, "createdAt": "",
+		}),
+		OldInputs: onideltest.BuildProps(map[string]any{"name": "web", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40, "os": 24, "ipv6": false}),
+		Inputs:    onideltest.BuildProps(map[string]any{"name": "web-2", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40, "os": 24, "ipv6": true}),
+	})
+
+	assert.EqualError(t, err, "onidel: PATCH /vm/v: HTTP 400")
+	get := onideltest.Request{Method: "GET", Path: "/vm/v", Query: "team_id=" + onideltest.TeamID}
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		get,
+		get, {Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": onideltest.TeamID, "name": "web-2"}},
+	}, ctx.api.GetRequests())
 }

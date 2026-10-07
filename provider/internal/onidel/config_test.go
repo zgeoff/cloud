@@ -1,4 +1,4 @@
-package onidel
+package onidel_test
 
 import (
 	"net/http"
@@ -9,41 +9,41 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidel"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
 func TestConfigDiffUpdatesTheProviderInPlace(t *testing.T) {
 	rows := []struct {
 		name   string
-		state  *Config
-		inputs *Config
+		state  *onidel.Config
+		inputs *onidel.Config
 		want   infer.DiffResponse
 	}{
 		{
 			"it updates a rotated API key in place",
-			&Config{APIKey: "old"}, &Config{APIKey: "new"},
+			&onidel.Config{APIKey: "old"}, &onidel.Config{APIKey: "new"},
 			infer.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"apiKey": {Kind: p.Update, InputDiff: true}}},
 		},
 		{
 			"it updates a changed team in place",
-			&Config{TeamID: "team-a"}, &Config{TeamID: "team-b"},
+			&onidel.Config{TeamID: "team-a"}, &onidel.Config{TeamID: "team-b"},
 			infer.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"teamId": {Kind: p.Update, InputDiff: true}}},
 		},
 		{
 			"it updates a changed endpoint in place",
-			&Config{Endpoint: "https://a.example"}, &Config{Endpoint: "https://b.example"},
+			&onidel.Config{Endpoint: "https://a.example"}, &onidel.Config{Endpoint: "https://b.example"},
 			infer.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"endpoint": {Kind: p.Update, InputDiff: true}}},
 		},
 		{
 			"it reports no change for an equal config",
-			&Config{APIKey: "same", TeamID: "team-a"}, &Config{APIKey: "same", TeamID: "team-a"},
+			&onidel.Config{APIKey: "same", TeamID: "team-a"}, &onidel.Config{APIKey: "same", TeamID: "team-a"},
 			infer.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}},
 		},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
-			resp, err := (&Config{}).Diff(t.Context(), infer.DiffRequest[*Config, *Config]{State: row.state, Inputs: row.inputs})
+			resp, err := (&onidel.Config{}).Diff(t.Context(), infer.DiffRequest[*onidel.Config, *onidel.Config]{State: row.state, Inputs: row.inputs})
 
 			require.NoError(t, err)
 			assert.Equal(t, row.want, resp)
@@ -52,16 +52,16 @@ func TestConfigDiffUpdatesTheProviderInPlace(t *testing.T) {
 }
 
 func TestConfigureFailsWithoutAnAPIKey(t *testing.T) {
-	t.Setenv(APIKeyEnv, "")
+	t.Setenv(onidel.APIKeyEnv, "")
 
-	err := (&Config{}).Configure(t.Context())
+	err := (&onidel.Config{}).Configure(t.Context())
 
 	assert.EqualError(t, err, "onidel: set the apiKey config or ONIDEL_API_KEY")
 }
 
 func TestConfigureFallsBackToTheEnvironmentForTheAPIKey(t *testing.T) {
-	t.Setenv(APIKeyEnv, "from-env")
-	cfg := &Config{}
+	t.Setenv(onidel.APIKeyEnv, "from-env")
+	cfg := &onidel.Config{}
 
 	err := cfg.Configure(t.Context())
 
@@ -70,8 +70,8 @@ func TestConfigureFallsBackToTheEnvironmentForTheAPIKey(t *testing.T) {
 }
 
 func TestConfigurePrefersTheConfiguredAPIKeyOverTheEnvironment(t *testing.T) {
-	t.Setenv(APIKeyEnv, "from-env")
-	cfg := &Config{APIKey: "from-config"}
+	t.Setenv(onidel.APIKeyEnv, "from-env")
+	cfg := &onidel.Config{APIKey: "from-config"}
 
 	err := cfg.Configure(t.Context())
 
@@ -81,37 +81,40 @@ func TestConfigurePrefersTheConfiguredAPIKeyOverTheEnvironment(t *testing.T) {
 
 func TestConfigUsesTheConfiguredTeamWithoutListingTeams(t *testing.T) {
 	ctx := setupTest(t)
-	cfg := &Config{APIKey: onideltest.APIKey, TeamID: "team-a", Endpoint: ctx.api.URL}
-	require.NoError(t, cfg.Configure(t.Context()))
+	require.NoError(t, ctx.server.Configure(p.ConfigureRequest{Args: onideltest.BuildProps(map[string]any{
+		"apiKey": onideltest.APIKey, "endpoint": ctx.api.URL, "teamId": "team-a",
+	})}))
 
-	teamID, err := cfg.resolveTeamID(t.Context())
-
-	require.NoError(t, err)
-	assert.Equal(t, []any{"team-a", []onideltest.Request(nil)}, []any{teamID, ctx.api.GetRequests()})
-}
-
-func TestConfigUsesTheAPIKeysOnlyTeam(t *testing.T) {
-	ctx := setupTest(t)
-	cfg := &Config{APIKey: onideltest.APIKey, Endpoint: ctx.api.URL}
-	require.NoError(t, cfg.Configure(t.Context()))
-
-	teamID, err := cfg.resolveTeamID(t.Context())
+	_, err := ctx.server.Create(p.CreateRequest{
+		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),
+		Properties: onideltest.BuildProps(map[string]any{"description": "edge"}),
+	})
 
 	require.NoError(t, err)
-	assert.Equal(t, onideltest.TeamID, teamID)
+	assert.Equal(t, []onideltest.Request{
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "edge"}},
+	}, ctx.api.GetRequests())
 }
 
 func TestConfigListsTeamsOnlyOnce(t *testing.T) {
 	ctx := setupTest(t)
-	cfg := &Config{APIKey: onideltest.APIKey, Endpoint: ctx.api.URL}
-	require.NoError(t, cfg.Configure(t.Context()))
+	_, err := ctx.server.Create(p.CreateRequest{
+		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "a"),
+		Properties: onideltest.BuildProps(map[string]any{"description": "a"}),
+	})
+	require.NoError(t, err)
 
-	_, _ = cfg.resolveTeamID(t.Context())
-	teamID, err := cfg.resolveTeamID(t.Context())
+	_, err = ctx.server.Create(p.CreateRequest{
+		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "b"),
+		Properties: onideltest.BuildProps(map[string]any{"description": "b"}),
+	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{onideltest.TeamID, []onideltest.Request{{Method: "GET", Path: "/teams"}}},
-		[]any{teamID, ctx.api.GetRequests()})
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "a"}},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "b"}},
+	}, ctx.api.GetRequests())
 }
 
 func TestConfigFailsWhenTheAPIKeyDoesNotSeeExactlyOneTeam(t *testing.T) {
@@ -130,28 +133,43 @@ func TestConfigFailsWhenTheAPIKeyDoesNotSeeExactlyOneTeam(t *testing.T) {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
 			ctx.api.SetTeams(row.teams...)
-			cfg := &Config{APIKey: onideltest.APIKey, Endpoint: ctx.api.URL}
-			require.NoError(t, cfg.Configure(t.Context()))
 
-			teamID, err := cfg.resolveTeamID(t.Context())
+			_, err := ctx.server.Create(p.CreateRequest{
+				Urn:        onideltest.BuildURN("onidel:index:SshKey", "me"),
+				Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
+			})
 
 			assert.EqualError(t, err, row.want)
-			assert.Equal(t, "", teamID)
+			assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
 		})
 	}
 }
 
-func TestConfigFailsWhenTheTeamLookupFails(t *testing.T) {
+func TestConfigSendsNoTeamOnAReadWhenTheTeamLookupFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
+	ctx.api.RegisterResponse("GET /teams", http.StatusInternalServerError, "", 1)
+
+	read, err := ctx.server.Read(p.ReadRequest{ID: "k", Urn: onideltest.BuildURN("onidel:index:SshKey", "me")})
+
+	require.NoError(t, err)
+	assert.Equal(t, []any{"", []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k"}}},
+		[]any{read.ID, ctx.api.GetRequests()})
+}
+
+func TestConfigSendsNoTeamOnADeleteWhenTheTeamLookupFails(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /teams", http.StatusInternalServerError, "", 1)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "instance_count": 0})
+
+	err := ctx.server.Delete(p.DeleteRequest{
+		ID: "g1", Urn: onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),
+		Properties: onideltest.BuildProps(map[string]any{
+			"description": "edge", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-02T00:00:00Z",
+			"instanceCount": 0, "ruleCount": 0,
+		}),
 	})
-	cfg := &Config{APIKey: onideltest.APIKey, Endpoint: ctx.api.URL}
-	require.NoError(t, cfg.Configure(t.Context()))
 
-	_, err := cfg.resolveTeamID(t.Context())
-
-	var apiErr *client.APIError
-	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, &client.APIError{Method: "GET", Path: "/teams", Status: 500}, apiErr)
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/network/firewalls/g1"}},
+		ctx.api.GetRequests())
 }

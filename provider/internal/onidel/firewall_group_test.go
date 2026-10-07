@@ -1,4 +1,4 @@
-package onidel
+package onidel_test
 
 import (
 	"net/http"
@@ -98,9 +98,7 @@ func TestFirewallGroupReadReportsADeletedGroupAsGone(t *testing.T) {
 
 func TestFirewallGroupReadFailsWhenTheAPIFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /network/firewalls/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /network/firewalls/{id}", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Read(p.ReadRequest{ID: "g1", Urn: onideltest.BuildURN("onidel:index:FirewallGroup", "fw")})
 
@@ -200,9 +198,7 @@ func TestFirewallGroupUpdateFailsWhenTheGroupIsGone(t *testing.T) {
 func TestFirewallGroupUpdateFailsWhenTheRereadFails(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "cloud"})
-	ctx.api.RegisterHandler("GET /network/firewalls/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /network/firewalls/{id}", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Update(p.UpdateRequest{
 		ID: "g1", Urn: onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),

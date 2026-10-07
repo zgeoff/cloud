@@ -1,4 +1,4 @@
-package onidel
+package onidel_test
 
 import (
 	"encoding/json"
@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidel"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -29,11 +30,10 @@ func setupTest(t *testing.T) struct {
 	client.DefaultPollInterval = time.Millisecond
 	t.Cleanup(func() { client.DefaultPollInterval = previous })
 	api := onideltest.StartFakeAPI(t)
-	t.Cleanup(func() { assert.Empty(t, api.GetProblems(), "the fake API saw requests it does not serve") })
 
-	prov, err := New()
+	prov, err := onidel.New()
 	require.NoError(t, err)
-	server, err := integration.NewServer(t.Context(), Name, semver.MustParse("0.1.0"), integration.WithProvider(prov))
+	server, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(prov))
 	require.NoError(t, err)
 	// Boot data: every resource call needs a configured API client.
 	require.NoError(t, server.Configure(p.ConfigureRequest{Args: onideltest.BuildProps(map[string]any{

@@ -1,11 +1,10 @@
-package onidel
+package onidel_test
 
 import (
 	"net/http"
 	"testing"
 
 	p "github.com/pulumi/pulumi-go-provider"
-	"github.com/pulumi/pulumi-go-provider/integration"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -150,9 +149,7 @@ func TestRDNSReadReportsAMissingRecordAsGone(t *testing.T) {
 
 func TestRDNSReadReportsARecordWithAnEmptyDomainAsGone(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /vm/{id}/rdns", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte(`{"rdns":[{"ip":"203.0.113.18","domain":""}]}`))
-	})
+	ctx.api.RegisterResponse("GET /vm/{id}/rdns", http.StatusOK, `{"rdns":[{"ip":"203.0.113.18","domain":""}]}`, 1)
 
 	read, err := ctx.server.Read(p.ReadRequest{ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4")})
 
@@ -162,9 +159,9 @@ func TestRDNSReadReportsARecordWithAnEmptyDomainAsGone(t *testing.T) {
 
 func TestRDNSReadReportsAMissingVMAsGone(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /vm/{id}/rdns", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	})
+	// The spec lists no 404 for GET /vm/{id}/rdns and none has been seen live; this
+	// covers the not-found branch in RDNS.Read (rdns.go) that the code keeps anyway.
+	ctx.api.RegisterResponse("GET /vm/{id}/rdns", http.StatusNotFound, "", 1)
 
 	read, err := ctx.server.Read(p.ReadRequest{ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4")})
 
@@ -174,50 +171,44 @@ func TestRDNSReadReportsAMissingVMAsGone(t *testing.T) {
 
 func TestRDNSReadFailsWhenTheAPIFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /vm/{id}/rdns", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-	})
+	ctx.api.RegisterResponse("GET /vm/{id}/rdns", http.StatusForbidden, "", 1)
 
 	_, err := ctx.server.Read(p.ReadRequest{ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4")})
 
 	assert.EqualError(t, err, "onidel: GET /vm/v/rdns: HTTP 403")
 }
 
-func TestRDNSRejectsAMalformedID(t *testing.T) {
+func TestRDNSReadRejectsAMalformedID(t *testing.T) {
 	rows := []struct {
 		name string
 		id   string
-		call func(server integration.Server, id string) error
 	}{
-		{"it rejects a read of an ID without a slash", "nope", func(server integration.Server, id string) error {
-			_, err := server.Read(p.ReadRequest{ID: id, Urn: onideltest.BuildURN("onidel:index:Rdns", "r")})
-			return err
-		}},
-		{"it rejects a read of an ID without a VM", "/203.0.113.18", func(server integration.Server, id string) error {
-			_, err := server.Read(p.ReadRequest{ID: id, Urn: onideltest.BuildURN("onidel:index:Rdns", "r")})
-			return err
-		}},
-		{"it rejects a read of an ID whose IP does not parse", "v/not-an-ip", func(server integration.Server, id string) error {
-			_, err := server.Read(p.ReadRequest{ID: id, Urn: onideltest.BuildURN("onidel:index:Rdns", "r")})
-			return err
-		}},
-		{"it rejects a delete of an ID whose IP does not parse", "v/not-an-ip", func(server integration.Server, id string) error {
-			return server.Delete(p.DeleteRequest{
-				ID: id, Urn: onideltest.BuildURN("onidel:index:Rdns", "r"),
-				Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
-			})
-		}},
+		{"it rejects an ID without a slash", "nope"},
+		{"it rejects an ID without a VM", "/203.0.113.18"},
+		{"it rejects an ID whose IP does not parse", "v/not-an-ip"},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
 
-			err := row.call(ctx.server, row.id)
+			_, err := ctx.server.Read(p.ReadRequest{ID: row.id, Urn: onideltest.BuildURN("onidel:index:Rdns", "r")})
 
 			assert.EqualError(t, err, `onidel: rdns ID "`+row.id+`" is not <vmId>/<ip>`)
 			assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 		})
 	}
+}
+
+func TestRDNSDeleteRejectsAMalformedID(t *testing.T) {
+	ctx := setupTest(t)
+
+	err := ctx.server.Delete(p.DeleteRequest{
+		ID: "v/not-an-ip", Urn: onideltest.BuildURN("onidel:index:Rdns", "r"),
+		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+	})
+
+	assert.EqualError(t, err, `onidel: rdns ID "v/not-an-ip" is not <vmId>/<ip>`)
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestRDNSDiffUpdatesTheDomainInPlaceAndReplacesForANewIP(t *testing.T) {
@@ -336,9 +327,9 @@ func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 
 func TestRDNSDeleteAcceptsARecordWhoseVMIsGone(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("DELETE /vm/{id}/rdns/{ip}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	})
+	// The spec lists no 404 for DELETE /vm/{id}/rdns/{ip} and none has been seen live;
+	// this covers the not-found branch in RDNS.Delete (rdns.go) that the code keeps anyway.
+	ctx.api.RegisterResponse("DELETE /vm/{id}/rdns/{ip}", http.StatusNotFound, "", 1)
 
 	err := ctx.server.Delete(p.DeleteRequest{
 		ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),

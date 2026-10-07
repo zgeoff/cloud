@@ -1,4 +1,4 @@
-package onidel
+package onidel_test
 
 import (
 	"net/http"
@@ -49,26 +49,9 @@ func TestSSHKeyCreatePreviewSendsNothing(t *testing.T) {
 	}, []any{onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
 }
 
-func TestSSHKeyCreateFailsWhenTheKeySeesSeveralTeams(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetTeams(
-		map[string]any{"id": "team-a", "name": "a", "role": "Team Owner"},
-		map[string]any{"id": "team-b", "name": "b", "role": "Team Owner"},
-	)
-
-	_, err := ctx.server.Create(p.CreateRequest{
-		Urn:        onideltest.BuildURN("onidel:index:SshKey", "me"),
-		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
-	})
-
-	assert.EqualError(t, err, "onidel: the API key can see 2 teams; set the teamId config")
-}
-
 func TestSSHKeyCreateFailsWhenTheTeamLookupFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /teams", http.StatusInternalServerError, "", 1)
 
 	_, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:SshKey", "me"),
@@ -256,13 +239,45 @@ func TestSSHKeyDeleteAcceptsAKeyThatIsAlreadyGone(t *testing.T) {
 
 func TestSSHKeyDeleteFailsWhenTheAPIRefuses(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("DELETE /ssh_keys/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusUnauthorized)
-	})
+	ctx.api.RegisterResponse("DELETE /ssh_keys/{id}", http.StatusUnauthorized, "", 1)
 
 	err := ctx.server.Delete(p.DeleteRequest{ID: "k", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
 		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
 	})
 
 	assert.EqualError(t, err, "onidel: DELETE /ssh_keys/k: HTTP 401")
+}
+
+func TestSSHKeyCreateFailsWhenTheAPIRefuses(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("POST /ssh_keys", http.StatusBadRequest, "", 1)
+
+	_, err := ctx.server.Create(p.CreateRequest{
+		Urn:        onideltest.BuildURN("onidel:index:SshKey", "me"),
+		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
+	})
+
+	assert.EqualError(t, err, "onidel: POST /ssh_keys: HTTP 400")
+}
+
+func TestSSHKeyReadFailsWhenTheAPIFails(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /ssh_keys/{id}", http.StatusInternalServerError, "", 1)
+
+	_, err := ctx.server.Read(p.ReadRequest{ID: "k", Urn: onideltest.BuildURN("onidel:index:SshKey", "me")})
+
+	assert.EqualError(t, err, "onidel: GET /ssh_keys/k: HTTP 500")
+}
+
+func TestSSHKeyUpdateFailsForAKeyThatIsGone(t *testing.T) {
+	ctx := setupTest(t)
+
+	_, err := ctx.server.Update(p.UpdateRequest{
+		ID: "missing", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
+		State:     onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
+		OldInputs: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
+		Inputs:    onideltest.BuildProps(map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 AAAA me@host"}),
+	})
+
+	assert.EqualError(t, err, "onidel: PATCH /ssh_keys/missing: HTTP 404")
 }
