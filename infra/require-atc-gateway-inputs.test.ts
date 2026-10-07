@@ -135,7 +135,7 @@ test.each(['GeoffCloud', 'home_pc', '1pc', 'pc-', 'home.pc', '', 'a'.repeat(32)]
               daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
             },
           },
-          defaultDaemon: name,
+          defaultDaemon: 'geoffcloud',
         },
         { ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'x'.repeat(32) },
       ),
@@ -236,6 +236,31 @@ test('it refuses a defaultDaemon that is not among the daemons', () => {
   ).toThrowWithMessage(
     Error,
     "atcGateway.defaultDaemon 'home-pc' is not in atcGateway.daemons (geoffcloud)",
+  );
+});
+
+test('it lists every daemon when the defaultDaemon is not among them', () => {
+  expect(() =>
+    requireATCGatewayInputs(
+      {
+        image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
+        daemons: {
+          geoffcloud: {
+            address: '100.69.47.33:8415',
+            daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+          },
+          'home-pc': {
+            address: '100.101.12.7:8415',
+            daemonID: '7c3e9a1b-2d4f-4a6c-8e0b-5f1a2c3d4e5f',
+          },
+        },
+        defaultDaemon: 'laptop',
+      },
+      { ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'x'.repeat(32), ATC_GATEWAY_TOKEN_HOME_PC: 'y'.repeat(32) },
+    ),
+  ).toThrowWithMessage(
+    Error,
+    "atcGateway.defaultDaemon 'laptop' is not in atcGateway.daemons (geoffcloud, home-pc)",
   );
 });
 
@@ -493,6 +518,28 @@ test('it refuses an alertSeverity other than critical or warning', () => {
   ).toThrowWithMessage(
     Error,
     'atcGateway.daemons.geoffcloud.alertSeverity must be critical or warning, got page',
+  );
+});
+
+test('it refuses an empty alertSeverity', () => {
+  expect(() =>
+    requireATCGatewayInputs(
+      {
+        image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
+        daemons: {
+          geoffcloud: {
+            address: '100.69.47.33:8415',
+            daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+            alertSeverity: '',
+          },
+        },
+        defaultDaemon: 'geoffcloud',
+      },
+      { ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'x'.repeat(32) },
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'atcGateway.daemons.geoffcloud.alertSeverity must be critical or warning, got ',
   );
 });
 
