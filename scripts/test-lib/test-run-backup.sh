@@ -23,7 +23,7 @@ it_runs_the_backup_image_as_the_backup_pods_do() {
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
   cat > "$tree/probe.sh" << 'EOF'
 id -u
 id -g
@@ -60,7 +60,7 @@ it_runs_the_backup_entrypoint_with_the_arguments() {
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
 mkdir /tmp/a && echo a > /tmp/a/gateway.db
@@ -87,7 +87,7 @@ it_returns_the_backup_entrypoints_exit_status() {
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" ls > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -105,7 +105,7 @@ it_refuses_a_docker_run_option_without_a_value() {
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" --version > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -120,7 +120,7 @@ it_names_the_backup_container_after_the_case_while_it_runs() {
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" --entrypoint /bin/sleep 300 > /dev/null 2>&1 &
 
@@ -134,7 +134,7 @@ it_shares_the_state_and_repository_volumes_between_run_backup_shell_and_run_back
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'echo in state > /state/marker; echo in repo > /repo/marker'
 
   run_backup "$name" "$backup_image" --entrypoint /bin/cat /state/marker /repo/marker \
@@ -152,7 +152,7 @@ EOF
 # writable by the nonroot uid so that only the read-only mount refuses a write, and a
 # state volume and a restic repository volume owned by the nonroot uid, as fsGroup 65532
 # leaves the pod's new volume. Its chown container is named for the case's trap.
-setup_case() {
+setup_test() {
   local tree="$1" name="$2" backup_image="$3"
   mkdir "$tree/seed"
   chmod -R a+rwX "$tree/seed"

@@ -22,7 +22,7 @@ it_runs_the_backup_shell_script_from_stdin_as_the_backup_pods_do_with_the_seed_r
   name="atc-gw-shell-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
   echo seeded > "$tree/seed/note"
 
   run_backup_shell "$name" "$backup_image" "$tree" > "$tree/out" 2> "$tree/err" << 'EOF' || status=$?
@@ -56,7 +56,7 @@ it_stops_the_backup_shell_at_the_first_failing_command() {
   name="atc-gw-shell-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'echo before; false; echo after' \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -71,7 +71,7 @@ it_names_the_backup_shell_container_after_the_case_while_it_runs() {
   name="atc-gw-shell-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'exec sleep 300' > /dev/null 2>&1 &
 
@@ -84,7 +84,7 @@ it_names_the_backup_shell_container_after_the_case_while_it_runs() {
 # writable by the nonroot uid so that only the read-only mount refuses a write, and a
 # state volume and a restic repository volume owned by the nonroot uid, as fsGroup 65532
 # leaves the pod's new volume. Its chown container is named for the case's trap.
-setup_case() {
+setup_test() {
   local tree="$1" name="$2" backup_image="$3"
   mkdir "$tree/seed"
   chmod -R a+rwX "$tree/seed"

@@ -23,7 +23,7 @@ Run with `bun run <script>` from the repo root. Hooks and CI call these too.
 | `typecheck`                | `sdk:build`, then `tsc --noEmit`                                                                                                     |
 | `test`                     | `bun test`                                                                                                                           |
 | `test:scripts`             | the shell test library's own tests, then the stub tests of `install-atc-gateway-credentials.sh` and `switch-geoffcloud.sh` (no host) |
-| `test:atc-gateway-fixture` | the gateway image fixture test, in Docker                                                                                            |
+| `test:atc-gateway-fixture` | the gateway image and backup script fixture tests, then the restore journey in `e2e/`, in Docker                                     |
 | `deadcode`                 | `knip`                                                                                                                               |
 | `audit`                    | `bun audit`                                                                                                                          |
 | `build:agents`             | regenerates `AGENTS.md` from `agents/shared.md` and `agents/project.md`                                                              |
@@ -206,7 +206,6 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 | `install-atc-gateway-credentials.sh`      | creates the impd secret `glm`, the impd token `atc-cloud` and the daemon bearer; skips each one that exists, the saved impd token only after it authenticates as `atc-cloud` |
 | `copy-impd-db.sh <label>`                 | takes a consistent copy of impd's database, with `COPY-INFO`, into `/root/imp-db-backups/`                                                                                   |
 | `fetch-atc-release.sh <dir>`              | downloads and checksums the pinned atc release for the gateway image                                                                                                         |
-| `test-atc-gateway-fixture.sh`             | the gateway image fixture test, locally in Docker                                                                                                                            |
 | `test-install-atc-gateway-credentials.sh` | stub test of the credential script's rerun check on the saved impd token; no host                                                                                            |
 | `check-agent-image.sh --imp <name>`       | checks the agent image in a running imp (or `--docker <image>`): login state, a gitleaks scan, each pinned version                                                           |
 
@@ -219,7 +218,8 @@ The PrometheusRule `geoff-cloud-alerts`, from `infra/build-alert-rules.ts`.
 | `sdk/onidel/` | its generated TypeScript SDK. Never edit by hand: run `bun run sdk:gen` |
 | `workers/`    | the health-check Worker, bundled by `infra/` at deploy time             |
 | `nixos/`      | the host flake: `hosts/geoffcloud`, `modules/`, `checks/`               |
-| `deploy/`     | the atc gateway's images and restore Job (PENDING)                      |
+| `deploy/`     | the atc gateway's images and restore Job (PENDING), with their tests    |
 | `scripts/`    | repo and host tooling                                                   |
+| `e2e/`        | end-to-end journeys, one file each                                      |
 | `docs/`       | these pages, `runbooks/` and `plans/`                                   |
 | `agents/`     | the partials that build `AGENTS.md`                                     |
