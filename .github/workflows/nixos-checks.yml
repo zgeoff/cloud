@@ -37,5 +37,14 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      # the runner has /dev/kvm, but QEMU, which runs as a nixbld user in the nixos/nix
+      # container, got "Permission denied" on it and fell back to emulation; this rule opens it
+      # to every user, as GitHub's changelog of 2024-04-02 documents for the hosted Linux runners
+      - name: Open /dev/kvm to QEMU
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: NixOS checks
         run: bun run test:nixos
