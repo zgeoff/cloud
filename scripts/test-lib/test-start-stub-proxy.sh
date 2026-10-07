@@ -86,9 +86,11 @@ Accept: */*
 Proxy-Connection: Keep-Alive
 
 LINES
-  # curl's own source port is the kernel's pick, so it is masked
+  # curl's own source port is the kernel's pick, so it is masked. curl 8.5.0 (CI's ubuntu-24.04
+  # runner image 20261004) and 8.22.0 word the trace's info lines differently; the case accepts
+  # either whole trace, with the same stderr and exit 52 below.
   sed -E 's/ from 127\.0\.0\.1 port [0-9]+ $/ from 127.0.0.1 port CLIENT /' "$tree/out" > "$tree/out-masked"
-  diff - "$tree/out-masked" << OUT
+  cat > "$tree/out-curl-8.22" << OUT
 *   Trying 127.0.0.1:$port...
 * Established connection to 127.0.0.1 (127.0.0.1 port $port) from 127.0.0.1 port CLIENT 
 * using HTTP/1.x
@@ -102,6 +104,20 @@ LINES
 * Empty reply from server
 * shutting down connection #0
 OUT
+  cat > "$tree/out-curl-8.5" << OUT
+== Info:   Trying 127.0.0.1:$port...
+== Info: Connected to 127.0.0.1 (127.0.0.1) port $port
+=> Send header, 115 bytes (0x73)
+0000: GET http://127.0.0.1:1/rpc/tokens/whoami HTTP/1.1
+0033: Host: 127.0.0.1:1
+0046: Accept: */*
+0053: Proxy-Connection: Keep-Alive
+0071: 
+== Info: Empty reply from server
+== Info: Closing connection
+OUT
+  cmp -s "$tree/out-curl-8.22" "$tree/out-masked" || cmp -s "$tree/out-curl-8.5" "$tree/out-masked" ||
+    { cat "$tree/out-masked"; echo "not curl 8.5's or 8.22's trace" >&2; exit 1; }
   diff - "$tree/err" << 'ERR'
 Warning: --trace-ascii overrides an earlier trace/verbose option
 curl: (52) Empty reply from server

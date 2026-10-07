@@ -52,7 +52,7 @@ it_fails_when_a_stand_in_is_not_executable() {
   require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "tailscale resolves to $(PATH=/usr/bin:/bin command -v tailscale || echo nothing), not a stand-in in $tree/bin"
+  diff - "$tree/err" <<< "tailscale stand-in in $tree/bin is not executable"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
