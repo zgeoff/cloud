@@ -27,7 +27,7 @@
     "format": "oxfmt . && format-codemod --quiet .",
     "format:check": "oxfmt --check . && format-codemod --check --quiet .",
     "provider:build": "cd provider && go build -o bin/pulumi-resource-onidel ./cmd/pulumi-resource-onidel",
-    "provider:check": "test ! -f provider/go.mod || (cd provider && test -z \"$(gofmt -l .)\" && go vet ./... && go test ./...)",
+    "provider:check": "test ! -f provider/go.mod || (cd provider && test -z \"$(gofmt -l .)\" && go vet ./... && go test -race ./...)",
     "sdk:gen": "bash scripts/gen-sdk.sh",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
     "preview": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi preview --stack prod",

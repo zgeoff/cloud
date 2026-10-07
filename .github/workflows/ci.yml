@@ -82,10 +82,12 @@ jobs:
         with:
           go-version-file: provider/go.mod
 
+      # provider:check is plain shell and Go, so the job needs Bun but no install.
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
       - name: Check
         if: hashFiles('provider/go.mod') != ''
-        working-directory: provider
-        run: |
-          test -z "$(gofmt -l .)"
-          go vet ./...
-          go test ./...
+        run: bun run provider:check
