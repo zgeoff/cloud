@@ -254,17 +254,29 @@ func TestFirewallRuleDeleteFailsWhenTheAPIRefuses(t *testing.T) {
 	assert.EqualError(t, err, "onidel: DELETE /network/firewalls/g1/rules/r1: HTTP 401")
 }
 
-func TestFirewallRuleDiffUpdatesOnlyTheDescriptionInPlace(t *testing.T) {
+func TestFirewallRuleDiffUpdatesTheDescriptionInPlace(t *testing.T) {
+	ctx := setupTest(t)
+
+	diff, err := ctx.server.Diff(p.DiffRequest{
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6"),
+		State: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
+		}),
+		OldInputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
+		Inputs:    onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0, "description": "ping"}),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"description": {Kind: p.Add}}}, diff)
+}
+
+func TestFirewallRuleDiffReplacesTheRuleForAChangedFixedInput(t *testing.T) {
 	rows := []struct {
 		name   string
 		inputs map[string]any
 		want   p.DiffResponse
 	}{
-		{
-			"it adds a description in place",
-			map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0, "description": "ping"},
-			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"description": {Kind: p.Add}}},
-		},
 		{
 			"it replaces the rule for a new port and protocol",
 			map[string]any{"firewallId": "g1", "protocol": "tcp", "port": "443", "subnet": "::", "subnetSize": 0},
@@ -281,11 +293,6 @@ func TestFirewallRuleDiffUpdatesOnlyTheDescriptionInPlace(t *testing.T) {
 			"it replaces the rule for a new group",
 			map[string]any{"firewallId": "g2", "protocol": "icmp", "subnet": "::", "subnetSize": 0},
 			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"firewallId": {Kind: p.UpdateReplace}}},
-		},
-		{
-			"it reports no change for the same inputs",
-			map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0},
-			p.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}},
 		},
 	}
 	for _, row := range rows {
@@ -306,6 +313,23 @@ func TestFirewallRuleDiffUpdatesOnlyTheDescriptionInPlace(t *testing.T) {
 			assert.Equal(t, row.want, diff)
 		})
 	}
+}
+
+func TestFirewallRuleDiffReportsNoChangeForTheSameInputs(t *testing.T) {
+	ctx := setupTest(t)
+
+	diff, err := ctx.server.Diff(p.DiffRequest{
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6"),
+		State: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
+		}),
+		OldInputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
+		Inputs:    onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, p.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}}, diff)
 }
 
 func TestFirewallRuleUpdateChangesTheDescription(t *testing.T) {
