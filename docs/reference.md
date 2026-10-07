@@ -82,36 +82,38 @@ The Onidel provider reads `onidel:apiKey` (falls back to `ONIDEL_API_KEY`), `oni
 Read one with `pulumi stack output --stack prod <name>` from `infra/`, through `op run`. Add
 `--show-secrets` for a secret one; it prints the value.
 
-| Output                 | Secret | Holds                                                    |
-| ---------------------- | ------ | -------------------------------------------------------- |
-| `grafanaURL`           | no     | `http://geoffcloud:30300`                                |
-| `grafanaAdminPassword` | yes    | Grafana's `admin` password                               |
-| `hostAuthKey`          | yes    | single-use tailnet key for the host's node (`tag:cloud`) |
-| `impHostAuthKey`       | yes    | single-use tailnet key for imp's node on the host        |
-| `tunnelToken`          | yes    | cloudflared's tunnel token                               |
-| `geoffcloudIPv4`       | no     | the VM's public IPv4                                     |
-| `mcpURL`               | no     | `https://mcp.geoff.cloud`                                |
-| `backupsBucket`        | no     | `geoff-cloud-backups`                                    |
-| `atcGatewayServiceURL` | no     | **PENDING.** The gateway's in-cluster URL                |
+| Output                  | Secret | Holds                                                    |
+| ----------------------- | ------ | -------------------------------------------------------- |
+| `grafanaURL`            | no     | `http://geoffcloud:30300`                                |
+| `grafanaAdminPassword`  | yes    | Grafana's `admin` password                               |
+| `hostAuthKey`           | yes    | single-use tailnet key for the host's node (`tag:cloud`) |
+| `impHostAuthKey`        | yes    | single-use tailnet key for imp's node on the host        |
+| `tunnelToken`           | yes    | cloudflared's tunnel token                               |
+| `geoffcloudIPv4`        | no     | the VM's public IPv4                                     |
+| `mcpURL`                | no     | `https://mcp.geoff.cloud`                                |
+| `backupsBucket`         | no     | `geoff-cloud-backups`                                    |
+| `onePasswordConnectURL` | no     | **PENDING.** `https://op-connect.geoff.cloud`            |
+| `atcGatewayServiceURL`  | no     | **PENDING.** The gateway's in-cluster URL                |
 
 ## .env
 
 `.env` holds `op://` references only. Each item is in the 1Password vault `cloud`.
 
-| Variable                                                                                                               | Item                    | Used by                                                          |
-| ---------------------------------------------------------------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------- |
-| `ONIDEL_API_KEY`                                                                                                       | `onidel-api`            | the Onidel provider, `snapshot-geoffcloud.sh`                    |
-| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`                                                                        | `cloudflare-api`        | the Cloudflare provider                                          |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                                                           | `r2-pulumi-state`       | the Pulumi state backend on R2                                   |
-| `PULUMI_BACKEND_URL`                                                                                                   | `r2-pulumi-state`       | the state bucket's `s3://` URL                                   |
-| `AWS_REGION`                                                                                                           | none: `auto`            | R2                                                               |
-| `PULUMI_CONFIG_PASSPHRASE`                                                                                             | `pulumi-passphrase`     | Pulumi's secrets provider                                        |
-| `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET`, `TAILSCALE_TAILNET`                                      | `tailscale-oauth`       | the Tailscale provider                                           |
-| `ALERT_WEBHOOK_URL`                                                                                                    | `alert-webhook`         | the health-check Worker; Alertmanager when `discordAlerts` is on |
-| `K3S_KUBECONFIG`                                                                                                       | `k3s-kubeconfig`        | the Kubernetes provider                                          |
-| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`                                                                                         | `atc-daemon-token`      | **PENDING.** The gateway's bearer for the daemon                 |
-| `ATC_GATEWAY_RESTIC_PASSWORD`                                                                                          | `atc-gateway-restic`    | **PENDING.** The gateway backup's restic password                |
-| `ATC_GATEWAY_R2_ACCESS_KEY_ID`, `ATC_GATEWAY_R2_SECRET_ACCESS_KEY`, `ATC_GATEWAY_R2_ENDPOINT`, `ATC_GATEWAY_R2_BUCKET` | `r2-atc-gateway-backup` | **PENDING.** The gateway backup's R2 bucket and key              |
+| Variable                                                                                                               | Item                              | Used by                                                                           |
+| ---------------------------------------------------------------------------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------- |
+| `ONIDEL_API_KEY`                                                                                                       | `onidel-api`                      | the Onidel provider, `snapshot-geoffcloud.sh`                                     |
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`                                                                        | `cloudflare-api`                  | the Cloudflare provider                                                           |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`                                                                           | `r2-pulumi-state`                 | the Pulumi state backend on R2                                                    |
+| `PULUMI_BACKEND_URL`                                                                                                   | `r2-pulumi-state`                 | the state bucket's `s3://` URL                                                    |
+| `AWS_REGION`                                                                                                           | none: `auto`                      | R2                                                                                |
+| `PULUMI_CONFIG_PASSPHRASE`                                                                                             | `pulumi-passphrase`               | Pulumi's secrets provider                                                         |
+| `TAILSCALE_OAUTH_CLIENT_ID`, `TAILSCALE_OAUTH_CLIENT_SECRET`, `TAILSCALE_TAILNET`                                      | `tailscale-oauth`                 | the Tailscale provider                                                            |
+| `ALERT_WEBHOOK_URL`                                                                                                    | `alert-webhook`                   | the health-check Worker; Alertmanager when `discordAlerts` is on                  |
+| `K3S_KUBECONFIG`                                                                                                       | `k3s-kubeconfig`                  | the Kubernetes provider                                                           |
+| `ONEPASSWORD_CONNECT_CREDENTIALS`                                                                                      | `onepassword-connect-credentials` | **PENDING.** The Connect server's credentials file (JSON), for the Connect Secret |
+| `ATC_GATEWAY_TOKEN_GEOFFCLOUD`                                                                                         | `atc-daemon-token`                | **PENDING.** The gateway's bearer for the daemon                                  |
+| `ATC_GATEWAY_RESTIC_PASSWORD`                                                                                          | `atc-gateway-restic`              | **PENDING.** The gateway backup's restic password                                 |
+| `ATC_GATEWAY_R2_ACCESS_KEY_ID`, `ATC_GATEWAY_R2_SECRET_ACCESS_KEY`, `ATC_GATEWAY_R2_ENDPOINT`, `ATC_GATEWAY_R2_BUCKET` | `r2-atc-gateway-backup`           | **PENDING.** The gateway backup's R2 bucket and key                               |
 
 The gateway's backup builds its restic repository as `s3:<endpoint>/<bucket>/atc-gateway`. With none
 of the five backup variables set, the gateway deploys with no backup CronJob; with only some set,
@@ -133,6 +135,7 @@ Items that `.env` does not reference:
 | `mcp.geoff.cloud`                        | the tunnel → atc on Geoff's PC, port 8414  | Pulumi                |
 | `imps.geoff.cloud`, `*.imps.geoff.cloud` | the host's tailnet IP (DNS only)           | impd, never Pulumi    |
 | `atc.geoff.cloud`                        | **PENDING.** The tunnel → the atc gateway  | Pulumi, once deployed |
+| `op-connect.geoff.cloud`                 | **PENDING.** The tunnel → Connect in k3s   | Pulumi, once deployed |
 | `imp.geoff.cloud`                        | **PENDING.** Reserved for imp's public MCP | none yet              |
 | `geoffcloud`                             | the host on the tailnet (MagicDNS)         | Tailscale             |
 | `imp-geoffcloud`                         | imp's own tailnet node on the host         | Tailscale             |
