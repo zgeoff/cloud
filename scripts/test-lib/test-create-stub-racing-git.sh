@@ -30,7 +30,7 @@ it_answers_rev_parse_origin_main_then_lands_a_commit() {
   git -C "$tree/clone" push -q origin main
   checked="$(git -C "$tree/clone" rev-parse HEAD)"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     git -C "$tree/clone" rev-parse origin/main > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< "$checked"
@@ -57,12 +57,17 @@ it_passes_a_failed_rev_parse_origin_main_through_and_lands_nothing() {
   git -C "$tree/clone" update-ref -d refs/remotes/origin/main
   head="$(git -C "$tree/clone" rev-parse HEAD)"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     git -C "$tree/clone" rev-parse origin/main > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< origin/main
-  diff - <(head -n 1 "$tree/err") <<< "fatal: ambiguous argument 'origin/main': unknown revision or path not in the working tree."
-  diff - <(git -C "$tree/clone" rev-parse HEAD) <<< "$head"
+  diff - "$tree/err" << 'ERR'
+fatal: ambiguous argument 'origin/main': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
+ERR
+  git -C "$tree/clone" rev-parse HEAD > "$tree/head-after"
+  diff - "$tree/head-after" <<< "$head"
   diff - "$tree/clone/nixos/marker" <<< committed
   [ ! -e "$tree/calls" ] || { echo "the stand-in logged a move" >&2; exit 1; }
   [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
@@ -80,7 +85,7 @@ it_hands_every_other_call_to_the_real_git_unchanged() {
   git -C "$tree/clone" push -q origin main
   head="$(git -C "$tree/clone" rev-parse HEAD)"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     git -C "$tree/clone" rev-parse HEAD > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< "$head"
@@ -96,7 +101,7 @@ it_passes_the_real_gits_exit_code_through_on_other_calls() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     git -C "$tree/clone" rev-parse --verify -q no-such-ref > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -105,10 +110,11 @@ it_passes_the_real_gits_exit_code_through_on_other_calls() {
 }
 
 # Runtime every case needs: a clone of a bare origin whose main holds one empty commit,
-# and the stand-in in <tree>/bin, racing against that clone.
+# the stand-in in <tree>/bin, racing against that clone, and the HOME and TMPDIR the
+# stand-in's git runs with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin"
+  mkdir "$tree/bin" "$tree/home" "$tree/tmp"
   git init -q --bare -b main "$tree/origin.git"
   git clone -q "$tree/origin.git" "$tree/clone" 2> /dev/null
   git -C "$tree/clone" commit -q --allow-empty -m init
