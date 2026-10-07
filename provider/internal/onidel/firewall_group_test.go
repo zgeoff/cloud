@@ -240,6 +240,7 @@ func TestFirewallGroupDeleteRemovesTheGroupFromTheTeam(t *testing.T) {
 
 func TestFirewallGroupDeleteAcceptsAGroupThatIsAlreadyGone(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 
 	err := ctx.server.Delete(p.DeleteRequest{
 		ID: "missing", Urn: onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),
@@ -249,7 +250,8 @@ func TestFirewallGroupDeleteAcceptsAGroupThatIsAlreadyGone(t *testing.T) {
 		}),
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/network/firewalls/missing", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestFirewallGroupDeleteFailsWhileVMsAreAttached(t *testing.T) {

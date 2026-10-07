@@ -235,12 +235,14 @@ func TestSSHKeyDeleteRemovesTheKeyFromTheTeam(t *testing.T) {
 
 func TestSSHKeyDeleteAcceptsAKeyThatIsAlreadyGone(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 
 	err := ctx.server.Delete(p.DeleteRequest{ID: "missing", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
 		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/ssh_keys/missing", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestSSHKeyDeleteFailsWhenTheAPIRefuses(t *testing.T) {

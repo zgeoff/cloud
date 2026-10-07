@@ -413,6 +413,7 @@ func TestFirewallRuleDeleteRemovesTheRuleFromTheTeam(t *testing.T) {
 
 func TestFirewallRuleDeleteAcceptsARuleThatIsAlreadyGone(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 
 	err := ctx.server.Delete(p.DeleteRequest{
 		ID: "g1/missing", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r"),
@@ -422,7 +423,8 @@ func TestFirewallRuleDeleteAcceptsARuleThatIsAlreadyGone(t *testing.T) {
 		}),
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/network/firewalls/g1/rules/missing", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestFirewallRuleReadAfterDeleteReportsTheRuleAsGone(t *testing.T) {
