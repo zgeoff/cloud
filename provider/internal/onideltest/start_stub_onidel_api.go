@@ -16,12 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TeamID is the one team the stub API starts with, as GET /teams lists it.
-const TeamID = "169b0175-361a-4ea7-b31f-d82f42bc43b1"
-
-// APIKey is the bearer token the stub API accepts. Any other token gets a 401.
-const APIKey = "test-key"
-
 // StubOnidelAPI is an in-memory Onidel API, written against provider/spec/onidel.yaml and
 // shaped after live responses: GET /vm returns a bare array, a VM object carries the
 // root password in plain text, a missing VM is a 404 with an empty body, and POST /vm
@@ -50,17 +44,19 @@ type StubOnidelAPI struct {
 	rdns       map[string]map[string]string // VM ID -> IP -> domain
 	requests   []Request
 	problems   []string
-	canned     map[string][]cannedResponse // pattern -> responses still to send
+	// canned holds, per pattern, the status and body of each response still to send.
+	canned map[string][]struct {
+		status int
+		body   string
+	}
 
 	routes    *http.ServeMux
 	overrides *http.ServeMux
 	cans      *http.ServeMux
 }
 
-type cannedResponse struct {
-	status int
-	body   string
-}
+// TeamID is the one team the stub API starts with, as GET /teams lists it.
+const TeamID = "169b0175-361a-4ea7-b31f-d82f42bc43b1"
 
 // StartStubOnidelAPI starts a stub API with one team and no resources. When the test ends,
 // it fails the test on any problem left undrained, then stops the server.
@@ -74,10 +70,13 @@ func StartStubOnidelAPI(t testing.TB) *StubOnidelAPI {
 		firewalls:  map[string]map[string]any{},
 		rules:      map[string]map[string]any{},
 		rdns:       map[string]map[string]string{},
-		canned:     map[string][]cannedResponse{},
-		routes:     http.NewServeMux(),
-		overrides:  http.NewServeMux(),
-		cans:       http.NewServeMux(),
+		canned: map[string][]struct {
+			status int
+			body   string
+		}{},
+		routes:    http.NewServeMux(),
+		overrides: http.NewServeMux(),
+		cans:      http.NewServeMux(),
 	}
 	f.registerRoutes()
 	server := httptest.NewServer(f)
@@ -99,7 +98,10 @@ func (f *StubOnidelAPI) RegisterResponse(pattern string, status int, body string
 	if _, ok := f.canned[pattern]; !ok {
 		f.cans.HandleFunc(pattern, func(http.ResponseWriter, *http.Request) {})
 	}
-	f.canned[pattern] = append(f.canned[pattern], slices.Repeat([]cannedResponse{{status, body}}, times)...)
+	f.canned[pattern] = append(f.canned[pattern], slices.Repeat([]struct {
+		status int
+		body   string
+	}{{status, body}}, times)...)
 }
 
 // RegisterHandler serves pattern (a net/http ServeMux pattern such as "POST /vm") with
@@ -195,6 +197,9 @@ func (f *StubOnidelAPI) GetRDNS() map[string]map[string]string {
 	return out
 }
 
+// APIKey is the bearer token the stub API accepts. Any other token gets a 401.
+const APIKey = "test-key"
+
 // ServeHTTP records the request, then answers it: 400 for a body that is not a JSON
 // object, 401 for a wrong bearer token, else the registered override or the route.
 func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -216,9 +221,9 @@ func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
-	if response, ok := f.claimCannedResponse(r); ok {
-		w.WriteHeader(response.status)
-		_, _ = w.Write([]byte(response.body))
+	if status, body, ok := f.claimCannedResponse(r); ok {
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
 		return
 	}
 	if h, pattern := f.overrides.Handler(r); pattern != "" {
@@ -226,29 +231,6 @@ func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.routes.ServeHTTP(w, r)
-}
-
-func (f *StubOnidelAPI) claimCannedResponse(r *http.Request) (cannedResponse, bool) {
-	_, pattern := f.cans.Handler(r)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	queue := f.canned[pattern]
-	if pattern == "" || len(queue) == 0 {
-		return cannedResponse{}, false
-	}
-	f.canned[pattern] = queue[1:]
-	return queue[0], true
-}
-
-func decodeBody(raw []byte) (map[string]any, bool) {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return nil, true
-	}
-	var body map[string]any
-	if err := json.Unmarshal(raw, &body); err != nil || body == nil {
-		return nil, false
-	}
-	return body, true
 }
 
 func (f *StubOnidelAPI) registerRoutes() {
@@ -263,33 +245,44 @@ func (f *StubOnidelAPI) registerRoutes() {
 	}
 
 	route("/", f.checkUnhandled)
-	route("GET /teams", f.readTeams)
-	route("GET /os_templates", f.readOSTemplates)
+	route("GET /teams", f.sendTeams)
+	route("GET /os_templates", f.sendOSTemplates)
 
 	route("POST /ssh_keys", f.createSSHKey)
-	route("GET /ssh_keys/{id}", f.readSSHKey)
+	route("GET /ssh_keys/{id}", f.sendSSHKey)
 	route("PATCH /ssh_keys/{id}", f.updateSSHKey)
 	route("DELETE /ssh_keys/{id}", f.removeSSHKey)
 
-	route("GET /vm", f.readVMs)
+	route("GET /vm", f.sendVMs)
 	route("POST /vm", f.createVM)
-	route("GET /vm/{id}", f.readVM)
+	route("GET /vm/{id}", f.sendVM)
 	route("PATCH /vm/{id}", f.updateVM)
 	route("DELETE /vm/{id}", f.removeVM)
 
 	route("POST /network/firewalls", f.createFirewallGroup)
-	route("GET /network/firewalls/{id}", f.readFirewallGroup)
+	route("GET /network/firewalls/{id}", f.sendFirewallGroup)
 	route("PUT /network/firewalls/{id}", f.updateFirewallGroup)
 	route("DELETE /network/firewalls/{id}", f.removeFirewallGroup)
 
 	route("POST /network/firewalls/{id}/rules", f.createFirewallRule)
-	route("GET /network/firewalls/{id}/rules/{rule}", f.readFirewallRule)
+	route("GET /network/firewalls/{id}/rules/{rule}", f.sendFirewallRule)
 	route("PATCH /network/firewalls/{id}/rules/{rule}", f.updateFirewallRule)
 	route("DELETE /network/firewalls/{id}/rules/{rule}", f.removeFirewallRule)
 
-	route("GET /vm/{id}/rdns", f.readRDNS)
-	route("POST /vm/{id}/rdns", f.updateRDNS)
+	route("GET /vm/{id}/rdns", f.sendRDNS)
+	route("POST /vm/{id}/rdns", f.upsertRDNS)
 	route("DELETE /vm/{id}/rdns/{ip}", f.removeRDNS)
+}
+
+func decodeBody(raw []byte) (map[string]any, bool) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, true
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+		return nil, false
+	}
+	return body, true
 }
 
 func (f *StubOnidelAPI) checkUnhandled(w http.ResponseWriter, r *http.Request, _ map[string]any) {
@@ -301,11 +294,17 @@ func (f *StubOnidelAPI) checkUnhandled(w http.ResponseWriter, r *http.Request, _
 	w.WriteHeader(http.StatusInternalServerError)
 }
 
-func (f *StubOnidelAPI) readTeams(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
+func (f *StubOnidelAPI) sendTeams(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
 	sendJSON(w, http.StatusOK, f.teams)
 }
 
-func (f *StubOnidelAPI) readOSTemplates(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
+func sendJSON(w http.ResponseWriter, status int, body any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(body)
+}
+
+func (f *StubOnidelAPI) sendOSTemplates(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
 	sendJSON(w, http.StatusOK, []any{
 		map[string]any{"id": 3, "name": "Ubuntu 24.04 LTS x64", "family": "Ubuntu"},
 		map[string]any{"id": 24, "name": "Ubuntu 26.04 LTS x64", "family": "Ubuntu"},
@@ -325,7 +324,21 @@ func (f *StubOnidelAPI) createSSHKey(w http.ResponseWriter, _ *http.Request, bod
 	sendJSON(w, http.StatusCreated, map[string]any{"ssh_key": key})
 }
 
-func (f *StubOnidelAPI) readSSHKey(w http.ResponseWriter, r *http.Request, _ map[string]any) {
+func hasStrings(body map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if s, _ := body[key].(string); s == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func (f *StubOnidelAPI) claimID() string {
+	f.seq++
+	return fmt.Sprintf("00000000-0000-4000-8000-%012d", f.seq)
+}
+
+func (f *StubOnidelAPI) sendSSHKey(w http.ResponseWriter, r *http.Request, _ map[string]any) {
 	key, ok := f.sshKeys[r.PathValue("id")]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -357,8 +370,8 @@ func (f *StubOnidelAPI) removeSSHKey(w http.ResponseWriter, r *http.Request, _ m
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// readVMs lists VMs in the order they were stored.
-func (f *StubOnidelAPI) readVMs(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
+// sendVMs lists VMs in the order they were stored.
+func (f *StubOnidelAPI) sendVMs(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
 	list := []any{}
 	for _, id := range f.vmOrder {
 		list = append(list, f.vms[id])
@@ -395,7 +408,27 @@ func (f *StubOnidelAPI) createVM(w http.ResponseWriter, _ *http.Request, body ma
 	w.WriteHeader(http.StatusCreated)
 }
 
-func (f *StubOnidelAPI) readVM(w http.ResponseWriter, r *http.Request, _ map[string]any) {
+func (f *StubOnidelAPI) setVM(vm map[string]any) {
+	id := vm["id"].(string)
+	if _, ok := f.vms[id]; !ok {
+		f.vmOrder = append(f.vmOrder, id)
+	}
+	f.vms[id] = vm
+}
+
+// updateInstanceCount moves a group's instance_count when a VM attaches or detaches.
+// A VM may report its group by a numeric ID no stored group has; that changes nothing.
+func (f *StubOnidelAPI) updateInstanceCount(groupID any, delta int) {
+	id, _ := groupID.(string)
+	group, ok := f.firewalls[id]
+	if !ok {
+		return
+	}
+	count, _ := group["instance_count"].(int)
+	group["instance_count"] = count + delta
+}
+
+func (f *StubOnidelAPI) sendVM(w http.ResponseWriter, r *http.Request, _ map[string]any) {
 	vm, ok := f.vms[r.PathValue("id")]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -493,7 +526,7 @@ func (f *StubOnidelAPI) createFirewallGroup(w http.ResponseWriter, _ *http.Reque
 	sendJSON(w, http.StatusCreated, map[string]any{"firewall_group": group})
 }
 
-func (f *StubOnidelAPI) readFirewallGroup(w http.ResponseWriter, r *http.Request, _ map[string]any) {
+func (f *StubOnidelAPI) sendFirewallGroup(w http.ResponseWriter, r *http.Request, _ map[string]any) {
 	group, ok := f.firewalls[r.PathValue("id")]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -574,7 +607,7 @@ func (f *StubOnidelAPI) createFirewallRule(w http.ResponseWriter, r *http.Reques
 	sendJSON(w, http.StatusCreated, map[string]any{"firewall_rule": created})
 }
 
-func (f *StubOnidelAPI) readFirewallRule(w http.ResponseWriter, r *http.Request, _ map[string]any) {
+func (f *StubOnidelAPI) sendFirewallRule(w http.ResponseWriter, r *http.Request, _ map[string]any) {
 	rule, ok := f.findRule(r)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -623,9 +656,9 @@ func (f *StubOnidelAPI) removeFirewallRule(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// readRDNS lists a VM's PTR records sorted by IP. A VM with none, or an unknown VM,
+// sendRDNS lists a VM's PTR records sorted by IP. A VM with none, or an unknown VM,
 // lists none: the spec documents no 404 here.
-func (f *StubOnidelAPI) readRDNS(w http.ResponseWriter, r *http.Request, _ map[string]any) {
+func (f *StubOnidelAPI) sendRDNS(w http.ResponseWriter, r *http.Request, _ map[string]any) {
 	records := f.rdns[r.PathValue("id")]
 	list := []any{}
 	for _, ip := range slices.Sorted(maps.Keys(records)) {
@@ -634,9 +667,9 @@ func (f *StubOnidelAPI) readRDNS(w http.ResponseWriter, r *http.Request, _ map[s
 	sendJSON(w, http.StatusOK, map[string]any{"rdns": list})
 }
 
-// updateRDNS sets a PTR record: 400 for a missing or invalid IP or domain, 401 when
+// upsertRDNS sets a PTR record: 400 for a missing or invalid IP or domain, 401 when
 // the IP is not the VM's (the spec's "IP not owned by this VM").
-func (f *StubOnidelAPI) updateRDNS(w http.ResponseWriter, r *http.Request, body map[string]any) {
+func (f *StubOnidelAPI) upsertRDNS(w http.ResponseWriter, r *http.Request, body map[string]any) {
 	ip, _ := body["ip_addr"].(string)
 	domain, _ := body["domain"].(string)
 	if net.ParseIP(ip) == nil || domain == "" {
@@ -654,20 +687,6 @@ func (f *StubOnidelAPI) updateRDNS(w http.ResponseWriter, r *http.Request, body 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (f *StubOnidelAPI) removeRDNS(w http.ResponseWriter, r *http.Request, _ map[string]any) {
-	ip := r.PathValue("ip")
-	if net.ParseIP(ip) == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if !f.isVMAddress(r.PathValue("id"), ip) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	delete(f.rdns[r.PathValue("id")], ip)
-	w.WriteHeader(http.StatusNoContent)
-}
-
 func (f *StubOnidelAPI) isVMAddress(vmID, ip string) bool {
 	vm, ok := f.vms[vmID]
 	if !ok {
@@ -683,38 +702,18 @@ func (f *StubOnidelAPI) isVMAddress(vmID, ip string) bool {
 	return false
 }
 
-func (f *StubOnidelAPI) setVM(vm map[string]any) {
-	id := vm["id"].(string)
-	if _, ok := f.vms[id]; !ok {
-		f.vmOrder = append(f.vmOrder, id)
-	}
-	f.vms[id] = vm
-}
-
-// updateInstanceCount moves a group's instance_count when a VM attaches or detaches.
-// A VM may report its group by a numeric ID no stored group has; that changes nothing.
-func (f *StubOnidelAPI) updateInstanceCount(groupID any, delta int) {
-	id, _ := groupID.(string)
-	group, ok := f.firewalls[id]
-	if !ok {
+func (f *StubOnidelAPI) removeRDNS(w http.ResponseWriter, r *http.Request, _ map[string]any) {
+	ip := r.PathValue("ip")
+	if net.ParseIP(ip) == nil {
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	count, _ := group["instance_count"].(int)
-	group["instance_count"] = count + delta
-}
-
-func (f *StubOnidelAPI) claimID() string {
-	f.seq++
-	return fmt.Sprintf("00000000-0000-4000-8000-%012d", f.seq)
-}
-
-func hasStrings(body map[string]any, keys ...string) bool {
-	for _, key := range keys {
-		if s, _ := body[key].(string); s == "" {
-			return false
-		}
+	if !f.isVMAddress(r.PathValue("id"), ip) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
-	return true
+	delete(f.rdns[r.PathValue("id")], ip)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func buildStoreCopy(store map[string]map[string]any) map[string]map[string]any {
@@ -725,8 +724,14 @@ func buildStoreCopy(store map[string]map[string]any) map[string]map[string]any {
 	return out
 }
 
-func sendJSON(w http.ResponseWriter, status int, body any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(body)
+func (f *StubOnidelAPI) claimCannedResponse(r *http.Request) (int, string, bool) {
+	_, pattern := f.cans.Handler(r)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	queue := f.canned[pattern]
+	if pattern == "" || len(queue) == 0 {
+		return 0, "", false
+	}
+	f.canned[pattern] = queue[1:]
+	return queue[0].status, queue[0].body, true
 }
