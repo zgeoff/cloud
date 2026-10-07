@@ -29,6 +29,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-host-install.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-impd-curl.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-stub-impd.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-stub-proxy.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-stub-resetting-listener.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
 
@@ -2348,13 +2349,17 @@ EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
+# A listener that resets the connection after reading the request drives the real curl
+# on "the host" to exit 56. curl 8.22.0 prints the pinned line, as 8.5.0 (CI's
+# ubuntu-24.04 runner image 20261004) does in test-create-stub-impd-curl.sh.
 it_leaves_the_saved_token_unchecked_when_impd_resets_the_connection() {
-  local seed="$1" good_token status=0
+  local seed="$1" good_token listener_port status=0
   tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
-  setup_test "$tree" atc-key
+  trap 'kill "$(cat "$tree/listener/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" atc-key listener
   mkdir "$tree/vault/cloud" "$tree/host/secrets"
   good_token="$(build_token "$seed" good)"
+  listener_port="$(cat "$tree/listener/port")"
   echo '{"version":"0.27.0","features":{"sessionOffsets":true,"leases":true,"grantableTokens":true,"secretRebind":true}}' > "$tree/impd/info.json"
   echo '[{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/secrets.json"
   echo '[{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"sshKeys":[],"grantable":["glm"],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/tokens.json"
@@ -2364,14 +2369,15 @@ it_leaves_the_saved_token_unchecked_when_impd_resets_the_connection() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_CURL_EXIT=56 \
+    STUB_HOST_BIN="$tree/host-bin-real-curl" STUB_GOOD_TOKEN="$good_token" \
+    ATC_IMPD_PORT="$listener_port" \
     ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
 curl: (56) Recv failure: Connection reset by peer
 the check on the host exited 56 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
-Check impd on the host's 127.0.0.1:7070, then rerun
+Check impd on the host's 127.0.0.1:$listener_port, then rerun
 EOF
   diff - "$tree/out" << EOF
 
@@ -2401,9 +2407,9 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
-["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$listener_port/rpc/tokens/whoami"]
 EOF
+  diff - "$tree/listener/connections" <<< connection
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
@@ -3115,8 +3121,8 @@ EOF
 
 # Real curl against the impd and proxy stand-ins (test-lib/start-stub-impd.sh and
 # test-lib/start-stub-proxy.sh) under the hostile curl config whose controls are
-# test-lib/test-start-stub-proxy.sh's curlrc case and this suite's noproxy-alone case:
-# the token must reach impd's stand-in only, with no proxy connection and no trace.
+# test-lib/test-start-stub-proxy.sh's curlrc and noproxy-alone cases: the token must
+# reach impd's stand-in only, with no proxy connection and no trace.
 it_sends_the_saved_token_to_impd_alone_under_the_hostile_curl_config() {
   local seed="$1" good_token impd_port proxy_port status=0
   tree="$(mktemp -d)"
@@ -3389,44 +3395,6 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-# The control for the hostile-config cases above: curl with --noproxy alone, without the
-# script's -q, still reads CURL_HOME's .curlrc and traces the bearer, so a case that finds
-# no trace proves the script's isolation, not a dead config. It runs curl itself, not
-# the script, because what it pins is real curl's reading of that config: the same POST
-# the script sends, answered with impd's 401 for the stale bearer, and no proxy connection.
-it_traces_the_bearer_when_curl_runs_with_noproxy_alone_under_the_hostile_config() {
-  local seed="$1" stale_token status=0
-  tree="$(mktemp -d)"
-  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_test "$tree" impd proxy
-  stale_token="$(build_token "$seed" stale)"
-  mkdir "$tree/curl-home"
-  printf -- '-v\nproxy = %s\ntrace-ascii = %s\n' "http://127.0.0.1:$(cat "$tree/proxy/port")" "$tree/trace.txt" \
-    > "$tree/curl-home/.curlrc"
-
-  printf 'Authorization: Bearer %s\n' "$stale_token" |
-    env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" CURL_HOME="$tree/curl-home" \
-      curl --noproxy '*' -sS --max-time 5 -H @- -H 'content-type: application/json' --data '{"json":{}}' \
-      "http://127.0.0.1:$(cat "$tree/impd-whoami/port")/rpc/tokens/whoami" > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/err" <<< "Warning: --trace-ascii overrides an earlier trace/verbose option"
-  printf '{"error":"unauthorized"}' | diff - "$tree/out"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
-pid
-port
-
-$tree/proxy:
-pid
-port
-EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
-  [ -f "$tree/trace.txt" ] || { echo "curl wrote no trace" >&2; exit 1; }
-  sed -E 's/^[0-9a-f]{4}: //' "$tree/trace.txt" | tr -d '\n' | grep -qF -- "$stale_token" ||
-    { echo "the trace does not hold the bearer" >&2; exit 1; }
-}
-
 # Boot data every case needs: the script, the roots of the 1Password stand-in's vaults
 # (vault/) and of "the host" (host/), impd's state directory (impd/), and the stand-ins
 # from test-lib for op, ssh, and the host's docker (impd), install and curl, which log
@@ -3436,7 +3404,8 @@ EOF
 # remote tools the others do not provide (scp, sftp, rsync, tailscale, and ssh on "the
 # host"), and a guard ends the case unless every remote tool resolves to a stand-in. The config names what a case wires on top: atc-key, the stand-in for the
 # z.ai key; impd, the stand-in impd whoami server, started in impd-whoami/; and proxy,
-# the recording proxy, started in proxy/.
+# the recording proxy, started in proxy/; and listener, the resetting listener, started
+# in listener/.
 setup_test() {
   local tree="$1" part
   mkdir -p "$tree/bin" "$tree/host-bin" "$tree/host-bin-real-curl" "$tree/home" "$tree/tmp" \
@@ -3462,6 +3431,7 @@ setup_test() {
       atc-key) create_stub_atc_key "$tree/bin" ;;
       impd) mkdir "$tree/impd-whoami" && start_stub_impd "$tree/impd-whoami" ;;
       proxy) mkdir "$tree/proxy" && start_stub_proxy "$tree/proxy" ;;
+      listener) mkdir "$tree/listener" && start_stub_resetting_listener "$tree/listener" ;;
     esac
   done
 }
