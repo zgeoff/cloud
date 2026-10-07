@@ -17,7 +17,7 @@ import (
 func TestReadVMDropsTheRootPassword(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{
-		"id": "0f289413-258f-4115-ac81-252000998fe0", "name": "geoffcloud", "vcpu": 8, "ram": 32768,
+		"id": "0f289413-258f-4115-ac81-252000998fe0", "name": "edge", "vcpu": 8, "ram": 32768,
 		"disk": 240, "location": "Melbourne", "password": "fixture-root-pw-do-not-leak",
 		"main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8::", "template": "Ubuntu 26.04 LTS x64",
 		"firewall_group_id": nil, "bgp_enabled": false, "status": "active", "active_action_id": nil,
@@ -28,7 +28,7 @@ func TestReadVMDropsTheRootPassword(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, client.VM{
-		ID: "0f289413-258f-4115-ac81-252000998fe0", Name: "geoffcloud", VCPU: 8, RAM: 32768, Disk: 240,
+		ID: "0f289413-258f-4115-ac81-252000998fe0", Name: "edge", VCPU: 8, RAM: 32768, Disk: 240,
 		Location: "Melbourne", MainIPv4: "203.0.113.18", MainIPv6: "2001:db8::", Template: "Ubuntu 26.04 LTS x64",
 		Status: "active", CreatedAt: "2026-10-02T05:48:53.632641Z", ActiveActionID: json.RawMessage("null"),
 	}, vm)

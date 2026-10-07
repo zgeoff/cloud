@@ -20,7 +20,7 @@ func TestVMImportAdoptsTheLiveVMWithoutItsPassword(t *testing.T) {
 	// The shape of GET /vm/{id} for a live VM (values changed), password included.
 	ctx.api.SetVM(map[string]any{
 		"id": "0f289413-258f-4115-ac81-252000998fe0", "current_cpu_limit": nil, "cpu_limit_updated_at": nil,
-		"cpu_limit_stale": true, "name": "geoffcloud", "vcpu": 8, "ram": 32768, "disk": 240, "location": "Melbourne",
+		"cpu_limit_stale": true, "name": "edge", "vcpu": 8, "ram": 32768, "disk": 240, "location": "Melbourne",
 		"password": "fixture-root-pw-do-not-leak", "bw_used": 0.73, "main_ipv4": "203.0.113.18",
 		"main_ipv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
 		"created_at": "2026-10-02T05:48:53.632641Z", "renewed_at": "2026-10-02T05:48:53.632641Z",
@@ -28,16 +28,16 @@ func TestVMImportAdoptsTheLiveVMWithoutItsPassword(t *testing.T) {
 		"billing_cycle": 1, "firewall_group_id": nil, "bgp_enabled": false, "status": "active", "active_action_id": nil,
 	})
 
-	read, err := ctx.server.Read(p.ReadRequest{ID: "0f289413-258f-4115-ac81-252000998fe0", Urn: onideltest.BuildURN("onidel:index:Vm", "geoffcloud")})
+	read, err := ctx.server.Read(p.ReadRequest{ID: "0f289413-258f-4115-ac81-252000998fe0", Urn: onideltest.BuildURN("onidel:index:Vm", "edge")})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		"0f289413-258f-4115-ac81-252000998fe0",
 		map[string]any{
-			"name": "geoffcloud", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
+			"name": "edge", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
 		},
 		map[string]any{
-			"name": "geoffcloud", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
+			"name": "edge", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
 			"status": "active", "mainIpv4": "203.0.113.18", "mainIpv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
 			"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53.632641Z",
 		},
@@ -183,17 +183,17 @@ func TestVMDiffAdoptsInputsTheAPICannotReportAfterAnImport(t *testing.T) {
 	ctx := setupTest(t)
 
 	diff, err := ctx.server.Diff(p.DiffRequest{
-		ID: "0f289413-258f-4115-ac81-252000998fe0", Urn: onideltest.BuildURN("onidel:index:Vm", "geoffcloud"),
+		ID: "0f289413-258f-4115-ac81-252000998fe0", Urn: onideltest.BuildURN("onidel:index:Vm", "edge"),
 		State: onideltest.BuildProps(map[string]any{
-			"name": "geoffcloud", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "ipv6": true,
+			"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "ipv6": true,
 			"status": "active", "mainIpv4": "203.0.113.18", "mainIpv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
 			"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53.632641Z",
 		}),
 		OldInputs: onideltest.BuildProps(map[string]any{
-			"name": "geoffcloud", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "ipv6": true,
+			"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24, "ipv6": true,
 		}),
 		Inputs: onideltest.BuildProps(map[string]any{
-			"name": "geoffcloud", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
+			"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
 			"paymentCycle": "monthly", "sshKeys": []any{"1423a98b-c6be-4dd8-b140-576e76c617d3"}, "ipv6": true,
 		}),
 	})
@@ -217,7 +217,7 @@ func TestVMDiffReportsEachChangedInput(t *testing.T) {
 		{"it replaces for a new payment cycle", map[string]any{"paymentCycle": "hourly"}, map[string]p.PropertyDiff{"paymentCycle": {Kind: p.UpdateReplace, InputDiff: true}}},
 		{"it ignores the order of SSH keys", map[string]any{"sshKeys": []any{"k2", "k1"}}, map[string]p.PropertyDiff{}},
 		{"it replaces for a new SSH key", map[string]any{"sshKeys": []any{"k1", "k3"}}, map[string]p.PropertyDiff{"sshKeys": {Kind: p.UpdateReplace, InputDiff: true}}},
-		{"it renames in place", map[string]any{"name": "geoffcloud-2"}, map[string]p.PropertyDiff{"name": {Kind: p.Update, InputDiff: true}}},
+		{"it renames in place", map[string]any{"name": "edge-2"}, map[string]p.PropertyDiff{"name": {Kind: p.Update, InputDiff: true}}},
 		{"it toggles IPv6 in place", map[string]any{"ipv6": false}, map[string]p.PropertyDiff{"ipv6": {Kind: p.Update, InputDiff: true}}},
 		{"it leaves IPv6 alone when the program unsets it", map[string]any{"ipv6": nil}, map[string]p.PropertyDiff{}},
 		{"it attaches a firewall group in place", map[string]any{"firewallGroupId": "g1"}, map[string]p.PropertyDiff{"firewallGroupId": {Kind: p.Add, InputDiff: true}}},
@@ -226,7 +226,7 @@ func TestVMDiffReportsEachChangedInput(t *testing.T) {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
 			inputs := map[string]any{
-				"name": "geoffcloud", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
+				"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
 				"paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true,
 			}
 			for key, value := range row.changes {
@@ -234,9 +234,9 @@ func TestVMDiffReportsEachChangedInput(t *testing.T) {
 			}
 
 			diff, err := ctx.server.Diff(p.DiffRequest{
-				ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "geoffcloud"),
+				ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "edge"),
 				State: onideltest.BuildProps(map[string]any{
-					"name": "geoffcloud", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
+					"name": "edge", "location": "Melbourne", "cpu": 8, "ram": 32768, "disk": 240, "os": 24,
 					"paymentCycle": "monthly", "sshKeys": []any{"k1", "k2"}, "ipv6": true,
 					"status": "active", "mainIpv4": "203.0.113.18", "mainIpv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
 					"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53.632641Z",

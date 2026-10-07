@@ -19,19 +19,19 @@ func TestRDNSCreateSetsThePTRRecordForTheVMsIP(t *testing.T) {
 	created, err := ctx.server.Create(p.CreateRequest{
 		Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),
 		Properties: onideltest.BuildProps(map[string]any{
-			"vmId": "0f289413-258f-4115-ac81-252000998fe0", "ip": "203.0.113.18", "domain": "geoff.cloud",
+			"vmId": "0f289413-258f-4115-ac81-252000998fe0", "ip": "203.0.113.18", "domain": "example.com",
 		}),
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		"0f289413-258f-4115-ac81-252000998fe0/203.0.113.18",
-		map[string]any{"vmId": "0f289413-258f-4115-ac81-252000998fe0", "ip": "203.0.113.18", "domain": "geoff.cloud"},
-		map[string]map[string]string{"0f289413-258f-4115-ac81-252000998fe0": {"203.0.113.18": "geoff.cloud"}},
+		map[string]any{"vmId": "0f289413-258f-4115-ac81-252000998fe0", "ip": "203.0.113.18", "domain": "example.com"},
+		map[string]map[string]string{"0f289413-258f-4115-ac81-252000998fe0": {"203.0.113.18": "example.com"}},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0/rdns", Body: map[string]any{
-				"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "geoff.cloud",
+				"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "example.com",
 			}},
 		},
 	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRDNS(), ctx.api.GetRequests()})
@@ -42,13 +42,13 @@ func TestRDNSCreatePreviewSendsNothing(t *testing.T) {
 
 	created, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:Rdns", "v4"),
-		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 		DryRun:     true,
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"},
+		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"},
 		[]onideltest.Request(nil),
 	}, []any{onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
 }
@@ -59,7 +59,7 @@ func TestRDNSCreateFailsForAnIPTheVMDoesNotOwn(t *testing.T) {
 
 	_, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:Rdns", "v4"),
-		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "198.51.100.1", "domain": "geoff.cloud"}),
+		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "198.51.100.1", "domain": "example.com"}),
 	})
 
 	assert.EqualError(t, err, "onidel: POST /vm/v/rdns: HTTP 401")
@@ -70,7 +70,7 @@ func TestRDNSImportReadsTheRecordByCompositeID(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 	require.NoError(t, err)
 
@@ -79,8 +79,8 @@ func TestRDNSImportReadsTheRecordByCompositeID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		"v/203.0.113.18",
-		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"},
-		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"},
+		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"},
+		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"},
 	}, []any{imported.ID, onideltest.ToPlain(imported.Inputs), onideltest.ToPlain(imported.Properties)})
 }
 
@@ -89,17 +89,17 @@ func TestRDNSReadKeepsTheProgramsSpellingOfAnEquivalentDomain(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 	require.NoError(t, err)
 
 	read, err := ctx.server.Read(p.ReadRequest{
 		ID: created.ID, Urn: urn, Properties: created.Properties,
-		Inputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "Geoff.Cloud."}),
+		Inputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "Example.Com."}),
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "Geoff.Cloud."}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "Example.Com."}, onideltest.ToPlain(read.Inputs))
 }
 
 func TestRDNSReadReportsADomainChangedOutsideTheProgram(t *testing.T) {
@@ -113,7 +113,7 @@ func TestRDNSReadReportsADomainChangedOutsideTheProgram(t *testing.T) {
 
 	read, err := ctx.server.Read(p.ReadRequest{
 		ID: created.ID, Urn: urn, Properties: created.Properties,
-		Inputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Inputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 
 	require.NoError(t, err)
@@ -125,7 +125,7 @@ func TestRDNSReadMatchesAnIPv6RecordWrittenInAnotherForm(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv6": "2001:db8::1"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v6")
 	_, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "2001:db8::1", "domain": "geoff.cloud"}),
+		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "2001:db8::1", "domain": "example.com"}),
 	})
 	require.NoError(t, err)
 
@@ -134,7 +134,7 @@ func TestRDNSReadMatchesAnIPv6RecordWrittenInAnotherForm(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		"v/2001:0db8:0:0:0:0:0:1",
-		map[string]any{"vmId": "v", "ip": "2001:0db8:0:0:0:0:0:1", "domain": "geoff.cloud"},
+		map[string]any{"vmId": "v", "ip": "2001:0db8:0:0:0:0:0:1", "domain": "example.com"},
 	}, []any{read.ID, onideltest.ToPlain(read.Inputs)})
 }
 
@@ -204,7 +204,7 @@ func TestRDNSRejectsAMalformedID(t *testing.T) {
 		{"it rejects a delete of an ID whose IP does not parse", "v/not-an-ip", func(server integration.Server, id string) error {
 			return server.Delete(p.DeleteRequest{
 				ID: id, Urn: onideltest.BuildURN("onidel:index:Rdns", "r"),
-				Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+				Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 			})
 		}},
 	}
@@ -228,17 +228,17 @@ func TestRDNSDiffUpdatesTheDomainInPlaceAndReplacesForANewIP(t *testing.T) {
 	}{
 		{
 			"it updates a new domain in place",
-			map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.geoff.cloud"},
+			map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.example.com"},
 			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"domain": {Kind: p.Update}}},
 		},
 		{
 			"it replaces the record for a new IP",
-			map[string]any{"vmId": "v", "ip": "2001:db8:4:17f::", "domain": "geoff.cloud"},
+			map[string]any{"vmId": "v", "ip": "2001:db8:4:17f::", "domain": "example.com"},
 			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"ip": {Kind: p.UpdateReplace}}},
 		},
 		{
 			"it replaces the record for a new VM",
-			map[string]any{"vmId": "w", "ip": "203.0.113.18", "domain": "geoff.cloud"},
+			map[string]any{"vmId": "w", "ip": "203.0.113.18", "domain": "example.com"},
 			p.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"vmId": {Kind: p.UpdateReplace}}},
 		},
 	}
@@ -248,8 +248,8 @@ func TestRDNSDiffUpdatesTheDomainInPlaceAndReplacesForANewIP(t *testing.T) {
 
 			diff, err := ctx.server.Diff(p.DiffRequest{
 				ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),
-				State:     onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
-				OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+				State:     onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+				OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 				Inputs:    onideltest.BuildProps(row.inputs),
 			})
 
@@ -264,20 +264,20 @@ func TestRDNSUpdateOverwritesTheRecord(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 	require.NoError(t, err)
 
 	updated, err := ctx.server.Update(p.UpdateRequest{
 		ID: created.ID, Urn: urn, State: created.Properties,
-		OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
-		Inputs:    onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.geoff.cloud"}),
+		OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+		Inputs:    onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.example.com"}),
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.geoff.cloud"},
-		map[string]map[string]string{"v": {"203.0.113.18": "host.geoff.cloud"}},
+		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.example.com"},
+		map[string]map[string]string{"v": {"203.0.113.18": "host.example.com"}},
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRDNS()})
 }
 
@@ -286,15 +286,15 @@ func TestRDNSUpdatePreviewSendsNothing(t *testing.T) {
 
 	updated, err := ctx.server.Update(p.UpdateRequest{
 		ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),
-		State:     onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
-		OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
-		Inputs:    onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.geoff.cloud"}),
+		State:     onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+		OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+		Inputs:    onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.example.com"}),
 		DryRun:    true,
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.geoff.cloud"},
+		map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.example.com"},
 		[]onideltest.Request(nil),
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
 }
@@ -304,9 +304,9 @@ func TestRDNSUpdateFailsWhenTheAPIRefuses(t *testing.T) {
 
 	_, err := ctx.server.Update(p.UpdateRequest{
 		ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),
-		State:     onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
-		OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
-		Inputs:    onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.geoff.cloud"}),
+		State:     onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+		OldInputs: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
+		Inputs:    onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "host.example.com"}),
 	})
 
 	assert.EqualError(t, err, "onidel: POST /vm/v/rdns: HTTP 401")
@@ -317,7 +317,7 @@ func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 	require.NoError(t, err)
 
@@ -328,7 +328,7 @@ func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 		map[string]map[string]string{"v": {}},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "geoff.cloud"}},
+			{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "example.com"}},
 			{Method: "DELETE", Path: "/vm/v/rdns/203.0.113.18", Query: "team_id=" + onideltest.TeamID},
 		},
 	}, []any{ctx.api.GetRDNS(), ctx.api.GetRequests()})
@@ -342,7 +342,7 @@ func TestRDNSDeleteAcceptsARecordWhoseVMIsGone(t *testing.T) {
 
 	err := ctx.server.Delete(p.DeleteRequest{
 		ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),
-		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 
 	assert.NoError(t, err)
@@ -353,7 +353,7 @@ func TestRDNSDeleteFailsWhenTheAPIRefuses(t *testing.T) {
 
 	err := ctx.server.Delete(p.DeleteRequest{
 		ID: "v/203.0.113.18", Urn: onideltest.BuildURN("onidel:index:Rdns", "v4"),
-		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 
 	assert.EqualError(t, err, "onidel: DELETE /vm/v/rdns/203.0.113.18: HTTP 401")
@@ -364,7 +364,7 @@ func TestRDNSReadAfterDeleteReportsTheRecordAsGone(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "geoff.cloud"}),
+		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 	require.NoError(t, err)
 	require.NoError(t, ctx.server.Delete(p.DeleteRequest{ID: created.ID, Urn: urn, Properties: created.Properties}))
