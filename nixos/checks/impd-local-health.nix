@@ -480,7 +480,8 @@ let
 
         before=$(date +%s)
         status=0
-        IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
+        env -u IMPD_HEALTH_TIMEOUT_SECONDS IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out \
+          ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
         assert_equals 0 "$status" "the probe's exit status"
