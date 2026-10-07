@@ -256,6 +256,12 @@ it_fails_with_the_build_when_a_check_fails() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: Cannot build '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-atc-daemon-check.drv'."
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","nixos/nix","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
