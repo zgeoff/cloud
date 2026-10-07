@@ -6,7 +6,7 @@ export function buildMockATCDaemonEndpoint(
 ): ATCDaemonEndpoint {
   return {
     name: faker.internet.domainWord(),
-    address: `${faker.internet.ipv4()}:${faker.internet.port()}`,
+    address: `${faker.internet.ipv4()}:${faker.number.int({ min: 1, max: 65_535 })}`,
     alertSeverity: 'critical',
     ...overrides,
   };
