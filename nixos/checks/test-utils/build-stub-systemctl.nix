@@ -1,7 +1,7 @@
 # A stand-in systemctl for the impd-restore rehearsal: the real systemctl, except that it cannot
 # read one unit's state. The call `show -p ActiveState --value <unit>`, for the unit
 # $FAIL_SHOW_UNIT names, prints systemctl's own failure line for a property read it cannot make
-# and exits 1, as systemctl does when it cannot reach the manager. Every other call, with any
+# and exits 1, as systemctl does when the manager's reply times out. Every other call, with any
 # other arguments, is the real systemctl with the same arguments: the script under test also
 # reads the other unit's state, and its failure path stops the units, so the stand-in passes
 # what it does not expect through rather than failing it. Without $FAIL_SHOW_UNIT it exits 2.

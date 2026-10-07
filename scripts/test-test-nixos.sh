@@ -149,6 +149,31 @@ EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
+it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_checks_without_kvm() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
+    STUB_CHECKS=$'atc-daemon\nimpd-restore\nimpd-restore-seams\n' KVM_DEVICE="$tree/no-kvm" \
+    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "test-nixos: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","nixos/nix","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","nixos/nix","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+EOF
+  ls -A "$tree/tmp" > "$tree/tmp-left"
+  diff /dev/null "$tree/tmp-left"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
 it_fails_naming_impd_restore_and_builds_nothing_when_it_is_the_only_check_and_kvm_is_missing() {
   local status=0
   tree="$(mktemp -d)"
