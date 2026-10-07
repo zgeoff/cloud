@@ -503,8 +503,25 @@ let
         assert_equals 0 "$status" "the probe's exit status"
         # the default --max-time 5 ends the probe: at least 5 s, and not much more
         assert_between 5 "$((after - before))" 7 "the probe's run time in seconds"
-        assert_equals "impd_local_health_status_code 0" \
-          "$(grep '^impd_local_health_status_code ' out/impd_local_health.prom)" "the status code line"
+        assert_files_equal /dev/null stdout
+        assert_files_equal /dev/null stderr
+        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
+        assert_between "$before" "$stamp" "$after" "the timestamp"
+        sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
+          out/impd_local_health.prom > actual
+        cat > expected <<'EOF'
+        # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
+        # TYPE impd_local_health_up gauge
+        impd_local_health_up 0
+        # HELP impd_local_health_status_code HTTP status of the last loopback probe, 0 when it got no answer.
+        # TYPE impd_local_health_status_code gauge
+        impd_local_health_status_code 0
+        # HELP impd_local_health_last_check_timestamp_seconds When the last loopback probe ran.
+        # TYPE impd_local_health_last_check_timestamp_seconds gauge
+        impd_local_health_last_check_timestamp_seconds STAMP
+        EOF
+        assert_files_equal expected actual
       '';
     }
     {
