@@ -15,9 +15,10 @@ let
   # (infra/onepassword-connect.ts).
   connectRelayAddress = "172.17.0.1";
   connectRelayPort = 18081;
-  connectServiceAddress = "10.43.82.198:8000";
+  connectServiceAddress = "10.43.82.198:8080";
   # docker0's subnet. imp's module does not fix imp-host's address on it, so the rule below
-  # admits the whole subnet; the other containers on docker0 are ours and none reach k3s.
+  # admits the whole subnet: every container on docker0, imp's docker proxy and image builds
+  # included, can reach the relay. Connect's read-only token still gates every request.
   dockerSubnet = "172.17.0.0/16";
   atc = pkgs.callPackage ../../packages/atc.nix { };
 in
@@ -135,6 +136,14 @@ in
 
   # The relay: systemd holds the socket and starts the proxy on the first connection, so the
   # socket can wait for docker0 (FreeBind) and the proxy dials the ClusterIP from the host.
+  # imp-host reaches the relay on docker0 only while imp's IPv6 mode is off: that mode moves
+  # imp-host to its own bridge, which neither nixos-fw nor cloud_host opens for the relay
+  assertions = [
+    {
+      assertion = !(config.services.imp.ipv6.enable or false);
+      message = "the Connect relay assumes imp-host on docker0; services.imp.ipv6.enable moves it to br-imphost";
+    }
+  ];
   systemd.sockets.onepassword-connect-relay = {
     wantedBy = [ "sockets.target" ];
     listenStreams = [ "${connectRelayAddress}:${toString connectRelayPort}" ];

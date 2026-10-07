@@ -24,9 +24,9 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 - No live change without a preview first. The Tailscale policy file in particular: Pulumi's `Acl`
   replaces the whole file, so Geoff reviews the diff before an apply that changes it.
 - The host's firewall is NixOS's table `inet nixos-fw`, plus `inet cloud_host` for the atc daemon's
-  port. imp's module adds `inet imp-forward`, and k3s and Docker add their own tables; imp's
-  `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and keep
-  `networking.nftables.flushRuleset` off.
+  port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and Docker add their own
+  tables; imp's `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and
+  keep `networking.nftables.flushRuleset` off.
 - Never touch `/dev/vdb` on the host. It holds imp's ZFS pool.
 - Everything the hooks and CI run is a root `package.json` script.
 

@@ -9,15 +9,14 @@ items with `op read`, through imp's credential broker. It has no public route. T
 A granted imp sends HTTPS to `op-connect.imp.internal`. The broker in imp-host swaps the placeholder
 bearer for the real token and forwards to `http://172.17.0.1:18081`. There the host's
 `onepassword-connect-relay` socket starts `systemd-socket-proxyd`, which dials the Service's
-ClusterIP, `10.43.82.198:8000`. That is the nginx proxy in the Connect pod, which passes GET and
-HEAD only.
+ClusterIP, `10.43.82.198:8080`: Connect's API.
 
 ## What holds what
 
 | Where                                                 | Holds                                                      |
 | ----------------------------------------------------- | ---------------------------------------------------------- |
 | vault `cloud`, item `onepassword-connect-credentials` | the Connect server `imp-connect`'s credentials file (JSON) |
-| vault `cloud`, item `onepassword-connect-token`       | the Connect access token the broker presents               |
+| vault `cloud`, item `onepassword-connect-token`       | the read-only Connect token `imp-agents-ro` (vault `imp`)  |
 | vault `imp`                                           | the items imps read; granted to the Connect server only    |
 | the Connect Secret in k3s                             | the credentials file, set by Pulumi from `.env`            |
 | impd, custom secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host |
@@ -52,10 +51,8 @@ The broker swaps the placeholder for the real token on the way out.
 
 ## Failures
 
-| Symptom             | Cause                                                      | Fix                                                                                                                                                            |
-| ------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 502 from the broker | the relay or Connect is down                               | on the host: `systemctl status onepassword-connect-relay.socket`; check the Service's ClusterIP is still `10.43.82.198`; `k3s kubectl -n onepassword get pods` |
-| 405 from the proxy  | the request was not GET or HEAD; Connect is read-only here | none: writes are out of scope                                                                                                                                  |
-| 401 from Connect    | the token is missing a grant on the vault, or it is wrong  | grant the Connect server and token the `imp` vault; re-add the token                                                                                           |
-
-The proxy's access log goes to the pod's stdout and never records the `Authorization` header.
+| Symptom             | Cause                                                     | Fix                                                                                                                                                            |
+| ------------------- | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 502 from the broker | the relay or Connect is down                              | on the host: `systemctl status onepassword-connect-relay.socket`; check the Service's ClusterIP is still `10.43.82.198`; `k3s kubectl -n onepassword get pods` |
+| 403 from Connect    | a write: the token is read-only                           | none: writes are out of scope                                                                                                                                  |
+| 401 from Connect    | the token is missing a grant on the vault, or it is wrong | grant the Connect server and token the `imp` vault; re-add the token                                                                                           |

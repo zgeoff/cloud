@@ -142,18 +142,18 @@ Items that `.env` does not reference:
 
 ## Ports
 
-| Port      | Where                               | Reachable from                                     | Service                          |
-| --------- | ----------------------------------- | -------------------------------------------------- | -------------------------------- |
-| udp 41641 | `geoffcloud`, public                | the internet                                       | Tailscale direct connections     |
-| tcp 22    | `geoffcloud`                        | tailnet admins (Tailscale SSH)                     | SSH                              |
-| tcp 6443  | `geoffcloud`                        | the tailnet                                        | the k3s API                      |
-| tcp 30300 | `geoffcloud`, tailnet address only  | the tailnet                                        | Grafana (NodePort)               |
-| tcp 7070  | host loopback, and `imp-geoffcloud` | the host; tailnet members; `tag:imp` nodes         | impd's API and `/health`         |
-| tcp 8414  | Geoff's PC (`home-pc`)              | tailnet members; `tag:cloud`                       | `atc mcp --http`                 |
-| tcp 8415  | `geoffcloud`, tailnet address       | k3s pods only (`inet cloud_host`)                  | the atc daemon (**PENDING**)     |
-| tcp 18081 | `geoffcloud`, docker0 address       | imp-host's docker0 subnet only (`inet cloud_host`) | the Connect relay (**PENDING**)  |
-| tcp 2000  | cloudflared pods                    | the cluster                                        | cloudflared metrics and `/ready` |
-| tcp 3100  | `loki.observability.svc`            | the cluster                                        | Loki                             |
+| Port      | Where                               | Reachable from                              | Service                          |
+| --------- | ----------------------------------- | ------------------------------------------- | -------------------------------- |
+| udp 41641 | `geoffcloud`, public                | the internet                                | Tailscale direct connections     |
+| tcp 22    | `geoffcloud`                        | tailnet admins (Tailscale SSH)              | SSH                              |
+| tcp 6443  | `geoffcloud`                        | the tailnet                                 | the k3s API                      |
+| tcp 30300 | `geoffcloud`, tailnet address only  | the tailnet                                 | Grafana (NodePort)               |
+| tcp 7070  | host loopback, and `imp-geoffcloud` | the host; tailnet members; `tag:imp` nodes  | impd's API and `/health`         |
+| tcp 8414  | Geoff's PC (`home-pc`)              | tailnet members; `tag:cloud`                | `atc mcp --http`                 |
+| tcp 8415  | `geoffcloud`, tailnet address       | k3s pods only (`inet cloud_host`)           | the atc daemon (**PENDING**)     |
+| tcp 18081 | `geoffcloud`, docker0 address       | docker0 containers only (`inet cloud_host`) | the Connect relay (**PENDING**)  |
+| tcp 2000  | cloudflared pods                    | the cluster                                 | cloudflared metrics and `/ready` |
+| tcp 3100  | `loki.observability.svc`            | the cluster                                 | Loki                             |
 
 ## Host paths
 
