@@ -15,12 +15,15 @@
 # What it does not prove: gateway-to-daemon transport (the registry's daemon is a dead
 # address), R2, k3s.
 #
-# The images build once per run, under tags carrying a random per-run id that the run
-# removes. Each case then starts its own containers on its own volumes and an ephemeral
-# host port, all named from that id, and removes them when it exits.
+# The images come from scripts/test-lib/with-fixture-images.sh, which builds them once
+# per run under tags carrying a random per-run id, removes them after, and sets
+# FIXTURE_RUN, FIXTURE_GATEWAY_IMAGE and FIXTURE_BACKUP_IMAGE. Each case starts its own
+# containers on its own volumes and an ephemeral host port, all named from that id, and
+# removes them when it exits. `bun run test:atc-gateway-fixture` runs it after the helper
+# tests; alone:
 #
-#   bash scripts/test-atc-gateway-fixture.sh
-#   CASE='foreign Host' bash scripts/test-atc-gateway-fixture.sh   # the cases whose title holds it
+#   bash scripts/test-lib/with-fixture-images.sh bash scripts/test-atc-gateway-fixture.sh
+#   CASE='foreign Host' bash scripts/test-lib/with-fixture-images.sh bash scripts/test-atc-gateway-fixture.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -681,30 +684,14 @@ setup_case() {
     -v "$name-state:/s" -v "$name-repo:/r" "$restic_image" -c 'chown 65532:65532 /s /r'
 }
 
-# Boot data every case needs: both images, built once under per-run tags that the run
-# removes, and the random per-run id that the tags and every case's container and volume
-# names carry, so concurrent runs on one daemon never share them. The cases take the
-# image names, the pinned restic image and the run id as arguments.
+# Boot data every case needs: the pinned restic image that setup_case chowns the volumes
+# with, and the images and the run id that with-fixture-images.sh provides.
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# sets BASE_IMAGE and RESTIC_IMAGE, among the pins
+# sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
 source "$repo/deploy/atc-gateway/versions.env"
-run="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
-work="$(mktemp -d)"
-gateway_image="atc-gateway:fixture-$run"
-backup_image="atc-gateway-backup:fixture-$run"
-trap 'docker rmi -f "$gateway_image" "$backup_image" > /dev/null 2>&1 || true; rm -rf "$work" || true' EXIT
+: "${FIXTURE_RUN:?is unset: run this under scripts/test-lib/with-fixture-images.sh}"
+: "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under scripts/test-lib/with-fixture-images.sh}"
+: "${FIXTURE_BACKUP_IMAGE:?is unset: run this under scripts/test-lib/with-fixture-images.sh}"
 # shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env
-if ! {
-  "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
-    cp "$repo/deploy/atc-gateway/Dockerfile" "$work/context/" &&
-    docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway_image" "$work/context" &&
-    docker build -q --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup_image" \
-      "$repo/deploy/atc-gateway/backup"
-} > "$work/build.log" 2>&1; then
-  echo "FAIL the images did not build from the pinned, checked binary and pinned bases"
-  sed 's/^/    /' "$work/build.log"
-  exit 1
-fi
-echo "built $gateway_image and $backup_image"
-run_cases "$gateway_image" "$backup_image" "$RESTIC_IMAGE" "$run"
+run_cases "$FIXTURE_GATEWAY_IMAGE" "$FIXTURE_BACKUP_IMAGE" "$RESTIC_IMAGE" "$FIXTURE_RUN"
