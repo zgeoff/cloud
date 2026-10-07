@@ -2,10 +2,11 @@
 name: project-testing
 description:
   cloud's own testing rules on top of the shared testing skill — where each suite runs, the infra
-  test utils (faker factories, the stub Pulumi Config, Outputs by reference), the Go provider's
-  stub Onidel API and injected sleep, the shell suites' case runner and stand-ins, the NixOS checks
-  and restore rehearsals, and the rule that no test reaches a real host. Load together with the
-  testing skill when designing, writing, or reviewing cloud tests.
+  test utils (faker factories, the stub Pulumi Config, Outputs by reference), the health-check
+  worker's MSW boundary, the Go provider's stub Onidel API and injected sleep, the shell suites'
+  case runner and stand-ins, the NixOS checks and restore rehearsals, and the rule that no test
+  reaches a real host. Load together with the testing skill when designing, writing, or reviewing
+  cloud tests.
 ---
 
 # cloud testing
