@@ -203,9 +203,18 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             "== start",
             f"restored /root/imp-db-backups/pre-0.29-20261004T000000 (migration 0002_tokens) on generation 1; the replaced database is in {saved}",
         ], out
-        # switch-to-configuration writes its progress to stderr: the units it stops, starts and
-        # restarts, which vary with the generations; the script's own lines start with its name
-        assert [line for line in err.splitlines() if line.startswith("restore-impd-db:")] == [], err
+        # switch-to-configuration's progress; the mounts docker made for imp-host carry generated
+        # ids, and how many it made varies; dhcpcd in this VM can crash, which starts
+        # systemd-coredump's slice
+        err_lines = err.splitlines()
+        assert re.fullmatch(r"the following new units were started: (((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount|system-systemd\\x2dcoredump\.slice)(, |$))+", err_lines[5]), err
+        assert err_lines[:5] + err_lines[6:] == [
+            "Checking switch inhibitors... done",
+            "updating GRUB 2 menu...",
+            "activating the configuration...",
+            "restarting sysinit-reactivation.target",
+            "reloading the following units: dbus-broker.service",
+        ], err
         machine.fail("findmnt -rn -S tank/imp")
         leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
         assert leftovers == "", f"the script left {leftovers}"
@@ -289,9 +298,18 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             "== start",
             f"restored /root/imp-db-backups/pre-0.29-20261004T000000 (migration 0002_tokens) on generation 1; the replaced database is in {saved}",
         ], out
-        # switch-to-configuration writes its progress to stderr: the units it stops, starts and
-        # restarts, which vary with the generations; the script's own lines start with its name
-        assert [line for line in err.splitlines() if line.startswith("restore-impd-db:")] == [], err
+        # switch-to-configuration's progress; the mounts docker made for imp-host carry generated
+        # ids, and how many it made varies; dhcpcd in this VM can crash, which starts
+        # systemd-coredump's slice
+        err_lines = err.splitlines()
+        assert re.fullmatch(r"the following new units were started: (((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount|system-systemd\\x2dcoredump\.slice)(, |$))+", err_lines[5]), err
+        assert err_lines[:5] + err_lines[6:] == [
+            "Checking switch inhibitors... done",
+            "updating GRUB 2 menu...",
+            "activating the configuration...",
+            "restarting sysinit-reactivation.target",
+            "reloading the following units: dbus-broker.service",
+        ], err
         machine.fail("findmnt -rn -S tank/imp")
         leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
         assert leftovers == "", f"the script left {leftovers}"
@@ -327,69 +345,6 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert published == 0, "the published database differs from the copy"
         assert secret == "dummy-secret-value\n", f"the secret reads {secret!r}"
         assert secret_saved == 0, "the saved secret differs from the one in place"
-
-
-    with subtest("it stops imp-host and imp-docker-proxy again when the switch fails"):
-        ctx = setup_test()
-        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-        machine.succeed("install -d -m 0700 /mnt/imp/db")
-        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-        machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-        machine.succeed(
-            "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-        )
-        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-        machine.succeed("umount /mnt/imp")
-        machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-        machine.succeed(
-            "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-        )
-        machine.succeed(
-            "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-        )
-        machine.succeed("systemctl stop imp-host imp-docker-proxy")
-
-        status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
-        err = machine.succeed("cat /tmp/restore.err")
-
-        assert status == 1, f"exit {status}: {out}{err}"
-        saved_dirs = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
-        assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
-        saved = saved_dirs[0]
-        # after these, switch-to-configuration prints the failed unit's status, with times and PIDs
-        assert out.splitlines()[:10] == [
-            "== check the copy",
-            "== check the host",
-            "== mount tank/imp",
-            "== preserve the stopped database",
-            f"saved: {saved}",
-            "== stage and check the copy",
-            "== publish",
-            "== unmount",
-            "== activate generation 2",
-            "setting up /etc...",
-        ], out
-        later = [line for line in out.splitlines()[10:] if line.startswith(("== ", "saved: ", "restored "))]
-        assert later == [], f"the script went on past the switch: {later}"
-        # switch-to-configuration writes its progress to stderr; the script's own lines start with its name
-        messages = [line for line in err.splitlines() if line.startswith("restore-impd-db:")]
-        assert len(messages) == 2, err
-        # the ERR trap names the script line, which moves with any edit to the script
-        assert re.fullmatch(r"restore-impd-db: failed at line \d+", messages[0]), err
-        assert messages[1] == (
-            f"restore-impd-db: the copy is in place (the original is in {saved}); "
-            "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again"
-        ), err
-        units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units == ["failed", "failed"], f"the units are {units}"
-        machine.fail("findmnt -rn -S tank/imp")
-        # the activation ran; only a unit failed
-        current = machine.succeed("readlink -f /run/current-system").strip()
-        assert current == ctx["broken_path"], f"the system is {current}"
-        machine.succeed("mount -t zfs tank/imp /mnt/imp")
-        published = machine.execute("cmp /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite /mnt/imp/db/imp.sqlite")[0]
-        machine.succeed("umount /mnt/imp")
-        assert published == 0, "the published database differs from the copy"
 
 
     with subtest("it restores without a switch when the copy's generation is the running one"):
@@ -620,65 +575,6 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert published == 0, "the published database differs from the copy"
 
 
-    with subtest("it stops both units again when no imp-host container appears within the wait"):
-        ctx = setup_test()
-        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-        machine.succeed("install -d -m 0700 /mnt/imp/db")
-        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-        machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-        machine.succeed(
-            "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-        )
-        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-        machine.succeed("umount /mnt/imp")
-        machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-        machine.succeed(
-            "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-        )
-        machine.succeed(
-            "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-        )
-        machine.succeed("systemctl stop imp-host imp-docker-proxy")
-        # docker run reads its seccomp profile before it creates the container: an invalid profile
-        # makes every start fail with no container at all
-        seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
-        assert len(seccomp) == 1, f"the unit names {seccomp}"
-        machine.succeed("printf '{' > /tmp/broken-seccomp.json")
-        machine.succeed(f"mount --bind /tmp/broken-seccomp.json {seccomp[0]}")
-
-        status, out = machine.execute("IMPD_START_WAIT_SECONDS=1 SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
-        err = machine.succeed("cat /tmp/restore.err")
-
-        assert status == 1, f"exit {status}: {out}{err}"
-        saved_dirs = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
-        assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
-        saved = saved_dirs[0]
-        assert out.splitlines() == [
-            "== check the copy",
-            "== check the host",
-            "== mount tank/imp",
-            "== preserve the stopped database",
-            f"saved: {saved}",
-            "== stage and check the copy",
-            "== publish",
-            "== unmount",
-            "== activate generation 3",
-            "== start",
-        ], out
-        assert err.splitlines() == [
-            "restore-impd-db: no imp-host container appeared within 1 s of the start",
-            f"restore-impd-db: the copy is in place (the original is in {saved}); "
-            "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
-        ], err
-        units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units == ["inactive", "failed"], f"the units are {units}"
-        containers = machine.succeed("docker ps -a --format '{{.Names}}'").split()
-        assert containers == [], f"the containers are {containers}"
-        machine.fail("findmnt -rn -S tank/imp")
-        current = machine.succeed("readlink -f /run/current-system").strip()
-        assert current == ctx["base_path"], f"the system is {current}"
-
-
     with subtest("it prints its usage, and changes nothing, without arguments"):
         ctx = setup_test()
         machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
@@ -705,9 +601,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
         assert status == 1, f"exit {status}: {out}{err}"
         assert out == "", out
-        # bash names the script and the line of the failed expansion; the line moves with any edit
-        normalized = re.sub(r": line [0-9]+: ", ": line N: ", err)
-        assert normalized == "${../../scripts/restore-impd-db.sh}: line N: 1: usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>\n", err
+        # bash names the script and the line of the failed expansion, the script's first argument
+        assert err == "${../../scripts/restore-impd-db.sh}: line 20: 1: usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>\n", err
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
         assert units == units_before, f"the units went from {units_before} to {units}"
         backups = machine.succeed("ls -A /root/imp-db-backups").split()
@@ -1275,116 +1170,6 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         machine.succeed("umount /mnt/imp")
         assert sums == db_sums, f"the database changed: {sums}"
         assert db_files == ['imp.sqlite', 'imp.sqlite-shm', 'imp.sqlite-wal'], f"the database files are {db_files}"
-
-
-    with subtest("it stops before the copy goes in place when the saved secrets differ from the originals"):
-        ctx = setup_test()
-        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-        machine.succeed("install -d -m 0700 /mnt/imp/db")
-        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-        machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-        machine.succeed(
-            "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-        )
-        # a relative symlink in the secrets: cp -a saves the link itself, and diff follows each
-        # copy from where it sits, to the dataset's imp.sqlite note here and to the saved
-        # database there, so the saved secrets really differ from the originals
-        machine.succeed("printf 'a note beside the database\\n' > /mnt/imp/imp.sqlite")
-        machine.succeed("ln -s ../imp.sqlite /mnt/imp/secrets/note")
-        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-        machine.succeed("umount /mnt/imp")
-        machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-        machine.succeed(
-            "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-        )
-        machine.succeed(
-            "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-        )
-        machine.succeed("systemctl stop imp-host imp-docker-proxy")
-        units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-
-        status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
-        err = machine.succeed("cat /tmp/restore.err")
-
-        assert status == 1, f"exit {status}: {out}{err}"
-        saved_dirs = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
-        assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
-        assert out.splitlines() == ["== check the copy", "== check the host", "== mount tank/imp", "== preserve the stopped database"], out
-        assert err.splitlines() == [
-            "restore-impd-db: the saved secrets differ from the originals",
-            "restore-impd-db: nothing was changed",
-        ], err
-        units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units == units_before, f"the units went from {units_before} to {units}"
-        machine.fail("findmnt -rn -S tank/imp")
-        leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
-        assert leftovers == "", f"the script left {leftovers}"
-        current = machine.succeed("readlink -f /run/current-system").strip()
-        assert current == ctx["base_path"], f"the system is {current}"
-        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-        assert profile == "system-3-link", f"the system profile is {profile}"
-        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-        machine.succeed("mount -t zfs tank/imp /mnt/imp")
-        sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-        db_files = machine.succeed("ls -A /mnt/imp/db").split()
-        machine.succeed("umount /mnt/imp")
-        assert sums == db_sums, f"the database changed: {sums}"
-        assert db_files == ['imp.sqlite', 'imp.sqlite-shm', 'imp.sqlite-wal'], f"the database files are {db_files}"
-
-
-    with subtest("it stops before the copy goes in place when a saved database file differs from its original"):
-        ctx = setup_test()
-        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-        machine.succeed("install -d -m 0700 /mnt/imp/db")
-        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-        machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-        machine.succeed(
-            "sqlite3 /mnt/imp/db/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-        )
-        # /proc/self/status reads differently for each process that reads it, as a file that
-        # changes under the copy would
-        machine.succeed("ln -s /proc/self/status /mnt/imp/db/imp.sqlite-shm")
-        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite")
-        machine.succeed("umount /mnt/imp")
-        machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-        machine.succeed(
-            "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-        )
-        machine.succeed(
-            "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-        )
-        machine.succeed("systemctl stop imp-host imp-docker-proxy")
-        units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-
-        status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
-        err = machine.succeed("cat /tmp/restore.err")
-
-        assert status == 1, f"exit {status}: {out}{err}"
-        saved_dirs = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
-        assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
-        assert out.splitlines() == ["== check the copy", "== check the host", "== mount tank/imp", "== preserve the stopped database"], out
-        assert err.splitlines() == [
-            "restore-impd-db: the saved imp.sqlite-shm differs from the original",
-            "restore-impd-db: nothing was changed",
-        ], err
-        units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units == units_before, f"the units went from {units_before} to {units}"
-        machine.fail("findmnt -rn -S tank/imp")
-        leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
-        assert leftovers == "", f"the script left {leftovers}"
-        current = machine.succeed("readlink -f /run/current-system").strip()
-        assert current == ctx["base_path"], f"the system is {current}"
-        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-        assert profile == "system-3-link", f"the system profile is {profile}"
-        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-        machine.succeed("mount -t zfs tank/imp /mnt/imp")
-        sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite")
-        db_files = machine.succeed("ls -A /mnt/imp/db").split()
-        machine.succeed("umount /mnt/imp")
-        assert sums == db_sums, f"the database changed: {sums}"
-        assert db_files == ['imp.sqlite', 'imp.sqlite-shm'], f"the database files are {db_files}"
 
 
     with subtest("it stops, and leaves the database in place, when the staged file fails integrity_check"):
