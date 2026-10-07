@@ -293,14 +293,16 @@ func TestClientNeverRetriesAServerError(t *testing.T) {
 
 func TestClientStopsRetryingWhenTheContextEnds(t *testing.T) {
 	ctx := setupTest(t)
+	callCtx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
 	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
+		cancel()
 		w.WriteHeader(http.StatusServiceUnavailable)
 	})
 	ctx.client.RetryBase = time.Hour
-	deadline, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
-	t.Cleanup(cancel)
 
-	_, err := ctx.client.ReadTeams(deadline)
+	_, err := ctx.client.ReadTeams(callCtx)
 
-	assert.Equal(t, []any{context.DeadlineExceeded, 1}, []any{err, len(ctx.api.GetRequests())})
+	require.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
 }
