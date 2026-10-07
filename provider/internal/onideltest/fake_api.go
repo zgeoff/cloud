@@ -12,6 +12,8 @@ import (
 	"slices"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 // TeamID is the one team the fake API starts with, as GET /teams lists it.
@@ -29,8 +31,9 @@ const APIKey = "test-key"
 // the in-flight state (status building, or an active_action_id), and the next read
 // sees it active with no action. SetAutoSettle(false) holds every VM where it is.
 //
-// The fake records every request. A request no route serves, or a body that is not
-// JSON, is a problem: it gets a 500 or a 400 and is listed by GetProblems.
+// The fake records every request. A request no route serves, a VM setting the fake
+// does not model, or a body that is not JSON, is a problem: it gets a 500 or a 400,
+// and the test fails at cleanup unless it drains the problem with DrainProblems.
 type FakeAPI struct {
 	// URL is the base URL of the running fake.
 	URL string
@@ -47,13 +50,20 @@ type FakeAPI struct {
 	rdns       map[string]map[string]string // VM ID -> IP -> domain
 	requests   []Request
 	problems   []string
+	canned     map[string][]cannedResponse // pattern -> responses still to send
 
 	routes    *http.ServeMux
 	overrides *http.ServeMux
+	cans      *http.ServeMux
 }
 
-// StartFakeAPI starts a fake API with one team and no resources. The server stops
-// when the test ends.
+type cannedResponse struct {
+	status int
+	body   string
+}
+
+// StartFakeAPI starts a fake API with one team and no resources. When the test ends,
+// it fails the test on any problem left undrained, then stops the server.
 func StartFakeAPI(t testing.TB) *FakeAPI {
 	t.Helper()
 	f := &FakeAPI{
@@ -64,14 +74,32 @@ func StartFakeAPI(t testing.TB) *FakeAPI {
 		firewalls:  map[string]map[string]any{},
 		rules:      map[string]map[string]any{},
 		rdns:       map[string]map[string]string{},
+		canned:     map[string][]cannedResponse{},
 		routes:     http.NewServeMux(),
 		overrides:  http.NewServeMux(),
+		cans:       http.NewServeMux(),
 	}
 	f.registerRoutes()
 	server := httptest.NewServer(f)
 	t.Cleanup(server.Close)
+	t.Cleanup(func() {
+		t.Helper()
+		assert.Empty(t, f.DrainProblems(), "the fake API saw requests it does not serve")
+	})
 	f.URL = server.URL
 	return f
+}
+
+// RegisterResponse answers the next times requests that match pattern (a ServeMux
+// pattern such as "GET /teams") with status and body, before the pattern falls back
+// to the fake's own route. Responses registered for one pattern are sent in order.
+func (f *FakeAPI) RegisterResponse(pattern string, status int, body string, times int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if _, ok := f.canned[pattern]; !ok {
+		f.cans.HandleFunc(pattern, func(http.ResponseWriter, *http.Request) {})
+	}
+	f.canned[pattern] = append(f.canned[pattern], slices.Repeat([]cannedResponse{{status, body}}, times)...)
 }
 
 // RegisterHandler serves pattern (a net/http ServeMux pattern such as "POST /vm") with
@@ -118,11 +146,14 @@ func (f *FakeAPI) GetRequests() []Request {
 	return slices.Clone(f.requests)
 }
 
-// GetProblems lists the unhandled requests and undecodable bodies seen so far.
-func (f *FakeAPI) GetProblems() []string {
+// DrainProblems returns the problems seen so far and clears them, so a test that
+// provokes one on purpose can assert it and still pass the cleanup check.
+func (f *FakeAPI) DrainProblems() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	return slices.Clone(f.problems)
+	problems := f.problems
+	f.problems = nil
+	return problems
 }
 
 // GetSSHKeys returns the stored SSH keys by ID.
@@ -185,11 +216,28 @@ func (f *FakeAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r.Body = io.NopCloser(bytes.NewReader(raw))
+	if response, ok := f.claimCannedResponse(r); ok {
+		w.WriteHeader(response.status)
+		_, _ = w.Write([]byte(response.body))
+		return
+	}
 	if h, pattern := f.overrides.Handler(r); pattern != "" {
 		h.ServeHTTP(w, r)
 		return
 	}
 	f.routes.ServeHTTP(w, r)
+}
+
+func (f *FakeAPI) claimCannedResponse(r *http.Request) (cannedResponse, bool) {
+	_, pattern := f.cans.Handler(r)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	queue := f.canned[pattern]
+	if pattern == "" || len(queue) == 0 {
+		return cannedResponse{}, false
+	}
+	f.canned[pattern] = queue[1:]
+	return queue[0], true
 }
 
 func decodeBody(raw []byte) (map[string]any, bool) {
@@ -403,7 +451,9 @@ func (f *FakeAPI) updateVM(w http.ResponseWriter, r *http.Request, body map[stri
 			f.updateInstanceCount(vm["firewall_group_id"], -1)
 			vm["firewall_group_id"] = nil
 		default:
-			w.WriteHeader(http.StatusBadRequest)
+			// The spec accepts more settings (os_id, use_uefi, enable_sev) than the fake models.
+			f.problems = append(f.problems, fmt.Sprintf("unmodelled VM setting: PATCH %s %s", r.URL.Path, key))
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 	}
