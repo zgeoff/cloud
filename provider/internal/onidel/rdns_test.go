@@ -13,6 +13,7 @@ import (
 
 func TestRDNSCreateSetsThePTRRecordForTheVMsIP(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetVM(map[string]any{"id": "0f289413-258f-4115-ac81-252000998fe0", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8:4:17f::"})
 
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -30,7 +31,7 @@ func TestRDNSCreateSetsThePTRRecordForTheVMsIP(t *testing.T) {
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
 			{Method: "POST", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0/rdns", Body: map[string]any{
-				"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "example.com",
+				"team_id": "team-a", "ip_addr": "203.0.113.18", "domain": "example.com",
 			}},
 		},
 	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRDNS(), ctx.api.GetRequests()})
@@ -305,6 +306,7 @@ func TestRDNSUpdateFailsWhenTheAPIRefuses(t *testing.T) {
 
 func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
 	urn := onideltest.BuildURN("onidel:index:Rdns", "v4")
 	created, err := ctx.server.Create(p.CreateRequest{
@@ -319,14 +321,15 @@ func TestRDNSDeleteRemovesTheRecord(t *testing.T) {
 		map[string]map[string]string{"v": {}},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{"team_id": onideltest.TeamID, "ip_addr": "203.0.113.18", "domain": "example.com"}},
-			{Method: "DELETE", Path: "/vm/v/rdns/203.0.113.18", Query: "team_id=" + onideltest.TeamID},
+			{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{"team_id": "team-a", "ip_addr": "203.0.113.18", "domain": "example.com"}},
+			{Method: "DELETE", Path: "/vm/v/rdns/203.0.113.18", Query: "team_id=team-a"},
 		},
 	}, []any{ctx.api.GetRDNS(), ctx.api.GetRequests()})
 }
 
 func TestRDNSDeleteAcceptsARecordWhoseVMIsGone(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	// The spec lists no 404 for DELETE /vm/{id}/rdns/{ip} and none has been seen live;
 	// this covers the not-found branch in RDNS.Delete (rdns.go) that the code keeps anyway.
 	ctx.api.RegisterResponse("DELETE /vm/{id}/rdns/{ip}", http.StatusNotFound, "", 1)
@@ -336,7 +339,8 @@ func TestRDNSDeleteAcceptsARecordWhoseVMIsGone(t *testing.T) {
 		Properties: onideltest.BuildProps(map[string]any{"vmId": "v", "ip": "203.0.113.18", "domain": "example.com"}),
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/vm/v/rdns/203.0.113.18", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestRDNSDeleteFailsWhenTheAPIRefuses(t *testing.T) {

@@ -3,7 +3,7 @@
 // values. It must not import the client package, whose own tests use it.
 package onideltest
 
-// Request is one request the fake API received, in arrival order.
+// Request is one request the stub API received, in arrival order.
 type Request struct {
 	Method string
 	Path   string

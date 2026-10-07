@@ -35,11 +35,6 @@ func TestConfigDiffUpdatesTheProviderInPlace(t *testing.T) {
 			&onidel.Config{Endpoint: "https://a.example"}, &onidel.Config{Endpoint: "https://b.example"},
 			infer.DiffResponse{HasChanges: true, DetailedDiff: map[string]p.PropertyDiff{"endpoint": {Kind: p.Update, InputDiff: true}}},
 		},
-		{
-			"it reports no change for an equal config",
-			&onidel.Config{APIKey: "same", TeamID: "team-a"}, &onidel.Config{APIKey: "same", TeamID: "team-a"},
-			infer.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}},
-		},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -49,6 +44,15 @@ func TestConfigDiffUpdatesTheProviderInPlace(t *testing.T) {
 			assert.Equal(t, row.want, resp)
 		})
 	}
+}
+
+func TestConfigDiffReportsNoChangeForAnEqualConfig(t *testing.T) {
+	resp, err := (&onidel.Config{}).Diff(t.Context(), infer.DiffRequest[*onidel.Config, *onidel.Config]{
+		State: &onidel.Config{APIKey: "same", TeamID: "team-a"}, Inputs: &onidel.Config{APIKey: "same", TeamID: "team-a"},
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, infer.DiffResponse{DetailedDiff: map[string]p.PropertyDiff{}}, resp)
 }
 
 func TestConfigureFailsWithoutAnAPIKey(t *testing.T) {
@@ -99,6 +103,7 @@ func TestConfigUsesTheConfiguredTeamWithoutListingTeams(t *testing.T) {
 
 func TestConfigListsTeamsOnlyOnce(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	_, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "a"),
 		Properties: onideltest.BuildProps(map[string]any{"description": "a"}),
@@ -113,8 +118,8 @@ func TestConfigListsTeamsOnlyOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{
 		{Method: "GET", Path: "/teams"},
-		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "a"}},
-		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "b"}},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "a"}},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "b"}},
 	}, ctx.api.GetRequests())
 }
 

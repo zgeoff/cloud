@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// SendRequest sends one request with the fake's bearer token to baseURL+path and
+// SendRequest sends one request with the stub's bearer token to baseURL+path and
 // returns the status and the raw body. An empty body sends no content. It fails the
 // test on a transport error.
 func SendRequest(t testing.TB, baseURL, method, path, body string) (int, string) {

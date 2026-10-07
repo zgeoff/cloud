@@ -14,6 +14,7 @@ import (
 
 func TestFirewallGroupCreateAddsTheGroupToTheResolvedTeam(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 
 	created, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),
@@ -29,7 +30,7 @@ func TestFirewallGroupCreateAddsTheGroupToTheResolvedTeam(t *testing.T) {
 		},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": onideltest.TeamID, "description": "cloud"}},
+			{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "cloud"}},
 		},
 	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
 }
@@ -124,6 +125,7 @@ func TestFirewallGroupDiffUpdatesTheDescriptionInPlace(t *testing.T) {
 
 func TestFirewallGroupUpdateChangesTheDescriptionAndRereadsTheGroup(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetFirewallGroup(map[string]any{
 		"id": "g1", "description": "cloud", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-02T00:00:00Z",
 		"instance_count": 0, "rule_count": 0,
@@ -147,7 +149,7 @@ func TestFirewallGroupUpdateChangesTheDescriptionAndRereadsTheGroup(t *testing.T
 		},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "PUT", Path: "/network/firewalls/g1", Body: map[string]any{"team_id": onideltest.TeamID, "description": "cloud host"}},
+			{Method: "PUT", Path: "/network/firewalls/g1", Body: map[string]any{"team_id": "team-a", "description": "cloud host"}},
 			{Method: "GET", Path: "/network/firewalls/g1"},
 		},
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
@@ -215,6 +217,7 @@ func TestFirewallGroupUpdateFailsWhenTheRereadFails(t *testing.T) {
 
 func TestFirewallGroupDeleteRemovesTheGroupFromTheTeam(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "cloud", "instance_count": 0})
 
 	err := ctx.server.Delete(p.DeleteRequest{
@@ -230,13 +233,14 @@ func TestFirewallGroupDeleteRemovesTheGroupFromTheTeam(t *testing.T) {
 		map[string]map[string]any{},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "DELETE", Path: "/network/firewalls/g1", Query: "team_id=" + onideltest.TeamID},
+			{Method: "DELETE", Path: "/network/firewalls/g1", Query: "team_id=team-a"},
 		},
 	}, []any{ctx.api.GetFirewallGroups(), ctx.api.GetRequests()})
 }
 
 func TestFirewallGroupDeleteAcceptsAGroupThatIsAlreadyGone(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 
 	err := ctx.server.Delete(p.DeleteRequest{
 		ID: "missing", Urn: onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),
@@ -246,7 +250,8 @@ func TestFirewallGroupDeleteAcceptsAGroupThatIsAlreadyGone(t *testing.T) {
 		}),
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/network/firewalls/missing", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestFirewallGroupDeleteFailsWhileVMsAreAttached(t *testing.T) {

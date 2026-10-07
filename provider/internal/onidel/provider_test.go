@@ -1,12 +1,10 @@
 package onidel_test
 
 import (
-	"context"
 	"encoding/json"
 	"maps"
 	"slices"
 	"testing"
-	"time"
 
 	"github.com/blang/semver"
 	p "github.com/pulumi/pulumi-go-provider"
@@ -18,17 +16,17 @@ import (
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
-// setupTest starts the fake API and a provider configured against it. Go allows one
+// setupTest starts the stub API and a provider configured against it. Go allows one
 // setupTest per package, so this one serves every test file in the package.
 func setupTest(t *testing.T) struct {
-	api    *onideltest.FakeAPI
+	api    *onideltest.StubOnidelAPI
 	server integration.Server
 } {
 	t.Helper()
-	api := onideltest.StartFakeAPI(t)
+	api := onideltest.StartStubOnidelAPI(t)
 
 	// The API client polls every ten seconds; return from each sleep at once.
-	prov, err := onidel.NewWithOptions(onidel.Options{Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }})
+	prov, err := onidel.NewWithOptions(onidel.Options{Sleep: onideltest.BuildStubSleep().Sleep})
 	require.NoError(t, err)
 	server, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(prov))
 	require.NoError(t, err)
@@ -37,7 +35,7 @@ func setupTest(t *testing.T) struct {
 		"apiKey": onideltest.APIKey, "endpoint": api.URL,
 	})}))
 	return struct {
-		api    *onideltest.FakeAPI
+		api    *onideltest.StubOnidelAPI
 		server integration.Server
 	}{api: api, server: server}
 }
@@ -52,9 +50,9 @@ func TestSchemaPublishesEveryResourceToken(t *testing.T) {
 		Resources map[string]json.RawMessage `json:"resources"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(resp.Schema), &schema))
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"onidel:index:FirewallGroup", "onidel:index:FirewallRule", "onidel:index:Rdns", "onidel:index:SshKey", "onidel:index:Vm",
-	}, slices.Sorted(maps.Keys(schema.Resources)))
+	}, slices.Collect(maps.Keys(schema.Resources)))
 }
 
 func TestSchemaNamesTheNodeSDKPackage(t *testing.T) {
@@ -86,11 +84,11 @@ func TestSchemaGivesTheVmNoPasswordProperty(t *testing.T) {
 		} `json:"resources"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(resp.Schema), &schema))
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"bgpEnabled", "cpu", "createdAt", "disableSshBlocking", "disk", "firewallGroupId", "instanceType", "ipv6", "isoId",
 		"location", "mainIpv4", "mainIpv6", "name", "os", "paymentCycle", "ram", "snapshotId", "sshKeys", "startupScriptId",
 		"status", "template", "vpcs",
-	}, slices.Sorted(maps.Keys(schema.Resources["onidel:index:Vm"].Properties)))
+	}, slices.Collect(maps.Keys(schema.Resources["onidel:index:Vm"].Properties)))
 }
 
 func TestSchemaNeverNamesAPassword(t *testing.T) {

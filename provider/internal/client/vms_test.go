@@ -25,7 +25,7 @@ func TestReadVMDropsTheRootPassword(t *testing.T) {
 		"created_at": "2026-10-02T05:48:53.632641Z",
 	})
 
-	vm, err := ctx.client.ReadVM(t.Context(), "0f289413-258f-4115-ac81-252000998fe0", onideltest.TeamID)
+	vm, err := ctx.client.ReadVM(t.Context(), "0f289413-258f-4115-ac81-252000998fe0", "team-a")
 
 	require.NoError(t, err)
 	assert.Equal(t, client.VM{
@@ -71,7 +71,7 @@ func TestCreateVMFindsTheNewVMByListingAfterABodylessCreate(t *testing.T) {
 	ctx.api.SetVM(map[string]any{"id": "old", "name": "web", "status": "active", "created_at": "2026-01-01T00:00:00Z"})
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{
-		TeamID: onideltest.TeamID, Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
+		TeamID: "team-a", Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
 	})
 
 	require.NoError(t, err)
@@ -215,7 +215,7 @@ func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
-	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, *ctx.sleeps})
+	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, ctx.sleep.GetDurations()})
 }
 
 func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
@@ -241,7 +241,7 @@ func TestCreateVMReturnsTheIDOfAVMThatNeverBecomesReady(t *testing.T) {
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Equal(t, []any{client.VM{ID: "00000000-0000-4000-8000-000000000001"}, slices.Repeat([]time.Duration{10 * time.Second}, 180)},
-		[]any{vm, *ctx.sleeps})
+		[]any{vm, ctx.sleep.GetDurations()})
 }
 
 func TestWaitForVMReadyWaitsForAnActiveVMWithNoActionInFlight(t *testing.T) {
@@ -428,7 +428,7 @@ func TestWaitForVMReadyWaitsThroughTheAlternativeSnapshotSpelling(t *testing.T) 
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "status": "active", "active_action_id": nil})
 	// The spec spells it taking_snaphot; the client also accepts taking_snapshot,
-	// which the fake does not model, so one canned read reports it.
+	// which the stub does not model, so one canned read reports it.
 	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusOK, `{"id":"v","status":"taking_snapshot"}`, 1)
 
 	vm, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
@@ -446,10 +446,7 @@ func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
 	ctx.api.SetAutoSettle(false)
 	callCtx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error {
-		cancel()
-		return sleepCtx.Err()
-	}
+	ctx.client.Sleep = onideltest.BuildStubCancelingSleep(cancel).Sleep
 
 	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
 
