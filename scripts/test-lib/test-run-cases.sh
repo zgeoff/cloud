@@ -6,6 +6,7 @@
 # the Nix build sandbox (nixos/checks/test-utils-check.nix), which has no /usr/bin.
 #
 #   bash scripts/test-lib/test-run-cases.sh
+#   CASE='exported' bash scripts/test-lib/test-run-cases.sh   # the cases whose title holds it
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -256,6 +257,7 @@ lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-cases.sh"
 failures=0
 ran=0
 for fn in $(declare -F | sed -n 's/^declare -f[a-z]* \(it_.*\)$/\1/p'); do
+  [[ "${fn//_/ }" == *"${CASE:-}"* ]] || continue
   ran=$((ran + 1))
   set +e
   output="$(
@@ -275,4 +277,4 @@ for fn in $(declare -F | sed -n 's/^declare -f[a-z]* \(it_.*\)$/\1/p'); do
   fi
 done
 echo "$ran cases, $failures failed"
-[ "$failures" = 0 ]
+[ "$ran" != 0 ] && [ "$failures" = 0 ]
