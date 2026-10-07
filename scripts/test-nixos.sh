@@ -17,7 +17,7 @@ volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
 if [ "$#" -gt 0 ]; then
   checks=("$@")
 else
-  checks=(atc-daemon impd-local-health impd-restore)
+  checks=(test-utils atc-daemon impd-local-health impd-restore)
 fi
 
 # impd-restore's VM needs KVM; the other checks build without it
