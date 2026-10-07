@@ -3,173 +3,20 @@ import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
+import { alloyValues } from './alloy-values.ts';
 import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
-import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
-import { createAlertWebhook } from './create-alert-webhook.ts';
 import { createDashboards } from './create-dashboards.ts';
+import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
 // and opens no public port, so http://geoffcloud:30300 works from the tailnet alone.
 const grafanaNodePort = 30_300;
 
-interface ObservabilityOutputs {
+export interface ObservabilityOutputs {
   readonly logShipper: Chart;
   readonly grafanaURL: string;
   readonly grafanaAdminPassword: Output<string>;
-}
-
-// Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
-// (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
-// when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemons, set only
-// with the atc gateway, adds a TCP probe of each of atc's daemons and its alert.
-export function createObservability(
-  cluster: Provider,
-  alertWebhookURL: string | undefined,
-  atcDaemons: readonly ATCDaemonEndpoint[] | undefined,
-): ObservabilityOutputs {
-  const opts = { provider: cluster };
-
-  const ns = new Namespace('observability', { metadata: { name: 'observability' } }, opts);
-  const adminPassword = new RandomPassword('grafana-admin', { length: 32, special: false });
-
-  const metrics = createMetrics(
-    ns,
-    { grafanaPassword: adminPassword.result, alertWebhookURL },
-    cluster,
-  );
-
-  const logs = new Chart(
-    'loki',
-    {
-      namespace: ns.metadata.name,
-      chart: 'loki',
-      version: '7.3.0',
-      repositoryOpts: { repo: 'https://grafana.github.io/helm-charts' },
-      values: lokiValues,
-    },
-    opts,
-  );
-
-  const shipper = createLogShipper(ns, [logs, metrics], cluster);
-
-  createMonitors(ns, atcDaemons, { provider: cluster, dependsOn: [metrics] });
-  createDashboards(ns, cluster);
-
-  return {
-    logShipper: shipper,
-    grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
-    grafanaAdminPassword: adminPassword.result,
-  };
-}
-
-interface MetricsInputs {
-  readonly grafanaPassword: Output<string>;
-  readonly alertWebhookURL: string | undefined;
-}
-
-// kube-prometheus-stack: Prometheus, Alertmanager, Grafana and the exporters
-function createMetrics(ns: Namespace, inputs: MetricsInputs, cluster: Provider): Chart {
-  const webhook =
-    inputs.alertWebhookURL === undefined
-      ? undefined
-      : createAlertWebhook(ns, inputs.alertWebhookURL, cluster);
-
-  return new Chart(
-    'kube-prometheus-stack',
-    {
-      namespace: ns.metadata.name,
-      chart: 'kube-prometheus-stack',
-      version: '91.8.2',
-      repositoryOpts: { repo: 'https://prometheus-community.github.io/helm-charts' },
-      values: {
-        ...buildMetricsValues(inputs.grafanaPassword),
-        alertmanager: buildAlertmanagerValues(webhook),
-      },
-    },
-
-    // the Alertmanager pod mounts the webhook's Secret, so the Secret comes first
-    { provider: cluster, dependsOn: webhook === undefined ? [] : [webhook.resource] },
-  );
-}
-
-// Alloy ships pod logs and the host journal to Loki (alloyValues)
-function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider): Chart {
-  return new Chart(
-    'alloy',
-    {
-      namespace: ns.metadata.name,
-      chart: 'alloy',
-      version: '1.13.0',
-      repositoryOpts: { repo: 'https://grafana.github.io/helm-charts' },
-      values: alloyValues,
-    },
-    { provider: cluster, dependsOn },
-  );
-}
-
-// the chart's own args plus the textfile collector, which reads metrics that host timers
-// write (impd local health, #29); node-exporter sees the host root at /host/root
-const nodeExporterArgs = [
-  '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)',
-  '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$',
-  '--collector.textfile.directory=/host/root/var/lib/node-exporter/textfile',
-];
-
-// Grafana idles near 240Mi, and each query and each plugin backend it installs at start adds
-// to that: at a 256Mi limit, Explore got it OOM-killed.
-const grafanaResources = { requests: { cpu: '50m', memory: '256Mi' }, limits: { memory: '768Mi' } };
-
-// the chart's values but Alertmanager's, which buildAlertmanagerValues gives
-function buildMetricsValues(grafanaPassword: Output<string>): Record<string, unknown> {
-  return {
-    // buildAlertRules has a per-target TargetDown in place of the chart's ratio-based one
-    defaultRules: { disabled: { TargetDown: true } },
-
-    // k3s runs these inside the k3s binary; there is nothing separate to scrape
-    kubeEtcd: { enabled: false },
-    kubeControllerManager: { enabled: false },
-    kubeScheduler: { enabled: false },
-    kubeProxy: { enabled: false },
-
-    // a Helm hook Job makes the webhook's TLS secret, and Pulumi does not run Helm
-    // hooks, so the operator waits on that secret forever. One node, one operator:
-    // the webhook only validates rules, so go without it.
-    prometheusOperator: { admissionWebhooks: { enabled: false }, tls: { enabled: false } },
-    prometheus: {
-      prometheusSpec: {
-        retention: '30d',
-        retentionSize: '8GB',
-        resources: { requests: { cpu: '100m', memory: '256Mi' }, limits: { memory: '512Mi' } },
-
-        // pick up every ServiceMonitor, PodMonitor and PrometheusRule, not only the chart's own
-        serviceMonitorSelectorNilUsesHelmValues: false,
-        podMonitorSelectorNilUsesHelmValues: false,
-        ruleSelectorNilUsesHelmValues: false,
-        storageSpec: {
-          volumeClaimTemplate: {
-            spec: { accessModes: ['ReadWriteOnce'], resources: { requests: { storage: '10Gi' } } },
-          },
-        },
-      },
-    },
-
-    'prometheus-node-exporter': { extraArgs: nodeExporterArgs },
-    grafana: {
-      adminPassword: grafanaPassword,
-      service: { type: 'NodePort', nodePort: grafanaNodePort },
-      resources: grafanaResources,
-      additionalDataSources: [
-        { name: 'Loki', type: 'loki', url: 'http://loki.observability.svc:3100', access: 'proxy' },
-      ],
-
-      // no Alertmanager datasource: Grafana does no alerting here, and alerts show in
-      // Prometheus and Alertmanager themselves (#28, #29); deleteDatasources removes the
-      // copy Grafana provisioned while Alertmanager was off
-      sidecar: { datasources: { alertmanager: { enabled: false } } },
-      deleteDatasources: [{ name: 'Alertmanager', orgId: 1 }],
-    },
-  };
 }
 
 const lokiValues = {
@@ -207,75 +54,61 @@ const lokiValues = {
   test: { enabled: false },
 };
 
-// Alloy as a DaemonSet: tail every pod's logs and the host's journal, and push them to Loki
-const alloyValues = {
-  alloy: {
-    configMap: {
-      content: `
-discovery.kubernetes "pods" {
-  role = "pod"
-}
+// Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
+// (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
+// when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemons, set only
+// with the atc gateway, adds a TCP probe of each of atc's daemons and its alert.
+export function createObservability(
+  cluster: Provider,
+  alertWebhookURL: string | undefined,
+  atcDaemons: readonly ATCDaemonEndpoint[] | undefined,
+): ObservabilityOutputs {
+  const opts = { provider: cluster };
 
-discovery.relabel "pods" {
-  targets = discovery.kubernetes.pods.targets
-  rule {
-    source_labels = ["__meta_kubernetes_namespace"]
-    target_label  = "namespace"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_name"]
-    target_label  = "pod"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_container_name"]
-    target_label  = "container"
-  }
-}
+  const ns = new Namespace('observability', { metadata: { name: 'observability' } }, opts);
+  const adminPassword = new RandomPassword('grafana-admin', { length: 32, special: false });
 
-loki.source.kubernetes "pods" {
-  targets    = discovery.relabel.pods.output
-  forward_to = [loki.process.pods.receiver]
-}
+  const metrics = createMetrics(
+    ns,
+    { grafanaPassword: adminPassword.result, grafanaNodePort, alertWebhookURL },
+    cluster,
+  );
 
-// the atc gateway's OAuth approval lines stay in kubectl logs only, never in Loki
-loki.process "pods" {
-  stage.match {
-    selector = "{namespace=\\"atc\\", container=\\"atc-gateway\\"} |~ \\"^atc-approval\\""
-    action   = "drop"
-  }
-  forward_to = [loki.write.default.receiver]
-}
-
-// the host's journal: impd (imp-host logs to journald), k3s, tailscaled and the rest
-// of the host, which no pod log covers
-loki.source.journal "host" {
-  path          = "/var/log/journal"
-  // Loki rejects entries more than an hour behind a stream's newest; a restart
-  // re-reads from max_age, since the read position is not persisted
-  max_age       = "1h"
-  relabel_rules = loki.relabel.journal.rules
-  labels        = { job = "journal" }
-  forward_to    = [loki.write.default.receiver]
-}
-
-loki.relabel "journal" {
-  forward_to = []
-  rule {
-    source_labels = ["__journal__systemd_unit"]
-    target_label  = "unit"
-  }
-}
-
-loki.write "default" {
-  endpoint {
-    url = "http://loki.observability.svc:3100/loki/api/v1/push"
-  }
-}
-`,
+  const logs = new Chart(
+    'loki',
+    {
+      namespace: ns.metadata.name,
+      chart: 'loki',
+      version: '7.3.0',
+      repositoryOpts: { repo: 'https://grafana.github.io/helm-charts' },
+      values: lokiValues,
     },
+    opts,
+  );
 
-    // /var/log from the host, read-only, for the journal
-    mounts: { varlog: true },
-    resources: { requests: { cpu: '20m', memory: '64Mi' }, limits: { memory: '192Mi' } },
-  },
-};
+  const shipper = createLogShipper(ns, [logs, metrics], cluster);
+
+  createMonitors(ns, atcDaemons, { provider: cluster, dependsOn: [metrics] });
+  createDashboards(ns, cluster);
+
+  return {
+    logShipper: shipper,
+    grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
+    grafanaAdminPassword: adminPassword.result,
+  };
+}
+
+// Alloy ships pod logs and the host journal to Loki (alloyValues)
+function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider): Chart {
+  return new Chart(
+    'alloy',
+    {
+      namespace: ns.metadata.name,
+      chart: 'alloy',
+      version: '1.13.0',
+      repositoryOpts: { repo: 'https://grafana.github.io/helm-charts' },
+      values: alloyValues,
+    },
+    { provider: cluster, dependsOn },
+  );
+}

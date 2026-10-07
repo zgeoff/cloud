@@ -17,8 +17,8 @@ import {
   atcGatewayRegistryFile,
   buildATCGatewaySpec,
 } from './build-atc-gateway-spec.ts';
+import { buildATCGatewayTokenData } from './build-atc-gateway-token-data.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
-import { toATCGatewayTokenVariable } from './to-atc-gateway-token-variable.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
 // daemons (docs/plans/atc-gateway.md). Off until the stack config sets atcGateway;
@@ -180,12 +180,7 @@ function createConfigObjects(
       // no fixed name: Pulumi names it and replaces it on a change, so the Deployment
       // rolls and the gateway, which reads both only at start, picks the change up
       metadata: { namespace },
-      stringData: Object.fromEntries(
-        Object.entries(inputs.secrets.tokens).map(([name, token]) => [
-          toATCGatewayTokenVariable(name),
-          token,
-        ]),
-      ),
+      stringData: buildATCGatewayTokenData(inputs.secrets.tokens),
     },
     { provider: cluster },
   );

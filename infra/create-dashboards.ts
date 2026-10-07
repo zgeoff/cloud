@@ -1,6 +1,8 @@
 import type { Provider } from '@pulumi/kubernetes';
 import { ConfigMap } from '@pulumi/kubernetes/core/v1';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
+import { buildDashboard } from './build-dashboard.ts';
+import type { DashboardPanel } from './build-dashboard.ts';
 
 // Grafana's dashboard sidecar loads every ConfigMap labelled grafana_dashboard=1 (#27)
 export function createDashboards(ns: Namespace, cluster: Provider): ConfigMap[] {
@@ -23,19 +25,10 @@ export function createDashboards(ns: Namespace, cluster: Provider): ConfigMap[] 
   );
 }
 
-interface Panel {
-  readonly title: string;
-  readonly type: 'timeseries' | 'stat' | 'logs';
-  readonly expr: string;
-  readonly legend?: string;
-  readonly width: number;
-  readonly height: number;
-}
-
 // impd logs to journald through imp-host.service; it exports no metrics (no OTLP, #8)
 const impdStream = '{job="journal", unit="imp-host.service"}';
 
-const impPanels: readonly Panel[] = [
+const impPanels: readonly DashboardPanel[] = [
   {
     title: 'impd log lines',
     type: 'timeseries',
@@ -85,75 +78,6 @@ const impPanels: readonly Panel[] = [
 
 function buildIMPDashboard(): Record<string, unknown> {
   return buildDashboard('imp', 'loki', impPanels);
-}
-
-// the datasource is a variable, so the dashboard does not depend on a generated datasource uid
-function buildDashboard(
-  title: string,
-  datasourceType: 'loki' | 'prometheus',
-  panels: readonly Panel[],
-): Record<string, unknown> {
-  const datasource = { type: datasourceType, uid: '$datasource' };
-  const positions = buildGridPositions(panels);
-
-  return {
-    uid: `geoff-cloud-${title}`,
-    title,
-    tags: ['geoff.cloud'],
-    timezone: 'utc',
-    schemaVersion: 39,
-    refresh: '1m',
-    time: { from: 'now-24h', to: 'now' },
-    templating: {
-      list: [{ name: 'datasource', type: 'datasource', query: datasourceType, hide: 2 }],
-    },
-    panels: panels.map((panel, index) => ({
-      id: index + 1,
-      title: panel.title,
-      type: panel.type,
-      datasource,
-      gridPos: positions[index],
-      targets: [
-        {
-          refId: 'A',
-          datasource,
-          expr: panel.expr,
-          ...(panel.legend === undefined ? {} : { legendFormat: panel.legend }),
-          ...(panel.type === 'stat' ? { instant: true, queryType: 'instant' } : {}),
-        },
-      ],
-      ...(panel.type === 'stat' ? { options: { reduceOptions: { calcs: ['lastNotNull'] } } } : {}),
-    })),
-  };
-}
-
-interface GridPosition {
-  readonly x: number;
-  readonly y: number;
-  readonly w: number;
-  readonly h: number;
-}
-
-// panels flow left to right in rows of 24 columns
-function buildGridPositions(panels: readonly Panel[]): GridPosition[] {
-  let x = 0;
-  let y = 0;
-  let rowHeight = 0;
-
-  return panels.map((panel) => {
-    if (x + panel.width > 24) {
-      x = 0;
-      y += rowHeight;
-      rowHeight = 0;
-    }
-
-    const position = { x, y, w: panel.width, h: panel.height };
-
-    x += panel.width;
-    rowHeight = Math.max(rowHeight, panel.height);
-
-    return position;
-  });
 }
 
 function buildCloudflaredDashboard(): Record<string, unknown> {
