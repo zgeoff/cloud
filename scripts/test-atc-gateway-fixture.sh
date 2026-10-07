@@ -26,7 +26,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/wait-for.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/gateway-fixture.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/normalize-restic-output.sh"
 
 it_answers_the_protected_resource_metadata_on_its_public_Host() {
   local gateway_image="$1" port code
@@ -658,110 +659,27 @@ setup_case() {
     "$restic_image" -c 'chown 65532:65532 /s /r'
 }
 
-# The container as the Deployment runs it: a read-only root, no new privileges, every
-# capability dropped, the same tmpfs mounts, env and args, on an ephemeral loopback port.
-start_gateway() {
-  local name="$1" tree="$2" image="$3"
-  docker run -d --name "$name" --read-only --security-opt no-new-privileges --cap-drop ALL \
-    --tmpfs /run/atc:uid=65532,gid=65532 --tmpfs /tmp:exec \
-    --tmpfs /home/nonroot/.config:uid=65532,gid=65532 \
-    -v "$name-state:/home/nonroot/.local/state/atc" -v "$tree/registry:/etc/atc-gateway:ro" \
-    -p 127.0.0.1::8414 -e ATC_GATEWAY_TOKEN_GEOFFCLOUD=fixture-only \
-    -e ATC_GATEWAY_STATE_DIR=/home/nonroot/.local/state/atc \
-    "$image" serve --host 0.0.0.0 --port 8414 --public-url https://atc.fixture.invalid \
-    --registry /etc/atc-gateway/registry.json --state-dir /home/nonroot/.local/state/atc > /dev/null
-  wait_for_ready "$name"
-}
-
-# Polls /readyz on the public Host until it answers 200, for at most 30 seconds; past the
-# deadline it prints the container's logs and fails.
-wait_for_ready() {
-  local name="$1" port
-  port="$(docker port "$name" 8414/tcp)"
-  port="${port##*:}"
-  if ! wait_for 30 "$name to answer /readyz with 200" is_ready "$port"; then
-    docker logs "$name" 2>&1 | tail -20 >&2
-    return 1
-  fi
-}
-
-is_ready() {
-  [ "$(curl -q --noproxy '*' -s -o /dev/null -w '%{http_code}' -H 'Host: atc.fixture.invalid' \
-    "http://127.0.0.1:$1/readyz")" = 200 ]
-}
-
-# The backup image as the backup CronJob and the restore Job run it: uid and gid 65532,
-# no privilege escalation, every capability dropped, HOME=/tmp on a writable /tmp (an
-# emptyDir there). Neither pod sets readOnlyRootFilesystem, so neither does this. Extra
-# `docker run` options (such as -e SNAPSHOT=…) go before the image.
-run_backup() {
-  local name="$1" image="$2"
-  shift 2
-  local options=()
-  while [ "$#" -gt 0 ] && [[ "$1" == -* ]]; do
-    options+=("$1" "$2")
-    shift 2
-  done
-  docker run --rm --user 65532:65532 --security-opt no-new-privileges --cap-drop ALL \
-    -e HOME=/tmp --tmpfs /tmp -v "$name-state:/state" -v "$name-repo:/repo" \
-    -e STATE_DIR=/state -e RESTIC_REPOSITORY=/repo -e RESTIC_PASSWORD=fixture-only \
-    "${options[@]}" "$image" "$@"
-}
-
-# A shell in the backup image under the same uid and security, with the same volumes and
-# repository, and the case's seed directory (<tree>/seed) at /seed; it runs the script on stdin with
-# errexit, for arranging snapshots and state and for reading them back.
-run_backup_shell() {
-  local name="$1" image="$2" tree="$3"
-  docker run --rm -i --user 65532:65532 --security-opt no-new-privileges --cap-drop ALL \
-    -e HOME=/tmp --tmpfs /tmp -v "$name-state:/state" -v "$name-repo:/repo" \
-    -v "$tree/seed:/seed:ro" -e RESTIC_REPOSITORY=/repo -e RESTIC_PASSWORD=fixture-only \
-    --entrypoint /bin/sh "$image" -es
-}
-
-# Masks what restic prints that changes from run to run: snapshot IDs, the wall-clock time
-# of a new snapshot (seeded snapshots keep their 2020 times), durations, sizes and the
-# restore's temp directory.
-normalize_restic_output() {
-  sed -E \
-    -e 's/^[0-9a-f]{8}  /ID  /' \
-    -e 's/snapshot [0-9a-f]{8} /snapshot ID /' \
-    -e 's/20(2[1-9]|[3-9][0-9])-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?/NOW/g' \
-    -e 's/2020-([0-9]{2})-([0-9]{2}) ([0-9:]{8})\.0+ /2020-\1-\2 \3 /g' \
-    -e 's/[0-9]+(\.[0-9]+)? (B|KiB|MiB)/SIZE/g' \
-    -e 's/ in [0-9]+:[0-9]{2}/ in T/' \
-    -e 's/^\[[0-9]+:[0-9]{2}\] /[T] /' \
-    -e 's#/tmp/tmp\.[A-Za-z0-9]+#/tmp/tmp.X#'
-}
-
-# Builds both images once under per-run tags that the run removes, then runs the cases
-# with the image names (and the pinned restic image) as their arguments.
-run_suite() {
-  local repo work gateway_image backup_image
-  repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  # sets BASE_IMAGE and RESTIC_IMAGE, among the pins
-  # shellcheck source=/dev/null
-  source "$repo/deploy/atc-gateway/versions.env"
-  work="$(mktemp -d)"
-  gateway_image="atc-gateway:fixture-$$"
-  backup_image="atc-gateway-backup:fixture-$$"
-  # expanded now: the trap runs after run_suite returns and its locals are gone
-  # shellcheck disable=SC2064
-  trap "docker rmi -f '$gateway_image' '$backup_image' > /dev/null 2>&1 || true; rm -rf '$work' || true" EXIT
-  # shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env
-  if ! {
-    "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
-      cp "$repo/deploy/atc-gateway/Dockerfile" "$work/context/" &&
-      docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway_image" "$work/context" &&
-      docker build -q --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup_image" \
-        "$repo/deploy/atc-gateway/backup"
-  } > "$work/build.log" 2>&1; then
-    echo "FAIL the images did not build from the pinned, checked binary and pinned bases"
-    sed 's/^/    /' "$work/build.log"
-    exit 1
-  fi
-  echo "built $gateway_image and $backup_image"
-  run_cases "$gateway_image" "$backup_image" "$RESTIC_IMAGE"
-}
-
-run_suite
+# Boot data every case needs: both images, built once under per-run tags that the run
+# removes. The cases take the image names (and the pinned restic image) as arguments.
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# sets BASE_IMAGE and RESTIC_IMAGE, among the pins
+# shellcheck source=/dev/null
+source "$repo/deploy/atc-gateway/versions.env"
+work="$(mktemp -d)"
+gateway_image="atc-gateway:fixture-$$"
+backup_image="atc-gateway-backup:fixture-$$"
+trap 'docker rmi -f "$gateway_image" "$backup_image" > /dev/null 2>&1 || true; rm -rf "$work" || true' EXIT
+# shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env
+if ! {
+  "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
+    cp "$repo/deploy/atc-gateway/Dockerfile" "$work/context/" &&
+    docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway_image" "$work/context" &&
+    docker build -q --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup_image" \
+      "$repo/deploy/atc-gateway/backup"
+} > "$work/build.log" 2>&1; then
+  echo "FAIL the images did not build from the pinned, checked binary and pinned bases"
+  sed 's/^/    /' "$work/build.log"
+  exit 1
+fi
+echo "built $gateway_image and $backup_image"
+run_cases "$gateway_image" "$backup_image" "$RESTIC_IMAGE"
