@@ -27,14 +27,13 @@ Live:
 
 - `geoffcloud` on NixOS, with k3s, imp in its `imp-host` container, and tailnet SSH. Public SSH is
   closed.
-- The Cloudflare tunnel. `mcp.geoff.cloud` routes to atc's MCP on Geoff's PC.
+- The Cloudflare tunnel. `atc.geoff.cloud` routes to the atc gateway in k3s, which dials the atc
+  daemons on `geoffcloud` and `home-pc`. See [the plan](./docs/plans/atc-gateway.md).
 - imps over HTTPS on the tailnet at `<name>.imps.geoff.cloud`.
 - Prometheus, Alertmanager, Loki, Grafana and Alloy in k3s, and the external health check.
 
 **PENDING** (not deployed):
 
-- The atc gateway at `atc.geoff.cloud/mcp`, and the atc daemon on `geoffcloud`. The package is built
-  and validated; see [the plan](./docs/plans/atc-gateway.md).
 - 1Password Connect for imps, host-local at `op-connect.imp.internal`; see
   [the runbook](./docs/runbooks/onepassword-connect.md).
 - Public connector sign-in through the gateway's OAuth issuer.

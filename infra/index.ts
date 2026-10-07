@@ -205,8 +205,6 @@ const tunnel = new ZeroTrustTunnelCloudflared('edge', {
   configSrc: 'cloudflare',
 });
 
-const mcpHostname = `mcp.${domain}`;
-
 // Redirect plain http to https on every hostname: a misconfigured client must not send
 // a bearer token or an authorization code over http, even only as far as the edge.
 const alwaysHTTPS = new ZoneSetting('always-use-https', {
@@ -235,17 +233,15 @@ const workloads =
         },
       });
 
-// atc.geoff.cloud: a workload in k3s on the same tunnel
+// the tunnel's one route: atc.geoff.cloud, a workload in k3s
 const routes = createTunnelRoutes({
   accountID,
   zoneID: zone.zoneId,
   tunnelID: tunnel.id,
-  mcpHostname,
   atcRoute: workloads?.atcGatewayRoute,
 });
 
 export const tunnelConfigVersion = routes.configVersion;
-export const mcpURL = routes.mcpURL;
 export const atcURL = routes.atcURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const grafanaURL = workloads?.grafanaURL;
@@ -256,12 +252,10 @@ export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 // changes show only in the Worker's logs.
 const healthCheck = await createHealthCheck({
   accountID,
-  targets: [
-    { name: 'mcp', url: `https://${mcpHostname}/.well-known/oauth-protected-resource` },
-    ...(workloads?.atcGatewayRoute === undefined
+  targets:
+    workloads?.atcGatewayRoute === undefined
       ? []
-      : [{ name: 'atc', url: workloads.atcGatewayRoute.healthURL }]),
-  ],
+      : [{ name: 'atc', url: workloads.atcGatewayRoute.healthURL }],
   alertURL: process.env['ALERT_WEBHOOK_URL'],
 });
 

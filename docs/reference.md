@@ -90,7 +90,6 @@ Read one with `pulumi stack output --stack prod <name>` from `infra/`, through `
 | `impHostAuthKey`               | yes    | single-use tailnet key for imp's node on the host        |
 | `tunnelToken`                  | yes    | cloudflared's tunnel token                               |
 | `geoffcloudIPv4`               | no     | the VM's public IPv4                                     |
-| `mcpURL`                       | no     | `https://mcp.geoff.cloud`                                |
 | `backupsBucket`                | no     | `geoff-cloud-backups`                                    |
 | `onePasswordConnectServiceURL` | no     | **PENDING.** Connect's in-cluster URL                    |
 | `atcGatewayServiceURL`         | no     | **PENDING.** The gateway's in-cluster URL                |
@@ -130,15 +129,14 @@ Items that `.env` does not reference:
 
 ## Hostnames
 
-| Name                                     | Points at                                                           | Owner                 |
-| ---------------------------------------- | ------------------------------------------------------------------- | --------------------- |
-| `mcp.geoff.cloud`                        | the tunnel → atc on Geoff's PC, port 8414                           | Pulumi                |
-| `imps.geoff.cloud`, `*.imps.geoff.cloud` | the host's tailnet IP (DNS only)                                    | impd, never Pulumi    |
-| `atc.geoff.cloud`                        | **PENDING.** The tunnel → the atc gateway                           | Pulumi, once deployed |
-| `op-connect.imp.internal`                | **PENDING.** Imp guests only: the broker → the host relay → Connect | imp's broker, no DNS  |
-| `imp.geoff.cloud`                        | **PENDING.** Reserved for imp's public MCP                          | none yet              |
-| `geoffcloud`                             | the host on the tailnet (MagicDNS)                                  | Tailscale             |
-| `imp-geoffcloud`                         | imp's own tailnet node on the host                                  | Tailscale             |
+| Name                                     | Points at                                                           | Owner                |
+| ---------------------------------------- | ------------------------------------------------------------------- | -------------------- |
+| `imps.geoff.cloud`, `*.imps.geoff.cloud` | the host's tailnet IP (DNS only)                                    | impd, never Pulumi   |
+| `atc.geoff.cloud`                        | the tunnel → the atc gateway                                        | Pulumi               |
+| `op-connect.imp.internal`                | **PENDING.** Imp guests only: the broker → the host relay → Connect | imp's broker, no DNS |
+| `imp.geoff.cloud`                        | **PENDING.** Reserved for imp's public MCP                          | none yet             |
+| `geoffcloud`                             | the host on the tailnet (MagicDNS)                                  | Tailscale            |
+| `imp-geoffcloud`                         | imp's own tailnet node on the host                                  | Tailscale            |
 
 ## Ports
 
@@ -149,7 +147,6 @@ Items that `.env` does not reference:
 | tcp 6443  | `geoffcloud`                        | the tailnet                                 | the k3s API                      |
 | tcp 30300 | `geoffcloud`, tailnet address only  | the tailnet                                 | Grafana (NodePort)               |
 | tcp 7070  | host loopback, and `imp-geoffcloud` | the host; tailnet members; `tag:imp` nodes  | impd's API and `/health`         |
-| tcp 8414  | Geoff's PC (`home-pc`)              | tailnet members; `tag:cloud`                | `atc mcp --http`                 |
 | tcp 8415  | `geoffcloud`, tailnet address       | k3s pods only (`inet cloud_host`)           | the atc daemon (**PENDING**)     |
 | tcp 18081 | `geoffcloud`, docker0 address       | docker0 containers only (`inet cloud_host`) | the Connect relay (**PENDING**)  |
 | tcp 2000  | cloudflared pods                    | the cluster                                 | cloudflared metrics and `/ready` |
