@@ -1,11 +1,7 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
-
-// a public hostname the tunnel serves from a workload in k3s
-interface TunnelRoute {
-  readonly hostname: string;
-  readonly service: Output<string>;
-}
+import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
+import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 
 interface TunnelRoutesInputs {
   readonly accountID: string;
@@ -30,12 +26,7 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
     accountId: inputs.accountID,
     tunnelId: inputs.tunnelID,
     config: {
-      ingresses: [
-        ...(atcRoute === undefined
-          ? []
-          : [{ hostname: atcRoute.hostname, service: atcRoute.service }]),
-        { service: 'http_status:404' },
-      ],
+      ingresses: buildTunnelIngresses(atcRoute),
     },
   });
 

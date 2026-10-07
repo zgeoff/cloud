@@ -1,12 +1,14 @@
 import { Provider } from '@pulumi/kubernetes';
-import type { Deployment } from '@pulumi/kubernetes/apps/v1';
-import type { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { Config } from '@pulumi/pulumi';
-import type { ATCGatewayInputs, ATCGatewayOutputs } from './atc-gateway.ts';
+import type { ATCGatewayInputs } from './atc-gateway.ts';
 import { createATCGateway } from './atc-gateway.ts';
-import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
+import { buildATCDaemonEndpoints } from './build-atc-daemon-endpoints.ts';
+import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
+import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
+import type { CloudflaredOutputs } from './create-cloudflared.ts';
 import { createCloudflared } from './create-cloudflared.ts';
+import type { ObservabilityOutputs } from './observability.ts';
 import { createObservability } from './observability.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
@@ -23,20 +25,8 @@ interface ClusterInputs {
   readonly onePasswordConnect: OnePasswordConnectInputs;
 }
 
-// the tunnel ingress for the gateway's public hostname, and the URL the external health
-// check probes there
-interface ATCGatewayRoute {
-  readonly hostname: string;
-  readonly service: Output<string>;
-  readonly healthURL: string;
-}
-
-interface ClusterOutputs {
-  readonly ingressNamespace: Output<string>;
-  readonly cloudflared: Deployment;
-  readonly logShipper: Chart;
-  readonly grafanaURL: string;
-  readonly grafanaAdminPassword: Output<string>;
+// cloudflared's and observability's outputs, and the gateway's and Connect's
+interface ClusterOutputs extends CloudflaredOutputs, ObservabilityOutputs {
   readonly atcGatewayServiceURL?: Output<string>;
   readonly atcGatewayRoute?: ATCGatewayRoute;
   readonly onePasswordConnectServiceURL: Output<string>;
@@ -69,37 +59,6 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
     ...ingress,
     ...observability,
     onePasswordConnectServiceURL: connect.serviceURL,
-    ...(gateway === undefined ? {} : buildGatewayOutputs(gateway)),
-  };
-}
-
-// the gateway's daemons, for the probe and its alert; none without the gateway
-function buildATCDaemonEndpoints(
-  gateway: ATCGatewayInputs | undefined,
-): readonly ATCDaemonEndpoint[] | undefined {
-  if (gateway === undefined) {
-    return undefined;
-  }
-
-  return Object.entries(gateway.daemons).map(([name, daemon]) => ({
-    name,
-    address: daemon.address,
-    alertSeverity: daemon.alertSeverity,
-  }));
-}
-
-interface GatewayOutputs {
-  readonly atcGatewayServiceURL: Output<string>;
-  readonly atcGatewayRoute: ATCGatewayRoute;
-}
-
-function buildGatewayOutputs(gateway: ATCGatewayOutputs): GatewayOutputs {
-  return {
-    atcGatewayServiceURL: gateway.serviceURL,
-    atcGatewayRoute: {
-      hostname: gateway.publicHost,
-      service: gateway.serviceURL,
-      healthURL: `https://${gateway.publicHost}/.well-known/oauth-protected-resource/mcp`,
-    },
+    ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
 }

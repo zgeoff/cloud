@@ -13,7 +13,7 @@ import { createMonitors } from './create-monitors.ts';
 // and opens no public port, so http://geoffcloud:30300 works from the tailnet alone.
 const grafanaNodePort = 30_300;
 
-interface ObservabilityOutputs {
+export interface ObservabilityOutputs {
   readonly logShipper: Chart;
   readonly grafanaURL: string;
   readonly grafanaAdminPassword: Output<string>;

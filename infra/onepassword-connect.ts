@@ -1,9 +1,16 @@
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import { Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
-import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 import { all, secret } from '@pulumi/pulumi';
+import {
+  buildOnePasswordConnectServiceSpec,
+  onePasswordConnectServicePort,
+} from './build-onepassword-connect-service-spec.ts';
+import {
+  buildOnePasswordConnectSpec,
+  onePasswordConnectCredentialsKey,
+} from './build-onepassword-connect-spec.ts';
 
 // 1Password Connect, for imps (GEO-120): imp's credential broker swaps a placeholder
 // bearer for the real Connect token on requests to op-connect.imp.internal and forwards
@@ -12,27 +19,6 @@ import { all, secret } from '@pulumi/pulumi';
 // 1Password/connect-helm-charts). The token is read-only (vault `imp`, read), so Connect
 // itself refuses a write. Pods in the cluster can reach the Service too; they need the
 // bearer token either way.
-
-// The host relay (nixos/hosts/geoffcloud/configuration.nix) dials this address, so the
-// Service keeps it; a cluster rebuild must keep it free. It is the Service's live value.
-const serviceClusterIP = '10.43.82.198';
-
-// connect-api's port in the pod
-const connectAPIPort = 8080;
-
-// The Service's port, which the host relay dials. It stays 8000, the proxy's old port:
-// server-side apply keys Service ports by number, so a new number under the same name
-// fails as a duplicate. Only the target moves to connect-api.
-const servicePort = 8000;
-
-// Connect's release; bump deliberately
-const connectVersion = '1.8.3';
-const connectAPIImage = `1password/connect-api:${connectVersion}`;
-const connectSyncImage = `1password/connect-sync:${connectVersion}`;
-const credentialsKey = '1password-credentials.json';
-const credentialsPath = `/home/opuser/.op/${credentialsKey}`;
-const dataPath = '/home/opuser/.op/data';
-const labels = { app: 'onepassword-connect' };
 
 export interface OnePasswordConnectInputs {
   // the Connect server's credentials file (JSON)
@@ -60,7 +46,7 @@ export function createOnePasswordConnect(
     'onepassword-connect',
     {
       metadata: { name: 'onepassword-connect', namespace },
-      spec: buildSpec(createCredentials(cluster, namespace, inputs)),
+      spec: buildOnePasswordConnectSpec(createCredentials(cluster, namespace, inputs)),
     },
     { provider: cluster },
   );
@@ -71,7 +57,7 @@ export function createOnePasswordConnect(
     deployment,
     serviceURL: all([service.metadata.name, service.metadata.namespace]).apply(
       ([name, serviceNamespace]) =>
-        `http://${name}.${serviceNamespace}.svc.cluster.local:${servicePort}`,
+        `http://${name}.${serviceNamespace}.svc.cluster.local:${onePasswordConnectServicePort}`,
     ),
   };
 }
@@ -81,17 +67,7 @@ function createService(cluster: Provider, namespace: Output<string>): Service {
     'onepassword-connect',
     {
       metadata: { name: 'onepassword-connect', namespace },
-      spec: {
-        clusterIP: serviceClusterIP,
-        selector: labels,
-        ports: [
-          {
-            name: 'http',
-            port: servicePort,
-            targetPort: connectAPIPort,
-          },
-        ],
-      },
+      spec: buildOnePasswordConnectServiceSpec(),
     },
     {
       provider: cluster,
@@ -112,96 +88,12 @@ function createCredentials(
 ): Output<string> {
   const credentials = new Secret(
     'onepassword-connect-credentials',
-    { metadata: { namespace }, stringData: { [credentialsKey]: secret(inputs.credentials) } },
+    {
+      metadata: { namespace },
+      stringData: { [onePasswordConnectCredentialsKey]: secret(inputs.credentials) },
+    },
     { provider: cluster },
   );
 
   return credentials.metadata.name;
-}
-
-const lockedDown: input.core.v1.SecurityContext = {
-  allowPrivilegeEscalation: false,
-  readOnlyRootFilesystem: true,
-  capabilities: { drop: ['ALL'] },
-};
-
-const podSecurityContext: input.core.v1.PodSecurityContext = {
-  fsGroup: 999,
-  runAsUser: 999,
-  runAsGroup: 999,
-  runAsNonRoot: true,
-  seccompProfile: { type: 'RuntimeDefault' },
-};
-
-function buildSpec(credentialsSecret: Output<string>): input.apps.v1.DeploymentSpec {
-  return {
-    replicas: 1,
-    selector: { matchLabels: labels },
-    template: {
-      metadata: { labels },
-      spec: {
-        securityContext: podSecurityContext,
-        volumes: [
-          { name: 'shared-data', emptyDir: {} },
-          { name: 'credentials', secret: { secretName: credentialsSecret } },
-        ],
-        containers: [
-          buildConnectContainer({
-            name: 'connect-api',
-            image: connectAPIImage,
-            httpPort: connectAPIPort,
-            busPort: 11_220,
-            peerPort: 11_221,
-            memory: '128Mi',
-          }),
-          buildConnectContainer({
-            name: 'connect-sync',
-            image: connectSyncImage,
-            httpPort: 8081,
-            busPort: 11_221,
-            peerPort: 11_220,
-            memory: '128Mi',
-          }),
-        ],
-      },
-    },
-  };
-}
-
-interface ConnectContainer {
-  readonly name: string;
-  readonly image: string;
-  readonly httpPort: number;
-  readonly busPort: number;
-  readonly peerPort: number;
-  readonly memory: string;
-}
-
-// connect-api and connect-sync differ only in ports and image; they share a data volume
-// and talk over the pod's loopback
-function buildConnectContainer(spec: ConnectContainer): input.core.v1.Container {
-  return {
-    name: spec.name,
-    image: spec.image,
-    env: [
-      { name: 'OP_HTTP_PORT', value: String(spec.httpPort) },
-      { name: 'OP_SESSION', value: credentialsPath },
-      { name: 'OP_BUS_PORT', value: String(spec.busPort) },
-      { name: 'OP_BUS_PEERS', value: `localhost:${spec.peerPort}` },
-      { name: 'OP_LOG_LEVEL', value: 'info' },
-    ],
-    readinessProbe: { httpGet: { path: '/health', port: spec.httpPort } },
-    livenessProbe: {
-      httpGet: { path: '/heartbeat', port: spec.httpPort },
-      periodSeconds: 30,
-      failureThreshold: 3,
-      initialDelaySeconds: 15,
-    },
-    volumeMounts: [
-      { name: 'shared-data', mountPath: dataPath },
-      { name: 'credentials', mountPath: credentialsPath, subPath: credentialsKey, readOnly: true },
-    ],
-    securityContext: lockedDown,
-    resources: { requests: { cpu: '10m', memory: '32Mi' }, limits: { memory: spec.memory } },
-  };
 }
