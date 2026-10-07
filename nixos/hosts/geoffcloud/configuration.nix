@@ -1,6 +1,6 @@
 # geoffcloud: Onidel VM, Melbourne. 8 vCPU (EPYC 7513, nested KVM), 31 GiB RAM.
 # vda: root (disko.nix). vdb: imp's ZFS pool, imported, never formatted here.
-{ modulesPath, pkgs, ... }:
+{ config, modulesPath, pkgs, ... }:
 let
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = "100.69.47.33";
@@ -8,6 +8,17 @@ let
   # k3s's default cluster CIDR (no --cluster-cidr override below); services.imp.forwardDeny
   # names the same range
   k3sPodCIDR = "10.42.0.0/16";
+  # 1Password Connect for imps (GEO-120). The imp broker in imp-host forwards granted requests
+  # for op-connect.imp.internal to the relay below, on docker0's host address. imp-forward
+  # drops imp-host's traffic to the k3s ranges, so the container cannot reach the Service
+  # itself: the host dials its ClusterIP instead. The Service pins that ClusterIP
+  # (infra/onepassword-connect.ts).
+  connectRelayAddress = "172.17.0.1";
+  connectRelayPort = 18081;
+  connectServiceAddress = "10.43.82.198:8000";
+  # docker0's subnet. imp's module does not fix imp-host's address on it, so the rule below
+  # admits the whole subnet; the other containers on docker0 are ours and none reach k3s.
+  dockerSubnet = "172.17.0.0/16";
   atc = pkgs.callPackage ../../packages/atc.nix { };
 in
 {
@@ -110,8 +121,40 @@ in
         type filter hook input priority filter - 10; policy accept;
         tcp dport ${toString atcDaemonPort} iifname "cni0" ip saddr ${k3sPodCIDR} ip daddr ${atcDaemonAddress} accept
         tcp dport ${toString atcDaemonPort} drop
+        tcp dport ${toString connectRelayPort} iifname "docker0" ip saddr ${dockerSubnet} ip daddr ${connectRelayAddress} accept
+        tcp dport ${toString connectRelayPort} drop
       }
     '';
+  };
+
+  # The Connect relay's port, from docker0 only: nixos-fw does not trust docker0, and imp-host
+  # reaches the host there. The cloud_host rules above admit only docker0's subnet to it and
+  # drop the rest; as with 8415, a drop in any input chain is final and the accept only passes
+  # the packet on to nixos-fw, which opens the port on docker0 alone.
+  networking.firewall.interfaces.docker0.allowedTCPPorts = [ connectRelayPort ];
+
+  # The relay: systemd holds the socket and starts the proxy on the first connection, so the
+  # socket can wait for docker0 (FreeBind) and the proxy dials the ClusterIP from the host.
+  systemd.sockets.onepassword-connect-relay = {
+    wantedBy = [ "sockets.target" ];
+    listenStreams = [ "${connectRelayAddress}:${toString connectRelayPort}" ];
+    socketConfig.FreeBind = true;
+  };
+  systemd.services.onepassword-connect-relay = {
+    serviceConfig = {
+      ExecStart = "${config.systemd.package}/lib/systemd/systemd-socket-proxyd ${connectServiceAddress}";
+      DynamicUser = true;
+      PrivateTmp = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      NoNewPrivileges = true;
+      RestrictAddressFamilies = [
+        "AF_INET"
+        "AF_INET6"
+        "AF_UNIX"
+      ];
+      CapabilityBoundingSet = "";
+    };
   };
 
   services.openssh = {
