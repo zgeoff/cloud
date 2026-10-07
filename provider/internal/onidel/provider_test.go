@@ -72,7 +72,7 @@ func TestSchemaNamesTheNodeSDKPackage(t *testing.T) {
 	assert.Equal(t, "@zgeoff/pulumi-onidel", schema.Language.Nodejs.PackageName)
 }
 
-func TestSchemaGivesTheVmNoPasswordProperty(t *testing.T) {
+func TestSchemaGivesTheVMNoPasswordProperty(t *testing.T) {
 	ctx := setupTest(t)
 
 	resp, err := ctx.server.GetSchema(p.GetSchemaRequest{})

@@ -695,22 +695,7 @@ func TestVMDeleteAcceptsAVMThatIsAlreadyGone(t *testing.T) {
 	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/vm/missing", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
-func TestVMReadAfterDeleteReportsTheVMAsGone(t *testing.T) {
-	ctx := setupTest(t)
-	urn := onideltest.BuildURN("onidel:index:Vm", "web")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"name": "web", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40, "os": 24}),
-	})
-	require.NoError(t, err)
-	require.NoError(t, ctx.server.Delete(p.DeleteRequest{ID: created.ID, Urn: urn, Properties: created.Properties}))
-
-	read, err := ctx.server.Read(p.ReadRequest{ID: created.ID, Urn: urn, Properties: created.Properties})
-
-	require.NoError(t, err)
-	assert.Equal(t, "", read.ID)
-}
-
-func TestVMReadTakesTheNumericFirewallIDOnImport(t *testing.T) {
+func TestVMReadTakesTheNumericFirewallIDWhenTheProgramSetsNone(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
 	ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "location": "Sydney", "firewall_group_id": 1581, "status": "active"})

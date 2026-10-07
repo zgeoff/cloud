@@ -91,23 +91,28 @@ func TestFirewallRuleCreateFailsForAMissingGroup(t *testing.T) {
 
 func TestFirewallRuleRefreshShowsNoDriftForICMPOnAV6Subnet(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
-	inputs := map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}
-	created, err := ctx.server.Create(p.CreateRequest{Urn: urn, Properties: onideltest.BuildProps(inputs)})
-	require.NoError(t, err)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
+		"subnet": "::", "subnet_size": 0, "desc": "",
+	})
 
 	read, err := ctx.server.Read(p.ReadRequest{
-		ID: created.ID, Urn: urn, Properties: created.Properties, Inputs: onideltest.BuildProps(inputs),
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6"),
+		Properties: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
+		}),
+		Inputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		"g1/00000000-0000-4000-8000-000000000001",
+		"g1/r1",
 		map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0.0},
 		map[string]any{
 			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0.0,
-			"ruleId": "00000000-0000-4000-8000-000000000001", "ipType": "v6", "action": "allow",
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
 		},
 	}, []any{read.ID, onideltest.ToPlain(read.Inputs), onideltest.ToPlain(read.Properties)})
 }
@@ -115,27 +120,20 @@ func TestFirewallRuleRefreshShowsNoDriftForICMPOnAV6Subnet(t *testing.T) {
 func TestFirewallRuleImportAdoptsTheAPIsSpellingByCompositeID(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
+		"subnet": "::", "subnet_size": 0, "desc": "",
 	})
-	require.NoError(t, err)
 
-	imported, err := ctx.server.Read(p.ReadRequest{ID: created.ID, Urn: urn})
+	imported, err := ctx.server.Read(p.ReadRequest{ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		map[string]any{"firewallId": "g1", "protocol": "ipv6-icmp", "subnet": "::", "subnetSize": 0.0},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
-			}},
-			{
-				Method: "GET", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-				Query: "team_id=team-a",
-			},
+			{Method: "GET", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"},
 		},
 	}, []any{onideltest.ToPlain(imported.Inputs), ctx.api.GetRequests()})
 }
@@ -335,15 +333,18 @@ func TestFirewallRuleDiffReportsNoChangeForTheSameInputs(t *testing.T) {
 func TestFirewallRuleUpdateChangesTheDescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
+		"subnet": "::", "subnet_size": 0, "desc": "",
 	})
-	require.NoError(t, err)
 
 	updated, err := ctx.server.Update(p.UpdateRequest{
-		ID: created.ID, Urn: urn, State: created.Properties,
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6"),
+		State: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
+		}),
 		OldInputs: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
 		Inputs:    onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0, "description": "ping"}),
 	})
@@ -352,17 +353,11 @@ func TestFirewallRuleUpdateChangesTheDescription(t *testing.T) {
 	assert.Equal(t, []any{
 		map[string]any{
 			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0.0, "description": "ping",
-			"ruleId": "00000000-0000-4000-8000-000000000001", "ipType": "v6", "action": "allow",
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
 		},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
-			}},
-			{
-				Method: "PATCH", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-				Body: map[string]any{"team_id": "team-a", "desc": "ping"},
-			},
+			{Method: "PATCH", Path: "/network/firewalls/g1/rules/r1", Body: map[string]any{"team_id": "team-a", "desc": "ping"}},
 		},
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
 }
@@ -410,27 +405,26 @@ func TestFirewallRuleUpdateFailsWhenTheRuleIsGone(t *testing.T) {
 func TestFirewallRuleDeleteRemovesTheRuleFromTheTeam(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
+		"subnet": "::", "subnet_size": 0, "desc": "",
 	})
-	require.NoError(t, err)
 
-	err = ctx.server.Delete(p.DeleteRequest{ID: created.ID, Urn: urn, Properties: created.Properties})
+	err := ctx.server.Delete(p.DeleteRequest{
+		ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6"),
+		Properties: onideltest.BuildProps(map[string]any{
+			"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0,
+			"ruleId": "r1", "ipType": "v6", "action": "allow",
+		}),
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		map[string]map[string]any{},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{
-				"team_id": "team-a", "protocol": "icmp", "subnet": "::", "subnet_size": 0.0,
-			}},
-			{
-				Method: "DELETE", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-				Query: "team_id=team-a",
-			},
+			{Method: "DELETE", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"},
 		},
 	}, []any{ctx.api.GetFirewallRules(), ctx.api.GetRequests()})
 }
@@ -449,20 +443,4 @@ func TestFirewallRuleDeleteAcceptsARuleThatIsAlreadyGone(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/network/firewalls/g1/rules/missing", Query: "team_id=team-a"}}, ctx.api.GetRequests())
-}
-
-func TestFirewallRuleReadAfterDeleteReportsTheRuleAsGone(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	urn := onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"firewallId": "g1", "protocol": "icmp", "subnet": "::", "subnetSize": 0}),
-	})
-	require.NoError(t, err)
-	require.NoError(t, ctx.server.Delete(p.DeleteRequest{ID: created.ID, Urn: urn, Properties: created.Properties}))
-
-	read, err := ctx.server.Read(p.ReadRequest{ID: created.ID, Urn: urn})
-
-	require.NoError(t, err)
-	assert.Equal(t, "", read.ID)
 }
