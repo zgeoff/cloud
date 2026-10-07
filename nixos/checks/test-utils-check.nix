@@ -13,6 +13,8 @@ let
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
+  stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
+  stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
 
   # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
   pinnedBun = pkgs.stdenv.mkDerivation {
@@ -448,6 +450,246 @@ pkgs.runCommand "test-utils-check"
       assert_equals 1 "$staged" "the script's staged file"
       assert_equals 1 "$checked" "the script's checks of the staged file"
       assert_equals 1 "$sqlite" "the script's sqlite3"
+    )
+
+    echo "#buildStubSystemctl fails the state read of its unit, with systemctl's message and status"
+    (
+      cd "$(mktemp -d)"
+
+      status=0
+      FAIL_SHOW_UNIT=imp-docker-proxy ${stubSystemctl} show -p ActiveState --value imp-docker-proxy > out 2> err || status=$?
+
+      assert_equals 1 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_equals "Failed to get properties: Connection timed out" "$(cat err)" "the error"
+    )
+
+    echo "#buildStubSystemctl passes the state read of another unit to systemctl unchanged"
+    (
+      cd "$(mktemp -d)"
+
+      real_status=0
+      ${pkgs.systemd}/bin/systemctl show -p ActiveState --value imp-host > real.out 2> real.err || real_status=$?
+      stub_status=0
+      FAIL_SHOW_UNIT=imp-docker-proxy ${stubSystemctl} show -p ActiveState --value imp-host > stub.out 2> stub.err ||
+        stub_status=$?
+
+      assert_equals "$real_status" "$stub_status" "the exit status"
+      assert_files_equal real.out stub.out
+      assert_files_equal real.err stub.err
+    )
+
+    echo "#buildStubSystemctl passes another property read of its unit to systemctl unchanged"
+    (
+      cd "$(mktemp -d)"
+
+      real_status=0
+      ${pkgs.systemd}/bin/systemctl show -p SubState --value imp-docker-proxy > real.out 2> real.err || real_status=$?
+      stub_status=0
+      FAIL_SHOW_UNIT=imp-docker-proxy ${stubSystemctl} show -p SubState --value imp-docker-proxy > stub.out 2> stub.err ||
+        stub_status=$?
+
+      assert_equals "$real_status" "$stub_status" "the exit status"
+      assert_files_equal real.out stub.out
+      assert_files_equal real.err stub.err
+    )
+
+    echo "#buildStubSystemctl passes a call that succeeds to systemctl unchanged"
+    (
+      cd "$(mktemp -d)"
+
+      ${pkgs.systemd}/bin/systemctl --version > real.out 2> real.err
+      FAIL_SHOW_UNIT=imp-docker-proxy ${stubSystemctl} --version > stub.out 2> stub.err
+
+      assert_files_equal real.out stub.out
+      assert_files_equal real.err stub.err
+      assert_not_equals "" "$(cat stub.out)" "the version"
+    )
+
+    echo "#buildStubSystemctl passes its arguments to systemctl as given"
+    (
+      cd "$(mktemp -d)"
+
+      real_status=0
+      ${pkgs.systemd}/bin/systemctl --no-such-option 'two words' > real.out 2> real.err || real_status=$?
+      stub_status=0
+      FAIL_SHOW_UNIT=imp-docker-proxy ${stubSystemctl} --no-such-option 'two words' > stub.out 2> stub.err || stub_status=$?
+
+      assert_equals "$real_status" "$stub_status" "the exit status"
+      assert_files_equal real.out stub.out
+      assert_files_equal real.err stub.err
+      assert_equals "${pkgs.systemd}/bin/systemctl: unrecognized option '--no-such-option'" "$(cat stub.err)" \
+        "the error, which names the argument"
+    )
+
+    echo "#buildStubSystemctl refuses to run without the unit whose state read fails"
+    (
+      cd "$(mktemp -d)"
+
+      status=0
+      ${stubSystemctl} --version > out 2> err || status=$?
+
+      assert_equals 2 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_equals "systemctl-failing-one-state-read: set FAIL_SHOW_UNIT to the unit whose state read fails" "$(cat err)" \
+        "the error"
+    )
+
+    echo "#buildStubSystemctl's premises hold: systemctl prints its message, and the script reads each state through \$SYSTEMCTL"
+    (
+      cd "$(mktemp -d)"
+
+      message=$(grep -laF 'Failed to get properties: %s' ${pkgs.systemd}/bin/systemctl ${pkgs.systemd}/lib/systemd/libsystemd-shared-*.so | wc -l)
+      systemctl=$(grep -cxF 'systemctl="''${SYSTEMCTL:-systemctl}"' ${../../scripts/restore-impd-db.sh} || true)
+      reads=$(grep -cxF '  unit_state="$("$systemctl" show -p ActiveState --value "$unit")" || fail "cannot read $unit'"'"'s state"' \
+        ${../../scripts/restore-impd-db.sh} || true)
+      units=$(grep -cxF 'units=(imp-host imp-docker-proxy)' ${../../scripts/restore-impd-db.sh} || true)
+
+      assert_not_equals 0 "$message" "systemd's files that hold the message"
+      assert_equals 1 "$systemctl" "the script's systemctl"
+      assert_equals 1 "$reads" "the script's state reads"
+      assert_equals 1 "$units" "the script's units"
+    )
+
+    echo "#buildStubCmp finds a difference in its one comparison, even between equal files, as cmp -s reports one"
+    (
+      cd "$(mktemp -d)"
+      mkdir -p copy run/db
+      printf 'same\n' > copy/imp.sqlite
+      printf 'same\n' > run/db/imp.sqlite.restore
+
+      status=0
+      FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/r*/db/imp.sqlite.restore" \
+        ${stubCmp} -s "$PWD/copy/imp.sqlite" "$PWD/run/db/imp.sqlite.restore" > out 2> err || status=$?
+
+      assert_equals 1 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_files_equal /dev/null err
+    )
+
+    echo "#buildStubCmp passes a comparison whose second file does not match to cmp unchanged"
+    (
+      cd "$(mktemp -d)"
+      mkdir -p copy run/db
+      printf 'same\n' > copy/imp.sqlite
+      printf 'same\n' > run/db/imp.sqlite
+
+      status=0
+      FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/r*/db/imp.sqlite.restore" \
+        ${stubCmp} -s "$PWD/copy/imp.sqlite" "$PWD/run/db/imp.sqlite" > out 2> err || status=$?
+
+      assert_equals 0 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_files_equal /dev/null err
+    )
+
+    echo "#buildStubCmp passes a comparison whose first file does not match to cmp unchanged"
+    (
+      cd "$(mktemp -d)"
+      mkdir -p copy run/db saved
+      printf 'same\n' > run/db/imp.sqlite.restore
+      printf 'same\n' > saved/imp.sqlite.restore
+
+      status=0
+      FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/*/imp.sqlite.restore" \
+        ${stubCmp} -s "$PWD/saved/imp.sqlite.restore" "$PWD/run/db/imp.sqlite.restore" > out 2> err || status=$?
+
+      assert_equals 0 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_files_equal /dev/null err
+    )
+
+    echo "#buildStubCmp passes its one comparison without -s to cmp unchanged"
+    (
+      cd "$(mktemp -d)"
+      mkdir -p copy run/db
+      printf 'same\n' > copy/imp.sqlite
+      printf 'same\n' > run/db/imp.sqlite.restore
+
+      status=0
+      FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/r*/db/imp.sqlite.restore" \
+        ${stubCmp} "$PWD/copy/imp.sqlite" "$PWD/run/db/imp.sqlite.restore" > out 2> err || status=$?
+
+      assert_equals 0 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_files_equal /dev/null err
+    )
+
+    echo "#buildStubCmp passes a comparison of files that differ to cmp, with its arguments as given"
+    (
+      cd "$(mktemp -d)"
+      printf 'one\n' > 'first file'
+      printf 'two\n' > second
+
+      real_status=0
+      ${pkgs.diffutils}/bin/cmp 'first file' second > real.out 2> real.err || real_status=$?
+      stub_status=0
+      FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/*" ${stubCmp} 'first file' second > stub.out 2> stub.err ||
+        stub_status=$?
+
+      assert_equals 1 "$real_status" "cmp's exit status"
+      assert_equals 1 "$stub_status" "the stand-in's exit status"
+      assert_files_equal real.out stub.out
+      assert_files_equal real.err stub.err
+      assert_equals "first file second differ: char 1, line 1" "$(cat stub.out)" "the difference, which names the files"
+    )
+
+    echo "#buildStubCmp passes a comparison with a missing file to cmp unchanged"
+    (
+      cd "$(mktemp -d)"
+      printf 'one\n' > present
+
+      real_status=0
+      ${pkgs.diffutils}/bin/cmp -s present missing > real.out 2> real.err || real_status=$?
+      stub_status=0
+      FAIL_CMP_FIRST=$PWD/copy/imp.sqlite FAIL_CMP_SECOND="$PWD/*" ${stubCmp} -s present missing > stub.out 2> stub.err ||
+        stub_status=$?
+
+      assert_equals 2 "$real_status" "cmp's exit status"
+      assert_equals 2 "$stub_status" "the stand-in's exit status"
+      assert_files_equal real.out stub.out
+      assert_files_equal real.err stub.err
+    )
+
+    echo "#buildStubCmp refuses to run without the comparison that fails"
+    (
+      cd "$(mktemp -d)"
+      printf 'one\n' > first
+      printf 'one\n' > second
+
+      status=0
+      FAIL_CMP_FIRST=$PWD/first ${stubCmp} -s first second > out 2> err || status=$?
+
+      assert_equals 2 "$status" "the exit status"
+      assert_files_equal /dev/null out
+      assert_equals "cmp-failing-one-comparison: set FAIL_CMP_FIRST and FAIL_CMP_SECOND to the comparison that fails" \
+        "$(cat err)" "the error"
+    )
+
+    echo "#buildStubCmp's premises hold in scripts/restore-impd-db.sh: it compares through \$CMP, the copy first in its two checks"
+    (
+      cd "$(mktemp -d)"
+
+      cmp=$(grep -cxF 'cmp="''${CMP:-cmp}"' ${../../scripts/restore-impd-db.sh} || true)
+      mount=$(grep -cxF 'mnt="$(mktemp -d /run/impd-restore.XXXXXX)"' ${../../scripts/restore-impd-db.sh} || true)
+      db=$(grep -cxF 'db="$mnt/db"' ${../../scripts/restore-impd-db.sh} || true)
+      staged_file=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
+      staged=$(grep -cxF '"$cmp" -s "$copy/imp.sqlite" "$staged" || fail "the staged file differs from the copy"' \
+        ${../../scripts/restore-impd-db.sh} || true)
+      published=$(grep -cxF '"$cmp" -s "$copy/imp.sqlite" "$db/imp.sqlite" || fail "the published database differs from the copy"' \
+        ${../../scripts/restore-impd-db.sh} || true)
+      saved=$(grep -cxF '    "$cmp" -s "$db/$file" "$saved/$file" || fail "the saved $file differs from the original"' \
+        ${../../scripts/restore-impd-db.sh} || true)
+      calls=$(grep -cF '"$cmp"' ${../../scripts/restore-impd-db.sh} || true)
+
+      assert_equals 1 "$cmp" "the script's cmp"
+      assert_equals 1 "$mount" "the script's mount directory"
+      assert_equals 1 "$db" "the script's database directory"
+      assert_equals 1 "$staged_file" "the script's staged file"
+      assert_equals 1 "$staged" "the script's checks of the staged file"
+      assert_equals 1 "$published" "the script's checks of the published database"
+      assert_equals 1 "$saved" "the script's checks of the saved files"
+      assert_equals 3 "$calls" "the script's comparisons"
     )
 
     touch $out

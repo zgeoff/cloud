@@ -12,7 +12,9 @@
 # it starts nothing and switches nothing. It preserves the stopped database and its WAL files
 # in /root/imp-db-backups/pre-restore-<UTC time>/, stages the copy beside the database,
 # checks it there, publishes it with one rename, and moves on only after a clean unmount.
-# A copy needs COPY-INFO from scripts/copy-impd-db.sh.
+# A copy needs COPY-INFO from scripts/copy-impd-db.sh. SQLITE3, SYSTEMCTL and CMP name the
+# sqlite3, systemctl and cmp it runs (default: those on PATH), so the rehearsals in
+# nixos/checks/impd-restore.nix and impd-restore-seams.nix can put a stand-in in place of one.
 set -euo pipefail
 
 copy="${1:?usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>}"
@@ -21,6 +23,8 @@ profiles="${NIX_PROFILES_DIR:-/nix/var/nix/profiles}"
 dataset="${IMPD_DATASET:-tank/imp}"
 backups="${IMPD_BACKUPS:-/root/imp-db-backups}"
 sqlite="${SQLITE3:-sqlite3}"
+systemctl="${SYSTEMCTL:-systemctl}"
+cmp="${CMP:-cmp}"
 start_wait="${IMPD_START_WAIT_SECONDS:-60}"
 units=(imp-host imp-docker-proxy)
 
@@ -39,7 +43,7 @@ fail() {
 
 stop_after_failure() {
   if [ "$starting" = true ]; then
-    if systemctl stop "${units[@]}"; then
+    if "$systemctl" stop "${units[@]}"; then
       state="$state; imp-host and imp-docker-proxy are stopped again"
     else
       state="$state; stopping imp-host and imp-docker-proxy FAILED, check them by hand"
@@ -69,7 +73,7 @@ fi
 
 step "check the host"
 for unit in "${units[@]}"; do
-  unit_state="$(systemctl show -p ActiveState --value "$unit")" || fail "cannot read $unit's state"
+  unit_state="$("$systemctl" show -p ActiveState --value "$unit")" || fail "cannot read $unit's state"
   case "$unit_state" in
     inactive | failed) ;;
     *) fail "$unit is $unit_state, not stopped; run: systemctl stop ${units[*]}" ;;
@@ -133,7 +137,7 @@ if [ -d "$mnt/secrets" ]; then
 fi
 for file in imp.sqlite imp.sqlite-wal imp.sqlite-shm; do
   if [ -e "$db/$file" ]; then
-    cmp -s "$db/$file" "$saved/$file" || fail "the saved $file differs from the original"
+    "$cmp" -s "$db/$file" "$saved/$file" || fail "the saved $file differs from the original"
   fi
 done
 echo "saved: $saved"
@@ -144,7 +148,7 @@ staged="$db/imp.sqlite.restore"
 cp "$copy/imp.sqlite" "$staged"
 chown --reference="$db/imp.sqlite" "$staged"
 chmod --reference="$db/imp.sqlite" "$staged"
-cmp -s "$copy/imp.sqlite" "$staged" || fail "the staged file differs from the copy"
+"$cmp" -s "$copy/imp.sqlite" "$staged" || fail "the staged file differs from the copy"
 [ "$("$sqlite" "file:$staged?mode=ro&immutable=1" 'PRAGMA integrity_check;')" = ok ] ||
   fail "the staged file fails integrity_check"
 sync -f "$staged"
@@ -153,7 +157,7 @@ step "publish"
 rm -f "$db/imp.sqlite-wal" "$db/imp.sqlite-shm"
 mv -f "$staged" "$db/imp.sqlite"
 sync -f "$db/imp.sqlite"
-cmp -s "$copy/imp.sqlite" "$db/imp.sqlite" || fail "the published database differs from the copy"
+"$cmp" -s "$copy/imp.sqlite" "$db/imp.sqlite" || fail "the published database differs from the copy"
 state="the copy is in place (the original is in $saved); nothing was started or switched"
 
 step "unmount"
@@ -173,7 +177,7 @@ if [ "$(readlink -f "${CURRENT_SYSTEM:-/run/current-system}")" != "$(readlink -f
 fi
 
 step "start"
-systemctl start imp-host
+"$systemctl" start imp-host
 # imp-host is Type=exec: the start returns once docker run has begun, before the container
 # exists, so wait for it
 running_image=""
