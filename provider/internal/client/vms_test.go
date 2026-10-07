@@ -444,9 +444,14 @@ func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "status": "building"})
 	ctx.api.SetAutoSettle(false)
-	ctx.client.Sleep = func(context.Context, time.Duration) error { return context.Canceled }
+	callCtx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error {
+		cancel()
+		return sleepCtx.Err()
+	}
 
-	_, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
+	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
 
 	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}}, []any{err, ctx.api.GetRequests()})
 }

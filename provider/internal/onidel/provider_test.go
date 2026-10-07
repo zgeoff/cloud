@@ -103,16 +103,19 @@ func TestSchemaNeverNamesAPassword(t *testing.T) {
 	assert.NotContains(t, resp.Schema, `"password"`)
 }
 
-func TestNewBuildsTheSameSchemaAsTheZeroOptions(t *testing.T) {
-	ctx := setupTest(t)
-	prov, err := onidel.New()
+func TestNewPublishesTheSameSchemaAsZeroOptions(t *testing.T) {
+	plain, err := onidel.New()
 	require.NoError(t, err)
-	server, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(prov))
+	zero, err := onidel.NewWithOptions(onidel.Options{})
 	require.NoError(t, err)
-	want, err := ctx.server.GetSchema(p.GetSchemaRequest{})
+	plainServer, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(plain))
+	require.NoError(t, err)
+	zeroServer, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(zero))
+	require.NoError(t, err)
+	want, err := zeroServer.GetSchema(p.GetSchemaRequest{})
 	require.NoError(t, err)
 
-	got, err := server.GetSchema(p.GetSchemaRequest{})
+	got, err := plainServer.GetSchema(p.GetSchemaRequest{})
 
 	require.NoError(t, err)
 	assert.Equal(t, want, got)

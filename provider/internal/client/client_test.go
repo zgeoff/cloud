@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -31,9 +32,9 @@ func setupTest(t *testing.T) struct {
 	api := onideltest.StartFakeAPI(t)
 	c := client.New(api.URL, onideltest.APIKey)
 	var sleeps []time.Duration
-	c.Sleep = func(_ context.Context, d time.Duration) error {
+	c.Sleep = func(sleepCtx context.Context, d time.Duration) error {
 		sleeps = append(sleeps, d)
-		return nil
+		return sleepCtx.Err()
 	}
 	return struct {
 		api    *onideltest.FakeAPI
@@ -49,22 +50,32 @@ func TestNewStartsWithTheDefaultIntervals(t *testing.T) {
 		[]time.Duration{c.PollInterval, c.RetryBase, c.VMWaitTimeout})
 }
 
-func TestNewSleepsOnARealTimer(t *testing.T) {
-	c := client.New("", "key")
+func TestNewSleepsForTheWholeDuration(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := client.New("", "key")
+		start := time.Now()
 
-	err := c.Sleep(t.Context(), time.Millisecond)
+		err := c.Sleep(t.Context(), time.Hour)
 
-	assert.NoError(t, err)
+		assert.Equal(t, []any{nil, time.Hour}, []any{err, time.Since(start)})
+	})
 }
 
 func TestNewSleepsNoLongerThanTheContextLasts(t *testing.T) {
-	c := client.New("", "key")
-	canceled, cancel := context.WithCancel(t.Context())
-	cancel()
+	synctest.Test(t, func(t *testing.T) {
+		c := client.New("", "key")
+		sleepCtx, cancel := context.WithCancel(t.Context())
+		t.Cleanup(cancel)
+		go func() {
+			time.Sleep(time.Minute)
+			cancel()
+		}()
+		start := time.Now()
 
-	err := c.Sleep(canceled, time.Hour)
+		err := c.Sleep(sleepCtx, time.Hour)
 
-	assert.Equal(t, context.Canceled, err)
+		assert.Equal(t, []any{context.Canceled, time.Minute}, []any{err, time.Since(start)})
+	})
 }
 
 func TestNewTrimsATrailingSlashFromTheBaseURL(t *testing.T) {
