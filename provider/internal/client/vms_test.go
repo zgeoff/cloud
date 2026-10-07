@@ -149,25 +149,45 @@ func TestCreateVMTakesTheIDFromACreateBodyThatCarriesOne(t *testing.T) {
 	}
 }
 
-func TestCreateVMFallsBackToListingWhenTheCreateBodyIsNotJSON(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.RegisterHandler("POST /vm", func(w http.ResponseWriter, _ *http.Request) {
-		ctx.api.SetVM(map[string]any{"id": "listed", "name": "web", "status": "active"})
-		w.WriteHeader(http.StatusCreated)
-		_, _ = w.Write([]byte(`created`))
-	})
+func TestCreateVMFallsBackToListingWhenTheCreateBodyCarriesNoID(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+	}{
+		{"it lists after a body that is not JSON", `created`},
+		{"it lists after an empty JSON object", `{}`},
+		{"it lists after a JSON body without an ID field", `{"name":"web","status":"building"}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.RegisterHandler("POST /vm", func(w http.ResponseWriter, _ *http.Request) {
+				ctx.api.SetVM(map[string]any{"id": "listed", "name": "web", "status": "active"})
+				w.WriteHeader(http.StatusCreated)
+				_, _ = w.Write([]byte(row.body))
+			})
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+			vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
-	require.NoError(t, err)
-	assert.Equal(t, client.VM{ID: "listed", Name: "web", Status: "active"}, vm)
+			require.NoError(t, err)
+			assert.Equal(t, []any{
+				client.VM{ID: "listed", Name: "web", Status: "active"},
+				[]onideltest.Request{
+					{Method: "GET", Path: "/vm"},
+					{Method: "POST", Path: "/vm", Body: map[string]any{
+						"name": "web", "location": "Sydney", "cpu": 1.0, "ram": 1024.0, "disk": 20.0, "os": 24.0, "ipv6": false,
+					}},
+					{Method: "GET", Path: "/vm"},
+					{Method: "GET", Path: "/vm/listed"},
+				},
+			}, []any{vm, ctx.api.GetRequests()})
+		})
+	}
 }
 
 func TestCreateVMFailsWhenTheFirstListingFails(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("GET /vm", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /vm", http.StatusInternalServerError, "", 1)
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
@@ -189,9 +209,7 @@ func TestCreateVMFailsWhenTheAPIRefusesTheCreate(t *testing.T) {
 
 func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("POST /vm", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusCreated)
-	})
+	ctx.api.RegisterResponse("POST /vm", http.StatusCreated, "", 1)
 	previous := client.VMWaitTimeout
 	client.VMWaitTimeout = 50 * time.Millisecond
 	t.Cleanup(func() { client.VMWaitTimeout = previous })
@@ -205,9 +223,7 @@ func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterHandler("POST /vm", func(w http.ResponseWriter, _ *http.Request) {
-		ctx.api.RegisterHandler("GET /vm", func(w http.ResponseWriter, _ *http.Request) {
-			w.WriteHeader(http.StatusInternalServerError)
-		})
+		ctx.api.RegisterResponse("GET /vm", http.StatusInternalServerError, "", 1)
 		w.WriteHeader(http.StatusCreated)
 	})
 
@@ -367,25 +383,21 @@ func TestRemoveVMAcceptsAVMStillListedAsDestroyed(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
-			ctx.api.SetVM(map[string]any{"id": "v", "status": "active"})
 			// Undocumented: a destroyed VM may stay listed under a terminal status.
-			ctx.api.RegisterHandler("DELETE /vm/{id}", func(w http.ResponseWriter, _ *http.Request) {
-				ctx.api.SetVM(map[string]any{"id": "v", "status": row.status})
-				w.WriteHeader(http.StatusNoContent)
-			})
+			ctx.api.SetVM(map[string]any{"id": "v", "status": row.status})
+			ctx.api.RegisterResponse("DELETE /vm/{id}", http.StatusNoContent, "", 1)
 
 			err := ctx.client.RemoveVM(t.Context(), "v", "")
 
-			assert.NoError(t, err)
+			require.NoError(t, err)
+			assert.Equal(t, []onideltest.Request{{Method: "DELETE", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
 		})
 	}
 }
 
 func TestRemoveVMFailsWhenTheAPIRefusesTheDelete(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterHandler("DELETE /vm/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-	})
+	ctx.api.RegisterResponse("DELETE /vm/{id}", http.StatusBadRequest, "", 1)
 
 	err := ctx.client.RemoveVM(t.Context(), "v", "")
 
@@ -397,13 +409,34 @@ func TestRemoveVMFailsWhenTheAPIRefusesTheDelete(t *testing.T) {
 func TestRemoveVMFailsWhenTheReadAfterTheDeleteFails(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "status": "active"})
-	ctx.api.RegisterHandler("GET /vm/{id}", func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-	})
+	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusInternalServerError, "", 1)
 
 	err := ctx.client.RemoveVM(t.Context(), "v", "")
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, &client.APIError{Method: "GET", Path: "/vm/v", Status: 500}, apiErr)
+}
+func TestReadVMReportsAMissingVMAsNotFound(t *testing.T) {
+	ctx := setupTest(t)
+
+	_, err := ctx.client.ReadVM(t.Context(), "x", "team")
+
+	assert.True(t, client.IsNotFound(err))
+}
+
+func TestWaitForVMReadyWaitsThroughTheAlternativeSnapshotSpelling(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "status": "active", "active_action_id": nil})
+	// The spec spells it taking_snaphot; the client also accepts taking_snapshot,
+	// which the fake does not model, so one canned read reports it.
+	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusOK, `{"id":"v","status":"taking_snapshot"}`, 1)
+
+	vm, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
+
+	require.NoError(t, err)
+	assert.Equal(t, []any{
+		client.VM{ID: "v", Status: "active", ActiveActionID: json.RawMessage("null")},
+		[]onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}},
+	}, []any{vm, ctx.api.GetRequests()})
 }

@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,5 +40,7 @@ func TestFlexStringRejectsABoolean(t *testing.T) {
 
 	err := json.Unmarshal([]byte(`true`), &got)
 
-	assert.EqualError(t, err, "json: cannot unmarshal bool into Go value of type json.Number")
+	var typeErr *json.UnmarshalTypeError
+	require.ErrorAs(t, err, &typeErr)
+	assert.Equal(t, &json.UnmarshalTypeError{Value: "bool", Type: reflect.TypeFor[json.Number](), Offset: 4}, typeErr)
 }
