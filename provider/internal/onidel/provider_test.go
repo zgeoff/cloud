@@ -50,9 +50,9 @@ func TestSchemaPublishesEveryResourceToken(t *testing.T) {
 		Resources map[string]json.RawMessage `json:"resources"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(resp.Schema), &schema))
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"onidel:index:FirewallGroup", "onidel:index:FirewallRule", "onidel:index:Rdns", "onidel:index:SshKey", "onidel:index:Vm",
-	}, slices.Sorted(maps.Keys(schema.Resources)))
+	}, slices.Collect(maps.Keys(schema.Resources)))
 }
 
 func TestSchemaNamesTheNodeSDKPackage(t *testing.T) {
@@ -84,11 +84,11 @@ func TestSchemaGivesTheVmNoPasswordProperty(t *testing.T) {
 		} `json:"resources"`
 	}
 	require.NoError(t, json.Unmarshal([]byte(resp.Schema), &schema))
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"bgpEnabled", "cpu", "createdAt", "disableSshBlocking", "disk", "firewallGroupId", "instanceType", "ipv6", "isoId",
 		"location", "mainIpv4", "mainIpv6", "name", "os", "paymentCycle", "ram", "snapshotId", "sshKeys", "startupScriptId",
 		"status", "template", "vpcs",
-	}, slices.Sorted(maps.Keys(schema.Resources["onidel:index:Vm"].Properties)))
+	}, slices.Collect(maps.Keys(schema.Resources["onidel:index:Vm"].Properties)))
 }
 
 func TestSchemaNeverNamesAPassword(t *testing.T) {
