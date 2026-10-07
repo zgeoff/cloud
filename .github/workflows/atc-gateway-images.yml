@@ -10,12 +10,16 @@ on:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
       - scripts/test-atc-gateway-fixture.sh
+      - scripts/test-lib/**
+      - package.json
       - .github/workflows/atc-gateway-images.yml
   pull_request:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
       - scripts/test-atc-gateway-fixture.sh
+      - scripts/test-lib/**
+      - package.json
       - .github/workflows/atc-gateway-images.yml
   workflow_dispatch:
     inputs:
