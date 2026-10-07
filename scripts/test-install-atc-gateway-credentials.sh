@@ -13,6 +13,8 @@
 #   SEED=1234 CASE='stale saved token' bash scripts/test-install-atc-gateway-credentials.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
+# fixed, so the modes the cases assert do not depend on the caller's umask
+umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/wait-for.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/build-token.sh"

@@ -7,6 +7,8 @@
 #   bash scripts/test-lib/test-impd-proxy-listener.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
+# fixed, so the modes the cases assert do not depend on the caller's umask
+umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/build-token.sh"

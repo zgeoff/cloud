@@ -23,6 +23,8 @@
 #   CASE='foreign Host' bash scripts/test-atc-gateway-fixture.sh   # the cases whose title holds it
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
+# fixed, so the modes the cases assert do not depend on the caller's umask
+umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/wait-for.sh"
 

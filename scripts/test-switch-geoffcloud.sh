@@ -10,6 +10,8 @@
 #   CASE='unknown argument' bash scripts/test-switch-geoffcloud.sh   # the cases whose title holds it
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
+# fixed, so the modes the cases assert do not depend on the caller's umask
+umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository,

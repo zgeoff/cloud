@@ -7,6 +7,8 @@
 #   bash scripts/test-lib/test-run-cases.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
+# fixed, so the modes the cases assert do not depend on the caller's umask
+umask 022
 
 it_prints_ok_for_each_passing_case_and_exits_0() {
   local status=0
