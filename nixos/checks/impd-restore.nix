@@ -95,12 +95,25 @@ pkgs.testers.runNixOSTest {
         before = [ "imp-host-image.service" ];
         requires = [ "docker-registry.service" ];
         after = [ "docker-registry.service" ];
-        path = [ pkgs.skopeo ];
+        path = [
+          pkgs.curl
+          pkgs.skopeo
+        ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
         };
+        # docker-registry is Type=simple, so "after" orders on its start, not on its port: wait
+        # until it answers before the first copy
         script = ''
+          deadline=$((SECONDS + 30))
+          until curl -sf -o /dev/null http://ghcr.io/v2/; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "the registry did not answer within 30 s" >&2
+              exit 1
+            fi
+            sleep 0.1
+          done
           skopeo --insecure-policy copy --preserve-digests --dest-tls-verify=false \
             oci:${layout28}:0.28.0 docker://ghcr.io/zgeoff/imp-host:0.28.0
           skopeo --insecure-policy copy --preserve-digests --dest-tls-verify=false \
@@ -144,6 +157,9 @@ pkgs.testers.runNixOSTest {
     import re
 
     machine.wait_for_unit("multi-user.target")
+    # setup_case resets failed units, so a unit that failed at boot shows only here
+    failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
+    assert failed == "", f"units failed at boot: {failed}"
 
 
     def setup_case():
