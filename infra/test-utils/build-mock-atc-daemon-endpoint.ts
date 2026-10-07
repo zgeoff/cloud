@@ -1,12 +1,12 @@
+import { faker } from '@faker-js/faker';
 import type { ATCDaemonEndpoint } from '../build-alert-rules.ts';
 
-// infra's outputs are pinned as literals, so every default is fixed
 export function buildMockATCDaemonEndpoint(
   overrides: Partial<ATCDaemonEndpoint> = {},
 ): ATCDaemonEndpoint {
   return {
-    name: 'geoffcloud',
-    address: '100.64.0.1:8415',
+    name: faker.internet.domainWord(),
+    address: `${faker.internet.ipv4()}:${faker.internet.port()}`,
     alertSeverity: 'critical',
     ...overrides,
   };
