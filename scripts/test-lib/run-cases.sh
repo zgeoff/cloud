@@ -8,10 +8,11 @@
 # a plain statement, never the operand of `||` or `if`, where bash would ignore errexit.
 # It prints `ok <title>`, or `FAIL <title> (exit <n>)` and the case's output indented,
 # keeps going after a failure, then prints the totals. It exits 1 when a case failed or
-# when no case ran.
+# when no case ran. It lists the cases with `declare -F`, not `compgen`, so it also runs
+# under a bash built without programmable completion, such as the Nix build sandbox's.
 run_cases() {
   local fn title output status failures=0 ran=0
-  for fn in $(compgen -A function it_); do
+  for fn in $(declare -F | sed -n 's/^declare -f[a-z]* \(it_.*\)$/\1/p'); do
     title="${fn//_/ }"
     [[ "$title" == *"${CASE:-}"* ]] || continue
     ran=$((ran + 1))
