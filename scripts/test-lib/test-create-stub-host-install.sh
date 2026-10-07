@@ -41,6 +41,8 @@ it_sets_mode_0700_on_a_directory_that_exists() {
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+# coreutils 9.4 (CI's ubuntu-24.04 runner image 20261004) and 9.11 word install's failure under a
+# parent it may not write differently, so the case accepts either exact line.
 it_fails_with_installs_own_error_under_a_parent_it_may_not_write() {
   local status=0
   tree="$(mktemp -d)"
@@ -52,7 +54,11 @@ it_fails_with_installs_own_error_under_a_parent_it_may_not_write() {
     install -d -m 0700 -o root -g root "$tree/host/secrets" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "install: cannot create directory '$tree/host/secrets': Permission denied"
+  grep -qxF \
+    -e "/usr/bin/install: cannot change permissions of '$tree/host/secrets': No such file or directory" \
+    -e "install: cannot create directory '$tree/host/secrets': Permission denied" \
+    "$tree/err" || { cat "$tree/err"; echo "not coreutils 9.4's or 9.11's install error" >&2; exit 1; }
+  [ "$(wc -l < "$tree/err")" = 1 ] || { cat "$tree/err"; echo "want one line on stderr" >&2; exit 1; }
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 

@@ -566,7 +566,9 @@ EOF
 }
 
 # The real install on "the host" (test-lib/create-stub-host-install.sh drops only the
-# owner, which needs root), under a parent directory it may not write.
+# owner, which needs root), under a parent directory it may not write. coreutils 9.4 (CI's
+# ubuntu-24.04 runner image 20261004) and 9.11 word that failure differently, so the case
+# accepts either exact line.
 it_stops_when_the_host_cannot_create_the_secrets_directory() {
   local seed="$1" status=0
   tree="$(mktemp -d)"
@@ -583,9 +585,11 @@ it_stops_when_the_host_cannot_create_the_secrets_directory() {
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/err" << EOF
-install: cannot create directory '$tree/host/secrets': Permission denied
-EOF
+  grep -qxF \
+    -e "/usr/bin/install: cannot change permissions of '$tree/host/secrets': No such file or directory" \
+    -e "install: cannot create directory '$tree/host/secrets': Permission denied" \
+    "$tree/err" || { cat "$tree/err"; echo "not coreutils 9.4's or 9.11's install error" >&2; exit 1; }
+  [ "$(wc -l < "$tree/err")" = 1 ] || { cat "$tree/err"; echo "want one line on stderr" >&2; exit 1; }
   diff - "$tree/out" << EOF
 
 == preflight
