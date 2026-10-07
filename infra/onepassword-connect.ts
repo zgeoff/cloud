@@ -17,8 +17,13 @@ import { all, secret } from '@pulumi/pulumi';
 // Service keeps it; a cluster rebuild must keep it free. It is the Service's live value.
 const serviceClusterIP = '10.43.82.198';
 
-// connect-api's port, the Service's only port
+// connect-api's port in the pod
 const connectAPIPort = 8080;
+
+// The Service's port, which the host relay dials. It stays 8000, the proxy's old port:
+// server-side apply keys Service ports by number, so a new number under the same name
+// fails as a duplicate. Only the target moves to connect-api.
+const servicePort = 8000;
 
 // Connect's release; bump deliberately
 const connectVersion = '1.8.3';
@@ -66,7 +71,7 @@ export function createOnePasswordConnect(
     deployment,
     serviceURL: all([service.metadata.name, service.metadata.namespace]).apply(
       ([name, serviceNamespace]) =>
-        `http://${name}.${serviceNamespace}.svc.cluster.local:${connectAPIPort}`,
+        `http://${name}.${serviceNamespace}.svc.cluster.local:${servicePort}`,
     ),
   };
 }
@@ -82,7 +87,7 @@ function createService(cluster: Provider, namespace: Output<string>): Service {
         ports: [
           {
             name: 'http',
-            port: connectAPIPort,
+            port: servicePort,
             targetPort: connectAPIPort,
           },
         ],
