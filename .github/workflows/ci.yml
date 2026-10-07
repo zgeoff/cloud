@@ -62,7 +62,7 @@ jobs:
       - name: Test
         run: bun run test
 
-      # bash, jq and openssl, all on ubuntu-latest's image
+      # bash, git, jq, openssl, curl, python3 and coreutils, all on ubuntu-latest's image
       - name: Test Scripts
         run: bun run test:scripts
 
