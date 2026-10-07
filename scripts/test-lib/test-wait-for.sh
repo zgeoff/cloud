@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Test for wait-for.sh: wait_for polls a command until it succeeds, and fails with a
 # named message once its deadline passes. The cases step the fake clock from
-# create-stub-clock.sh, so a deadline costs no real time; the last case alone runs on the
-# real clock and sleep, because nothing else shows that the defaults advance and so ever
-# reach a deadline.
+# create-stub-clock.sh, so a deadline costs no real time; the last case checks the
+# defaults, bash's SECONDS and sleep, with a sleep function that steps SECONDS.
 #
 #   bash scripts/test-lib/test-wait-for.sh
 # shellcheck source-path=SCRIPTDIR
@@ -27,7 +26,8 @@ it_returns_once_the_command_succeeds_on_a_later_poll() {
     wait_for 5 "the third poll" "$tree/third-poll" > "$tree/out" 2>&1 || status=$?
 
   diff /dev/null "$tree/out"
-  diff - <(wc -l < "$tree/polls") <<< 3
+  wc -l < "$tree/polls" > "$tree/poll-count"
+  diff - "$tree/poll-count" <<< 3
   diff - "$tree/pauses" << 'PAUSES'
 0.05
 0.05
@@ -67,7 +67,8 @@ it_fails_with_a_named_message_once_the_deadline_passes() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'timed out after 3s waiting for a condition that never holds'
-  diff - <(wc -l < "$tree/polls") <<< 4
+  wc -l < "$tree/polls" > "$tree/poll-count"
+  diff - "$tree/poll-count" <<< 4
   diff - "$tree/pauses" << 'PAUSES'
 0.05
 0.05
@@ -90,18 +91,26 @@ it_passes_the_command_arguments_through_unchanged() {
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-it_times_out_on_the_real_clock_and_sleep_when_neither_is_set() {
-  local started elapsed status=0
+# With neither WAIT_FOR_CLOCK nor WAIT_FOR_SLEEP set, wait_for reads bash's SECONDS and
+# calls sleep by name, so a sleep function in the case shell stands in for the real one:
+# it records the pause and moves SECONDS on one second. SECONDS starts at 0 so no real
+# second passes during the case, and the deadline falls at the first pause.
+it_times_out_on_bashs_seconds_and_sleep_when_neither_is_set() {
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  started="$SECONDS"
+  # shellcheck disable=SC2329 # wait_for calls it by name
+  sleep() {
+    echo "$1" >> "$tree/pauses"
+    SECONDS=$((SECONDS + 1))
+  }
+  SECONDS=0
 
   wait_for 1 "a condition that never holds" false > "$tree/out" 2> "$tree/err" || status=$?
 
-  elapsed=$((SECONDS - started))
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'timed out after 1s waiting for a condition that never holds'
-  [ "$elapsed" -ge 1 ] && [ "$elapsed" -le 3 ] || { echo "returned after ${elapsed}s, want 1 to 3" >&2; exit 1; }
+  diff - "$tree/pauses" <<< 0.05
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 

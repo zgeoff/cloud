@@ -83,18 +83,21 @@ EOF
 # made before it listens is refused and leaves no line. Read before the case sends any
 # request of its own, the log holds exactly the helper's one answered poll, a 200.
 it_returns_from_start_gateway_only_once_readyz_answers_200() {
-  local gateway_image="$1" backup_image="$2" run="$3"
+  local gateway_image="$1" backup_image="$2" run="$3" status=0
   name="atc-gw-start-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
 
-  start_gateway "$name" "$tree" "$gateway_image"
+  start_gateway "$name" "$tree" "$gateway_image" > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   docker logs "$name" > "$tree/log.out" 2> "$tree/log.err"
   diff - "$tree/log.out" <<< 'atc-gateway: serving https://atc.fixture.invalid/mcp, listening on http://0.0.0.0:8414'
   sed -E 's/ [0-9.]+ms$/ Tms/' "$tree/log.err" > "$tree/requests"
   diff - "$tree/requests" <<< 'GET /readyz 200 Tms'
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a

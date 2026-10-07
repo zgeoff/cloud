@@ -29,15 +29,16 @@ it_fails_for_different_files_printing_the_unified_diff() {
   trap 'rm -rf "$tree"' EXIT
   printf 'x\n' > "$tree/a"
   printf 'y\n' > "$tree/b"
+  # the two header lines carry the files' modification times, pinned here and printed in UTC
+  touch -d '2026-01-02 03:04:05.000000006 UTC' "$tree/a"
+  touch -d '2026-07-08 09:10:11.000000012 UTC' "$tree/b"
 
-  assert_files_equal "$tree/a" "$tree/b" > "$tree/out" 2> "$tree/err" || status=$?
+  TZ=UTC assert_files_equal "$tree/a" "$tree/b" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  # the two header lines carry the files' modification times
-  sed -E '1,2s/\t.*$//' "$tree/err" > "$tree/err-masked"
-  diff - "$tree/err-masked" << EOF
---- $tree/a
-+++ $tree/b
+  diff - "$tree/err" << EOF
+--- $tree/a	2026-01-02 03:04:05.000000006 +0000
++++ $tree/b	2026-07-08 09:10:11.000000012 +0000
 @@ -1 +1 @@
 -x
 +y
