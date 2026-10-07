@@ -10,11 +10,16 @@ import {
 } from './build-onepassword-connect-proxy-config.ts';
 
 // 1Password Connect, for imps (GEO-120): imp's credential broker swaps a placeholder
-// bearer for the real Connect token on requests to op-connect.geoff.cloud. The pod follows
-// 1Password's Helm chart (charts/connect in 1Password/connect-helm-charts), plus an nginx
-// proxy that is the only port on the Service: it admits only the allowed source
-// addresses and only GET and HEAD. Pods in the cluster can still reach Connect's own
+// bearer for the real Connect token on requests to op-connect.imp.internal and forwards
+// them to a relay on the host, which dials this Service's ClusterIP. Connect has no public
+// route. The pod follows 1Password's Helm chart (charts/connect in
+// 1Password/connect-helm-charts), plus an nginx proxy that is the only port on the
+// Service: it passes only GET and HEAD. Pods in the cluster can still reach Connect's own
 // ports directly; they need the bearer token either way.
+
+// The host relay (nixos/hosts/geoffcloud/configuration.nix) dials this address, so the
+// Service keeps it; a cluster rebuild must keep it free. It is the Service's live value.
+const serviceClusterIP = '10.43.82.198';
 
 // Connect's release; bump deliberately
 const connectVersion = '1.8.3';
@@ -31,17 +36,11 @@ const labels = { app: 'onepassword-connect' };
 export interface OnePasswordConnectInputs {
   // the Connect server's credentials file (JSON)
   readonly credentials: Output<string>;
-
-  // the public IPv4 addresses the proxy admits
-  readonly allowedSources: Output<readonly string[]>;
 }
 
 export interface OnePasswordConnectOutputs {
   readonly deployment: Deployment;
   readonly serviceURL: Output<string>;
-
-  // the public hostname the tunnel routes to serviceURL
-  readonly publicHost: string;
 }
 
 export function createOnePasswordConnect(
@@ -66,11 +65,24 @@ export function createOnePasswordConnect(
     { provider: cluster },
   );
 
-  const service = new Service(
+  const service = createService(cluster, namespace);
+
+  return {
+    deployment,
+    serviceURL: all([service.metadata.name, service.metadata.namespace]).apply(
+      ([name, serviceNamespace]) =>
+        `http://${name}.${serviceNamespace}.svc.cluster.local:${onePasswordConnectProxyPort}`,
+    ),
+  };
+}
+
+function createService(cluster: Provider, namespace: Output<string>): Service {
+  return new Service(
     'onepassword-connect',
     {
       metadata: { name: 'onepassword-connect', namespace },
       spec: {
+        clusterIP: serviceClusterIP,
         selector: labels,
         ports: [
           {
@@ -81,17 +93,14 @@ export function createOnePasswordConnect(
         ],
       },
     },
-    { provider: cluster },
-  );
+    {
+      provider: cluster,
 
-  return {
-    deployment,
-    serviceURL: all([service.metadata.name, service.metadata.namespace]).apply(
-      ([name, serviceNamespace]) =>
-        `http://${name}.${serviceNamespace}.svc.cluster.local:${onePasswordConnectProxyPort}`,
-    ),
-    publicHost: 'op-connect.geoff.cloud',
-  };
+      // clusterIP is immutable, so pinning it in a change to the live Service would replace
+      // the Service. The state already holds the live value; a new Service takes the pin.
+      ignoreChanges: ['spec.clusterIP'],
+    },
+  );
 }
 
 // no fixed names on the Secret and the ConfigMap: Pulumi names them and replaces them on a
@@ -112,9 +121,7 @@ function createConfigObjects(
     {
       metadata: { namespace },
       data: {
-        'default.conf': inputs.allowedSources.apply((sources) =>
-          buildOnePasswordConnectProxyConfig(sources),
-        ),
+        'default.conf': buildOnePasswordConnectProxyConfig(),
       },
     },
     { provider: cluster },
@@ -184,7 +191,7 @@ function buildProxyContainer(): input.core.v1.Container {
     image: proxyImage,
     ports: [{ name: 'http', containerPort: onePasswordConnectProxyPort }],
 
-    // a TCP probe: an HTTP one would face the allowlist
+    // a TCP probe: an HTTP one would need Connect's own health path through the proxy
     readinessProbe: { tcpSocket: { port: onePasswordConnectProxyPort } },
     volumeMounts: [
       { name: 'proxy-config', mountPath: '/etc/nginx/conf.d', readOnly: true },

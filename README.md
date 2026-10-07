@@ -35,7 +35,7 @@ Live:
 
 - The atc gateway at `atc.geoff.cloud/mcp`, and the atc daemon on `geoffcloud`. The package is built
   and validated; see [the plan](./docs/plans/atc-gateway.md).
-- 1Password Connect for imps at `op-connect.geoff.cloud`; see
+- 1Password Connect for imps, host-local at `op-connect.imp.internal`; see
   [the runbook](./docs/runbooks/onepassword-connect.md).
 - Public connector sign-in through the gateway's OAuth issuer.
 - `imp.geoff.cloud/mcp`, imp's public MCP endpoint.
