@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { RunError } from '@pulumi/pulumi';
 import { buildStubConfig } from './build-stub-config.ts';
 
 test('it returns the raw string from get', () => {
@@ -28,8 +29,11 @@ test('it reads an unset key as undefined from getObject', () => {
   expect(buildStubConfig({}).getObject<object>('atcGateway')).toBeUndefined();
 });
 
-test('it throws from getObject on a value that is not JSON', () => {
+test("it throws Config's error, naming the full key, from getObject on a value that is not JSON", () => {
   const config = buildStubConfig({ atcGateway: 'not json' });
 
-  expect(() => config.getObject<object>('atcGateway')).toThrow(SyntaxError);
+  expect(() => config.getObject<object>('atcGateway')).toThrowWithMessage(
+    RunError,
+    "Configuration 'geoff-cloud:atcGateway' value 'not json' is not a valid JSON object",
+  );
 });
