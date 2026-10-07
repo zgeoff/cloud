@@ -4,7 +4,7 @@ import {
   WorkersScript,
   WorkersScriptSubdomain,
 } from '@pulumi/cloudflare';
-import { secret } from '@pulumi/pulumi';
+import { buildHealthCheckBindings } from './build-health-check-bindings.ts';
 
 interface HealthCheckInputs {
   readonly accountID: string;
@@ -42,13 +42,11 @@ export async function createHealthCheck(inputs: HealthCheckInputs): Promise<Work
     mainModule: 'index.js',
     compatibilityDate: '2026-09-01',
     observability,
-    bindings: [
-      { name: 'STATE', type: 'r2_bucket', bucketName: state.name },
-      { name: 'TARGETS', type: 'plain_text', text: JSON.stringify(inputs.targets) },
-      ...(inputs.alertURL === undefined || inputs.alertURL === ''
-        ? []
-        : [{ name: 'ALERT_URL', type: 'secret_text', text: secret(inputs.alertURL) }]),
-    ],
+    bindings: buildHealthCheckBindings({
+      stateBucket: state.name,
+      targets: inputs.targets,
+      alertURL: inputs.alertURL,
+    }),
   });
 
   // cron only: no public workers.dev URL for this script
