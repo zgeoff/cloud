@@ -78,6 +78,7 @@ ssh root@geoffcloud stat -c '%n %U %a %s bytes' $tree/host/secrets $tree/host/se
 EOF
   diff - "$tree/op-token-seen" <<< ops_fixture_env
   diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -268,6 +269,7 @@ atc-key zai
 docker exec -i imp-host imp secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json
 EOF
   diff /dev/null <(grep -F -e "$zai_key" -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -385,7 +387,8 @@ it_mints_one_bearer_into_1Password_and_a_root_only_host_file_when_neither_exists
 ok: the 1Password item and the host file match
 
 EOF
-  diff /dev/null <(grep -F -e "$bearer" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(grep -F -e "$bearer" -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -432,6 +435,7 @@ it_accepts_a_saved_token_without_a_trailing_newline() {
   diff /dev/null "$tree/err"
   grep -x 'skip: both exist, atc-cloud has the expected limits, and the file authenticates as it' "$tree/out"
   diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -461,6 +465,7 @@ $tree/host/secrets/imp-token and run 'imp token rm atc-cloud' in imp-host, then 
 a new one
 EOF
   diff /dev/null <(jq -r 'select(.[0] == "curl" or (join(" ") | test("token (new|rm)")))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -645,6 +650,7 @@ a new one
 EOF
   diff - <(jq -r 'select(.[0] == "curl") | .[0]' "$tree/calls") <<< curl
   diff /dev/null <(grep -F -e "$good_token" -e "$stale_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -675,6 +681,7 @@ $tree/host/secrets/imp-token and run 'imp token rm atc-cloud' in imp-host, then 
 a new one
 EOF
   diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -704,6 +711,8 @@ than one line, stale or another token). impd shows a token once, so remove
 $tree/host/secrets/imp-token and run 'imp token rm atc-cloud' in imp-host, then rerun to mint
 a new one
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -729,6 +738,8 @@ it_accepts_an_identity_that_impd_answers_with_a_2xx_other_than_200() {
 
   diff /dev/null "$tree/err"
   grep -x 'skip: both exist, atc-cloud has the expected limits, and the file authenticates as it' "$tree/out"
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -756,6 +767,8 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_204_without_a_body() {
 impd answered HTTP 204 without an identity, so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -783,6 +796,8 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_200_with_a_body_that_is_no
 impd answered HTTP 200 without an identity, so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -810,6 +825,8 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_500() {
 impd answered HTTP 500, so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -837,6 +854,8 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_403() {
 impd answered HTTP 403, so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -864,6 +883,8 @@ curl: (7) Failed to connect to 127.0.0.1 port 7070 after 0 ms: Couldn't connect 
 the check on the host exited 7 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -891,6 +912,8 @@ curl: (56) Recv failure: Connection reset by peer
 the check on the host exited 56 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -921,6 +944,8 @@ Connection to geoffcloud closed by remote host.
 the check on the host exited 255 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -952,6 +977,8 @@ the saved token is not a readable regular file on the host, so $tree/host/secret
 Check $tree/host/secrets/imp-token on the host, then rerun
 EOF
   diff /dev/null <(jq -r 'select(.[0] == "curl") | .[0]' "$tree/calls")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -978,6 +1005,7 @@ the saved token is not a readable regular file on the host, so $tree/host/secret
 Check $tree/host/secrets/imp-token on the host, then rerun
 EOF
   diff /dev/null <(jq -r 'select(.[0] == "curl") | .[0]' "$tree/calls")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -1005,6 +1033,8 @@ it_leaves_the_saved_token_unchecked_when_the_file_cannot_be_read() {
 the saved token is not a readable regular file on the host, so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check $tree/host/secrets/imp-token on the host, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -1029,6 +1059,8 @@ it_stops_when_atc_cloud_exists_with_another_scope() {
 
   diff - "$tree/err" <<< 'atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun'
   diff /dev/null <(jq -r 'select(.[0] == "curl") | .[0]' "$tree/calls")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -1053,6 +1085,7 @@ it_stops_when_only_the_atc_cloud_token_exists() {
 only one exists (token: true, host file: false). impd shows a token once,
 so run 'imp token rm atc-cloud' in imp-host and remove $tree/host/secrets/imp-token, then rerun
 EOF
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -1080,6 +1113,8 @@ only one exists (token: false, host file: true). impd shows a token once,
 so run 'imp token rm atc-cloud' in imp-host and remove $tree/host/secrets/imp-token, then rerun
 EOF
   diff - "$tree/host/secrets/imp-token" <<< "$good_token"
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
+  diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -1229,6 +1264,7 @@ it_sends_the_saved_token_to_impd_alone_under_the_hostile_curl_config() {
   diff - <(ls -A "$tree/listener") <<< ports
   [ ! -e "$tree/trace.txt" ] || { echo "curl wrote a trace" >&2; exit 1; }
   diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -1277,6 +1313,7 @@ EOF
   diff - <(ls -A "$tree/listener") <<< ports
   [ ! -e "$tree/trace.txt" ] || { echo "curl wrote a trace" >&2; exit 1; }
   diff /dev/null <(grep -F -e "$good_token" -e "$stale_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -1313,6 +1350,7 @@ it_keeps_the_saved_token_out_of_the_output_under_a_curlrc_in_HOME_alone() {
   grep -x 'skip: both exist, atc-cloud has the expected limits, and the file authenticates as it' "$tree/out"
   diff - <(ls -A "$tree/listener") <<< ports
   diff /dev/null <(grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err")
+  diff /dev/null <(jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls")
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
