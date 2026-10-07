@@ -2,32 +2,35 @@
 /* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { buildDashboard } from './build-dashboard.ts';
+import { buildMockDashboardPanel } from './test-utils/build-mock-dashboard-panel.ts';
 
 test('it makes stat panels instant queries reduced to the last value, and gives a legend only where the panel sets one', () => {
   expect(
     buildDashboard('imp', 'loki', [
-      {
+      buildMockDashboardPanel({
         title: 'impd log lines',
         type: 'timeseries',
         expr: 'sum(count_over_time({unit="imp-host.service"} [$__auto]))',
         legend: 'lines',
         width: 12,
         height: 8,
-      },
-      {
+      }),
+      buildMockDashboardPanel({
         title: 'Backups',
         type: 'stat',
         expr: 'sum(count_over_time({unit="imp-host.service"} [$__range]))',
+        legend: undefined,
         width: 12,
         height: 5,
-      },
-      {
+      }),
+      buildMockDashboardPanel({
         title: 'impd logs',
         type: 'logs',
         expr: '{unit="imp-host.service"}',
+        legend: undefined,
         width: 24,
         height: 12,
-      },
+      }),
     ]),
   ).toStrictEqual({
     uid: 'geoff-cloud-imp',
