@@ -2,11 +2,11 @@
 # checks the service, the config.json it links and the module's assertions. Each case evaluates
 # its own config, runs on its own and reports ok or not ok (case-helpers.sh); the check fails when
 # any case fails. Run: bun run test:nixos atc-daemon
-{ nixpkgs }:
+{ nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs; };
+  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
 
   # evaluates a minimal system with the module and one services.atc-daemon config
   evalDaemon =

@@ -570,7 +570,7 @@ pkgs.testers.runNixOSTest {
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again"
         ), err
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units[0] != "active" and units[1] != "active", f"the units are {units}"
+        assert units == ["failed", "failed"], f"the units are {units}"
         machine.fail("findmnt -rn -S tank/imp")
         # the activation ran; only a unit failed
         current = machine.succeed("readlink -f /run/current-system").strip()
@@ -861,7 +861,7 @@ pkgs.testers.runNixOSTest {
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
         ], err
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-        assert units[0] != "active" and units[1] != "active", f"the units are {units}"
+        assert units == ["inactive", "failed"], f"the units are {units}"
         containers = machine.succeed("docker ps -a --format '{{.Names}}'").split()
         assert containers == [], f"the containers are {containers}"
         machine.fail("findmnt -rn -S tank/imp")

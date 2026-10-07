@@ -2,10 +2,11 @@
 # Build the NixOS flake's checks in a nixos/nix container, as scripts/switch-geoffcloud.sh builds
 # the host, so you need no local Nix:
 #
-#   bash scripts/test-nixos.sh            # every check
-#   bash scripts/test-nixos.sh atc-daemon # one check, by its name in checks.x86_64-linux
+#   bash scripts/test-nixos.sh            # every check in checks.x86_64-linux
+#   bash scripts/test-nixos.sh atc-daemon # one check, by its name there
 #
-# impd-restore boots a NixOS VM, so it needs /dev/kvm. It reads scripts/ beside nixos/,
+# impd-restore boots a NixOS VM, so it needs /dev/kvm: without it, the script builds every other
+# check it was asked for and then fails, naming impd-restore. It reads scripts/ beside nixos/,
 # so the build's flake source is the repo root (path:.?dir=nixos), not nixos/ alone. The source is
 # a snapshot of the working tree's tracked and unignored files, so a local edit is tested before
 # it is committed and nothing ignored, such as node_modules or .worktrees, is copied. The Docker
@@ -14,24 +15,6 @@
 set -euo pipefail
 
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
-if [ "$#" -gt 0 ]; then
-  checks=("$@")
-else
-  checks=(test-utils atc-daemon impd-local-health impd-restore)
-fi
-
-# impd-restore's VM needs KVM; the other checks build without it
-kvm=()
-for check in "${checks[@]}"; do
-  if [ "$check" = impd-restore ]; then
-    if [ ! -c /dev/kvm ]; then
-      echo "test-nixos: /dev/kvm is missing; impd-restore needs KVM" >&2
-      exit 1
-    fi
-    kvm=(--device /dev/kvm)
-  fi
-done
-
 repo="$(git rev-parse --show-toplevel)"
 snapshot="$(mktemp -d)"
 
@@ -49,12 +32,50 @@ git -C "$repo" ls-files -z --cached --others --exclude-standard --deduplicate |
   done |
   tar -C "$repo" --null -T - -cf - | tar -C "$snapshot" -xf -
 
+run_nix() {
+  docker run --rm --network host "$@"
+}
+
+nix_args=(--extra-experimental-features "nix-command flakes")
+if [ "$#" -gt 0 ]; then
+  checks=("$@")
+else
+  # every check the flake declares, so a new one cannot be left out of the default run
+  # written to a file first, so a failing eval stops the script instead of building nothing
+  names="$(mktemp)"
+  trap 'teardown; rm -f "$names"' EXIT
+  run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src nixos/nix \
+    nix "${nix_args[@]}" eval --raw "path:/src?dir=nixos#checks.x86_64-linux" \
+    --apply 'checks: builtins.concatStringsSep "\n" (builtins.attrNames checks) + "\n"' > "$names"
+  mapfile -t checks < "$names"
+  if [ "${#checks[@]}" -eq 0 ]; then
+    echo "test-nixos: the flake declares no checks.x86_64-linux" >&2
+    exit 1
+  fi
+fi
+
+# impd-restore's VM needs KVM; the other checks build without it
+kvm=()
+missing_kvm=""
 installables=()
 for check in "${checks[@]}"; do
+  if [ "$check" = impd-restore ]; then
+    if [ ! -c /dev/kvm ]; then
+      missing_kvm=1
+      continue
+    fi
+    kvm=(--device /dev/kvm)
+  fi
   installables+=("path:/src?dir=nixos#checks.x86_64-linux.$check")
 done
 
-docker run --rm --network host "${kvm[@]}" -v "$volume":/nix -v "$snapshot":/src:ro -w /src \
-  nixos/nix nix --extra-experimental-features "nix-command flakes" \
-  --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
-  build --no-link -L "${installables[@]}"
+if [ "${#installables[@]}" -gt 0 ]; then
+  run_nix "${kvm[@]}" -v "$volume":/nix -v "$snapshot":/src:ro -w /src nixos/nix \
+    nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
+    build --no-link -L "${installables[@]}"
+fi
+
+if [ -n "$missing_kvm" ]; then
+  echo "test-nixos: /dev/kvm is missing; impd-restore needs KVM" >&2
+  exit 1
+fi

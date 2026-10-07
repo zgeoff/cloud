@@ -8,11 +8,17 @@ on:
     paths:
       - nixos/**
       - scripts/**
+      - package.json
+      - .bun-version
+      - .gitignore
       - .github/workflows/nixos-checks.yml
   pull_request:
     paths:
       - nixos/**
       - scripts/**
+      - package.json
+      - .bun-version
+      - .gitignore
       - .github/workflows/nixos-checks.yml
 
 permissions:
@@ -30,9 +36,6 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
-
-      - name: Show KVM
-        run: ls -l /dev/kvm
 
       - name: NixOS checks
         run: bun run test:nixos

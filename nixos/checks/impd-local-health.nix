@@ -7,7 +7,7 @@
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs; };
+  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
 
   # evaluates a minimal system with the module and one services.impd-local-health config
   evalHealth =
@@ -61,17 +61,6 @@ let
   stub = ./start-stub-impd.py;
 
   cases = [
-    {
-      title = "it stubs impd with the /health handler and the Elysia version of the pinned imp";
-      dir = "impd-shape";
-      script = ''
-        handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \
-          ${imp}/packages/daemon/src/build-app.ts || true)
-        assert_equals 1 "$handlers" "the /health handlers in imp's build-app.ts"
-        assert_equals '"1.4.29"' "$(jq '.workspaces.catalog.elysia' ${imp}/package.json)" \
-          "imp's Elysia version"
-      '';
-    }
     {
       title = "it runs the probe each minute as impd-health, against loopback only, by default";
       dir = "units-default";

@@ -13,18 +13,18 @@ merged.
 
 ## The package
 
-| Part                                                  | File                                                                                                                                    | Validated by                                       |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| Pins (atc release, checksum, base and restic digests) | `deploy/atc-gateway/versions.env`                                                                                                       | the fixture test                                   |
-| Gateway image                                         | `deploy/atc-gateway/Dockerfile`, `scripts/fetch-atc-release.sh`                                                                         | the fixture test                                   |
-| Backup image and script                               | `deploy/atc-gateway/backup/`                                                                                                            | the fixture test (backup, wipe, restore)           |
-| k3s workload, off by default                          | `infra/atc-gateway.ts`, `infra/build-atc-gateway-spec.ts`, `infra/create-atc-gateway-backup-job.ts`, `infra/load-atc-gateway-inputs.ts` | `bun run preview`, off and on                      |
-| Restore Job                                           | `deploy/atc-gateway/restore-job.yaml`                                                                                                   | client dry run                                     |
-| Cloud daemon, off and not imported                    | `nixos/modules/atc-daemon.nix`                                                                                                          | `nix build ./nixos#checks.x86_64-linux.atc-daemon` |
-| Image CI, publish on demand                           | `.github/workflows/atc-gateway-images.yml`                                                                                              | its own run                                        |
-| Readiness checks                                      | `scripts/check-atc-gateway-readiness.sh`                                                                                                | run against the live cluster                       |
-| Backup and restore                                    | `docs/runbooks/atc-gateway-backup-restore.md`                                                                                           | the fixture test                                   |
-| Operator checklist                                    | `docs/runbooks/atc-gateway-operator-checklist.md`                                                                                       | —                                                  |
+| Part                                                  | File                                                                                                                                    | Validated by                             |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Pins (atc release, checksum, base and restic digests) | `deploy/atc-gateway/versions.env`                                                                                                       | the fixture test                         |
+| Gateway image                                         | `deploy/atc-gateway/Dockerfile`, `scripts/fetch-atc-release.sh`                                                                         | the fixture test                         |
+| Backup image and script                               | `deploy/atc-gateway/backup/`                                                                                                            | the fixture test (backup, wipe, restore) |
+| k3s workload, off by default                          | `infra/atc-gateway.ts`, `infra/build-atc-gateway-spec.ts`, `infra/create-atc-gateway-backup-job.ts`, `infra/load-atc-gateway-inputs.ts` | `bun run preview`, off and on            |
+| Restore Job                                           | `deploy/atc-gateway/restore-job.yaml`                                                                                                   | client dry run                           |
+| Cloud daemon, off and not imported                    | `nixos/modules/atc-daemon.nix`                                                                                                          | `bun run test:nixos atc-daemon`          |
+| Image CI, publish on demand                           | `.github/workflows/atc-gateway-images.yml`                                                                                              | its own run                              |
+| Readiness checks                                      | `scripts/check-atc-gateway-readiness.sh`                                                                                                | run against the live cluster             |
+| Backup and restore                                    | `docs/runbooks/atc-gateway-backup-restore.md`                                                                                           | the fixture test                         |
+| Operator checklist                                    | `docs/runbooks/atc-gateway-operator-checklist.md`                                                                                       | —                                        |
 
 ### Contract facts found in atc's code (2.10.0)
 

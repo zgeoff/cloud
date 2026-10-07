@@ -151,7 +151,8 @@ while `tank/imp` was mounted, for a dataset without `imp.sqlite`, for a copy wit
 `COPY-INFO`, failing `integrity_check`, lacking the image or the migration, or with a different
 migration, and for a generation that was not a number, did not exist or ran another image. The
 stand-ins: busybox containers that only sleep, a proxy that only opens its socket, the local
-registry, and generations that are the VM's own specialisations. Run it on a machine with KVM:
+registry, and generations that are the VM's own specialisations. Run it on a machine with Docker and
+KVM:
 
 ```sh
 bun run test:nixos impd-restore

@@ -39,9 +39,10 @@
       };
       # bun run test:nixos builds them all. impd-restore reads ../scripts and needs KVM, so it
       # builds only with the repo root as the flake's source (path:.?dir=nixos)
-      checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs; };
+      checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.test-utils = import ./checks/test-utils-check.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        inherit imp;
       };
       checks.x86_64-linux.impd-local-health = import ./checks/impd-local-health.nix {
         inherit nixpkgs imp;

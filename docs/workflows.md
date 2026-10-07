@@ -97,9 +97,10 @@ op run --env-file=.env -- bash scripts/snapshot-geoffcloud.sh pre-<change>
 
 The flake also has checks: `atc-daemon` and `impd-local-health` for its modules, `test-utils` for
 the helpers and the stand-in impd they share, and `impd-restore`, a NixOS VM rehearsal of
-`scripts/restore-impd-db.sh` that needs KVM. `bun run test:nixos` builds them all in the same
-`nixos/nix` container, from a snapshot of the working tree's tracked and unignored files;
-`bun run test:nixos atc-daemon` builds one.
+`scripts/restore-impd-db.sh` that needs KVM. `bun run test:nixos` builds every check the flake
+declares in a `nixos/nix` container, from a snapshot of the working tree's tracked and unignored
+files. Its Nix store is the Docker volume `cloud-nixos-checks-store`, never the switch's
+`geoffcloud-nix-store`. `bun run test:nixos atc-daemon` builds one check.
 
 ## Upgrade imp
 
