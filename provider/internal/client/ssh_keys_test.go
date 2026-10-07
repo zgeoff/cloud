@@ -33,45 +33,41 @@ func TestCreateSSHKeyFailsWithoutATeam(t *testing.T) {
 
 func TestReadSSHKeyReadsOneKeyInTheTeam(t *testing.T) {
 	ctx := setupTest(t)
-	_, err := ctx.client.CreateSSHKey(t.Context(), client.SSHKeyInput{TeamID: "team-a", Name: "me", PublicKey: "k"})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
 
-	key, err := ctx.client.ReadSSHKey(t.Context(), "00000000-0000-4000-8000-000000000001", "team-a")
+	key, err := ctx.client.ReadSSHKey(t.Context(), "k1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, client.SSHKey{ID: "00000000-0000-4000-8000-000000000001", Created: "2026-10-02T05:35:28Z", Name: "me", PublicKey: "k"}, key)
-	assert.Equal(t, []onideltest.Request{
-		{Method: "POST", Path: "/ssh_keys", Body: map[string]any{"team_id": "team-a", "name": "me", "ssh_key": "k"}},
-		{Method: "GET", Path: "/ssh_keys/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
-	}, ctx.api.GetRequests())
+	assert.Equal(t, []any{
+		client.SSHKey{ID: "k1", Created: "2026-10-02T05:35:28Z", Name: "me", PublicKey: "k"},
+		[]onideltest.Request{{Method: "GET", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
+	}, []any{key, ctx.api.GetRequests()})
 }
 
 func TestUpdateSSHKeySendsTheWholeKey(t *testing.T) {
 	ctx := setupTest(t)
-	_, err := ctx.client.CreateSSHKey(t.Context(), client.SSHKeyInput{TeamID: "team-a", Name: "me", PublicKey: "k1"})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
 
-	err = ctx.client.UpdateSSHKey(t.Context(), "00000000-0000-4000-8000-000000000001", client.SSHKeyInput{TeamID: "team-a", Name: "me-2", PublicKey: "k2"})
+	err := ctx.client.UpdateSSHKey(t.Context(), "k1", client.SSHKeyInput{TeamID: "team-a", Name: "me-2", PublicKey: "k2"})
 
 	require.NoError(t, err)
-	assert.Equal(t, map[string]map[string]any{"00000000-0000-4000-8000-000000000001": {
-		"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2",
-	}}, ctx.api.GetSSHKeys())
+	assert.Equal(t, []any{
+		map[string]map[string]any{"k1": {"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2"}},
+		[]onideltest.Request{{Method: "PATCH", Path: "/ssh_keys/k1", Body: map[string]any{
+			"team_id": "team-a", "name": "me-2", "ssh_key": "k2",
+		}}},
+	}, []any{ctx.api.GetSSHKeys(), ctx.api.GetRequests()})
 }
 
 func TestRemoveSSHKeyRemovesTheKeyInTheTeam(t *testing.T) {
 	ctx := setupTest(t)
-	_, err := ctx.client.CreateSSHKey(t.Context(), client.SSHKeyInput{TeamID: "team-a", Name: "me", PublicKey: "k"})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
 
-	err = ctx.client.RemoveSSHKey(t.Context(), "00000000-0000-4000-8000-000000000001", "team-a")
+	err := ctx.client.RemoveSSHKey(t.Context(), "k1", "team-a")
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		map[string]map[string]any{},
-		[]onideltest.Request{
-			{Method: "POST", Path: "/ssh_keys", Body: map[string]any{"team_id": "team-a", "name": "me", "ssh_key": "k"}},
-			{Method: "DELETE", Path: "/ssh_keys/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
-		},
+		[]onideltest.Request{{Method: "DELETE", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
 	}, []any{ctx.api.GetSSHKeys(), ctx.api.GetRequests()})
 }
