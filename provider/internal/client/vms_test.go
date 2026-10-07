@@ -439,3 +439,14 @@ func TestWaitForVMReadyWaitsThroughTheAlternativeSnapshotSpelling(t *testing.T) 
 		[]onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}},
 	}, []any{vm, ctx.api.GetRequests()})
 }
+
+func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "status": "building"})
+	ctx.api.SetAutoSettle(false)
+	ctx.client.Sleep = func(context.Context, time.Duration) error { return context.Canceled }
+
+	_, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
+
+	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}}, []any{err, ctx.api.GetRequests()})
+}

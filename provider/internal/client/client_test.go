@@ -291,18 +291,17 @@ func TestClientNeverRetriesAServerError(t *testing.T) {
 
 func TestClientStopsRetryingWhenTheContextEnds(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /teams", http.StatusServiceUnavailable, "", 1)
 	callCtx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
+	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error {
 		cancel()
-		w.WriteHeader(http.StatusServiceUnavailable)
-	})
-	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error { return sleepCtx.Err() }
+		return sleepCtx.Err()
+	}
 
 	_, err := ctx.client.ReadTeams(callCtx)
 
-	require.ErrorIs(t, err, context.Canceled)
-	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
+	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/teams"}}}, []any{err, ctx.api.GetRequests()})
 }
 
 func TestClientReportsABaseURLThatDoesNotParse(t *testing.T) {
