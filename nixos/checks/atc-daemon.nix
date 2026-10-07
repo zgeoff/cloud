@@ -1,7 +1,7 @@
 # Evaluates services.atc-daemon apart from any host's config, with a stand-in atc binary, and
 # checks the service, the config.json it links and the module's assertions. Each case evaluates
 # its own config, runs on its own and reports ok or not ok (case-helpers.sh); the check fails when
-# any case fails. Run: nix build ./nixos#checks.x86_64-linux.atc-daemon
+# any case fails. Run: bun run test:nixos atc-daemon
 { nixpkgs }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;

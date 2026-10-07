@@ -10,10 +10,11 @@
 # One VM boots once. setup_case() returns it to the same boot state before each subtest: the
 # 0.29.0 system running, its image pulled fresh, an empty tank/imp, generations 1 to 3. Each
 # subtest writes its own database, secret, copy and COPY-INFO, so every subtest stands alone. It
-# needs KVM; the run command is in docs/runbooks/restore-geoff-cloud.md, section 2.
+# needs KVM, and it reads scripts/ beside nixos/, so it builds only from the repo root: run
+# `bun run test:nixos impd-restore`.
+{ nixpkgs, imp }:
 let
-  flake = builtins.getFlake "path:${toString ../.}";
-  pkgs = flake.inputs.nixpkgs.legacyPackages.x86_64-linux;
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = pkgs.lib;
 
   # imp-docker-proxy's command in imp's image: here it only opens the socket the module waits for
@@ -66,7 +67,7 @@ pkgs.testers.runNixOSTest {
   nodes.machine =
     { config, ... }:
     {
-      imports = [ flake.inputs.imp.nixosModules.imp ];
+      imports = [ imp.nixosModules.imp ];
       networking.hostId = "5ca71846";
       # imp-host's docker run passes --device /dev/kvm
       boot.kernelModules = [
