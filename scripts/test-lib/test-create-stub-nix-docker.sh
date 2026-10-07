@@ -2,9 +2,9 @@
 # Test for create-stub-nix-docker.sh: the docker stand-in logs every call, answers the
 # nix build and copy that switch-geoffcloud.sh runs, fails closed on any other call, and
 # hands a call to the real docker when asked. The last case pins what the switch suite
-# assumes about the real docker CLI with no daemon socket: exit 1 and one line naming the
-# socket, worded as docker 28.0.4 (CI's ubuntu-24.04 runner image 20261004) or docker
-# 29.7.2 words it. No nix runs here, so a failed build's exit 1 is nix's documented exit
+# assumes about the real docker CLI with no daemon socket: exit 1 and the whole stderr naming
+# the socket, as docker 28.0.4 (CI's ubuntu-24.04 runner image 20261004, with a help line) or
+# docker 29.7.2 (one line) prints it. No nix runs here, so a failed build's exit 1 is nix's documented exit
 # for a failed build, not pinned against nix.
 #
 #   bash scripts/test-lib/test-create-stub-nix-docker.sh
@@ -135,11 +135,10 @@ it_hands_a_logged_call_to_the_real_docker_which_fails_with_exit_1_without_a_daem
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - <(wc -l < "$tree/err") <<< 1
-  grep -qxF \
-    -e "Cannot connect to the Docker daemon at unix://$tree/docker.sock. Is the docker daemon running?" \
-    -e "failed to connect to the docker API at unix://$tree/docker.sock; check if the path is correct and if the daemon is running: dial unix $tree/docker.sock: connect: no such file or directory" \
-    "$tree/err" || { cat "$tree/err"; echo "not docker 28's or 29's missing-socket error" >&2; exit 1; }
+  printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
+  printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
+  cmp -s "$tree/err-docker-28" "$tree/err" || cmp -s "$tree/err-docker-29" "$tree/err" ||
+    { cat "$tree/err"; echo "exit $status; not docker 28's or 29's missing-socket error" >&2; exit 1; }
   diff - "$tree/calls" << 'CALLS'
 ["docker","run","--rm","nixos/nix","nix","build","--no-link","--print-out-paths","path:."]
 CALLS

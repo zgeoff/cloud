@@ -540,7 +540,7 @@ EOF
 
 # The real docker CLI, behind the logging stand-in, with no daemon at its socket: docker
 # 28.0.4 (CI's ubuntu-24.04 runner image 20261004) and 29.7.2 word that error differently,
-# so the case accepts either exact line.
+# and 28 adds a help line, so the case accepts either whole stderr.
 it_never_switches_when_docker_cannot_reach_its_daemon() {
   local commit status=0
   tree="$(mktemp -d)"
@@ -554,11 +554,10 @@ it_never_switches_when_docker_cannot_reach_its_daemon() {
     DOCKER_HOST="unix://$tree/docker.sock" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - <(wc -l < "$tree/err") <<< 1
-  grep -qxF \
-    -e "Cannot connect to the Docker daemon at unix://$tree/docker.sock. Is the docker daemon running?" \
-    -e "failed to connect to the docker API at unix://$tree/docker.sock; check if the path is correct and if the daemon is running: dial unix $tree/docker.sock: connect: no such file or directory" \
-    "$tree/err" || { cat "$tree/err"; echo "not docker 28's or 29's missing-socket error" >&2; exit 1; }
+  printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
+  printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
+  cmp -s "$tree/err-docker-28" "$tree/err" || cmp -s "$tree/err-docker-29" "$tree/err" ||
+    { cat "$tree/err"; echo "exit $status; not docker 28's or 29's missing-socket error" >&2; exit 1; }
   diff - "$tree/out" << EOF
 == build ${commit:0:7}
 EOF
