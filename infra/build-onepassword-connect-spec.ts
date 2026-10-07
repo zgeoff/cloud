@@ -12,8 +12,6 @@ export const onePasswordConnectCredentialsKey = '1password-credentials.json';
 const connectVersion = '1.8.3';
 const connectAPIImage = `1password/connect-api:${connectVersion}`;
 const connectSyncImage = `1password/connect-sync:${connectVersion}`;
-const credentialsPath = `/home/opuser/.op/${onePasswordConnectCredentialsKey}`;
-const dataPath = '/home/opuser/.op/data';
 
 const podSecurityContext: input.core.v1.PodSecurityContext = {
   fsGroup: 999,
@@ -77,6 +75,9 @@ const lockedDown: input.core.v1.SecurityContext = {
   readOnlyRootFilesystem: true,
   capabilities: { drop: ['ALL'] },
 };
+
+const credentialsPath = `/home/opuser/.op/${onePasswordConnectCredentialsKey}`;
+const dataPath = '/home/opuser/.op/data';
 
 // connect-api and connect-sync differ only in ports and image; they share a data volume
 // and talk over the pod's loopback

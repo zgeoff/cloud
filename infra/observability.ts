@@ -19,6 +19,41 @@ export interface ObservabilityOutputs {
   readonly grafanaAdminPassword: Output<string>;
 }
 
+const lokiValues = {
+  deploymentMode: 'SingleBinary',
+  loki: {
+    auth_enabled: false,
+    commonConfig: { replication_factor: 1 },
+    storage: { type: 'filesystem' },
+    schemaConfig: {
+      configs: [
+        {
+          from: '2026-10-01',
+          store: 'tsdb',
+          object_store: 'filesystem',
+          schema: 'v13',
+          index: { prefix: 'index_', period: '24h' },
+        },
+      ],
+    },
+    limits_config: { retention_period: '720h' },
+    compactor: { retention_enabled: true, delete_request_store: 'filesystem' },
+  },
+  singleBinary: {
+    replicas: 1,
+    persistence: { size: '20Gi' },
+    resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '384Mi' } },
+  },
+  read: { replicas: 0 },
+  write: { replicas: 0 },
+  backend: { replicas: 0 },
+  chunksCache: { enabled: false },
+  resultsCache: { enabled: false },
+  gateway: { enabled: false },
+  lokiCanary: { enabled: false },
+  test: { enabled: false },
+};
+
 // Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
 // (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
 // when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemons, set only
@@ -77,38 +112,3 @@ function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider):
     { provider: cluster, dependsOn },
   );
 }
-
-const lokiValues = {
-  deploymentMode: 'SingleBinary',
-  loki: {
-    auth_enabled: false,
-    commonConfig: { replication_factor: 1 },
-    storage: { type: 'filesystem' },
-    schemaConfig: {
-      configs: [
-        {
-          from: '2026-10-01',
-          store: 'tsdb',
-          object_store: 'filesystem',
-          schema: 'v13',
-          index: { prefix: 'index_', period: '24h' },
-        },
-      ],
-    },
-    limits_config: { retention_period: '720h' },
-    compactor: { retention_enabled: true, delete_request_store: 'filesystem' },
-  },
-  singleBinary: {
-    replicas: 1,
-    persistence: { size: '20Gi' },
-    resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '384Mi' } },
-  },
-  read: { replicas: 0 },
-  write: { replicas: 0 },
-  backend: { replicas: 0 },
-  chunksCache: { enabled: false },
-  resultsCache: { enabled: false },
-  gateway: { enabled: false },
-  lokiCanary: { enabled: false },
-  test: { enabled: false },
-};
