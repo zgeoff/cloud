@@ -4,8 +4,8 @@
 # hands a call to the real docker when asked. The last case pins what the switch suite
 # assumes about the real docker CLI with no daemon socket: the whole stderr naming the socket
 # and the exit status, as docker 28.0.4 (CI's ubuntu-24.04 runner image 20261004: a help line,
-# exit 125) or docker 29.7.2 (one line, exit 1) prints them. No nix runs here, so a failed build's exit 1 is nix's documented exit
-# for a failed build, not pinned against nix.
+# exit 125) or docker 29.7.2 (one line, exit 1) prints them. No nix runs here, so a failed
+# build's exit 1 is nix's documented exit for a failed build, not pinned against nix.
 #
 #   bash scripts/test-lib/test-create-stub-nix-docker.sh
 # shellcheck source-path=SCRIPTDIR

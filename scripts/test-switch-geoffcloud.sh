@@ -540,7 +540,7 @@ EOF
 
 # The real docker CLI, behind the logging stand-in, with no daemon at its socket: docker
 # 28.0.4 (CI's ubuntu-24.04 runner image 20261004) and 29.7.2 word that error differently,
-# and 28 adds a help line, so the case accepts either whole stderr.
+# and 28 adds a help line and exits 125, so the case accepts either stderr with its status.
 it_never_switches_when_docker_cannot_reach_its_daemon() {
   local commit status=0
   tree="$(mktemp -d)"
@@ -556,7 +556,9 @@ it_never_switches_when_docker_cannot_reach_its_daemon() {
 
   printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
   printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
-  cmp -s "$tree/err-docker-28" "$tree/err" || cmp -s "$tree/err-docker-29" "$tree/err" ||
+  # set -e passes docker's status through: 125 from docker 28, 1 from docker 29
+  { cmp -s "$tree/err-docker-28" "$tree/err" && [ "$status" = 125 ]; } ||
+    { cmp -s "$tree/err-docker-29" "$tree/err" && [ "$status" = 1 ]; } ||
     { cat "$tree/err"; echo "exit $status; not docker 28's or 29's missing-socket error" >&2; exit 1; }
   diff - "$tree/out" << EOF
 == build ${commit:0:7}
@@ -567,7 +569,6 @@ EOF
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_never_switches_when_the_build_prints_no_system_path() {
