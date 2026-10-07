@@ -7,25 +7,26 @@ exist in code but are not deployed.
 
 Run with `bun run <script>` from the repo root. Hooks and CI call these too.
 
-| Script           | What it does                                                                      |
-| ---------------- | --------------------------------------------------------------------------------- |
-| `preview`        | builds the provider, then `pulumi preview --stack prod` through `op run`          |
-| `drift`          | builds the SDK, then `preview --refresh --expect-no-changes`: fails on any change |
-| `up`             | builds the provider, then `pulumi up --stack prod` through `op run`               |
-| `provider:build` | builds `provider/bin/pulumi-resource-onidel`                                      |
-| `provider:check` | `gofmt`, `go vet` and `go test` in `provider/`                                    |
-| `sdk:gen`        | regenerates `sdk/onidel/` from the provider binary (`scripts/gen-sdk.sh`)         |
-| `sdk:build`      | compiles `sdk/onidel/` to `sdk/onidel/bin/`, which `infra/` imports               |
-| `format`         | `oxfmt` and `format-codemod`, writing fixes                                       |
-| `format:check`   | the same, check only                                                              |
-| `lint`           | `oxlint` with type-aware rules                                                    |
-| `lint:fix`       | the same, writing fixes                                                           |
-| `typecheck`      | `sdk:build`, then `tsc --noEmit`                                                  |
-| `test`           | `bun test`                                                                        |
-| `test:scripts`   | the stub test of `install-atc-gateway-credentials.sh` (no host)                   |
-| `deadcode`       | `knip`                                                                            |
-| `audit`          | `bun audit`                                                                       |
-| `build:agents`   | regenerates `AGENTS.md` from `agents/shared.md` and `agents/project.md`           |
+| Script                     | What it does                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `preview`                  | builds the provider, then `pulumi preview --stack prod` through `op run`                                                             |
+| `drift`                    | builds the SDK, then `preview --refresh --expect-no-changes`: fails on any change                                                    |
+| `up`                       | builds the provider, then `pulumi up --stack prod` through `op run`                                                                  |
+| `provider:build`           | builds `provider/bin/pulumi-resource-onidel`                                                                                         |
+| `provider:check`           | `gofmt`, `go vet` and `go test` in `provider/`                                                                                       |
+| `sdk:gen`                  | regenerates `sdk/onidel/` from the provider binary (`scripts/gen-sdk.sh`)                                                            |
+| `sdk:build`                | compiles `sdk/onidel/` to `sdk/onidel/bin/`, which `infra/` imports                                                                  |
+| `format`                   | `oxfmt` and `format-codemod`, writing fixes                                                                                          |
+| `format:check`             | the same, check only                                                                                                                 |
+| `lint`                     | `oxlint` with type-aware rules                                                                                                       |
+| `lint:fix`                 | the same, writing fixes                                                                                                              |
+| `typecheck`                | `sdk:build`, then `tsc --noEmit`                                                                                                     |
+| `test`                     | `bun test`                                                                                                                           |
+| `test:scripts`             | the shell test library's own tests, then the stub tests of `install-atc-gateway-credentials.sh` and `switch-geoffcloud.sh` (no host) |
+| `test:atc-gateway-fixture` | the gateway image fixture test, in Docker                                                                                            |
+| `deadcode`                 | `knip`                                                                                                                               |
+| `audit`                    | `bun audit`                                                                                                                          |
+| `build:agents`             | regenerates `AGENTS.md` from `agents/shared.md` and `agents/project.md`                                                              |
 
 Pass Pulumi flags after `--`: `bun run up -- --yes`.
 
