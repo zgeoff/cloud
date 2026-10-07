@@ -11,13 +11,15 @@ import (
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
-func TestBuildStubCancelingSleepEndsTheCallersContextAndReturnsItsError(t *testing.T) {
+func TestBuildStubCancelingSleepEndsTheCallersContextAndReturnsTheClientsSleepError(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	c := client.New("", "key")
-	c.Sleep = onideltest.BuildStubCancelingSleep(cancel).Sleep
+	plain := client.New("", "key")
+	stubbed := client.New("", "key")
+	stubbed.Sleep = onideltest.BuildStubCancelingSleep(cancel).Sleep
 
-	err := c.Sleep(ctx, time.Hour)
+	// The stub's sleep runs first and ends ctx; the real Sleep then sees an ended context.
+	got, want := stubbed.Sleep(ctx, time.Millisecond), plain.Sleep(ctx, time.Millisecond)
 
-	assert.Equal(t, []error{context.Canceled, context.Canceled}, []error{err, ctx.Err()})
+	assert.Equal(t, []error{context.Canceled, context.Canceled, context.Canceled}, []error{got, want, ctx.Err()})
 }

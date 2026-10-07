@@ -28,11 +28,11 @@ func TestBuildStubSleepRecordsEachDurationInOrder(t *testing.T) {
 func TestBuildStubSleepReturnsTheClientsSleepErrorForACanceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	c := client.New("", "key")
-	want := c.Sleep(ctx, time.Hour)
-	c.Sleep = onideltest.BuildStubSleep().Sleep
+	plain := client.New("", "key")
+	stubbed := client.New("", "key")
+	stubbed.Sleep = onideltest.BuildStubSleep().Sleep
 
-	got := c.Sleep(ctx, time.Hour)
+	want, got := plain.Sleep(ctx, time.Hour), stubbed.Sleep(ctx, time.Hour)
 
 	assert.Equal(t, []error{context.Canceled, context.Canceled}, []error{want, got})
 }
@@ -40,11 +40,11 @@ func TestBuildStubSleepReturnsTheClientsSleepErrorForACanceledContext(t *testing
 func TestBuildStubSleepReturnsTheClientsSleepErrorForAnExpiredContext(t *testing.T) {
 	ctx, cancel := context.WithDeadline(t.Context(), time.Unix(0, 0))
 	t.Cleanup(cancel)
-	c := client.New("", "key")
-	want := c.Sleep(ctx, time.Hour)
-	c.Sleep = onideltest.BuildStubSleep().Sleep
+	plain := client.New("", "key")
+	stubbed := client.New("", "key")
+	stubbed.Sleep = onideltest.BuildStubSleep().Sleep
 
-	got := c.Sleep(ctx, time.Hour)
+	want, got := plain.Sleep(ctx, time.Hour), stubbed.Sleep(ctx, time.Hour)
 
 	assert.Equal(t, []error{context.DeadlineExceeded, context.DeadlineExceeded}, []error{want, got})
 }

@@ -12,8 +12,9 @@ type StubCancelingSleep struct {
 	cancel context.CancelFunc
 }
 
-// BuildStubCancelingSleep returns a StubCancelingSleep that calls cancel on its
-// first sleep. cancel must end the context the caller passes to the client.
+// BuildStubCancelingSleep returns a StubCancelingSleep that calls cancel on every
+// sleep; the first call ends the context, and later calls change nothing. cancel must
+// end the context the caller passes to the client.
 func BuildStubCancelingSleep(cancel context.CancelFunc) *StubCancelingSleep {
 	return &StubCancelingSleep{cancel: cancel}
 }
