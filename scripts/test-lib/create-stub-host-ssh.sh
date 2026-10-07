@@ -57,7 +57,8 @@ esac
 # every remote tool must resolve to a stand-in in STUB_HOST_BIN, and the command must not name
 # one by path or bypass PATH with `command -p`
 for tool in ssh scp sftp rsync tailscale; do
-  if [ "$(PATH="$STUB_HOST_BIN:/usr/bin:/bin" command -v "$tool" || true)" != "$STUB_HOST_BIN/$tool" ]; then
+  if [ "$(PATH="$STUB_HOST_BIN:/usr/bin:/bin" command -v "$tool" || true)" != "$STUB_HOST_BIN/$tool" ] ||
+    [ ! -x "$STUB_HOST_BIN/$tool" ]; then
     echo "unexpected: $tool on the host PATH is not a stand-in in $STUB_HOST_BIN" >&2
     exit 97
   fi

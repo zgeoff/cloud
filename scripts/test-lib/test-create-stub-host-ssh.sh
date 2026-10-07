@@ -80,6 +80,27 @@ it_fails_closed_before_any_interception_when_a_remote_tool_on_the_host_path_is_n
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
+it_fails_closed_before_any_interception_when_a_host_stand_in_is_not_executable() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/host/secrets"
+  echo bearer > "$tree/host/secrets/gateway-token"
+  chmod -x "$tree/host-bin/rsync"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_ALTER_BEARER_BEFORE_SUM=1 \
+    ssh -o BatchMode=yes root@geoffcloud "sha256sum $tree/host/secrets/gateway-token" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "unexpected: rsync on the host PATH is not a stand-in in $tree/host-bin"
+  diff - "$tree/host/secrets/gateway-token" <<< bearer
+  diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"sha256sum $tree/host/secrets/gateway-token\"]"
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
 it_fails_closed_with_exit_97_when_a_known_command_names_a_remote_tool_by_path() {
   local status=0
   tree="$(mktemp -d)"
