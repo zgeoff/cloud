@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -210,14 +211,11 @@ func TestCreateVMFailsWhenTheAPIRefusesTheCreate(t *testing.T) {
 func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("POST /vm", http.StatusCreated, "", 1)
-	previous := client.VMWaitTimeout
-	client.VMWaitTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { client.VMWaitTimeout = previous })
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
-	assert.Equal(t, client.VM{}, vm)
+	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, *ctx.sleeps})
 }
 
 func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
@@ -238,14 +236,12 @@ func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
 func TestCreateVMReturnsTheIDOfAVMThatNeverBecomesReady(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetAutoSettle(false)
-	previous := client.VMWaitTimeout
-	client.VMWaitTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { client.VMWaitTimeout = previous })
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Equal(t, client.VM{ID: "00000000-0000-4000-8000-000000000001"}, vm)
+	assert.Equal(t, []any{client.VM{ID: "00000000-0000-4000-8000-000000000001"}, slices.Repeat([]time.Duration{10 * time.Second}, 180)},
+		[]any{vm, *ctx.sleeps})
 }
 
 func TestWaitForVMReadyWaitsForAnActiveVMWithNoActionInFlight(t *testing.T) {

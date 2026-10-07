@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
 )
 
 // VM is a virtual machine as the API reports it.
@@ -69,9 +68,6 @@ type VMPatch struct {
 	DisableFirewall *bool  `json:"disable_firewall,omitempty"`
 }
 
-// VMWaitTimeout caps how long the VM helpers wait for the API to settle.
-var VMWaitTimeout = 30 * time.Minute
-
 func buildVMPath(id string) string { return "/vm/" + url.PathEscape(id) }
 
 // ReadVMs lists the team's VMs (GET /vm).
@@ -112,7 +108,7 @@ func (c *Client) CreateVM(ctx context.Context, in VMInput) (VM, error) {
 
 	id := findCreatedID(raw)
 	if id == "" {
-		err = c.waitFor(ctx, VMWaitTimeout, func() (bool, error) {
+		err = c.waitFor(ctx, c.VMWaitTimeout, func() (bool, error) {
 			vms, err := c.ReadVMs(ctx, in.TeamID)
 			if err != nil {
 				return false, err
@@ -188,7 +184,7 @@ func (c *Client) RemoveVM(ctx context.Context, id, teamID string) error {
 	if err != nil {
 		return err
 	}
-	return c.waitFor(ctx, VMWaitTimeout, func() (bool, error) {
+	return c.waitFor(ctx, c.VMWaitTimeout, func() (bool, error) {
 		vm, err := c.ReadVM(ctx, id, teamID)
 		if IsNotFound(err) {
 			return true, nil
@@ -213,7 +209,7 @@ var transientVMStatuses = map[string]bool{
 // WaitForVMReady polls until the VM is active with no action in flight.
 func (c *Client) WaitForVMReady(ctx context.Context, id, teamID string) (VM, error) {
 	var vm VM
-	err := c.waitFor(ctx, VMWaitTimeout, func() (bool, error) {
+	err := c.waitFor(ctx, c.VMWaitTimeout, func() (bool, error) {
 		var err error
 		vm, err = c.ReadVM(ctx, id, teamID)
 		if err != nil {

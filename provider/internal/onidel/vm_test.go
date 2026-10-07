@@ -3,7 +3,6 @@ package onidel_test
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	p "github.com/pulumi/pulumi-go-provider"
 	"github.com/pulumi/pulumi-go-provider/infer"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zgeoff/cloud/provider/internal/client"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -407,9 +405,6 @@ func TestVMCreatePreviewSendsNothing(t *testing.T) {
 func TestVMCreateKeepsAVMThatNeverBecomesReadyInState(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetAutoSettle(false)
-	previous := client.VMWaitTimeout
-	client.VMWaitTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { client.VMWaitTimeout = previous })
 
 	created, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:Vm", "web"),

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	p "github.com/pulumi/pulumi-go-provider"
 	"github.com/pulumi/pulumi-go-provider/infer"
@@ -23,6 +24,9 @@ type Config struct {
 	Endpoint string `pulumi:"endpoint,optional"`
 
 	client *client.Client
+	// sleep, when set, replaces the client's Sleep; infer decodes the config into
+	// this struct, so the unexported field survives.
+	sleep func(ctx context.Context, d time.Duration) error
 
 	teamOnce sync.Once
 	teamID   string
@@ -63,6 +67,9 @@ func (c *Config) Configure(context.Context) error {
 		return errors.New("onidel: set the apiKey config or " + APIKeyEnv)
 	}
 	c.client = client.New(c.Endpoint, c.APIKey)
+	if c.sleep != nil {
+		c.client.Sleep = c.sleep
+	}
 	return nil
 }
 
