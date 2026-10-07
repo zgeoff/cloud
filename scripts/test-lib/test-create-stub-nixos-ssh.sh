@@ -201,6 +201,8 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   printf '#!/usr/bin/env bash\necho fake ssh\n' > "$tree/fake/ssh"
   chmod +x "$tree/fake/ssh"
   PATH="$tree/fake:$PATH" create_stub_nixos_ssh "$tree/bin"
+  create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
+  require_remote_tool_stubs "$tree/bin"
 
   env -i PATH="$tree/bin:$tree/fake:/usr/bin:/bin" HOME="$tree" STUB_LOG="$tree/calls" \
     STUB_SSH_PASS=1 ssh -o BatchMode=yes ssh://root@127.0.0.1:1 true \
