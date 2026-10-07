@@ -9,17 +9,17 @@ test('it builds a default atc gateway daemon config', () => {
     daemonID: expect.toSatisfy((daemonID: string) =>
       /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/u.test(daemonID),
     ),
+    alertSeverity: 'critical',
   });
 });
 
 test('it applies overrides on top of the defaults', () => {
   expect(
-    buildMockATCGatewayDaemonConfig({ address: '100.67.122.120:8415', alertSeverity: 'warning' }),
+    buildMockATCGatewayDaemonConfig({ address: '100.67.122.120:8415', alertSeverity: undefined }),
   ).toStrictEqual({
     address: '100.67.122.120:8415',
     daemonID: expect.toSatisfy((daemonID: string) =>
       /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/u.test(daemonID),
     ),
-    alertSeverity: 'warning',
   });
 });

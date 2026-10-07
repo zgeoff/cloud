@@ -10,6 +10,19 @@ test('it builds a default atc gateway config', () => {
       /^ghcr\.io\/zgeoff\/atc-gateway-backup:\d+\.\d+\.\d+@sha256:[\da-f]{64}$/u.test(value),
     ),
     publicURL: expect.toSatisfy((value: string) => /^https:\/\/[\w.-]+$/u.test(value)),
+    daemons: {
+      geoffcloud: {
+        address: expect.toSatisfy((address: string) =>
+          /^\d{1,3}(?:\.\d{1,3}){3}:\d{1,5}$/u.test(address),
+        ),
+        daemonID: expect.toSatisfy((daemonID: string) =>
+          /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/u.test(daemonID),
+        ),
+        alertSeverity: 'critical',
+      },
+    },
+    defaultDaemon: 'geoffcloud',
+    stateDir: expect.toSatisfy((value: string) => value.startsWith('/')),
   });
 });
 
@@ -17,8 +30,9 @@ test('it applies overrides on top of the defaults', () => {
   expect(
     buildMockATCGatewayConfig({
       publicURL: 'https://atc.geoff.cloud',
+      daemons: undefined,
+      defaultDaemon: undefined,
       stateDir: '/var/lib/atc',
-      defaultDaemon: 'geoffcloud',
     }),
   ).toStrictEqual({
     image: expect.toSatisfy((value: string) =>
@@ -29,6 +43,5 @@ test('it applies overrides on top of the defaults', () => {
     ),
     publicURL: 'https://atc.geoff.cloud',
     stateDir: '/var/lib/atc',
-    defaultDaemon: 'geoffcloud',
   });
 });

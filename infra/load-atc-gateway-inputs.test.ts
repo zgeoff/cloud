@@ -17,15 +17,16 @@ test('it returns no gateway while the stack config leaves atcGateway unset', () 
 test('it carries each daemon, the default daemon and a token per daemon, and leaves the backup out when its variables are unset', () => {
   const config = buildMockATCGatewayConfig({
     daemons: {
-      geoffcloud: {
+      geoffcloud: buildMockATCGatewayDaemonConfig({
         address: '100.69.47.33:8415',
         daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
-      },
-      'home-pc': {
+        alertSeverity: undefined,
+      }),
+      'home-pc': buildMockATCGatewayDaemonConfig({
         address: '100.67.122.120:8415',
         daemonID: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
         alertSeverity: 'warning',
-      },
+      }),
     },
     defaultDaemon: 'geoffcloud',
   });
@@ -100,11 +101,11 @@ test('it gives each daemon the token from its own ATC_GATEWAY_TOKEN_<NAME> varia
     ATC_GATEWAY_TOKEN_HOME_PC: 'h'.repeat(32),
   });
 
-  if (result.atcGateway === undefined) {
+  const tokens = result.atcGateway?.secrets.tokens;
+
+  if (tokens === undefined) {
     throw new Error('expected the gateway inputs');
   }
-
-  const tokens = result.atcGateway.secrets.tokens;
 
   expect(
     Promise.all(

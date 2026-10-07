@@ -16,6 +16,7 @@ import { createClusterWorkloads } from './cluster-workloads.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 import { createHealthCheck } from './health-check.ts';
 import { loadClusterInputs } from './load-cluster-inputs.ts';
+import { requireCloudflareAccountID } from './require-cloudflare-account-id.ts';
 import { tailnetPolicy } from './tailnet-policy.ts';
 
 // K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig, and ONEPASSWORD_CONNECT_CREDENTIALS
@@ -23,11 +24,7 @@ import { tailnetPolicy } from './tailnet-policy.ts';
 // whether the cluster is managed, so a missing value fails the run before any resource
 // registers, instead of planning to delete the cluster's resources.
 const clusterInputs = loadClusterInputs(new Config(), process.env);
-const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
-
-if (accountID === undefined) {
-  throw new Error('CLOUDFLARE_ACCOUNT_ID is unset; run through `op run --env-file=../.env`');
-}
+const accountID = requireCloudflareAccountID(process.env['CLOUDFLARE_ACCOUNT_ID']);
 
 export const domain = 'geoff.cloud';
 const zone = getZoneOutput({ filter: { name: domain } });

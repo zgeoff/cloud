@@ -16,6 +16,7 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir when the config sets
         image:
           'ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000',
         publicURL: 'https://atc.geoff.cloud',
+        stateDir: undefined,
       }),
       claim,
       tokens,
@@ -209,6 +210,7 @@ test("#buildATCGatewaySpec sends the public URL's host, port included, as the pr
         image:
           'ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:0000000000000000000000000000000000000000000000000000000000000000',
         publicURL: 'https://atc.geoff.cloud:8443',
+        stateDir: undefined,
       }),
       claim,
       tokens,

@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildCloudflaredSpec } from './build-cloudflared-spec.ts';
 
-test("it runs two tunnel replicas on the token Secret, serving metrics on the port named 'metrics' that the cloudflared PodMonitor scrapes", () => {
+test("it runs two tunnel replicas on the token Secret, serving metrics on a port named 'metrics'", () => {
   const tokenSecret = output('cloudflared-token');
 
   expect(buildCloudflaredSpec(tokenSecret)).toStrictEqual({
