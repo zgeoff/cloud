@@ -17,6 +17,10 @@ import (
 // APIKeyEnv is the environment fallback for the apiKey config.
 const APIKeyEnv = "ONIDEL_API_KEY"
 
+// ErrMissingAPIKey is Configure's error when neither the apiKey config nor the
+// environment sets a key.
+var ErrMissingAPIKey = errors.New("onidel: set the apiKey config or " + APIKeyEnv)
+
 // Config is the provider configuration.
 type Config struct {
 	APIKey   string `pulumi:"apiKey,optional" provider:"secret"`
@@ -64,7 +68,7 @@ func (c *Config) Configure(context.Context) error {
 		c.APIKey = os.Getenv(APIKeyEnv)
 	}
 	if c.APIKey == "" {
-		return errors.New("onidel: set the apiKey config or " + APIKeyEnv)
+		return ErrMissingAPIKey
 	}
 	c.client = client.New(c.Endpoint, c.APIKey)
 	if c.sleep != nil {

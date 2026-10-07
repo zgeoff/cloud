@@ -206,6 +206,17 @@ var transientVMStatuses = map[string]bool{
 	"taking_snapshot": true,
 }
 
+// VMStatusError is a VM in a status that never settles into active on its own, such
+// as suspended or awaiting_payment.
+type VMStatusError struct {
+	ID     string
+	Status string
+}
+
+func (e *VMStatusError) Error() string {
+	return fmt.Sprintf("onidel: VM %s is %q, not active", e.ID, e.Status)
+}
+
 // WaitForVMReady polls until the VM is active with no action in flight.
 func (c *Client) WaitForVMReady(ctx context.Context, id, teamID string) (VM, error) {
 	var vm VM
@@ -221,7 +232,7 @@ func (c *Client) WaitForVMReady(ctx context.Context, id, teamID string) (VM, err
 		if transientVMStatuses[vm.Status] {
 			return false, nil
 		}
-		return false, fmt.Errorf("onidel: VM %s is %q, not active", id, vm.Status)
+		return false, &VMStatusError{ID: id, Status: vm.Status}
 	})
 	return vm, err
 }

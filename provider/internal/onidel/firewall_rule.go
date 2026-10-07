@@ -133,10 +133,19 @@ func (FirewallRule) Delete(ctx context.Context, req infer.DeleteRequest[Firewall
 	return infer.DeleteResponse{}, err
 }
 
+// FirewallRuleIDError is a FirewallRule ID that is not `<firewallId>/<ruleId>`.
+type FirewallRuleIDError struct {
+	ID string
+}
+
+func (e *FirewallRuleIDError) Error() string {
+	return fmt.Sprintf("onidel: firewall rule ID %q is not <firewallId>/<ruleId>", e.ID)
+}
+
 func splitFirewallRuleID(id string) (string, string, error) {
 	firewallID, ruleID, ok := strings.Cut(id, "/")
 	if !ok || firewallID == "" || ruleID == "" {
-		return "", "", fmt.Errorf("onidel: firewall rule ID %q is not <firewallId>/<ruleId>", id)
+		return "", "", &FirewallRuleIDError{ID: id}
 	}
 	return firewallID, ruleID, nil
 }

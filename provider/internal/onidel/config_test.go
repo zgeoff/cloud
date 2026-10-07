@@ -56,6 +56,7 @@ func TestConfigureFailsWithoutAnAPIKey(t *testing.T) {
 
 	err := (&onidel.Config{}).Configure(t.Context())
 
+	require.ErrorIs(t, err, onidel.ErrMissingAPIKey)
 	assert.EqualError(t, err, "onidel: set the apiKey config or ONIDEL_API_KEY")
 }
 

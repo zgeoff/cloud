@@ -288,6 +288,9 @@ func TestWaitForVMReadyFailsOnAStatusThatNeverSettles(t *testing.T) {
 
 			_, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
 
+			var statusErr *client.VMStatusError
+			require.ErrorAs(t, err, &statusErr)
+			assert.Equal(t, &client.VMStatusError{ID: "v", Status: row.status}, statusErr)
 			assert.EqualError(t, err, `onidel: VM v is "`+row.status+`", not active`)
 		})
 	}

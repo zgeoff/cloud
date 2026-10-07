@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/zgeoff/cloud/provider/internal/onidel"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -170,6 +171,9 @@ func TestFirewallRuleReadRejectsAMalformedID(t *testing.T) {
 
 			_, err := ctx.server.Read(p.ReadRequest{ID: row.id, Urn: onideltest.BuildURN("onidel:index:FirewallRule", "r")})
 
+			var idErr *onidel.FirewallRuleIDError
+			require.ErrorAs(t, err, &idErr)
+			assert.Equal(t, &onidel.FirewallRuleIDError{ID: row.id}, idErr)
 			assert.EqualError(t, err, `onidel: firewall rule ID "`+row.id+`" is not <firewallId>/<ruleId>`)
 			assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 		})
@@ -191,6 +195,9 @@ func TestFirewallRuleUpdateRejectsAMalformedID(t *testing.T) {
 		}),
 	})
 
+	var idErr *onidel.FirewallRuleIDError
+	require.ErrorAs(t, err, &idErr)
+	assert.Equal(t, &onidel.FirewallRuleIDError{ID: "no-slash"}, idErr)
 	assert.EqualError(t, err, `onidel: firewall rule ID "no-slash" is not <firewallId>/<ruleId>`)
 	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
@@ -206,6 +213,9 @@ func TestFirewallRuleDeleteRejectsAMalformedID(t *testing.T) {
 		}),
 	})
 
+	var idErr *onidel.FirewallRuleIDError
+	require.ErrorAs(t, err, &idErr)
+	assert.Equal(t, &onidel.FirewallRuleIDError{ID: "no-slash"}, idErr)
 	assert.EqualError(t, err, `onidel: firewall rule ID "no-slash" is not <firewallId>/<ruleId>`)
 	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
