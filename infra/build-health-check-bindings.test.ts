@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret, output } from '@pulumi/pulumi';
 import { buildHealthCheckBindings } from './build-health-check-bindings.ts';
-import { readOutput } from './test-utils/read-output.ts';
+import { resolveOutput } from './test-utils/resolve-output.ts';
 
 test('it binds the state bucket, the targets as JSON and the alert webhook when one is set', () => {
   const stateBucket = output('geoff-cloud-health-check-state');
@@ -42,7 +42,7 @@ test('it binds the alert webhook as a secret holding the URL', () => {
     throw new Error('expected the ALERT_URL binding');
   }
 
-  expect(Promise.all([isSecret(alert.text), readOutput(alert.text)])).resolves.toStrictEqual([
+  expect(Promise.all([isSecret(alert.text), resolveOutput(alert.text)])).resolves.toStrictEqual([
     true,
     'https://discord.com/api/webhooks/1/abc',
   ]);
