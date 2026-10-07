@@ -9,6 +9,7 @@ set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_logs_a_call_and_fails_closed_with_exit_97() {
   local status=0
@@ -36,6 +37,7 @@ it_writes_one_stand_in_for_each_named_tool() {
 rsync
 scp
 sftp
+ssh
 tailscale
 TOOLS
 }
@@ -46,18 +48,20 @@ it_fails_closed_for_every_named_tool() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  for tool in rsync scp sftp tailscale; do
+  for tool in rsync scp sftp ssh tailscale; do
     env -i PATH="$tree/bin:/usr/bin:/bin" "$tool" status > /dev/null 2>&1 || statuses+="$tool $? "
   done
 
-  diff - <(echo "$statuses") <<< 'rsync 97 scp 97 sftp 97 tailscale 97 '
+  diff - <(echo "$statuses") <<< 'rsync 97 scp 97 sftp 97 ssh 97 tailscale 97 '
 }
 
-# Runtime every case needs: the stand-ins for rsync, scp, sftp and tailscale in <tree>/bin.
+# Runtime every case needs: the stand-ins for rsync, scp, sftp, ssh and tailscale in <tree>/bin,
+# checked before any case runs a tool, so no call can reach a real remote tool.
 setup_test() {
   local tree="$1"
   mkdir "$tree/bin"
-  create_stub_remote_tools "$tree/bin" "$tree/calls" rsync scp sftp tailscale
+  create_stub_remote_tools "$tree/bin" "$tree/calls" rsync scp sftp ssh tailscale
+  require_remote_tool_stubs "$tree/bin"
 }
 
 run_cases
