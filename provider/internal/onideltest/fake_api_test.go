@@ -1,0 +1,678 @@
+package onideltest_test
+
+import (
+	"io"
+	"net/http"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/zgeoff/cloud/provider/internal/onideltest"
+)
+
+// These tests pin each assumption the fake makes about the real API, on the wire,
+// against provider/spec/onidel.yaml. They drive raw HTTP so that no client decoding
+// stands between the test and the fake's output.
+
+// setupTest starts a fake API; send makes one authorised request to it and returns
+// the status and the raw body.
+func setupTest(t *testing.T) struct {
+	api  *onideltest.FakeAPI
+	send func(method, path, body string) (int, string)
+} {
+	t.Helper()
+	api := onideltest.StartFakeAPI(t)
+	send := func(method, path, body string) (int, string) {
+		t.Helper()
+		var reader io.Reader
+		if body != "" {
+			reader = strings.NewReader(body)
+		}
+		req, err := http.NewRequestWithContext(t.Context(), method, api.URL+path, reader)
+		require.NoError(t, err)
+		req.Header.Set("Authorization", "Bearer test-key")
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = resp.Body.Close() })
+		raw, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		return resp.StatusCode, string(raw)
+	}
+	return struct {
+		api  *onideltest.FakeAPI
+		send func(method, path, body string) (int, string)
+	}{api: api, send: send}
+}
+
+func TestFakeAPIListsItsOneTeamAsABareArray(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := ctx.send("GET", "/teams", "")
+
+	assert.Equal(t, http.StatusOK, status)
+	assert.JSONEq(t, `[{"id":"169b0175-361a-4ea7-b31f-d82f42bc43b1","name":"team","role":"Team Owner"}]`, body)
+}
+
+func TestFakeAPIListsTheTeamsATestSets(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetTeams(
+		map[string]any{"id": "team-a", "name": "a", "role": "Team Owner"},
+		map[string]any{"id": "team-b", "name": "b", "role": "Team Member"},
+	)
+
+	_, body := ctx.send("GET", "/teams", "")
+
+	assert.JSONEq(t, `[{"id":"team-a","name":"a","role":"Team Owner"},{"id":"team-b","name":"b","role":"Team Member"}]`, body)
+}
+
+func TestFakeAPIListsOSTemplatesAsABareArray(t *testing.T) {
+	ctx := setupTest(t)
+
+	_, body := ctx.send("GET", "/os_templates", "")
+
+	assert.JSONEq(t, `[{"id":3,"name":"Ubuntu 24.04 LTS x64","family":"Ubuntu"},`+
+		`{"id":24,"name":"Ubuntu 26.04 LTS x64","family":"Ubuntu"}]`, body)
+}
+
+func TestFakeAPIRejectsAWrongBearerToken(t *testing.T) {
+	ctx := setupTest(t)
+	req, err := http.NewRequestWithContext(t.Context(), "GET", ctx.api.URL+"/teams", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer other-key")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	assert.Equal(t, http.StatusUnauthorized, resp.StatusCode)
+}
+
+func TestFakeAPIReportsARequestNoRouteServes(t *testing.T) {
+	rows := []struct {
+		name    string
+		method  string
+		path    string
+		problem string
+	}{
+		{"it reports an unknown path with its query", "GET", "/nope?team_id=x", "unhandled request: GET /nope?team_id=x"},
+		{"it reports an unknown method on a known path", "OPTIONS", "/vm", "unhandled request: OPTIONS /vm"},
+		{"it reports an endpoint the fake does not model", "GET", "/ssh_keys", "unhandled request: GET /ssh_keys"},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+
+			status, _ := ctx.send(row.method, row.path, "")
+
+			assert.Equal(t, []any{http.StatusInternalServerError, []string{row.problem}}, []any{status, ctx.api.GetProblems()})
+		})
+	}
+}
+
+func TestFakeAPIReportsABodyThatIsNotAJSONObject(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, _ := ctx.send("POST", "/ssh_keys", `not json`)
+
+	assert.Equal(t, []any{http.StatusBadRequest, []string{"body is not a JSON object: POST /ssh_keys"}},
+		[]any{status, ctx.api.GetProblems()})
+}
+
+func TestFakeAPIRecordsEachRequestWithItsQueryAndBody(t *testing.T) {
+	ctx := setupTest(t)
+
+	ctx.send("GET", "/vm?team_id=team-a", "")
+	ctx.send("POST", "/network/firewalls", `{"team_id":"team-a","description":"edge"}`)
+
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "edge"}},
+	}, ctx.api.GetRequests())
+}
+
+func TestFakeAPIServesARegisteredHandlerInPlaceOfItsRoute(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+
+	status, _ := ctx.send("GET", "/teams", "")
+
+	assert.Equal(t, []any{http.StatusServiceUnavailable, []onideltest.Request{{Method: "GET", Path: "/teams"}}},
+		[]any{status, ctx.api.GetRequests()})
+}
+
+func TestFakeAPICreatesAnSSHKeyInAnEnvelope(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := ctx.send("POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"ssh-ed25519 AAAA me@host"}`)
+
+	assert.Equal(t, http.StatusCreated, status)
+	assert.JSONEq(t, `{"ssh_key":{"id":"00000000-0000-4000-8000-000000000001","created":"2026-10-02T05:35:28Z",`+
+		`"name":"me","ssh_key":"ssh-ed25519 AAAA me@host"}}`, body)
+}
+
+func TestFakeAPIRejectsAnSSHKeyWriteMissingARequiredField(t *testing.T) {
+	rows := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"it rejects a create without team_id", "POST", "/ssh_keys", `{"name":"me","ssh_key":"k"}`},
+		{"it rejects a create without name", "POST", "/ssh_keys", `{"team_id":"t","ssh_key":"k"}`},
+		{"it rejects a create without ssh_key", "POST", "/ssh_keys", `{"team_id":"t","name":"me"}`},
+		{"it rejects an update without team_id", "PATCH", "/ssh_keys/00000000-0000-4000-8000-000000000001", `{"name":"me","ssh_key":"k"}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.send("POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k"}`)
+
+			status, body := ctx.send(row.method, row.path, row.body)
+
+			assert.Equal(t, []any{http.StatusBadRequest, ""}, []any{status, body})
+		})
+	}
+}
+
+func TestFakeAPIUpdatesAnSSHKeyNameAndPublicKey(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.send("POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k1"}`)
+
+	status, _ := ctx.send("PATCH", "/ssh_keys/00000000-0000-4000-8000-000000000001", `{"team_id":"t","name":"me-2","ssh_key":"k2"}`)
+
+	assert.Equal(t, []any{http.StatusNoContent, map[string]map[string]any{
+		"00000000-0000-4000-8000-000000000001": {
+			"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2",
+		},
+	}}, []any{status, ctx.api.GetSSHKeys()})
+}
+
+func TestFakeAPIRemovesAnSSHKey(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.send("POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k1"}`)
+
+	status, _ := ctx.send("DELETE", "/ssh_keys/00000000-0000-4000-8000-000000000001?team_id=t", "")
+
+	assert.Equal(t, []any{http.StatusNoContent, map[string]map[string]any{}}, []any{status, ctx.api.GetSSHKeys()})
+}
+
+func TestFakeAPIAnswersAMissingResourceWithABare404(t *testing.T) {
+	rows := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"it answers a read of an unknown SSH key", "GET", "/ssh_keys/x", ""},
+		{"it answers an update of an unknown SSH key", "PATCH", "/ssh_keys/x", `{"team_id":"t","name":"me","ssh_key":"k"}`},
+		{"it answers a removal of an unknown SSH key", "DELETE", "/ssh_keys/x", ""},
+		{"it answers a read of an unknown VM", "GET", "/vm/x", ""},
+		{"it answers an update of an unknown VM", "PATCH", "/vm/x", `{"name":"web"}`},
+		{"it answers a removal of an unknown VM", "DELETE", "/vm/x", ""},
+		{"it answers a read of an unknown firewall group", "GET", "/network/firewalls/x", ""},
+		{"it answers an update of an unknown firewall group", "PUT", "/network/firewalls/x", `{"description":"d"}`},
+		{"it answers a removal of an unknown firewall group", "DELETE", "/network/firewalls/x", ""},
+		{"it answers a rule create in an unknown firewall group", "POST", "/network/firewalls/x/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`},
+		{"it answers a read of an unknown rule", "GET", "/network/firewalls/x/rules/y", ""},
+		{"it answers an update of an unknown rule", "PATCH", "/network/firewalls/x/rules/y", `{"desc":"d"}`},
+		{"it answers a removal of an unknown rule", "DELETE", "/network/firewalls/x/rules/y", ""},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+
+			status, body := ctx.send(row.method, row.path, row.body)
+
+			assert.Equal(t, []any{http.StatusNotFound, ""}, []any{status, body})
+		})
+	}
+}
+
+func TestFakeAPICreatesABuildingVMWithNoResponseBody(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := ctx.send("POST", "/vm", `{"team_id":"t","name":"web","location":"Sydney","cpu":2,"ram":4096,"disk":40,"os":24,"ipv6":true}`)
+
+	assert.Equal(t, []any{http.StatusCreated, "", map[string]map[string]any{
+		"00000000-0000-4000-8000-000000000001": {
+			"id": "00000000-0000-4000-8000-000000000001", "name": "web", "vcpu": 2.0, "ram": 4096.0, "disk": 40.0,
+			"location": "Sydney", "password": "fixture-root-pw-do-not-leak", "main_ipv4": "203.0.113.10",
+			"main_ipv6": "2401:db8::1", "template": "Ubuntu 26.04 LTS x64", "firewall_group_id": nil,
+			"created_at": "2026-10-02T05:48:53Z", "status": "building", "active_action_id": nil, "bgp_enabled": false,
+		},
+	}}, []any{status, body, ctx.api.GetVMs()})
+}
+
+func TestFakeAPIRejectsAVMWithoutExactlyOneImageSource(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+	}{
+		{"it rejects a VM with no image source", `{"name":"web","location":"Sydney","cpu":2,"ram":4096,"disk":40}`},
+		{"it rejects a VM with two image sources", `{"name":"web","location":"Sydney","cpu":2,"ram":4096,"disk":40,"os":24,"iso_id":"i"}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+
+			status, _ := ctx.send("POST", "/vm", row.body)
+
+			assert.Equal(t, []any{http.StatusBadRequest, map[string]map[string]any{}}, []any{status, ctx.api.GetVMs()})
+		})
+	}
+}
+
+func TestFakeAPIListsVMsInTheOrderTheyWereStored(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "b", "name": "second-id", "status": "active"})
+	ctx.api.SetVM(map[string]any{"id": "a", "name": "first-id", "status": "active"})
+
+	_, body := ctx.send("GET", "/vm", "")
+
+	assert.JSONEq(t, `[{"id":"b","name":"second-id","status":"active"},{"id":"a","name":"first-id","status":"active"}]`, body)
+}
+
+func TestFakeAPISettlesABuildingVMAfterOneRead(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "status": "building", "active_action_id": nil})
+
+	_, first := ctx.send("GET", "/vm/v", "")
+	_, second := ctx.send("GET", "/vm/v", "")
+
+	assert.Equal(t, []string{
+		`{"active_action_id":null,"id":"v","status":"building"}` + "\n",
+		`{"active_action_id":null,"id":"v","status":"active"}` + "\n",
+	}, []string{first, second})
+}
+
+func TestFakeAPIHoldsABuildingVMWhileAutoSettleIsOff(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "status": "building", "active_action_id": nil})
+	ctx.api.SetAutoSettle(false)
+
+	ctx.send("GET", "/vm/v", "")
+	_, second := ctx.send("GET", "/vm/v", "")
+
+	assert.JSONEq(t, `{"active_action_id":null,"id":"v","status":"building"}`, second)
+}
+
+func TestFakeAPIStartsAnActionOnAVMUpdate(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "status": "active", "active_action_id": nil})
+
+	status, _ := ctx.send("PATCH", "/vm/v", `{"team_id":"t","name":"web-2"}`)
+
+	assert.Equal(t, []any{http.StatusAccepted, map[string]map[string]any{
+		"v": {"id": "v", "name": "web-2", "status": "active", "active_action_id": 42},
+	}}, []any{status, ctx.api.GetVMs()})
+}
+
+func TestFakeAPIRefusesAVMUpdateWhileAnActionRuns(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "status": "active", "active_action_id": 7})
+
+	status, _ := ctx.send("PATCH", "/vm/v", `{"name":"web-2"}`)
+
+	assert.Equal(t, http.StatusConflict, status)
+}
+
+func TestFakeAPIRejectsAVMUpdateWithoutExactlyOneSetting(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+	}{
+		{"it rejects an update with only a team", `{"team_id":"t"}`},
+		{"it rejects an update with two settings", `{"name":"web-2","enable_ipv6":true}`},
+		{"it rejects a setting the fake does not model", `{"use_uefi":true}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "status": "active", "active_action_id": nil})
+
+			status, _ := ctx.send("PATCH", "/vm/v", row.body)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+		})
+	}
+}
+
+func TestFakeAPIAppliesEachVMSetting(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+		want map[string]any
+	}{
+		{"it enables IPv6", `{"enable_ipv6":true}`, map[string]any{"main_ipv6": "2401:db8::1", "firewall_group_id": "g1"}},
+		{"it disables IPv6", `{"enable_ipv6":false}`, map[string]any{"main_ipv6": "", "firewall_group_id": "g1"}},
+		{"it attaches a firewall group", `{"firewall_group_id":"g2"}`, map[string]any{"main_ipv6": "2401:db8::1", "firewall_group_id": "g2"}},
+		{"it detaches the firewall group", `{"disable_firewall":true}`, map[string]any{"main_ipv6": "2401:db8::1", "firewall_group_id": nil}},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetVM(map[string]any{"id": "v", "main_ipv6": "2401:db8::1", "firewall_group_id": "g1", "active_action_id": nil})
+
+			ctx.send("PATCH", "/vm/v", row.body)
+
+			assert.Equal(t, map[string]map[string]any{"v": {
+				"id": "v", "main_ipv6": row.want["main_ipv6"], "firewall_group_id": row.want["firewall_group_id"], "active_action_id": 42,
+			}}, ctx.api.GetVMs())
+		})
+	}
+}
+
+func TestFakeAPICountsTheVMsAttachedToAFirewallGroup(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "instance_count": 1})
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g2", "instance_count": 0})
+	ctx.api.SetVM(map[string]any{"id": "v", "firewall_group_id": "g1", "active_action_id": nil})
+
+	ctx.send("PATCH", "/vm/v", `{"firewall_group_id":"g2"}`)
+
+	assert.Equal(t, map[string]map[string]any{
+		"g1": {"id": "g1", "instance_count": 0},
+		"g2": {"id": "g2", "instance_count": 1},
+	}, ctx.api.GetFirewallGroups())
+}
+
+func TestFakeAPIRemovesAVMAndItsFirewallAttachment(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "instance_count": 1})
+	ctx.api.SetVM(map[string]any{"id": "v", "firewall_group_id": "g1"})
+
+	status, _ := ctx.send("DELETE", "/vm/v", "")
+
+	assert.Equal(t, []any{
+		http.StatusNoContent, map[string]map[string]any{}, map[string]map[string]any{"g1": {"id": "g1", "instance_count": 0}},
+	}, []any{status, ctx.api.GetVMs(), ctx.api.GetFirewallGroups()})
+}
+
+func TestFakeAPIRefusesAFirewallGroupWithoutATeamAs401(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := ctx.send("POST", "/network/firewalls", `{"description":"edge"}`)
+
+	assert.Equal(t, http.StatusUnauthorized, status)
+	assert.JSONEq(t, `{"err":"UNAUTHORIZED"}`, body)
+}
+
+func TestFakeAPIRejectsAFirewallGroupWriteWithoutADescription(t *testing.T) {
+	rows := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"it rejects a create", "POST", "/network/firewalls", `{"team_id":"t"}`},
+		{"it rejects an update", "PUT", "/network/firewalls/g1", `{"team_id":"t"}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge"})
+
+			status, _ := ctx.send(row.method, row.path, row.body)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+		})
+	}
+}
+
+func TestFakeAPICreatesAFirewallGroupInAnEnvelope(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := ctx.send("POST", "/network/firewalls", `{"team_id":"t","description":"edge"}`)
+
+	assert.Equal(t, http.StatusCreated, status)
+	assert.JSONEq(t, `{"firewall_group":{"id":"00000000-0000-4000-8000-000000000001","description":"edge",`+
+		`"created":"2026-10-02T00:00:00Z","updated":"2026-10-02T00:00:00Z","instance_count":0,"rule_count":0}}`, body)
+}
+
+func TestFakeAPIUpdatesAFirewallGroupDescription(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge", "updated": "2026-10-02T00:00:00Z"})
+
+	status, _ := ctx.send("PUT", "/network/firewalls/g1", `{"description":"edge 2"}`)
+
+	assert.Equal(t, []any{http.StatusNoContent, map[string]map[string]any{
+		"g1": {"id": "g1", "description": "edge 2", "updated": "2026-10-03T00:00:00Z"},
+	}}, []any{status, ctx.api.GetFirewallGroups()})
+}
+
+func TestFakeAPIRefusesToRemoveAFirewallGroupWithVMsAttached(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "instance_count": 1})
+
+	status, _ := ctx.send("DELETE", "/network/firewalls/g1", "")
+
+	assert.Equal(t, []any{http.StatusBadRequest, map[string]map[string]any{"g1": {"id": "g1", "instance_count": 1}}},
+		[]any{status, ctx.api.GetFirewallGroups()})
+}
+
+func TestFakeAPIRemovesAFirewallGroupWithNoVMs(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "instance_count": 0})
+
+	status, _ := ctx.send("DELETE", "/network/firewalls/g1", "")
+
+	assert.Equal(t, []any{http.StatusNoContent, map[string]map[string]any{}}, []any{status, ctx.api.GetFirewallGroups()})
+}
+
+func TestFakeAPIStoresARuleUnderItsSubnetFamily(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+		want string
+	}{
+		{
+			"it stores ICMP on a v6 subnet as ipv6-icmp",
+			`{"protocol":"icmp","subnet":"::","subnet_size":0}`,
+			`{"ip_type":"v6","protocol":"ipv6-icmp","port":"","subnet":"::","subnet_size":"0","desc":""}`,
+		},
+		{
+			"it stores ipv6-icmp on a v4 subnet as icmp",
+			`{"protocol":"ipv6-icmp","subnet":"0.0.0.0","subnet_size":0}`,
+			`{"ip_type":"v4","protocol":"icmp","port":"","subnet":"0.0.0.0","subnet_size":"0","desc":""}`,
+		},
+		{
+			"it stores TCP on a v6 subnet as v6",
+			`{"protocol":"tcp","port":"443","subnet":"2001:db8::","subnet_size":32,"desc":"web"}`,
+			`{"ip_type":"v6","protocol":"tcp","port":"443","subnet":"2001:db8::","subnet_size":"32","desc":"web"}`,
+		},
+		{
+			"it stores a special subnet value as v4",
+			`{"protocol":"tcp","port":"443","subnet":"Cloudflare","subnet_size":0}`,
+			`{"ip_type":"v4","protocol":"tcp","port":"443","subnet":"Cloudflare","subnet_size":"0","desc":""}`,
+		},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+
+			status, body := ctx.send("POST", "/network/firewalls/g1/rules", row.body)
+
+			assert.Equal(t, http.StatusCreated, status)
+			assert.JSONEq(t, `{"firewall_rule":`+strings.Replace(row.want, "{",
+				`{"id":"00000000-0000-4000-8000-000000000001","group":"g1","action":"allow",`, 1)+`}`, body)
+		})
+	}
+}
+
+func TestFakeAPIRejectsARuleMissingARequiredField(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+	}{
+		{"it rejects a rule without a protocol", `{"subnet":"0.0.0.0","subnet_size":0}`},
+		{"it rejects a rule with an unknown protocol", `{"protocol":"gre","subnet":"0.0.0.0","subnet_size":0}`},
+		{"it rejects a rule without a subnet", `{"protocol":"tcp","subnet_size":0}`},
+		{"it rejects a rule without a subnet size", `{"protocol":"tcp","subnet":"0.0.0.0"}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+
+			status, _ := ctx.send("POST", "/network/firewalls/g1/rules", row.body)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+		})
+	}
+}
+
+func TestFakeAPIReadsARuleWithANumericSubnetSize(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+	ctx.send("POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
+
+	status, body := ctx.send("GET", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", "")
+
+	assert.Equal(t, http.StatusOK, status)
+	assert.JSONEq(t, `{"firewall_rule":{"id":"00000000-0000-4000-8000-000000000001","group":"g1","ip_type":"v4",`+
+		`"action":"allow","protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24,"desc":""}}`, body)
+}
+
+func TestFakeAPICountsTheRulesInAFirewallGroup(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+
+	ctx.send("POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+	ctx.send("POST", "/network/firewalls/g1/rules", `{"protocol":"udp","subnet":"0.0.0.0","subnet_size":0}`)
+	ctx.send("DELETE", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", "")
+
+	assert.Equal(t, map[string]map[string]any{"g1": {"id": "g1", "rule_count": 1}}, ctx.api.GetFirewallGroups())
+}
+
+func TestFakeAPIFindsARuleOnlyInItsOwnGroup(t *testing.T) {
+	rows := []struct {
+		name   string
+		method string
+		body   string
+	}{
+		{"it hides the rule from a read", "GET", ""},
+		{"it refuses an update", "PATCH", `{"desc":"d"}`},
+		{"it refuses a removal", "DELETE", ""},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g2", "rule_count": 0})
+			ctx.send("POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+
+			status, _ := ctx.send(row.method, "/network/firewalls/g2/rules/00000000-0000-4000-8000-000000000001", row.body)
+
+			assert.Equal(t, []any{http.StatusNotFound, 1}, []any{status, len(ctx.api.GetFirewallRules())})
+		})
+	}
+}
+
+func TestFakeAPIUpdatesARuleDescription(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+	ctx.send("POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+
+	status, _ := ctx.send("PATCH", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", `{"team_id":"t","desc":"web"}`)
+
+	assert.Equal(t, []any{http.StatusOK, map[string]map[string]any{"00000000-0000-4000-8000-000000000001": {
+		"id": "00000000-0000-4000-8000-000000000001", "group": "g1", "ip_type": "v4", "action": "allow",
+		"protocol": "tcp", "port": "", "subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "web",
+	}}}, []any{status, ctx.api.GetFirewallRules()})
+}
+
+func TestFakeAPIRejectsARuleUpdateWithoutAValidDescription(t *testing.T) {
+	rows := []struct {
+		name string
+		body string
+	}{
+		{"it rejects an update without desc", `{"team_id":"t"}`},
+		{"it rejects a desc longer than 255 characters", `{"desc":"` + strings.Repeat("x", 256) + `"}`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+			ctx.send("POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+
+			status, _ := ctx.send("PATCH", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", row.body)
+
+			assert.Equal(t, http.StatusBadRequest, status)
+		})
+	}
+}
+
+func TestFakeAPIListsAVMsPTRRecordsSortedByIP(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8::1"})
+	ctx.send("POST", "/vm/v/rdns", `{"ip_addr":"2001:db8::1","domain":"v6.example.com"}`)
+	ctx.send("POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18","domain":"v4.example.com"}`)
+
+	status, body := ctx.send("GET", "/vm/v/rdns", "")
+
+	assert.Equal(t, http.StatusOK, status)
+	assert.JSONEq(t, `{"rdns":[{"ip":"2001:db8::1","domain":"v6.example.com"},{"ip":"203.0.113.18","domain":"v4.example.com"}]}`, body)
+}
+
+func TestFakeAPIListsNoPTRRecordsForAVMWithout(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := ctx.send("GET", "/vm/unknown/rdns", "")
+
+	assert.Equal(t, http.StatusOK, status)
+	assert.JSONEq(t, `{"rdns":[]}`, body)
+}
+
+func TestFakeAPIRejectsAnInvalidPTRWrite(t *testing.T) {
+	rows := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+		status int
+	}{
+		{"it rejects a record without an IP", "POST", "/vm/v/rdns", `{"domain":"example.com"}`, http.StatusBadRequest},
+		{"it rejects a record with an invalid IP", "POST", "/vm/v/rdns", `{"ip_addr":"nope","domain":"example.com"}`, http.StatusBadRequest},
+		{"it rejects a record without a domain", "POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18"}`, http.StatusBadRequest},
+		{"it refuses a record for an IP the VM does not own", "POST", "/vm/v/rdns", `{"ip_addr":"198.51.100.1","domain":"example.com"}`, http.StatusUnauthorized},
+		{"it refuses a record on an unknown VM", "POST", "/vm/other/rdns", `{"ip_addr":"203.0.113.18","domain":"example.com"}`, http.StatusUnauthorized},
+		{"it rejects a removal for an invalid IP", "DELETE", "/vm/v/rdns/nope", "", http.StatusBadRequest},
+		{"it refuses a removal for an IP the VM does not own", "DELETE", "/vm/v/rdns/198.51.100.1", "", http.StatusUnauthorized},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": ""})
+
+			status, _ := ctx.send(row.method, row.path, row.body)
+
+			assert.Equal(t, []any{row.status, map[string]map[string]string{}}, []any{status, ctx.api.GetRDNS()})
+		})
+	}
+}
+
+func TestFakeAPIOverwritesAPTRRecord(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
+	ctx.send("POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18","domain":"a.example.com"}`)
+
+	status, _ := ctx.send("POST", "/vm/v/rdns", `{"team_id":"t","ip_addr":"203.0.113.18","domain":"b.example.com"}`)
+
+	assert.Equal(t, []any{http.StatusOK, map[string]map[string]string{"v": {"203.0.113.18": "b.example.com"}}},
+		[]any{status, ctx.api.GetRDNS()})
+}
+
+func TestFakeAPIRemovesAPTRRecord(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
+	ctx.send("POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18","domain":"a.example.com"}`)
+
+	status, _ := ctx.send("DELETE", "/vm/v/rdns/203.0.113.18?team_id=t", "")
+
+	assert.Equal(t, []any{http.StatusNoContent, map[string]map[string]string{"v": {}}}, []any{status, ctx.api.GetRDNS()})
+}
