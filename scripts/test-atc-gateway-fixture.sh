@@ -156,6 +156,26 @@ UID GID COMMAND
 EOF
 }
 
+# The client ID is random, so the case reads it from the output, then diffs the whole
+# output with it; an output of another shape yields no ID and fails both checks.
+it_prints_the_new_clients_ID_when_it_adds_a_client() {
+  local gateway_image="$1" client_id status=0
+  name="atc-gw-fixture-$4-$BASHPID"
+  tree="$(mktemp -d)"
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_case "$tree" "$name" "$3"
+  start_gateway "$name" "$tree" "$gateway_image"
+
+  docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
+    --redirect-uri https://client.fixture.invalid/callback > "$tree/added" 2> "$tree/err" || status=$?
+
+  client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' "$tree/added")"
+  [ -n "$client_id" ] || { cat "$tree/added"; echo "no client ID in the add output" >&2; exit 1; }
+  diff - "$tree/added" <<< "Added fixture-client. Its client ID is $client_id"
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 it_keeps_a_stored_client_across_a_restart() {
   local gateway_image="$1" client_id
   name="atc-gw-fixture-$4-$BASHPID"
@@ -166,8 +186,7 @@ it_keeps_a_stored_client_across_a_restart() {
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
     --redirect-uri https://client.fixture.invalid/callback > "$tree/added"
   client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' "$tree/added")"
-  diff - "$tree/added" <<< "Added fixture-client. Its client ID is $client_id"
-  [ -n "$client_id" ] || { echo "no client ID in the add output" >&2; exit 1; }
+  [ -n "$client_id" ] || { cat "$tree/added"; echo "no client ID in the add output" >&2; exit 1; }
 
   docker restart "$name" > /dev/null
   wait_for_ready "$name" 30
