@@ -13,7 +13,9 @@
 # the fixed system path (/usr/local/bin, /usr/bin, /bin) when the stand-in is created,
 # never one from the caller's PATH. A call without `-o BatchMode=yes`, to a host other than
 # STUB_HOST, with a remote command it does not know, or with STUB_SSH_PASS=1 to any
-# destination but loopback ends with exit 97 and "unexpected: <argv>" on stderr.
+# destination but loopback ends with exit 97 and "unexpected: <argv>" on stderr. A known
+# command runs only when ssh, scp, sftp, rsync and tailscale each resolve to a stand-in in
+# STUB_HOST_BIN; otherwise the call ends with exit 97 and runs nothing.
 #
 # Interceptions, each logged as a one-element line, change the host at a moment no real
 # state reaches: STUB_SSH_DROP_AT_WHOAMI drops the connection on the whoami check (exit
@@ -82,6 +84,14 @@ case "$remote" in
     fi
     ;;
 esac
+# the remote command runs with /usr/bin on PATH, so every remote tool must resolve to a
+# stand-in in STUB_HOST_BIN first, or a command could reach a real one
+for tool in ssh scp sftp rsync tailscale; do
+  if [ "$(PATH="$STUB_HOST_BIN:/usr/bin:/bin" command -v "$tool" || true)" != "$STUB_HOST_BIN/$tool" ]; then
+    echo "unexpected: $tool on the host PATH is not a stand-in in $STUB_HOST_BIN" >&2
+    exit 97
+  fi
+done
 PATH="$STUB_HOST_BIN:/usr/bin:/bin" bash -c "$remote" | tee -a "$STUB_TREE/host-output"
 exit "${PIPESTATUS[0]}"
 STUB

@@ -15,6 +15,8 @@ set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-nixos-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_answers_the_switch_with_nothing() {
   local status=0
@@ -209,11 +211,14 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
 }
 
-# Runtime every case needs: the stand-in in <tree>/bin.
+# Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the other
+# remote tools, checked so no call can reach a real remote tool.
 setup_test() {
   local tree="$1"
   mkdir "$tree/bin"
   create_stub_nixos_ssh "$tree/bin"
+  create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
+  require_remote_tool_stubs "$tree/bin"
 }
 
 run_cases
