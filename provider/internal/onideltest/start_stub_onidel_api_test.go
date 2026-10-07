@@ -100,6 +100,30 @@ func TestStubOnidelAPIReportsARequestNoRouteServes(t *testing.T) {
 	}
 }
 
+func TestStartStubOnidelAPIFailsTheTestAtCleanupOnAnUndrainedProblem(t *testing.T) {
+	stub := onideltest.BuildStubTB(t)
+	api := onideltest.StartStubOnidelAPI(stub)
+	onideltest.SendRequest(t, api.URL, "GET", "/ssh_keys", "")
+
+	stub.RunCleanups()
+
+	errs := stub.GetErrors()
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0], "the stub API saw requests it does not serve")
+	assert.Contains(t, errs[0], "unhandled request: GET /ssh_keys")
+}
+
+func TestStartStubOnidelAPIPassesAtCleanupOnceTheTestDrainsItsProblems(t *testing.T) {
+	stub := onideltest.BuildStubTB(t)
+	api := onideltest.StartStubOnidelAPI(stub)
+	onideltest.SendRequest(t, api.URL, "GET", "/ssh_keys", "")
+	api.DrainProblems()
+
+	stub.RunCleanups()
+
+	assert.Equal(t, []any{false, []string(nil)}, []any{stub.Failed(), stub.GetErrors()})
+}
+
 func TestStubOnidelAPIReportsABodyThatIsNotAJSONObject(t *testing.T) {
 	ctx := setupTest(t)
 

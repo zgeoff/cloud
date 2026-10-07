@@ -2,9 +2,11 @@ package onideltest_test
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
@@ -29,4 +31,21 @@ func TestSendRequestSendsNoBodyForAnEmptyOne(t *testing.T) {
 
 	assert.Equal(t, []any{http.StatusOK, []onideltest.Request{{Method: "GET", Path: "/vm", Query: "team_id=t"}}},
 		[]any{status, api.GetRequests()})
+}
+
+func TestSendRequestFailsTheTestOnATransportError(t *testing.T) {
+	stub := onideltest.BuildStubTB(t)
+	server := httptest.NewServer(http.NotFoundHandler())
+	server.Close()
+	reached := false
+
+	stub.Run(func() {
+		onideltest.SendRequest(stub, server.URL, "GET", "/teams", "")
+		reached = true
+	})
+
+	errs := stub.GetErrors()
+	require.Len(t, errs, 1)
+	assert.Equal(t, []any{false, true}, []any{reached, stub.Failed()})
+	assert.Contains(t, errs[0], "connect: connection refused")
 }
