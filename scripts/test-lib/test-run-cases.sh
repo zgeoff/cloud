@@ -2,9 +2,11 @@
 # Test for run-cases.sh, the runner the shell suites source. It cannot run itself on the
 # runner it tests, so it drives each case with the plain loop at the bottom: every case
 # writes a small suite that sources run-cases.sh, runs it under `env -i`, and compares
-# the whole output and the exact exit code.
+# the whole output and the exact exit code. It keeps the caller's PATH, so it also runs in
+# the Nix build sandbox (nixos/checks/test-utils-check.nix), which has no /usr/bin.
 #
 #   bash scripts/test-lib/test-run-cases.sh
+#   CASE='exported' bash scripts/test-lib/test-run-cases.sh   # the cases whose title holds it
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -21,7 +23,7 @@ it_passes_second() { true; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it passes first
@@ -42,7 +44,7 @@ it_passes_after() { true; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 FAIL it fails (exit 3)
@@ -64,7 +66,7 @@ it_stops_early() { false; echo "after the failure"; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 FAIL it stops early (exit 1)
@@ -83,7 +85,7 @@ it_reads_unset() { echo "\$never_set"; echo "after the read"; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << EOF
 FAIL it reads unset (exit 1)
@@ -103,7 +105,7 @@ it_pipes() { false | true; echo "after the pipeline"; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 FAIL it pipes (exit 1)
@@ -123,7 +125,7 @@ it_writes_a_file() { false; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin CASE='reads a' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" CASE='reads a' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it reads a file
@@ -142,7 +144,7 @@ it_passes() { true; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin CASE='no such title' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" CASE='no such title' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" <<< '0 cases, 0 failed'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
@@ -159,7 +161,7 @@ it_counts_them() { [ "\$#" = 2 ]; }
 run_cases one "two words"
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it counts them
@@ -179,7 +181,7 @@ it_cleans_up() { trap 'touch "$tree/cleaned"' EXIT; false; }
 run_cases
 EOF
 
-  env -i PATH=/usr/bin:/bin bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   [ -e "$tree/cleaned" ] || { echo "the case's EXIT trap did not run" >&2; exit 1; }
   diff - "$tree/out" << 'EOF'
@@ -200,7 +202,7 @@ it_b_sees_neither() { [ -z "\${leaked:-}" ] && [ "\$PWD" = "$tree" ]; }
 run_cases
 EOF
 
-  (cd "$tree" && env -i PATH=/usr/bin:/bin bash "$tree/suite.sh") > "$tree/out" 2>&1 || status=$?
+  (cd "$tree" && env -i PATH="$PATH" bash "$tree/suite.sh") > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it a sets a variable
@@ -210,10 +212,52 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_runs_its_cases_in_a_bash_without_programmable_completion() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  cat > "$tree/suite.sh" << EOF
+# a bash built without them, as the Nix sandbox's is, has nothing to turn off
+enable -n compgen complete 2> /dev/null || true
+source "$lib"
+it_passes() { true; }
+run_cases
+EOF
+
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+
+  diff - "$tree/out" << 'EOF'
+ok it passes
+1 cases, 0 failed
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_runs_an_exported_case() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  cat > "$tree/suite.sh" << EOF
+source "$lib"
+it_is_exported() { true; }
+export -f it_is_exported
+run_cases
+EOF
+
+  env -i PATH="$PATH" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+
+  diff - "$tree/out" << 'EOF'
+ok it is exported
+1 cases, 0 failed
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-cases.sh"
 failures=0
 ran=0
-for fn in $(compgen -A function it_); do
+for fn in $(declare -F | sed -n 's/^declare -f[a-z]* \(it_.*\)$/\1/p'); do
+  [[ "${fn//_/ }" == *"${CASE:-}"* ]] || continue
   ran=$((ran + 1))
   set +e
   output="$(
@@ -233,4 +277,4 @@ for fn in $(compgen -A function it_); do
   fi
 done
 echo "$ran cases, $failures failed"
-[ "$failures" = 0 ]
+[ "$ran" != 0 ] && [ "$failures" = 0 ]

@@ -5,10 +5,12 @@
 #   bash scripts/test-nixos.sh            # every check in checks.x86_64-linux
 #   bash scripts/test-nixos.sh atc-daemon # one check, by its name there
 #
-# impd-restore boots a NixOS VM, so it needs /dev/kvm: without it, the script builds every other
-# check it was asked for and then fails, naming impd-restore. It reads scripts/ beside nixos/,
-# so the build's flake source is the repo root (path:.?dir=nixos), not nixos/ alone. The source is
-# a snapshot of the working tree's tracked and unignored files, so a local edit is tested before
+# impd-restore boots a NixOS VM, so it needs KVM: unless /dev/kvm (or KVM_DEVICE, which the
+# script's own test sets) is readable and writable, the script builds every other check it was
+# asked for and then fails, naming impd-restore. The check itself fails if QEMU still falls back
+# to emulation. The checks read scripts/ beside nixos/ (scripts/test-lib, and the scripts they
+# test), so the build's flake source is the repo root (path:.?dir=nixos), not nixos/ alone. The
+# source is a snapshot of the working tree's tracked and unignored files, so a local edit is tested before
 # it is committed and nothing ignored, such as node_modules or .worktrees, is copied. The Docker
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it
 # is not the switch's geoffcloud-nix-store, so a test build never shares the deploy cache.
@@ -47,7 +49,8 @@ else
   run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src nixos/nix \
     nix "${nix_args[@]}" eval --raw "path:/src?dir=nixos#checks.x86_64-linux" \
     --apply 'checks: builtins.concatStringsSep "\n" (builtins.attrNames checks) + "\n"' > "$names"
-  mapfile -t checks < "$names"
+  # an empty set of checks evaluates to one empty line, which names no check
+  mapfile -t checks < <(sed '/^$/d' "$names")
   if [ "${#checks[@]}" -eq 0 ]; then
     echo "test-nixos: the flake declares no checks.x86_64-linux" >&2
     exit 1
@@ -55,16 +58,18 @@ else
 fi
 
 # impd-restore's VM needs KVM; the other checks build without it
+kvm_device="${KVM_DEVICE:-/dev/kvm}"
 kvm=()
 missing_kvm=""
 installables=()
 for check in "${checks[@]}"; do
   if [ "$check" = impd-restore ]; then
-    if [ ! -c /dev/kvm ]; then
+    # QEMU opens the device read-write, and falls back to emulation when it cannot
+    if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
       missing_kvm=1
       continue
     fi
-    kvm=(--device /dev/kvm)
+    kvm=(--device "$kvm_device:/dev/kvm")
   fi
   installables+=("path:/src?dir=nixos#checks.x86_64-linux.$check")
 done
@@ -76,6 +81,6 @@ if [ "${#installables[@]}" -gt 0 ]; then
 fi
 
 if [ -n "$missing_kvm" ]; then
-  echo "test-nixos: /dev/kvm is missing; impd-restore needs KVM" >&2
+  echo "test-nixos: $kvm_device is missing or not readable and writable; impd-restore needs KVM" >&2
   exit 1
 fi

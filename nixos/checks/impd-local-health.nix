@@ -1,16 +1,19 @@
 # Checks services.impd-local-health: the units the module generates, and the probe script run
-# against a stand-in impd (start-stub-impd.py) in the build sandbox. Each case runs on its own,
-# with its own stand-in on an ephemeral port and its own textfile directory, and reports ok or
-# not ok (case-helpers.sh); the check fails when any case fails.
+# against a stand-in impd (test-utils/start-stub-impd.py) in the build sandbox. Each case runs on
+# its own, in a fresh directory, with its own stand-in on an ephemeral port and its own textfile
+# directory, under scripts/test-lib/run-cases.sh, which reports each case and fails the check when
+# any case fails.
 # Run: bun run test:nixos impd-local-health
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
+  testLib = ../../scripts/test-lib;
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
+  renderCases = import ./test-utils/render-cases.nix { inherit lib; };
 
   # evaluates a minimal system with the module and one services.impd-local-health config
-  evalHealth =
+  buildHealthSystem =
     health:
     lib.nixosSystem {
       system = "x86_64-linux";
@@ -29,52 +32,38 @@ let
       ];
     };
 
-  # what the module adds to a system; NixOS adds PATH to every service's environment, and
-  # tmpfiles rules from every module, so only the impd-health ones are the module's
-  moduleOutputOf =
-    system:
-    let
-      config = system.config;
-      service = config.systemd.services.impd-local-health;
-      timer = config.systemd.timers.impd-local-health;
-    in
-    {
-      service = {
-        inherit (service) wantedBy serviceConfig;
-        environment = removeAttrs service.environment [ "PATH" ];
-      };
-      timer = {
-        inherit (timer) wantedBy timerConfig;
-      };
-      tmpfiles = lib.filter (lib.hasInfix " impd-health ") config.systemd.tmpfiles.rules;
-      user = {
-        inherit (config.users.users.impd-health) isSystemUser group;
-      };
-      group = config.users.groups ? impd-health;
-    };
-
-  # the probe as the module packages it
-  probe =
-    (evalHealth { enable = true; }).config.services.impd-local-health.package
-    + "/bin/impd-local-health";
-
-  stub = ./start-stub-impd.py;
-
   cases = [
     {
       title = "it runs the probe each minute as impd-health, against loopback only, by default";
-      dir = "units-default";
-      script = ''
+      script =
+        let
+          config = (buildHealthSystem { enable = true; }).config;
+          service = config.systemd.services.impd-local-health;
+          timer = config.systemd.timers.impd-local-health;
+        in
+        ''
+        # NixOS adds PATH to every service's environment, and tmpfiles rules from every module,
+        # so only the impd-health ones are the module's
         jq -S . > actual <<'EOF'
-        ${builtins.toJSON (
-          moduleOutputOf (evalHealth {
-            enable = true;
-          })
-        )}
+        ${builtins.toJSON {
+          service = {
+            inherit (service) description wantedBy serviceConfig;
+            environment = removeAttrs service.environment [ "PATH" ];
+          };
+          timer = {
+            inherit (timer) wantedBy timerConfig;
+          };
+          tmpfiles = lib.filter (lib.hasInfix " impd-health ") config.systemd.tmpfiles.rules;
+          user = {
+            inherit (config.users.users.impd-health) isSystemUser group;
+          };
+          group = config.users.groups ? impd-health;
+        }}
         EOF
         jq -S . > expected <<'EOF'
         ${builtins.toJSON {
           service = {
+            description = "impd local health textfile metric";
             wantedBy = [ ];
             environment = {
               IMPD_HEALTH_URL = "http://127.0.0.1:7070/health";
@@ -82,7 +71,7 @@ let
             };
             serviceConfig = {
               Type = "oneshot";
-              ExecStart = probe;
+              ExecStart = "${config.services.impd-local-health.package}/bin/impd-local-health";
               User = "impd-health";
               Group = "impd-health";
               NoNewPrivileges = true;
@@ -121,21 +110,40 @@ let
     }
     {
       title = "it probes the configured url into the configured directory at the configured interval";
-      dir = "units-configured";
-      script = ''
-        jq -S . > actual <<'EOF'
-        ${builtins.toJSON (
-          moduleOutputOf (evalHealth {
+      script =
+        let
+          config = (buildHealthSystem {
             enable = true;
             url = "http://127.0.0.1:9090/ready";
             textfileDir = "/srv/textfile";
             interval = "5min";
-          })
-        )}
+          }).config;
+          service = config.systemd.services.impd-local-health;
+          timer = config.systemd.timers.impd-local-health;
+        in
+        ''
+        # NixOS adds PATH to every service's environment, and tmpfiles rules from every module,
+        # so only the impd-health ones are the module's
+        jq -S . > actual <<'EOF'
+        ${builtins.toJSON {
+          service = {
+            inherit (service) description wantedBy serviceConfig;
+            environment = removeAttrs service.environment [ "PATH" ];
+          };
+          timer = {
+            inherit (timer) wantedBy timerConfig;
+          };
+          tmpfiles = lib.filter (lib.hasInfix " impd-health ") config.systemd.tmpfiles.rules;
+          user = {
+            inherit (config.users.users.impd-health) isSystemUser group;
+          };
+          group = config.users.groups ? impd-health;
+        }}
         EOF
         jq -S . > expected <<'EOF'
         ${builtins.toJSON {
           service = {
+            description = "impd local health textfile metric";
             wantedBy = [ ];
             environment = {
               IMPD_HEALTH_URL = "http://127.0.0.1:9090/ready";
@@ -143,7 +151,7 @@ let
             };
             serviceConfig = {
               Type = "oneshot";
-              ExecStart = probe;
+              ExecStart = "${config.services.impd-local-health.package}/bin/impd-local-health";
               User = "impd-health";
               Group = "impd-health";
               NoNewPrivileges = true;
@@ -182,10 +190,9 @@ let
     }
     {
       title = "it adds no unit, user or rule when it is off";
-      dir = "units-off";
       script =
         let
-          config = (evalHealth { enable = false; }).config;
+          config = (buildHealthSystem { enable = false; }).config;
         in
         ''
           assert_equals ${
@@ -211,11 +218,14 @@ let
     }
     {
       title = "it reports impd up when /health answers 200 with ready true";
-      dir = "ready";
-      script = ''
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -251,11 +261,14 @@ let
     }
     {
       title = "it reports impd down when /health answers 200 with ready false";
-      dir = "unready";
-      script = ''
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":false}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":false}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -290,12 +303,15 @@ let
       '';
     }
     {
-      title = "it reports impd down with the status when the route answers 404 NOT_FOUND";
-      dir = "not-found";
-      script = ''
+      title = "it reports impd down with the status when no route matches /health";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 404 "" NOT_FOUND >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 404 'text/plain;charset=utf-8' NOT_FOUND >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -331,11 +347,14 @@ let
     }
     {
       title = "it reports impd down when /health answers 500 even with ready true";
-      dir = "server-error";
-      script = ''
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 500 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 500 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -371,12 +390,15 @@ let
     }
     {
       title = "it reports status 0 when nothing listens";
-      dir = "no-answer";
-      script = ''
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         # a port that answered once and is closed now
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid" 2>/dev/null || true' EXIT
         read -r -t 5 -u 3 port
@@ -413,18 +435,15 @@ let
       '';
     }
     {
-      title = "it gives up after IMPD_HEALTH_TIMEOUT_SECONDS and reports status 0 when impd accepts and never answers";
-      dir = "stall";
-      script = ''
-        # a listener whose backlog completes the connection, and that never accepts or answers
+      title = "it gives up after a configured 1 s timeout and reports status 0 when impd accepts and never answers";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 -c 'import socket, time
-        s = socket.socket()
-        s.bind(("127.0.0.1", 0))
-        s.listen(8)
-        print(s.getsockname()[1], flush=True)
-        time.sleep(3600)' >&3 &
+        python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -461,18 +480,15 @@ let
       '';
     }
     {
-      title = "it gives up after 5 s when IMPD_HEALTH_TIMEOUT_SECONDS is unset";
-      dir = "stall-default";
-      script = ''
-        # a listener whose backlog completes the connection, and that never accepts or answers
+      title = "it gives up after 5 s when no timeout is configured";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 -c 'import socket, time
-        s = socket.socket()
-        s.bind(("127.0.0.1", 0))
-        s.listen(8)
-        print(s.getsockname()[1], flush=True)
-        time.sleep(3600)' >&3 &
+        python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -487,17 +503,37 @@ let
         assert_equals 0 "$status" "the probe's exit status"
         # the default --max-time 5 ends the probe: at least 5 s, and not much more
         assert_between 5 "$((after - before))" 7 "the probe's run time in seconds"
-        assert_equals "impd_local_health_status_code 0" \
-          "$(grep '^impd_local_health_status_code ' out/impd_local_health.prom)" "the status code line"
+        assert_files_equal /dev/null stdout
+        assert_files_equal /dev/null stderr
+        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
+        assert_between "$before" "$stamp" "$after" "the timestamp"
+        sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
+          out/impd_local_health.prom > actual
+        cat > expected <<'EOF'
+        # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
+        # TYPE impd_local_health_up gauge
+        impd_local_health_up 0
+        # HELP impd_local_health_status_code HTTP status of the last loopback probe, 0 when it got no answer.
+        # TYPE impd_local_health_status_code gauge
+        impd_local_health_status_code 0
+        # HELP impd_local_health_last_check_timestamp_seconds When the last loopback probe ran.
+        # TYPE impd_local_health_last_check_timestamp_seconds gauge
+        impd_local_health_last_check_timestamp_seconds STAMP
+        EOF
+        assert_files_equal expected actual
       '';
     }
     {
       title = "it replaces an existing file with a new one, never writing it in place";
-      dir = "replace";
-      script = ''
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -515,15 +551,18 @@ let
         assert_files_equal /dev/null stderr
         assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
         new_inode=$(stat -c %i out/impd_local_health.prom)
-        [ "$new_inode" != "$old_inode" ] || { echo "the file kept inode $old_inode" >&2; exit 1; }
+        assert_not_equals "$old_inode" "$new_inode" "the file's inode"
         assert_equals 'impd_local_health_up 0' "$(cat <&4)" "what the old reader sees"
         assert_equals 'impd_local_health_up 1' "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" "the new up line"
       '';
     }
     {
-      title = "it fails, writing nothing, when IMPD_HEALTH_URL is unset";
-      dir = "no-url";
-      script = ''
+      title = "it fails, writing nothing, without a health URL";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkdir out
 
         status=0
@@ -538,12 +577,15 @@ let
       '';
     }
     {
-      title = "it fails, writing nothing, when TEXTFILE_DIR is unset";
-      dir = "no-dir";
-      script = ''
+      title = "it fails, writing nothing, without a textfile directory";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -561,46 +603,50 @@ let
       '';
     }
     {
-      title = "it fails, leaving no temp file, when TEXTFILE_DIR does not exist";
-      dir = "missing-dir";
-      script = ''
+      title = "it fails, leaving no temp file, when the textfile directory does not exist";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
-        export TMPDIR=$PWD/tmp
         mkdir tmp
 
         status=0
-        IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=missing ${probe} > stdout 2> stderr || status=$?
+        TMPDIR=$PWD/tmp IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=missing ${probe} > stdout 2> stderr || status=$?
 
         assert_equals 1 "$status" "the probe's exit status"
         assert_files_equal /dev/null stdout
         assert_equals "mktemp: failed to create file via template 'missing/.impd_local_health.XXXXXX': No such file or directory" \
           "$(cat stderr)" "the probe's stderr"
         assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
-        [ ! -e missing ] || { echo "the probe made the directory" >&2; exit 1; }
+        assert_missing missing "the textfile directory"
       '';
     }
     {
-      title = "it fails, leaving the directory empty, when TEXTFILE_DIR is not writable";
-      dir = "read-only-dir";
-      script = ''
+      title = "it fails, leaving the directory empty, when the textfile directory is not writable";
+      script =
+        let
+          probe = "${(buildHealthSystem { enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
         mkfifo port.fifo
         exec 3<>port.fifo
-        python3 ${stub} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
+        python3 ${./test-utils/start-stub-impd.py} 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
-        export TMPDIR=$PWD/tmp
         mkdir tmp out
         # the build user is not root, so 0555 holds
         chmod 0555 out
 
         status=0
-        IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
+        TMPDIR=$PWD/tmp IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
 
         assert_equals 1 "$status" "the probe's exit status"
         assert_files_equal /dev/null stdout
@@ -626,13 +672,13 @@ pkgs.runCommand "impd-local-health-check"
     inherit testUtilsCheck;
   }
   ''
-    source ${./case-helpers.sh}
-    ${lib.concatMapStrings (c: ''
-      case_${lib.replaceStrings [ "-" ] [ "_" ] c.dir}() {
-      ${c.script}
-      }
-      run_case ${lib.escapeShellArg c.title} ${c.dir} case_${lib.replaceStrings [ "-" ] [ "_" ] c.dir}
-    '') cases}
-    require_cases_passed
+    source ${testLib}/run-cases.sh
+    source ${testLib}/assert-equals.sh
+    source ${testLib}/assert-not-equals.sh
+    source ${testLib}/assert-files-equal.sh
+    source ${testLib}/assert-between.sh
+    source ${testLib}/assert-missing.sh
+    source ${pkgs.writeText "impd-local-health-cases.sh" (renderCases cases)}
+    run_cases
     touch $out
   ''
