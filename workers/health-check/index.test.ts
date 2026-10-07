@@ -119,7 +119,7 @@ test('it posts nothing while the state is unchanged', async () => {
   expect(webhook.requests).toBeEmpty();
 });
 
-test('it records a change without posting it when ALERT_URL is empty', async () => {
+test('it records a change when ALERT_URL is empty', async () => {
   await using target = startStubHTTPServer(502);
 
   const bucket = buildStubR2Bucket({ 'state:atc': 'up' });
