@@ -1,9 +1,9 @@
 // External health check for geoff.cloud (#8). Monitoring on the host cannot report
 // that the host is down, so this Worker probes from Cloudflare's edge on a cron.
 //
-// A probe of mcp.geoff.cloud tells three failures apart:
+// A probe of a tunnel hostname tells three failures apart:
 // - 530 or 1033: no tunnel connector, so cloudflared or the host is down
-// - 502 or 504: the tunnel is up, but the PC or atc behind it is not
+// - 502 or 504: the tunnel is up, but the atc gateway behind it is not
 // - anything else: up (atc answers 401 or 404 to an unauthenticated probe)
 //
 // Each target's last state lives in R2; a change of state posts to ALERT_URL when
