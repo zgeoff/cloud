@@ -113,6 +113,19 @@ func TestStartStubOnidelAPIFailsTheTestAtCleanupOnAnUndrainedProblem(t *testing.
 	assert.Contains(t, errs[0], "unhandled request: GET /ssh_keys")
 }
 
+func TestStartStubOnidelAPIFailsTheTestWhenItEndsWithAnUndrainedProblem(t *testing.T) {
+	wrapped := onideltest.BuildStubTB(t)
+	stub := onideltest.BuildStubTB(wrapped)
+	api := onideltest.StartStubOnidelAPI(stub)
+	onideltest.SendRequest(t, api.URL, "GET", "/ssh_keys", "")
+
+	wrapped.RunCleanups()
+
+	errs := wrapped.GetErrors()
+	require.Len(t, errs, 1)
+	assert.Contains(t, errs[0], "unhandled request: GET /ssh_keys")
+}
+
 func TestStartStubOnidelAPIPassesAtCleanupOnceTheTestDrainsItsProblems(t *testing.T) {
 	stub := onideltest.BuildStubTB(t)
 	api := onideltest.StartStubOnidelAPI(stub)

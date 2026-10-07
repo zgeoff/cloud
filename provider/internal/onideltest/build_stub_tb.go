@@ -21,10 +21,12 @@ type StubTB struct {
 	cleanups []func()
 }
 
-// BuildStubTB wraps t. Cleanups still held when t ends run then.
+// BuildStubTB wraps t. Cleanups still held when t ends run then, and any failure
+// they report fails t with the same text, so a check that only runs at cleanup is
+// never lost.
 func BuildStubTB(t testing.TB) *StubTB {
 	s := &StubTB{TB: t}
-	t.Cleanup(s.RunCleanups)
+	t.Cleanup(s.runEndOfTestCleanups)
 	return s
 }
 
@@ -40,13 +42,19 @@ func (s *StubTB) Run(fn func()) {
 }
 
 // RunCleanups runs the cleanups held so far, last registered first, and forgets them.
+// As with testing.T, a cleanup registered by a running cleanup runs in the same pass,
+// and a FailNow inside one cleanup ends only that cleanup.
 func (s *StubTB) RunCleanups() {
-	s.mu.Lock()
-	cleanups := s.cleanups
-	s.cleanups = nil
-	s.mu.Unlock()
-	for _, cleanup := range slices.Backward(cleanups) {
-		cleanup()
+	for {
+		s.mu.Lock()
+		if len(s.cleanups) == 0 {
+			s.mu.Unlock()
+			return
+		}
+		cleanup := s.cleanups[len(s.cleanups)-1]
+		s.cleanups = s.cleanups[:len(s.cleanups)-1]
+		s.mu.Unlock()
+		s.Run(cleanup)
 	}
 }
 
@@ -111,4 +119,20 @@ func (s *StubTB) Fatal(args ...any) {
 func (s *StubTB) Fatalf(format string, args ...any) {
 	s.Errorf(format, args...)
 	s.FailNow()
+}
+
+// runEndOfTestCleanups runs the cleanups still held when the wrapped test ends, then
+// reports each failure they recorded to the wrapped test. Failures recorded earlier
+// stay with the stub, where the test asserts them.
+func (s *StubTB) runEndOfTestCleanups() {
+	s.TB.Helper()
+	s.mu.Lock()
+	recorded := len(s.errors)
+	s.mu.Unlock()
+
+	s.RunCleanups()
+
+	for _, message := range s.GetErrors()[recorded:] {
+		s.TB.Errorf("%s", message)
+	}
 }

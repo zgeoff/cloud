@@ -83,3 +83,52 @@ func TestBuildStubTBEndsTheRunFunctionOnFatal(t *testing.T) {
 
 	assert.Equal(t, []any{false, []string{"stop\n"}}, []any{reached, stub.GetErrors()})
 }
+
+func TestBuildStubTBRunsACleanupRegisteredByACleanupInTheSamePass(t *testing.T) {
+	stub := onideltest.BuildStubTB(t)
+	var ran []string
+	stub.Cleanup(func() {
+		ran = append(ran, "outer")
+		stub.Cleanup(func() { ran = append(ran, "nested") })
+	})
+
+	stub.RunCleanups()
+
+	assert.Equal(t, []string{"outer", "nested"}, ran)
+}
+
+func TestBuildStubTBRunsTheOtherCleanupsAfterOneCallsFatalf(t *testing.T) {
+	stub := onideltest.BuildStubTB(t)
+	var ran []string
+	stub.Cleanup(func() { ran = append(ran, "first") })
+	stub.Cleanup(func() {
+		stub.Fatalf("stop")
+		ran = append(ran, "unreached")
+	})
+
+	stub.RunCleanups()
+
+	assert.Equal(t, []any{[]string{"first"}, []string{"stop"}}, []any{ran, stub.GetErrors()})
+}
+
+// The wrapped test is itself a StubTB here, so ending it (its RunCleanups) shows what
+// the inner stub reports to it without failing this test.
+func TestBuildStubTBFailsTheWrappedTestOnAFailureItsEndOfTestCleanupsRecord(t *testing.T) {
+	wrapped := onideltest.BuildStubTB(t)
+	stub := onideltest.BuildStubTB(wrapped)
+	stub.Cleanup(func() { stub.Errorf("left %d problems", 1) })
+
+	wrapped.RunCleanups()
+
+	assert.Equal(t, []string{"left 1 problems"}, wrapped.GetErrors())
+}
+
+func TestBuildStubTBKeepsAFailureRecordedBeforeTheWrappedTestEnds(t *testing.T) {
+	wrapped := onideltest.BuildStubTB(t)
+	stub := onideltest.BuildStubTB(wrapped)
+	stub.Errorf("asserted by the test")
+
+	wrapped.RunCleanups()
+
+	assert.Equal(t, []any{[]string(nil), []string{"asserted by the test"}}, []any{wrapped.GetErrors(), stub.GetErrors()})
+}
