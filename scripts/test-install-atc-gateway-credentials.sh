@@ -19,6 +19,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/build-token.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-op.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-atc-key.sh"
@@ -775,7 +776,7 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ ! -e "$tree/impd/secret-glm" ] || { echo "impd stored a glm secret" >&2; exit 1; }
+  assert_missing "$tree/impd/secret-glm" "impd secret glm"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -828,7 +829,7 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$zai_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ ! -e "$tree/impd/secret-glm" ] || { echo "impd stored a glm secret" >&2; exit 1; }
+  assert_missing "$tree/impd/secret-glm" "impd secret glm"
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
 }
 
@@ -1237,7 +1238,7 @@ EOF
 it_stops_with_the_item_created_when_the_host_cannot_write_the_bearer() {
   local seed="$1" status=0
   tree="$(mktemp -d)"
-  trap 'chmod -R u+rwX "$tree" || true; rm -rf "$tree"' EXIT
+  trap 'chmod -R u+rwX "$tree" || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" atc-key
   mkdir "$tree/vault/cloud" "$tree/host/secrets"
   echo '{"version":"0.27.0","features":{"sessionOffsets":true,"leases":true,"grantableTokens":true,"secretRebind":true}}' > "$tree/impd/info.json"
@@ -2305,7 +2306,8 @@ it_leaves_the_saved_token_unchecked_when_impd_refuses_the_connection() {
     -e "curl: (7) Failed to connect to 127.0.0.1 port 1 after N ms: Couldn't connect to server" \
     -e "curl: (7) Failed to connect to 127.0.0.1:1 after N ms: Could not connect to server" \
     "$tree/curl-line" || { cat "$tree/curl-line"; echo "not curl 8.5's or 8.22's refused-connection error" >&2; exit 1; }
-  diff - <(tail -n +2 "$tree/err-masked") << EOF
+  tail -n +2 "$tree/err-masked" > "$tree/err-rest"
+  diff - "$tree/err-rest" << EOF
 the check on the host exited 7 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:1, then rerun
 EOF
@@ -2431,8 +2433,10 @@ it_leaves_the_saved_token_unchecked_when_ssh_drops_during_the_check() {
     ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - <(head -n 1 "$tree/err") <<< $'Connection to geoffcloud closed by remote host.\r'
-  diff - <(tail -n +2 "$tree/err") << EOF
+  head -n 1 "$tree/err" > "$tree/err-first"
+  diff - "$tree/err-first" <<< $'Connection to geoffcloud closed by remote host.\r'
+  tail -n +2 "$tree/err" > "$tree/err-rest"
+  diff - "$tree/err-rest" << EOF
 the check on the host exited 255 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:7070, then rerun
 EOF
@@ -2603,7 +2607,7 @@ EOF
 it_leaves_the_saved_token_unchecked_when_the_file_cannot_be_read() {
   local seed="$1" good_token status=0
   tree="$(mktemp -d)"
-  trap 'chmod -R u+rwX "$tree" || true; rm -rf "$tree"' EXIT
+  trap 'chmod -R u+rwX "$tree" || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" atc-key
   mkdir "$tree/vault/cloud" "$tree/host/secrets"
   good_token="$(build_token "$seed" good)"
@@ -3116,7 +3120,7 @@ EOF
 it_sends_the_saved_token_to_impd_alone_under_the_hostile_curl_config() {
   local seed="$1" good_token impd_port proxy_port status=0
   tree="$(mktemp -d)"
-  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree"' EXIT
+  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" atc-key impd proxy
   mkdir "$tree/vault/cloud" "$tree/host/secrets"
   good_token="$(build_token "$seed" good)"
@@ -3204,14 +3208,14 @@ $tree/proxy:
 pid
 port
 EOF
-  [ ! -e "$tree/trace.txt" ] || { echo "curl wrote a trace" >&2; exit 1; }
+  assert_missing "$tree/trace.txt" "curl trace"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 it_rejects_a_stale_saved_token_without_leaking_it_under_the_hostile_curl_config() {
   local seed="$1" good_token stale_token impd_port proxy_port status=0
   tree="$(mktemp -d)"
-  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree"' EXIT
+  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" atc-key impd proxy
   mkdir "$tree/vault/cloud" "$tree/host/secrets"
   good_token="$(build_token "$seed" good)"
@@ -3292,7 +3296,7 @@ $tree/proxy:
 pid
 port
 EOF
-  [ ! -e "$tree/trace.txt" ] || { echo "curl wrote a trace" >&2; exit 1; }
+  assert_missing "$tree/trace.txt" "curl trace"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -3300,7 +3304,7 @@ EOF
 it_keeps_the_saved_token_out_of_the_output_under_a_curlrc_in_HOME_alone() {
   local seed="$1" good_token impd_port proxy_port status=0
   tree="$(mktemp -d)"
-  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree"' EXIT
+  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" atc-key impd proxy
   mkdir "$tree/vault/cloud" "$tree/host/secrets"
   good_token="$(build_token "$seed" good)"
@@ -3381,18 +3385,19 @@ $tree/proxy:
 pid
 port
 EOF
-  [ ! -e "$tree/trace.txt" ] || { echo "curl wrote a trace" >&2; exit 1; }
+  assert_missing "$tree/trace.txt" "curl trace"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 # The control for the hostile-config cases above: curl with --noproxy alone, without the
 # script's -q, still reads CURL_HOME's .curlrc and traces the bearer, so a case that finds
 # no trace proves the script's isolation, not a dead config. It runs curl itself, not
-# the script, because what it pins is real curl's reading of that config.
+# the script, because what it pins is real curl's reading of that config: the same POST
+# the script sends, answered with impd's 401 for the stale bearer, and no proxy connection.
 it_traces_the_bearer_when_curl_runs_with_noproxy_alone_under_the_hostile_config() {
-  local seed="$1" stale_token
+  local seed="$1" stale_token status=0
   tree="$(mktemp -d)"
-  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree"' EXIT
+  trap 'kill $(cat "$tree/impd-whoami/pid" "$tree/proxy/pid" 2> /dev/null) 2> /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" impd proxy
   stale_token="$(build_token "$seed" stale)"
   mkdir "$tree/curl-home"
@@ -3400,10 +3405,23 @@ it_traces_the_bearer_when_curl_runs_with_noproxy_alone_under_the_hostile_config(
     > "$tree/curl-home/.curlrc"
 
   printf 'Authorization: Bearer %s\n' "$stale_token" |
-    env -i PATH=/usr/bin:/bin HOME="$tree/home" CURL_HOME="$tree/curl-home" \
-      curl --noproxy '*' -sS --max-time 5 -H @- \
-      "http://127.0.0.1:$(cat "$tree/impd-whoami/port")/rpc/tokens/whoami" > /dev/null 2>&1 || true
+    env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" CURL_HOME="$tree/curl-home" \
+      curl --noproxy '*' -sS --max-time 5 -H @- -H 'content-type: application/json' --data '{"json":{}}' \
+      "http://127.0.0.1:$(cat "$tree/impd-whoami/port")/rpc/tokens/whoami" > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff - "$tree/err" <<< "Warning: --trace-ascii overrides an earlier trace/verbose option"
+  printf '{"error":"unauthorized"}' | diff - "$tree/out"
+  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
+  diff - "$tree/stand-in-files" << EOF
+$tree/impd-whoami:
+pid
+port
+
+$tree/proxy:
+pid
+port
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
   [ -f "$tree/trace.txt" ] || { echo "curl wrote no trace" >&2; exit 1; }
   sed -E 's/^[0-9a-f]{4}: //' "$tree/trace.txt" | tr -d '\n' | grep -qF -- "$stale_token" ||
     { echo "the trace does not hold the bearer" >&2; exit 1; }

@@ -171,11 +171,35 @@ mkdir -p /tmp/other && echo other > /tmp/other/f
 sqlite3 /state/gateway.db 'CREATE TABLE fixture (x); INSERT INTO fixture VALUES (1);'
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json --tag other' > "$tree/other-before"
+  jq -e 'length == 1' "$tree/other-before" > /dev/null
 
   run_backup "$name" "$backup_image" backup > "$tree/backup.out" 2> "$tree/backup.err"
 
   diff /dev/null "$tree/backup.err"
-  jq -e 'length == 1' "$tree/other-before" > /dev/null
+  normalize_restic_output < "$tree/backup.out" > "$tree/backup.normal"
+  diff - "$tree/backup.normal" << 'EOF'
+no parent snapshot found, will read all files
+
+Files:           1 new,     0 changed,     0 unmodified
+Dirs:            0 new,     0 changed,     0 unmodified
+Added to the repository: SIZE (SIZE stored)
+
+processed 1 files, SIZE in T
+snapshot ID saved
+Applying Policy: keep 7 daily, 4 weekly snapshots
+keep 3 snapshots:
+ID        Time                 Host         Tags         Reasons                 Paths                    Size
+-------------------------------------------------------------------------------------------------------------------
+ID  2020-01-06 10:00:00  atc-gateway  atc-gateway  oldest daily snapshot   /tmp/old-a               SIZE
+                                                         oldest weekly snapshot
+ID  2020-01-06 11:00:00  atc-gateway  atc-gateway  daily snapshot          /tmp/old-b               SIZE
+                                                         weekly snapshot
+ID  NOW  atc-gateway  atc-gateway  daily snapshot          /tmp/atc-gateway-backup  SIZE
+                                                         weekly snapshot
+-------------------------------------------------------------------------------------------------------------------
+3 snapshots
+
+EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json --tag other' > "$tree/other-after"
   jq -S . "$tree/other-before" > "$tree/other-before.json"
   jq -S . "$tree/other-after" > "$tree/other-after.json"
@@ -445,6 +469,11 @@ EOF
   run_backup "$name" "$backup_image" -e "SNAPSHOT=$older" restore > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
+Summary: Restored 1 files/dirs (SIZE) in T
+EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/value"
   diff - "$tree/value" <<< older
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -470,6 +499,11 @@ EOF
   run_backup "$name" "$backup_image" restore > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
+  normalize_restic_output < "$tree/out" > "$tree/out.normal"
+  diff - "$tree/out.normal" << 'EOF'
+restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
+Summary: Restored 1 files/dirs (SIZE) in T
+EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state; sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state"
   diff - "$tree/state" << 'EOF'
 gateway.db

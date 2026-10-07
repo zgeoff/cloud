@@ -47,6 +47,33 @@ it_restores_a_stored_client_after_a_backup_a_wipe_and_a_restore() {
   run_backup "$name" "$backup_image" backup > "$tree/backup.out" 2> "$tree/backup.err"
 
   diff /dev/null "$tree/backup.err"
+  # the repository's id is generated at init, so it is masked like a snapshot ID
+  normalize_restic_output < "$tree/backup.out" |
+    sed -E 's/^created restic repository [0-9a-f]+ at /created restic repository ID at /' > "$tree/backup.normal"
+  diff - "$tree/backup.normal" << 'EOF'
+created restic repository ID at /repo
+
+Please note that knowledge of your password is required to access
+the repository. Losing your password means that your data is
+irrecoverably lost.
+no parent snapshot found, will read all files
+
+Files:           2 new,     0 changed,     0 unmodified
+Dirs:            0 new,     0 changed,     0 unmodified
+Added to the repository: SIZE (SIZE stored)
+
+processed 2 files, SIZE in T
+snapshot ID saved
+Applying Policy: keep 7 daily, 4 weekly snapshots
+keep 1 snapshots:
+ID        Time                 Host         Tags         Reasons          Paths                    Size
+--------------------------------------------------------------------------------------------------------------
+ID  NOW  atc-gateway  atc-gateway  daily snapshot   /tmp/atc-gateway-backup  SIZE
+                                                         weekly snapshot
+--------------------------------------------------------------------------------------------------------------
+1 snapshots
+
+EOF
 
   docker stop "$name" > /dev/null
   docker rm "$name" > /dev/null
