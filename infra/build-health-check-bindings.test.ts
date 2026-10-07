@@ -29,7 +29,7 @@ test('it binds the state bucket, the targets as JSON and the alert webhook when 
   ]);
 });
 
-test('it binds the alert webhook as a secret holding the URL', () => {
+test('it marks the alert webhook binding secret', () => {
   const bindings = buildHealthCheckBindings({
     stateBucket: output('geoff-cloud-health-check-state'),
     targets: [],
@@ -42,10 +42,23 @@ test('it binds the alert webhook as a secret holding the URL', () => {
     throw new Error('expected the ALERT_URL binding');
   }
 
-  expect(Promise.all([isSecret(alert.text), resolveOutput(alert.text)])).resolves.toStrictEqual([
-    true,
-    'https://discord.com/api/webhooks/1/abc',
-  ]);
+  expect(isSecret(alert.text)).resolves.toBeTrue();
+});
+
+test('it binds the alert webhook URL as given', () => {
+  const bindings = buildHealthCheckBindings({
+    stateBucket: output('geoff-cloud-health-check-state'),
+    targets: [],
+    alertURL: 'https://discord.com/api/webhooks/1/abc',
+  });
+
+  const alert = bindings.find((binding) => binding.name === 'ALERT_URL');
+
+  if (alert?.type !== 'secret_text') {
+    throw new Error('expected the ALERT_URL binding');
+  }
+
+  expect(resolveOutput(alert.text)).resolves.toBe('https://discord.com/api/webhooks/1/abc');
 });
 
 test('it leaves ALERT_URL out when no webhook is set', () => {

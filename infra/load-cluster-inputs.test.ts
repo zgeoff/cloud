@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
 import { loadClusterInputs } from './load-cluster-inputs.ts';
 import { buildMockATCGatewayConfig } from './test-utils/build-mock-atc-gateway-config.ts';
-import { buildMockATCGatewayDaemonConfig } from './test-utils/build-mock-atc-gateway-daemon-config.ts';
 import { buildStubConfig } from './test-utils/build-stub-config.ts';
 import { resolveOutput } from './test-utils/resolve-output.ts';
 
@@ -63,10 +62,13 @@ test('it carries the Connect credentials file as given', () => {
 });
 
 test('it loads the gateway from the same stack config and environment when atcGateway is set', () => {
-  const geoffcloud = buildMockATCGatewayDaemonConfig();
-
   const config = buildMockATCGatewayConfig({
-    daemons: { geoffcloud },
+    daemons: {
+      geoffcloud: {
+        address: '100.69.47.33:8415',
+        daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      },
+    },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -85,8 +87,8 @@ test('it loads the gateway from the same stack config and environment when atcGa
       config,
       daemons: {
         geoffcloud: {
-          address: geoffcloud.address,
-          daemonID: geoffcloud.daemonID,
+          address: '100.69.47.33:8415',
+          daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
           alertSeverity: 'critical',
         },
       },

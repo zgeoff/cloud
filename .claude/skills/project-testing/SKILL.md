@@ -2,10 +2,11 @@
 name: project-testing
 description:
   cloud's own testing rules on top of the shared testing skill — where each suite runs, the infra
-  test utils (faker factories, the stub Pulumi Config, Outputs by reference), the Go provider's
-  stub Onidel API and injected sleep, the shell suites' case runner and stand-ins, the NixOS checks
-  and restore rehearsals, and the rule that no test reaches a real host. Load together with the
-  testing skill when designing, writing, or reviewing cloud tests.
+  test utils (faker factories, the stub Pulumi Config, Outputs by reference), the health-check
+  worker's MSW boundary, the Go provider's stub Onidel API and injected sleep, the shell suites'
+  case runner and stand-ins, the NixOS checks and restore rehearsals, and the rule that no test
+  reaches a real host. Load together with the testing skill when designing, writing, or reviewing
+  cloud tests.
 ---
 
 # cloud testing
@@ -49,12 +50,14 @@ live host.
 
 ## infra (TypeScript)
 
-The package is in the pure regime: every unit under test is a builder or a validator that returns a
+`infra/` is in the pure regime: every unit under test is a builder or a validator that returns a
 value. Resource-creating modules stay thin, and their logic lives in an exported `build*`,
-`require*`, `find*` or `to*` function in its own file, which the test calls directly.
+`require*`, `find*` or `to*` function in its own file, which the test calls directly. The
+health-check worker in `workers/` is HTTP-mocked.
 
-- The `bunfig.toml` preload registers `@zgeoff/bun-test-extended` and runs
-  `infra/test-utils/seed-faker.ts`, which seeds faker once per run.
+- The `bunfig.toml` preload registers `@zgeoff/bun-test-extended`, runs
+  `infra/test-utils/seed-faker.ts`, which seeds faker once per run, and runs
+  `workers/mocks/register-mock-server.ts`, which starts the MSW server.
 - Beside the preload, `infra/test-utils/` holds the shared test utils, each with its own test file:
   - `buildMock<Type>` factories fill every field: faker values for arbitrary fields, a fixed value
     for constrained ones. A test passes `undefined` for a field whose absence it tests, and passes
@@ -65,9 +68,13 @@ value. Resource-creating modules stay thin, and their logic lives in an exported
     the Pulumi runtime.
   - `resolveOutput` reads an `Output`'s value. Assert secrecy with `isSecret`, separately from the
     value.
-  - `startStubHTTPServer` is a real `Bun.serve` on loopback that records requests, and
-    `buildStubR2Bucket` is an in-memory R2 bucket. The health-check worker is tested through its
-    exported `scheduled` handler against them.
+  - `buildStubR2Bucket` is an in-memory R2 bucket.
+- The health-check worker is tested through its exported `scheduled` handler. Its HTTP boundary is
+  MSW handlers in `workers/mocks/` over two in-memory stores: the probe targets' statuses and the
+  alerts sent. The server runs with `onUnhandledRequest: 'error'`, and the preload also fails the
+  test on any `request:unhandled` event, because the worker turns a failed probe into a status
+  instead of throwing. A dead target is a per-test `passthrough()` to `127.0.0.1:1`, so the
+  connection really fails.
 - Pass an `Output` input by reference (`output('…')`) and put the same object in the expected
   literal: `toStrictEqual` fails when a builder swaps or rebuilds it.
 - A hand-written spec (alert rules, Helm values, a Deployment spec, the tailnet policy) is asserted
