@@ -27,7 +27,7 @@ it_runs_a_known_remote_command_on_the_host_and_copies_its_output() {
   mkdir "$tree/host/secrets"
   touch "$tree/host/secrets/gateway-token"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud "ls $tree/host/secrets" > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -47,7 +47,7 @@ it_fails_closed_with_exit_97_and_runs_nothing_when_a_remote_tool_on_the_host_pat
   touch "$tree/host/secrets/gateway-token"
   rm "$tree/host-bin/tailscale"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud "ls $tree/host/secrets" > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -67,7 +67,7 @@ it_fails_closed_before_any_interception_when_a_remote_tool_on_the_host_path_is_n
   touch "$tree/host/secrets/imp-token"
   rm "$tree/host-bin/ssh"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_REMOVE_TOKEN_AT_WHOAMI=1 \
     ssh -o BatchMode=yes root@geoffcloud "set -euo pipefail; export LC_ALL=C; curl http://127.0.0.1/rpc/tokens/whoami" \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -89,7 +89,7 @@ it_fails_closed_before_any_interception_when_a_host_stand_in_is_not_executable()
   echo bearer > "$tree/host/secrets/gateway-token"
   chmod -x "$tree/host-bin/rsync"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_ALTER_BEARER_BEFORE_SUM=1 \
     ssh -o BatchMode=yes root@geoffcloud "sha256sum $tree/host/secrets/gateway-token" \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -107,7 +107,7 @@ it_fails_closed_with_exit_97_when_a_known_command_names_a_remote_tool_by_path() 
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud "docker exec -i imp-host imp secret add glm x; /usr/bin/ssh root@geoffcloud true" \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -115,6 +115,7 @@ it_fails_closed_with_exit_97_when_a_known_command_names_a_remote_tool_by_path() 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud docker exec -i imp-host imp secret add glm x; /usr/bin/ssh root@geoffcloud true"
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec -i imp-host imp secret add glm x; /usr/bin/ssh root@geoffcloud true"]'
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -124,7 +125,7 @@ it_fails_closed_with_exit_97_when_a_known_command_bypasses_path_with_command_p()
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud "docker exec -i imp-host imp secret add glm x; command -p true" \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -132,6 +133,7 @@ it_fails_closed_with_exit_97_when_a_known_command_bypasses_path_with_command_p()
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud docker exec -i imp-host imp secret add glm x; command -p true"
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec -i imp-host imp secret add glm x; command -p true"]'
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -143,12 +145,15 @@ it_runs_the_remote_command_with_the_host_stand_ins_first_on_PATH() {
   printf '#!/usr/bin/env bash\necho "host docker: $*"\n' > "$tree/host-bin/docker"
   chmod +x "$tree/host-bin/docker"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud docker exec imp-host imp info --json \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'host docker: exec imp-host imp info --json'
+  diff - "$tree/host-output" <<< 'host docker: exec imp-host imp info --json'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","info","--json"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -159,13 +164,15 @@ it_returns_the_remote_commands_exit_code_and_stderr() {
   setup_test "$tree"
   mkdir "$tree/host/secrets"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud "sha256sum $tree/host/secrets/gateway-token" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
+  diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "sha256sum: $tree/host/secrets/gateway-token: No such file or directory"
+  diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"sha256sum $tree/host/secrets/gateway-token\"]"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -175,12 +182,13 @@ it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@geoffcloud "rm -rf $tree/host" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud rm -rf $tree/host"
+  diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"rm -rf $tree/host\"]"
   [ -d "$tree/host" ] || { echo "the unknown command ran" >&2; exit 1; }
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
@@ -191,12 +199,13 @@ it_fails_closed_with_exit_97_on_another_host() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh -o BatchMode=yes root@other.test true > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@other.test true'
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@other.test","true"]'
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -206,11 +215,13 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     ssh root@geoffcloud true > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@geoffcloud true'
+  diff - "$tree/calls" <<< '["ssh","root@geoffcloud","true"]'
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -220,7 +231,7 @@ it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     STUB_SSH_PASS=1 ssh -o BatchMode=yes ssh://root@127.0.0.1:1 true \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -239,13 +250,14 @@ it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     STUB_SSH_PASS=1 ssh -o BatchMode=yes ssh://root@127.0.0.2:1 true \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.2:1 true'
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.2:1","true"]'
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -257,7 +269,7 @@ it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     STUB_SSH_PASS=1 ssh -o BatchMode=yes ssh://root@127.0.0.1:1 -oProxyCommand=false true \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -272,20 +284,21 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  mkdir "$tree/bin" "$tree/host-bin" "$tree/host" "$tree/fake"
+  mkdir "$tree/bin" "$tree/host-bin" "$tree/host" "$tree/home" "$tree/tmp" "$tree/fake"
   printf '#!/usr/bin/env bash\necho fake ssh\n' > "$tree/fake/ssh"
   chmod +x "$tree/fake/ssh"
   PATH="$tree/fake:$PATH" create_stub_host_ssh "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
   require_remote_tool_stubs "$tree/bin"
 
-  env -i PATH="$tree/bin:$tree/fake:/usr/bin:/bin" HOME="$tree" STUB_TREE="$tree" \
+  env -i PATH="$tree/bin:$tree/fake:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" \
     STUB_SSH_PASS=1 ssh -o BatchMode=yes ssh://root@127.0.0.1:1 true \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
   [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
 }
 
@@ -295,14 +308,18 @@ it_drops_the_connection_at_the_whoami_check_with_exit_255() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_SSH_DROP_AT_WHOAMI=1 \
     ssh -o BatchMode=yes root@geoffcloud "set -euo pipefail; export LC_ALL=C; echo ran http://127.0.0.1:7070/rpc/tokens/whoami" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
+  diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< $'Connection to geoffcloud closed by remote host.\r'
-  diff - <(tail -n 1 "$tree/calls") <<< '["ssh-dropped-at-whoami"]'
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C; echo ran http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh-dropped-at-whoami"]
+CALLS
   [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
 }
 
@@ -314,31 +331,42 @@ it_removes_the_saved_token_just_before_the_whoami_check() {
   mkdir "$tree/host/secrets"
   touch "$tree/host/secrets/imp-token"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_REMOVE_TOKEN_AT_WHOAMI=1 \
     ssh -o BatchMode=yes root@geoffcloud "set -euo pipefail; export LC_ALL=C; ls $tree/host/secrets; echo http://127.0.0.1:7070/rpc/tokens/whoami" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< http://127.0.0.1:7070/rpc/tokens/whoami
-  diff - <(tail -n 1 "$tree/calls") <<< '["imp-token-removed-at-whoami"]'
+  diff - "$tree/host-output" <<< http://127.0.0.1:7070/rpc/tokens/whoami
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << CALLS
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C; ls $tree/host/secrets; echo http://127.0.0.1:7070/rpc/tokens/whoami"]
+["imp-token-removed-at-whoami"]
+CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 it_makes_the_secrets_directory_read_only_just_before_the_bearer_write() {
   local status=0
   tree="$(mktemp -d)"
-  trap 'chmod -R u+w "$tree"; rm -rf "$tree"' EXIT
+  trap 'chmod -R u+w "$tree" || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree"
   mkdir "$tree/host/secrets"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_READONLY_AT_BEARER_WRITE=1 \
     ssh -o BatchMode=yes root@geoffcloud "umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \"\$t\"" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - <(stat -c %a "$tree/host/secrets") <<< 500
-  diff - <(sed -E 's/XXXXXX/X/' "$tree/err") <<< "mktemp: failed to create file via template '$tree/host/secrets/.gateway-token.X': Permission denied"
-  diff - <(tail -n 1 "$tree/calls") <<< '["secrets-dir-made-read-only"]'
+  stat -c %a "$tree/host/secrets" > "$tree/mode"
+  diff - "$tree/mode" <<< 500
+  diff - "$tree/out" <<< ''
+  diff - "$tree/host-output" <<< ''
+  diff - "$tree/err" <<< "mktemp: failed to create file via template '$tree/host/secrets/.gateway-token.XXXXXX': Permission denied"
+  diff - "$tree/calls" << CALLS
+["ssh","-o","BatchMode=yes","root@geoffcloud","umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \\"\$t\\""]
+["secrets-dir-made-read-only"]
+CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -351,7 +379,7 @@ it_alters_the_written_bearer_just_before_its_checksum() {
   printf 'fixture-bearer\n' > "$tree/host/secrets/gateway-token"
   chmod 0400 "$tree/host/secrets/gateway-token"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_ALTER_BEARER_BEFORE_SUM=1 \
     ssh -o BatchMode=yes root@geoffcloud "sha256sum $tree/host/secrets/gateway-token" \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -360,8 +388,13 @@ it_alters_the_written_bearer_just_before_its_checksum() {
 fixture-bearer
 altered
 TOKEN
-  diff - <(cut -d' ' -f1 "$tree/out") <<< "$(printf 'fixture-bearer\naltered\n' | sha256sum | cut -d' ' -f1)"
-  diff - <(tail -n 1 "$tree/calls") <<< '["gateway-token-altered"]'
+  diff - "$tree/out" <<< "443bb39ffac96e35bd546055e8af30b610d7774f3b06275f35daa5cc1840ff0a  $tree/host/secrets/gateway-token"
+  diff - "$tree/host-output" <<< "443bb39ffac96e35bd546055e8af30b610d7774f3b06275f35daa5cc1840ff0a  $tree/host/secrets/gateway-token"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << CALLS
+["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
+["gateway-token-altered"]
+CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -373,22 +406,30 @@ it_removes_the_bearer_just_before_the_final_stat() {
   mkdir "$tree/host/secrets"
   touch "$tree/host/secrets/gateway-token" "$tree/host/secrets/imp-token"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_REMOVE_BEARER_BEFORE_STAT=1 \
     ssh -o BatchMode=yes root@geoffcloud "stat -c '%n %U %a %s bytes' $tree/host/secrets $tree/host/secrets/gateway-token $tree/host/secrets/imp-token" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff - "$tree/out" << OUT
+$tree/host/secrets $(id -un) 755 $(stat -c %s "$tree/host/secrets") bytes
+$tree/host/secrets/imp-token $(id -un) 644 0 bytes
+OUT
+  diff "$tree/out" "$tree/host-output"
   diff - "$tree/err" <<< "stat: cannot statx '$tree/host/secrets/gateway-token': No such file or directory"
-  diff - <(tail -n 1 "$tree/calls") <<< '["gateway-token-removed-before-stat"]'
+  diff - "$tree/calls" << CALLS
+["ssh","-o","BatchMode=yes","root@geoffcloud","stat -c '%n %U %a %s bytes' $tree/host/secrets $tree/host/secrets/gateway-token $tree/host/secrets/imp-token"]
+["gateway-token-removed-before-stat"]
+CALLS
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, a <tree>/host-bin for the host's
 # stand-ins, fail-closed stand-ins for every other remote tool in both, checked so no call can
-# reach a real remote tool, and the host's root.
+# reach a real remote tool, the host's root, and the HOME and TMPDIR the stand-in runs with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin" "$tree/host-bin" "$tree/host"
+  mkdir "$tree/bin" "$tree/host-bin" "$tree/host" "$tree/home" "$tree/tmp"
   : > "$tree/host-output"
   create_stub_host_ssh "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale

@@ -36,7 +36,8 @@ it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
   bash -ec 'source "$1"; require_remote_tool_stubs "$2"; touch "$3"' _ "$lib" "$tree/bin" \
     "$tree/script-ran" > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/err" <<< "ssh resolves to $(PATH=/usr/bin:/bin command -v ssh || true), not a stand-in in $tree/bin"
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "ssh resolves to $(PATH=/usr/bin:/bin command -v ssh || echo nothing), not a stand-in in $tree/bin"
   [ ! -e "$tree/script-ran" ] || { echo "the step after the guard ran" >&2; exit 1; }
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -50,23 +51,40 @@ it_fails_when_a_stand_in_is_not_executable() {
 
   require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
 
-  grep -q '^tailscale resolves to ' "$tree/err" || { cat "$tree/err"; echo "no tailscale finding" >&2; exit 1; }
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "tailscale resolves to $(PATH=/usr/bin:/bin command -v tailscale || echo nothing), not a stand-in in $tree/bin"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_fails_for_each_tool_that_is_missing() {
-  local tool statuses=""
+  local tool status
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
   for tool in ssh scp sftp rsync tailscale; do
     mv "$tree/bin/$tool" "$tree/aside"
-    require_remote_tool_stubs "$tree/bin" 2> /dev/null || statuses+="$tool $? "
+    status=0
+    require_remote_tool_stubs "$tree/bin" >> "$tree/out" 2>> "$tree/err" || status=$?
+    echo "$tool $status" >> "$tree/statuses"
     mv "$tree/aside" "$tree/bin/$tool"
   done
 
-  diff - <(echo "$statuses") <<< 'ssh 1 scp 1 sftp 1 rsync 1 tailscale 1 '
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << ERR
+ssh resolves to $(PATH=/usr/bin:/bin command -v ssh || echo nothing), not a stand-in in $tree/bin
+scp resolves to $(PATH=/usr/bin:/bin command -v scp || echo nothing), not a stand-in in $tree/bin
+sftp resolves to $(PATH=/usr/bin:/bin command -v sftp || echo nothing), not a stand-in in $tree/bin
+rsync resolves to $(PATH=/usr/bin:/bin command -v rsync || echo nothing), not a stand-in in $tree/bin
+tailscale resolves to $(PATH=/usr/bin:/bin command -v tailscale || echo nothing), not a stand-in in $tree/bin
+ERR
+  diff - "$tree/statuses" << 'STATUSES'
+ssh 1
+scp 1
+sftp 1
+rsync 1
+tailscale 1
+STATUSES
 }
 
 # Runtime every case needs: <tree>/bin with an executable placeholder for each remote
