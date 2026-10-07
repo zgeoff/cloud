@@ -18,13 +18,15 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 - CodeRabbit is not installed on this repo, so a PR here gets no bot review.
 - This repo is public. Never commit a secret. Secrets live in the 1Password `cloud` vault; `.env`
   holds only `op://` references, resolved with `op run --env-file=.env -- <command>`.
+- A new service in the cloud stays host-local or on the tailnet by default. A public route (a tunnel
+  hostname or a public DNS record) needs a stated reason in its PR.
 - Never print a secret, and never log a whole Onidel VM object: the API returns the root password.
 - No live change without a preview first. The Tailscale policy file in particular: Pulumi's `Acl`
   replaces the whole file, so Geoff reviews the diff before an apply that changes it.
 - The host's firewall is NixOS's table `inet nixos-fw`, plus `inet cloud_host` for the atc daemon's
-  port. imp's module adds `inet imp-forward`, and k3s and Docker add their own tables; imp's
-  `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and keep
-  `networking.nftables.flushRuleset` off.
+  port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and Docker add their own
+  tables; imp's `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and
+  keep `networking.nftables.flushRuleset` off.
 - Never touch `/dev/vdb` on the host. It holds imp's ZFS pool.
 - Everything the hooks and CI run is a root `package.json` script.
 

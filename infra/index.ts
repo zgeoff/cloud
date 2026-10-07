@@ -232,24 +232,22 @@ const workloads =
         ...(clusterInputs.atcGateway === undefined ? {} : { atcGateway: clusterInputs.atcGateway }),
         onePasswordConnect: {
           credentials: clusterInputs.onePasswordConnectCredentials,
-          allowedSources: geoffcloud.mainIpv4.apply((address) => [address]),
         },
       });
 
-// atc.geoff.cloud and op-connect.geoff.cloud: workloads in k3s on the same tunnel
+// atc.geoff.cloud: a workload in k3s on the same tunnel
 const routes = createTunnelRoutes({
   accountID,
   zoneID: zone.zoneId,
   tunnelID: tunnel.id,
   mcpHostname,
   atcRoute: workloads?.atcGatewayRoute,
-  connectRoute: workloads?.onePasswordConnectRoute,
 });
 
 export const tunnelConfigVersion = routes.configVersion;
 export const mcpURL = routes.mcpURL;
 export const atcURL = routes.atcURL;
-export const onePasswordConnectURL = routes.onePasswordConnectURL;
+export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const grafanaURL = workloads?.grafanaURL;
 export const grafanaAdminPassword = workloads?.grafanaAdminPassword;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;

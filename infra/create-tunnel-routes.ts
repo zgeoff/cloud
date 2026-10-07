@@ -20,24 +20,18 @@ interface TunnelRoutesInputs {
 
   // the atc gateway, on its public URL's host. It owns OAuth too.
   readonly atcRoute?: TunnelRoute | undefined;
-
-  // 1Password Connect; its proxy allowlists the source address and Connect checks the
-  // bearer token
-  readonly connectRoute?: TunnelRoute | undefined;
 }
 
 interface TunnelRoutesOutputs {
   readonly configVersion: Output<number>;
   readonly mcpURL: Output<string>;
   readonly atcURL?: Output<string>;
-  readonly onePasswordConnectURL?: Output<string>;
 }
 
 // The tunnel's ingress rules and the proxied CNAME for each hostname. The catch-all 404
 // stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
   const atcRoute = inputs.atcRoute;
-  const connectRoute = inputs.connectRoute;
 
   const config = new ZeroTrustTunnelCloudflaredConfig('edge', {
     accountId: inputs.accountID,
@@ -54,9 +48,6 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
         ...(atcRoute === undefined
           ? []
           : [{ hostname: atcRoute.hostname, service: atcRoute.service }]),
-        ...(connectRoute === undefined
-          ? []
-          : [{ hostname: connectRoute.hostname, service: connectRoute.service }]),
         { service: 'http_status:404' },
       ],
     },
@@ -65,16 +56,10 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
   const mcp = createRecord('mcp', inputs, inputs.mcpHostname);
   const atc = atcRoute === undefined ? undefined : createRecord('atc', inputs, atcRoute.hostname);
 
-  const connect =
-    connectRoute === undefined
-      ? undefined
-      : createRecord('op-connect', inputs, connectRoute.hostname);
-
   return {
     configVersion: config.version,
     mcpURL: toURL(mcp),
     ...(atc === undefined ? {} : { atcURL: toURL(atc) }),
-    ...(connect === undefined ? {} : { onePasswordConnectURL: toURL(connect) }),
   };
 }
 

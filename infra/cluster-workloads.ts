@@ -8,7 +8,7 @@ import { createATCGateway } from './atc-gateway.ts';
 import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { createCloudflared } from './create-cloudflared.ts';
 import { createObservability } from './observability.ts';
-import type { OnePasswordConnectInputs, OnePasswordConnectOutputs } from './onepassword-connect.ts';
+import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
 import { requireAlertWebhook } from './require-alert-webhook.ts';
 
@@ -21,13 +21,6 @@ interface ClusterInputs {
 
   // 1Password Connect for imps (GEO-120)
   readonly onePasswordConnect: OnePasswordConnectInputs;
-}
-
-// the tunnel ingress for Connect's public hostname. No health check: Cloudflare's edge
-// addresses are not on the proxy's allowlist.
-interface OnePasswordConnectRoute {
-  readonly hostname: string;
-  readonly service: Output<string>;
 }
 
 // the tunnel ingress for the gateway's public hostname, and the URL the external health
@@ -46,7 +39,7 @@ interface ClusterOutputs {
   readonly grafanaAdminPassword: Output<string>;
   readonly atcGatewayServiceURL?: Output<string>;
   readonly atcGatewayRoute?: ATCGatewayRoute;
-  readonly onePasswordConnectRoute: OnePasswordConnectRoute;
+  readonly onePasswordConnectServiceURL: Output<string>;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7, #8). Pulumi reaches the k3s API
@@ -75,7 +68,7 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
   return {
     ...ingress,
     ...observability,
-    onePasswordConnectRoute: buildConnectRoute(connect),
+    onePasswordConnectServiceURL: connect.serviceURL,
     ...(gateway === undefined ? {} : buildGatewayOutputs(gateway)),
   };
 }
@@ -109,8 +102,4 @@ function buildGatewayOutputs(gateway: ATCGatewayOutputs): GatewayOutputs {
       healthURL: `https://${gateway.publicHost}/.well-known/oauth-protected-resource/mcp`,
     },
   };
-}
-
-function buildConnectRoute(connect: OnePasswordConnectOutputs): OnePasswordConnectRoute {
-  return { hostname: connect.publicHost, service: connect.serviceURL };
 }

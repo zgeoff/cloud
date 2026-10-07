@@ -75,19 +75,24 @@ daemon on `geoffcloud`. [The gateway plan](./plans/atc-gateway.md) holds its des
 ## Secrets for imps: 1Password Connect
 
 **PENDING:** Connect runs in k3s, in the namespace `onepassword`, so imps can read vault items
-through imp's credential broker. The broker swaps a placeholder bearer for the real Connect token on
-requests to a granted host, and forwards them to `https://<host>` with the system's trust roots. So
-Connect has a public name with a publicly trusted certificate: `op-connect.geoff.cloud`, a route on
-the tunnel.
+through imp's credential broker. It has no public route: it is reachable only through the broker on
+the same VM.
 
-- **Allowlist.** An nginx proxy is the only port on Connect's Service. It admits a request only when
-  `Cf-Connecting-Ip` is geoffcloud's public IPv4 (the address imp-host egresses from; IPv4 only),
-  and returns 403 otherwise. Cloudflare's edge sets that header, and cloudflared is the only path
-  from outside the cluster to the Service. The Cloudflare token has no WAF permission, so the
-  allowlist lives at the origin.
-- **Read-only.** The proxy passes GET and HEAD and returns 405 for any other method.
-- **Caveat.** A pod in the cluster can still reach Connect's own ports and skip the proxy. It still
-  needs the bearer token. No NetworkPolicy covers this yet.
+- **Path.** A custom secret in impd names the guest host `op-connect.imp.internal` and an upstream,
+  `http://172.17.0.1:18081`. The guest talks HTTPS to that name; the broker swaps a placeholder
+  bearer for the real Connect token and forwards the request to the upstream.
+- **Relay.** The upstream is a socket-activated `systemd-socket-proxyd` on the host
+  (`onepassword-connect-relay`), listening on docker0's address. It dials the Service's ClusterIP,
+  `10.43.82.198:8080` (Connect's API), which Pulumi pins. The relay exists because imp's
+  `inet imp-forward` drops imp-host's traffic to the k3s ranges, even after kube-proxy's DNAT, so
+  the container cannot reach the ClusterIP, a pod or a NodePort itself.
+- **Firewall.** nixos-fw does not trust docker0, so it opens tcp 18081 on docker0 alone. The
+  `inet cloud_host` table admits only docker0's subnet to that port and drops the rest. Every
+  container on docker0 can reach it, imp's docker proxy and image builds included.
+- **Read-only.** The token, `imp-agents-ro`, reads the `imp` vault only, so Connect itself refuses a
+  write.
+- **Caveat.** A pod in the cluster can reach Connect's Service too. It still needs the bearer token.
+  No NetworkPolicy covers this yet.
 - **Token.** The Connect token lives only in impd, as the custom secret `op-connect`. Neither the
   repo nor Pulumi holds it. The Connect server's credentials file is the Pulumi input.
 
