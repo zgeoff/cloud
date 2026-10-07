@@ -25,7 +25,16 @@ test("it probes each daemon's address with a TCP connect, keeping geoffcloud's o
 });
 
 test('it probes no target without daemons', () => {
-  expect(buildATCDaemonProbeValues([]).serviceMonitor.targets).toStrictEqual([]);
+  expect(buildATCDaemonProbeValues([])).toStrictEqual({
+    podSecurityContext: { seccompProfile: { type: 'RuntimeDefault' } },
+    resources: { requests: { cpu: '10m', memory: '16Mi' }, limits: { memory: '64Mi' } },
+    config: { modules: { tcp_connect: { prober: 'tcp', timeout: '5s' } } },
+    serviceMonitor: {
+      enabled: true,
+      defaults: { module: 'tcp_connect', interval: '30s', scrapeTimeout: '10s' },
+      targets: [],
+    },
+  });
 });
 
 test("it names each probe target as the daemon's alert rule selects it", () => {

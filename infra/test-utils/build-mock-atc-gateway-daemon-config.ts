@@ -5,7 +5,7 @@ type ATCGatewayDaemonConfig = NonNullable<ATCGatewayConfig['daemons']>[string];
 
 // alertSeverity's absence is behaviour (the daemon takes critical), so an override of
 // undefined leaves it out: with exactOptionalPropertyTypes a plain override cannot
-interface ATCGatewayDaemonConfigOverrides {
+export interface ATCGatewayDaemonConfigOverrides {
   readonly address?: string;
   readonly daemonID?: string;
   readonly alertSeverity?: string | undefined;

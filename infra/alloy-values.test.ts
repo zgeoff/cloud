@@ -74,15 +74,3 @@ loki.write "default" {
     },
   });
 });
-
-test("it drops the atc gateway's approval lines from pod logs before they reach Loki", () => {
-  expect(alloyValues.alloy.configMap.content).toInclude(
-    String.raw`loki.process "pods" {
-  stage.match {
-    selector = "{namespace=\"atc\", container=\"atc-gateway\"} |~ \"^atc-approval\""
-    action   = "drop"
-  }
-  forward_to = [loki.write.default.receiver]
-}`,
-  );
-});

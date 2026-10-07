@@ -122,9 +122,17 @@ test('it refuses empty daemons, naming the fields they replace', () => {
   );
 });
 
-test.each(['GeoffCloud', 'home_pc', '1pc', 'pc-', 'home.pc', '', 'a'.repeat(32)])(
-  'it refuses the daemon name %p, which is not a lowercase DNS label atc takes',
-  (name) => {
+test.each([
+  ['GeoffCloud', 'ATC_GATEWAY_TOKEN_GEOFFCLOUD'],
+  ['home_pc', 'ATC_GATEWAY_TOKEN_HOME_PC'],
+  ['1pc', 'ATC_GATEWAY_TOKEN_1PC'],
+  ['pc-', 'ATC_GATEWAY_TOKEN_PC_'],
+  ['home.pc', 'ATC_GATEWAY_TOKEN_HOME.PC'],
+  ['', 'ATC_GATEWAY_TOKEN_'],
+  ['a'.repeat(32), `ATC_GATEWAY_TOKEN_${'A'.repeat(32)}`],
+])(
+  'it refuses the daemon name %p, which is not a lowercase DNS label atc takes, even with its token in %s',
+  (name, variable) => {
     expect(() =>
       requireATCGatewayInputs(
         {
@@ -135,9 +143,9 @@ test.each(['GeoffCloud', 'home_pc', '1pc', 'pc-', 'home.pc', '', 'a'.repeat(32)]
               daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
             },
           },
-          defaultDaemon: 'geoffcloud',
+          defaultDaemon: name,
         },
-        { ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'x'.repeat(32) },
+        { [variable]: 'x'.repeat(32) },
       ),
     ).toThrowWithMessage(
       Error,
