@@ -34,13 +34,21 @@ test("it names each probe target as the daemon's alert rule selects it", () => {
     buildMockATCDaemonEndpoint({ name: 'home-pc' }),
   ];
 
-  const selectors = buildATCDaemonProbeValues(daemons).serviceMonitor.targets.map(
-    (target) => `probe_success{target="${target.name}"}`,
+  const targets = buildATCDaemonProbeValues(daemons).serviceMonitor.targets.map(
+    (target) => target.name,
   );
 
   const [group] = buildAlertRules({ atcDaemons: daemons });
 
-  expect(
-    group?.rules.filter((rule) => rule.alert === 'ATCDaemonUnreachable').map((rule) => rule.expr),
-  ).toStrictEqual(selectors.map((selector) => `${selector} == 0 or absent(${selector})`));
+  const exprs = group?.rules
+    .filter((rule) => rule.alert === 'ATCDaemonUnreachable')
+    .map((rule) => rule.expr);
+
+  expect({ targets, exprs }).toStrictEqual({
+    targets: ['atc-daemon', 'atc-daemon-home-pc'],
+    exprs: [
+      'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
+      'probe_success{target="atc-daemon-home-pc"} == 0 or absent(probe_success{target="atc-daemon-home-pc"})',
+    ],
+  });
 });
