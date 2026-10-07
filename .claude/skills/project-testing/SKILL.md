@@ -25,9 +25,9 @@ is decided in the shared skill, not here.
 | NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`         |
 
 - A new suite gets a root `package.json` script, and CI calls that script, never the file directly.
-- Every suite is hermetic: no test reaches a real host, the tailnet, 1Password, Onidel, Cloudflare,
-  the Pulumi state or the internet. `bun run drift` is a read-only check of a refactor, never part
-  of a test.
+- Every test case is hermetic: no case reaches a real host, the tailnet, 1Password, Onidel,
+  Cloudflare, the Pulumi state or the internet. The image and flake builds that run before the cases
+  fetch only pinned inputs. `bun run drift` is a read-only check of a refactor, never part of a test.
 
 ## No test reaches a real host
 
@@ -55,7 +55,7 @@ value. Resource-creating modules stay thin, and their logic lives in an exported
 
 - The `bunfig.toml` preload registers `@zgeoff/bun-test-extended` and runs
   `infra/test-utils/seed-faker.ts`, which seeds faker once per run.
-- Shared test utils live in `infra/test-utils/`, each with its own test file:
+- Beside the preload, `infra/test-utils/` holds the shared test utils, each with its own test file:
   - `buildMock<Type>` factories fill every field: faker values for arbitrary fields, a fixed value
     for constrained ones. A test passes `undefined` for a field whose absence it tests, and passes
     as an override every field its assertions depend on.
@@ -103,8 +103,9 @@ Each shared rule takes its Go form:
   - Shape the stub's state with its setters. A deviation is `RegisterResponse`; a handler that must
     change state mid-request is `RegisterHandler`. Assert the requests the code sent with
     `GetRequests()`, as a whole list.
-- Run `go test -race -count=1` (what `provider:check` runs), then `go test -shuffle=on -count=3`. A
-  test that touches a context or time also passes `-count=200` before it lands.
+- Run `bun run provider:check` (`gofmt`, `go vet`, then `go test -race ./...`), then
+  `go test -race -shuffle=on -count=3 ./...`. A test that touches a context or time also passes
+  `-count=200` before it lands.
 
 ## Shell suites
 
@@ -117,7 +118,7 @@ journey. Each shared rule takes its shell form:
 | `test('it …')`               | a function `it_<words>`; its title is the name with spaces; `CASE='<part of a title>'` runs the matching cases                                                                                                     |
 | The runner                   | `run_cases` from `scripts/test-lib/run-cases.sh`: each case in its own errexit subshell, `ok`/`FAIL` per case, exit 1 on any failure or when no case ran                                                            |
 | `setupTest()`                | one `setup_test` per suite: a fresh `mktemp -d` tree and the stand-ins every case needs, with no scenario data; its config chooses which stand-ins to wire                                                          |
-| Dispose and `onTestFinished` | `trap '…' EXIT` inside the case on the line after the acquisition; every step ends `\|\| true`                                                                                                                     |
+| Dispose and `onTestFinished` | `trap '…' EXIT` inside the case on the line after the acquisition; in a trap with more than one step, every step ends `\|\| true`                                                                                    |
 | Every test stands alone      | the script under test runs under `env -i` with an explicit `PATH`, `HOME` and `TMPDIR` inside the case tree; git with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`; each suite starts with `umask 022` |
 | `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `scripts/test-lib/`; mask only a temp path or a generated id                                     |
 | Exact errors                 | the exact exit code, never "non-zero", plus the exact stderr                                                                                                                                                       |
@@ -125,15 +126,20 @@ journey. Each shared rule takes its shell form:
 | Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds                                                                               |
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                             |
 
-- A stand-in lives in `scripts/test-lib/` with its own `test-<file>.sh`: `create-stub-<thing>.sh`
-  writes an executable to disk, and `start-stub-<thing>.sh` runs a process. It logs its argv as one
-  JSON line, matches the real tool's exit codes and messages at the versions CI runs (recorded in a
-  comment), and ends with `*) echo "unexpected: $*" >&2; exit 97`. A process stand-in records an
+- A stand-in lives in `scripts/test-lib/` with its own `test-<file>.sh`, never inline in a suite:
+  `create-stub-<thing>.sh` writes an executable to disk, and `start-stub-<thing>.sh` runs a process.
+- A stand-in that replaces a tool logs its argv as one JSON line, matches the real tool's exit codes
+  and messages, and ends with `*) echo "unexpected: $*" >&2; exit 97`. Where the real tool's output
+  differs between the versions CI and a developer run, a comment names both versions and the test
+  accepts each version's output only with its own exit code. A process stand-in records an
   unexpected request and answers it with a failure.
+- A stand-in that wraps the real tool, such as `create-stub-racing-git.sh`, or that supplies a value
+  rather than a tool, such as `create-stub-clock.sh`, states in its header what it changes, and its
+  test pins that change.
 - A producer whose output a case compares writes to a file under errexit first, so a failing
   producer fails the case instead of producing an empty match.
-- Every other helper in `scripts/test-lib/` exports one function, named for its file, and has its
-  own `test-<helper>.sh` that `test:scripts` runs, or `test:atc-gateway-fixture` when it needs
+- Every other helper in `scripts/test-lib/` exports one public function, named for its file, and
+  has its own `test-<helper>.sh` that `test:scripts` runs, or `test:atc-gateway-fixture` when it needs
   Docker.
 - The Docker suites run under `scripts/test-lib/with-fixture-images.sh`, which builds the images
   once per run under tags that carry a random run id and removes them after. Every container and
@@ -157,10 +163,8 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   interpolated by Nix.
 - A module assertion has a negative case that evaluates a bad config and compares the failing
   assertion messages exactly.
-- The restore rehearsals (`impd-restore` and `impd-restore-*`) share one machine and one
-  `setup_test()` in `nixos/checks/test-utils/build-restore-rehearsal.nix`. Each
-  `with subtest("it …")` starts from `setup_test()`, which resets every state a subtest can leave.
-  It asserts `machine.execute`'s status and output exactly, plus every side effect the script
+- In a restore rehearsal (`impd-restore` and `impd-restore-*`), each `with subtest("it …")` starts
+  from `setup_test()`, which resets every state a subtest can leave. It asserts `machine.execute`'s status and output exactly, plus every side effect the script
   promises, including the saved original on each failure path. Waits use `wait_for_unit`,
   `wait_until_succeeds` or `wait_for`.
 - An error the script declares is reached through real VM state where real state can produce it,
@@ -170,5 +174,5 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   prints `kvm`, so a run that fell back to emulation fails. `test-nixos.sh` needs a readable and
   writable KVM device for any `impd-restore*` check.
 - nixpkgs passes a VM test script as one environment variable, capped at 131,072 bytes. A rehearsal
-  that would pass the cap becomes a new `impd-restore-<area>` check on the shared machine, never a
-  shorter rewrite of existing subtests.
+  that would pass the cap becomes a new `impd-restore-<area>` check, never a shorter rewrite of
+  existing subtests.
