@@ -66,14 +66,16 @@ FILES
 }
 
 it_receives_a_plain_curl_that_a_curlrc_in_HOME_routes_to_it() {
+  local port status=0
   tree="$(mktemp -d)"
   trap 'kill "$(cat "$tree/proxy/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree"
-  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$(cat "$tree/proxy/port")" > "$tree/home/.curlrc"
+  port="$(cat "$tree/proxy/port")"
+  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$port" > "$tree/home/.curlrc"
 
-  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
-    http_proxy="http://127.0.0.1:$(cat "$tree/proxy/port")" \
-    curl -sS --max-time 5 -H 'User-Agent:' http://127.0.0.1:1/rpc/tokens/whoami > /dev/null 2>&1 || true
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" http_proxy="http://127.0.0.1:$port" \
+    curl -sS --max-time 5 -H 'User-Agent:' http://127.0.0.1:1/rpc/tokens/whoami \
+    > "$tree/out" 2> "$tree/err" || status=$?
 
   tr -d '\r' < "$tree/proxy/connections" > "$tree/connections"
   diff - "$tree/connections" << 'LINES'
@@ -84,6 +86,27 @@ Accept: */*
 Proxy-Connection: Keep-Alive
 
 LINES
+  # curl's own source port is the kernel's pick, so it is masked
+  sed -E 's/ from 127\.0\.0\.1 port [0-9]+ $/ from 127.0.0.1 port CLIENT /' "$tree/out" > "$tree/out-masked"
+  diff - "$tree/out-masked" << OUT
+*   Trying 127.0.0.1:$port...
+* Established connection to 127.0.0.1 (127.0.0.1 port $port) from 127.0.0.1 port CLIENT 
+* using HTTP/1.x
+=> Send header, 115 bytes (0x73)
+0000: GET http://127.0.0.1:1/rpc/tokens/whoami HTTP/1.1
+0033: Host: 127.0.0.1:1
+0046: Accept: */*
+0053: Proxy-Connection: Keep-Alive
+0071: 
+* Request completely sent off
+* Empty reply from server
+* shutting down connection #0
+OUT
+  diff - "$tree/err" << 'ERR'
+Warning: --trace-ascii overrides an earlier trace/verbose option
+curl: (52) Empty reply from server
+ERR
+  [ "$status" = 52 ] || { echo "exit $status, want 52" >&2; exit 1; }
 }
 
 # The control for the credentials suite's hostile-config cases. It runs curl itself, not

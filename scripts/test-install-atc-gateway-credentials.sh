@@ -3403,8 +3403,8 @@ EOF
 # the real one. Each of the three bin directories also gets fail-closed stand-ins for the
 # remote tools the others do not provide (scp, sftp, rsync, tailscale, and ssh on "the
 # host"), and a guard ends the case unless every remote tool resolves to a stand-in. The config names what a case wires on top: atc-key, the stand-in for the
-# z.ai key; impd, the stand-in impd whoami server, started in impd-whoami/; and proxy,
-# the recording proxy, started in proxy/; and listener, the resetting listener, started
+# z.ai key; impd, the stand-in impd whoami server, started in impd-whoami/; proxy, the
+# recording proxy, started in proxy/; and listener, the resetting listener, started
 # in listener/.
 setup_test() {
   local tree="$1" part

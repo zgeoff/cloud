@@ -35,14 +35,18 @@ it_resets_every_connection_and_records_each() {
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" curl -q --noproxy '*' -sS \
-    --max-time 10 "http://127.0.0.1:$(cat "$tree/listener/port")/first" > /dev/null 2>&1 || first=$?
+    --max-time 10 "http://127.0.0.1:$(cat "$tree/listener/port")/first" > "$tree/first-out" 2> "$tree/first-err" || first=$?
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" curl -q --noproxy '*' -sS \
-    --max-time 10 "http://127.0.0.1:$(cat "$tree/listener/port")/second" > /dev/null 2>&1 || second=$?
+    --max-time 10 "http://127.0.0.1:$(cat "$tree/listener/port")/second" > "$tree/second-out" 2> "$tree/second-err" || second=$?
 
   diff - "$tree/listener/connections" << 'LINES'
 connection
 connection
 LINES
+  diff /dev/null "$tree/first-out"
+  diff /dev/null "$tree/second-out"
+  diff - "$tree/first-err" <<< 'curl: (56) Recv failure: Connection reset by peer'
+  diff - "$tree/second-err" <<< 'curl: (56) Recv failure: Connection reset by peer'
   [ "$first $second" = "56 56" ] || { echo "exits $first $second, want 56 56" >&2; exit 1; }
 }
 
