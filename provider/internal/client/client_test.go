@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -169,6 +170,21 @@ func TestClientReportsAMalformedPayloadWithoutItsContent(t *testing.T) {
 	_, err := ctx.client.ReadTeams(t.Context())
 
 	assert.EqualError(t, err, "onidel: decode GET /teams: invalid character 'o' in literal null (expecting 'u')")
+}
+
+func TestClientReportsAResponseBodyThatEndsEarly(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("[]"))
+	})
+
+	_, err := ctx.client.ReadTeams(t.Context())
+
+	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+	assert.EqualError(t, err, "onidel: GET /teams: read body: unexpected EOF")
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
 }
 
 func TestClientReportsAnUnreachableAPI(t *testing.T) {

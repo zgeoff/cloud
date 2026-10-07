@@ -421,6 +421,9 @@ func TestReadVMReportsAMissingVMAsNotFound(t *testing.T) {
 
 	_, err := ctx.client.ReadVM(t.Context(), "x", "team")
 
+	var apiErr *client.APIError
+	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, &client.APIError{Method: "GET", Path: "/vm/x", Status: 404}, apiErr)
 	assert.True(t, client.IsNotFound(err))
 }
 

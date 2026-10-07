@@ -170,6 +170,77 @@ func TestStubOnidelAPIServesARegisteredHandlerInPlaceOfItsRoute(t *testing.T) {
 		[]any{status, ctx.api.GetRequests()})
 }
 
+func TestStubOnidelAPIRunsARegisteredHandlerThatCallsASetter(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterHandler("POST /vm", func(w http.ResponseWriter, _ *http.Request) {
+		ctx.api.SetVM(map[string]any{"id": "v", "name": "web", "status": "building"})
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm", `{"name":"web"}`)
+
+	assert.Equal(t, []any{http.StatusCreated, map[string]map[string]any{
+		"v": {"id": "v", "name": "web", "status": "building"},
+	}}, []any{status, ctx.api.GetVMs()})
+}
+
+func TestStubOnidelAPIReplacesAVMInItsListPositionWhenATestSetsItsIDAgain(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "a", "name": "first", "status": "active"})
+	ctx.api.SetVM(map[string]any{"id": "b", "name": "second", "status": "active"})
+	ctx.api.SetVM(map[string]any{"id": "a", "name": "first-2", "status": "building"})
+
+	_, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm", "")
+
+	assert.JSONEq(t, `[{"id":"a","name":"first-2","status":"building"},{"id":"b","name":"second","status":"active"}]`, body)
+}
+
+func TestStubOnidelAPIReplacesAnSSHKeyWhenATestSetsItsIDAgain(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "name": "me", "ssh_key": "k"})
+
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "name": "me-2", "ssh_key": "k2"})
+
+	assert.Equal(t, map[string]map[string]any{"k1": {"id": "k1", "name": "me-2", "ssh_key": "k2"}}, ctx.api.GetSSHKeys())
+}
+
+func TestStubOnidelAPIServesAFirewallRuleATestSets(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "ssh",
+	})
+
+	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/network/firewalls/g1/rules/r1", "")
+
+	assert.Equal(t, http.StatusOK, status)
+	assert.JSONEq(t, `{"firewall_rule":{"id":"r1","group":"g1","ip_type":"v4","action":"allow","protocol":"tcp",`+
+		`"port":"22","subnet":"0.0.0.0","subnet_size":0,"desc":"ssh"}}`, body)
+}
+
+func TestStubOnidelAPIReplacesAFirewallRuleWhenATestSetsItsIDAgain(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallRule(map[string]any{"id": "r1", "group": "g1", "desc": "ssh"})
+
+	ctx.api.SetFirewallRule(map[string]any{"id": "r1", "group": "g1", "desc": "web"})
+
+	assert.Equal(t, map[string]map[string]any{"r1": {"id": "r1", "group": "g1", "desc": "web"}}, ctx.api.GetFirewallRules())
+}
+
+func TestStubOnidelAPIReplacesAVMsPTRRecordsWhenATestSetsThemAgain(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "v4.example.com", "2001:db8::1": "v6.example.com"})
+	ctx.api.SetRDNS("w", map[string]string{"198.51.100.1": "w.example.com"})
+
+	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "host.example.com"})
+
+	assert.Equal(t, map[string]map[string]string{
+		"v": {"203.0.113.18": "host.example.com"},
+		"w": {"198.51.100.1": "w.example.com"},
+	}, ctx.api.GetRDNS())
+}
+
 func TestStubOnidelAPICreatesAnSSHKeyInAnEnvelope(t *testing.T) {
 	ctx := setupTest(t)
 
@@ -195,18 +266,22 @@ func TestStubOnidelAPIRejectsAnSSHKeyWriteMissingARequiredField(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
-			onideltest.SendRequest(t, ctx.api.URL, "POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k"}`)
+			ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
 
 			status, body := onideltest.SendRequest(t, ctx.api.URL, row.method, row.path, row.body)
 
-			assert.Equal(t, []any{http.StatusBadRequest, ""}, []any{status, body})
+			assert.Equal(t, []any{http.StatusBadRequest, "", map[string]map[string]any{
+				"00000000-0000-4000-8000-000000000001": {
+					"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k",
+				},
+			}}, []any{status, body, ctx.api.GetSSHKeys()})
 		})
 	}
 }
 
 func TestStubOnidelAPIUpdatesAnSSHKeyNameAndPublicKey(t *testing.T) {
 	ctx := setupTest(t)
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k1"}`)
+	ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k1"})
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/ssh_keys/00000000-0000-4000-8000-000000000001", `{"team_id":"t","name":"me-2","ssh_key":"k2"}`)
 
@@ -219,7 +294,7 @@ func TestStubOnidelAPIUpdatesAnSSHKeyNameAndPublicKey(t *testing.T) {
 
 func TestStubOnidelAPIRemovesAnSSHKey(t *testing.T) {
 	ctx := setupTest(t)
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k1"}`)
+	ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k1"})
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "DELETE", "/ssh_keys/00000000-0000-4000-8000-000000000001?team_id=t", "")
 
@@ -369,7 +444,9 @@ func TestStubOnidelAPIRefusesAVMUpdateWhileAnActionRuns(t *testing.T) {
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/vm/v", `{"name":"web-2"}`)
 
-	assert.Equal(t, http.StatusConflict, status)
+	assert.Equal(t, []any{http.StatusConflict, map[string]map[string]any{
+		"v": {"id": "v", "name": "web", "status": "active", "active_action_id": 7},
+	}}, []any{status, ctx.api.GetVMs()})
 }
 
 func TestStubOnidelAPIRejectsAVMUpdateWithoutExactlyOneSetting(t *testing.T) {
@@ -387,7 +464,9 @@ func TestStubOnidelAPIRejectsAVMUpdateWithoutExactlyOneSetting(t *testing.T) {
 
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/vm/v", row.body)
 
-			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, []any{http.StatusBadRequest, map[string]map[string]any{
+				"v": {"id": "v", "name": "web", "status": "active", "active_action_id": nil},
+			}}, []any{status, ctx.api.GetVMs()})
 		})
 	}
 }
@@ -602,7 +681,9 @@ func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", row.body)
 
-			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, []any{
+				http.StatusBadRequest, map[string]map[string]any{}, map[string]map[string]any{"g1": {"id": "g1", "rule_count": 0}},
+			}, []any{status, ctx.api.GetFirewallRules(), ctx.api.GetFirewallGroups()})
 		})
 	}
 }
@@ -610,11 +691,11 @@ func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 func TestStubOnidelAPIReadsARuleWithANumericSubnetSize(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
 
+	createStatus, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", "")
 
-	assert.Equal(t, http.StatusOK, status)
+	assert.Equal(t, []int{http.StatusCreated, http.StatusOK}, []int{createStatus, status})
 	assert.JSONEq(t, `{"firewall_rule":{"id":"00000000-0000-4000-8000-000000000001","group":"g1","ip_type":"v4",`+
 		`"action":"allow","protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24,"desc":""}}`, body)
 }
@@ -643,9 +724,12 @@ func TestStubOnidelAPIFindsARuleOnlyInItsOwnGroup(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
-			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 			ctx.api.SetFirewallGroup(map[string]any{"id": "g2", "rule_count": 0})
-			onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+			ctx.api.SetFirewallRule(map[string]any{
+				"id": "00000000-0000-4000-8000-000000000001", "group": "g1", "ip_type": "v4", "action": "allow",
+				"protocol": "tcp", "port": "", "subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
+			})
 
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, row.method, "/network/firewalls/g2/rules/00000000-0000-4000-8000-000000000001", row.body)
 
@@ -659,8 +743,11 @@ func TestStubOnidelAPIFindsARuleOnlyInItsOwnGroup(t *testing.T) {
 
 func TestStubOnidelAPIUpdatesARuleDescription(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "00000000-0000-4000-8000-000000000001", "group": "g1", "ip_type": "v4", "action": "allow",
+		"protocol": "tcp", "port": "", "subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
+	})
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", `{"team_id":"t","desc":"web"}`)
 
@@ -681,12 +768,18 @@ func TestStubOnidelAPIRejectsARuleUpdateWithoutAValidDescription(t *testing.T) {
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
 			ctx := setupTest(t)
-			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-			onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"0.0.0.0","subnet_size":0}`)
+			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+			ctx.api.SetFirewallRule(map[string]any{
+				"id": "00000000-0000-4000-8000-000000000001", "group": "g1", "ip_type": "v4", "action": "allow",
+				"protocol": "tcp", "port": "", "subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
+			})
 
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", row.body)
 
-			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, []any{http.StatusBadRequest, map[string]map[string]any{"00000000-0000-4000-8000-000000000001": {
+				"id": "00000000-0000-4000-8000-000000000001", "group": "g1", "ip_type": "v4", "action": "allow",
+				"protocol": "tcp", "port": "", "subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
+			}}}, []any{status, ctx.api.GetFirewallRules()})
 		})
 	}
 }
@@ -694,8 +787,7 @@ func TestStubOnidelAPIRejectsARuleUpdateWithoutAValidDescription(t *testing.T) {
 func TestStubOnidelAPIListsAVMsPTRRecordsSortedByIP(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8::1"})
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns", `{"ip_addr":"2001:db8::1","domain":"v6.example.com"}`)
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18","domain":"v4.example.com"}`)
+	ctx.api.SetRDNS("v", map[string]string{"2001:db8::1": "v6.example.com", "203.0.113.18": "v4.example.com"})
 
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm/v/rdns", "")
 
@@ -754,7 +846,7 @@ func TestStubOnidelAPIRejectsAnInvalidPTRWrite(t *testing.T) {
 func TestStubOnidelAPIOverwritesAPTRRecord(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18","domain":"a.example.com"}`)
+	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "a.example.com"})
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns", `{"team_id":"t","ip_addr":"203.0.113.18","domain":"b.example.com"}`)
 
@@ -765,7 +857,7 @@ func TestStubOnidelAPIOverwritesAPTRRecord(t *testing.T) {
 func TestStubOnidelAPIRemovesAPTRRecord(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18","domain":"a.example.com"}`)
+	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "a.example.com"})
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "DELETE", "/vm/v/rdns/203.0.113.18?team_id=t", "")
 
@@ -774,7 +866,7 @@ func TestStubOnidelAPIRemovesAPTRRecord(t *testing.T) {
 
 func TestStubOnidelAPIReadsAnSSHKeyInAnEnvelope(t *testing.T) {
 	ctx := setupTest(t)
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"k"}`)
+	ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
 
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/ssh_keys/00000000-0000-4000-8000-000000000001?team_id=t", "")
 

@@ -133,11 +133,42 @@ func (f *StubOnidelAPI) SetVM(vm map[string]any) {
 	f.setVM(maps.Clone(vm))
 }
 
+func (f *StubOnidelAPI) setVM(vm map[string]any) {
+	id := vm["id"].(string)
+	if _, ok := f.vms[id]; !ok {
+		f.vmOrder = append(f.vmOrder, id)
+	}
+	f.vms[id] = vm
+}
+
 // SetFirewallGroup stores group under its "id", replacing any group with that ID.
 func (f *StubOnidelAPI) SetFirewallGroup(group map[string]any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.firewalls[group["id"].(string)] = maps.Clone(group)
+}
+
+// SetSSHKey stores key under its "id", replacing any key with that ID.
+func (f *StubOnidelAPI) SetSSHKey(key map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sshKeys[key["id"].(string)] = maps.Clone(key)
+}
+
+// SetFirewallRule stores rule under its "id", replacing any rule with that ID. The
+// rule's "group" names the group it belongs to; the group's rule_count is left as
+// the test set it.
+func (f *StubOnidelAPI) SetFirewallRule(rule map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.rules[rule["id"].(string)] = maps.Clone(rule)
+}
+
+// SetRDNS replaces the PTR records of the VM vmID with records, IP -> domain.
+func (f *StubOnidelAPI) SetRDNS(vmID string, records map[string]string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.rdns[vmID] = maps.Clone(records)
 }
 
 // GetRequests returns every request received so far, in order.
@@ -162,6 +193,14 @@ func (f *StubOnidelAPI) GetSSHKeys() map[string]map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return buildStoreCopy(f.sshKeys)
+}
+
+func buildStoreCopy(store map[string]map[string]any) map[string]map[string]any {
+	out := make(map[string]map[string]any, len(store))
+	for id, item := range store {
+		out[id] = maps.Clone(item)
+	}
+	return out
 }
 
 // GetVMs returns the stored VMs by ID.
@@ -232,6 +271,29 @@ func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.routes.ServeHTTP(w, r)
 }
 
+func decodeBody(raw []byte) (map[string]any, bool) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, true
+	}
+	var body map[string]any
+	if err := json.Unmarshal(raw, &body); err != nil || body == nil {
+		return nil, false
+	}
+	return body, true
+}
+
+func (f *StubOnidelAPI) claimCannedResponse(r *http.Request) (int, string, bool) {
+	_, pattern := f.cans.Handler(r)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	queue := f.canned[pattern]
+	if pattern == "" || len(queue) == 0 {
+		return 0, "", false
+	}
+	f.canned[pattern] = queue[1:]
+	return queue[0].status, queue[0].body, true
+}
+
 func (f *StubOnidelAPI) registerRoutes() {
 	route := func(pattern string, h func(w http.ResponseWriter, r *http.Request, body map[string]any)) {
 		f.routes.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
@@ -271,17 +333,6 @@ func (f *StubOnidelAPI) registerRoutes() {
 	route("GET /vm/{id}/rdns", f.sendRDNS)
 	route("POST /vm/{id}/rdns", f.upsertRDNS)
 	route("DELETE /vm/{id}/rdns/{ip}", f.removeRDNS)
-}
-
-func decodeBody(raw []byte) (map[string]any, bool) {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		return nil, true
-	}
-	var body map[string]any
-	if err := json.Unmarshal(raw, &body); err != nil || body == nil {
-		return nil, false
-	}
-	return body, true
 }
 
 func (f *StubOnidelAPI) checkUnhandled(w http.ResponseWriter, r *http.Request, _ map[string]any) {
@@ -405,14 +456,6 @@ func (f *StubOnidelAPI) createVM(w http.ResponseWriter, _ *http.Request, body ma
 	})
 	f.updateInstanceCount(firewall, 1)
 	w.WriteHeader(http.StatusCreated)
-}
-
-func (f *StubOnidelAPI) setVM(vm map[string]any) {
-	id := vm["id"].(string)
-	if _, ok := f.vms[id]; !ok {
-		f.vmOrder = append(f.vmOrder, id)
-	}
-	f.vms[id] = vm
 }
 
 // updateInstanceCount moves a group's instance_count when a VM attaches or detaches.
@@ -721,24 +764,4 @@ func (f *StubOnidelAPI) removeRDNS(w http.ResponseWriter, r *http.Request, _ map
 	}
 	delete(f.rdns[r.PathValue("id")], ip)
 	w.WriteHeader(http.StatusNoContent)
-}
-
-func buildStoreCopy(store map[string]map[string]any) map[string]map[string]any {
-	out := make(map[string]map[string]any, len(store))
-	for id, item := range store {
-		out[id] = maps.Clone(item)
-	}
-	return out
-}
-
-func (f *StubOnidelAPI) claimCannedResponse(r *http.Request) (int, string, bool) {
-	_, pattern := f.cans.Handler(r)
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	queue := f.canned[pattern]
-	if pattern == "" || len(queue) == 0 {
-		return 0, "", false
-	}
-	f.canned[pattern] = queue[1:]
-	return queue[0].status, queue[0].body, true
 }

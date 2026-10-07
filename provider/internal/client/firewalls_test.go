@@ -112,57 +112,56 @@ func TestCreateFirewallRuleOmitsAnEmptyPortAndDescription(t *testing.T) {
 
 func TestReadFirewallRuleReadsOneRuleInTheTeam(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", client.FirewallRuleInput{Protocol: "icmp", Subnet: "::", SubnetSize: 0})
-	require.NoError(t, err)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
+		"subnet": "::", "subnet_size": 0.0, "desc": "",
+	})
 
-	rule, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "00000000-0000-4000-8000-000000000001", "team-a")
+	rule, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "r1", "team-a")
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		client.FirewallRule{
-			ID: "00000000-0000-4000-8000-000000000001", Group: "g1", IPType: "v6", Action: "allow",
-			Protocol: "ipv6-icmp", Subnet: "::",
-		},
-		[]onideltest.Request{
-			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{"protocol": "icmp", "subnet": "::", "subnet_size": 0.0}},
-			{Method: "GET", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
-		},
+		client.FirewallRule{ID: "r1", Group: "g1", IPType: "v6", Action: "allow", Protocol: "ipv6-icmp", Subnet: "::"},
+		[]onideltest.Request{{Method: "GET", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}},
 	}, []any{rule, ctx.api.GetRequests()})
 }
 
 func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", client.FirewallRuleInput{Protocol: "tcp", Port: "22", Subnet: "0.0.0.0", SubnetSize: 0})
-	require.NoError(t, err)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
+	})
 
-	err = ctx.client.UpdateFirewallRuleDescription(t.Context(), "g1", "00000000-0000-4000-8000-000000000001", "team-a", "ssh")
+	err := ctx.client.UpdateFirewallRuleDescription(t.Context(), "g1", "r1", "team-a", "ssh")
 
 	require.NoError(t, err)
-	assert.Equal(t, []onideltest.Request{
-		{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{"protocol": "tcp", "port": "22", "subnet": "0.0.0.0", "subnet_size": 0.0}},
-		{
-			Method: "PATCH", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001",
-			Body: map[string]any{"team_id": "team-a", "desc": "ssh"},
-		},
-	}, ctx.api.GetRequests())
+	assert.Equal(t, []any{
+		map[string]map[string]any{"r1": {
+			"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
+			"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "ssh",
+		}},
+		[]onideltest.Request{{
+			Method: "PATCH", Path: "/network/firewalls/g1/rules/r1", Body: map[string]any{"team_id": "team-a", "desc": "ssh"},
+		}},
+	}, []any{ctx.api.GetFirewallRules(), ctx.api.GetRequests()})
 }
 
 func TestRemoveFirewallRuleRemovesARuleInTheTeam(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", client.FirewallRuleInput{Protocol: "tcp", Port: "22", Subnet: "0.0.0.0", SubnetSize: 0})
-	require.NoError(t, err)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
+	})
 
-	err = ctx.client.RemoveFirewallRule(t.Context(), "g1", "00000000-0000-4000-8000-000000000001", "team-a")
+	err := ctx.client.RemoveFirewallRule(t.Context(), "g1", "r1", "team-a")
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		map[string]map[string]any{},
-		[]onideltest.Request{
-			{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{"protocol": "tcp", "port": "22", "subnet": "0.0.0.0", "subnet_size": 0.0}},
-			{Method: "DELETE", Path: "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
-		},
+		[]onideltest.Request{{Method: "DELETE", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}},
 	}, []any{ctx.api.GetFirewallRules(), ctx.api.GetRequests()})
 }

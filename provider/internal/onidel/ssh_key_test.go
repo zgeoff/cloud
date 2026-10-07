@@ -65,20 +65,17 @@ func TestSSHKeyCreateFailsWhenTheTeamLookupFails(t *testing.T) {
 func TestSSHKeyReadKeepsTheProgramsSpellingOfAnEquivalentPublicKey(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	urn := onideltest.BuildURN("onidel:index:SshKey", "me")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
-	})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"})
 
 	read, err := ctx.server.Read(p.ReadRequest{
-		ID: created.ID, Urn: urn, Properties: created.Properties,
-		Inputs: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n"}),
+		ID: "k1", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
+		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
+		Inputs:     onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n"}),
 	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
-		created.ID,
+		"k1",
 		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n"},
 		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n", "created": "2026-10-02T05:35:28Z"},
 	}, []any{read.ID, onideltest.ToPlain(read.Inputs), onideltest.ToPlain(read.Properties)})
@@ -87,15 +84,12 @@ func TestSSHKeyReadKeepsTheProgramsSpellingOfAnEquivalentPublicKey(t *testing.T)
 func TestSSHKeyReadReportsAPublicKeyChangedOutsideTheProgram(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	urn := onideltest.BuildURN("onidel:index:SshKey", "me")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 BBBB me@host"}),
-	})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "ssh-ed25519 BBBB me@host"})
 
 	read, err := ctx.server.Read(p.ReadRequest{
-		ID: created.ID, Urn: urn, Properties: created.Properties,
-		Inputs: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
+		ID: "k1", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
+		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
+		Inputs:     onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
 	})
 
 	require.NoError(t, err)
@@ -105,22 +99,14 @@ func TestSSHKeyReadReportsAPublicKeyChangedOutsideTheProgram(t *testing.T) {
 func TestSSHKeyImportReadsTheKeyByIDInTheTeam(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	urn := onideltest.BuildURN("onidel:index:SshKey", "me")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
-	})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"})
 
-	read, err := ctx.server.Read(p.ReadRequest{ID: created.ID, Urn: urn})
+	read, err := ctx.server.Read(p.ReadRequest{ID: "k1", Urn: onideltest.BuildURN("onidel:index:SshKey", "me")})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/ssh_keys", Body: map[string]any{"team_id": "team-a", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"}},
-			{Method: "GET", Path: "/ssh_keys/" + created.ID, Query: "team_id=team-a"},
-		},
+		[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
 	}, []any{onideltest.ToPlain(read.Inputs), ctx.api.GetRequests()})
 }
 
@@ -153,14 +139,11 @@ func TestSSHKeyDiffUpdatesTheNameAndPublicKeyInPlace(t *testing.T) {
 func TestSSHKeyUpdateSendsTheWholeKeyToTheTeam(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	urn := onideltest.BuildURN("onidel:index:SshKey", "me")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
-	})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"})
 
 	updated, err := ctx.server.Update(p.UpdateRequest{
-		ID: created.ID, Urn: urn, State: created.Properties,
+		ID: "k1", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
+		State:     onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
 		OldInputs: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
 		Inputs:    onideltest.BuildProps(map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 BBBB me@host"}),
 	})
@@ -170,8 +153,7 @@ func TestSSHKeyUpdateSendsTheWholeKeyToTheTeam(t *testing.T) {
 		map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 BBBB me@host", "created": "2026-10-02T05:35:28Z"},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/ssh_keys", Body: map[string]any{"team_id": "team-a", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"}},
-			{Method: "PATCH", Path: "/ssh_keys/" + created.ID, Body: map[string]any{
+			{Method: "PATCH", Path: "/ssh_keys/k1", Body: map[string]any{
 				"team_id": "team-a", "name": "me-2", "ssh_key": "ssh-ed25519 BBBB me@host",
 			}},
 		},
@@ -196,7 +178,7 @@ func TestSSHKeyUpdatePreviewSendsNothing(t *testing.T) {
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
 }
 
-func TestSSHKeyUpdateFailsWhenTheKeySeesNoTeam(t *testing.T) {
+func TestSSHKeyUpdateFailsWhenTheAPIKeySeesNoTeam(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams()
 
@@ -213,22 +195,17 @@ func TestSSHKeyUpdateFailsWhenTheKeySeesNoTeam(t *testing.T) {
 func TestSSHKeyDeleteRemovesTheKeyFromTheTeam(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
-	urn := onideltest.BuildURN("onidel:index:SshKey", "me")
-	created, err := ctx.server.Create(p.CreateRequest{
-		Urn: urn, Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
-	})
-	require.NoError(t, err)
+	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"})
 
-	err = ctx.server.Delete(p.DeleteRequest{ID: created.ID, Urn: urn, Properties: created.Properties})
+	err := ctx.server.Delete(p.DeleteRequest{
+		ID: "k1", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
+		Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
+	})
 
 	require.NoError(t, err)
 	assert.Equal(t, []any{
 		map[string]map[string]any{},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/ssh_keys", Body: map[string]any{"team_id": "team-a", "name": "me", "ssh_key": "ssh-ed25519 AAAA me@host"}},
-			{Method: "DELETE", Path: "/ssh_keys/" + created.ID, Query: "team_id=team-a"},
-		},
+		[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
 	}, []any{ctx.api.GetSSHKeys(), ctx.api.GetRequests()})
 }
 
