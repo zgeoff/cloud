@@ -307,7 +307,7 @@ func TestVMDiffUpdatesTheVMInPlaceForAChangedMutableInput(t *testing.T) {
 	}
 }
 
-func TestVMDiffReportsNoChangeForAnEquivalentInput(t *testing.T) {
+func TestVMDiffReportsNoChangeForAnEquivalentOrUnsetInput(t *testing.T) {
 	rows := []struct {
 		name   string
 		inputs map[string]any
