@@ -18,14 +18,14 @@ import (
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
-// setupTest starts the fake API and a provider configured against it. Go allows one
+// setupTest starts the stub API and a provider configured against it. Go allows one
 // setupTest per package, so this one serves every test file in the package.
 func setupTest(t *testing.T) struct {
-	api    *onideltest.FakeAPI
+	api    *onideltest.StubOnidelAPI
 	server integration.Server
 } {
 	t.Helper()
-	api := onideltest.StartFakeAPI(t)
+	api := onideltest.StartStubOnidelAPI(t)
 
 	// The API client polls every ten seconds; return from each sleep at once.
 	prov, err := onidel.NewWithOptions(onidel.Options{Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }})
@@ -37,7 +37,7 @@ func setupTest(t *testing.T) struct {
 		"apiKey": onideltest.APIKey, "endpoint": api.URL,
 	})}))
 	return struct {
-		api    *onideltest.FakeAPI
+		api    *onideltest.StubOnidelAPI
 		server integration.Server
 	}{api: api, server: server}
 }

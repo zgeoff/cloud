@@ -428,7 +428,7 @@ func TestWaitForVMReadyWaitsThroughTheAlternativeSnapshotSpelling(t *testing.T) 
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "status": "active", "active_action_id": nil})
 	// The spec spells it taking_snaphot; the client also accepts taking_snapshot,
-	// which the fake does not model, so one canned read reports it.
+	// which the stub does not model, so one canned read reports it.
 	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusOK, `{"id":"v","status":"taking_snapshot"}`, 1)
 
 	vm, err := ctx.client.WaitForVMReady(t.Context(), "v", "")

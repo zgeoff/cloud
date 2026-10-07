@@ -9,8 +9,8 @@ import (
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
-func TestSendRequestSendsTheBodyWithTheFakesBearerToken(t *testing.T) {
-	api := onideltest.StartFakeAPI(t)
+func TestSendRequestSendsTheBodyWithTheStubsBearerToken(t *testing.T) {
+	api := onideltest.StartStubOnidelAPI(t)
 
 	status, body := onideltest.SendRequest(t, api.URL, "POST", "/network/firewalls", `{"team_id":"t","description":"edge"}`)
 
@@ -23,7 +23,7 @@ func TestSendRequestSendsTheBodyWithTheFakesBearerToken(t *testing.T) {
 }
 
 func TestSendRequestSendsNoBodyForAnEmptyOne(t *testing.T) {
-	api := onideltest.StartFakeAPI(t)
+	api := onideltest.StartStubOnidelAPI(t)
 
 	status, _ := onideltest.SendRequest(t, api.URL, "GET", "/vm?team_id=t", "")
 
