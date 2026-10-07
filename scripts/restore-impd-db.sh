@@ -13,8 +13,8 @@
 # in /root/imp-db-backups/pre-restore-<UTC time>/, stages the copy beside the database,
 # checks it there, publishes it with one rename, and moves on only after a clean unmount.
 # A copy needs COPY-INFO from scripts/copy-impd-db.sh. SQLITE3, SYSTEMCTL and CMP name the
-# sqlite3, systemctl and cmp it runs (default: those on PATH), so the rehearsal in
-# nixos/checks/impd-restore.nix can put a stand-in in place of one.
+# sqlite3, systemctl and cmp it runs (default: those on PATH), so the rehearsals in
+# nixos/checks/impd-restore.nix and impd-restore-seams.nix can put a stand-in in place of one.
 set -euo pipefail
 
 copy="${1:?usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>}"

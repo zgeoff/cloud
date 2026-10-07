@@ -5,10 +5,10 @@
 #   bash scripts/test-nixos.sh            # every check in checks.x86_64-linux
 #   bash scripts/test-nixos.sh atc-daemon # one check, by its name there
 #
-# impd-restore boots a NixOS VM, so it needs KVM: unless /dev/kvm (or KVM_DEVICE, which the
-# script's own test sets) is readable and writable, the script builds every other check it was
-# asked for and then fails, naming impd-restore. The check itself fails if QEMU still falls back
-# to emulation. The checks read scripts/ beside nixos/ (scripts/test-lib, and the scripts they
+# impd-restore and every other check named impd-restore-* boot a NixOS VM, so they need KVM:
+# unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the
+# script builds every other check it was asked for and then fails, naming those checks. Each such
+# check itself fails if QEMU still falls back to emulation. The checks read scripts/ beside nixos/ (scripts/test-lib, and the scripts they
 # test), so the build's flake source is the repo root (path:.?dir=nixos), not nixos/ alone. The
 # source is a snapshot of the working tree's tracked and unignored files, so a local edit is tested before
 # it is committed and nothing ignored, such as node_modules or .worktrees, is copied. The Docker
@@ -57,20 +57,22 @@ else
   fi
 fi
 
-# impd-restore's VM needs KVM; the other checks build without it
+# the restore rehearsals' VMs need KVM; the other checks build without it
 kvm_device="${KVM_DEVICE:-/dev/kvm}"
 kvm=()
-missing_kvm=""
+missing_kvm=()
 installables=()
 for check in "${checks[@]}"; do
-  if [ "$check" = impd-restore ]; then
-    # QEMU opens the device read-write, and falls back to emulation when it cannot
-    if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
-      missing_kvm=1
-      continue
-    fi
-    kvm=(--device "$kvm_device:/dev/kvm")
-  fi
+  case "$check" in
+    impd-restore | impd-restore-*)
+      # QEMU opens the device read-write, and falls back to emulation when it cannot
+      if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
+        missing_kvm+=("$check")
+        continue
+      fi
+      kvm=(--device "$kvm_device:/dev/kvm")
+      ;;
+  esac
   installables+=("path:/src?dir=nixos#checks.x86_64-linux.$check")
 done
 
@@ -80,7 +82,11 @@ if [ "${#installables[@]}" -gt 0 ]; then
     build --no-link -L "${installables[@]}"
 fi
 
-if [ -n "$missing_kvm" ]; then
-  echo "test-nixos: $kvm_device is missing or not readable and writable; impd-restore needs KVM" >&2
+if [ "${#missing_kvm[@]}" -eq 1 ]; then
+  echo "test-nixos: $kvm_device is missing or not readable and writable; ${missing_kvm[0]} needs KVM" >&2
+  exit 1
+elif [ "${#missing_kvm[@]}" -gt 1 ]; then
+  names="$(printf '%s, ' "${missing_kvm[@]}")"
+  echo "test-nixos: $kvm_device is missing or not readable and writable; ${names%, } need KVM" >&2
   exit 1
 fi

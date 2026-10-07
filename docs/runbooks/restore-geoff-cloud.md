@@ -151,11 +151,14 @@ while `tank/imp` was mounted, for a dataset without `imp.sqlite`, for a copy wit
 `COPY-INFO`, failing `integrity_check`, lacking the image or the migration, or with a different
 migration, and for a generation that was not a number, did not exist or ran another image. The
 stand-ins: busybox containers that only sleep, a proxy that only opens its socket, the local
-registry, and generations that are the VM's own specialisations. Run it on a machine with Docker and
-KVM:
+registry, and generations that are the VM's own specialisations. A second check on the same machine,
+`nixos/checks/impd-restore-seams.nix`, reaches the errors no real state can: a unit whose state
+cannot be read, and a staged or published file that differs from the copy, through a stand-in
+`systemctl` or `cmp` that fails only that one call. Each stopped as before, with nothing started or
+switched. Run them on a machine with Docker and KVM:
 
 ```sh
-bun run test:nixos impd-restore
+bun run test:nixos impd-restore impd-restore-seams
 ```
 
 Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
