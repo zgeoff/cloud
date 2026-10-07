@@ -5,6 +5,7 @@
 #   bash scripts/test-lib/test-assert-between.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
+umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-between.sh"
 

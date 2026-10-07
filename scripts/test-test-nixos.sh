@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-checks-git.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-checks-docker.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-nixos.sh"
 
@@ -265,38 +267,8 @@ setup_test() {
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
   : > "$tree/calls"
   : > "$tree/ls-files"
-  # git: answers the toplevel and the file list the snapshot reads
-  cat > "$tree/bin/git" << 'STUB'
-#!/usr/bin/env bash
-printf '%s\0' git "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_LOG"
-case "$*" in
-  "rev-parse --show-toplevel") printf '%s\n' "$STUB_TOPLEVEL" ;;
-  "-C $STUB_TOPLEVEL ls-files -z --cached --others --exclude-standard --deduplicate") cat "$STUB_LS_FILES" ;;
-  *) echo "unexpected: $*" >&2; exit 97 ;;
-esac
-STUB
-  # docker: an eval prints STUB_CHECKS, or fails with STUB_EVAL_ERROR (nix's exit 1); a build
-  # copies its /src mount to STUB_BUILD_SAW, then fails with STUB_BUILD_ERROR (exit 1)
-  cat > "$tree/bin/docker" << 'STUB'
-#!/usr/bin/env bash
-printf '%s\0' docker "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_LOG"
-case "$*" in
-  "run "*" eval --raw path:/src?dir=nixos#checks.x86_64-linux --apply "*)
-    if [ -n "${STUB_EVAL_ERROR:-}" ]; then echo "$STUB_EVAL_ERROR" >&2; exit 1; fi
-    printf '%s' "$STUB_CHECKS"
-    ;;
-  "run "*" build --no-link -L "*)
-    src=""
-    for arg in "$@"; do
-      case "$arg" in *":/src:ro") src="${arg%:/src:ro}" ;; esac
-    done
-    cp -R "$src" "$STUB_BUILD_SAW"
-    if [ -n "${STUB_BUILD_ERROR:-}" ]; then echo "$STUB_BUILD_ERROR" >&2; exit 1; fi
-    ;;
-  *) echo "unexpected: $*" >&2; exit 97 ;;
-esac
-STUB
-  chmod +x "$tree/bin/git" "$tree/bin/docker"
+  create_stub_checks_git "$tree/bin"
+  create_stub_checks_docker "$tree/bin"
 }
 
 run_cases
