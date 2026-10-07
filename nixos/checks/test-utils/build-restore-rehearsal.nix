@@ -34,6 +34,9 @@ pkgs.testers.runNixOSTest {
     {
       imports = [ imp.nixosModules.imp ];
       networking.hostId = "5ca71846";
+      # the rehearsal reaches only loopback, and dhcpcd crashing at times would start
+      # systemd-coredump's slice in the middle of a switch
+      networking.useDHCP = false;
       # imp-host's docker run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"

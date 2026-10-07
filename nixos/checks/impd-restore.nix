@@ -204,10 +204,9 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             f"restored /root/imp-db-backups/pre-0.29-20261004T000000 (migration 0002_tokens) on generation 1; the replaced database is in {saved}",
         ], out
         # switch-to-configuration's progress; the mounts docker made for imp-host carry generated
-        # ids, and how many it made varies; dhcpcd in this VM can crash, which starts
-        # systemd-coredump's slice
+        # ids, and how many it made varies
         err_lines = err.splitlines()
-        assert re.fullmatch(r"the following new units were started: (((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount|system-systemd\\x2dcoredump\.slice)(, |$))+", err_lines[5]), err
+        assert re.fullmatch(r"the following new units were started: ((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount(, |$))+", err_lines[5]), err
         assert err_lines[:5] + err_lines[6:] == [
             "Checking switch inhibitors... done",
             "updating GRUB 2 menu...",
@@ -299,10 +298,9 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             f"restored /root/imp-db-backups/pre-0.29-20261004T000000 (migration 0002_tokens) on generation 1; the replaced database is in {saved}",
         ], out
         # switch-to-configuration's progress; the mounts docker made for imp-host carry generated
-        # ids, and how many it made varies; dhcpcd in this VM can crash, which starts
-        # systemd-coredump's slice
+        # ids, and how many it made varies
         err_lines = err.splitlines()
-        assert re.fullmatch(r"the following new units were started: (((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount|system-systemd\\x2dcoredump\.slice)(, |$))+", err_lines[5]), err
+        assert re.fullmatch(r"the following new units were started: ((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount(, |$))+", err_lines[5]), err
         assert err_lines[:5] + err_lines[6:] == [
             "Checking switch inhibitors... done",
             "updating GRUB 2 menu...",
