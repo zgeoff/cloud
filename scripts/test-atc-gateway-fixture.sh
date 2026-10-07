@@ -15,9 +15,9 @@
 # What it does not prove: gateway-to-daemon transport (the registry's daemon is a dead
 # address), R2, k3s.
 #
-# The images build once per run, under per-run tags that the run removes. Each case then
-# starts its own containers on its own volumes and an ephemeral host port, and removes
-# them when it exits.
+# The images build once per run, under tags carrying a random per-run id that the run
+# removes. Each case then starts its own containers on its own volumes and an ephemeral
+# host port, all named from that id, and removes them when it exits.
 #
 #   bash scripts/test-atc-gateway-fixture.sh
 #   CASE='foreign Host' bash scripts/test-atc-gateway-fixture.sh   # the cases whose title holds it
@@ -26,14 +26,17 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/gateway-fixture.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-gateway.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/wait-for-ready.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-backup.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-backup-shell.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/normalize-restic-output.sh"
 
 it_answers_the_protected_resource_metadata_on_its_public_Host() {
   local gateway_image="$1" port code
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -65,9 +68,9 @@ EOF
 
 it_answers_healthz_on_its_public_Host() {
   local gateway_image="$1" port code
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -83,9 +86,9 @@ it_answers_healthz_on_its_public_Host() {
 
 it_answers_readyz_on_its_public_Host() {
   local gateway_image="$1" port code
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -102,9 +105,9 @@ it_answers_readyz_on_its_public_Host() {
 # the kubelet's probe reaches the pod by its IP, so the probe must set Host
 it_refuses_healthz_for_a_foreign_Host() {
   local gateway_image="$1" port code
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -120,9 +123,9 @@ it_refuses_healthz_for_a_foreign_Host() {
 
 it_refuses_the_metadata_for_a_foreign_Host() {
   local gateway_image="$1" port code
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -138,9 +141,9 @@ it_refuses_the_metadata_for_a_foreign_Host() {
 
 it_runs_the_gateway_process_as_the_nonroot_uid() {
   local gateway_image="$1"
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
 
   start_gateway "$name" "$tree" "$gateway_image"
@@ -155,9 +158,9 @@ EOF
 
 it_keeps_a_stored_client_across_a_restart() {
   local gateway_image="$1" client_id
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
@@ -167,7 +170,7 @@ it_keeps_a_stored_client_across_a_restart() {
   [ -n "$client_id" ] || { echo "no client ID in the add output" >&2; exit 1; }
 
   docker restart "$name" > /dev/null
-  wait_for_ready "$name"
+  wait_for_ready "$name" 30
 
   docker exec "$name" /usr/local/bin/atc-gateway clients list > "$tree/clients"
   diff - "$tree/clients" <<< "$client_id  fixture-client  https://client.fixture.invalid/callback"
@@ -179,9 +182,9 @@ it_keeps_a_stored_client_across_a_restart() {
 # restore's own uid and the modes the gateway gave them, with no chown after it.
 it_restores_a_stored_client_after_a_backup_a_wipe_and_a_restore() {
   local gateway_image="$1" backup_image="$2" client_id
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
@@ -221,9 +224,9 @@ EOF
 # then masks it.
 it_groups_the_gateway_snapshots_across_source_paths_when_a_backup_prunes() {
   local backup_image="$2" before after
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -340,9 +343,9 @@ EOF
 # day, so it would be forgotten if retention did not filter by the gateway's host and tag.
 it_leaves_another_tools_snapshot_alone_when_a_backup_prunes() {
   local backup_image="$2"
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -369,9 +372,9 @@ EOF
 
 it_rejects_a_run_without_a_mode_with_its_usage() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
 
   run_backup "$name" "$backup_image" > "$tree/out" 2> "$tree/err" || status=$?
@@ -383,9 +386,9 @@ it_rejects_a_run_without_a_mode_with_its_usage() {
 
 it_rejects_an_unknown_mode_with_its_usage() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
 
   run_backup "$name" "$backup_image" prune > "$tree/out" 2> "$tree/err" || status=$?
@@ -397,13 +400,13 @@ it_rejects_an_unknown_mode_with_its_usage() {
 
 it_stops_before_restic_when_STATE_DIR_is_unset() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
 
-  docker run --rm --user 65532:65532 --security-opt no-new-privileges --cap-drop ALL \
-    -e HOME=/tmp --tmpfs /tmp -v "$name-repo:/repo" -e RESTIC_REPOSITORY=/repo \
+  docker run --rm --name "$name-backup" --user 65532:65532 --security-opt no-new-privileges \
+    --cap-drop ALL -e HOME=/tmp --tmpfs /tmp -v "$name-repo:/repo" -e RESTIC_REPOSITORY=/repo \
     -e RESTIC_PASSWORD=fixture-only "$backup_image" backup > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< '/usr/local/bin/atc-gateway-backup: line 14: STATE_DIR: set STATE_DIR'
@@ -415,9 +418,9 @@ it_stops_before_restic_when_STATE_DIR_is_unset() {
 
 it_fails_a_backup_of_a_state_dir_without_databases() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic init -q; echo notes > /state/readme'
 
@@ -435,9 +438,9 @@ it_fails_a_backup_of_a_state_dir_without_databases() {
 # The backup script pipes that check into `grep -qx ok`, so it fails without a message.
 it_fails_a_backup_whose_copy_fails_the_integrity_check() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   python3 - "$tree/seed/gateway.db" << 'EOF'
 import sqlite3, sys
@@ -469,9 +472,9 @@ EOF
 # database before it replaces anything, so the state keeps the database it had.
 it_fails_a_restore_whose_snapshot_fails_the_integrity_check_and_keeps_the_state() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   python3 - "$tree/seed/gateway.db" << 'EOF'
 import sqlite3, sys
@@ -513,9 +516,9 @@ EOF
 
 it_fails_a_restore_of_a_snapshot_without_databases() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -538,9 +541,9 @@ EOF
 
 it_fails_a_restore_when_the_repository_holds_no_gateway_snapshot() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -560,9 +563,9 @@ EOF
 # ls lists the gateway's snapshots alone; each ID is random, so the case masks that column
 it_lists_the_gateway_snapshots_alone_in_ls_mode() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -589,9 +592,9 @@ EOF
 
 it_restores_the_snapshot_that_SNAPSHOT_names_instead_of_the_latest() {
   local backup_image="$2" older status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -615,9 +618,9 @@ EOF
 
 it_removes_stale_wal_and_shm_files_when_it_restores_a_database() {
   local backup_image="$2" status=0
-  name="atc-gw-fixture-$BASHPID"
+  name="atc-gw-fixture-$4-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_case "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -655,19 +658,22 @@ setup_case() {
   chmod -R a+rX "$tree"
   docker volume create "$name-state" > /dev/null
   docker volume create "$name-repo" > /dev/null
-  docker run --rm --user 0 --entrypoint /bin/sh -v "$name-state:/s" -v "$name-repo:/r" \
-    "$restic_image" -c 'chown 65532:65532 /s /r'
+  docker run --rm --name "$name-setup" --user 0 --entrypoint /bin/sh \
+    -v "$name-state:/s" -v "$name-repo:/r" "$restic_image" -c 'chown 65532:65532 /s /r'
 }
 
 # Boot data every case needs: both images, built once under per-run tags that the run
-# removes. The cases take the image names (and the pinned restic image) as arguments.
+# removes, and the random per-run id that the tags and every case's container and volume
+# names carry, so concurrent runs on one daemon never share them. The cases take the
+# image names, the pinned restic image and the run id as arguments.
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # sets BASE_IMAGE and RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
 source "$repo/deploy/atc-gateway/versions.env"
+run="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
 work="$(mktemp -d)"
-gateway_image="atc-gateway:fixture-$$"
-backup_image="atc-gateway-backup:fixture-$$"
+gateway_image="atc-gateway:fixture-$run"
+backup_image="atc-gateway-backup:fixture-$run"
 trap 'docker rmi -f "$gateway_image" "$backup_image" > /dev/null 2>&1 || true; rm -rf "$work" || true' EXIT
 # shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env
 if ! {
@@ -682,4 +688,4 @@ if ! {
   exit 1
 fi
 echo "built $gateway_image and $backup_image"
-run_cases "$gateway_image" "$backup_image" "$RESTIC_IMAGE"
+run_cases "$gateway_image" "$backup_image" "$RESTIC_IMAGE" "$run"
