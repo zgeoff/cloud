@@ -21,7 +21,14 @@ it_builds_every_check_the_flake_declares_from_a_snapshot_of_the_tracked_and_unig
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
+  # a tracked file, an untracked one git lists, and an ignored one it does not; ls-files also
+  # names nixos/gone.nix, deleted from the working tree
+  mkdir "$tree/repo/nixos" "$tree/repo/scripts"
+  echo tracked > "$tree/repo/nixos/flake.nix"
+  echo untracked > "$tree/repo/scripts/untracked.sh"
+  echo ignored > "$tree/repo/notes.txt"
+  printf '%s\0' nixos/flake.nix nixos/gone.nix scripts/untracked.sh > "$tree/ls-files"
   touch "$tree/kvm"
   chmod 0600 "$tree/kvm"
 
@@ -55,7 +62,7 @@ it_builds_only_the_checks_named_without_listing_the_flake() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
@@ -77,7 +84,7 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
@@ -99,7 +106,7 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
   # QEMU cannot open such a device, and would fall back to emulation
   touch "$tree/kvm"
   chmod 0400 "$tree/kvm"
@@ -124,7 +131,7 @@ it_fails_naming_impd_restore_and_builds_nothing_when_it_is_the_only_check_and_kv
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
@@ -144,7 +151,7 @@ it_stops_without_building_when_the_flake_fails_to_evaluate() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
@@ -168,7 +175,7 @@ it_fails_when_the_flake_declares_no_checks() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
@@ -190,7 +197,7 @@ it_fails_with_the_build_when_a_check_fails() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  setup_case "$tree"
+  setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
@@ -205,16 +212,12 @@ it_fails_with_the_build_when_a_check_fails() {
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
-setup_case() {
+setup_test() {
   local tree="$1"
-  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo/nixos" "$tree/repo/scripts"
+  # the repository the stub git stands for starts empty, with nothing for ls-files to list
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
   : > "$tree/calls"
-  # the repository the stub git stands for: a tracked file, an untracked one git lists, and an
-  # ignored one it does not; ls-files also names nixos/gone.nix, deleted from the working tree
-  echo tracked > "$tree/repo/nixos/flake.nix"
-  echo untracked > "$tree/repo/scripts/untracked.sh"
-  echo ignored > "$tree/repo/notes.txt"
-  printf '%s\0' nixos/flake.nix nixos/gone.nix scripts/untracked.sh > "$tree/ls-files"
+  : > "$tree/ls-files"
   # git: answers the toplevel and the file list the snapshot reads
   cat > "$tree/bin/git" << 'STUB'
 #!/usr/bin/env bash
