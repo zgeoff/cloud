@@ -23,6 +23,7 @@ let
   image28 = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
   image29 = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.29.0";
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
+  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
 in
 pkgs.testers.runNixOSTest {
   name = "impd-restore-rehearsal";
@@ -110,6 +111,8 @@ pkgs.testers.runNixOSTest {
     };
 
   testScript = ''
+    # the shared test utilities pass their own tests before any subtest relies on them:
+    # ${testUtilsCheck}
     import re
 
     machine.wait_for_unit("multi-user.target")
@@ -1448,8 +1451,11 @@ pkgs.testers.runNixOSTest {
         machine.succeed(
             "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
         )
-        # diff follows a symlink, so a dangling one in the secrets cannot compare equal to its copy
-        machine.succeed("ln -s /nonexistent/secret /mnt/imp/secrets/dangling")
+        # a relative symlink in the secrets: cp -a saves the link itself, and diff follows each
+        # copy from where it sits, to the dataset's imp.sqlite note here and to the saved
+        # database there, so the saved secrets really differ from the originals
+        machine.succeed("printf 'a note beside the database\\n' > /mnt/imp/imp.sqlite")
+        machine.succeed("ln -s ../imp.sqlite /mnt/imp/secrets/note")
         db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
         machine.succeed("umount /mnt/imp")
         machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
@@ -1468,13 +1474,8 @@ pkgs.testers.runNixOSTest {
         assert status == 1, f"exit {status}: {out}{err}"
         saved_dirs = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
         assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
-        saved = saved_dirs[0]
         assert out.splitlines() == ["== check the copy", "== check the host", "== mount tank/imp", "== preserve the stopped database"], out
-        err_lines = err.splitlines()
-        assert len(err_lines) == 3, err
-        # the mountpoint is a fresh mktemp directory
-        assert re.fullmatch(r"diff: /run/impd-restore\.\w{6}/secrets/dangling: No such file or directory", err_lines[0]), err
-        assert err_lines[1:] == [
+        assert err.splitlines() == [
             "restore-impd-db: the saved secrets differ from the originals",
             "restore-impd-db: nothing was changed",
         ], err
@@ -1527,7 +1528,6 @@ pkgs.testers.runNixOSTest {
         assert status == 1, f"exit {status}: {out}{err}"
         saved_dirs = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
         assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
-        saved = saved_dirs[0]
         assert out.splitlines() == ["== check the copy", "== check the host", "== mount tank/imp", "== preserve the stopped database"], out
         assert err.splitlines() == [
             "restore-impd-db: the saved imp.sqlite-shm differs from the original",
@@ -1606,6 +1606,20 @@ pkgs.testers.runNixOSTest {
             "restore-impd-db: the staged file fails integrity_check",
             f"restore-impd-db: the original database is saved in {saved}; nothing was started or switched",
         ], err
+        # the stopped database and its secrets, saved before anything changed
+        listing = machine.succeed(f"cd {saved} && find . -printf '%M %u:%g %p\\n' | sort -k3").splitlines()
+        assert listing == [
+            "drwx------ root:root .",
+            "-rw------- root:root ./imp.sqlite",
+            "-rw------- root:root ./imp.sqlite-shm",
+            "-rw------- root:root ./imp.sqlite-wal",
+            "drwx------ root:root ./secrets",
+            "-rw------- root:root ./secrets/glm",
+        ], listing
+        saved_sums = machine.succeed(f"cd {saved} && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
+        assert saved_sums == db_sums, f"the saved database differs: {saved_sums}"
+        saved_secret = machine.succeed(f"cat {saved}/secrets/glm")
+        assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
         assert units == units_before, f"the units went from {units_before} to {units}"
         current = machine.succeed("readlink -f /run/current-system").strip()
@@ -1678,6 +1692,20 @@ pkgs.testers.runNixOSTest {
             f"umount: {mounts[0]}: target is busy.",
             f"restore-impd-db: tank/imp is still mounted at {mounts[0]}; unmount it by hand",
         ], err
+        # the stopped database and its secrets, saved before anything changed
+        listing = machine.succeed(f"cd {saved} && find . -printf '%M %u:%g %p\\n' | sort -k3").splitlines()
+        assert listing == [
+            "drwx------ root:root .",
+            "-rw------- root:root ./imp.sqlite",
+            "-rw------- root:root ./imp.sqlite-shm",
+            "-rw------- root:root ./imp.sqlite-wal",
+            "drwx------ root:root ./secrets",
+            "-rw------- root:root ./secrets/glm",
+        ], listing
+        saved_sums = machine.succeed(f"cd {saved} && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
+        assert saved_sums == db_sums, f"the saved database differs: {saved_sums}"
+        saved_secret = machine.succeed(f"cat {saved}/secrets/glm")
+        assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
         assert units == units_before, f"the units went from {units_before} to {units}"
         current = machine.succeed("readlink -f /run/current-system").strip()
@@ -1701,6 +1729,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed(
             "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
         )
+        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
         machine.succeed("umount /mnt/imp")
         machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
         machine.succeed(
@@ -1736,6 +1765,20 @@ pkgs.testers.runNixOSTest {
             f"restore-impd-db: cannot unmount {mounts[0]}",
             f"restore-impd-db: the copy is in place (the original is in {saved}); nothing was started or switched",
         ], err
+        # the stopped database and its secrets, saved before anything changed
+        listing = machine.succeed(f"cd {saved} && find . -printf '%M %u:%g %p\\n' | sort -k3").splitlines()
+        assert listing == [
+            "drwx------ root:root .",
+            "-rw------- root:root ./imp.sqlite",
+            "-rw------- root:root ./imp.sqlite-shm",
+            "-rw------- root:root ./imp.sqlite-wal",
+            "drwx------ root:root ./secrets",
+            "-rw------- root:root ./secrets/glm",
+        ], listing
+        saved_sums = machine.succeed(f"cd {saved} && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
+        assert saved_sums == db_sums, f"the saved database differs: {saved_sums}"
+        saved_secret = machine.succeed(f"cat {saved}/secrets/glm")
+        assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
         assert units == units_before, f"the units went from {units_before} to {units}"
         current = machine.succeed("readlink -f /run/current-system").strip()
@@ -1759,6 +1802,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed(
             "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
         )
+        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
         machine.succeed("umount /mnt/imp")
         machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
         machine.succeed(
@@ -1797,6 +1841,20 @@ pkgs.testers.runNixOSTest {
             f"restore-impd-db: the copy is in place (the original is in {saved}); "
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
         ], err
+        # the stopped database and its secrets, saved before anything changed
+        listing = machine.succeed(f"cd {saved} && find . -printf '%M %u:%g %p\\n' | sort -k3").splitlines()
+        assert listing == [
+            "drwx------ root:root .",
+            "-rw------- root:root ./imp.sqlite",
+            "-rw------- root:root ./imp.sqlite-shm",
+            "-rw------- root:root ./imp.sqlite-wal",
+            "drwx------ root:root ./secrets",
+            "-rw------- root:root ./secrets/glm",
+        ], listing
+        saved_sums = machine.succeed(f"cd {saved} && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
+        assert saved_sums == db_sums, f"the saved database differs: {saved_sums}"
+        saved_secret = machine.succeed(f"cat {saved}/secrets/glm")
+        assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
         assert units == ["failed", "failed"], f"the units are {units}"
         machine.fail("findmnt -rn -S tank/imp")
