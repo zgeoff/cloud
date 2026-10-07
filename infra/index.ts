@@ -1,3 +1,5 @@
+// the program's entry point: it wires every top-level module, one import each
+/* oxlint-disable import/max-dependencies */
 import {
   R2Bucket,
   ZeroTrustTunnelCloudflared,
@@ -9,6 +11,7 @@ import { Command } from '@pulumi/command/local';
 import { Config, secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
+import { buildEdgeRules } from './build-edge-rules.ts';
 import { createClusterWorkloads } from './cluster-workloads.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 import { createHealthCheck } from './health-check.ts';
@@ -19,7 +22,7 @@ import { tailnetPolicy } from './tailnet-policy.ts';
 // from op://cloud/onepassword-connect-credentials. The stack's "cluster" config says
 // whether the cluster is managed, so a missing value fails the run before any resource
 // registers, instead of planning to delete the cluster's resources.
-const clusterInputs = loadClusterInputs(new Config().get('cluster'), process.env);
+const clusterInputs = loadClusterInputs(new Config(), process.env);
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
 
 if (accountID === undefined) {
@@ -153,48 +156,10 @@ const geoffcloud = new Vm(
 );
 
 export const geoffcloudIPv4 = geoffcloud.mainIpv4;
-
-interface EdgeRule {
-  readonly name: string;
-  readonly protocol: string;
-  readonly port?: string;
-  readonly description: string;
-}
-
-const edgeRules: readonly EdgeRule[] = [
-  // SSH stays public until tailnet SSH works on the NixOS host (#6)
-  ...(hostOnTailnet
-    ? []
-    : [{ name: 'ssh', protocol: 'tcp', port: '22', description: 'SSH, until tailnet SSH (#6)' }]),
-  {
-    name: 'tailscale',
-    protocol: 'udp',
-    port: '41641',
-    description: 'Tailscale direct connections',
-  },
-  { name: 'icmp', protocol: 'icmp', description: 'ICMP' },
-];
-
 const edgeRuleResources: FirewallRule[] = [];
 
-const anywhere = [
-  { family: 'v4', subnet: '0.0.0.0' },
-  { family: 'v6', subnet: '::' },
-] as const;
-
-for (const rule of edgeRules) {
-  for (const target of anywhere) {
-    edgeRuleResources.push(
-      new FirewallRule(`edge-${rule.name}-${target.family}`, {
-        firewallId: edge.id,
-        protocol: rule.protocol,
-        ...(rule.port === undefined ? {} : { port: rule.port }),
-        subnet: target.subnet,
-        subnetSize: 0,
-        description: rule.description,
-      }),
-    );
-  }
+for (const rule of buildEdgeRules({ hostOnTailnet, firewallID: edge.id })) {
+  edgeRuleResources.push(new FirewallRule(rule.name, rule.args));
 }
 
 // Public ingress (#7). One tunnel for every public hostname under geoff.cloud;
