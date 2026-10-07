@@ -278,6 +278,32 @@ func TestStubOnidelAPISettlesABuildingVMAfterOneRead(t *testing.T) {
 	}, []string{first, second})
 }
 
+func TestStubOnidelAPISettlesEachInFlightStatusAfterOneRead(t *testing.T) {
+	rows := []struct {
+		name   string
+		status string
+	}{
+		{"it settles a restoring VM", "restoring"},
+		{"it settles a migrating VM", "migrating"},
+		// The spec spells the snapshot status taking_snaphot.
+		{"it settles a VM taking a snapshot", "taking_snaphot"},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetVM(map[string]any{"id": "v", "status": row.status, "active_action_id": nil})
+
+			_, first := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm/v", "")
+			_, second := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm/v", "")
+
+			assert.Equal(t, []string{
+				`{"active_action_id":null,"id":"v","status":"` + row.status + `"}` + "\n",
+				`{"active_action_id":null,"id":"v","status":"active"}` + "\n",
+			}, []string{first, second})
+		})
+	}
+}
+
 func TestStubOnidelAPIHoldsABuildingVMWhileAutoSettleIsOff(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "v", "status": "building", "active_action_id": nil})
@@ -417,26 +443,25 @@ func TestStubOnidelAPIRefusesAFirewallGroupWithoutATeamAs401(t *testing.T) {
 	assert.JSONEq(t, `{"err":"UNAUTHORIZED"}`, body)
 }
 
-func TestStubOnidelAPIRejectsAFirewallGroupWriteWithoutADescription(t *testing.T) {
-	rows := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{"it rejects a create", "POST", "/network/firewalls", `{"team_id":"t"}`},
-		{"it rejects an update", "PUT", "/network/firewalls/g1", `{"team_id":"t"}`},
-	}
-	for _, row := range rows {
-		t.Run(row.name, func(t *testing.T) {
-			ctx := setupTest(t)
-			ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge"})
+func TestStubOnidelAPIRejectsAFirewallGroupCreateWithoutADescription(t *testing.T) {
+	ctx := setupTest(t)
 
-			status, _ := onideltest.SendRequest(t, ctx.api.URL, row.method, row.path, row.body)
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls", `{"team_id":"t"}`)
 
-			assert.Equal(t, http.StatusBadRequest, status)
-		})
-	}
+	assert.Equal(t, []any{http.StatusBadRequest, map[string]map[string]any{}}, []any{status, ctx.api.GetFirewallGroups()})
+}
+
+func TestStubOnidelAPIReportsAFirewallGroupUpdateWithoutADescription(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge"})
+
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "PUT", "/network/firewalls/g1", `{"team_id":"t"}`)
+
+	assert.Equal(t, []any{
+		http.StatusInternalServerError,
+		[]string{"undocumented response: PUT /network/firewalls/g1 without a description"},
+		map[string]map[string]any{"g1": {"id": "g1", "description": "edge"}},
+	}, []any{status, ctx.api.DrainProblems(), ctx.api.GetFirewallGroups()})
 }
 
 func TestStubOnidelAPICreatesAFirewallGroupInAnEnvelope(t *testing.T) {
@@ -648,6 +673,17 @@ func TestStubOnidelAPIListsNoPTRRecordsForAVMWithoutAny(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, status)
 	assert.JSONEq(t, `{"rdns":[]}`, body)
+}
+
+func TestStubOnidelAPIAcceptsAPTRRecordForAnotherSpellingOfTheVMsIPv6Address(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8::1"})
+
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns",
+		`{"ip_addr":"2001:0db8:0000:0000:0000:0000:0000:0001","domain":"v6.example.com"}`)
+
+	assert.Equal(t, []any{http.StatusOK, map[string]map[string]string{"v": {"2001:0db8:0000:0000:0000:0000:0000:0001": "v6.example.com"}}},
+		[]any{status, ctx.api.GetRDNS()})
 }
 
 func TestStubOnidelAPIRejectsAnInvalidPTRWrite(t *testing.T) {

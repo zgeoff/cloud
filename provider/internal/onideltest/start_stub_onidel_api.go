@@ -534,9 +534,13 @@ func (f *StubOnidelAPI) sendFirewallGroup(w http.ResponseWriter, r *http.Request
 	sendJSON(w, http.StatusOK, map[string]any{"firewall_group": group})
 }
 
+// updateFirewallGroup changes the description. UpdateFirewallGroup requires one, but
+// the spec lists no 400 for this call (only 204, 401 and 404) and no live answer is
+// on record, so an update without one is a problem, not a guessed status.
 func (f *StubOnidelAPI) updateFirewallGroup(w http.ResponseWriter, r *http.Request, body map[string]any) {
 	if _, ok := body["description"].(string); !ok {
-		w.WriteHeader(http.StatusBadRequest)
+		f.problems = append(f.problems, fmt.Sprintf("undocumented response: PUT %s without a description", r.URL.Path))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	group, ok := f.firewalls[r.PathValue("id")]
@@ -686,6 +690,10 @@ func (f *StubOnidelAPI) upsertRDNS(w http.ResponseWriter, r *http.Request, body 
 	w.WriteHeader(http.StatusOK)
 }
 
+// isVMAddress compares parsed addresses, so another spelling of the VM's IPv6 address
+// (such as its expanded form) is the VM's own. The spec types ip_addr as "the VM IP
+// address" and does not say how it compares spellings; the provider makes the same
+// assumption when it matches a listed record (findRDNSRecord in onidel/rdns.go).
 func (f *StubOnidelAPI) isVMAddress(vmID, ip string) bool {
 	vm, ok := f.vms[vmID]
 	if !ok {
