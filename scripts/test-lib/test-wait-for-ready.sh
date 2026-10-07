@@ -16,6 +16,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-gateway.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for-ready.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
 
 # As above: one answered poll from start_gateway before the restart, and one from
 # wait_for_ready after it. Every poll that wait_for_ready makes follows the restart.
@@ -24,7 +25,7 @@ it_waits_for_readyz_after_a_restart() {
   name="atc-gw-ready-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
   start_gateway "$name" "$tree" "$gateway_image"
   docker restart "$name" > /dev/null
 
@@ -46,8 +47,9 @@ EOF
 }
 
 # The container publishes 8414 but nothing listens there, so /readyz never answers before
-# the one-second deadline. Docker keeps no order between a container's stdout and stderr
-# lines, so the case compares the log lines after the timeout as a sorted set.
+# the one-second deadline, which the fake clock (create-stub-clock.sh) reaches at the first
+# pause instead of after a real second. Docker keeps no order between a container's stdout
+# and stderr lines, so the case compares the log lines after the timeout as a sorted set.
 it_fails_wait_for_ready_with_the_containers_logs_when_readyz_never_answers() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-ready-$run-$BASHPID"
@@ -55,8 +57,10 @@ it_fails_wait_for_ready_with_the_containers_logs_when_readyz_never_answers() {
   trap 'docker rm -f "$name" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
   docker run -d --name "$name" -p 127.0.0.1::8414 --entrypoint /bin/sh "$backup_image" \
     -c 'echo a log line on stdout; echo a log line on stderr >&2; exec sleep 300' > /dev/null
+  create_stub_clock "$tree"
 
-  wait_for_ready "$name" 1 > "$tree/out" 2> "$tree/err" || status=$?
+  WAIT_FOR_CLOCK="$tree/clock" WAIT_FOR_SLEEP="$tree/sleep" \
+    wait_for_ready "$name" 1 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - <(head -n 1 "$tree/err") <<< "timed out after 1s waiting for $name to answer /readyz with 200"
@@ -64,38 +68,40 @@ it_fails_wait_for_ready_with_the_containers_logs_when_readyz_never_answers() {
 a log line on stderr
 a log line on stdout
 EOF
+  diff - "$tree/pauses" <<< 0.05
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
-# The container has exited before the helper starts, so the helper reports it at once
-# instead of polling a port that is gone until the 30-second deadline.
+# The container has exited before the helper starts, so the helper reports it at its
+# first poll, with no pause, instead of polling a port that is gone until the 30-second
+# deadline.
 it_fails_wait_for_ready_with_the_containers_logs_as_soon_as_the_container_stops() {
-  local backup_image="$2" run="$3" started elapsed status=0
+  local backup_image="$2" run="$3" status=0
   name="atc-gw-ready-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
   docker run -d --name "$name" -p 127.0.0.1::8414 --entrypoint /bin/sh "$backup_image" \
     -c 'echo a log line on stdout; echo a log line on stderr >&2; exit 3' > /dev/null
   docker wait "$name" > /dev/null
-  started="$SECONDS"
+  create_stub_clock "$tree"
 
-  wait_for_ready "$name" 30 > "$tree/out" 2> "$tree/err" || status=$?
+  WAIT_FOR_CLOCK="$tree/clock" WAIT_FOR_SLEEP="$tree/sleep" \
+    wait_for_ready "$name" 30 > "$tree/out" 2> "$tree/err" || status=$?
 
-  elapsed=$((SECONDS - started))
   diff /dev/null "$tree/out"
   diff - <(head -n 1 "$tree/err") <<< "$name stopped before it answered /readyz with 200"
   diff - <(tail -n +2 "$tree/err" | sort) << 'EOF'
 a log line on stderr
 a log line on stdout
 EOF
-  [ "$elapsed" -le 5 ] || { echo "returned after ${elapsed}s, want at most 5" >&2; exit 1; }
+  [ ! -e "$tree/pauses" ] || { echo "wait_for_ready paused before it reported the stop" >&2; exit 1; }
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a
 # state volume owned by the nonroot uid, as fsGroup 65532 leaves the pod's new volume.
 # Its chown container is named for the case's trap.
-setup_case() {
+setup_test() {
   local tree="$1" name="$2" backup_image="$3"
   mkdir "$tree/registry"
   # start_gateway mounts it; the gateway exits at boot without it, and serves without

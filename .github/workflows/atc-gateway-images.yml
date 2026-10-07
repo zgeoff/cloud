@@ -9,7 +9,10 @@ on:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
-      - scripts/test-atc-gateway-fixture.sh
+      - e2e/test-atc-gateway-restore.sh
+      - infra/build-atc-gateway-spec.ts
+      - infra/create-atc-gateway-backup-job.ts
+      - infra/build-atc-gateway-backup-pod-spec.ts
       - scripts/test-lib/**
       - package.json
       - .github/workflows/atc-gateway-images.yml
@@ -17,7 +20,10 @@ on:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
-      - scripts/test-atc-gateway-fixture.sh
+      - e2e/test-atc-gateway-restore.sh
+      - infra/build-atc-gateway-spec.ts
+      - infra/create-atc-gateway-backup-job.ts
+      - infra/build-atc-gateway-backup-pod-spec.ts
       - scripts/test-lib/**
       - package.json
       - .github/workflows/atc-gateway-images.yml

@@ -20,7 +20,7 @@ it_starts_the_gateway_with_the_deployments_container_security_env_and_args() {
   name="atc-gw-start-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   start_gateway "$name" "$tree" "$gateway_image" > "$tree/out" 2> "$tree/err"
 
@@ -87,7 +87,7 @@ it_returns_from_start_gateway_only_once_readyz_answers_200() {
   name="atc-gw-start-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
-  setup_case "$tree" "$name" "$backup_image"
+  setup_test "$tree" "$name" "$backup_image"
 
   start_gateway "$name" "$tree" "$gateway_image"
 
@@ -100,7 +100,7 @@ it_returns_from_start_gateway_only_once_readyz_answers_200() {
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a
 # state volume owned by the nonroot uid, as fsGroup 65532 leaves the pod's new volume.
 # Its chown container is named for the case's trap.
-setup_case() {
+setup_test() {
   local tree="$1" name="$2" backup_image="$3"
   mkdir "$tree/registry"
   # start_gateway mounts it; the gateway exits at boot without it, and serves without

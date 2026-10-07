@@ -1,8 +1,9 @@
 # atc-gateway: backup and restore
 
 The gateway's durable state is two SQLite files on its volume. This runbook covers what is backed
-up, where, and how to restore it. The procedure is tested by `scripts/test-atc-gateway-fixture.sh`
-against a local restic repository; it has not run against R2 or k3s yet.
+up, where, and how to restore it. The procedure is tested by `e2e/test-atc-gateway-restore.sh` and
+`deploy/atc-gateway/backup/test-backup.sh` against a local restic repository; it has not run against
+R2 or k3s yet.
 
 ## Data boundary
 
