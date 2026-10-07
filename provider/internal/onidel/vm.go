@@ -2,7 +2,6 @@ package onidel
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -89,11 +88,21 @@ func (a *VMArgs) Annotate(an infer.Annotator) {
 	an.Describe(&a.FirewallGroupID, "FirewallGroup to attach. Updatable in place; unset detaches.")
 }
 
+// ImageSourceError is a Vm whose inputs set Count of os, snapshotId and isoId, where
+// exactly one is needed.
+type ImageSourceError struct {
+	Count int
+}
+
+func (e *ImageSourceError) Error() string {
+	return "onidel: a Vm needs exactly one of os, snapshotId or isoId"
+}
+
 // Create provisions the VM and waits until it is active.
 func (VM) Create(ctx context.Context, req infer.CreateRequest[VMArgs]) (infer.CreateResponse[VMState], error) {
 	in := req.Inputs
 	if n := countSet(in.OS != nil, in.SnapshotID != nil, in.ISOID != nil); n != 1 {
-		return infer.CreateResponse[VMState]{}, errors.New("onidel: a Vm needs exactly one of os, snapshotId or isoId")
+		return infer.CreateResponse[VMState]{}, &ImageSourceError{Count: n}
 	}
 	if req.DryRun {
 		return infer.CreateResponse[VMState]{Output: VMState{VMArgs: in}}, nil

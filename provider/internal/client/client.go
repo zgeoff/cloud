@@ -28,7 +28,10 @@ const (
 )
 
 // DefaultPollInterval is the PollInterval New gives a client.
-var DefaultPollInterval = 10 * time.Second
+const DefaultPollInterval = 10 * time.Second
+
+// DefaultVMWaitTimeout is the VMWaitTimeout New gives a client.
+const DefaultVMWaitTimeout = 30 * time.Minute
 
 // Client talks to the Onidel API with a bearer token.
 type Client struct {
@@ -39,6 +42,11 @@ type Client struct {
 	PollInterval time.Duration
 	// RetryBase is the first backoff for a retried request; it doubles per retry.
 	RetryBase time.Duration
+	// VMWaitTimeout caps how long the VM helpers wait for the API to settle.
+	VMWaitTimeout time.Duration
+	// Sleep waits d between polls and retries. It returns ctx's error, and stops
+	// waiting, when ctx ends first.
+	Sleep func(ctx context.Context, d time.Duration) error
 }
 
 // New returns a client for baseURL (DefaultBaseURL when empty).
@@ -47,11 +55,25 @@ func New(baseURL, apiKey string) *Client {
 		baseURL = DefaultBaseURL
 	}
 	return &Client{
-		baseURL:      strings.TrimRight(baseURL, "/"),
-		apiKey:       apiKey,
-		http:         &http.Client{Timeout: 60 * time.Second},
-		PollInterval: DefaultPollInterval,
-		RetryBase:    500 * time.Millisecond,
+		baseURL:       strings.TrimRight(baseURL, "/"),
+		apiKey:        apiKey,
+		http:          &http.Client{Timeout: 60 * time.Second},
+		PollInterval:  DefaultPollInterval,
+		RetryBase:     500 * time.Millisecond,
+		VMWaitTimeout: DefaultVMWaitTimeout,
+		Sleep:         sleepContext,
+	}
+}
+
+// sleepContext waits d, or returns ctx's error as soon as ctx ends.
+func sleepContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
 	}
 }
 
@@ -94,10 +116,8 @@ func (c *Client) sendRequest(
 		if !shouldRetry(method, err) || attempt >= maxRetries {
 			return raw, err
 		}
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(c.RetryBase << attempt):
+		if err := c.Sleep(ctx, c.RetryBase<<attempt); err != nil {
+			return nil, err
 		}
 	}
 }
@@ -208,19 +228,25 @@ func buildTeamQuery(teamID string) url.Values {
 	return url.Values{"team_id": {teamID}}
 }
 
-// waitFor polls check until it reports done, returns an error, or ctx ends.
+// waitFor polls check until it reports done, returns an error, or ctx ends. It also
+// gives up once its sleeps add up to timeout: a real sleep lasts at least as long as
+// asked, so that never comes before the context's own deadline, and it lets an
+// injected Sleep reach the timeout without the wall clock.
 func (c *Client) waitFor(ctx context.Context, timeout time.Duration, check func() (bool, error)) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	var slept time.Duration
 	for {
 		done, err := check()
 		if err != nil || done {
 			return err
 		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(c.PollInterval):
+		if slept >= timeout {
+			return context.DeadlineExceeded
 		}
+		if err := c.Sleep(ctx, c.PollInterval); err != nil {
+			return err
+		}
+		slept += c.PollInterval
 	}
 }

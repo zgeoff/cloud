@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 
@@ -210,14 +211,11 @@ func TestCreateVMFailsWhenTheAPIRefusesTheCreate(t *testing.T) {
 func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("POST /vm", http.StatusCreated, "", 1)
-	previous := client.VMWaitTimeout
-	client.VMWaitTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { client.VMWaitTimeout = previous })
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
-	assert.Equal(t, client.VM{}, vm)
+	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, *ctx.sleeps})
 }
 
 func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
@@ -238,14 +236,12 @@ func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
 func TestCreateVMReturnsTheIDOfAVMThatNeverBecomesReady(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetAutoSettle(false)
-	previous := client.VMWaitTimeout
-	client.VMWaitTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { client.VMWaitTimeout = previous })
 
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Equal(t, client.VM{ID: "00000000-0000-4000-8000-000000000001"}, vm)
+	assert.Equal(t, []any{client.VM{ID: "00000000-0000-4000-8000-000000000001"}, slices.Repeat([]time.Duration{10 * time.Second}, 180)},
+		[]any{vm, *ctx.sleeps})
 }
 
 func TestWaitForVMReadyWaitsForAnActiveVMWithNoActionInFlight(t *testing.T) {
@@ -292,6 +288,9 @@ func TestWaitForVMReadyFailsOnAStatusThatNeverSettles(t *testing.T) {
 
 			_, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
 
+			var statusErr *client.VMStatusError
+			require.ErrorAs(t, err, &statusErr)
+			assert.Equal(t, &client.VMStatusError{ID: "v", Status: row.status}, statusErr)
 			assert.EqualError(t, err, `onidel: VM v is "`+row.status+`", not active`)
 		})
 	}
@@ -439,4 +438,20 @@ func TestWaitForVMReadyWaitsThroughTheAlternativeSnapshotSpelling(t *testing.T) 
 		client.VM{ID: "v", Status: "active", ActiveActionID: json.RawMessage("null")},
 		[]onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}},
 	}, []any{vm, ctx.api.GetRequests()})
+}
+
+func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "status": "building"})
+	ctx.api.SetAutoSettle(false)
+	callCtx, cancel := context.WithCancel(t.Context())
+	t.Cleanup(cancel)
+	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error {
+		cancel()
+		return sleepCtx.Err()
+	}
+
+	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
+
+	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}}, []any{err, ctx.api.GetRequests()})
 }

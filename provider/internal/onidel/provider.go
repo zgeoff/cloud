@@ -3,6 +3,9 @@
 package onidel
 
 import (
+	"context"
+	"time"
+
 	p "github.com/pulumi/pulumi-go-provider"
 	"github.com/pulumi/pulumi-go-provider/infer"
 )
@@ -16,8 +19,20 @@ const NodePackageName = "@zgeoff/pulumi-onidel"
 // pulumiNodeSDKVersion pins the SDK's @pulumi/pulumi dependency to an exact version.
 const pulumiNodeSDKVersion = "3.251.0"
 
+// Options changes how NewWithOptions builds the provider. The zero value builds the
+// provider New does.
+type Options struct {
+	// Sleep, when set, replaces the API client's wait between polls and retries.
+	Sleep func(ctx context.Context, d time.Duration) error
+}
+
 // New builds the provider.
 func New() (p.Provider, error) {
+	return NewWithOptions(Options{})
+}
+
+// NewWithOptions builds the provider with opts.
+func NewWithOptions(opts Options) (p.Provider, error) {
 	return infer.NewProviderBuilder().
 		WithDisplayName("Onidel").
 		WithDescription("A partial provider for the Onidel cloud API: VMs, SSH keys, firewalls and rDNS.").
@@ -41,7 +56,7 @@ func New() (p.Provider, error) {
 			},
 		}).
 		WithGoImportPath("github.com/zgeoff/cloud/sdk/go/onidel").
-		WithConfig(infer.Config(&Config{})).
+		WithConfig(infer.Config(&Config{sleep: opts.Sleep})).
 		WithResources(
 			infer.Resource(SSHKey{}),
 			infer.Resource(VM{}),

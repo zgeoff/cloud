@@ -1,6 +1,7 @@
 package onidel_test
 
 import (
+	"context"
 	"encoding/json"
 	"maps"
 	"slices"
@@ -13,7 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zgeoff/cloud/provider/internal/client"
 	"github.com/zgeoff/cloud/provider/internal/onidel"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
@@ -25,13 +25,10 @@ func setupTest(t *testing.T) struct {
 	server integration.Server
 } {
 	t.Helper()
-	previous := client.DefaultPollInterval
-	// The VM wait helpers sleep on the wall clock; keep each sleep short.
-	client.DefaultPollInterval = time.Millisecond
-	t.Cleanup(func() { client.DefaultPollInterval = previous })
 	api := onideltest.StartFakeAPI(t)
 
-	prov, err := onidel.New()
+	// The API client polls every ten seconds; return from each sleep at once.
+	prov, err := onidel.NewWithOptions(onidel.Options{Sleep: func(ctx context.Context, _ time.Duration) error { return ctx.Err() }})
 	require.NoError(t, err)
 	server, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(prov))
 	require.NoError(t, err)
@@ -104,4 +101,22 @@ func TestSchemaNeverNamesAPassword(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, resp.Schema, `"onidel:index:Vm"`)
 	assert.NotContains(t, resp.Schema, `"password"`)
+}
+
+func TestNewPublishesTheSameSchemaAsZeroOptions(t *testing.T) {
+	plain, err := onidel.New()
+	require.NoError(t, err)
+	zero, err := onidel.NewWithOptions(onidel.Options{})
+	require.NoError(t, err)
+	plainServer, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(plain))
+	require.NoError(t, err)
+	zeroServer, err := integration.NewServer(t.Context(), onidel.Name, semver.MustParse("0.1.0"), integration.WithProvider(zero))
+	require.NoError(t, err)
+	want, err := zeroServer.GetSchema(p.GetSchemaRequest{})
+	require.NoError(t, err)
+
+	got, err := plainServer.GetSchema(p.GetSchemaRequest{})
+
+	require.NoError(t, err)
+	assert.Equal(t, want, got)
 }

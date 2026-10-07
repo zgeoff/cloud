@@ -3,7 +3,6 @@ package onidel_test
 import (
 	"net/http"
 	"testing"
-	"time"
 
 	p "github.com/pulumi/pulumi-go-provider"
 	"github.com/pulumi/pulumi-go-provider/infer"
@@ -11,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidel"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -364,9 +363,10 @@ func TestVMCreateNeedsExactlyOneImageSource(t *testing.T) {
 	rows := []struct {
 		name   string
 		inputs map[string]any
+		count  int
 	}{
-		{"it rejects a VM with no image source", map[string]any{"name": "x", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40}},
-		{"it rejects a VM with two image sources", map[string]any{"name": "x", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40, "os": 24, "isoId": "i"}},
+		{"it rejects a VM with no image source", map[string]any{"name": "x", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40}, 0},
+		{"it rejects a VM with two image sources", map[string]any{"name": "x", "location": "Sydney", "cpu": 2, "ram": 4096, "disk": 40, "os": 24, "isoId": "i"}, 2},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -374,6 +374,9 @@ func TestVMCreateNeedsExactlyOneImageSource(t *testing.T) {
 
 			_, err := ctx.server.Create(p.CreateRequest{Urn: onideltest.BuildURN("onidel:index:Vm", "x"), Properties: onideltest.BuildProps(row.inputs)})
 
+			var sourceErr *onidel.ImageSourceError
+			require.ErrorAs(t, err, &sourceErr)
+			assert.Equal(t, &onidel.ImageSourceError{Count: row.count}, sourceErr)
 			assert.EqualError(t, err, "onidel: a Vm needs exactly one of os, snapshotId or isoId")
 			assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 		})
@@ -407,9 +410,6 @@ func TestVMCreatePreviewSendsNothing(t *testing.T) {
 func TestVMCreateKeepsAVMThatNeverBecomesReadyInState(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetAutoSettle(false)
-	previous := client.VMWaitTimeout
-	client.VMWaitTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { client.VMWaitTimeout = previous })
 
 	created, err := ctx.server.Create(p.CreateRequest{
 		Urn:        onideltest.BuildURN("onidel:index:Vm", "web"),

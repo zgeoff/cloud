@@ -10,6 +10,7 @@ import (
 	"strings"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/assert"
@@ -21,26 +22,60 @@ import (
 
 // setupTest starts the fake API and a client for it. Go allows one setupTest per
 // package, so this one serves every test file in the package.
+// The client's sleeps return at once and are recorded in sleeps, in order.
 func setupTest(t *testing.T) struct {
 	api    *onideltest.FakeAPI
 	client *client.Client
+	sleeps *[]time.Duration
 } {
 	t.Helper()
 	api := onideltest.StartFakeAPI(t)
 	c := client.New(api.URL, onideltest.APIKey)
-	// The wait and retry helpers sleep on the wall clock; keep each sleep short.
-	c.PollInterval = time.Millisecond
-	c.RetryBase = time.Millisecond
+	var sleeps []time.Duration
+	c.Sleep = func(sleepCtx context.Context, d time.Duration) error {
+		sleeps = append(sleeps, d)
+		return sleepCtx.Err()
+	}
 	return struct {
 		api    *onideltest.FakeAPI
 		client *client.Client
-	}{api: api, client: c}
+		sleeps *[]time.Duration
+	}{api: api, client: c, sleeps: &sleeps}
 }
 
 func TestNewStartsWithTheDefaultIntervals(t *testing.T) {
 	c := client.New("", "key")
 
-	assert.Equal(t, []time.Duration{client.DefaultPollInterval, 500 * time.Millisecond}, []time.Duration{c.PollInterval, c.RetryBase})
+	assert.Equal(t, []time.Duration{10 * time.Second, 500 * time.Millisecond, 30 * time.Minute},
+		[]time.Duration{c.PollInterval, c.RetryBase, c.VMWaitTimeout})
+}
+
+func TestNewSleepsForTheWholeDuration(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := client.New("", "key")
+		start := time.Now()
+
+		err := c.Sleep(t.Context(), time.Hour)
+
+		assert.Equal(t, []any{nil, time.Hour}, []any{err, time.Since(start)})
+	})
+}
+
+func TestNewSleepsNoLongerThanTheContextLasts(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		c := client.New("", "key")
+		sleepCtx, cancel := context.WithCancel(t.Context())
+		t.Cleanup(cancel)
+		go func() {
+			time.Sleep(time.Minute)
+			cancel()
+		}()
+		start := time.Now()
+
+		err := c.Sleep(sleepCtx, time.Hour)
+
+		assert.Equal(t, []any{context.Canceled, time.Minute}, []any{err, time.Since(start)})
+	})
 }
 
 func TestNewTrimsATrailingSlashFromTheBaseURL(t *testing.T) {
@@ -171,6 +206,7 @@ func TestClientRetriesAGETOnATransientStatus(t *testing.T) {
 			assert.Equal(t, []onideltest.Request{
 				{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"},
 			}, ctx.api.GetRequests())
+			assert.Equal(t, []time.Duration{500 * time.Millisecond, time.Second}, *ctx.sleeps)
 		})
 	}
 }
@@ -187,6 +223,7 @@ func TestClientRetriesAPUT(t *testing.T) {
 		{Method: "PUT", Path: "/network/firewalls/g", Body: map[string]any{"description": "d"}},
 		{Method: "PUT", Path: "/network/firewalls/g", Body: map[string]any{"description": "d"}},
 	}, ctx.api.GetRequests())
+	assert.Equal(t, []time.Duration{500 * time.Millisecond}, *ctx.sleeps)
 }
 
 func TestClientRetriesADELETE(t *testing.T) {
@@ -201,6 +238,7 @@ func TestClientRetriesADELETE(t *testing.T) {
 		{Method: "DELETE", Path: "/network/firewalls/g", Query: "team_id=t"},
 		{Method: "DELETE", Path: "/network/firewalls/g", Query: "team_id=t"},
 	}, ctx.api.GetRequests())
+	assert.Equal(t, []time.Duration{500 * time.Millisecond}, *ctx.sleeps)
 }
 
 func TestClientGivesUpAfterFourRetries(t *testing.T) {
@@ -216,6 +254,7 @@ func TestClientGivesUpAfterFourRetries(t *testing.T) {
 		{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"},
 		{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"},
 	}, ctx.api.GetRequests())
+	assert.Equal(t, []time.Duration{500 * time.Millisecond, time.Second, 2 * time.Second, 4 * time.Second}, *ctx.sleeps)
 }
 
 func TestClientNeverRetriesAPOST(t *testing.T) {
@@ -230,6 +269,7 @@ func TestClientNeverRetriesAPOST(t *testing.T) {
 	assert.Equal(t, []onideltest.Request{
 		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "t", "description": "x"}},
 	}, ctx.api.GetRequests())
+	assert.Equal(t, []time.Duration(nil), *ctx.sleeps)
 }
 
 func TestClientNeverRetriesAPATCH(t *testing.T) {
@@ -244,6 +284,7 @@ func TestClientNeverRetriesAPATCH(t *testing.T) {
 	assert.Equal(t, []onideltest.Request{
 		{Method: "PATCH", Path: "/ssh_keys/k", Body: map[string]any{"team_id": "t", "name": "n", "ssh_key": "p"}},
 	}, ctx.api.GetRequests())
+	assert.Equal(t, []time.Duration(nil), *ctx.sleeps)
 }
 
 func TestClientNeverRetriesAServerError(t *testing.T) {
@@ -256,22 +297,22 @@ func TestClientNeverRetriesAServerError(t *testing.T) {
 	require.ErrorAs(t, err, &apiErr)
 	assert.Equal(t, &client.APIError{Method: "GET", Path: "/teams", Status: 500}, apiErr)
 	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
+	assert.Equal(t, []time.Duration(nil), *ctx.sleeps)
 }
 
 func TestClientStopsRetryingWhenTheContextEnds(t *testing.T) {
 	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /teams", http.StatusServiceUnavailable, "", 1)
 	callCtx, cancel := context.WithCancel(t.Context())
 	t.Cleanup(cancel)
-	ctx.api.RegisterHandler("GET /teams", func(w http.ResponseWriter, _ *http.Request) {
+	ctx.client.Sleep = func(sleepCtx context.Context, _ time.Duration) error {
 		cancel()
-		w.WriteHeader(http.StatusServiceUnavailable)
-	})
-	ctx.client.RetryBase = time.Hour
+		return sleepCtx.Err()
+	}
 
 	_, err := ctx.client.ReadTeams(callCtx)
 
-	require.ErrorIs(t, err, context.Canceled)
-	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
+	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/teams"}}}, []any{err, ctx.api.GetRequests()})
 }
 
 func TestClientReportsABaseURLThatDoesNotParse(t *testing.T) {
