@@ -1,10 +1,11 @@
 # Probe impd's /health on loopback and write node-exporter textfile metrics atomically.
-# Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR. Writes $TEXTFILE_DIR/impd_local_health.prom.
+# Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR, and IMPD_HEALTH_TIMEOUT_SECONDS (curl's --max-time,
+# default 5). Writes $TEXTFILE_DIR/impd_local_health.prom.
 
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
 
-code=$(curl -s -o "$body" -w '%{http_code}' --max-time 5 "$IMPD_HEALTH_URL" || true)
+code=$(curl -s -o "$body" -w '%{http_code}' --max-time "${IMPD_HEALTH_TIMEOUT_SECONDS:-5}" "$IMPD_HEALTH_URL" || true)
 code=${code:-000}
 
 up=0

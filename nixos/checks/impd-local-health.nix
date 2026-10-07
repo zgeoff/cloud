@@ -413,8 +413,56 @@ let
       '';
     }
     {
-      title = "it gives up after 5 s and reports status 0 when impd accepts and never answers";
+      title = "it gives up after IMPD_HEALTH_TIMEOUT_SECONDS and reports status 0 when impd accepts and never answers";
       dir = "stall";
+      script = ''
+        # a listener whose backlog completes the connection, and that never accepts or answers
+        mkfifo port.fifo
+        exec 3<>port.fifo
+        python3 -c 'import socket, time
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        s.listen(8)
+        print(s.getsockname()[1], flush=True)
+        time.sleep(3600)' >&3 &
+        stub_pid=$!
+        trap 'kill "$stub_pid"' EXIT
+        read -r -t 5 -u 3 port
+        mkdir out
+
+        before=$(date +%s)
+        status=0
+        IMPD_HEALTH_TIMEOUT_SECONDS=1 IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out \
+          ${probe} > stdout 2> stderr || status=$?
+        after=$(date +%s)
+
+        assert_equals 0 "$status" "the probe's exit status"
+        # curl's --max-time 1 ends the probe: at least 1 s, and not much more
+        assert_between 1 "$((after - before))" 3 "the probe's run time in seconds"
+        assert_files_equal /dev/null stdout
+        assert_files_equal /dev/null stderr
+        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
+        assert_between "$before" "$stamp" "$after" "the timestamp"
+        sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
+          out/impd_local_health.prom > actual
+        cat > expected <<'EOF'
+        # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
+        # TYPE impd_local_health_up gauge
+        impd_local_health_up 0
+        # HELP impd_local_health_status_code HTTP status of the last loopback probe, 0 when it got no answer.
+        # TYPE impd_local_health_status_code gauge
+        impd_local_health_status_code 0
+        # HELP impd_local_health_last_check_timestamp_seconds When the last loopback probe ran.
+        # TYPE impd_local_health_last_check_timestamp_seconds gauge
+        impd_local_health_last_check_timestamp_seconds STAMP
+        EOF
+        assert_files_equal expected actual
+      '';
+    }
+    {
+      title = "it gives up after 5 s when IMPD_HEALTH_TIMEOUT_SECONDS is unset";
+      dir = "stall-default";
       script = ''
         # a listener whose backlog completes the connection, and that never accepts or answers
         mkfifo port.fifo
@@ -436,27 +484,10 @@ let
         after=$(date +%s)
 
         assert_equals 0 "$status" "the probe's exit status"
-        # curl's --max-time 5 ends the probe: at least 5 s, and not much more
+        # the default --max-time 5 ends the probe: at least 5 s, and not much more
         assert_between 5 "$((after - before))" 7 "the probe's run time in seconds"
-        assert_files_equal /dev/null stdout
-        assert_files_equal /dev/null stderr
-        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
-        stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
-        assert_between "$before" "$stamp" "$after" "the timestamp"
-        sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
-          out/impd_local_health.prom > actual
-        cat > expected <<'EOF'
-        # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
-        # TYPE impd_local_health_up gauge
-        impd_local_health_up 0
-        # HELP impd_local_health_status_code HTTP status of the last loopback probe, 0 when it got no answer.
-        # TYPE impd_local_health_status_code gauge
-        impd_local_health_status_code 0
-        # HELP impd_local_health_last_check_timestamp_seconds When the last loopback probe ran.
-        # TYPE impd_local_health_last_check_timestamp_seconds gauge
-        impd_local_health_last_check_timestamp_seconds STAMP
-        EOF
-        assert_files_equal expected actual
+        assert_equals "impd_local_health_status_code 0" \
+          "$(grep '^impd_local_health_status_code ' out/impd_local_health.prom)" "the status code line"
       '';
     }
     {
