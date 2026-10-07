@@ -115,7 +115,7 @@ func TestReadFirewallRuleReadsOneRuleInTheTeam(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
-		"subnet": "::", "subnet_size": 0, "desc": "",
+		"subnet": "::", "subnet_size": 0.0, "desc": "",
 	})
 
 	rule, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "r1", "team-a")
@@ -132,7 +132,7 @@ func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
-		"subnet": "0.0.0.0", "subnet_size": 0, "desc": "",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
 	})
 
 	err := ctx.client.UpdateFirewallRuleDescription(t.Context(), "g1", "r1", "team-a", "ssh")
@@ -141,7 +141,7 @@ func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {
 	assert.Equal(t, []any{
 		map[string]map[string]any{"r1": {
 			"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
-			"subnet": "0.0.0.0", "subnet_size": 0, "desc": "ssh",
+			"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "ssh",
 		}},
 		[]onideltest.Request{{
 			Method: "PATCH", Path: "/network/firewalls/g1/rules/r1", Body: map[string]any{"team_id": "team-a", "desc": "ssh"},
@@ -154,7 +154,7 @@ func TestRemoveFirewallRuleRemovesARuleInTheTeam(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
-		"subnet": "0.0.0.0", "subnet_size": 0, "desc": "",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
 	})
 
 	err := ctx.client.RemoveFirewallRule(t.Context(), "g1", "r1", "team-a")

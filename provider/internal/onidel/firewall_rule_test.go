@@ -94,7 +94,7 @@ func TestFirewallRuleRefreshShowsNoDriftForICMPOnAV6Subnet(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
-		"subnet": "::", "subnet_size": 0, "desc": "",
+		"subnet": "::", "subnet_size": 0.0, "desc": "",
 	})
 
 	read, err := ctx.server.Read(p.ReadRequest{
@@ -123,7 +123,7 @@ func TestFirewallRuleImportAdoptsTheAPIsSpellingByCompositeID(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
-		"subnet": "::", "subnet_size": 0, "desc": "",
+		"subnet": "::", "subnet_size": 0.0, "desc": "",
 	})
 
 	imported, err := ctx.server.Read(p.ReadRequest{ID: "g1/r1", Urn: onideltest.BuildURN("onidel:index:FirewallRule", "icmp6")})
@@ -336,7 +336,7 @@ func TestFirewallRuleUpdateChangesTheDescription(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
-		"subnet": "::", "subnet_size": 0, "desc": "",
+		"subnet": "::", "subnet_size": 0.0, "desc": "",
 	})
 
 	updated, err := ctx.server.Update(p.UpdateRequest{
@@ -408,7 +408,7 @@ func TestFirewallRuleDeleteRemovesTheRuleFromTheTeam(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v6", "action": "allow", "protocol": "ipv6-icmp", "port": "",
-		"subnet": "::", "subnet_size": 0, "desc": "",
+		"subnet": "::", "subnet_size": 0.0, "desc": "",
 	})
 
 	err := ctx.server.Delete(p.DeleteRequest{

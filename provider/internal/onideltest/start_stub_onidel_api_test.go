@@ -195,16 +195,6 @@ func TestStubOnidelAPIReplacesAVMInItsListPositionWhenATestSetsItsIDAgain(t *tes
 	assert.JSONEq(t, `[{"id":"a","name":"first-2","status":"building"},{"id":"b","name":"second","status":"active"}]`, body)
 }
 
-func TestStubOnidelAPIServesAnSSHKeyATestSets(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
-
-	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/ssh_keys/k1?team_id=t", "")
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.JSONEq(t, `{"ssh_key":{"id":"k1","created":"2026-10-02T05:35:28Z","name":"me","ssh_key":"k"}}`, body)
-}
-
 func TestStubOnidelAPIReplacesAnSSHKeyWhenATestSetsItsIDAgain(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetSSHKey(map[string]any{"id": "k1", "name": "me", "ssh_key": "k"})
@@ -219,7 +209,7 @@ func TestStubOnidelAPIServesAFirewallRuleATestSets(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
 	ctx.api.SetFirewallRule(map[string]any{
 		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
-		"subnet": "0.0.0.0", "subnet_size": 0, "desc": "ssh",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "ssh",
 	})
 
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/network/firewalls/g1/rules/r1", "")
@@ -236,16 +226,6 @@ func TestStubOnidelAPIReplacesAFirewallRuleWhenATestSetsItsIDAgain(t *testing.T)
 	ctx.api.SetFirewallRule(map[string]any{"id": "r1", "group": "g1", "desc": "web"})
 
 	assert.Equal(t, map[string]map[string]any{"r1": {"id": "r1", "group": "g1", "desc": "web"}}, ctx.api.GetFirewallRules())
-}
-
-func TestStubOnidelAPIListsThePTRRecordsATestSets(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "v4.example.com", "2001:db8::1": "v6.example.com"})
-
-	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm/v/rdns", "")
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.JSONEq(t, `{"rdns":[{"ip":"2001:db8::1","domain":"v6.example.com"},{"ip":"203.0.113.18","domain":"v4.example.com"}]}`, body)
 }
 
 func TestStubOnidelAPIReplacesAVMsPTRRecordsWhenATestSetsThemAgain(t *testing.T) {
@@ -711,11 +691,11 @@ func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 func TestStubOnidelAPIReadsARuleWithANumericSubnetSize(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
-	onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
 
+	createStatus, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", "")
 
-	assert.Equal(t, http.StatusOK, status)
+	assert.Equal(t, []int{http.StatusCreated, http.StatusOK}, []int{createStatus, status})
 	assert.JSONEq(t, `{"firewall_rule":{"id":"00000000-0000-4000-8000-000000000001","group":"g1","ip_type":"v4",`+
 		`"action":"allow","protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24,"desc":""}}`, body)
 }

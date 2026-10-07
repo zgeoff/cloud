@@ -101,7 +101,8 @@ Each shared rule takes its Go form:
     client `Sleep`.
   - `BuildStubTB` lets a test observe a helper failing a test, with `testing.T`'s cleanup order.
   - Shape the stub's state with its setters. A deviation is `RegisterResponse`; a handler that must
-    change state mid-request is `RegisterHandler`. Assert the requests the code sent with
+    change state mid-request, or a transport fault `RegisterResponse` cannot express (such as a
+    body shorter than its `Content-Length`), is `RegisterHandler`. Assert the requests the code sent with
     `GetRequests()`, as a whole list.
 - Run `bun run provider:check` (`gofmt`, `go vet`, then `go test -race ./...`), then
   `go test -race -shuffle=on -count=3 ./...`. A test that touches a context or time also passes
