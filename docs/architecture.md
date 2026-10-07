@@ -83,9 +83,9 @@ the same VM.
   bearer for the real Connect token and forwards the request to the upstream.
 - **Relay.** The upstream is a socket-activated `systemd-socket-proxyd` on the host
   (`onepassword-connect-relay`), listening on docker0's address. It dials the Service's ClusterIP,
-  `10.43.82.198:8080` (Connect's API), which Pulumi pins. The relay exists because imp's
-  `inet imp-forward` drops imp-host's traffic to the k3s ranges, even after kube-proxy's DNAT, so
-  the container cannot reach the ClusterIP, a pod or a NodePort itself.
+  `10.43.82.198:8000` (port 8000, Connect's API behind it), which Pulumi pins. The relay exists
+  because imp's `inet imp-forward` drops imp-host's traffic to the k3s ranges, even after
+  kube-proxy's DNAT, so the container cannot reach the ClusterIP, a pod or a NodePort itself.
 - **Firewall.** nixos-fw does not trust docker0, so it opens tcp 18081 on docker0 alone. The
   `inet cloud_host` table admits only docker0's subnet to that port and drops the rest. Every
   container on docker0 can reach it, imp's docker proxy and image builds included.

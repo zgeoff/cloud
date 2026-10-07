@@ -9,7 +9,7 @@ items with `op read`, through imp's credential broker. It has no public route. T
 A granted imp sends HTTPS to `op-connect.imp.internal`. The broker in imp-host swaps the placeholder
 bearer for the real token and forwards to `http://172.17.0.1:18081`. There the host's
 `onepassword-connect-relay` socket starts `systemd-socket-proxyd`, which dials the Service's
-ClusterIP, `10.43.82.198:8080`: Connect's API.
+ClusterIP, `10.43.82.198:8000`, whose target is Connect's API on 8080.
 
 ## What holds what
 

@@ -15,7 +15,7 @@ let
   # (infra/onepassword-connect.ts).
   connectRelayAddress = "172.17.0.1";
   connectRelayPort = 18081;
-  connectServiceAddress = "10.43.82.198:8080";
+  connectServiceAddress = "10.43.82.198:8000";
   # docker0's subnet. imp's module does not fix imp-host's address on it, so the rule below
   # admits the whole subnet: every container on docker0, imp's docker proxy and image builds
   # included, can reach the relay. Connect's read-only token still gates every request.
