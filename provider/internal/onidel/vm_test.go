@@ -553,7 +553,6 @@ func TestVMUpdateAppliesEachInPlaceChangeAsOnePatch(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	get := onideltest.Request{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}
 	assert.Equal(t, []any{
 		map[string]any{
 			"name": "web-2", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0, "ipv6": true,
@@ -562,10 +561,19 @@ func TestVMUpdateAppliesEachInPlaceChangeAsOnePatch(t *testing.T) {
 		},
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			get,
-			get, {Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}}, get, get,
-			get, {Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "enable_ipv6": true}}, get, get,
-			get, {Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "firewall_group_id": "fw-1"}}, get, get,
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "enable_ipv6": true}},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "firewall_group_id": "fw-1"}},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
 		},
 	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
 }
@@ -586,12 +594,14 @@ func TestVMUpdateDetachesTheFirewallGroupTheProgramDrops(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	get := onideltest.Request{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}
 	assert.Equal(t, []any{
 		[]onideltest.Request{
 			{Method: "GET", Path: "/teams"},
-			get,
-			get, {Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "disable_firewall": true}}, get, get,
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "disable_firewall": true}},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
 		},
 		map[string]map[string]any{"v": {
 			"id": "v", "name": "web", "location": "Sydney", "firewall_group_id": nil, "status": "active", "active_action_id": nil,
@@ -773,10 +783,10 @@ func TestVMUpdateStopsAtTheFirstPatchThatFails(t *testing.T) {
 	})
 
 	assert.EqualError(t, err, "onidel: PATCH /vm/v: HTTP 400")
-	get := onideltest.Request{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}
 	assert.Equal(t, []onideltest.Request{
 		{Method: "GET", Path: "/teams"},
-		get,
-		get, {Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
 	}, ctx.api.GetRequests())
 }

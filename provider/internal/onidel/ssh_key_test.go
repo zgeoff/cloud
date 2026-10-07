@@ -135,12 +135,11 @@ func TestSSHKeyReadReportsADeletedKeyAsGone(t *testing.T) {
 
 func TestSSHKeyDiffUpdatesTheNameAndPublicKeyInPlace(t *testing.T) {
 	ctx := setupTest(t)
-	old := map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}
 
 	diff, err := ctx.server.Diff(p.DiffRequest{
 		ID: "k", Urn: onideltest.BuildURN("onidel:index:SshKey", "me"),
 		State:     onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": "2026-10-02T05:35:28Z"}),
-		OldInputs: onideltest.BuildProps(old),
+		OldInputs: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
 		Inputs:    onideltest.BuildProps(map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 BBBB me@host"}),
 	})
 
