@@ -1,8 +1,6 @@
 import {
-  DnsRecord,
   R2Bucket,
   ZeroTrustTunnelCloudflared,
-  ZeroTrustTunnelCloudflaredConfig,
   ZoneSetting,
   getZeroTrustTunnelCloudflaredTokenOutput,
   getZoneOutput,
@@ -12,15 +10,16 @@ import { Config, secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { createClusterWorkloads } from './cluster-workloads.ts';
+import { createTunnelRoutes } from './create-tunnel-routes.ts';
 import { createHealthCheck } from './health-check.ts';
-import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
-import { requireKubeconfig } from './require-kubeconfig.ts';
-import { homePC, tailnetPolicy } from './tailnet-policy.ts';
+import { loadClusterInputs } from './load-cluster-inputs.ts';
+import { tailnetPolicy } from './tailnet-policy.ts';
 
-// K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig. The stack's "cluster" config says
-// whether the cluster is managed, so a missing kubeconfig fails the run before any resource
+// K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig, and ONEPASSWORD_CONNECT_CREDENTIALS
+// from op://cloud/onepassword-connect-credentials. The stack's "cluster" config says
+// whether the cluster is managed, so a missing value fails the run before any resource
 // registers, instead of planning to delete the cluster's resources.
-const kubeconfig = requireKubeconfig(new Config().get('cluster'), process.env['K3S_KUBECONFIG']);
+const clusterInputs = loadClusterInputs(new Config().get('cluster'), process.env);
 const accountID = process.env['CLOUDFLARE_ACCOUNT_ID'];
 
 if (accountID === undefined) {
@@ -223,65 +222,34 @@ export const tunnelToken = secret(
   getZeroTrustTunnelCloudflaredTokenOutput({ accountId: accountID, tunnelId: tunnel.id }).token,
 );
 
-// k3s workloads (#6), with the kubeconfig checked at the top of the program
+// k3s workloads (#6), with their inputs checked at the top of the program
 const workloads =
-  kubeconfig === undefined
+  clusterInputs === undefined
     ? undefined
-    : createClusterWorkloads({ kubeconfig, tunnelToken, ...loadATCGatewayInputs() });
-
-// atc.geoff.cloud: the atc gateway in k3s, on its public URL's host through the same
-// tunnel. The gateway owns OAuth, so no Cloudflare Access here either.
-const atcRoute = workloads?.atcGatewayRoute;
-
-// mcp.geoff.cloud: atc's MCP on Geoff's PC, bound to the PC's tailnet address. The
-// hop is plain HTTP inside WireGuard, and the tailnet policy lets only tag:cloud
-// reach the port. atc owns OAuth, so no Cloudflare Access on this hostname.
-const tunnelConfig = new ZeroTrustTunnelCloudflaredConfig('edge', {
-  accountId: accountID,
-  tunnelId: tunnel.id,
-  config: {
-    ingresses: [
-      {
-        hostname: mcpHostname,
-
-        // the IP, not the MagicDNS name: CoreDNS in k3s does not forward to 100.100.100.100
-        service: `http://${homePC.ip}:${homePC.mcpPort}`,
-        originRequest: { httpHostHeader: mcpHostname },
-      },
-      ...(atcRoute === undefined
-        ? []
-        : [{ hostname: atcRoute.hostname, service: atcRoute.service }]),
-      { service: 'http_status:404' },
-    ],
-  },
-});
-
-export const tunnelConfigVersion = tunnelConfig.version;
-
-const mcpRecord = new DnsRecord('mcp', {
-  zoneId: zone.zoneId,
-  name: mcpHostname,
-  type: 'CNAME',
-  content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
-  proxied: true,
-  ttl: 1,
-});
-
-export const mcpURL = mcpRecord.name.apply((name) => `https://${name}`);
-
-const atcRecord =
-  atcRoute === undefined
-    ? undefined
-    : new DnsRecord('atc', {
-        zoneId: zone.zoneId,
-        name: atcRoute.hostname,
-        type: 'CNAME',
-        content: tunnel.id.apply((id) => `${id}.cfargotunnel.com`),
-        proxied: true,
-        ttl: 1,
+    : createClusterWorkloads({
+        kubeconfig: clusterInputs.kubeconfig,
+        tunnelToken,
+        ...(clusterInputs.atcGateway === undefined ? {} : { atcGateway: clusterInputs.atcGateway }),
+        onePasswordConnect: {
+          credentials: clusterInputs.onePasswordConnectCredentials,
+          allowedSources: geoffcloud.mainIpv4.apply((address) => [address]),
+        },
       });
 
-export const atcURL = atcRecord?.name.apply((name) => `https://${name}`);
+// atc.geoff.cloud and op-connect.geoff.cloud: workloads in k3s on the same tunnel
+const routes = createTunnelRoutes({
+  accountID,
+  zoneID: zone.zoneId,
+  tunnelID: tunnel.id,
+  mcpHostname,
+  atcRoute: workloads?.atcGatewayRoute,
+  connectRoute: workloads?.onePasswordConnectRoute,
+});
+
+export const tunnelConfigVersion = routes.configVersion;
+export const mcpURL = routes.mcpURL;
+export const atcURL = routes.atcURL;
+export const onePasswordConnectURL = routes.onePasswordConnectURL;
 export const grafanaURL = workloads?.grafanaURL;
 export const grafanaAdminPassword = workloads?.grafanaAdminPassword;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
@@ -292,7 +260,9 @@ const healthCheck = await createHealthCheck({
   accountID,
   targets: [
     { name: 'mcp', url: `https://${mcpHostname}/.well-known/oauth-protected-resource` },
-    ...(atcRoute === undefined ? [] : [{ name: 'atc', url: atcRoute.healthURL }]),
+    ...(workloads?.atcGatewayRoute === undefined
+      ? []
+      : [{ name: 'atc', url: workloads.atcGatewayRoute.healthURL }]),
   ],
   alertURL: process.env['ALERT_WEBHOOK_URL'],
 });
