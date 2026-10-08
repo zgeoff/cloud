@@ -4,7 +4,8 @@
 # which starts at 0. The pause records its argument as a line of <dir>/pauses, then
 # advances <dir>/now by one second, so a test reads how often wait_for paused and steps
 # past a deadline without waiting. Pass them as WAIT_FOR_CLOCK=<dir>/clock and
-# WAIT_FOR_SLEEP=<dir>/sleep.
+# WAIT_FOR_SLEEP=<dir>/sleep, or put <dir> first on PATH, where the pause answers as the
+# sleep command that wait_for runs by default.
 create_stub_clock() {
   local dir="$1"
   echo 0 > "$dir/now"
