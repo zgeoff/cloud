@@ -650,7 +650,7 @@ CALLS
 
 # Runtime every case needs: the script in <tree>/scripts, where it finds <tree>/infra as
 # its repo's; the ssh, curl and getent stand-ins with fail-closed stand-ins for the other
-# remote tools in <tree>/bin, checked so no call can reach a real remote tool or DNS; the
+# remote tools in <tree>/bin, checked so no call can reach a real remote tool; the
 # empty call log; and the HOME and TMPDIR the script runs with.
 setup_test() {
   local tree="$1"
