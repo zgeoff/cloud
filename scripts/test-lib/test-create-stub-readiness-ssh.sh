@@ -99,7 +99,7 @@ it_fails_a_missing_storage_class_with_kubectls_NotFound_and_exit_1() {
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
-it_prints_a_deployment_it_holds_with_the_namespace_before_or_after_get() {
+it_prints_a_deployment_it_holds_with_the_namespace_before_get() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
@@ -116,6 +116,26 @@ atc-gateway   1/1     1            1           2d
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]'
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_prints_a_deployment_it_holds_with_the_namespace_after_get() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/cluster/deploy/atc"
+  printf 1 > "$tree/cluster/deploy/atc/atc-gateway"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+    ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud k3s kubectl get -n atc deploy atc-gateway > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'OUT'
+NAME   READY   UP-TO-DATE   AVAILABLE   AGE
+atc-gateway   1/1     1            1           2d
+OUT
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","-n","atc","deploy","atc-gateway"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 

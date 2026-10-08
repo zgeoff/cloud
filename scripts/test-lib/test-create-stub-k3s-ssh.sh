@@ -61,6 +61,7 @@ it_fails_a_missing_kubeconfig_as_the_real_cat_does() {
   diff "$tree/real-out" "$tree/out"
   sed "s|$tree/host/k3s.yaml|/etc/rancher/k3s/k3s.yaml|" "$tree/real-err" > "$tree/real-err-at-host-path"
   diff "$tree/real-err-at-host-path" "$tree/err"
+  diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
   [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
 }
 
