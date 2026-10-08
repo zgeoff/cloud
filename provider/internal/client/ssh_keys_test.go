@@ -7,13 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/clienttest"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
 func TestCreateSSHKeyReturnsTheStoredKey(t *testing.T) {
 	ctx := setupTest(t)
 
-	key, err := ctx.client.CreateSSHKey(t.Context(), client.SSHKeyInput{TeamID: "team-a", Name: "me", PublicKey: "ssh-ed25519 AAAA me@host"})
+	key, err := ctx.client.CreateSSHKey(t.Context(), clienttest.BuildMockSSHKeyInput(func(in *client.SSHKeyInput) {
+		in.TeamID, in.Name, in.PublicKey = "team-a", "me", "ssh-ed25519 AAAA me@host"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, client.SSHKey{
@@ -24,7 +27,9 @@ func TestCreateSSHKeyReturnsTheStoredKey(t *testing.T) {
 func TestCreateSSHKeyFailsWithoutATeam(t *testing.T) {
 	ctx := setupTest(t)
 
-	_, err := ctx.client.CreateSSHKey(t.Context(), client.SSHKeyInput{Name: "me", PublicKey: "ssh-ed25519 AAAA me@host"})
+	_, err := ctx.client.CreateSSHKey(t.Context(), clienttest.BuildMockSSHKeyInput(func(in *client.SSHKeyInput) {
+		in.TeamID = ""
+	}))
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -46,7 +51,9 @@ func TestUpdateSSHKeySendsTheWholeKey(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetSSHKey(map[string]any{"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
 
-	err := ctx.client.UpdateSSHKey(t.Context(), "k1", client.SSHKeyInput{TeamID: "team-a", Name: "me-2", PublicKey: "k2"})
+	err := ctx.client.UpdateSSHKey(t.Context(), "k1", clienttest.BuildMockSSHKeyInput(func(in *client.SSHKeyInput) {
+		in.TeamID, in.Name, in.PublicKey = "team-a", "me-2", "k2"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, map[string]map[string]any{"k1": {"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2"}}, ctx.api.GetSSHKeys())

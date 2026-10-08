@@ -116,6 +116,7 @@ Each shared rule takes its Go form:
 | Error strictness                   | `require.ErrorAs` plus a whole-value compare for a typed error, `require.ErrorIs` for a sentinel, `assert.EqualError` when the text is contract |
 | Narrowing                          | `require.*` before an `assert.Empty`, `Nil`, `NotContains` or `Zero`, which pass on a missing value                                             |
 | No sleeps; injected time           | `Client.Sleep` and `Client.VMWaitTimeout`, or `onidel.NewWithOptions(Options{Sleep})`; `testing/synctest` for the default sleep itself          |
+| Factories (`buildMock<Type>`)      | `BuildMock<Type>(overrides ...func(*T)) T` in `internal/clienttest` for the client's request types, with fixed defaults, since the tests pin the request body as exact values; a test sets each field its assertion names |
 
 - Tests are black-box (`package client_test`, `package onidel_test`) and sit in the file named for
   the source file they test. One approved exception: `client_internal_test.go` (`package client`)
