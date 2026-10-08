@@ -38,6 +38,46 @@ CALLS
   [ "$status" = 3 ] || { echo "exit $status, want 3" >&2; exit 1; }
 }
 
+it_forwards_none_of_the_callers_environment() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" \
+    ssh -o BatchMode=yes root@geoffcloud "bash -c 'printenv STUB_TREE'" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c 'printenv STUB_TREE'"]
+CALLS
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_runs_the_command_from_the_host_directory_with_a_HOME_inside_it() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  (cd "$tree/tmp" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" \
+    ssh -o BatchMode=yes root@geoffcloud "bash -c 'pwd; printenv HOME; ls -A \"\$HOME\"'") \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << OUT
+$tree/host
+$tree/host/root
+OUT
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c 'pwd; printenv HOME; ls -A \"$HOME\"'"]
+CALLS
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   local status=0
   tree="$(mktemp -d)"

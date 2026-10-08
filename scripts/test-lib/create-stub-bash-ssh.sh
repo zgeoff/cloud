@@ -1,9 +1,12 @@
 # shellcheck shell=bash
 # create_stub_bash_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to a host that runs one
 # `bash -c <script> _ <args>…` command, as install-imp-dns-token.sh sends it. "The host" is
-# the case's tree: the stand-in hands the command to bash here, as the remote login shell
-# would, with STUB_HOST_BIN first on PATH and its own stdin, and returns its exit code. It
-# logs each call's argv as a JSON line to STUB_TREE/calls.
+# STUB_TREE/host: the stand-in hands the command to bash here, as the remote login shell
+# would, with its own stdin, and returns its exit code. Like real ssh, it forwards none of
+# the caller's environment or working directory: the command runs from STUB_TREE/host under
+# `env -i` with only PATH (STUB_HOST_BIN, then /usr/bin and /bin) and HOME set, HOME being
+# STUB_TREE/host/root, which it creates, never the real /root. It logs each call's argv as
+# a JSON line to STUB_TREE/calls.
 #
 # With STUB_SSH_PASS=1, a call to a loopback destination (ssh://<user>@127.0.0.1:<port>)
 # goes to the real ssh after it is logged, with -F /dev/null so no ssh config on the
@@ -46,7 +49,9 @@ if [[ "$4" =~ (^|[^A-Za-z0-9_.-])(ssh|scp|sftp|rsync|tailscale)([^A-Za-z0-9_-]|$
   echo "unexpected: $*" >&2
   exit 97
 fi
-PATH="$STUB_HOST_BIN:/usr/bin:/bin" exec bash -c "$4"
+mkdir -p "$STUB_TREE/host/root"
+cd "$STUB_TREE/host" || exit 97
+exec env -i PATH="$STUB_HOST_BIN:/usr/bin:/bin" HOME="$STUB_TREE/host/root" bash -c "$4"
 STUB
   } > "$bin/ssh"
   chmod +x "$bin/ssh"
