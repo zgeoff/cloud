@@ -9,6 +9,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-k3s-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
@@ -109,7 +110,7 @@ it_fails_closed_with_exit_97_on_another_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: root@geoffcloud touch $tree/ran"
   diff - "$tree/calls" <<< "[\"ssh\",\"root@geoffcloud\",\"touch $tree/ran\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 

@@ -10,6 +10,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-gh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-github-api.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh"
@@ -74,8 +75,8 @@ EOF
 GET /api/v3/repos/zgeoff/atc/releases/tags/${release//\//%2F}
 POST /api/graphql RepositoryReleaseByTag tagName=$release
 EOF
-  [ ! -e "$tree/github/unexpected" ] || { echo "gh sent an unexpected request" >&2; exit 1; }
-  [ ! -e "$tree/ran" ] || { echo "the command ran after a failed build" >&2; exit 1; }
+  assert_missing "$tree/github/unexpected" "gh sent an unexpected request"
+  assert_missing "$tree/ran" "the command ran after a failed build"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -106,7 +107,7 @@ FAIL the images did not build from the pinned, checked binary and pinned bases
     release not found
 EOF
   diff /dev/null "$tree/err"
-  [ ! -e "$tree/ran" ] || { echo "the command ran after a failed build" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran after a failed build"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 

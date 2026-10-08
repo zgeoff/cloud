@@ -12,6 +12,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-imp-host-docker.sh"
 
 it_prints_imps_info_from_its_state_file() {
@@ -128,7 +129,7 @@ it_fails_the_secret_add_with_the_named_error_and_imps_exit_2() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: secret glm exists'
-  [ ! -e "$tree/impd/secret-glm" ] || { echo "the failed add stored the key" >&2; exit 1; }
+  assert_missing "$tree/impd/secret-glm" "the failed add stored the key"
   jq -c . "$tree/impd/secrets.json" > "$tree/secrets"
   diff - "$tree/secrets" <<< '[]'
   diff - "$tree/calls" <<< '["docker","exec","-i","imp-host","imp","secret","add","glm","--kind","custom","--hosts","api.z.ai","--header","authorization","--scheme","bearer","--json"]'

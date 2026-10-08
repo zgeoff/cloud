@@ -12,6 +12,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/build-token.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-impd.sh"
 
@@ -29,7 +30,7 @@ it_answers_whoami_with_atc_clouds_identity_for_the_good_bearer() {
 
   printf '%s' '{"json":{"kind":"token","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}' | diff - "$tree/body"
   [ "$code" = 200 ] || { echo "HTTP $code, want 200" >&2; exit 1; }
-  [ ! -e "$tree/impd/unexpected" ] || { echo "whoami was recorded as unexpected" >&2; exit 1; }
+  assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
 it_answers_whoami_with_401_for_another_bearer() {
@@ -46,7 +47,7 @@ it_answers_whoami_with_401_for_another_bearer() {
 
   printf '%s' '{"error":"unauthorized"}' | diff - "$tree/body"
   [ "$code" = 401 ] || { echo "HTTP $code, want 401" >&2; exit 1; }
-  [ ! -e "$tree/impd/unexpected" ] || { echo "whoami was recorded as unexpected" >&2; exit 1; }
+  assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
 it_answers_whoami_with_401_while_it_holds_no_good_bearer() {

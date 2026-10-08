@@ -13,6 +13,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_passes_when_every_remote_tool_resolves_to_a_stand_in_on_the_default_system_path() {
@@ -57,7 +58,7 @@ it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to nothing, not a stand-in in $tree/bin"
-  [ ! -e "$tree/script-ran" ] || { echo "the step after the guard ran" >&2; exit 1; }
+  assert_missing "$tree/script-ran" "the step after the guard ran"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 

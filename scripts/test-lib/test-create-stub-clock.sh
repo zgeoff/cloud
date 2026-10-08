@@ -9,6 +9,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
 
 it_reads_0_before_any_pause() {
@@ -19,7 +20,7 @@ it_reads_0_before_any_pause() {
   "$tree/clock" > "$tree/out"
 
   diff - "$tree/out" <<< 0
-  [ ! -e "$tree/pauses" ] || { echo "the clock recorded a pause" >&2; exit 1; }
+  assert_missing "$tree/pauses" "the clock recorded a pause"
 }
 
 it_advances_one_second_for_each_pause_and_records_its_argument() {

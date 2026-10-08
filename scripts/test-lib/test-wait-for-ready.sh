@@ -14,6 +14,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-gateway.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for-ready.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
@@ -98,7 +99,7 @@ it_fails_wait_for_ready_with_the_containers_logs_as_soon_as_the_container_stops(
 a log line on stderr
 a log line on stdout
 EOF
-  [ ! -e "$tree/pauses" ] || { echo "wait_for_ready paused before it reported the stop" >&2; exit 1; }
+  assert_missing "$tree/pauses" "wait_for_ready paused before it reported the stop"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
