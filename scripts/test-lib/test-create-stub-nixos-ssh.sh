@@ -4,9 +4,10 @@
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
 # Connection refused" and the CR LF that its log ends a line with on stderr, as OpenSSH
-# 9.6p1 (CI's ubuntu-24.04 runner image 20261004) and 10.5p1 print it. A session that drops after it opens has no real transport here, so the
-# stand-in's drop reuses that exit 255 with OpenSSH's "Connection to <host> closed by
-# remote host." line.
+# 9.6p1 (CI's ubuntu-24.04 runner image 20261004) and 10.5p1 print it. A session that
+# drops after it opens has no real transport here, so the stand-in's drop reuses that exit
+# 255 with OpenSSH's "Connection to <host> closed by remote host." line, whose source and
+# check create-stub-nixos-ssh.sh records with those of the other texts it prints.
 #
 #   bash scripts/test-lib/test-create-stub-nixos-ssh.sh
 # shellcheck source-path=SCRIPTDIR
@@ -36,19 +37,27 @@ CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-it_fails_the_switch_with_the_named_activation_exit_code() {
+# switch-to-configuration-ng sorts the failed units by their lower-case names, so
+# Atc-daemon.service comes between alloy.service and zram.service, not first as a byte
+# order would put it.
+it_fails_the_switch_as_switch_to_configuration_ng_reports_failed_units() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_ACTIVATE_EXIT=4 \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_ACTIVATE_FAILED_UNITS="zram.service Atc-daemon.service alloy.service" \
+    STUB_ACTIVATE_STATUS=$'× alloy.service - Alloy\n     Active: failed (Result: exit-code)' \
     ssh -o BatchMode=yes root@geoffcloud \
     "nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'warning: error(s) occurred while switching to the new configuration'
+  diff - "$tree/out" << 'OUT'
+× alloy.service - Alloy
+     Active: failed (Result: exit-code)
+OUT
+  diff - "$tree/err" <<< 'warning: the following units failed: alloy.service, Atc-daemon.service, zram.service'
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS

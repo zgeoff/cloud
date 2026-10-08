@@ -24,6 +24,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/assert-between.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/run-backup.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/run-backup-shell.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/normalize-restic-output.sh"
@@ -32,8 +33,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/normalize-resti
 # one fixed day: grouped by host and tags, retention keeps the newest of that day (old-c)
 # and the group's oldest (old-a, kept while keep-daily is not used up) and forgets old-b.
 # Grouped by path, as restic does by default, each would keep itself. The new snapshot's
-# time comes from the wall clock, so the case checks it falls inside the backup's run,
-# then masks it.
+# time comes from the wall clock, so the case bounds it by clock reads before and after
+# the backup with assert_between, then masks it.
 it_groups_the_gateway_snapshots_across_source_paths_when_a_backup_prunes() {
   local backup_image="$2" before after
   name="atc-gw-backup-script-$4-$BASHPID"
@@ -56,11 +57,12 @@ EOF
   after="$(date -u +%s)"
   diff /dev/null "$tree/backup.err"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json' > "$tree/snapshots"
-  jq -S --argjson before "$before" --argjson after "$after" '[.[] | {paths, tags, hostname,
-      time: (if .paths == ["/tmp/atc-gateway-backup"]
-        then (.time | sub("\\.[0-9]+"; "") | fromdateiso8601 |
-          if . >= $before and . <= $after then "within the backup run" else todate end)
-        else .time end)}] | sort_by(.paths)' "$tree/snapshots" > "$tree/kept"
+  jq -r '.[] | select(.paths == ["/tmp/atc-gateway-backup"]) | .time | sub("\\.[0-9]+"; "") |
+      fromdateiso8601' "$tree/snapshots" > "$tree/new-time"
+  assert_between "$before" "$(cat "$tree/new-time")" "$after" "the new snapshot's time"
+  jq -S '[.[] | {paths, tags, hostname,
+      time: (if .paths == ["/tmp/atc-gateway-backup"] then "TIME" else .time end)}] |
+      sort_by(.paths)' "$tree/snapshots" > "$tree/kept"
   diff - "$tree/kept" << 'EOF'
 [
   {
@@ -71,7 +73,7 @@ EOF
     "tags": [
       "atc-gateway"
     ],
-    "time": "within the backup run"
+    "time": "TIME"
   },
   {
     "hostname": "atc-gateway",

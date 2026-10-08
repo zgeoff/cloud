@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test for create-stub-atc-key.sh: the atc-key stand-in prints the z.ai key it is given
-# and fails closed on any other call. No atc-key runs here; it prints a key and a newline
-# for a known provider, which the case pins as a literal.
+# and fails closed on any other call. No atc-key runs here: the case pins as a literal the
+# key and newline the real script printed when checked (create-stub-atc-key.sh records it).
 #
 #   bash scripts/test-lib/test-create-stub-atc-key.sh
 # shellcheck source-path=SCRIPTDIR

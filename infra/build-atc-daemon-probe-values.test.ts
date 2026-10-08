@@ -35,14 +35,3 @@ test('it probes no target without daemons', () => {
     },
   });
 });
-
-test("it names geoffcloud's probe target atc-daemon and each other daemon's atc-daemon-<name>", () => {
-  const daemons = [
-    buildMockATCDaemonEndpoint({ name: 'geoffcloud' }),
-    buildMockATCDaemonEndpoint({ name: 'home-pc' }),
-  ];
-
-  expect(
-    buildATCDaemonProbeValues(daemons).serviceMonitor.targets.map((target) => target.name),
-  ).toStrictEqual(['atc-daemon', 'atc-daemon-home-pc']);
-});

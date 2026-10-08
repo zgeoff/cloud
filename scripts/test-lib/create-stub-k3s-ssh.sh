@@ -10,6 +10,14 @@
 # hands a call to the real ssh: the script names the host as root@<name>, which leaves no
 # room for a loopback port. Any other call, including one to a host other than STUB_HOST,
 # ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# Checked on 2026-10-08 against OpenSSH's source and a real ssh. The line is sshconnect.c's
+# error("ssh: connect to host %s port %s: %s", …, strerror(errno)) (line 524 at V_9_6_P1,
+# line 554 at V_10_5_P1), which log.c ends with CR LF, and ssh exits 255 when no connection
+# opens. OpenSSH 10.5p1 printed exactly that line, with "Connection timed out", and exited 255
+# against a loopback port whose accept queue was full, with -o ConnectTimeout=2. 9.6p1 (CI's
+# ubuntu-24.04 runner) was not run; its source line is the same. Left open: the reason text
+# is the C library's strerror(ETIMEDOUT), and the port is 22 because the script names none.
 create_stub_k3s_ssh() {
   local bin="$1"
   cat > "$bin/ssh" << 'STUB'

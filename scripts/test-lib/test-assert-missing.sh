@@ -30,7 +30,7 @@ it_fails_for_a_file_naming_its_path_quoted() {
   assert_missing "$tree/a file" "the label" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "the label: expected no $(printf %q "$tree/a file")"
+  diff - "$tree/err" <<< "the label: expected no $tree/a\\ file"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 

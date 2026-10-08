@@ -672,17 +672,20 @@ it_stops_with_the_activation_exit_code_when_switch_to_configuration_fails() {
     STUB_BUILD_SAW="$tree/build-saw" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
-    STUB_ACTIVATE_EXIT=4 \
+    STUB_ACTIVATE_FAILED_UNITS=atc-daemon.service \
+    STUB_ACTIVATE_STATUS=$'× atc-daemon.service - atc daemon\n     Active: failed (Result: exit-code)' \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-warning: error(s) occurred while switching to the new configuration
+warning: the following units failed: atc-daemon.service
 EOF
   diff - "$tree/out" << EOF
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
 == switch root@geoffcloud
+× atc-daemon.service - atc daemon
+     Active: failed (Result: exit-code)
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
