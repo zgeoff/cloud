@@ -17,12 +17,10 @@ func TestUpdateRDNSSetsThePTRRecordForAnIP(t *testing.T) {
 	err := ctx.client.UpdateRDNS(t.Context(), "v", "team-a", "203.0.113.18", "example.com")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]string{"v": {"203.0.113.18": "example.com"}},
-		[]onideltest.Request{{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{
-			"team_id": "team-a", "ip_addr": "203.0.113.18", "domain": "example.com",
-		}}},
-	}, []any{ctx.api.GetRDNS(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]string{"v": {"203.0.113.18": "example.com"}}, ctx.api.GetRDNS())
+	assert.Equal(t, []onideltest.Request{{Method: "POST", Path: "/vm/v/rdns", Body: map[string]any{
+		"team_id": "team-a", "ip_addr": "203.0.113.18", "domain": "example.com",
+	}}}, ctx.api.GetRequests())
 }
 
 func TestUpdateRDNSFailsForAnIPTheVMDoesNotOwn(t *testing.T) {
@@ -44,10 +42,8 @@ func TestReadRDNSListsTheVMsPTRRecords(t *testing.T) {
 	records, err := ctx.client.ReadRDNS(t.Context(), "v", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		[]client.RDNSRecord{{IP: "2001:db8::1", Domain: "v6.example.com"}, {IP: "203.0.113.18", Domain: "example.com"}},
-		[]onideltest.Request{{Method: "GET", Path: "/vm/v/rdns", Query: "team_id=team-a"}},
-	}, []any{records, ctx.api.GetRequests()})
+	assert.Equal(t, []client.RDNSRecord{{IP: "2001:db8::1", Domain: "v6.example.com"}, {IP: "203.0.113.18", Domain: "example.com"}}, records)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm/v/rdns", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestRemoveRDNSRemovesThePTRRecordForAnIP(t *testing.T) {
@@ -58,8 +54,6 @@ func TestRemoveRDNSRemovesThePTRRecordForAnIP(t *testing.T) {
 	err := ctx.client.RemoveRDNS(t.Context(), "v", "team-a", "2001:db8::1")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]string{"v": {}},
-		[]onideltest.Request{{Method: "DELETE", Path: "/vm/v/rdns/2001:db8::1", Query: "team_id=team-a"}},
-	}, []any{ctx.api.GetRDNS(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]string{"v": {}}, ctx.api.GetRDNS())
+	assert.Equal(t, []onideltest.Request{{Method: "DELETE", Path: "/vm/v/rdns/2001:db8::1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }

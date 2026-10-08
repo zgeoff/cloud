@@ -66,10 +66,8 @@ func TestRemoveFirewallGroupRemovesAGroupInTheTeam(t *testing.T) {
 	err := ctx.client.RemoveFirewallGroup(t.Context(), "g1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{{Method: "DELETE", Path: "/network/firewalls/g1", Query: "team_id=team-a"}},
-	}, []any{ctx.api.GetFirewallGroups(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallGroups())
+	assert.Equal(t, []onideltest.Request{{Method: "DELETE", Path: "/network/firewalls/g1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestRemoveFirewallGroupFailsWhileVMsAreAttached(t *testing.T) {
@@ -121,10 +119,8 @@ func TestReadFirewallRuleReadsOneRuleInTheTeam(t *testing.T) {
 	rule, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "r1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		client.FirewallRule{ID: "r1", Group: "g1", IPType: "v6", Action: "allow", Protocol: "ipv6-icmp", Subnet: "::"},
-		[]onideltest.Request{{Method: "GET", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}},
-	}, []any{rule, ctx.api.GetRequests()})
+	assert.Equal(t, client.FirewallRule{ID: "r1", Group: "g1", IPType: "v6", Action: "allow", Protocol: "ipv6-icmp", Subnet: "::"}, rule)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {
@@ -138,15 +134,13 @@ func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {
 	err := ctx.client.UpdateFirewallRuleDescription(t.Context(), "g1", "r1", "team-a", "ssh")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{"r1": {
-			"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
-			"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "ssh",
-		}},
-		[]onideltest.Request{{
-			Method: "PATCH", Path: "/network/firewalls/g1/rules/r1", Body: map[string]any{"team_id": "team-a", "desc": "ssh"},
-		}},
-	}, []any{ctx.api.GetFirewallRules(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{"r1": {
+		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
+		"subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "ssh",
+	}}, ctx.api.GetFirewallRules())
+	assert.Equal(t, []onideltest.Request{{
+		Method: "PATCH", Path: "/network/firewalls/g1/rules/r1", Body: map[string]any{"team_id": "team-a", "desc": "ssh"},
+	}}, ctx.api.GetRequests())
 }
 
 func TestRemoveFirewallRuleRemovesARuleInTheTeam(t *testing.T) {
@@ -160,8 +154,6 @@ func TestRemoveFirewallRuleRemovesARuleInTheTeam(t *testing.T) {
 	err := ctx.client.RemoveFirewallRule(t.Context(), "g1", "r1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{{Method: "DELETE", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}},
-	}, []any{ctx.api.GetFirewallRules(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallRules())
+	assert.Equal(t, []onideltest.Request{{Method: "DELETE", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }

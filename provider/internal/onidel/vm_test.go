@@ -30,17 +30,15 @@ func TestVMImportAdoptsTheLiveVMWithoutItsPassword(t *testing.T) {
 	read, err := ctx.server.Read(p.ReadRequest{ID: "0f289413-258f-4115-ac81-252000998fe0", Urn: onideltest.BuildURN("onidel:index:Vm", "edge")})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		"0f289413-258f-4115-ac81-252000998fe0",
-		map[string]any{
-			"name": "edge", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
-		},
-		map[string]any{
-			"name": "edge", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
-			"status": "active", "mainIpv4": "203.0.113.18", "mainIpv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
-			"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53.632641Z",
-		},
-	}, []any{read.ID, onideltest.ToPlain(read.Inputs), onideltest.ToPlain(read.Properties)})
+	assert.Equal(t, "0f289413-258f-4115-ac81-252000998fe0", read.ID)
+	assert.Equal(t, map[string]any{
+		"name": "edge", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
+	}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, map[string]any{
+		"name": "edge", "location": "Melbourne", "cpu": 8.0, "ram": 32768.0, "disk": 240.0, "os": 24.0, "ipv6": true,
+		"status": "active", "mainIpv4": "203.0.113.18", "mainIpv6": "2001:db8:4:17f::", "template": "Ubuntu 26.04 LTS x64",
+		"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53.632641Z",
+	}, onideltest.ToPlain(read.Properties))
 }
 
 func TestVMImportLeavesOSUnsetForAnUnknownTemplate(t *testing.T) {
@@ -84,10 +82,8 @@ func TestVMReadKeepsASnapshotSourceWithoutResolvingTheTemplate(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "snapshotId": "s1"},
-		[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}},
-	}, []any{onideltest.ToPlain(read.Inputs), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "snapshotId": "s1"}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestVMReadReportsADeletedVMAsGone(t *testing.T) {
@@ -395,26 +391,24 @@ func TestVMCreateProvisionsTheVMAndWaitsUntilItIsActive(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		"00000000-0000-4000-8000-000000000001",
-		map[string]any{
-			"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
-			"paymentCycle": "hourly", "sshKeys": []any{"key-1"}, "ipv6": false,
-			"status": "active", "mainIpv4": "203.0.113.10", "mainIpv6": "", "template": "Ubuntu 26.04 LTS x64",
-			"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53Z",
-		},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
-			{Method: "POST", Path: "/vm", Body: map[string]any{
-				"team_id": "team-a", "name": "web", "payment_cycle": "hourly", "location": "Sydney",
-				"cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0, "ssh_keys": []any{"key-1"}, "ipv6": false,
-			}},
-			{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
-		},
-	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, "00000000-0000-4000-8000-000000000001", created.ID)
+	assert.Equal(t, map[string]any{
+		"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
+		"paymentCycle": "hourly", "sshKeys": []any{"key-1"}, "ipv6": false,
+		"status": "active", "mainIpv4": "203.0.113.10", "mainIpv6": "", "template": "Ubuntu 26.04 LTS x64",
+		"bgpEnabled": false, "createdAt": "2026-10-02T05:48:53Z",
+	}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
+		{Method: "POST", Path: "/vm", Body: map[string]any{
+			"team_id": "team-a", "name": "web", "payment_cycle": "hourly", "location": "Sydney",
+			"cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0, "ssh_keys": []any{"key-1"}, "ipv6": false,
+		}},
+		{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/00000000-0000-4000-8000-000000000001", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
 }
 
 func TestVMCreateNeedsExactlyOneImageSource(t *testing.T) {
@@ -451,18 +445,16 @@ func TestVMCreatePreviewSendsNothing(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{
-			"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
-			"status":     presource.Computed{Element: presource.NewProperty("")},
-			"mainIpv4":   presource.Computed{Element: presource.NewProperty("")},
-			"mainIpv6":   presource.Computed{Element: presource.NewProperty("")},
-			"template":   presource.Computed{Element: presource.NewProperty("")},
-			"bgpEnabled": presource.Computed{Element: presource.NewProperty("")},
-			"createdAt":  presource.Computed{Element: presource.NewProperty("")},
-		},
-		[]onideltest.Request(nil),
-	}, []any{onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{
+		"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
+		"status":     presource.Computed{Element: presource.NewProperty("")},
+		"mainIpv4":   presource.Computed{Element: presource.NewProperty("")},
+		"mainIpv6":   presource.Computed{Element: presource.NewProperty("")},
+		"template":   presource.Computed{Element: presource.NewProperty("")},
+		"bgpEnabled": presource.Computed{Element: presource.NewProperty("")},
+		"createdAt":  presource.Computed{Element: presource.NewProperty("")},
+	}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestVMCreateKeepsAVMThatNeverBecomesReadyInState(t *testing.T) {
@@ -476,23 +468,19 @@ func TestVMCreateKeepsAVMThatNeverBecomesReadyInState(t *testing.T) {
 
 	var initFailed infer.ResourceInitFailedError
 	require.ErrorAs(t, err, &initFailed)
-	assert.Equal(t, []any{
-		infer.ResourceInitFailedError{Reasons: []string{"context deadline exceeded"}},
-		"00000000-0000-4000-8000-000000000001",
-		map[string]map[string]any{"00000000-0000-4000-8000-000000000001": {
-			"id": "00000000-0000-4000-8000-000000000001", "name": "web", "vcpu": 2.0, "ram": 4096.0, "disk": 40.0,
-			"location": "Sydney", "password": "fixture-root-pw-do-not-leak", "main_ipv4": "203.0.113.10", "main_ipv6": "",
-			"template": "Ubuntu 26.04 LTS x64", "firewall_group_id": nil, "created_at": "2026-10-02T05:48:53Z",
-			"status": "building", "active_action_id": nil, "bgp_enabled": false,
-		}},
-	}, []any{initFailed, created.ID, ctx.api.GetVMs()})
-	assert.Equal(t, []any{
-		map[string]any{
-			"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
-			"status": "", "mainIpv4": "", "mainIpv6": "", "template": "", "bgpEnabled": false, "createdAt": "",
-		},
-		&p.InitializationFailed{Reasons: []string{"context deadline exceeded"}},
-	}, []any{onideltest.ToPlain(created.Properties), created.PartialState})
+	assert.Equal(t, infer.ResourceInitFailedError{Reasons: []string{"context deadline exceeded"}}, initFailed)
+	assert.Equal(t, "00000000-0000-4000-8000-000000000001", created.ID)
+	assert.Equal(t, map[string]map[string]any{"00000000-0000-4000-8000-000000000001": {
+		"id": "00000000-0000-4000-8000-000000000001", "name": "web", "vcpu": 2.0, "ram": 4096.0, "disk": 40.0,
+		"location": "Sydney", "password": "fixture-root-pw-do-not-leak", "main_ipv4": "203.0.113.10", "main_ipv6": "",
+		"template": "Ubuntu 26.04 LTS x64", "firewall_group_id": nil, "created_at": "2026-10-02T05:48:53Z",
+		"status": "building", "active_action_id": nil, "bgp_enabled": false,
+	}}, ctx.api.GetVMs())
+	assert.Equal(t, map[string]any{
+		"name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
+		"status": "", "mainIpv4": "", "mainIpv6": "", "template": "", "bgpEnabled": false, "createdAt": "",
+	}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, &p.InitializationFailed{Reasons: []string{"context deadline exceeded"}}, created.PartialState)
 }
 
 func TestVMCreateFailsWithoutStateWhenTheAPIRefuses(t *testing.T) {
@@ -553,29 +541,27 @@ func TestVMUpdateAppliesEachInPlaceChangeAsOnePatch(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{
-			"name": "web-2", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0, "ipv6": true,
-			"firewallGroupId": "fw-1", "status": "active", "mainIpv4": "203.0.113.10", "mainIpv6": "2401:db8::1",
-			"template": "Ubuntu 26.04 LTS x64", "bgpEnabled": false, "createdAt": "2026-10-02T05:48:53Z",
-		},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "enable_ipv6": true}},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "firewall_group_id": "fw-1"}},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-		},
-	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{
+		"name": "web-2", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0, "ipv6": true,
+		"firewallGroupId": "fw-1", "status": "active", "mainIpv4": "203.0.113.10", "mainIpv6": "2401:db8::1",
+		"template": "Ubuntu 26.04 LTS x64", "bgpEnabled": false, "createdAt": "2026-10-02T05:48:53Z",
+	}, onideltest.ToPlain(updated.Properties))
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "enable_ipv6": true}},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "firewall_group_id": "fw-1"}},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
 }
 
 func TestVMUpdateDetachesTheFirewallGroupTheProgramDrops(t *testing.T) {
@@ -594,19 +580,17 @@ func TestVMUpdateDetachesTheFirewallGroupTheProgramDrops(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "disable_firewall": true}},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-		},
-		map[string]map[string]any{"v": {
-			"id": "v", "name": "web", "location": "Sydney", "firewall_group_id": nil, "status": "active", "active_action_id": nil,
-		}},
-	}, []any{ctx.api.GetRequests(), ctx.api.GetVMs()})
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "disable_firewall": true}},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
+	assert.Equal(t, map[string]map[string]any{"v": {
+		"id": "v", "name": "web", "location": "Sydney", "firewall_group_id": nil, "status": "active", "active_action_id": nil,
+	}}, ctx.api.GetVMs())
 }
 
 func TestVMUpdatePreviewSendsNothing(t *testing.T) {
@@ -625,18 +609,16 @@ func TestVMUpdatePreviewSendsNothing(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{
-			"name": "web-2", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
-			"status":     presource.Computed{Element: presource.NewProperty("")},
-			"mainIpv4":   presource.Computed{Element: presource.NewProperty("")},
-			"mainIpv6":   presource.Computed{Element: presource.NewProperty("")},
-			"template":   presource.Computed{Element: presource.NewProperty("")},
-			"bgpEnabled": presource.Computed{Element: presource.NewProperty("")},
-			"createdAt":  presource.Computed{Element: presource.NewProperty("")},
-		},
-		[]onideltest.Request(nil),
-	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{
+		"name": "web-2", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0,
+		"status":     presource.Computed{Element: presource.NewProperty("")},
+		"mainIpv4":   presource.Computed{Element: presource.NewProperty("")},
+		"mainIpv6":   presource.Computed{Element: presource.NewProperty("")},
+		"template":   presource.Computed{Element: presource.NewProperty("")},
+		"bgpEnabled": presource.Computed{Element: presource.NewProperty("")},
+		"createdAt":  presource.Computed{Element: presource.NewProperty("")},
+	}, onideltest.ToPlain(updated.Properties))
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestVMUpdateFailsForAVMThatIsGone(t *testing.T) {
@@ -669,14 +651,12 @@ func TestVMDeleteDestroysTheVMAndWaitsUntilItIsGone(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "DELETE", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-		},
-	}, []any{ctx.api.GetVMs(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetVMs())
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "DELETE", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
 }
 
 func TestVMDeleteAcceptsAVMThatIsAlreadyGone(t *testing.T) {
@@ -706,10 +686,8 @@ func TestVMReadTakesTheNumericFirewallIDWhenTheProgramSetsNone(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{"name": "web", "location": "Sydney", "cpu": 0.0, "ram": 0.0, "disk": 0.0, "snapshotId": "s1", "firewallGroupId": "1581"},
-		[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}},
-	}, []any{onideltest.ToPlain(read.Inputs), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{"name": "web", "location": "Sydney", "cpu": 0.0, "ram": 0.0, "disk": 0.0, "snapshotId": "s1", "firewallGroupId": "1581"}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestVMReadReportsAFirewallUUIDAsTheAPIReportsIt(t *testing.T) {
@@ -743,10 +721,8 @@ func TestVMReadReportsAFirewallUUIDAsTheAPIReportsIt(t *testing.T) {
 			})
 
 			require.NoError(t, err)
-			assert.Equal(t, []any{
-				row.want,
-				[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}},
-			}, []any{onideltest.ToPlain(read.Inputs), ctx.api.GetRequests()})
+			assert.Equal(t, row.want, onideltest.ToPlain(read.Inputs))
+			assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 		})
 	}
 }

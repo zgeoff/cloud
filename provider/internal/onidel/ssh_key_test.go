@@ -22,16 +22,14 @@ func TestSSHKeyCreateAddsTheKeyToTheResolvedTeam(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		"00000000-0000-4000-8000-000000000001",
-		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAAC3Nza me@host\n", "created": "2026-10-02T05:35:28Z"},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/ssh_keys", Body: map[string]any{
-				"team_id": "team-a", "name": "me", "ssh_key": "ssh-ed25519 AAAAC3Nza me@host\n",
-			}},
-		},
-	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, "00000000-0000-4000-8000-000000000001", created.ID)
+	assert.Equal(t, map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAAC3Nza me@host\n", "created": "2026-10-02T05:35:28Z"}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "POST", Path: "/ssh_keys", Body: map[string]any{
+			"team_id": "team-a", "name": "me", "ssh_key": "ssh-ed25519 AAAAC3Nza me@host\n",
+		}},
+	}, ctx.api.GetRequests())
 }
 
 func TestSSHKeyCreatePreviewSendsNothing(t *testing.T) {
@@ -44,10 +42,8 @@ func TestSSHKeyCreatePreviewSendsNothing(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": presource.Computed{Element: presource.NewProperty("")}},
-		[]onideltest.Request(nil),
-	}, []any{onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host", "created": presource.Computed{Element: presource.NewProperty("")}}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestSSHKeyCreateFailsWhenTheTeamLookupFails(t *testing.T) {
@@ -74,11 +70,9 @@ func TestSSHKeyReadKeepsTheProgramsSpellingOfAnEquivalentPublicKey(t *testing.T)
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		"k1",
-		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n"},
-		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n", "created": "2026-10-02T05:35:28Z"},
-	}, []any{read.ID, onideltest.ToPlain(read.Inputs), onideltest.ToPlain(read.Properties)})
+	assert.Equal(t, "k1", read.ID)
+	assert.Equal(t, map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n"}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host\n", "created": "2026-10-02T05:35:28Z"}, onideltest.ToPlain(read.Properties))
 }
 
 func TestSSHKeyReadReportsAPublicKeyChangedOutsideTheProgram(t *testing.T) {
@@ -104,10 +98,8 @@ func TestSSHKeyImportReadsTheKeyByIDInTheTeam(t *testing.T) {
 	read, err := ctx.server.Read(p.ReadRequest{ID: "k1", Urn: onideltest.BuildURN("onidel:index:SshKey", "me")})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"},
-		[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
-	}, []any{onideltest.ToPlain(read.Inputs), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestSSHKeyReadReportsADeletedKeyAsGone(t *testing.T) {
@@ -149,15 +141,13 @@ func TestSSHKeyUpdateSendsTheWholeKeyToTheTeam(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 BBBB me@host", "created": "2026-10-02T05:35:28Z"},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "PATCH", Path: "/ssh_keys/k1", Body: map[string]any{
-				"team_id": "team-a", "name": "me-2", "ssh_key": "ssh-ed25519 BBBB me@host",
-			}},
-		},
-	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 BBBB me@host", "created": "2026-10-02T05:35:28Z"}, onideltest.ToPlain(updated.Properties))
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "PATCH", Path: "/ssh_keys/k1", Body: map[string]any{
+			"team_id": "team-a", "name": "me-2", "ssh_key": "ssh-ed25519 BBBB me@host",
+		}},
+	}, ctx.api.GetRequests())
 }
 
 func TestSSHKeyUpdatePreviewSendsNothing(t *testing.T) {
@@ -172,10 +162,8 @@ func TestSSHKeyUpdatePreviewSendsNothing(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 AAAA me@host", "created": presource.Computed{Element: presource.NewProperty("")}},
-		[]onideltest.Request(nil),
-	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{"name": "me-2", "publicKey": "ssh-ed25519 AAAA me@host", "created": presource.Computed{Element: presource.NewProperty("")}}, onideltest.ToPlain(updated.Properties))
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestSSHKeyUpdateFailsWhenTheAPIKeySeesNoTeam(t *testing.T) {
@@ -203,10 +191,8 @@ func TestSSHKeyDeleteRemovesTheKeyFromTheTeam(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
-	}, []any{ctx.api.GetSSHKeys(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetSSHKeys())
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "DELETE", Path: "/ssh_keys/k1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestSSHKeyDeleteAcceptsAKeyThatIsAlreadyGone(t *testing.T) {

@@ -15,13 +15,15 @@ func TestBuildStubTBRecordsAFailureWithoutFailingTheWrappedTest(t *testing.T) {
 	stub.Errorf("saw %d problems", 2)
 	stub.Error("saw", "one more")
 
-	assert.Equal(t, []any{true, []string{"saw 2 problems", "saw one more\n"}}, []any{stub.Failed(), stub.GetErrors()})
+	assert.True(t, stub.Failed())
+	assert.Equal(t, []string{"saw 2 problems", "saw one more\n"}, stub.GetErrors())
 }
 
 func TestBuildStubTBReportsNoFailureAtFirst(t *testing.T) {
 	stub := onideltest.BuildStubTB(t)
 
-	assert.Equal(t, []any{false, []string(nil)}, []any{stub.Failed(), stub.GetErrors()})
+	assert.False(t, stub.Failed())
+	assert.Equal(t, []string(nil), stub.GetErrors())
 }
 
 func TestBuildStubTBHoldsCleanupsUntilRunCleanupsRunsThemOnceLastFirst(t *testing.T) {
@@ -34,7 +36,8 @@ func TestBuildStubTBHoldsCleanupsUntilRunCleanupsRunsThemOnceLastFirst(t *testin
 	stub.RunCleanups()
 	stub.RunCleanups()
 
-	assert.Equal(t, []any{0, []string{"second", "first"}}, []any{held, ran})
+	assert.Equal(t, 0, held)
+	assert.Equal(t, []string{"second", "first"}, ran)
 }
 
 func TestBuildStubTBRunsHeldCleanupsWhenTheWrappedTestEnds(t *testing.T) {
@@ -57,7 +60,9 @@ func TestBuildStubTBEndsOnlyTheRunFunctionOnARequireFailure(t *testing.T) {
 		reached = true
 	})
 
-	assert.Equal(t, []any{false, true, 1}, []any{reached, stub.Failed(), len(stub.GetErrors())})
+	assert.False(t, reached)
+	assert.True(t, stub.Failed())
+	assert.Len(t, stub.GetErrors(), 1)
 }
 
 func TestBuildStubTBEndsTheRunFunctionOnFatalf(t *testing.T) {
@@ -69,7 +74,8 @@ func TestBuildStubTBEndsTheRunFunctionOnFatalf(t *testing.T) {
 		reached = true
 	})
 
-	assert.Equal(t, []any{false, []string{"stop at here"}}, []any{reached, stub.GetErrors()})
+	assert.False(t, reached)
+	assert.Equal(t, []string{"stop at here"}, stub.GetErrors())
 }
 
 func TestBuildStubTBEndsTheRunFunctionOnFatal(t *testing.T) {
@@ -81,7 +87,8 @@ func TestBuildStubTBEndsTheRunFunctionOnFatal(t *testing.T) {
 		reached = true
 	})
 
-	assert.Equal(t, []any{false, []string{"stop\n"}}, []any{reached, stub.GetErrors()})
+	assert.False(t, reached)
+	assert.Equal(t, []string{"stop\n"}, stub.GetErrors())
 }
 
 func TestBuildStubTBRunsACleanupRegisteredByACleanupInTheSamePass(t *testing.T) {
@@ -108,7 +115,8 @@ func TestBuildStubTBRunsTheOtherCleanupsAfterOneCallsFatalf(t *testing.T) {
 
 	stub.RunCleanups()
 
-	assert.Equal(t, []any{[]string{"first"}, []string{"stop"}}, []any{ran, stub.GetErrors()})
+	assert.Equal(t, []string{"first"}, ran)
+	assert.Equal(t, []string{"stop"}, stub.GetErrors())
 }
 
 // The wrapped test is itself a StubTB here, so ending it (its RunCleanups) shows what
@@ -130,5 +138,6 @@ func TestBuildStubTBKeepsAFailureRecordedBeforeTheWrappedTestEnds(t *testing.T) 
 
 	wrapped.RunCleanups()
 
-	assert.Equal(t, []any{[]string(nil), []string{"asserted by the test"}}, []any{wrapped.GetErrors(), stub.GetErrors()})
+	assert.Equal(t, []string(nil), wrapped.GetErrors())
+	assert.Equal(t, []string{"asserted by the test"}, stub.GetErrors())
 }

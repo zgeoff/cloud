@@ -38,10 +38,8 @@ func TestReadSSHKeyReadsOneKeyInTheTeam(t *testing.T) {
 	key, err := ctx.client.ReadSSHKey(t.Context(), "k1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		client.SSHKey{ID: "k1", Created: "2026-10-02T05:35:28Z", Name: "me", PublicKey: "k"},
-		[]onideltest.Request{{Method: "GET", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
-	}, []any{key, ctx.api.GetRequests()})
+	assert.Equal(t, client.SSHKey{ID: "k1", Created: "2026-10-02T05:35:28Z", Name: "me", PublicKey: "k"}, key)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/ssh_keys/k1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
 func TestUpdateSSHKeySendsTheWholeKey(t *testing.T) {
@@ -51,12 +49,10 @@ func TestUpdateSSHKeySendsTheWholeKey(t *testing.T) {
 	err := ctx.client.UpdateSSHKey(t.Context(), "k1", client.SSHKeyInput{TeamID: "team-a", Name: "me-2", PublicKey: "k2"})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{"k1": {"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2"}},
-		[]onideltest.Request{{Method: "PATCH", Path: "/ssh_keys/k1", Body: map[string]any{
-			"team_id": "team-a", "name": "me-2", "ssh_key": "k2",
-		}}},
-	}, []any{ctx.api.GetSSHKeys(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{"k1": {"id": "k1", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2"}}, ctx.api.GetSSHKeys())
+	assert.Equal(t, []onideltest.Request{{Method: "PATCH", Path: "/ssh_keys/k1", Body: map[string]any{
+		"team_id": "team-a", "name": "me-2", "ssh_key": "k2",
+	}}}, ctx.api.GetRequests())
 }
 
 func TestRemoveSSHKeyRemovesTheKeyInTheTeam(t *testing.T) {
@@ -66,8 +62,6 @@ func TestRemoveSSHKeyRemovesTheKeyInTheTeam(t *testing.T) {
 	err := ctx.client.RemoveSSHKey(t.Context(), "k1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{{Method: "DELETE", Path: "/ssh_keys/k1", Query: "team_id=team-a"}},
-	}, []any{ctx.api.GetSSHKeys(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetSSHKeys())
+	assert.Equal(t, []onideltest.Request{{Method: "DELETE", Path: "/ssh_keys/k1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }

@@ -44,8 +44,9 @@ func setupTest(t *testing.T) struct {
 func TestNewStartsWithTheDefaultIntervals(t *testing.T) {
 	c := client.New("", "key")
 
-	assert.Equal(t, []time.Duration{10 * time.Second, 500 * time.Millisecond, 30 * time.Minute},
-		[]time.Duration{c.PollInterval, c.RetryBase, c.VMWaitTimeout})
+	assert.Equal(t, 10*time.Second, c.PollInterval)
+	assert.Equal(t, 500*time.Millisecond, c.RetryBase)
+	assert.Equal(t, 30*time.Minute, c.VMWaitTimeout)
 }
 
 func TestNewSleepsForTheWholeDuration(t *testing.T) {
@@ -55,7 +56,8 @@ func TestNewSleepsForTheWholeDuration(t *testing.T) {
 
 		err := c.Sleep(t.Context(), time.Hour)
 
-		assert.Equal(t, []any{nil, time.Hour}, []any{err, time.Since(start)})
+		require.NoError(t, err)
+		assert.Equal(t, time.Hour, time.Since(start))
 	})
 }
 
@@ -72,7 +74,8 @@ func TestNewSleepsNoLongerThanTheContextLasts(t *testing.T) {
 
 		err := c.Sleep(sleepCtx, time.Hour)
 
-		assert.Equal(t, []any{context.Canceled, time.Minute}, []any{err, time.Since(start)})
+		assert.Equal(t, context.Canceled, err)
+		assert.Equal(t, time.Minute, time.Since(start))
 	})
 }
 
@@ -323,7 +326,8 @@ func TestClientStopsRetryingWhenTheContextEnds(t *testing.T) {
 
 	_, err := ctx.client.ReadTeams(callCtx)
 
-	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/teams"}}}, []any{err, ctx.api.GetRequests()})
+	assert.Equal(t, context.Canceled, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
 }
 
 func TestClientReportsABaseURLThatDoesNotParse(t *testing.T) {

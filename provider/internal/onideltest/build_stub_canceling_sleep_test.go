@@ -21,5 +21,7 @@ func TestBuildStubCancelingSleepEndsTheCallersContextAndReturnsTheClientsSleepEr
 	// The stub's sleep runs first and ends ctx; the real Sleep then sees an ended context.
 	got, want := stubbed.Sleep(ctx, time.Millisecond), plain.Sleep(ctx, time.Millisecond)
 
-	assert.Equal(t, []error{context.Canceled, context.Canceled, context.Canceled}, []error{got, want, ctx.Err()})
+	assert.Equal(t, context.Canceled, got)
+	assert.Equal(t, context.Canceled, want)
+	assert.Equal(t, context.Canceled, ctx.Err())
 }
