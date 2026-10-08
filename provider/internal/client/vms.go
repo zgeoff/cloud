@@ -108,7 +108,7 @@ func (c *Client) CreateVM(ctx context.Context, in VMInput) (VM, error) {
 
 	id := findCreatedID(raw)
 	if id == "" {
-		err = c.waitFor(ctx, c.VMWaitTimeout, func() (bool, error) {
+		err = c.waitFor(ctx, c.VMWaitTimeout, func(ctx context.Context) (bool, error) {
 			vms, err := c.ReadVMs(ctx, in.TeamID)
 			if err != nil {
 				return false, err
@@ -184,7 +184,7 @@ func (c *Client) RemoveVM(ctx context.Context, id, teamID string) error {
 	if err != nil {
 		return err
 	}
-	return c.waitFor(ctx, c.VMWaitTimeout, func() (bool, error) {
+	return c.waitFor(ctx, c.VMWaitTimeout, func(ctx context.Context) (bool, error) {
 		vm, err := c.ReadVM(ctx, id, teamID)
 		if IsNotFound(err) {
 			return true, nil
@@ -220,7 +220,7 @@ func (e *VMStatusError) Error() string {
 // WaitForVMReady polls until the VM is active with no action in flight.
 func (c *Client) WaitForVMReady(ctx context.Context, id, teamID string) (VM, error) {
 	var vm VM
-	err := c.waitFor(ctx, c.VMWaitTimeout, func() (bool, error) {
+	err := c.waitFor(ctx, c.VMWaitTimeout, func(ctx context.Context) (bool, error) {
 		var err error
 		vm, err = c.ReadVM(ctx, id, teamID)
 		if err != nil {

@@ -123,6 +123,20 @@ func TestReadFirewallRuleReadsOneRuleInTheTeam(t *testing.T) {
 	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
+func TestReadFirewallRuleNamesANonIntegerSubnetSize(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
+	ctx.api.SetFirewallRule(map[string]any{
+		"id": "r1", "group": "g1", "ip_type": "v4", "action": "allow", "protocol": "tcp", "port": "22",
+		"subnet": "0.0.0.0", "subnet_size": "x", "desc": "",
+	})
+
+	_, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "r1", "team-a")
+
+	assert.EqualError(t, err, "onidel: decode GET /network/firewalls/g1/rules/r1: "+
+		"json: cannot unmarshal non-integer value into Go struct field FirewallRule.firewall_rule.subnet_size of type client.FlexInt")
+}
+
 func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})

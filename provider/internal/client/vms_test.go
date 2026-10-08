@@ -450,3 +450,83 @@ func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
 	assert.Equal(t, context.Canceled, err)
 	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
 }
+
+func TestWaitForVMReadyStopsAtItsTimeoutWhileTheCallersContextIsLive(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusServiceUnavailable, "", 1)
+	ctx.client.VMWaitTimeout = 30 * time.Second
+	ctx.client.RetryBase = time.Minute
+	sleep := onideltest.BuildStubClockSleep()
+	ctx.client.Sleep = sleep.Sleep
+	callCtx := t.Context()
+
+	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
+
+	assert.Equal(t, context.DeadlineExceeded, err)
+	require.NoError(t, callCtx.Err())
+	assert.Equal(t, []time.Duration{time.Minute}, sleep.GetDurations())
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
+}
+
+func TestWaitForVMReadyEndsAHungReadAtItsTimeout(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterHandler("GET /vm/{id}", func(_ http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	})
+	// The read hangs, so no sleep runs: the request's own context is the only thing
+	// that can end it, which takes a real deadline. Without it, the client's
+	// 60-second HTTP timeout ends the read with a different error.
+	ctx.client.VMWaitTimeout = 50 * time.Millisecond
+	callCtx := t.Context()
+
+	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
+
+	assert.EqualError(t, err, `onidel: GET /vm/v: Get "`+ctx.api.URL+`/vm/v": context deadline exceeded`)
+	require.NoError(t, callCtx.Err())
+	assert.Equal(t, []time.Duration(nil), ctx.sleep.GetDurations())
+}
+
+func TestRemoveVMStopsAtItsTimeoutWhileTheCallersContextIsLive(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "status": "active"})
+	ctx.api.RegisterResponse("GET /vm/{id}", http.StatusServiceUnavailable, "", 1)
+	ctx.client.VMWaitTimeout = 30 * time.Second
+	ctx.client.RetryBase = time.Minute
+	sleep := onideltest.BuildStubClockSleep()
+	ctx.client.Sleep = sleep.Sleep
+	callCtx := t.Context()
+
+	err := ctx.client.RemoveVM(callCtx, "v", "")
+
+	assert.Equal(t, context.DeadlineExceeded, err)
+	require.NoError(t, callCtx.Err())
+	assert.Equal(t, []time.Duration{time.Minute}, sleep.GetDurations())
+	assert.Equal(t, []onideltest.Request{{Method: "DELETE", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
+}
+
+func TestCreateVMStopsLookingForTheNewVMAtItsTimeoutWhileTheCallersContextIsLive(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /vm", http.StatusOK, "[]", 1)
+	ctx.api.RegisterResponse("GET /vm", http.StatusServiceUnavailable, "", 1)
+	ctx.client.VMWaitTimeout = 30 * time.Second
+	ctx.client.RetryBase = time.Minute
+	sleep := onideltest.BuildStubClockSleep()
+	ctx.client.Sleep = sleep.Sleep
+	callCtx := t.Context()
+
+	_, err := ctx.client.CreateVM(callCtx, client.VMInput{
+		TeamID: "team-a", Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
+	})
+
+	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+	require.NoError(t, callCtx.Err())
+	assert.Equal(t, []time.Duration{time.Minute}, sleep.GetDurations())
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
+		{Method: "POST", Path: "/vm", Body: map[string]any{
+			"team_id": "team-a", "name": "web", "location": "Sydney", "cpu": 2.0, "ram": 4096.0, "disk": 40.0, "os": 24.0, "ipv6": false,
+		}},
+		{Method: "GET", Path: "/vm", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
+}
