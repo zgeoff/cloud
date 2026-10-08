@@ -15,6 +15,7 @@ let
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
+  stubBlockingSqlite3 = import ./test-utils/build-stub-blocking-sqlite3.nix { inherit pkgs; };
   stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
@@ -456,6 +457,76 @@ let
     }
     {
       title = "it buildStubSqlite3 holds to scripts/restore-impd-db.sh: it checks the staged file through SQLITE3";
+      script = ''
+        staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
+        checked=$(grep -cF '[ "$("$sqlite" "file:$staged?mode=ro&immutable=1" '"'"'PRAGMA integrity_check;'"'"')" = ok ]' \
+          ${../../scripts/restore-impd-db.sh} || true)
+        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../../scripts/restore-impd-db.sh} || true)
+
+        assert_equals 1 "$staged" "the script's staged file"
+        assert_equals 1 "$checked" "the script's checks of the staged file"
+        assert_equals 1 "$sqlite" "the script's sqlite3"
+      '';
+    }
+    {
+      title = "it buildStubBlockingSqlite3 blocks on the check of the staged file, under the PID it writes, and answers nothing";
+      script = ''
+        mkdir home tmp db
+        sqlite3 db/imp.sqlite.restore 'CREATE TABLE t (v TEXT);'
+        source ${testLib}/wait-for.sh
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" HOLDER_PID_FILE=$PWD/holder.pid \
+          ${stubBlockingSqlite3} "file:$PWD/db/imp.sqlite.restore?mode=ro&immutable=1" 'PRAGMA integrity_check;' > out 2> err &
+        stub_pid=$!
+        trap 'kill -KILL "$stub_pid" || true' EXIT
+        printf '%s\0' ${pkgs.coreutils}/bin/sleep infinity > expected-command
+        # it writes the PID file just before it becomes sleep
+        wait_for 30 "the stand-in to block" cmp -s expected-command /proc/$stub_pid/cmdline
+        cp /proc/$stub_pid/cmdline command
+        kill -KILL "$stub_pid"
+        status=0
+        wait "$stub_pid" || status=$?
+
+        assert_equals "$stub_pid" "$(cat holder.pid)" "the blocked process"
+        assert_files_equal expected-command command
+        assert_equals 137 "$status" "the exit status, killed"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_missing holder.pid.partial "the partial PID file"
+      '';
+    }
+    {
+      title = "it buildStubBlockingSqlite3 is sqlite3 alone for any other file";
+      script = ''
+        mkdir home tmp
+        sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);'
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" HOLDER_PID_FILE=$PWD/holder.pid \
+          ${stubBlockingSqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err
+
+        assert_equals ok "$(cat out)" "sqlite3's answer"
+        assert_files_equal /dev/null err
+        assert_missing holder.pid "a holder's PID file"
+      '';
+    }
+    {
+      title = "it buildStubBlockingSqlite3 refuses to run without the file that names the blocked process";
+      script = ''
+        mkdir home tmp
+        sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);'
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubBlockingSqlite3} copy.sqlite 'PRAGMA integrity_check;' \
+          > out 2> err || status=$?
+
+        assert_equals 2 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "sqlite3-blocking-on-staged-check: set HOLDER_PID_FILE to the file that names the blocked process" \
+          "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubBlockingSqlite3 holds to scripts/restore-impd-db.sh: it checks the staged file through SQLITE3";
       script = ''
         staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
         checked=$(grep -cF '[ "$("$sqlite" "file:$staged?mode=ro&immutable=1" '"'"'PRAGMA integrity_check;'"'"')" = ok ]' \

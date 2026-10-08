@@ -163,7 +163,8 @@ pkgs.testers.runNixOSTest {
         assert images == "", f"images are left: {images}"
         machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err /tmp/sleep.log")
 
-        machine.succeed("zfs destroy -r tank/imp")
+        # an earlier reset that stopped after this destroy left no tank/imp
+        machine.succeed("if zfs list -H -o name tank/imp >/dev/null 2>&1; then zfs destroy -r tank/imp; fi")
         # imp's module makes the dataset again
         machine.succeed("systemctl restart imp-zfs-dataset")
         mountpoint = machine.succeed("zfs get -H -o value mountpoint tank/imp").strip()
