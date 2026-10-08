@@ -1,9 +1,20 @@
 # shellcheck shell=bash
 # create_stub_host_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the host that
-# install-atc-gateway-credentials.sh installs credentials on. "The host" is the case's
-# tree: the stand-in runs each remote command it knows here, with STUB_HOST_BIN first on
-# PATH, copies its stdout to STUB_TREE/host-output, and returns its exit code. It logs
-# each call's argv as a JSON line to STUB_TREE/calls.
+# install-atc-gateway-credentials.sh installs credentials on. "The host" is STUB_TREE/host:
+# the stand-in runs each remote command it knows there, with its own stdin, copies its
+# stdout to STUB_TREE/host-output, and returns its exit code. It logs each call's argv as a
+# JSON line to STUB_TREE/calls.
+#
+# Like real ssh, it forwards none of the caller's environment or working directory: the
+# command runs from STUB_TREE/host under `env -i`, with the host's login environment, the
+# lines of STUB_TREE/host/environment (NAME=value, as pam_env reads /etc/environment) when
+# that file exists, then PATH (STUB_HOST_BIN, then /usr/bin and /bin) and HOME, which is
+# STUB_TREE/host/root, never the real /root, and which the stand-in creates when missing.
+# The only other variables it passes are the host stand-ins' own settings, which stand
+# for the host's state, not the caller's: STUB_TREE, STUB_IMPD_FAIL_AT,
+# STUB_SECRET_ADD_ERROR, STUB_TOKEN_NEW_ERROR and STUB_MINTED (create-stub-imp-host-docker.sh),
+# and STUB_GOOD_TOKEN, STUB_WHOAMI_STATUS and STUB_WHOAMI_BODY (create-stub-impd-curl.sh),
+# each only when set.
 #
 # With STUB_SSH_PASS=1, a call to a loopback destination (ssh://<user>@127.0.0.1:<port>)
 # goes to the real ssh after it is logged, with -F /dev/null so no ssh config on the
@@ -100,7 +111,20 @@ case "$remote" in
     fi
     ;;
 esac
-PATH="$STUB_HOST_BIN:/usr/bin:/bin" bash -c "$remote" | tee -a "$STUB_TREE/host-output"
+host_env=()
+if [ -f "$STUB_TREE/host/environment" ]; then
+  while IFS= read -r line; do
+    if [ -n "$line" ]; then host_env+=("$line"); fi
+  done < "$STUB_TREE/host/environment"
+fi
+for name in STUB_TREE STUB_IMPD_FAIL_AT STUB_SECRET_ADD_ERROR STUB_TOKEN_NEW_ERROR STUB_MINTED \
+  STUB_GOOD_TOKEN STUB_WHOAMI_STATUS STUB_WHOAMI_BODY; do
+  if [ -n "${!name+set}" ]; then host_env+=("$name=${!name}"); fi
+done
+if [ ! -d "$STUB_TREE/host/root" ]; then mkdir "$STUB_TREE/host/root" || exit 97; fi
+cd "$STUB_TREE/host" || exit 97
+env -i "${host_env[@]}" PATH="$STUB_HOST_BIN:/usr/bin:/bin" HOME="$STUB_TREE/host/root" \
+  bash -c "$remote" | tee -a "$STUB_TREE/host-output"
 exit "${PIPESTATUS[0]}"
 STUB
   } > "$bin/ssh"
