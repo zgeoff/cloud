@@ -6,9 +6,10 @@
 # POST /rpc/tokens/whoami with the bearer that <dir>/good-token holds, read at each
 # request, gets atc-cloud's identity (200, in imp's {"json": Identity} envelope,
 # IdentitySchema in imp's packages/api); any other bearer, or any bearer while
-# <dir>/good-token is missing, gets impd's 401 {"error":"unauthorized"}. Every other request fails closed, as
-# the shell stand-ins' exit 97 does: it appends "<method> <path>" to <dir>/unexpected and
-# answers 500 with a body naming the stand-in, which no caller reads as impd's answer.
+# <dir>/good-token is missing, gets impd's 401 {"error":"unauthorized"}. Every other
+# request, whatever its method, fails closed, as the shell stand-ins' exit 97 does: it
+# appends "<method> <path>" to <dir>/unexpected and answers 500 with a body naming the
+# stand-in, which no caller reads as impd's answer.
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 
@@ -27,28 +28,32 @@ class Impd(BaseHTTPRequestHandler):
     def do_POST(self):
         self.rfile.read(int(self.headers.get("content-length", 0)))
         if self.path != "/rpc/tokens/whoami":
-            return self.refuse()
-        good = self.good_bearer()
+            return self.send_refusal()
+        good = self.read_good_bearer()
         if good is not None and self.headers.get("authorization") == good:
-            return self.answer(200, identity)
-        self.answer(401, b'{"error":"unauthorized"}')
+            return self.send_answer(200, identity)
+        self.send_answer(401, b'{"error":"unauthorized"}')
 
-    def good_bearer(self):
+    # http.server routes a request to do_<METHOD> and answers 501 when there is none, so
+    # every method but POST resolves here to the refusal, which records it.
+    def __getattr__(self, name):
+        if name.startswith("do_"):
+            return self.send_refusal
+        raise AttributeError(name)
+
+    def read_good_bearer(self):
         try:
             with open(os.path.join(out_dir, "good-token")) as token:
                 return "Bearer " + token.read()
         except FileNotFoundError:
             return None
 
-    def do_GET(self):
-        self.refuse()
-
-    def refuse(self):
+    def send_refusal(self):
         with open(os.path.join(out_dir, "unexpected"), "a") as out:
             out.write(f"{self.command} {self.path}\n")
-        self.answer(500, f'{{"error":"stub-impd: unexpected {self.command} {self.path}"}}'.encode())
+        self.send_answer(500, f'{{"error":"stub-impd: unexpected {self.command} {self.path}"}}'.encode())
 
-    def answer(self, status, body):
+    def send_answer(self, status, body):
         self.send_response(status)
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(body)))

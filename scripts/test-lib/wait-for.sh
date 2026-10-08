@@ -8,19 +8,16 @@
 # sleep; only wait_for's own tests (and tests of helpers built on it) set them, so a
 # timeout case steps a fake clock instead of waiting out real seconds.
 wait_for() {
-  local seconds="$1" what="$2" clock="${WAIT_FOR_CLOCK:-get_wait_for_seconds}"
-  local pause="${WAIT_FOR_SLEEP:-sleep}" deadline
+  local seconds="$1" what="$2" pause="${WAIT_FOR_SLEEP:-sleep}" now deadline
   shift 2
-  deadline=$(($("$clock") + seconds))
+  if [ -n "${WAIT_FOR_CLOCK:-}" ]; then now="$("$WAIT_FOR_CLOCK")"; else now="$SECONDS"; fi
+  deadline=$((now + seconds))
   until "$@"; do
-    if [ "$("$clock")" -ge "$deadline" ]; then
+    if [ -n "${WAIT_FOR_CLOCK:-}" ]; then now="$("$WAIT_FOR_CLOCK")"; else now="$SECONDS"; fi
+    if [ "$now" -ge "$deadline" ]; then
       echo "timed out after ${seconds}s waiting for $what" >&2
       return 1
     fi
     "$pause" 0.05
   done
-}
-
-get_wait_for_seconds() {
-  echo "$SECONDS"
 }

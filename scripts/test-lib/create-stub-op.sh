@@ -7,13 +7,23 @@
 # vault JSON, and its errors op's "[ERROR] <date> <message>" lines with exit 1:
 #
 # - `vault get <vault> --format json`: the vault, or op's "isn't a vault" error;
-# - `item list --vault <vault> --format json`: an item per file;
-# - `item create --vault <vault> - --format json`: writes the stdin item's credential;
+# - `item list --vault <vault> --format json`: an item per file, or the "isn't a vault" error;
+# - `item create --vault <vault> - --format json`: writes the stdin item's credential, or
+#   the "isn't a vault" error with nothing written;
 # - `read op://<vault>/<item>/credential`: the credential and a newline, or
-#   STUB_OP_READ_VALUE when set;
+#   STUB_OP_READ_VALUE when set, or op's "could not read secret" error for a missing item;
 # - STUB_OP_FAIL_AT (item-list, item-create) fails that call as op does when it is rate
 #   limited;
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# Not checked against a real op (no 1Password account runs in a test): the item and vault
+# JSON carry only the fields the credentials script reads (id, name, title) and a few
+# beside them, not every field op 2 prints, such as created_at and updated_at; the
+# missing-vault error repeats op's `vault get` text for item list and item create; and the
+# missing-item read error follows the text 1Password community reports quote for op 2
+# ("could not read secret op://<vault>/<item>/<field>: could not get item <vault>/<item>:
+# "<item>" isn't an item in the "<vault>" vault."), whose quoting of the reference varies
+# between op releases.
 create_stub_op() {
   local bin="$1"
   cat > "$bin/op" << 'STUB'
@@ -34,6 +44,10 @@ case "$*" in
       echo "[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later." >&2
       exit 1
     fi
+    if [ ! -d "$STUB_TREE/vault/$4" ]; then
+      echo "[ERROR] 2026/10/07 12:00:00 \"$4\" isn't a vault in this account. Specify the vault with its ID or name." >&2
+      exit 1
+    fi
     (cd "$STUB_TREE/vault/$4" && ls -A) | jq -R --arg vault "$4" \
       '{id: "fixture-item-id", title: ., version: 1, vault: {id: "fixture-vault-id", name: $vault}, category: "API_CREDENTIAL"}' |
       jq -s .
@@ -42,6 +56,10 @@ case "$*" in
     item="$(cat)"
     if [ "${STUB_OP_FAIL_AT:-}" = item-create ]; then
       echo "[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later." >&2
+      exit 1
+    fi
+    if [ ! -d "$STUB_TREE/vault/$4" ]; then
+      echo "[ERROR] 2026/10/07 12:00:00 \"$4\" isn't a vault in this account. Specify the vault with its ID or name." >&2
       exit 1
     fi
     title="$(jq -r .title <<< "$item")"
@@ -53,6 +71,10 @@ case "$*" in
     ref="${2#op://}"
     if [ -n "${STUB_OP_READ_VALUE:-}" ]; then
       printf '%s\n' "$STUB_OP_READ_VALUE"
+    elif [ ! -f "$STUB_TREE/vault/${ref%/credential}" ]; then
+      vault="${ref%%/*}" item="${ref#*/}" item="${item%/credential}"
+      echo "[ERROR] 2026/10/07 12:00:00 could not read secret $2: could not get item $vault/$item: \"$item\" isn't an item in the \"$vault\" vault." >&2
+      exit 1
     else
       cat "$STUB_TREE/vault/${ref%/credential}"
       echo

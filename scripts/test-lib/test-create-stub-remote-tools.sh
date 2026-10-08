@@ -17,7 +17,7 @@ it_logs_a_call_and_fails_closed_with_exit_97() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" scp -o BatchMode=yes "$tree/calls" root@geoffcloud:/tmp/ \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" scp -o BatchMode=yes "$tree/calls" root@geoffcloud:/tmp/ \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -43,23 +43,48 @@ TOOLS
 }
 
 it_fails_closed_for_every_named_tool() {
-  local tool statuses=""
+  local tool status
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
   for tool in rsync scp sftp ssh tailscale; do
-    env -i PATH="$tree/bin:/usr/bin:/bin" "$tool" status > /dev/null 2>&1 || statuses+="$tool $? "
+    status=0
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" "$tool" status \
+      >> "$tree/out" 2>> "$tree/err" || status=$?
+    echo "$tool $status" >> "$tree/statuses"
   done
 
-  diff - <(echo "$statuses") <<< 'rsync 97 scp 97 sftp 97 ssh 97 tailscale 97 '
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'ERR'
+unexpected: rsync status
+unexpected: scp status
+unexpected: sftp status
+unexpected: ssh status
+unexpected: tailscale status
+ERR
+  diff - "$tree/calls" << 'CALLS'
+["rsync","status"]
+["scp","status"]
+["sftp","status"]
+["ssh","status"]
+["tailscale","status"]
+CALLS
+  diff - "$tree/statuses" << 'STATUSES'
+rsync 97
+scp 97
+sftp 97
+ssh 97
+tailscale 97
+STATUSES
 }
 
 # Runtime every case needs: the stand-ins for rsync, scp, sftp, ssh and tailscale in <tree>/bin,
-# checked before any case runs a tool, so no call can reach a real remote tool.
+# checked before any case runs a tool, so no call can reach a real remote tool, and the HOME and
+# TMPDIR they run with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin"
+  mkdir "$tree/bin" "$tree/home" "$tree/tmp"
   create_stub_remote_tools "$tree/bin" "$tree/calls" rsync scp sftp ssh tailscale
   require_remote_tool_stubs "$tree/bin"
 }

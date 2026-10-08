@@ -10,26 +10,21 @@ source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 
 wait_for_ready() {
   local name="$1" seconds="$2"
-  if ! wait_for "$seconds" "$name to answer /readyz with 200" is_ready_or_stopped "$name"; then
+  # one poll: true once the gateway answers 200, or once there is no running container to
+  # wait for
+  # shellcheck disable=SC2016 # expanded by the poll's own bash
+  local poll='
+    [ "$(docker inspect -f "{{.State.Running}}" "$1" 2> /dev/null)" = true ] || exit 0
+    port="$(docker port "$1" 8414/tcp 2> /dev/null)" || exit 1
+    [ "$(curl -q --noproxy "*" -s -o /dev/null -w "%{http_code}" -H "Host: atc.fixture.invalid" \
+      "http://127.0.0.1:${port##*:}/readyz")" = 200 ]'
+  if ! wait_for "$seconds" "$name to answer /readyz with 200" bash -c "$poll" wait-for-ready "$name"; then
     docker logs "$name" 2>&1 | tail -20 >&2
     return 1
   fi
-  if ! is_running "$name"; then
+  if [ "$(docker inspect -f '{{.State.Running}}' "$name" 2> /dev/null)" != true ]; then
     echo "$name stopped before it answered /readyz with 200" >&2
     docker logs "$name" 2>&1 | tail -20 >&2
     return 1
   fi
-}
-
-# true once the gateway answers 200, or once there is no running container to wait for
-is_ready_or_stopped() {
-  local name="$1" port
-  is_running "$name" || return 0
-  port="$(docker port "$name" 8414/tcp 2> /dev/null)" || return 1
-  [ "$(curl -q --noproxy '*' -s -o /dev/null -w '%{http_code}' -H 'Host: atc.fixture.invalid' \
-    "http://127.0.0.1:${port##*:}/readyz")" = 200 ]
-}
-
-is_running() {
-  [ "$(docker inspect -f '{{.State.Running}}' "$1" 2> /dev/null)" = true ]
 }

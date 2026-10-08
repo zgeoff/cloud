@@ -16,7 +16,7 @@ it_prints_the_toplevel_with_a_newline_and_logs_the_call() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_LOG="$tree/calls" STUB_TOPLEVEL="$tree/repo" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_TOPLEVEL="$tree/repo" \
     git rev-parse --show-toplevel > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< "$tree/repo"
@@ -32,7 +32,7 @@ it_prints_the_nul_separated_file_list_unchanged_for_the_toplevels_ls_files() {
   setup_test "$tree"
   printf 'flake.nix\0scripts/a b.sh\0' > "$tree/ls-files"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_LOG="$tree/calls" STUB_TOPLEVEL="$tree/repo" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_TOPLEVEL="$tree/repo" \
     STUB_LS_FILES="$tree/ls-files" \
     git -C "$tree/repo" ls-files -z --cached --others --exclude-standard --deduplicate \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -49,7 +49,7 @@ it_fails_closed_with_exit_97_on_ls_files_for_another_directory() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_LOG="$tree/calls" STUB_TOPLEVEL="$tree/repo" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_TOPLEVEL="$tree/repo" \
     git -C "$tree/other" ls-files -z --cached --others --exclude-standard --deduplicate \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -59,9 +59,12 @@ it_fails_closed_with_exit_97_on_ls_files_for_another_directory() {
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
+# Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each call
+# runs with. The empty call log is boot data: the stand-in appends to it, and a case
+# compares it whole.
 setup_test() {
   local tree="$1"
-  mkdir -p "$tree/bin" "$tree/repo"
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
   : > "$tree/calls"
   create_stub_checks_git "$tree/bin"
 }

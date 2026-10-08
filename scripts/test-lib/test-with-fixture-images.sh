@@ -38,25 +38,36 @@ EOF
   [ "$status" = 7 ] || { echo "exit $status, want 7" >&2; exit 1; }
 }
 
-# GH_HOST names a host that does not resolve, so the release fetch fails at once; the
-# log's text is gh's own, so the case checks only that it follows, indented
+# GH_HOST points gh at a dead loopback port, so the release fetch fails at once with Go's
+# own connection error and nothing leaves the machine. gh sends its release lookup and a
+# GraphQL query at once and reports whichever fails first, so the log is one of exactly
+# two lines. The lookup's URL carries the pinned release tag with its slash escaped, as gh
+# escapes it, so the case reads the tag from the pins.
 it_reports_a_failed_build_with_its_log_and_runs_nothing() {
-  local status=0
+  local release status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree" || true' EXIT
-  mkdir "$tree/gh"
+  mkdir "$tree/gh" "$tree/home" "$tree/tmp"
+  sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../deploy/atc-gateway/versions.env" > "$tree/release"
+  release="$(< "$tree/release")"
 
   # shellcheck disable=SC2016 # expanded by the inner shell
-  env -u GH_TOKEN -u GITHUB_TOKEN GH_HOST=fixture.invalid GH_CONFIG_DIR="$tree/gh" \
+  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" GH_HOST=127.0.0.1:1 GH_CONFIG_DIR="$tree/gh" \
     bash -c 'source "$1"; with_fixture_images touch "$2/ran"' _ \
     "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh" "$tree" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
-  diff - <(head -n 1 "$tree/out") <<< 'FAIL the images did not build from the pinned, checked binary and pinned bases'
-  tail -n +2 "$tree/out" > "$tree/log"
-  [ -s "$tree/log" ] || { echo "no build log after the FAIL line" >&2; exit 1; }
-  diff /dev/null <(grep -v '^    ' "$tree/log")
+  cat > "$tree/want-lookup" << EOF
+FAIL the images did not build from the pinned, checked binary and pinned bases
+    Get "https://127.0.0.1:1/api/v3/repos/zgeoff/atc/releases/tags/${release//\//%2F}": dial tcp 127.0.0.1:1: connect: connection refused
+EOF
+  cat > "$tree/want-graphql" << 'EOF'
+FAIL the images did not build from the pinned, checked binary and pinned bases
+    Post "https://127.0.0.1:1/api/graphql": dial tcp 127.0.0.1:1: connect: connection refused
+EOF
+  cmp -s "$tree/want-lookup" "$tree/out" || cmp -s "$tree/want-graphql" "$tree/out" ||
+    { diff "$tree/want-lookup" "$tree/out" || diff "$tree/want-graphql" "$tree/out"; exit 1; }
   [ ! -e "$tree/ran" ] || { echo "the command ran after a failed build" >&2; exit 1; }
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }

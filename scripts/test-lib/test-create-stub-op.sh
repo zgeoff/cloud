@@ -20,7 +20,8 @@ it_prints_a_vault_that_exists_and_records_the_token_it_ran_with() {
   setup_test "$tree"
   mkdir "$tree/vault/cloud"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_fixture \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    OP_SERVICE_ACCOUNT_TOKEN=ops_fixture \
     op vault get cloud --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '{"id":"fixture-vault-id","name":"cloud"}'
@@ -37,10 +38,13 @@ it_records_unset_when_it_runs_without_a_token() {
   setup_test "$tree"
   mkdir "$tree/vault/cloud"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op vault get cloud --format json \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op vault get cloud --format json > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff - "$tree/out" <<< '{"id":"fixture-vault-id","name":"cloud"}'
+  diff /dev/null "$tree/err"
   diff - "$tree/op-token-seen" <<< unset
+  diff - "$tree/calls" <<< '["op","vault","get","cloud","--format","json"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -50,11 +54,12 @@ it_fails_a_missing_vault_with_ops_error_and_exit_1() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op vault get missing --format json \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op vault get missing --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 "missing" isn'"'"'t a vault in this account. Specify the vault with its ID or name.'
+  diff - "$tree/calls" <<< '["op","vault","get","missing","--format","json"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -67,14 +72,15 @@ it_lists_each_file_in_a_vault_as_an_item() {
   printf one > "$tree/vault/cloud/first"
   printf two > "$tree/vault/cloud/second"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op item list --vault cloud --format json \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op item list --vault cloud --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   jq -c . "$tree/out" > "$tree/items"
   diff - "$tree/items" << 'ITEMS'
 [{"id":"fixture-item-id","title":"first","version":1,"vault":{"id":"fixture-vault-id","name":"cloud"},"category":"API_CREDENTIAL"},{"id":"fixture-item-id","title":"second","version":1,"vault":{"id":"fixture-vault-id","name":"cloud"},"category":"API_CREDENTIAL"}]
 ITEMS
   diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["op","item","list","--vault","cloud","--format","json"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -85,11 +91,29 @@ it_lists_an_empty_vault_as_an_empty_array() {
   setup_test "$tree"
   mkdir "$tree/vault/cloud"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op item list --vault cloud --format json \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op item list --vault cloud --format json > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - <(jq -c . "$tree/out") <<< '[]'
+  jq -c . "$tree/out" > "$tree/items"
+  diff - "$tree/items" <<< '[]'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["op","item","list","--vault","cloud","--format","json"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_fails_the_item_list_of_a_missing_vault_with_ops_error_and_exit_1() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op item list --vault missing --format json > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 "missing" isn'"'"'t a vault in this account. Specify the vault with its ID or name.'
+  diff - "$tree/calls" <<< '["op","item","list","--vault","missing","--format","json"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_fails_the_item_list_as_a_rate_limited_op_when_told_to() {
@@ -99,11 +123,13 @@ it_fails_the_item_list_as_a_rate_limited_op_when_told_to() {
   setup_test "$tree"
   mkdir "$tree/vault/cloud"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_OP_FAIL_AT=item-list \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_OP_FAIL_AT=item-list \
     op item list --vault cloud --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/calls" <<< '["op","item","list","--vault","cloud","--format","json"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -115,13 +141,34 @@ it_writes_the_credential_of_an_item_it_creates_and_prints_the_item() {
   mkdir "$tree/vault/cloud"
 
   echo '{"title":"atc-daemon-token","category":"API_CREDENTIAL","fields":[{"id":"credential","type":"CONCEALED","label":"credential","value":"fixture-bearer"}]}' |
-    env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op item create --vault cloud - --format json \
-    > "$tree/out" 2> "$tree/err" || status=$?
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+      op item create --vault cloud - --format json > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - <(jq -c . "$tree/out") <<< '{"id":"fixture-item-id","title":"atc-daemon-token","version":1,"vault":{"id":"fixture-vault-id","name":"cloud"},"category":"API_CREDENTIAL"}'
-  diff - <(cat "$tree/vault/cloud/atc-daemon-token"; echo) <<< fixture-bearer
+  jq -c . "$tree/out" > "$tree/item"
+  diff - "$tree/item" <<< '{"id":"fixture-item-id","title":"atc-daemon-token","version":1,"vault":{"id":"fixture-vault-id","name":"cloud"},"category":"API_CREDENTIAL"}'
+  printf fixture-bearer > "$tree/want-credential"
+  cmp "$tree/want-credential" "$tree/vault/cloud/atc-daemon-token"
   diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["op","item","create","--vault","cloud","-","--format","json"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_fails_an_item_create_into_a_missing_vault_with_ops_error_and_exit_1() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  echo '{"title":"atc-daemon-token","category":"API_CREDENTIAL","fields":[{"id":"credential","type":"CONCEALED","label":"credential","value":"fixture-bearer"}]}' |
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+      op item create --vault missing - --format json > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 "missing" isn'"'"'t a vault in this account. Specify the vault with its ID or name.'
+  ls -A "$tree/vault" > "$tree/vaults"
+  diff /dev/null "$tree/vaults"
+  diff - "$tree/calls" <<< '["op","item","create","--vault","missing","-","--format","json"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_creates_no_item_when_told_to_fail_the_create() {
@@ -132,13 +179,15 @@ it_creates_no_item_when_told_to_fail_the_create() {
   mkdir "$tree/vault/cloud"
 
   echo '{"title":"atc-daemon-token","category":"API_CREDENTIAL","fields":[{"id":"credential","type":"CONCEALED","label":"credential","value":"fixture-bearer"}]}' |
-    env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_OP_FAIL_AT=item-create \
-    op item create --vault cloud - --format json > "$tree/out" 2> "$tree/err" || status=$?
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+      STUB_OP_FAIL_AT=item-create \
+      op item create --vault cloud - --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
+  diff - "$tree/calls" <<< '["op","item","create","--vault","cloud","-","--format","json"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -150,12 +199,29 @@ it_reads_an_items_credential_with_a_trailing_newline() {
   mkdir "$tree/vault/cloud"
   printf fixture-bearer > "$tree/vault/cloud/atc-daemon-token"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op read op://cloud/atc-daemon-token/credential \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op read op://cloud/atc-daemon-token/credential > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< fixture-bearer
   diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["op","read","op://cloud/atc-daemon-token/credential"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_fails_a_read_of_a_missing_item_with_ops_error_and_exit_1() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/vault/cloud"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op read op://cloud/atc-daemon-token/credential > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 could not read secret op://cloud/atc-daemon-token/credential: could not get item cloud/atc-daemon-token: "atc-daemon-token" isn'"'"'t an item in the "cloud" vault.'
+  diff - "$tree/calls" <<< '["op","read","op://cloud/atc-daemon-token/credential"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_reads_the_named_value_instead_when_told_to() {
@@ -166,10 +232,13 @@ it_reads_the_named_value_instead_when_told_to() {
   mkdir "$tree/vault/cloud"
   printf fixture-bearer > "$tree/vault/cloud/atc-daemon-token"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" STUB_OP_READ_VALUE=another-bearer \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_OP_READ_VALUE=another-bearer \
     op read op://cloud/atc-daemon-token/credential > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< another-bearer
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["op","read","op://cloud/atc-daemon-token/credential"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -179,8 +248,8 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" op item delete atc-daemon-token \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op item delete atc-daemon-token > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: item delete atc-daemon-token'
@@ -188,10 +257,11 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
-# Runtime every case needs: the stand-in in <tree>/bin, and the root of its vaults.
+# Runtime every case needs: the stand-in in <tree>/bin, the root of its vaults, and the
+# HOME and TMPDIR each call runs with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin" "$tree/vault"
+  mkdir "$tree/bin" "$tree/vault" "$tree/home" "$tree/tmp"
   create_stub_op "$tree/bin"
 }
 

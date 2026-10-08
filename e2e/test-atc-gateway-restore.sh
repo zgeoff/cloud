@@ -47,9 +47,7 @@ it_restores_a_stored_client_after_a_backup_a_wipe_and_a_restore() {
   run_backup "$name" "$backup_image" backup > "$tree/backup.out" 2> "$tree/backup.err"
 
   diff /dev/null "$tree/backup.err"
-  # the repository's id is generated at init, so it is masked like a snapshot ID
-  normalize_restic_output < "$tree/backup.out" |
-    sed -E 's/^created restic repository [0-9a-f]+ at /created restic repository ID at /' > "$tree/backup.normal"
+  normalize_restic_output < "$tree/backup.out" > "$tree/backup.normal"
   diff - "$tree/backup.normal" << 'EOF'
 created restic repository ID at /repo
 

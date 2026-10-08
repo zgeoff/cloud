@@ -63,8 +63,10 @@ it_fails_wait_for_ready_with_the_containers_logs_when_readyz_never_answers() {
     wait_for_ready "$name" 1 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - <(head -n 1 "$tree/err") <<< "timed out after 1s waiting for $name to answer /readyz with 200"
-  diff - <(tail -n +2 "$tree/err" | sort) << 'EOF'
+  head -n 1 "$tree/err" > "$tree/err-first"
+  tail -n +2 "$tree/err" | sort > "$tree/err-logs"
+  diff - "$tree/err-first" <<< "timed out after 1s waiting for $name to answer /readyz with 200"
+  diff - "$tree/err-logs" << 'EOF'
 a log line on stderr
 a log line on stdout
 EOF
@@ -89,8 +91,10 @@ it_fails_wait_for_ready_with_the_containers_logs_as_soon_as_the_container_stops(
     wait_for_ready "$name" 30 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - <(head -n 1 "$tree/err") <<< "$name stopped before it answered /readyz with 200"
-  diff - <(tail -n +2 "$tree/err" | sort) << 'EOF'
+  head -n 1 "$tree/err" > "$tree/err-first"
+  tail -n +2 "$tree/err" | sort > "$tree/err-logs"
+  diff - "$tree/err-first" <<< "$name stopped before it answered /readyz with 200"
+  diff - "$tree/err-logs" << 'EOF'
 a log line on stderr
 a log line on stdout
 EOF

@@ -27,7 +27,8 @@ it_returns_once_the_command_succeeds_on_a_later_poll() {
     wait_for 5 "the third poll" "$tree/third-poll" > "$tree/out" 2>&1 || status=$?
 
   diff /dev/null "$tree/out"
-  diff - <(wc -l < "$tree/polls") <<< 3
+  wc -l < "$tree/polls" > "$tree/poll-count"
+  diff - "$tree/poll-count" <<< 3
   diff - "$tree/pauses" << 'PAUSES'
 0.05
 0.05
@@ -67,7 +68,8 @@ it_fails_with_a_named_message_once_the_deadline_passes() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'timed out after 3s waiting for a condition that never holds'
-  diff - <(wc -l < "$tree/polls") <<< 4
+  wc -l < "$tree/polls" > "$tree/poll-count"
+  diff - "$tree/poll-count" <<< 4
   diff - "$tree/pauses" << 'PAUSES'
 0.05
 0.05
