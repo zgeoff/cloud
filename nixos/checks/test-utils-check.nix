@@ -174,12 +174,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
+      title = "it run-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -195,12 +195,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd records a request for another path and answers it with a failure";
+      title = "it run-stub-impd records a request for another path and answers it with a failure";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -215,12 +215,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd records a request with another method and answers it with a failure";
+      title = "it run-stub-impd records a request with another method and answers it with a failure";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -235,12 +235,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
+      title = "it run-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -267,7 +267,7 @@ let
       '';
     }
     {
-      title = "it start-stub-impd holds to the pinned imp: its /health handler, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \
           ${imp}/packages/daemon/src/build-app.ts || true)
@@ -295,7 +295,7 @@ let
       '';
     }
     {
-      title = "it start-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.2 does";
+      title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.2 does";
       script = ''
         mkdir home tmp
         mkfifo real.fifo stub-health.fifo stub-missing.fifo
@@ -303,11 +303,11 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pinnedBun}/bin/bun ${pinnedElysiaApp}/app.ts >&3 &
         real_pid=$!
         trap 'kill "$real_pid"' EXIT
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/health.requests" >&4 &
         health_pid=$!
         trap 'kill "$real_pid" "$health_pid"' EXIT
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &
         missing_pid=$!
         trap 'kill "$real_pid" "$health_pid" "$missing_pid"' EXIT
@@ -335,12 +335,12 @@ let
       '';
     }
     {
-      title = "it start-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
+      title = "it run-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-hung-impd.py} >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port

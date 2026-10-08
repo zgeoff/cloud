@@ -2,7 +2,7 @@
 # content type and body, given as arguments, over HTTP/1.1 as Bun does, and records every
 # request it gets as one line, "<method> <path>", in a log file.
 #
-#   python3 start-stub-impd.py PATH STATUS CONTENT_TYPE BODY REQUEST_LOG
+#   python3 run-stub-impd.py PATH STATUS CONTENT_TYPE BODY REQUEST_LOG
 #
 # It listens on an ephemeral port on 127.0.0.1 and prints that port on one line once it accepts.
 # A request it does not expect, any other method or path, is recorded too and answered with a
