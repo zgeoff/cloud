@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # After the NixOS install: store the k3s kubeconfig in 1Password (server set to the
 # host's tailnet name) and reference it from .env, so Pulumi deploys the cluster
-# workloads. Safe to run again: it replaces the stored kubeconfig.
+# workloads. Safe to run again: it replaces the stored kubeconfig. It stores before it
+# writes .env, so a failed .env write leaves the stored copy current, and a second run
+# after the fix completes it.
 set -euo pipefail
 
 host="${1:-geoffcloud}"

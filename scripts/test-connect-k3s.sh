@@ -238,7 +238,7 @@ it_fails_with_exit_1_after_storing_when_it_may_not_append_to_env() {
     STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'connect-k3s.sh: line 18: .env: Permission denied'
+  diff - "$tree/err" <<< 'connect-k3s.sh: line 20: .env: Permission denied'
   diff - "$tree/calls" << 'CALLS'
 ["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]
 ["op","item","get","k3s-kubeconfig","--vault","cloud"]
@@ -247,6 +247,40 @@ CALLS
   diff - "$tree/vault/cloud/k3s-kubeconfig/kubeconfig.yaml" <<< '    server: https://geoffcloud:6443'
   diff - "$tree/.env" <<< 'ONIDEL_API_KEY=op://cloud/onidel/credential'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_completes_env_on_a_second_run_after_a_failed_env_write() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/vault/cloud"
+  printf '%s\n' '    server: https://127.0.0.1:6443' > "$tree/host/k3s.yaml"
+  printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
+  chmod 0444 "$tree/.env"
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > /dev/null 2>&1 || true
+  chmod 0644 "$tree/.env"
+  : > "$tree/calls"
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  diff - "$tree/out" <<< 'stored op://cloud/k3s-kubeconfig/kubeconfig.yaml; run: bun run up -- --yes'
+  diff - "$tree/calls" << 'CALLS'
+["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]
+["op","item","get","k3s-kubeconfig","--vault","cloud"]
+["op","document","edit","k3s-kubeconfig","--vault","cloud","--file-name","kubeconfig.yaml","-"]
+CALLS
+  diff - "$tree/vault/cloud/k3s-kubeconfig/kubeconfig.yaml" <<< '    server: https://geoffcloud:6443'
+  diff - "$tree/.env" << 'ENV'
+ONIDEL_API_KEY=op://cloud/onidel/credential
+
+# k3s API over the tailnet (#6)
+K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml
+ENV
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 # Runtime every case needs: the script in <tree>, the ssh and op stand-ins with fail-closed
