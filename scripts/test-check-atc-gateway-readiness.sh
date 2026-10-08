@@ -653,7 +653,7 @@ CALLS
 # remote tools in <tree>/bin, checked so no call can reach a real remote tool or DNS; the
 # empty call log; and the HOME and TMPDIR the script runs with.
 setup_test() {
-  local tree="$1" tool
+  local tree="$1"
   mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/scripts" "$tree/infra"
   : > "$tree/calls"
   cp "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-readiness.sh" "$tree/scripts/"
@@ -662,10 +662,6 @@ setup_test() {
   create_stub_getent "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
   require_remote_tool_stubs "$tree/bin"
-  for tool in curl getent; do
-    [ "$(PATH="$tree/bin:/usr/bin:/bin" command -v "$tool")" = "$tree/bin/$tool" ] ||
-      { echo "$tool does not resolve to its stand-in in $tree/bin" >&2; return 1; }
-  done
 }
 
 run_cases
