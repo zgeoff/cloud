@@ -6,10 +6,22 @@
 # paths; no unit failed; docker and both imp units up; imp-host and its proxy the only
 # containers, imp-host on its image, and that image the only one; an empty tank/imp with no
 # snapshot or child, mounted nowhere; nothing mounted under the backups or over imp-host's
-# seccomp profile; and no holder, backup, restore error, pause log or restore directory left. It needs KVM,
-# and it reads scripts/ beside nixos/, so it builds only from the repo root: run
+# seccomp profile; and no holder, backup, restore error, pause log or restore directory left.
+#
+# Beside the hand-made states, the last subtests reach the reset from what a real run leaves: a
+# restore-impd-db.sh run that fails in its switch, and one killed with SIGKILL while it checks its
+# staged copy, so its EXIT trap never unmounts tank/imp. A stand-in sqlite3 from test-utils
+# (build-stub-blocking-sqlite3.nix) blocks in that check and names itself in /tmp/holder.pid,
+# which is the test's signal to kill the script; the reset then ends the stand-in as it ends any
+# holder. The last two take the reset's own steps up to a point where an earlier reset could have
+# stopped: tank/imp destroyed and not yet made again, and every system profile link removed. It
+# needs KVM, and it reads scripts/ beside nixos/, so it builds only from the repo root: run
 # `bun run test:nixos impd-restore-reset`.
 { nixpkgs, imp }:
+let
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
+  stubBlockingSqlite3 = import ./test-utils/build-stub-blocking-sqlite3.nix { inherit pkgs; };
+in
 import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
   name = "impd-restore-reset-rehearsal";
   subtests =
@@ -622,6 +634,287 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         ctx = setup_test()
         assert contents_before == "db\n", f"tank/imp held {contents_before!r}"
         assert datasets_before == ["tank/imp", "tank/imp/leftover", "tank/imp@leftover"], f"the datasets were {datasets_before}"
+        booted = machine.succeed("readlink -f /run/booted-system").strip()
+        specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
+        assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
+        current = machine.succeed("readlink -f /run/current-system").strip()
+        assert current == booted, f"the system is {current}"
+        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
+        assert profile == "system-3-link", f"the system profile is {profile}"
+        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
+        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+        generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
+        assert generations == specialisations + [booted], f"the generations' systems are {generations}"
+        failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
+        assert failed == "", f"units are failed: {failed}"
+        active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
+        assert active == ["active", "active", "active", "active"], f"the units are {active}"
+        containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
+        assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
+        image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
+        assert image == "${image29.ref}", f"imp-host runs {image}"
+        images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
+        assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+        machine.fail("findmnt -rn -S tank/imp")
+        targets = machine.succeed("findmnt -rn -o TARGET").split()
+        backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
+        assert backup_mounts == [], f"mounted under the backups: {backup_mounts}"
+        seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
+        assert len(seccomp) == 1, f"the unit names {seccomp}"
+        machine.fail(f"mountpoint -q {seccomp[0]}")
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        assert left == "", f"the reset left {left}"
+        datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
+        assert datasets == ["tank/imp"], f"the datasets are {datasets}"
+        mountpoint = machine.succeed("zfs get -H -o value mountpoint tank/imp").strip()
+        assert mountpoint == "legacy", f"tank/imp has mountpoint {mountpoint!r}"
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        contents = machine.succeed("ls -A /mnt/imp")
+        machine.succeed("umount /mnt/imp")
+        assert contents == "", f"tank/imp holds {contents}"
+
+
+    with subtest("it returns to the baseline after a restore that failed in its switch, leaving a new generation, failed units and its saved original"):
+        ctx = setup_test()
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        machine.succeed("install -d -m 0700 /mnt/imp/db")
+        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
+        machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
+        machine.succeed(
+            "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
+        )
+        machine.succeed("umount /mnt/imp")
+        machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
+        machine.succeed(
+            "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
+        )
+        machine.succeed(
+            "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
+        )
+        machine.succeed("systemctl stop imp-host imp-docker-proxy")
+        broken_before = ctx["broken_path"]
+
+        status_before, out_before = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
+        err_before = machine.succeed("cat /tmp/restore.err").splitlines()
+        saved_before = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
+        units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+        switch_unit_before = machine.execute("systemctl is-failed fail-on-switch")[1].strip()
+        current_before = machine.succeed("readlink -f /run/current-system").strip()
+        links_before = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
+        generation_before = machine.succeed("readlink -f /nix/var/nix/profiles/system-4-link").strip()
+        machine.succeed("mount -t zfs tank/imp /mnt/imp")
+        contents_before = machine.succeed("cd /mnt/imp && find . | sort").split()
+        machine.succeed("umount /mnt/imp")
+
+        ctx = setup_test()
+        assert status_before == 1, f"the restore exited {status_before}: {out_before}{err_before}"
+        assert len(saved_before) == 1, f"the saved directories were {saved_before}"
+        assert err_before[-1] == (
+            f"restore-impd-db: the copy is in place (the original is in {saved_before[0]}); "
+            "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again"
+        ), err_before
+        assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+        assert switch_unit_before == "failed", f"fail-on-switch was {switch_unit_before!r}"
+        assert current_before == broken_before, f"the system was {current_before}"
+        assert links_before == ["system-1-link", "system-2-link", "system-3-link", "system-4-link"], f"the generations were {links_before}"
+        assert generation_before == broken_before, f"generation 4 was {generation_before}"
+        assert contents_before == [".", "./db", "./db/imp.sqlite", "./secrets", "./secrets/glm"], f"tank/imp held {contents_before}"
+        booted = machine.succeed("readlink -f /run/booted-system").strip()
+        specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
+        assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
+        current = machine.succeed("readlink -f /run/current-system").strip()
+        assert current == booted, f"the system is {current}"
+        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
+        assert profile == "system-3-link", f"the system profile is {profile}"
+        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
+        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+        generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
+        assert generations == specialisations + [booted], f"the generations' systems are {generations}"
+        failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
+        assert failed == "", f"units are failed: {failed}"
+        active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
+        assert active == ["active", "active", "active", "active"], f"the units are {active}"
+        containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
+        assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
+        image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
+        assert image == "${image29.ref}", f"imp-host runs {image}"
+        images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
+        assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+        machine.fail("findmnt -rn -S tank/imp")
+        targets = machine.succeed("findmnt -rn -o TARGET").split()
+        backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
+        assert backup_mounts == [], f"mounted under the backups: {backup_mounts}"
+        seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
+        assert len(seccomp) == 1, f"the unit names {seccomp}"
+        machine.fail(f"mountpoint -q {seccomp[0]}")
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        assert left == "", f"the reset left {left}"
+        datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
+        assert datasets == ["tank/imp"], f"the datasets are {datasets}"
+        mountpoint = machine.succeed("zfs get -H -o value mountpoint tank/imp").strip()
+        assert mountpoint == "legacy", f"tank/imp has mountpoint {mountpoint!r}"
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        contents = machine.succeed("ls -A /mnt/imp")
+        machine.succeed("umount /mnt/imp")
+        assert contents == "", f"tank/imp holds {contents}"
+
+
+    with subtest("it returns to the baseline after a restore killed while it checks its staged copy, with tank/imp still mounted"):
+        ctx = setup_test()
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        machine.succeed("install -d -m 0700 /mnt/imp/db")
+        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
+        machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
+        machine.succeed(
+            "sqlite3 /mnt/imp/db/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
+        )
+        machine.succeed("umount /mnt/imp")
+        machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
+        machine.succeed(
+            "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
+        )
+        machine.succeed(
+            "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
+        )
+        machine.succeed("systemctl stop imp-host imp-docker-proxy")
+
+        # the stand-in writes /tmp/holder.pid once the script is inside the check of its staged copy
+        pid = machine.succeed("SQLITE3=${stubBlockingSqlite3} HOLDER_PID_FILE=/tmp/holder.pid bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 > /tmp/restore.err 2>&1 < /dev/null & echo $!").strip()
+        machine.wait_until_succeeds("test -s /tmp/holder.pid")
+        blocked = machine.succeed("cat /tmp/holder.pid").strip()
+        machine.succeed(f"kill -KILL {pid}")
+        machine.wait_until_fails(f"kill -0 {pid}")
+        blocked_before = machine.execute(f"kill -0 {blocked}")[0]
+        out_before = machine.succeed("cat /tmp/restore.err").splitlines()
+        saved_before = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
+        mounts_before = machine.succeed("findmnt -rn -S tank/imp -o TARGET").split()
+        db_before = machine.succeed("ls -A /run/impd-restore.*/db").split()
+
+        ctx = setup_test()
+        assert blocked_before == 0, "the stand-in had stopped blocking before the reset"
+        assert len(saved_before) == 1, f"the saved directories were {saved_before}"
+        assert out_before == [
+            "== check the copy",
+            "== check the host",
+            "== mount tank/imp",
+            "== preserve the stopped database",
+            f"saved: {saved_before[0]}",
+            "== stage and check the copy",
+        ], out_before
+        assert len(mounts_before) == 1, f"tank/imp was mounted at {mounts_before}"
+        assert re.fullmatch(r"/run/impd-restore\.\w{6}", mounts_before[0]), f"tank/imp was mounted at {mounts_before[0]!r}, not a /run/impd-restore.* directory"
+        assert db_before == ["imp.sqlite", "imp.sqlite.restore"], f"the mounted database directory held {db_before}"
+        machine.fail(f"kill -0 {blocked}")
+        booted = machine.succeed("readlink -f /run/booted-system").strip()
+        specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
+        assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
+        current = machine.succeed("readlink -f /run/current-system").strip()
+        assert current == booted, f"the system is {current}"
+        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
+        assert profile == "system-3-link", f"the system profile is {profile}"
+        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
+        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+        generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
+        assert generations == specialisations + [booted], f"the generations' systems are {generations}"
+        failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
+        assert failed == "", f"units are failed: {failed}"
+        active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
+        assert active == ["active", "active", "active", "active"], f"the units are {active}"
+        containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
+        assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
+        image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
+        assert image == "${image29.ref}", f"imp-host runs {image}"
+        images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
+        assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+        machine.fail("findmnt -rn -S tank/imp")
+        targets = machine.succeed("findmnt -rn -o TARGET").split()
+        backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
+        assert backup_mounts == [], f"mounted under the backups: {backup_mounts}"
+        seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
+        assert len(seccomp) == 1, f"the unit names {seccomp}"
+        machine.fail(f"mountpoint -q {seccomp[0]}")
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        assert left == "", f"the reset left {left}"
+        datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
+        assert datasets == ["tank/imp"], f"the datasets are {datasets}"
+        mountpoint = machine.succeed("zfs get -H -o value mountpoint tank/imp").strip()
+        assert mountpoint == "legacy", f"tank/imp has mountpoint {mountpoint!r}"
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        contents = machine.succeed("ls -A /mnt/imp")
+        machine.succeed("umount /mnt/imp")
+        assert contents == "", f"tank/imp holds {contents}"
+
+
+    with subtest("it makes tank/imp again after a reset that stopped once it had destroyed the dataset"):
+        ctx = setup_test()
+        # the reset's own steps up to its destroy of tank/imp
+        machine.succeed("systemctl stop imp-host imp-docker-proxy")
+        machine.succeed("docker ps -aq | xargs -r docker rm -f")
+        machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
+        machine.succeed("zfs destroy -r tank/imp")
+        dataset_before = machine.execute("zfs list -H -o name tank/imp 2>&1")
+        units_before = machine.execute("systemctl is-active imp-host imp-docker-proxy")[1].split()
+        images_before = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
+
+        ctx = setup_test()
+        assert dataset_before == (1, "cannot open 'tank/imp': dataset does not exist\n"), f"tank/imp was {dataset_before}"
+        assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+        assert images_before == "", f"the images were {images_before}"
+        booted = machine.succeed("readlink -f /run/booted-system").strip()
+        specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
+        assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
+        current = machine.succeed("readlink -f /run/current-system").strip()
+        assert current == booted, f"the system is {current}"
+        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
+        assert profile == "system-3-link", f"the system profile is {profile}"
+        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
+        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+        generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
+        assert generations == specialisations + [booted], f"the generations' systems are {generations}"
+        failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
+        assert failed == "", f"units are failed: {failed}"
+        active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
+        assert active == ["active", "active", "active", "active"], f"the units are {active}"
+        containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
+        assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
+        image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
+        assert image == "${image29.ref}", f"imp-host runs {image}"
+        images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
+        assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+        machine.fail("findmnt -rn -S tank/imp")
+        targets = machine.succeed("findmnt -rn -o TARGET").split()
+        backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
+        assert backup_mounts == [], f"mounted under the backups: {backup_mounts}"
+        seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
+        assert len(seccomp) == 1, f"the unit names {seccomp}"
+        machine.fail(f"mountpoint -q {seccomp[0]}")
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        assert left == "", f"the reset left {left}"
+        datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
+        assert datasets == ["tank/imp"], f"the datasets are {datasets}"
+        mountpoint = machine.succeed("zfs get -H -o value mountpoint tank/imp").strip()
+        assert mountpoint == "legacy", f"tank/imp has mountpoint {mountpoint!r}"
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        contents = machine.succeed("ls -A /mnt/imp")
+        machine.succeed("umount /mnt/imp")
+        assert contents == "", f"tank/imp holds {contents}"
+
+
+    with subtest("it rebuilds the system profile after a reset that stopped once it had removed every generation"):
+        ctx = setup_test()
+        # the reset's own steps up to its removal of the system profile's links
+        machine.succeed("systemctl stop imp-host imp-docker-proxy")
+        machine.succeed("docker ps -aq | xargs -r docker rm -f")
+        machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
+        machine.succeed("rm -f /nix/var/nix/profiles/system /nix/var/nix/profiles/system-*-link")
+        profiles_before = [name for name in machine.succeed("ls -1 /nix/var/nix/profiles").split() if name.startswith("system")]
+        units_before = machine.execute("systemctl is-active imp-host imp-docker-proxy")[1].split()
+        images_before = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
+
+        ctx = setup_test()
+        assert profiles_before == [], f"the system profile's links were {profiles_before}"
+        assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+        assert images_before == "", f"the images were {images_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
