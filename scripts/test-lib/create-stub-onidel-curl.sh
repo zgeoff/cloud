@@ -11,7 +11,10 @@
 #   with STUB_ONIDEL_LIMIT_REACHED=1 it answers the spec's 403 instead;
 # - `-H <auth> <api>/snapshots`: prints snapshots.json; with STUB_ONIDEL_LIST_STATUS it
 #   answers that HTTP status instead;
-# - a bearer other than STUB_ONIDEL_KEY gets the spec's 401, and another VM its 404.
+# - a bearer other than STUB_ONIDEL_KEY gets 401, and a snapshot of another VM the spec's
+#   404. The spec lists 401 for the snapshot list only; the snapshot request's 401 is
+#   assumed by analogy with that route and is not in the spec, which lists 400, 403 and
+#   404 for it.
 #
 # An HTTP error goes as curl -fsS reports it: nothing on stdout, "curl: (22) The requested
 # URL returned error: <status>" on stderr, exit 22 (curl 8.5.0, CI's ubuntu-24.04, and
