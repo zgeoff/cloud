@@ -8,13 +8,15 @@
 # unignored files) and the workflow itself. A rename counts both its old and new path.
 #
 # A base of all zeros, as a push that creates a branch reports, has nothing to compare with, so
-# it prints "true". A base or head git cannot resolve fails the run with git's error, so the
-# workflow fails rather than skipping the checks.
+# it prints "true", and so does a base that is not an ancestor of <head>, such as main before a
+# push that rewrote it. An empty argument is a usage error, and a base or head git cannot resolve
+# fails the run with git's error, so the workflow fails rather than skipping the checks. Paths are
+# read NUL-separated, so a name git would quote still matches.
 #
 #   bash scripts/needs-nixos-checks.sh <base> <head>
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
+if [ "$#" -ne 2 ] || [ -z "$1" ] || [ -z "$2" ]; then
   echo "usage: needs-nixos-checks.sh <base> <head>" >&2
   exit 2
 fi
@@ -26,14 +28,21 @@ if [[ "$base" =~ ^0+$ ]]; then
   exit 0
 fi
 
-changed="$(git diff --no-renames --name-only "$base...$head")"
+changed="$(mktemp)"
+trap 'rm -f "$changed"' EXIT
+git diff -z --no-renames --name-only "$base...$head" > "$changed"
 
-while IFS= read -r path; do
+if ! git merge-base --is-ancestor "$base" "$head"; then
+  echo true
+  exit 0
+fi
+
+while IFS= read -r -d '' path; do
   case "$path" in
     nixos/* | scripts/* | package.json | .bun-version | .gitignore | .github/workflows/nixos-checks.yml)
       echo true
       exit 0
       ;;
   esac
-done <<< "$changed"
+done < "$changed"
 echo false
