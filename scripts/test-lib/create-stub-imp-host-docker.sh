@@ -30,10 +30,8 @@
 #   line 38: a failed command exits 2 for a usage error and 1 otherwise;
 # - https://github.com/moby/moby/blob/v28.0.4/daemon/errors.go : "container %s is not
 #   running", which docker 29.7.2 printed for an exec in a stopped container here, after
-#   "Error response from daemon: ", with exit 1.
+#   "Error response from daemon: ", with the container's full 64-hex ID and exit 1.
 #
-# Known deviation: real docker names the container by its full 64-hex ID; the stand-in
-# prints a 12-hex fixture, as create-stub-impd-db-ssh.sh and the suites that pin it do.
 # The sources do not settle, so they stay as they were and need an imp-host sample: the
 # JSON form of createdAt (the schemas hold a Date, printed here as an ISO string); the
 # shape of `imp info --json` (version and features here); whether impd's refusal of a
@@ -54,7 +52,7 @@ case "$*" in
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac
 if [ "${STUB_IMPD_FAIL_AT:-}" = "$call" ]; then
-  echo "Error response from daemon: container 4f6c0a2e9d1b is not running" >&2
+  echo "Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running" >&2
   exit 1
 fi
 case "$call" in

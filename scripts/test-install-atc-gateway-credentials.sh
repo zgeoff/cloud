@@ -440,7 +440,7 @@ it_reports_missing_grantable_tokens_when_imp_info_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-Error response from daemon: container 4f6c0a2e9d1b is not running
+Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
 impd lacks grantableTokens; nothing changed
 EOF
   diff - "$tree/out" << EOF
@@ -473,7 +473,7 @@ it_stops_when_imp_secret_ls_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-Error response from daemon: container 4f6c0a2e9d1b is not running
+Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
 EOF
   diff - "$tree/out" << EOF
 
@@ -508,7 +508,7 @@ it_stops_when_imp_token_ls_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-Error response from daemon: container 4f6c0a2e9d1b is not running
+Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
 EOF
   diff - "$tree/out" << EOF
 

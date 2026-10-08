@@ -10,8 +10,10 @@
 #   bytes, mode 600)" line, exit 0;
 # - with STUB_COPY_FAIL=integrity, the same report with integrity set to SQLite's
 #   integrity_check finding, exit 1 from the script's last `test`;
-# - with STUB_COPY_FAIL=imp-host-stopped, docker's "container … is not running" error on
-#   stderr when the script makes its work directory, exit 1.
+# - with STUB_COPY_FAIL=imp-host-stopped, docker's "container <id> is not running" error
+#   on stderr when the script makes its work directory, exit 1. The text and the full
+#   64-hex ID are docker's (moby daemon/errors.go at v28.0.4, and docker 29.7.2's answer to
+#   an exec in a stopped container, checked on 2026-10-08).
 #
 # With STUB_SSH_PASS=1, a call to a loopback destination (ssh://<user>@127.0.0.1:<port>)
 # goes to the real ssh after it is logged, with -F /dev/null so no ssh config on the
@@ -44,7 +46,7 @@ if [ "$#" != 4 ] || [ "$3" != "$STUB_HOST" ] || [[ ! "$4" =~ ^bash\ -c\ .*\ _\ (
 fi
 dir="/root/imp-db-backups/${BASH_REMATCH[1]}-20261008T120000"
 if [ "${STUB_COPY_FAIL:-}" = imp-host-stopped ]; then
-  echo "Error response from daemon: container 4f6c0a2e9d1b is not running" >&2
+  echo "Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running" >&2
   exit 1
 fi
 integrity=ok
