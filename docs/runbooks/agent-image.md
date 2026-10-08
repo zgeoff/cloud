@@ -11,33 +11,37 @@ runs no tool, because a tool can write state when it runs (`codex --version` cre
 | Path                                | Holds                                                   |
 | ----------------------------------- | ------------------------------------------------------- |
 | `images/agent/Dockerfile`           | the pins, each with the command that checks its sum     |
-| `images/agent/VERSION`              | the image version; the imp image is `agent-<VERSION>`   |
 | `scripts/check-agent-image.sh`      | the version sweep, login-state check and secret scan    |
 | `scripts/agent-image-gitleaks.toml` | gitleaks' default rules, less named upstream test files |
 | `/opt/auto-mode/mods/auto-mode`     | the auto-mode mod in the guest, for `--plugin-dir`      |
+| `/usr/local/bin/atc`                | atc in the guest, which the `cloud` target's hooks use  |
 
-Each build gets a new imp image name, so the image that ran before stays on the host for a rollback.
+Each image is named `agent-<short sha>`, after the zgeoff/cloud commit on `main` it builds from. So
+each build gets a new imp image name, and the image that ran before stays on the host for a
+rollback.
 
 ## Build
 
-Build from a clean checkout of the commit you record, on a machine whose `imp` CLI calls the
+Build from a clean checkout of the merge commit on `main`, on a machine whose `imp` CLI calls the
 geoffcloud host. The token needs `manage` scope with no imp patterns.
 
 ```sh
-imp image build images/agent --name "agent-$(cat images/agent/VERSION)"
+git switch --detach <merge commit> && git status --short   # prints nothing
+image="agent-$(git rev-parse --short HEAD)"
+imp image build images/agent --name "$image"
 imp image ls
 ```
 
 `imp image ls` shows a short digest. Read the full one with
-`imp image ls --json | jq -r '.[] | select(.name == "agent-<VERSION>") | .digest'`, and record the
-commit, the name and the digest on the PR.
+`imp image ls --json | jq -r --arg image "$image" '.[] | select(.name == $image) | .digest'`, and
+record the name and the digest on the PR.
 
 ## Check
 
 Boot a fresh imp from the image, run the check, then remove the imp:
 
 ```sh
-imp new agent-check --image "agent-$(cat images/agent/VERSION)"
+imp new agent-check --image "$image"
 bash scripts/check-agent-image.sh --imp agent-check
 imp rm agent-check
 ```
@@ -60,16 +64,21 @@ with its reason, narrowed to that file or folder.
 The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs the atc daemon:
 
 ```json
-"cloud": { "provider": "imp", "image": "agent-1", "...": "..." }
+"cloud": { "provider": "imp", "image": "agent-<short sha>", "guestATC": "/usr/local/bin/atc", "...": "..." }
 ```
 
-1. Copy the file to `config.json.bak-<UTC stamp>-pre-<issue or agent-VERSION>`. Other sessions can
-   write the same file, so read it again just before the edit.
-2. Set `targets.cloud.image` and change nothing else:
+`guestATC` points the session hooks at the image's atc, so the daemon never copies its own binary
+into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB, before each new
+imp's first session starts.
+
+1. Copy the file to `config.json.bak-<UTC stamp>-pre-<issue or image>`. Other sessions can write the
+   same file, so read it again just before the edit.
+2. Set `targets.cloud.image` and `targets.cloud.guestATC`, and change nothing else:
 
    ```sh
    f=~/.config/atc/config.json
-   jq --arg image "agent-$(cat images/agent/VERSION)" '.targets.cloud.image = $image' "$f" > "$f.new"
+   jq --arg image "agent-<short sha>" \
+     '.targets.cloud.image = $image | .targets.cloud.guestATC = "/usr/local/bin/atc"' "$f" > "$f.new"
    chmod 600 "$f.new" && mv "$f.new" "$f"
    ```
 
@@ -84,18 +93,20 @@ A switch changes new imps only. An imp keeps the image it was created from.
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
    above its pin.
-2. Add one to `images/agent/VERSION`.
-3. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
+2. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
    its check; run it locally first to find a failure sooner.
-4. After CI passes, build and check the new image on the host, as above, and record the digest.
-5. Switch the `cloud` target.
-6. Keep the image the target ran before, for a rollback. Remove an older one with
-   `imp image rm agent-<N>`; imp refuses to remove an image that an imp uses.
+3. After the PR merges, build and check the new image on the host from the merge commit, as above,
+   and record its name and digest on the PR.
+4. Switch the `cloud` target.
+5. Keep the image the target ran before, for a rollback. Remove an older one with
+   `imp image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
 
 ## Roll back
 
-A rollback points the `cloud` target at the image it ran before: `agent-<VERSION - 1>`, or `coder`
-before the first agent image.
+A rollback points the `cloud` target at the image it ran before: the `agent-<short sha>` its PR
+records, `agent-1` before the first image named for a commit, or `coder` before the first agent
+image. An image without atc, such as `agent-1` or `coder`, needs `guestATC` removed from the target
+too, so the daemon copies its binary in again.
 
 1. Check that the earlier image is still on the host: `imp image ls`.
 2. Set `targets.cloud.image` to it, as in the switch, and restart the daemon.

@@ -1,11 +1,13 @@
 # The agent image: imp-base plus the tools an agent session runs on an imp.
 # It holds binaries only: no configuration, no login state and no secret. atc
-# sets those up per session at launch. Build it on the imp host:
-#   imp image build images/agent --name "agent-$(cat images/agent/VERSION)"
+# sets those up per session at launch. Build it on the imp host, from a clean
+# checkout of the zgeoff/cloud commit on main that the image records:
+#   imp image build images/agent --name "agent-$(git rev-parse --short HEAD)"
 # docs/runbooks/agent-image.md covers the build, an update and a rollback.
 #
-# Every pin below is a reviewed change. Bump VERSION with it, so each build
-# gets a new imp image name and the previous image stays for a rollback.
+# Every pin below is a reviewed change. The image name carries the commit, so
+# each build gets a new imp image name and the previous image stays for a
+# rollback.
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/imp
@@ -57,8 +59,8 @@ RUN apt-get update --snapshot "$UBUNTU_SNAPSHOT" \
 #   curl -fsSL https://downloads.claude.ai/keys/claude-code.asc | gpg --import
 #   gpg --verify manifest.json.sig manifest.json
 #   jq -r '.platforms["linux-x64"].checksum' manifest.json
-ARG CLAUDE_CODE_VERSION=2.1.291
-ARG CLAUDE_CODE_SHA256=078fad28d0297c9a25d306b635b2d8816c6839347520f29eb54ffea5d56142fb
+ARG CLAUDE_CODE_VERSION=2.1.294
+ARG CLAUDE_CODE_SHA256=27122ca7b624f537546fbef35b80c66370d974ff258f3d9b10ac50bb8771f262
 RUN curl -fsSL -o /usr/local/bin/claude \
       "https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}/linux-x64/claude" \
  && echo "${CLAUDE_CODE_SHA256}  /usr/local/bin/claude" | sha256sum -c - \
@@ -67,6 +69,18 @@ RUN curl -fsSL -o /usr/local/bin/claude \
 # The root-owned binary above is the pin: no background update and no
 # `claude update`, which would install another version under ~/.local.
 ENV DISABLE_UPDATES=1
+
+# atc's compiled linux-x64 binary, for the session hooks of an atc daemon's
+# `cloud` target, which names it as guestATC so the daemon never copies its
+# own binary in. The sum is atc-linux-x64's line in the release's SHA256SUMS:
+#   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -p atc-linux-x64
+#   sha256sum -c --ignore-missing SHA256SUMS
+ARG ATC_VERSION=3.6.2
+ARG ATC_SHA256=8a58a970cf80bf2ab30cc06d9bac4f7053f3dff4ae52f2efc439d10b9a9b4cdb
+RUN curl -fsSL -o /usr/local/bin/atc \
+      "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
+ && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
+ && chmod 0755 /usr/local/bin/atc
 
 # Codex's full linux package: the codex binary, its bwrap sandbox helper and
 # rg. The sum is the asset digest GitHub lists on the release:
@@ -158,8 +172,8 @@ RUN curl -fsSL -o /tmp/op.zip \
 # has no dependencies. The mod sits at the fixed path /opt/auto-mode/mods/auto-mode,
 # for --plugin-dir. The sum is the tarball's; npm's dist.integrity is its sha512:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=0.4.2
-ARG AUTO_MODE_SHA256=85c43eebcb2fd16cce56679b2ee495c8cccd7bc58981bafd1452bbe22a8792dc
+ARG AUTO_MODE_VERSION=0.15.0
+ARG AUTO_MODE_SHA256=22f5192137baae7b41ead26c3ed05513a37981ddf334f0e55910f312446ea962
 RUN curl -fsSL -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
