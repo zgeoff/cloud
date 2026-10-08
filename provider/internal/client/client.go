@@ -228,16 +228,19 @@ func buildTeamQuery(teamID string) url.Values {
 	return url.Values{"team_id": {teamID}}
 }
 
-// waitFor polls check until it reports done, returns an error, or ctx ends. It also
-// gives up once its sleeps add up to timeout: a real sleep lasts at least as long as
-// asked, so that never comes before the context's own deadline, and it lets an
-// injected Sleep reach the timeout without the wall clock.
-func (c *Client) waitFor(ctx context.Context, timeout time.Duration, check func() (bool, error)) error {
+// waitFor polls check until it reports done, returns an error, or ctx ends. check
+// gets the wait's own context, so its requests and their retries end at timeout too.
+// It also gives up once its sleeps add up to timeout: a real sleep lasts at least as
+// long as asked, so that never comes before the context's own deadline, and it lets
+// an injected Sleep reach the timeout without the wall clock.
+func (c *Client) waitFor(
+	ctx context.Context, timeout time.Duration, check func(ctx context.Context) (bool, error),
+) error {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	var slept time.Duration
 	for {
-		done, err := check()
+		done, err := check(ctx)
 		if err != nil || done {
 			return err
 		}
