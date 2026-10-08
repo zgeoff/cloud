@@ -174,7 +174,8 @@ journey. Each shared rule takes its shell form:
   leave unsettled.
 - An ssh stand-in that cannot run the remote command, because it needs root or a container,
   answers as the host would, and the case writes out the whole remote command as the expected argv.
-  One that runs the command locally runs it under `env -i` from the case's host directory.
+  One that runs the command locally runs it under `env -i` from the case's host directory,
+  forwarding only the host's environment file and the host stand-ins' own settings.
 - A guard's tests pass it a search path the case owns, so its expected text never depends on the
   host.
 - A producer whose output a case compares writes to a file under errexit first, so a failing
