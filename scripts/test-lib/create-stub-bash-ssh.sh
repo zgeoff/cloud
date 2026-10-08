@@ -38,8 +38,9 @@ if [ -n "${STUB_SSH_PASS:-}" ]; then
 fi
 if [ "$#" != 4 ] || [ "$3" != "$STUB_HOST" ] || [[ "$4" != "bash -c "* ]]; then echo "unexpected: $*" >&2; exit 97; fi
 for tool in ssh scp sftp rsync tailscale; do
-  if [ "$(PATH="$STUB_HOST_BIN:/usr/bin:/bin" command -v "$tool" || true)" != "$STUB_HOST_BIN/$tool" ] ||
-    [ ! -x "$STUB_HOST_BIN/$tool" ]; then
+  # the execute bit first: bash versions differ on what command -v returns for a file without it
+  if [ ! -x "$STUB_HOST_BIN/$tool" ] ||
+    [ "$(PATH="$STUB_HOST_BIN:/usr/bin:/bin" command -v "$tool" || true)" != "$STUB_HOST_BIN/$tool" ]; then
     echo "unexpected: $tool on the host PATH is not a stand-in in $STUB_HOST_BIN" >&2
     exit 97
   fi

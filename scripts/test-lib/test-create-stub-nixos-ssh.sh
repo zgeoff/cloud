@@ -64,6 +64,26 @@ CALLS
   [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
 }
 
+it_prints_no_status_text_for_failed_units_when_none_is_given() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_ACTIVATE_FAILED_UNITS="alloy.service" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'warning: the following units failed: alloy.service'
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
+CALLS
+  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+}
+
 it_prints_the_named_current_system_for_readlink() {
   local status=0
   tree="$(mktemp -d)"
