@@ -2,21 +2,30 @@
 # start_stub_github_api <dir>: starts a stand-in for a GitHub Enterprise host's API over
 # HTTPS on an ephemeral loopback port, for a repository with no releases, and returns once
 # it listens. <dir>/port then holds the port, <dir>/pid the process to kill when the case
-# ends, and <dir>/cert.pem the self-signed certificate (for 127.0.0.1) it serves: point gh
-# at it with GH_HOST=127.0.0.1:<port> and SSL_CERT_FILE=<dir>/cert.pem, which Go's TLS
-# reads on Linux, so nothing outside the case trusts it.
+# ends, and <dir>/cert.pem the self-signed certificate (for 127.0.0.1) it serves.
+#
+# Point a real gh at it with GH_HOST=127.0.0.1:<port>, SSL_CERT_FILE=<dir>/cert.pem and
+# SSL_CERT_DIR set to an empty case directory: Go's TLS reads both on Linux, so gh trusts
+# this certificate alone and nothing outside the case trusts it. Run gh with
+# GH_TELEMETRY=0, DO_NOT_TRACK=1 and GH_NO_UPDATE_NOTIFIER=1 too. `gh help environment`
+# (gh 2.99.0) says GH_TELEMETRY "Set to `false` or `0` to disable telemetry. Takes
+# precedence over `DO_NOT_TRACK`", DO_NOT_TRACK "set to `true` or `1` to disable
+# telemetry", and GH_NO_UPDATE_NOTIFIER "set to any value to disable GitHub CLI update
+# notifications", whose check would otherwise reach github.com.
 #
 # It answers the two lookups `gh release download <tag>` sends at once (cli/cli's
 # FetchRelease), so that both report the tag as missing, whichever lands first:
 #
 # - GET /api/v3/repos/<owner>/<repo>/releases/tags/<tag>: 404 with GitHub's not-found
 #   body (gh reads only the status);
-# - POST /api/graphql with the RepositoryReleaseByTag query: 200 with a null release, as
-#   GitHub answers for a tag that has none.
+# - POST /api/graphql with a query named RepositoryReleaseByTag and a string tagName
+#   variable: 200 with a null release, as GitHub answers for a tag that has none.
 #
-# It appends "<method> <path>" for each request it answers, and the GraphQL body after the
-# path without the newline gh ends it with, to <dir>/requests. Every other request fails closed: it appends "<method> <path>" to
-# <dir>/unexpected and answers 500 with a body naming the stand-in.
+# It appends a line per request it answers to <dir>/requests: "GET <path>", or
+# "POST /api/graphql RepositoryReleaseByTag tagName=<tag>". The query's text is gh's own
+# and is not recorded, so a test pins only what this stand-in relies on. Every other
+# request fails closed: it appends "<method> <path>" to <dir>/unexpected and answers 500
+# with a body naming the stand-in.
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 
@@ -45,12 +54,22 @@ class GitHubAPI(BaseHTTPRequestHandler):
     def do_POST(self):
         body = self.rfile.read(int(self.headers.get("content-length", 0))).decode()
         try:
-            query = json.loads(body).get("query", "")
+            request = json.loads(body)
         except ValueError:
-            query = ""
-        if self.path != "/api/graphql" or not query.startswith("query RepositoryReleaseByTag("):
+            request = {}
+        if not isinstance(request, dict):
+            request = {}
+        query = request.get("query")
+        variables = request.get("variables")
+        tag = variables.get("tagName") if isinstance(variables, dict) else None
+        if (
+            self.path != "/api/graphql"
+            or not isinstance(query, str)
+            or not re.match(r"query RepositoryReleaseByTag\(", query)
+            or not isinstance(tag, str)
+        ):
             return self.send_refusal()
-        self.write_line("requests", f"POST {self.path} {body.rstrip()}")
+        self.write_line("requests", f"POST {self.path} RepositoryReleaseByTag tagName={tag}")
         self.send_answer(200, no_release)
 
     # http.server routes a request to do_<METHOD> and answers 501 when there is none, so

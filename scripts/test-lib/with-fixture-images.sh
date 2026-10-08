@@ -5,7 +5,9 @@
 # the command with FIXTURE_RUN (that id), FIXTURE_GATEWAY_IMAGE and FIXTURE_BACKUP_IMAGE
 # in its environment, removes both images, and returns the command's exit status. When
 # a build fails it prints "FAIL the images did not build …" and the build log indented to
-# stdout, runs nothing, and returns 1.
+# stdout, runs nothing, and returns 1. The release fetch runs gh with GH_TELEMETRY=0,
+# DO_NOT_TRACK=1 and GH_NO_UPDATE_NOTIFIER=1, so a test build sends gh's telemetry and
+# update check nowhere; only the pinned release download leaves the machine.
 #
 # Run as a script, it calls with_fixture_images with its arguments, so the Docker test
 # files share one build:
@@ -26,7 +28,7 @@ with_fixture_images() (
   trap 'docker rmi -f "$FIXTURE_GATEWAY_IMAGE" "$FIXTURE_BACKUP_IMAGE" > /dev/null 2>&1 || true; rm -rf "$work" || true' EXIT
   # shellcheck disable=SC2153 # BASE_IMAGE and RESTIC_IMAGE come from versions.env
   if ! {
-    "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
+    GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
       cp "$repo/deploy/atc-gateway/Dockerfile" "$work/context/" &&
       docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$FIXTURE_GATEWAY_IMAGE" "$work/context" &&
       docker build -q --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$FIXTURE_BACKUP_IMAGE" \
