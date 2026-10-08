@@ -173,7 +173,7 @@ One imp per harness, from a reusable image plus a clean checkout. No dirty-direc
 no subscription credentials copied from the PC.
 
 - **Image.** Harness imps run the agent image, `images/agent` in this repo, built `FROM imp-base` on
-  the host with `imp image build images/agent --name agent-<VERSION>`, which runs `docker build`
+  the host with `imp image build images/agent --name agent-<short sha>`, which runs `docker build`
   through impd. imp stays harness-unaware and ships `imp-base` only; atc holds no image. The image
   holds binaries only, and atc sets up each session at launch.
   [The agent image runbook](../runbooks/agent-image.md) covers the build, the check, the switch and

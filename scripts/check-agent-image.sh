@@ -126,6 +126,7 @@ done
 
 echo "== versions"
 check_tool claude "$CLAUDE_CODE_VERSION" claude --version
+check_tool atc "$ATC_VERSION" /usr/local/bin/atc --version
 check_tool codex "$CODEX_VERSION" codex --version
 check_tool gh "$GH_VERSION" gh --version
 check_package git "$GIT_VERSION"

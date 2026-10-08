@@ -20,3 +20,15 @@ paths = [
   # perl's core headers: apidoc markup
   '''^/usr/lib/x86_64-linux-gnu/perl/[0-9.]+/CORE/cop\.h$''',
 ]
+
+[[allowlists]]
+description = "auto-mode's bundled secret-scanner rules: a rule's own pattern, not a credential"
+# auto-mode ships gitleaks-style detection rules as data, and the short-lived Bedrock
+# key rule's pattern source is the fixed prefix that the rule matches. Both conditions
+# must hold, so this prefix anywhere else, and any other finding in the file, still
+# fail the check. The file comes from the auto-mode tarball the Dockerfile pins by sum;
+# review this entry again at each auto-mode bump.
+condition = "AND"
+paths = ['''^/opt/auto-mode/dist/classify-edit-[A-Za-z0-9_-]+\.js$''']
+regexTarget = "match"
+regexes = ['''^bedrock-api-key-YmVkcm9jay5hbWF6b25hd3MuY29t$''']
