@@ -7,8 +7,9 @@ interface GatewayBackupValues {
 
 // The gateway backup's inputs from .env, or undefined when none is set (no backup
 // CronJob). Throws when only some are set, so a missing reference fails the preview
-// instead of silently dropping the backup. The restic repository is built from the
-// R2 item's endpoint and bucket: s3:<endpoint>/<bucket>/atc-gateway.
+// instead of silently dropping the backup, and when one holds only whitespace. The
+// restic repository is built from the R2 item's endpoint and bucket:
+// s3:<endpoint>/<bucket>/atc-gateway.
 export function findATCGatewayBackup(
   env: Readonly<Record<string, string | undefined>>,
 ): GatewayBackupValues | undefined {
@@ -21,6 +22,14 @@ export function findATCGatewayBackup(
   if (missing.length > 0) {
     throw new Error(
       `the atc gateway's backup needs every one of ${backupVariables.join(', ')}; unset: ${missing.join(', ')}`,
+    );
+  }
+
+  const blank = backupVariables.filter((name) => getValue(env, name).trim() === '');
+
+  if (blank.length > 0) {
+    throw new Error(
+      `the atc gateway's backup needs a value in every one of ${backupVariables.join(', ')}; only whitespace: ${blank.join(', ')}`,
     );
   }
 
@@ -46,7 +55,9 @@ const backupVariables = [
 type BackupVariable = (typeof backupVariables)[number];
 
 function buildRepository(endpoint: string, bucket: string): string {
-  if (!endpoint.startsWith('https://') || endpoint.slice('https://'.length).includes('/')) {
+  const host = endpoint.slice('https://'.length);
+
+  if (!endpoint.startsWith('https://') || host === '' || host.includes('/')) {
     throw new Error('ATC_GATEWAY_R2_ENDPOINT must be an https:// origin with no path');
   }
 
