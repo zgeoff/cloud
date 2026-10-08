@@ -679,7 +679,6 @@ func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 		body string
 	}{
 		{"it rejects a rule without a protocol", `{"subnet":"0.0.0.0","subnet_size":0}`},
-		{"it rejects a rule with an unknown protocol", `{"protocol":"gre","subnet":"0.0.0.0","subnet_size":0}`},
 		{"it rejects a rule without a subnet", `{"protocol":"tcp","subnet_size":0}`},
 		{"it rejects a rule without a subnet size", `{"protocol":"tcp","subnet":"0.0.0.0"}`},
 	}
@@ -697,14 +696,26 @@ func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 	}
 }
 
+func TestStubOnidelAPIRejectsARuleWithAnUnknownProtocol(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"gre","subnet":"0.0.0.0","subnet_size":0}`)
+
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallRules())
+	assert.Equal(t, map[string]map[string]any{"g1": {"id": "g1", "rule_count": 0}}, ctx.api.GetFirewallGroups())
+}
+
 func TestStubOnidelAPIReadsARuleWithANumericSubnetSize(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
 	createStatus, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
+	require.Equal(t, http.StatusCreated, createStatus)
+
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", "")
 
-	assert.Equal(t, http.StatusCreated, createStatus)
 	assert.Equal(t, http.StatusOK, status)
 	assert.JSONEq(t, `{"firewall_rule":{"id":"00000000-0000-4000-8000-000000000001","group":"g1","ip_type":"v4",`+
 		`"action":"allow","protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24,"desc":""}}`, body)

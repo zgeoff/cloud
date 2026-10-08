@@ -228,6 +228,7 @@ func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
+	assert.Equal(t, &client.APIError{Method: "GET", Path: "/vm", Status: 500}, apiErr)
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: onidel: GET /vm: HTTP 500`)
 	assert.Equal(t, client.VM{}, vm)
 }
