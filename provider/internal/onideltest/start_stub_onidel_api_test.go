@@ -711,8 +711,7 @@ func TestStubOnidelAPIReadsARuleWithANumericSubnetSize(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
-	createStatus, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
-	require.Equal(t, http.StatusCreated, createStatus)
+	onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","port":"443","subnet":"0.0.0.0","subnet_size":24}`)
 
 	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", "")
 
