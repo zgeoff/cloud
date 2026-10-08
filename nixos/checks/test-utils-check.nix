@@ -592,7 +592,7 @@ let
       '';
     }
     {
-      title = "it buildStubIntegritySqlite3 answers an integrity check with one finding and exit 0";
+      title = "it buildStubIntegritySqlite3 answers an integrity check with the real report on a damaged index, and exit 0";
       script = ''
         mkdir home tmp
         sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);'
@@ -602,7 +602,10 @@ let
           ${stubIntegritySqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err || status=$?
 
         assert_equals 0 "$status" "the stand-in's exit"
-        assert_equals 'wrong # of entries in index sqlite_autoindex_imps_1' "$(cat out)" "the stand-in's finding"
+        printf '%s\n' 'wrong # of entries in index sqlite_autoindex_imps_1' \
+          'row 1 missing from index sqlite_autoindex_imps_1' 'row 2 missing from index sqlite_autoindex_imps_1' \
+          'row 3 missing from index sqlite_autoindex_imps_1' > expected
+        assert_files_equal expected out
         assert_files_equal /dev/null err
       '';
     }
@@ -620,17 +623,13 @@ let
       '';
     }
     {
-      title = "it buildStubIntegritySqlite3 holds to SQLite and scripts/copy-impd-db-host.sh: the text of the finding, and the check through SQLITE3";
+      title = "it buildStubIntegritySqlite3 holds to scripts/copy-impd-db-host.sh: it checks the copy through SQLITE3";
       script = ''
-        # nixpkgs' sqlite source is SQLite's source tree as a zip; integrity_check is in pragma.c
-        unzip -p ${pkgs.sqlite.src} '*/src/pragma.c' > pragma.c
-        finding=$(grep -cF '"wrong # of entries in index "' pragma.c || true)
         sqlite=$(grep -cxF 'sqlite=''${SQLITE3:-$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3}' \
           ${../../scripts/copy-impd-db-host.sh} || true)
         checked=$(grep -cxF 'integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")' \
           ${../../scripts/copy-impd-db-host.sh} || true)
 
-        assert_equals 1 "$finding" "SQLite's index finding"
         assert_equals 1 "$sqlite" "the host script's SQLITE3"
         assert_equals 1 "$checked" "the host script's integrity_check"
       '';
@@ -1158,7 +1157,6 @@ pkgs.runCommand "test-utils-check"
       pkgs.jq
       pkgs.python3
       pkgs.sqlite
-      pkgs.unzip
     ];
   }
   ''

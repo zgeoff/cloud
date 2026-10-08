@@ -6,8 +6,8 @@
 # write the database to its /var/lib/imp/db with docker cp.
 #
 # Stand-ins, from test-utils, beside the rehearsal's own: a sqlite3 that also holds the
-# restore's mount busy (build-stub-sqlite3.nix), and one whose integrity_check reports a finding
-# (build-stub-integrity-sqlite3.nix). Each subtest writes its own database, secret,
+# restore's mount busy (build-stub-sqlite3.nix), and one whose integrity_check gives the real
+# report on a damaged index (build-stub-integrity-sqlite3.nix). Each subtest writes its own database, secret,
 # copy and COPY-INFO, so every subtest stands alone. It needs KVM, and it reads scripts/ beside
 # nixos/, so it builds only from the repo root: run `bun run test:nixos impd-restore`.
 { nixpkgs, imp }:
@@ -546,7 +546,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert re.fullmatch(r"drwx------ pre-0\.30-\d{8}T\d{6}", left[0]), f"the backups hold {left}"
 
 
-    with subtest("it exits 1 with the whole report, its integrity finding included, when the copy fails integrity_check"):
+    with subtest("it exits 1 with the whole report, its integrity findings on one line, when the copy fails integrity_check"):
         ctx = setup_test()
         machine.succeed("install -d -m 0700 /tmp/impd-db-seed")
         machine.succeed(
@@ -570,7 +570,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             "lastMigration 0003_leases",
             "impVersion 0.29.0",
             f"createdAt {created}",
-            "integrity wrong # of entries in index sqlite_autoindex_imps_1",
+            "integrity wrong # of entries in index sqlite_autoindex_imps_1; row 1 missing from index sqlite_autoindex_imps_1; row 2 missing from index sqlite_autoindex_imps_1; row 3 missing from index sqlite_autoindex_imps_1",
             "image ${image29.ref}",
             f"copy: {copy} ({size} bytes, mode 600)",
         ], out

@@ -59,7 +59,7 @@ sizeBytes 73728
 lastMigration 0002_tokens
 impVersion 0.29.0
 createdAt 2026-10-08T12:00:00Z
-integrity wrong # of entries in index sqlite_autoindex_imps_1
+integrity wrong # of entries in index sqlite_autoindex_imps_1; row 1 missing from index sqlite_autoindex_imps_1; row 2 missing from index sqlite_autoindex_imps_1; row 3 missing from index sqlite_autoindex_imps_1
 image ghcr.io/zgeoff/imp-host:0.29.0@sha256:9b1f6c3e0a4d7f2b8c5e1a6d3f0b9c2e7a4d1f8b5c2e9a6d3f0c7b4e1a8d5f2b
 copy: /root/imp-db-backups/pre-x-20261008T120000 (73728 bytes, mode 600)
 OUT

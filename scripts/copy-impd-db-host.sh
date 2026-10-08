@@ -23,6 +23,8 @@ docker exec imp-host sh -c "umask 077; \"\$1/sqlite3\" /var/lib/imp/db/imp.sqlit
 docker cp "imp-host:$work/imp.sqlite" "$dir/imp.sqlite"
 chmod 0600 "$dir/imp.sqlite"
 integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")
+# integrity_check prints one finding per line; COPY-INFO keeps them on its one integrity line
+integrity=${integrity//$'\n'/; }
 migration=$("$sqlite" "$dir/imp.sqlite" "SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1;")
 version=$(docker exec imp-host imp info | sed -n "s/^version *//p")
 image=$(docker inspect imp-host --format "{{.Config.Image}}")

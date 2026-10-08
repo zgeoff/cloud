@@ -10,22 +10,17 @@
 # - by default, a copy made at 2026-10-08T12:00:00Z: the COPY-INFO lines (path, sizeBytes,
 #   lastMigration, impVersion, createdAt, integrity ok, image) and the "copy: <dir> (<size>
 #   bytes, mode 600)" line, exit 0;
-# - with STUB_COPY_FAIL=integrity, the same report with integrity set to SQLite's
-#   integrity_check finding, exit 1 from the script's last `test`;
+# - with STUB_COPY_FAIL=integrity, the same report with integrity set to the findings of a
+#   damaged index, joined with "; " as the script joins them, exit 1 from its last `test`;
 # - with STUB_COPY_FAIL=imp-host-stopped, docker's "No such container: imp-host" error on
 #   stderr when the script makes its work directory, exit 1: imp's module runs imp-host with
 #   --rm, so a stopped imp-host leaves no container. nixos/checks/impd-restore.nix gets this
 #   answer from the real docker for the real script.
 #
-# The integrity finding was checked on 2026-10-08 against SQLite's source and a real
-# sqlite3. src/pragma.c at version-3.51.2, the sqlite of nixpkgs
-# 4feb8eb8bf30f323a8a5d285f14ee51d6a7197b1 (nixos/flake.lock) that the script runs,
-# reports "wrong # of entries in index <index>" (line 1794). sqlite3 3.53.4 printed that
-# line for a table whose unique index was pointed at another table's index b-tree, among
-# three other lines ("2nd reference to page 5", "Page 3: never used", "row 2 missing from
-# index sqlite_autoindex_imps_1"). Left open: a real integrity_check prints every finding,
-# one per line, and which ones depends on the damage, so the stand-in's one line stands for
-# the shortest failing report.
+# The findings are the real sqlite3's report on the damaged database of
+# nixos/checks/test-utils/build-stub-integrity-sqlite3.nix: an empty page in place of the index
+# sqlite_autoindex_imps_1 of a three-row table. nixos/checks/impd-restore.nix runs the real
+# script on that report and checks the same joined line.
 #
 # With STUB_SSH_PASS=1, a call to a loopback destination (ssh://<user>@127.0.0.1:<port>)
 # goes to the real ssh after it is logged, with -F /dev/null so no ssh config on the
@@ -63,7 +58,7 @@ if [ "${STUB_COPY_FAIL:-}" = imp-host-stopped ]; then
   exit 1
 fi
 integrity=ok
-if [ "${STUB_COPY_FAIL:-}" = integrity ]; then integrity="wrong # of entries in index sqlite_autoindex_imps_1"; fi
+if [ "${STUB_COPY_FAIL:-}" = integrity ]; then integrity="wrong # of entries in index sqlite_autoindex_imps_1; row 1 missing from index sqlite_autoindex_imps_1; row 2 missing from index sqlite_autoindex_imps_1; row 3 missing from index sqlite_autoindex_imps_1"; fi
 printf 'path %s\nsizeBytes %s\nlastMigration %s\nimpVersion %s\ncreatedAt %s\nintegrity %s\nimage %s\n' \
   "$dir/imp.sqlite" 73728 0002_tokens 0.29.0 2026-10-08T12:00:00Z "$integrity" ghcr.io/zgeoff/imp-host:0.29.0@sha256:9b1f6c3e0a4d7f2b8c5e1a6d3f0b9c2e7a4d1f8b5c2e9a6d3f0c7b4e1a8d5f2b
 echo "copy: $dir (73728 bytes, mode 600)"
