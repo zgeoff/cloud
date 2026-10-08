@@ -1294,7 +1294,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         saved = saved_dirs[0]
         # the holder keeps the mount busy
         mounts = machine.succeed("findmnt -rn -S tank/imp -o TARGET").split()
-        assert len(mounts) == 1 and re.fullmatch(r"/run/impd-restore\.\w{6}", mounts[0]), f"tank/imp is mounted at {mounts}"
+        assert len(mounts) == 1, f"tank/imp is mounted at {mounts}"
+        assert re.fullmatch(r"/run/impd-restore\.\w{6}", mounts[0]), f"tank/imp is mounted at {mounts[0]!r}, not a /run/impd-restore.* directory"
         assert out.splitlines() == [
             "== check the copy",
             "== check the host",
@@ -1367,7 +1368,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert len(saved_dirs) == 1, f"the saved directories are {saved_dirs}"
         saved = saved_dirs[0]
         mounts = machine.succeed("findmnt -rn -S tank/imp -o TARGET").split()
-        assert len(mounts) == 1 and re.fullmatch(r"/run/impd-restore\.\w{6}", mounts[0]), f"tank/imp is mounted at {mounts}"
+        assert len(mounts) == 1, f"tank/imp is mounted at {mounts}"
+        assert re.fullmatch(r"/run/impd-restore\.\w{6}", mounts[0]), f"tank/imp is mounted at {mounts[0]!r}, not a /run/impd-restore.* directory"
         assert out.splitlines() == [
             "== check the copy",
             "== check the host",
