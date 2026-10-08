@@ -9,7 +9,8 @@
 # script may not write, an env file that is not there, and ssh refused by a dead loopback
 # port. Each case runs the script under `env -i` with only the variables it sets and
 # compares its whole stdout, stderr, call log and the files it leaves, and its exact exit
-# code.
+# code. The ssh call is written out as literal text, masking only the case's temporary
+# path as TREE.
 #
 #   bash scripts/test-install-imp-dns-token.sh
 #   CASE='local mode' bash scripts/test-install-imp-dns-token.sh   # the cases whose title holds it
@@ -24,7 +25,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
 
 it_installs_the_token_over_ssh_stdin_and_keeps_the_other_env_lines() {
-  local remote status=0
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -33,34 +34,6 @@ it_installs_the_token_over_ssh_stdin_and_keeps_the_other_env_lines() {
   printf '%s' acme@example.net > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
   printf '%s\n' IMP_FOO=bar IMP_ACME_EMAIL=old@example.net IMP_DNS_API_TOKEN=old-token IMP_OTHER=1 \
     > "$tree/host/secrets/imp-host.env"
-  remote="$(
-    cat << 'REMOTE'
-set -euo pipefail
-env_file=$1
-token_file=$2
-IFS= read -r token
-IFS= read -r email
-umask 077
-tmp_token=$(mktemp "$token_file.XXXXXX")
-tmp_env=$(mktemp "$env_file.XXXXXX")
-trap "rm -f \"$tmp_token\" \"$tmp_env\"" EXIT
-printf "%s" "$token" > "$tmp_token"
-{ grep -vE "^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=" "$env_file" || true; printf "IMP_ACME_EMAIL=%s\n" "$email"; } > "$tmp_env"
-unset token email
-chmod 0400 "$tmp_token" "$tmp_env"
-chown 0:0 "$tmp_token" "$tmp_env" 2>/dev/null || true
-mv -f "$tmp_token" "$token_file"
-mv -f "$tmp_env" "$env_file"
-trap - EXIT
-echo "installed: token file $token_file ($(stat -c %s "$token_file") bytes, mode $(stat -c %a "$token_file")); $env_file has $(grep -c "^IMP_ACME_EMAIL=" "$env_file") email line, $(grep -c "^IMP_DNS_API_TOKEN=" "$env_file") token lines, mode $(stat -c %a "$env_file")"
-REMOTE
-  )"
-  {
-    echo '["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]'
-    echo '["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]'
-    jq -cn --arg command "bash -c $(printf '%q' "$remote") _ $tree/host/secrets/imp-host.env $tree/host/secrets/dns-api-token" \
-      '["ssh","-o","BatchMode=yes","root@geoffcloud",$command]'
-  } > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
@@ -71,7 +44,12 @@ REMOTE
   diff - "$tree/out" << OUT
 installed: token file $tree/host/secrets/dns-api-token (34 bytes, mode 400); $tree/host/secrets/imp-host.env has 1 email line, 0 token lines, mode 400
 OUT
-  diff "$tree/calls-expected" "$tree/calls"
+  sed "s|$tree|TREE|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << 'CALLS'
+["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]
+["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c $'set -euo pipefail\\nenv_file=$1\\ntoken_file=$2\\nIFS= read -r token\\nIFS= read -r email\\numask 077\\ntmp_token=$(mktemp \"$token_file.XXXXXX\")\\ntmp_env=$(mktemp \"$env_file.XXXXXX\")\\ntrap \"rm -f \\\\\"$tmp_token\\\\\" \\\\\"$tmp_env\\\\\"\" EXIT\\nprintf \"%s\" \"$token\" > \"$tmp_token\"\\n{ grep -vE \"^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=\" \"$env_file\" || true; printf \"IMP_ACME_EMAIL=%s\\\\n\" \"$email\"; } > \"$tmp_env\"\\nunset token email\\nchmod 0400 \"$tmp_token\" \"$tmp_env\"\\nchown 0:0 \"$tmp_token\" \"$tmp_env\" 2>/dev/null || true\\nmv -f \"$tmp_token\" \"$token_file\"\\nmv -f \"$tmp_env\" \"$env_file\"\\ntrap - EXIT\\necho \"installed: token file $token_file ($(stat -c %s \"$token_file\") bytes, mode $(stat -c %a \"$token_file\")); $env_file has $(grep -c \"^IMP_ACME_EMAIL=\" \"$env_file\") email line, $(grep -c \"^IMP_DNS_API_TOKEN=\" \"$env_file\") token lines, mode $(stat -c %a \"$env_file\")\"' _ TREE/host/secrets/imp-host.env TREE/host/secrets/dns-api-token"]
+CALLS
   printf '%s' cf_test_TOKEN-0123456789abcdefghij | diff - "$tree/host/secrets/dns-api-token"
   diff - "$tree/host/secrets/imp-host.env" << 'ENV'
 IMP_FOO=bar
@@ -294,7 +272,7 @@ FILES
 }
 
 it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connection() {
-  local remote status=0
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -302,34 +280,6 @@ it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connect
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
   printf '%s' acme@example.net > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
-  remote="$(
-    cat << 'REMOTE'
-set -euo pipefail
-env_file=$1
-token_file=$2
-IFS= read -r token
-IFS= read -r email
-umask 077
-tmp_token=$(mktemp "$token_file.XXXXXX")
-tmp_env=$(mktemp "$env_file.XXXXXX")
-trap "rm -f \"$tmp_token\" \"$tmp_env\"" EXIT
-printf "%s" "$token" > "$tmp_token"
-{ grep -vE "^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=" "$env_file" || true; printf "IMP_ACME_EMAIL=%s\n" "$email"; } > "$tmp_env"
-unset token email
-chmod 0400 "$tmp_token" "$tmp_env"
-chown 0:0 "$tmp_token" "$tmp_env" 2>/dev/null || true
-mv -f "$tmp_token" "$token_file"
-mv -f "$tmp_env" "$env_file"
-trap - EXIT
-echo "installed: token file $token_file ($(stat -c %s "$token_file") bytes, mode $(stat -c %a "$token_file")); $env_file has $(grep -c "^IMP_ACME_EMAIL=" "$env_file") email line, $(grep -c "^IMP_DNS_API_TOKEN=" "$env_file") token lines, mode $(stat -c %a "$env_file")"
-REMOTE
-  )"
-  {
-    echo '["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]'
-    echo '["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]'
-    jq -cn --arg command "bash -c $(printf '%q' "$remote") _ $tree/host/secrets/imp-host.env $tree/host/secrets/dns-api-token" \
-      '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1",$command]'
-  } > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_SSH_PASS=1 IMP_HOST=ssh://root@127.0.0.1:1 IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
@@ -338,7 +288,12 @@ REMOTE
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
-  diff "$tree/calls-expected" "$tree/calls"
+  sed "s|$tree|TREE|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << 'CALLS'
+["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]
+["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]
+["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -c $'set -euo pipefail\\nenv_file=$1\\ntoken_file=$2\\nIFS= read -r token\\nIFS= read -r email\\numask 077\\ntmp_token=$(mktemp \"$token_file.XXXXXX\")\\ntmp_env=$(mktemp \"$env_file.XXXXXX\")\\ntrap \"rm -f \\\\\"$tmp_token\\\\\" \\\\\"$tmp_env\\\\\"\" EXIT\\nprintf \"%s\" \"$token\" > \"$tmp_token\"\\n{ grep -vE \"^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=\" \"$env_file\" || true; printf \"IMP_ACME_EMAIL=%s\\\\n\" \"$email\"; } > \"$tmp_env\"\\nunset token email\\nchmod 0400 \"$tmp_token\" \"$tmp_env\"\\nchown 0:0 \"$tmp_token\" \"$tmp_env\" 2>/dev/null || true\\nmv -f \"$tmp_token\" \"$token_file\"\\nmv -f \"$tmp_env\" \"$env_file\"\\ntrap - EXIT\\necho \"installed: token file $token_file ($(stat -c %s \"$token_file\") bytes, mode $(stat -c %a \"$token_file\")); $env_file has $(grep -c \"^IMP_ACME_EMAIL=\" \"$env_file\") email line, $(grep -c \"^IMP_DNS_API_TOKEN=\" \"$env_file\") token lines, mode $(stat -c %a \"$env_file\")\"' _ TREE/host/secrets/imp-host.env TREE/host/secrets/dns-api-token"]
+CALLS
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
