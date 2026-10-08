@@ -158,8 +158,8 @@ func TestConfigSendsNoTeamOnAReadWhenTheTeamLookupFails(t *testing.T) {
 	read, err := ctx.server.Read(p.ReadRequest{ID: "k", Urn: onideltest.BuildURN("onidel:index:SshKey", "me")})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{"", []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k"}}},
-		[]any{read.ID, ctx.api.GetRequests()})
+	assert.Equal(t, "", read.ID)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k"}}, ctx.api.GetRequests())
 }
 
 func TestConfigSendsNoTeamOnADeleteWhenTheTeamLookupFails(t *testing.T) {

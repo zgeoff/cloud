@@ -22,17 +22,15 @@ func TestFirewallGroupCreateAddsTheGroupToTheResolvedTeam(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		"00000000-0000-4000-8000-000000000001",
-		map[string]any{
-			"description": "cloud", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-02T00:00:00Z",
-			"instanceCount": 0.0, "ruleCount": 0.0,
-		},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "cloud"}},
-		},
-	}, []any{created.ID, onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, "00000000-0000-4000-8000-000000000001", created.ID)
+	assert.Equal(t, map[string]any{
+		"description": "cloud", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-02T00:00:00Z",
+		"instanceCount": 0.0, "ruleCount": 0.0,
+	}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "cloud"}},
+	}, ctx.api.GetRequests())
 }
 
 func TestFirewallGroupCreatePreviewSendsNothing(t *testing.T) {
@@ -45,15 +43,13 @@ func TestFirewallGroupCreatePreviewSendsNothing(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{
-			"description": "cloud", "created": presource.Computed{Element: presource.NewProperty("")},
-			"updated":       presource.Computed{Element: presource.NewProperty("")},
-			"instanceCount": presource.Computed{Element: presource.NewProperty("")},
-			"ruleCount":     presource.Computed{Element: presource.NewProperty("")},
-		},
-		[]onideltest.Request(nil),
-	}, []any{onideltest.ToPlain(created.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{
+		"description": "cloud", "created": presource.Computed{Element: presource.NewProperty("")},
+		"updated":       presource.Computed{Element: presource.NewProperty("")},
+		"instanceCount": presource.Computed{Element: presource.NewProperty("")},
+		"ruleCount":     presource.Computed{Element: presource.NewProperty("")},
+	}, onideltest.ToPlain(created.Properties))
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestFirewallGroupCreateFailsWithTheAPIsErrorWhenNoTeamResolves(t *testing.T) {
@@ -78,14 +74,12 @@ func TestFirewallGroupImportReadsTheGroupByID(t *testing.T) {
 	read, err := ctx.server.Read(p.ReadRequest{ID: "g1", Urn: onideltest.BuildURN("onidel:index:FirewallGroup", "fw")})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		"g1",
-		map[string]any{"description": "cloud"},
-		map[string]any{
-			"description": "cloud", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-03T00:00:00Z",
-			"instanceCount": 1.0, "ruleCount": 4.0,
-		},
-	}, []any{read.ID, onideltest.ToPlain(read.Inputs), onideltest.ToPlain(read.Properties)})
+	assert.Equal(t, "g1", read.ID)
+	assert.Equal(t, map[string]any{"description": "cloud"}, onideltest.ToPlain(read.Inputs))
+	assert.Equal(t, map[string]any{
+		"description": "cloud", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-03T00:00:00Z",
+		"instanceCount": 1.0, "ruleCount": 4.0,
+	}, onideltest.ToPlain(read.Properties))
 }
 
 func TestFirewallGroupReadReportsADeletedGroupAsGone(t *testing.T) {
@@ -142,17 +136,15 @@ func TestFirewallGroupUpdateChangesTheDescriptionAndRereadsTheGroup(t *testing.T
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{
-			"description": "cloud host", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-03T00:00:00Z",
-			"instanceCount": 0.0, "ruleCount": 0.0,
-		},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "PUT", Path: "/network/firewalls/g1", Body: map[string]any{"team_id": "team-a", "description": "cloud host"}},
-			{Method: "GET", Path: "/network/firewalls/g1"},
-		},
-	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{
+		"description": "cloud host", "created": "2026-10-02T00:00:00Z", "updated": "2026-10-03T00:00:00Z",
+		"instanceCount": 0.0, "ruleCount": 0.0,
+	}, onideltest.ToPlain(updated.Properties))
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "PUT", Path: "/network/firewalls/g1", Body: map[string]any{"team_id": "team-a", "description": "cloud host"}},
+		{Method: "GET", Path: "/network/firewalls/g1"},
+	}, ctx.api.GetRequests())
 }
 
 func TestFirewallGroupUpdatePreviewSendsNothing(t *testing.T) {
@@ -170,15 +162,13 @@ func TestFirewallGroupUpdatePreviewSendsNothing(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]any{
-			"description": "cloud host", "created": presource.Computed{Element: presource.NewProperty("")},
-			"updated":       presource.Computed{Element: presource.NewProperty("")},
-			"instanceCount": presource.Computed{Element: presource.NewProperty("")},
-			"ruleCount":     presource.Computed{Element: presource.NewProperty("")},
-		},
-		[]onideltest.Request(nil),
-	}, []any{onideltest.ToPlain(updated.Properties), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]any{
+		"description": "cloud host", "created": presource.Computed{Element: presource.NewProperty("")},
+		"updated":       presource.Computed{Element: presource.NewProperty("")},
+		"instanceCount": presource.Computed{Element: presource.NewProperty("")},
+		"ruleCount":     presource.Computed{Element: presource.NewProperty("")},
+	}, onideltest.ToPlain(updated.Properties))
+	assert.Equal(t, []onideltest.Request(nil), ctx.api.GetRequests())
 }
 
 func TestFirewallGroupUpdateFailsWhenTheGroupIsGone(t *testing.T) {
@@ -229,13 +219,11 @@ func TestFirewallGroupDeleteRemovesTheGroupFromTheTeam(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/teams"},
-			{Method: "DELETE", Path: "/network/firewalls/g1", Query: "team_id=team-a"},
-		},
-	}, []any{ctx.api.GetFirewallGroups(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallGroups())
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "DELETE", Path: "/network/firewalls/g1", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
 }
 
 func TestFirewallGroupDeleteAcceptsAGroupThatIsAlreadyGone(t *testing.T) {

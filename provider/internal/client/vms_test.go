@@ -139,13 +139,11 @@ func TestCreateVMTakesTheIDFromACreateBodyThatCarriesOne(t *testing.T) {
 			vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 			require.NoError(t, err)
-			assert.Equal(t, []any{
-				client.VM{ID: "0f289413-258f-4115-ac81-252000998fe0", Name: "web", Status: "active", ActiveActionID: json.RawMessage("null")},
-				[]onideltest.Request{{Method: "GET", Path: "/vm"}, {Method: "POST", Path: "/vm", Body: map[string]any{
-					"name": "web", "location": "Sydney", "cpu": 1.0, "ram": 1024.0, "disk": 20.0, "os": 24.0, "ipv6": false,
-				}}, {Method: "GET", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0"},
-					{Method: "GET", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0"}},
-			}, []any{vm, ctx.api.GetRequests()})
+			assert.Equal(t, client.VM{ID: "0f289413-258f-4115-ac81-252000998fe0", Name: "web", Status: "active", ActiveActionID: json.RawMessage("null")}, vm)
+			assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm"}, {Method: "POST", Path: "/vm", Body: map[string]any{
+				"name": "web", "location": "Sydney", "cpu": 1.0, "ram": 1024.0, "disk": 20.0, "os": 24.0, "ipv6": false,
+			}}, {Method: "GET", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0"},
+				{Method: "GET", Path: "/vm/0f289413-258f-4115-ac81-252000998fe0"}}, ctx.api.GetRequests())
 		})
 	}
 }
@@ -171,17 +169,15 @@ func TestCreateVMFallsBackToListingWhenTheCreateBodyCarriesNoID(t *testing.T) {
 			vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 			require.NoError(t, err)
-			assert.Equal(t, []any{
-				client.VM{ID: "listed", Name: "web", Status: "active"},
-				[]onideltest.Request{
-					{Method: "GET", Path: "/vm"},
-					{Method: "POST", Path: "/vm", Body: map[string]any{
-						"name": "web", "location": "Sydney", "cpu": 1.0, "ram": 1024.0, "disk": 20.0, "os": 24.0, "ipv6": false,
-					}},
-					{Method: "GET", Path: "/vm"},
-					{Method: "GET", Path: "/vm/listed"},
-				},
-			}, []any{vm, ctx.api.GetRequests()})
+			assert.Equal(t, client.VM{ID: "listed", Name: "web", Status: "active"}, vm)
+			assert.Equal(t, []onideltest.Request{
+				{Method: "GET", Path: "/vm"},
+				{Method: "POST", Path: "/vm", Body: map[string]any{
+					"name": "web", "location": "Sydney", "cpu": 1.0, "ram": 1024.0, "disk": 20.0, "os": 24.0, "ipv6": false,
+				}},
+				{Method: "GET", Path: "/vm"},
+				{Method: "GET", Path: "/vm/listed"},
+			}, ctx.api.GetRequests())
 		})
 	}
 }
@@ -194,8 +190,9 @@ func TestCreateVMFailsWhenTheFirstListingFails(t *testing.T) {
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, []any{&client.APIError{Method: "GET", Path: "/vm", Status: 500}, client.VM{}, map[string]map[string]any{}},
-		[]any{apiErr, vm, ctx.api.GetVMs()})
+	assert.Equal(t, &client.APIError{Method: "GET", Path: "/vm", Status: 500}, apiErr)
+	assert.Equal(t, client.VM{}, vm)
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetVMs())
 }
 
 func TestCreateVMFailsWhenTheAPIRefusesTheCreate(t *testing.T) {
@@ -205,7 +202,8 @@ func TestCreateVMFailsWhenTheAPIRefusesTheCreate(t *testing.T) {
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, []any{&client.APIError{Method: "POST", Path: "/vm", Status: 400}, client.VM{}}, []any{apiErr, vm})
+	assert.Equal(t, &client.APIError{Method: "POST", Path: "/vm", Status: 400}, apiErr)
+	assert.Equal(t, client.VM{}, vm)
 }
 
 func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
@@ -215,7 +213,8 @@ func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
-	assert.Equal(t, []any{client.VM{}, slices.Repeat([]time.Duration{10 * time.Second}, 180)}, []any{vm, ctx.sleep.GetDurations()})
+	assert.Equal(t, client.VM{}, vm)
+	assert.Equal(t, slices.Repeat([]time.Duration{10 * time.Second}, 180), ctx.sleep.GetDurations())
 }
 
 func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
@@ -240,8 +239,8 @@ func TestCreateVMReturnsTheIDOfAVMThatNeverBecomesReady(t *testing.T) {
 	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Equal(t, []any{client.VM{ID: "00000000-0000-4000-8000-000000000001"}, slices.Repeat([]time.Duration{10 * time.Second}, 180)},
-		[]any{vm, ctx.sleep.GetDurations()})
+	assert.Equal(t, client.VM{ID: "00000000-0000-4000-8000-000000000001"}, vm)
+	assert.Equal(t, slices.Repeat([]time.Duration{10 * time.Second}, 180), ctx.sleep.GetDurations())
 }
 
 func TestWaitForVMReadyWaitsForAnActiveVMWithNoActionInFlight(t *testing.T) {
@@ -264,10 +263,8 @@ func TestWaitForVMReadyWaitsForAnActiveVMWithNoActionInFlight(t *testing.T) {
 			vm, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
 
 			require.NoError(t, err)
-			assert.Equal(t, []any{
-				client.VM{ID: "v", Status: "active", ActiveActionID: json.RawMessage("null")},
-				[]onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}},
-			}, []any{vm, ctx.api.GetRequests()})
+			assert.Equal(t, client.VM{ID: "v", Status: "active", ActiveActionID: json.RawMessage("null")}, vm)
+			assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
 		})
 	}
 }
@@ -313,15 +310,13 @@ func TestUpdateVMAppliesOneSettingAndWaitsForItToSettle(t *testing.T) {
 	vm, err := ctx.client.UpdateVM(t.Context(), "v", client.VMPatch{TeamID: "team-a", Name: "web-2"})
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		client.VM{ID: "v", Name: "web-2", Status: "active", ActiveActionID: json.RawMessage("null")},
-		[]onideltest.Request{
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-		},
-	}, []any{vm, ctx.api.GetRequests()})
+	assert.Equal(t, client.VM{ID: "v", Name: "web-2", Status: "active", ActiveActionID: json.RawMessage("null")}, vm)
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "PATCH", Path: "/vm/v", Body: map[string]any{"team_id": "team-a", "name": "web-2"}},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
 }
 
 func TestUpdateVMFailsForAMissingVM(t *testing.T) {
@@ -331,7 +326,8 @@ func TestUpdateVMFailsForAMissingVM(t *testing.T) {
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, []any{&client.APIError{Method: "GET", Path: "/vm/missing", Status: 404}, client.VM{}}, []any{apiErr, vm})
+	assert.Equal(t, &client.APIError{Method: "GET", Path: "/vm/missing", Status: 404}, apiErr)
+	assert.Equal(t, client.VM{}, vm)
 }
 
 func TestUpdateVMFailsWhenTheAPIRefusesThePatch(t *testing.T) {
@@ -342,7 +338,8 @@ func TestUpdateVMFailsWhenTheAPIRefusesThePatch(t *testing.T) {
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, []any{&client.APIError{Method: "PATCH", Path: "/vm/v", Status: 400}, client.VM{}}, []any{apiErr, vm})
+	assert.Equal(t, &client.APIError{Method: "PATCH", Path: "/vm/v", Status: 400}, apiErr)
+	assert.Equal(t, client.VM{}, vm)
 }
 
 func TestRemoveVMWaitsUntilTheVMIsGone(t *testing.T) {
@@ -352,13 +349,11 @@ func TestRemoveVMWaitsUntilTheVMIsGone(t *testing.T) {
 	err := ctx.client.RemoveVM(t.Context(), "v", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		map[string]map[string]any{},
-		[]onideltest.Request{
-			{Method: "DELETE", Path: "/vm/v", Query: "team_id=team-a"},
-			{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
-		},
-	}, []any{ctx.api.GetVMs(), ctx.api.GetRequests()})
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetVMs())
+	assert.Equal(t, []onideltest.Request{
+		{Method: "DELETE", Path: "/vm/v", Query: "team_id=team-a"},
+		{Method: "GET", Path: "/vm/v", Query: "team_id=team-a"},
+	}, ctx.api.GetRequests())
 }
 
 func TestRemoveVMAcceptsAVMThatIsAlreadyGone(t *testing.T) {
@@ -437,10 +432,8 @@ func TestWaitForVMReadyWaitsThroughTheAlternativeSnapshotSpelling(t *testing.T) 
 	vm, err := ctx.client.WaitForVMReady(t.Context(), "v", "")
 
 	require.NoError(t, err)
-	assert.Equal(t, []any{
-		client.VM{ID: "v", Status: "active", ActiveActionID: json.RawMessage("null")},
-		[]onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}},
-	}, []any{vm, ctx.api.GetRequests()})
+	assert.Equal(t, client.VM{ID: "v", Status: "active", ActiveActionID: json.RawMessage("null")}, vm)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm/v"}, {Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
 }
 
 func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
@@ -453,5 +446,6 @@ func TestWaitForVMReadyStopsWhenTheContextEnds(t *testing.T) {
 
 	_, err := ctx.client.WaitForVMReady(callCtx, "v", "")
 
-	assert.Equal(t, []any{context.Canceled, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}}, []any{err, ctx.api.GetRequests()})
+	assert.Equal(t, context.Canceled, err)
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
 }

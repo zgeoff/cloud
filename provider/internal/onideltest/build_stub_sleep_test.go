@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
@@ -20,9 +21,11 @@ func TestBuildStubSleepRecordsNothingAtFirst(t *testing.T) {
 func TestBuildStubSleepRecordsEachDurationInOrder(t *testing.T) {
 	sleep := onideltest.BuildStubSleep()
 
-	errs := []error{sleep.Sleep(t.Context(), time.Second), sleep.Sleep(t.Context(), time.Hour)}
+	first, second := sleep.Sleep(t.Context(), time.Second), sleep.Sleep(t.Context(), time.Hour)
 
-	assert.Equal(t, []any{[]error{nil, nil}, []time.Duration{time.Second, time.Hour}}, []any{errs, sleep.GetDurations()})
+	require.NoError(t, first)
+	require.NoError(t, second)
+	assert.Equal(t, []time.Duration{time.Second, time.Hour}, sleep.GetDurations())
 }
 
 func TestBuildStubSleepReturnsTheClientsSleepErrorForACanceledContext(t *testing.T) {
@@ -34,7 +37,8 @@ func TestBuildStubSleepReturnsTheClientsSleepErrorForACanceledContext(t *testing
 
 	want, got := plain.Sleep(ctx, time.Hour), stubbed.Sleep(ctx, time.Hour)
 
-	assert.Equal(t, []error{context.Canceled, context.Canceled}, []error{want, got})
+	assert.Equal(t, context.Canceled, want)
+	assert.Equal(t, context.Canceled, got)
 }
 
 func TestBuildStubSleepReturnsTheClientsSleepErrorForAnExpiredContext(t *testing.T) {
@@ -46,5 +50,6 @@ func TestBuildStubSleepReturnsTheClientsSleepErrorForAnExpiredContext(t *testing
 
 	want, got := plain.Sleep(ctx, time.Hour), stubbed.Sleep(ctx, time.Hour)
 
-	assert.Equal(t, []error{context.DeadlineExceeded, context.DeadlineExceeded}, []error{want, got})
+	assert.Equal(t, context.DeadlineExceeded, want)
+	assert.Equal(t, context.DeadlineExceeded, got)
 }
