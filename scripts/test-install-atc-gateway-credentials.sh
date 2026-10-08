@@ -1249,8 +1249,7 @@ EOF
 
 # The secrets directory turns read-only after preflight; nothing but an interception
 # changes it at that moment, so the ssh stub does it and logs that it did. The real
-# mktemp then fails on it; the remote write has no errexit, so its later steps fail on
-# the empty path too, and the last one's exit ends the script.
+# mktemp then fails on it, and the remote write's errexit ends it before its trap is set.
 it_stops_with_the_item_created_when_the_host_cannot_write_the_bearer() {
   local seed="$1" status=0
   tree="$(mktemp -d)"
@@ -1302,6 +1301,69 @@ EOF
   diff /dev/null "$tree/mints"
   ls -A "$tree/host/secrets" > "$tree/host-files"
   diff /dev/null "$tree/host-files"
+  ls -A "$tree/vault/cloud" > "$tree/vault-items"
+  diff - "$tree/vault-items" <<< atc-daemon-token
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+# gateway-token turns into a read-only directory after preflight, so the write's mktemp
+# succeeds and its mv into that directory fails; the ssh stub does it and logs that it did.
+# The write's EXIT trap then removes the temporary file that holds the bearer.
+it_removes_the_temporary_bearer_file_when_the_host_cannot_move_it_into_place() {
+  local seed="$1" status=0
+  tree="$(mktemp -d)"
+  trap 'chmod -R u+rwX "$tree" || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" atc-key
+  mkdir "$tree/vault/cloud" "$tree/host/secrets"
+  echo '{"version":"0.27.0","features":{"sessionOffsets":true,"leases":true,"grantableTokens":true,"secretRebind":true}}' > "$tree/impd/info.json"
+  echo '[{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/secrets.json"
+  echo '[]' > "$tree/impd/tokens.json"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+    STUB_HOST_BIN="$tree/host-bin" STUB_READONLY_TARGET_AT_BEARER_WRITE=1 \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  # mktemp's six random characters are masked
+  sed -E 's/\.gateway-token\.[A-Za-z0-9]{6}/.gateway-token.XXXXXX/g' "$tree/err" > "$tree/err-masked"
+  diff - "$tree/err-masked" << EOF
+mv: cannot move '$tree/host/secrets/.gateway-token.XXXXXX' to '$tree/host/secrets/gateway-token/.gateway-token.XXXXXX': Permission denied
+EOF
+  diff - "$tree/out" << EOF
+
+== preflight
+ok: 1Password vault cloud, atc-key, ssh root@geoffcloud, impd grantableTokens, $tree/host/secrets
+
+== 1/3 impd secret glm (api.z.ai, authorization: Bearer)
+skip: glm exists with the expected rules
+
+== 2/3 daemon bearer: 1Password cloud/atc-daemon-token and root@geoffcloud:$tree/host/secrets/gateway-token
+1Password: atc-daemon-token (fixture-item-id)
+EOF
+  diff - "$tree/calls" << EOF
+["op","vault","get","cloud","--format","json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","true"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","info","--json"]
+["docker","exec","imp-host","imp","info","--json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
+["docker","exec","imp-host","imp","secret","ls","--json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","token","ls","--json"]
+["docker","exec","imp-host","imp","token","ls","--json"]
+["op","item","list","--vault","cloud","--format","json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","install -d -m 0700 -o root -g root $tree/host/secrets"]
+["install","-d","-m","0700","-o","root","-g","root","$tree/host/secrets"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
+["op","item","create","--vault","cloud","-","--format","json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX)\\n    trap 'rm -f \\"\$t\\"' EXIT\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token; trap - EXIT"]
+["gateway-token-made-a-read-only-directory"]
+EOF
+  jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
+  diff /dev/null "$tree/mints"
+  ls -A "$tree/host/secrets" > "$tree/host-files"
+  diff - "$tree/host-files" <<< gateway-token
+  ls -A "$tree/host/secrets/gateway-token" > "$tree/target-files"
+  diff /dev/null "$tree/target-files"
   ls -A "$tree/vault/cloud" > "$tree/vault-items"
   diff - "$tree/vault-items" <<< atc-daemon-token
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }

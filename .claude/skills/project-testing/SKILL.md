@@ -131,8 +131,10 @@ Each shared rule takes its Go form:
     It answers an unhandled route, an action it does not model, or a body that is not JSON with a
     recorded problem, and fails the test at cleanup when a problem was not drained.
   - `BuildStubSleep` records each duration and returns the context's error, and
-    `BuildStubCancelingSleep` ends the caller's context. Their tests compare both with the real
-    client `Sleep`.
+    `BuildStubCancelingSleep` ends the caller's context. `BuildStubClockSleep` runs its own
+    clock: each sleep returns at once and moves the clock on, stopping at the context's
+    deadline with `context.DeadlineExceeded`. Their tests compare each with the real client
+    `Sleep`.
   - `BuildStubTB` lets a test observe a helper failing a test, with `testing.T`'s cleanup order.
   - Shape the stub's state with its setters. A deviation is `RegisterResponse`; a handler that must
     change state mid-request, or a transport fault `RegisterResponse` cannot express (such as a

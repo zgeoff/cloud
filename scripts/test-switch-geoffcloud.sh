@@ -509,6 +509,12 @@ it_leaves_no_snapshot_archive_behind_when_the_commit_cannot_be_archived() {
 
   ls -A "$tree/tmp" > "$tree/tmp-files"
   diff /dev/null "$tree/tmp-files"
+  diff - "$tree/err" << EOF
+error: invalid object 100644 $blob for 'nixos/marker'
+error: cannot read '$blob'
+EOF
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/calls"
   [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
 }
 

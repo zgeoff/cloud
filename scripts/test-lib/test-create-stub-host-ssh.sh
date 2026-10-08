@@ -429,6 +429,28 @@ CALLS
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
+it_makes_gateway_token_a_read_only_directory_just_before_the_bearer_write() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'chmod -R u+w "$tree" || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree"
+  mkdir "$tree/host/secrets"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_READONLY_TARGET_AT_BEARER_WRITE=1 \
+    ssh -o BatchMode=yes root@geoffcloud "set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); stat -c %a $tree/host/secrets/gateway-token" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 500
+  diff - "$tree/host-output" <<< 500
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << CALLS
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); stat -c %a $tree/host/secrets/gateway-token"]
+["gateway-token-made-a-read-only-directory"]
+CALLS
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 it_alters_the_written_bearer_just_before_its_checksum() {
   local status=0
   tree="$(mktemp -d)"
