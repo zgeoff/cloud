@@ -67,6 +67,7 @@ test('it loads the gateway from the same stack config and environment when atcGa
       geoffcloud: {
         address: '100.69.47.33:8415',
         daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+        alertSeverity: 'critical',
       },
     },
     defaultDaemon: 'geoffcloud',
