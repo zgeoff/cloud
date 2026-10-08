@@ -22,7 +22,7 @@ test('it builds the restic repository from the endpoint and bucket', () => {
 test('it returns the values untrimmed, whitespace included', () => {
   expect(
     findATCGatewayBackup({
-      ATC_GATEWAY_RESTIC_PASSWORD: ' ',
+      ATC_GATEWAY_RESTIC_PASSWORD: ` ${'p'.repeat(32)} `,
       ATC_GATEWAY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
       ATC_GATEWAY_R2_SECRET_ACCESS_KEY: `${'s'.repeat(64)}\n`,
       ATC_GATEWAY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
@@ -31,7 +31,7 @@ test('it returns the values untrimmed, whitespace included', () => {
   ).toStrictEqual({
     repository:
       's3:https://0123456789abcdef.r2.cloudflarestorage.com/atc-gateway-backups/atc-gateway',
-    password: ' ',
+    password: ` ${'p'.repeat(32)} `,
     accessKeyID: 'a'.repeat(32),
     secretAccessKey: `${'s'.repeat(64)}\n`,
   });
@@ -91,8 +91,31 @@ test('it throws, naming the other four, when only a whitespace password is set',
 });
 
 test.each([
+  ['ATC_GATEWAY_RESTIC_PASSWORD', ' '],
+  ['ATC_GATEWAY_R2_ACCESS_KEY_ID', '\t'],
+  ['ATC_GATEWAY_R2_SECRET_ACCESS_KEY', '\n'],
+  ['ATC_GATEWAY_R2_ENDPOINT', '  '],
+  ['ATC_GATEWAY_R2_BUCKET', ' \n'],
+])('it throws, naming the field, when only whitespace is in %s', (name, blank) => {
+  expect(() =>
+    findATCGatewayBackup({
+      ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
+      ATC_GATEWAY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      ATC_GATEWAY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      ATC_GATEWAY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      ATC_GATEWAY_R2_BUCKET: 'atc-gateway-backups',
+      [name]: blank,
+    }),
+  ).toThrowWithMessage(
+    Error,
+    `the atc gateway's backup needs a value in every one of ATC_GATEWAY_RESTIC_PASSWORD, ATC_GATEWAY_R2_ACCESS_KEY_ID, ATC_GATEWAY_R2_SECRET_ACCESS_KEY, ATC_GATEWAY_R2_ENDPOINT, ATC_GATEWAY_R2_BUCKET; only whitespace: ${name}`,
+  );
+});
+
+test.each([
   'https://0123456789abcdef.r2.cloudflarestorage.com/bucket',
   'https://0123456789abcdef.r2.cloudflarestorage.com/',
+  'https://',
   'http://0123456789abcdef.r2.cloudflarestorage.com',
   '0123456789abcdef.r2.cloudflarestorage.com',
 ])('it refuses the endpoint %s', (endpoint) => {
