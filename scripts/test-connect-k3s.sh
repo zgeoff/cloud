@@ -250,7 +250,7 @@ CALLS
 }
 
 it_completes_env_on_a_second_run_after_a_failed_env_write() {
-  local status=0
+  local first_status=0 status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -259,7 +259,7 @@ it_completes_env_on_a_second_run_after_a_failed_env_write() {
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
   chmod 0444 "$tree/.env"
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > /dev/null 2>&1 || true
+    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > /dev/null 2> "$tree/first-err" || first_status=$?
   chmod 0644 "$tree/.env"
   : > "$tree/calls"
 
@@ -280,6 +280,8 @@ ONIDEL_API_KEY=op://cloud/onidel/credential
 # k3s API over the tailnet (#6)
 K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml
 ENV
+  diff - "$tree/first-err" <<< 'connect-k3s.sh: line 20: .env: Permission denied'
+  [ "$first_status" = 1 ] || { echo "first exit $first_status, want 1" >&2; exit 1; }
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 

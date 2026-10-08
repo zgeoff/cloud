@@ -16,6 +16,7 @@ let
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
+  stubIntegritySqlite3 = import ./test-utils/build-stub-integrity-sqlite3.nix { inherit pkgs; };
   stubBlockingSqlite3 = import ./test-utils/build-stub-blocking-sqlite3.nix { inherit pkgs; };
   stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
@@ -591,6 +592,50 @@ let
       '';
     }
     {
+      title = "it buildStubIntegritySqlite3 answers an integrity check with one finding and exit 0";
+      script = ''
+        mkdir home tmp
+        sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);'
+        status=0
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          ${stubIntegritySqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the stand-in's exit"
+        assert_equals 'wrong # of entries in index sqlite_autoindex_imps_1' "$(cat out)" "the stand-in's finding"
+        assert_files_equal /dev/null err
+      '';
+    }
+    {
+      title = "it buildStubIntegritySqlite3 is sqlite3 alone for any other statement";
+      script = ''
+        mkdir home tmp
+        sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);' "INSERT INTO t VALUES ('x');"
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          ${stubIntegritySqlite3} copy.sqlite 'SELECT v FROM t;' > out 2> err
+
+        assert_equals x "$(cat out)" "sqlite3's answer"
+        assert_files_equal /dev/null err
+      '';
+    }
+    {
+      title = "it buildStubIntegritySqlite3 holds to SQLite and scripts/copy-impd-db-host.sh: the text of the finding, and the check through SQLITE3";
+      script = ''
+        # nixpkgs' sqlite source is SQLite's source tree as a zip; integrity_check is in pragma.c
+        unzip -p ${pkgs.sqlite.src} '*/src/pragma.c' > pragma.c
+        finding=$(grep -cF '"wrong # of entries in index "' pragma.c || true)
+        sqlite=$(grep -cxF 'sqlite=''${SQLITE3:-$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3}' \
+          ${../../scripts/copy-impd-db-host.sh} || true)
+        checked=$(grep -cxF 'integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")' \
+          ${../../scripts/copy-impd-db-host.sh} || true)
+
+        assert_equals 1 "$finding" "SQLite's index finding"
+        assert_equals 1 "$sqlite" "the host script's SQLITE3"
+        assert_equals 1 "$checked" "the host script's integrity_check"
+      '';
+    }
+    {
       title = "it buildStubSqlite3 holds to scripts/restore-impd-db.sh: it checks the staged file through SQLITE3";
       script = ''
         staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
@@ -1113,6 +1158,7 @@ pkgs.runCommand "test-utils-check"
       pkgs.jq
       pkgs.python3
       pkgs.sqlite
+      pkgs.unzip
     ];
   }
   ''

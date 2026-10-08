@@ -10,7 +10,8 @@ set -euo pipefail
 umask 077
 nix() { command nix --extra-experimental-features "nix-command flakes" "$@"; }
 static=$(nix build --no-link --print-out-paths nixpkgs#pkgsStatic.sqlite.bin)/bin/sqlite3
-sqlite=$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3
+# SQLITE3 is for the restore VM, which checks a failed integrity_check; ssh never sends it
+sqlite=${SQLITE3:-$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3}
 mkdir -p -m 0700 /root/imp-db-backups
 dir=/root/imp-db-backups/$1-$(date -u +%Y%m%dT%H%M%S)
 mkdir -m 0700 "$dir"

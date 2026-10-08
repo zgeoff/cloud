@@ -6,13 +6,15 @@
 # write the database to its /var/lib/imp/db with docker cp.
 #
 # Stand-ins, from test-utils, beside the rehearsal's own: a sqlite3 that also holds the
-# restore's mount busy (build-stub-sqlite3.nix). Each subtest writes its own database, secret,
+# restore's mount busy (build-stub-sqlite3.nix), and one whose integrity_check reports a finding
+# (build-stub-integrity-sqlite3.nix). Each subtest writes its own database, secret,
 # copy and COPY-INFO, so every subtest stands alone. It needs KVM, and it reads scripts/ beside
 # nixos/, so it builds only from the repo root: run `bun run test:nixos impd-restore`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
+  stubIntegritySqlite3 = import ./test-utils/build-stub-integrity-sqlite3.nix { inherit pkgs; };
 in
 import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
   name = "impd-restore-rehearsal";
@@ -426,12 +428,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert published == 0, "the published database differs from the copy"
 
 
-    with subtest("it copies the running database, with the rows still in its WAL, to a root-only copy that COPY-INFO describes"):
+    with subtest("it copies the database from the running imp-host, rows only in its WAL included, to a root-only copy that COPY-INFO describes"):
         ctx = setup_test()
         machine.succeed("install -d -m 0700 /tmp/impd-db-seed")
         machine.succeed(
             "sqlite3 /tmp/impd-db-seed/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
         )
+        # the seed's marker table is only in its WAL: the main file alone has no such table
+        main_tables = machine.succeed("sqlite3 'file:/tmp/impd-db-seed/imp.sqlite?immutable=1' \"SELECT count(*) FROM sqlite_schema WHERE name = 'marker';\"").strip()
+        assert main_tables == "0", f"the seed's main file has {main_tables} marker tables"
         machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
         machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
 
@@ -537,7 +542,42 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert out == "", out
         assert err.splitlines() == ["Error response from daemon: No such container: imp-host"], err
         left = machine.succeed("find /root/imp-db-backups -mindepth 1 -printf '%M %P\\n'").splitlines()
-        assert len(left) == 1 and re.fullmatch(r"drwx------ pre-0\.30-\d{8}T\d{6}", left[0]), f"the backups hold {left}"
+        assert len(left) == 1, f"the backups hold {left}"
+        assert re.fullmatch(r"drwx------ pre-0\.30-\d{8}T\d{6}", left[0]), f"the backups hold {left}"
+
+
+    with subtest("it exits 1 with the whole report, its integrity finding included, when the copy fails integrity_check"):
+        ctx = setup_test()
+        machine.succeed("install -d -m 0700 /tmp/impd-db-seed")
+        machine.succeed(
+            "sqlite3 /tmp/impd-db-seed/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\""
+        )
+        machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
+        machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
+
+        status, out = machine.execute("SQLITE3=${stubIntegritySqlite3} bash -s -- pre-0.30 < ${../../scripts/copy-impd-db-host.sh} 2>/tmp/copy.err")
+        err = machine.succeed("cat /tmp/copy.err")
+
+        assert status == 1, f"exit {status}: {out}{err}"
+        assert err == "", err
+        copy = machine.succeed("ls -d /root/imp-db-backups/pre-0.30-*").strip()
+        size = machine.succeed(f"stat -c %s {copy}/imp.sqlite").strip()
+        lines = out.splitlines()
+        created = lines[4].removeprefix("createdAt ") if len(lines) > 4 else ""
+        assert lines == [
+            f"path {copy}/imp.sqlite",
+            f"sizeBytes {size}",
+            "lastMigration 0003_leases",
+            "impVersion 0.29.0",
+            f"createdAt {created}",
+            "integrity wrong # of entries in index sqlite_autoindex_imps_1",
+            "image ${image29.ref}",
+            f"copy: {copy} ({size} bytes, mode 600)",
+        ], out
+        info = machine.succeed(f"cat {copy}/COPY-INFO").splitlines()
+        assert info == lines[:7], info
+        work = machine.succeed("docker exec imp-host ls -A /tmp")
+        assert work == "", f"imp-host's /tmp holds {work}"
 
 
     with subtest("it restores a database that has no -wal or -shm file, saving only the database and secrets"):
