@@ -33,7 +33,9 @@
 # state reaches: STUB_SSH_DROP_AT_WHOAMI drops the connection on the whoami check (exit
 # 255 and OpenSSH's closed-session line); STUB_REMOVE_TOKEN_AT_WHOAMI removes the saved
 # token just before it; STUB_READONLY_AT_BEARER_WRITE makes the secrets directory
-# read-only just before the bearer is written; STUB_ALTER_BEARER_BEFORE_SUM appends to the
+# read-only just before the bearer is written; STUB_READONLY_TARGET_AT_BEARER_WRITE makes
+# gateway-token a read-only directory just before it, so the write's mktemp succeeds and its
+# mv fails; STUB_ALTER_BEARER_BEFORE_SUM appends to the
 # written bearer just before its checksum; STUB_REMOVE_BEARER_BEFORE_STAT removes it
 # before the final stat.
 #
@@ -104,6 +106,10 @@ case "$remote" in
     if [ -n "${STUB_READONLY_AT_BEARER_WRITE:-}" ]; then
       chmod 0500 "$dir"
       echo '["secrets-dir-made-read-only"]' >> "$STUB_TREE/calls"
+    fi
+    if [ -n "${STUB_READONLY_TARGET_AT_BEARER_WRITE:-}" ]; then
+      mkdir -m 0500 "$dir/gateway-token"
+      echo '["gateway-token-made-a-read-only-directory"]' >> "$STUB_TREE/calls"
     fi
     ;;
   "sha256sum "*)
