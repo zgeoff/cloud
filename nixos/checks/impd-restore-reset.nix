@@ -68,7 +68,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -116,7 +116,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -165,7 +165,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -177,16 +177,18 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         assert contents == "", f"tank/imp holds {contents}"
 
 
-    with subtest("it removes the backups, the saved restore error and the pause log"):
+    with subtest("it removes the backups, the saved restore error, the pause log, the copy's seed and its saved error"):
         ctx = setup_test()
         machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-restore-20261004T000000/secrets")
         machine.succeed("printf 'dummy-secret-value\\n' > /root/imp-db-backups/pre-restore-20261004T000000/secrets/glm")
         machine.succeed("printf 'restore-impd-db: nothing was changed\\n' > /tmp/restore.err")
         machine.succeed("printf '[\"1\"]\\n' > /tmp/sleep.log")
-        left_before = machine.succeed("find /root/imp-db-backups /tmp/restore.err /tmp/sleep.log | sort").split()
+        machine.succeed("install -d -m 0700 /tmp/impd-db-seed && sqlite3 /tmp/impd-db-seed/imp.sqlite 'CREATE TABLE marker (v TEXT);'")
+        machine.succeed("printf 'Error response from daemon\\n' > /tmp/copy.err")
+        left_before = machine.succeed("find /root/imp-db-backups /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err | sort").split()
 
         ctx = setup_test()
-        assert left_before == ["/root/imp-db-backups", "/root/imp-db-backups/pre-restore-20261004T000000", "/root/imp-db-backups/pre-restore-20261004T000000/secrets", "/root/imp-db-backups/pre-restore-20261004T000000/secrets/glm", "/tmp/restore.err", "/tmp/sleep.log"], f"the files were {left_before}"
+        assert left_before == ["/root/imp-db-backups", "/root/imp-db-backups/pre-restore-20261004T000000", "/root/imp-db-backups/pre-restore-20261004T000000/secrets", "/root/imp-db-backups/pre-restore-20261004T000000/secrets/glm", "/tmp/copy.err", "/tmp/impd-db-seed", "/tmp/impd-db-seed/imp.sqlite", "/tmp/restore.err", "/tmp/sleep.log"], f"the files were {left_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -215,7 +217,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -264,7 +266,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -318,7 +320,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -365,7 +367,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -412,7 +414,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -459,7 +461,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -507,7 +509,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -558,7 +560,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -609,7 +611,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -662,7 +664,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -747,7 +749,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -833,7 +835,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -888,7 +890,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -943,7 +945,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         assert len(seccomp) == 1, f"the unit names {seccomp}"
         machine.fail(f"mountpoint -q {seccomp[0]}")
-        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+        left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
         assert left == "", f"the reset left {left}"
         datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
         assert datasets == ["tank/imp"], f"the datasets are {datasets}"

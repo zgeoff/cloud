@@ -46,6 +46,22 @@ pkgs.testers.runNixOSTest {
       virtualisation.emptyDiskImages = [ 1024 ];
       virtualisation.memorySize = 2048;
       environment.systemPackages = [ pkgs.sqlite ];
+      # scripts/copy-impd-db-host.sh builds both its sqlite3s from the nixpkgs registry entry,
+      # as geoffcloud does; the VM has no network, so the flake and both outputs are in its
+      # store already, and nix skips the global registry it would otherwise download (a setting
+      # nix.conf accepts only with flakes on; the script turns them on for its own calls anyway)
+      nix.registry.nixpkgs.flake = nixpkgs;
+      nix.settings = {
+        experimental-features = [
+          "nix-command"
+          "flakes"
+        ];
+        flake-registry = "";
+      };
+      system.extraDependencies = [
+        pkgs.pkgsStatic.sqlite.bin
+        pkgs.sqlite.bin
+      ];
 
       # the registry that answers for ghcr.io: plain HTTP on port 80, which Docker falls back to
       # for a registry it lists as insecure
@@ -161,7 +177,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
         images = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
         assert images == "", f"images are left: {images}"
-        machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err /tmp/sleep.log")
+        machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err")
 
         # an earlier reset that stopped after this destroy left no tank/imp
         machine.succeed("if zfs list -H -o name tank/imp >/dev/null 2>&1; then zfs destroy -r tank/imp; fi")

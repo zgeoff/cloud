@@ -1,19 +1,21 @@
 # shellcheck shell=bash
 # create_stub_impd_db_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the host that
-# copy-impd-db.sh copies impd's database on. It never runs the remote command: the copy
-# needs root, Nix and the imp-host container, which no case has. It logs each call's argv
-# as a JSON line to STUB_TREE/calls and answers one `bash -c <script> _ <label>` command,
-# whose label is letters, digits, '.', '_' and '-', as the host does:
+# copy-impd-db.sh copies impd's database on. It never runs the script it is sent: the copy
+# needs root, Nix and the imp-host container, which no case has (nixos/checks/impd-restore.nix
+# runs it in the restore VM). It logs each call's argv as a JSON line to STUB_TREE/calls,
+# writes the script it reads on stdin to STUB_TREE/stdin, and answers one
+# `bash -s -- <label>` command, whose label is letters, digits, '.', '_' and '-', as the
+# host does:
 #
 # - by default, a copy made at 2026-10-08T12:00:00Z: the COPY-INFO lines (path, sizeBytes,
 #   lastMigration, impVersion, createdAt, integrity ok, image) and the "copy: <dir> (<size>
 #   bytes, mode 600)" line, exit 0;
 # - with STUB_COPY_FAIL=integrity, the same report with integrity set to SQLite's
 #   integrity_check finding, exit 1 from the script's last `test`;
-# - with STUB_COPY_FAIL=imp-host-stopped, docker's "container <id> is not running" error
-#   on stderr when the script makes its work directory, exit 1. The text and the full
-#   64-hex ID are docker's (moby daemon/errors.go at v28.0.4, and docker 29.7.2's answer to
-#   an exec in a stopped container, checked on 2026-10-08).
+# - with STUB_COPY_FAIL=imp-host-stopped, docker's "No such container: imp-host" error on
+#   stderr when the script makes its work directory, exit 1: imp's module runs imp-host with
+#   --rm, so a stopped imp-host leaves no container. nixos/checks/impd-restore.nix gets this
+#   answer from the real docker for the real script.
 #
 # The integrity finding was checked on 2026-10-08 against SQLite's source and a real
 # sqlite3. src/pragma.c at version-3.51.2, the sqlite of nixpkgs
@@ -50,19 +52,20 @@ if [ -n "${STUB_SSH_PASS:-}" ]; then
   echo "unexpected: $*" >&2
   exit 97
 fi
-if [ "$#" != 4 ] || [ "$3" != "$STUB_HOST" ] || [[ ! "$4" =~ ^bash\ -c\ .*\ _\ ([A-Za-z0-9._-]+)$ ]]; then
+if [ "$#" != 4 ] || [ "$3" != "$STUB_HOST" ] || [[ ! "$4" =~ ^bash\ -s\ --\ ([A-Za-z0-9._-]+)$ ]]; then
   echo "unexpected: $*" >&2
   exit 97
 fi
+cat > "$STUB_TREE/stdin"
 dir="/root/imp-db-backups/${BASH_REMATCH[1]}-20261008T120000"
 if [ "${STUB_COPY_FAIL:-}" = imp-host-stopped ]; then
-  echo "Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running" >&2
+  echo "Error response from daemon: No such container: imp-host" >&2
   exit 1
 fi
 integrity=ok
 if [ "${STUB_COPY_FAIL:-}" = integrity ]; then integrity="wrong # of entries in index sqlite_autoindex_imps_1"; fi
 printf 'path %s\nsizeBytes %s\nlastMigration %s\nimpVersion %s\ncreatedAt %s\nintegrity %s\nimage %s\n' \
-  "$dir/imp.sqlite" 73728 0002_tokens 0.29.0 2026-10-08T12:00:00Z "$integrity" ghcr.io/zgeoff/imp:0.29.0
+  "$dir/imp.sqlite" 73728 0002_tokens 0.29.0 2026-10-08T12:00:00Z "$integrity" ghcr.io/zgeoff/imp-host:0.29.0@sha256:9b1f6c3e0a4d7f2b8c5e1a6d3f0b9c2e7a4d1f8b5c2e9a6d3f0c7b4e1a8d5f2b
 echo "copy: $dir (73728 bytes, mode 600)"
 [ "$integrity" = ok ]
 STUB

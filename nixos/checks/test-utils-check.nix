@@ -491,7 +491,7 @@ let
         stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
       in
       {
-        title = "it buildStubImpHostImage sleeps as imp-host, and its imp-docker-proxy only opens the socket";
+        title = "it buildStubImpHostImage sleeps as imp-host, its imp-docker-proxy only opens the socket, and its imp info prints the version";
         script = ''
           blobs=${stubImage.layout}/blobs/sha256
           manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
@@ -516,6 +516,22 @@ let
           assert_equals -r-xr-xr-x "$proxy_mode" "the proxy's mode"
           assert_equals "${pkgs.busybox}/bin/sleep" "$sleep_target" "the image's sleep"
           assert_equals 1 "$busybox" "the image's busybox binaries"
+
+          imp=$(sed -n 's|^l.* \./usr/local/bin/imp -> /||p' listing)
+          tar -xOf "$layer" "$imp" > imp-script
+          tmp_mode=$(grep -E ' \./tmp/?$' listing | cut -c1-10)
+          info_status=0
+          sh imp-script info > info.out 2> info.err || info_status=$?
+          other_status=0
+          sh imp-script ls > other.out 2> other.err || other_status=$?
+
+          assert_equals 0 "$info_status" "imp info's exit"
+          assert_equals 'version     0.28.0' "$(cat info.out)" "imp info's output"
+          assert_files_equal /dev/null info.err
+          assert_equals 97 "$other_status" "another imp command's exit"
+          assert_files_equal /dev/null other.out
+          assert_equals 'unexpected: imp ls' "$(cat other.err)" "another imp command's error"
+          assert_equals drwxrwxrwt "$tmp_mode" "the image's /tmp"
         '';
       }
     )
@@ -530,6 +546,17 @@ let
         assert_equals '["/usr/local/bin/imp-docker-proxy"]' "$command" "the proxy's command"
         assert_equals 1 "$waits" "the module's waits for the proxy's socket"
         assert_equals 1 "$runs" "the module's imp-host runs that end at the image, with no command"
+      '';
+    }
+    {
+      title = "it buildStubImpHostImage holds to the pinned imp info: the version line first, each label padded to 12 characters";
+      script = ''
+        info=${imp}/packages/cli/src/commands/info.ts
+        first=$(grep -A1 -F 'const lines = [' "$info" | tail -n1 | tr -d ' ')
+        pads=$(grep -cF 'console.log(`''${label.padEnd(12)}''${value}`);' "$info" || true)
+
+        assert_equals "['version',info.version]," "$first" "imp info's first line"
+        assert_equals 1 "$pads" "imp info's padded labels"
       '';
     }
     {
