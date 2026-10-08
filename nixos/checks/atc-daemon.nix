@@ -419,7 +419,6 @@ let
                 service = false;
                 user = false;
                 group = false;
-                failedAssertions = [ ];
               }
             )
           } ${
@@ -428,10 +427,10 @@ let
                 service = system.config.systemd.services ? atc-daemon;
                 user = system.config.users.users ? atc;
                 group = system.config.users.groups ? atc;
-                failedAssertions = collectFailedAssertions system;
               }
             )
           } "what the module adds"
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
   ];
