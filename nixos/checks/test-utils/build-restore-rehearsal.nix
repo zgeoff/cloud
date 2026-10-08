@@ -15,7 +15,7 @@
 # follow, each calling setup_test() first. It needs KVM, and the checks it builds read scripts/
 # beside nixos/, so they build only from the repo root. The test utilities pass their own check
 # (test-utils-check.nix) before the VM runs, and every check that uses this runs it on every
-# build: its boot subtests are its tests.
+# build: its boot subtests are its tests, and impd-restore-reset.nix checks its reset.
 { nixpkgs, imp }:
 { name, subtests }:
 let
@@ -34,6 +34,9 @@ pkgs.testers.runNixOSTest {
     {
       imports = [ imp.nixosModules.imp ];
       networking.hostId = "5ca71846";
+      # the rehearsal reaches only loopback, and dhcpcd crashing at times would start
+      # systemd-coredump's slice in the middle of a switch
+      networking.useDHCP = false;
       # imp-host's docker run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"
@@ -135,7 +138,8 @@ pkgs.testers.runNixOSTest {
         """Returns the VM to its boot state, with nothing of an earlier subtest left: the 0.29.0
         system running with imp-host up on its freshly pulled image, an empty tank/imp mounted
         nowhere, and the generations 1 (0.28.0), 2 (0.28.0, a switch that fails) and 3 (0.29.0,
-        running). Returns the three systems' store paths."""
+        running). Returns the three systems' store paths as handles, as a temporary directory's
+        path would be; which generation a restore goes to stays in each subtest's body."""
         base_path = machine.succeed("readlink -f /run/booted-system").strip()
         # what a subtest can leave: a holder keeping a mount busy, tank/imp or a copy mounted,
         # the seccomp profile covered, docker stopped
@@ -157,7 +161,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
         images = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
         assert images == "", f"images are left: {images}"
-        machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err")
+        machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err /tmp/sleep.log")
 
         machine.succeed("zfs destroy -r tank/imp")
         # imp's module makes the dataset again

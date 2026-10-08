@@ -139,7 +139,7 @@ journey. Each shared rule takes its shell form:
 | `setupTest()`                | one `setup_test` per suite: a fresh `mktemp -d` tree and the stand-ins every case needs, with no scenario data; its config chooses which stand-ins to wire                                                          |
 | Dispose and `onTestFinished` | `trap '…' EXIT` inside the case on the line after the acquisition; in a trap with more than one step, every step ends `\|\| true`                                                                                    |
 | Every test stands alone      | the script under test runs under `env -i` with an explicit `PATH`, `HOME` and `TMPDIR` inside the case tree; git with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`; each suite starts with `umask 022` |
-| `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `scripts/test-lib/`; mask only a temp path or a generated id                                     |
+| `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `scripts/test-lib/`; mask only a temp path, a generated id, or a measurement that changes between runs (a wall-clock time, a duration, a size, a memory or CPU reading), never the value under test                                     |
 | Exact errors                 | the exact exit code, never "non-zero", plus the exact stderr                                                                                                                                                       |
 | Polling `waitFor`            | `wait_for <seconds> <what> <command…>` from `scripts/test-lib/wait-for.sh`                                                                                                                                         |
 | Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds                                                                               |
@@ -182,13 +182,27 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   interpolated by Nix.
 - A module assertion has a negative case that evaluates a bad config and compares the failing
   assertion messages exactly.
-- In a restore rehearsal (`impd-restore` and `impd-restore-*`), each `with subtest("it …")` starts
-  from `setup_test()`, which resets every state a subtest can leave. It asserts `machine.execute`'s status and output exactly, plus every side effect the script
-  promises, including the saved original on each failure path. Waits use `wait_for_unit`,
-  `wait_until_succeeds` or `wait_for`.
+- The restore rehearsals (`impd-restore`, `impd-restore-seams`, `impd-restore-saved-failures`)
+  share one VM definition and one reset, `setup_test()`. Each check boots its own VM, and each
+  subtest supplies its own scenario data. `impd-restore-reset` checks the reset itself: each
+  subtest leaves one kind of state behind, proves it is there, runs `setup_test()` and asserts the
+  whole clean baseline. Cleanup that depends on what a subtest left lives in the reset, never in
+  scenario flags. This is the language form of the shared skill's one `setupTest` per file.
+- `setup_test()` returns the generated system paths as runtime handles, like a temporary
+  directory. Each subtest names its restore generation and other scenario values in its own body.
+- In a restore rehearsal, each `with subtest("it …")` starts
+  from `setup_test()`, which resets every state a subtest can leave. It asserts
+  `machine.execute`'s status and output exactly, masking only what the shell compares may mask,
+  plus every side effect the script promises, including the saved original on each failure path.
+  Waits use `wait_for_unit`, `wait_until_succeeds` or `wait_for`.
 - An error the script declares is reached through real VM state where real state can produce it,
-  and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`) only where it
-  cannot.
+  and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`, the start loop's
+  pause `IMPD_START_SLEEP`, and the health probe's `CURL`) only where it cannot. The start wait
+  is counted through `build-stub-sleep` and the probe's timeout arguments are checked through
+  `build-stub-curl`, never by waiting out a deadline. Two cases wait out a real 1 s curl timeout
+  against the hung impd stand-in, with no elapsed-time assertion: the stand-in's own test in
+  `test-utils`, which also checks `build-stub-curl` against that real curl, and one probe case
+  in `impd-local-health`, the only real-transport proof that a hung impd reads as status 0.
 - A rehearsal's first subtests assert that no unit failed at boot and that `systemd-detect-virt`
   prints `kvm`, so a run that fell back to emulation fails. `test-nixos.sh` needs a readable and
   writable KVM device for any `impd-restore*` check.

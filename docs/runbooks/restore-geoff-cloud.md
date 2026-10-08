@@ -144,21 +144,26 @@ holding a WAL database and secrets, and a real generation switch. A restore to a
 saved the database, its WAL files and the secrets root-only, put the copy in place, unmounted,
 switched, and started imp-host on the copy's digest-pinned image, which `docker inspect` reported as
 the same `tag@sha256:…` string the unit names. A restore to the running generation skipped the
-switch; a database without WAL files and a dataset without secrets restored too. A real switch
-failure, and a start that never produced a container within the wait, each stopped both units again.
-It refused, with nothing changed, without arguments, while either unit or an imp-host container ran,
-while `tank/imp` was mounted, for a dataset without `imp.sqlite`, for a copy without `imp.sqlite` or
-`COPY-INFO`, failing `integrity_check`, lacking the image or the migration, or with a different
-migration, and for a generation that was not a number, did not exist or ran another image. The
-stand-ins: busybox containers that only sleep, a proxy that only opens its socket, the local
-registry, and generations that are the VM's own specialisations. A second check on the same machine,
+switch; a database without WAL files and a dataset without secrets restored too. It refused, with
+nothing changed, without arguments, while either unit or an imp-host container ran, while `tank/imp`
+was mounted, for a dataset without `imp.sqlite`, for a copy without `imp.sqlite` or `COPY-INFO`,
+failing `integrity_check`, lacking the image or the migration, or with a different migration, and
+for a generation that was not a number, did not exist or ran another image. The stand-ins: busybox
+containers that only sleep, a proxy that only opens its socket, the local registry, and generations
+that are the VM's own specialisations. A second check on the same machine,
+`nixos/checks/impd-restore-saved-failures.nix`, reaches through real state the failures that come
+after the original is saved: a real switch failure, and a start that never produced a container
+within the wait, each stopped both units again; saved secrets or a saved database file that differed
+from the original stopped the restore before the copy went in place. A third,
 `nixos/checks/impd-restore-seams.nix`, reaches the errors no real state can: a unit whose state
 cannot be read, and a staged or published file that differs from the copy, through a stand-in
 `systemctl` or `cmp` that fails only that one call. Each stopped as before, with nothing started or
-switched. Run them on a machine with Docker and KVM:
+switched. Every failure after the save left the original in its saved directory. A fourth,
+`nixos/checks/impd-restore-reset.nix`, checks that the machine's reset between subtests clears what
+each subtest can leave. Run them on a machine with Docker and KVM:
 
 ```sh
-bun run test:nixos impd-restore impd-restore-seams
+bun run test:nixos impd-restore impd-restore-saved-failures impd-restore-seams impd-restore-reset
 ```
 
 Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
