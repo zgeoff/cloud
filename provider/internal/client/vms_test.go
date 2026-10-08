@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/clienttest"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -70,9 +71,9 @@ func TestCreateVMFindsTheNewVMByListingAfterABodylessCreate(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetVM(map[string]any{"id": "old", "name": "web", "status": "active", "created_at": "2026-01-01T00:00:00Z"})
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{
-		TeamID: "team-a", Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
-	})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+		in.TeamID, in.Name, in.Location, in.CPU, in.RAM, in.Disk, in.OS = "team-a", "web", "Sydney", 2, 4096, 40, new(24)
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, client.VM{
@@ -85,10 +86,11 @@ func TestCreateVMFindsTheNewVMByListingAfterABodylessCreate(t *testing.T) {
 func TestCreateVMSendsTheInputAsTheCreateBody(t *testing.T) {
 	ctx := setupTest(t)
 
-	_, err := ctx.client.CreateVM(t.Context(), client.VMInput{
-		TeamID: "team-a", Name: "web", PaymentCycle: "hourly", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40,
-		OS: new(24), SSHKeys: []string{"key-1"}, FirewallGroupID: "g1", IPv6: true,
-	})
+	_, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+		in.TeamID, in.Name, in.PaymentCycle, in.Location = "team-a", "web", "hourly", "Sydney"
+		in.CPU, in.RAM, in.Disk, in.OS = 2, 4096, 40, new(24)
+		in.SSHKeys, in.FirewallGroupID, in.IPv6 = []string{"key-1"}, "g1", true
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{
@@ -112,7 +114,9 @@ func TestCreateVMPicksTheNewestNewVMWithTheRequestedName(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	})
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+		in.Name = "web"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, client.VM{ID: "newer", Name: "web", Status: "active", CreatedAt: "2026-10-02T00:00:00Z"}, vm)
@@ -136,7 +140,9 @@ func TestCreateVMTakesTheIDFromACreateBodyThatCarriesOne(t *testing.T) {
 				_, _ = w.Write([]byte(row.body))
 			})
 
-			vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+			vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+				in.Name, in.Location, in.CPU, in.RAM, in.Disk, in.OS = "web", "Sydney", 1, 1024, 20, new(24)
+			}))
 
 			require.NoError(t, err)
 			assert.Equal(t, client.VM{ID: "0f289413-258f-4115-ac81-252000998fe0", Name: "web", Status: "active", ActiveActionID: json.RawMessage("null")}, vm)
@@ -166,7 +172,9 @@ func TestCreateVMFallsBackToListingWhenTheCreateBodyCarriesNoID(t *testing.T) {
 				_, _ = w.Write([]byte(row.body))
 			})
 
-			vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+			vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+				in.Name, in.Location, in.CPU, in.RAM, in.Disk, in.OS = "web", "Sydney", 1, 1024, 20, new(24)
+			}))
 
 			require.NoError(t, err)
 			assert.Equal(t, client.VM{ID: "listed", Name: "web", Status: "active"}, vm)
@@ -186,7 +194,7 @@ func TestCreateVMFailsWhenTheFirstListingFails(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("GET /vm", http.StatusInternalServerError, "", 1)
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput())
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -198,7 +206,7 @@ func TestCreateVMFailsWhenTheFirstListingFails(t *testing.T) {
 func TestCreateVMFailsWhenTheAPIRefusesTheCreate(t *testing.T) {
 	ctx := setupTest(t)
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) { in.OS = nil }))
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -210,7 +218,9 @@ func TestCreateVMFailsWhenTheNewVMNeverAppears(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("POST /vm", http.StatusCreated, "", 1)
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+		in.Name = "web"
+	}))
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
 	assert.Equal(t, client.VM{}, vm)
@@ -224,7 +234,9 @@ func TestCreateVMFailsWhenTheListingFailsAfterTheCreate(t *testing.T) {
 		w.WriteHeader(http.StatusCreated)
 	})
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput(func(in *client.VMInput) {
+		in.Name = "web"
+	}))
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -237,7 +249,7 @@ func TestCreateVMReturnsTheIDOfAVMThatNeverBecomesReady(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetAutoSettle(false)
 
-	vm, err := ctx.client.CreateVM(t.Context(), client.VMInput{Name: "web", Location: "Sydney", CPU: 1, RAM: 1024, Disk: 20, OS: new(24)})
+	vm, err := ctx.client.CreateVM(t.Context(), clienttest.BuildMockVMInput())
 
 	require.ErrorIs(t, err, context.DeadlineExceeded)
 	assert.Equal(t, client.VM{ID: "00000000-0000-4000-8000-000000000001"}, vm)
@@ -514,9 +526,9 @@ func TestCreateVMStopsLookingForTheNewVMAtItsTimeoutWhileTheCallersContextIsLive
 	ctx.client.Sleep = sleep.Sleep
 	callCtx := t.Context()
 
-	_, err := ctx.client.CreateVM(callCtx, client.VMInput{
-		TeamID: "team-a", Name: "web", Location: "Sydney", CPU: 2, RAM: 4096, Disk: 40, OS: new(24),
-	})
+	_, err := ctx.client.CreateVM(callCtx, clienttest.BuildMockVMInput(func(in *client.VMInput) {
+		in.TeamID, in.Name, in.Location, in.CPU, in.RAM, in.Disk, in.OS = "team-a", "web", "Sydney", 2, 4096, 40, new(24)
+	}))
 
 	assert.EqualError(t, err, `onidel: find the VM "web" after create: context deadline exceeded`)
 	require.ErrorIs(t, err, context.DeadlineExceeded)

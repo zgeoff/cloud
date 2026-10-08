@@ -7,13 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/clienttest"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
 func TestCreateFirewallGroupReturnsTheStoredGroup(t *testing.T) {
 	ctx := setupTest(t)
 
-	group, err := ctx.client.CreateFirewallGroup(t.Context(), client.FirewallGroupInput{TeamID: "team-a", Description: "edge"})
+	group, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+		in.TeamID, in.Description = "team-a", "edge"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, client.FirewallGroup{
@@ -25,7 +28,9 @@ func TestCreateFirewallGroupReturnsTheStoredGroup(t *testing.T) {
 func TestCreateFirewallGroupFailsWithoutATeam(t *testing.T) {
 	ctx := setupTest(t)
 
-	_, err := ctx.client.CreateFirewallGroup(t.Context(), client.FirewallGroupInput{Description: "edge"})
+	_, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+		in.TeamID = ""
+	}))
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -51,7 +56,9 @@ func TestUpdateFirewallGroupChangesTheDescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge"})
 
-	err := ctx.client.UpdateFirewallGroup(t.Context(), "g1", client.FirewallGroupInput{TeamID: "team-a", Description: "edge 2"})
+	err := ctx.client.UpdateFirewallGroup(t.Context(), "g1", clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+		in.TeamID, in.Description = "team-a", "edge 2"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{{Method: "PUT", Path: "/network/firewalls/g1", Body: map[string]any{
@@ -85,9 +92,10 @@ func TestCreateFirewallRuleDecodesTheSubnetSizeTheCreateSendsAsAString(t *testin
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
-	rule, err := ctx.client.CreateFirewallRule(t.Context(), "g1", client.FirewallRuleInput{
-		TeamID: "team-a", Protocol: "tcp", Port: "443", Subnet: "203.0.113.0", SubnetSize: 24, Description: "web",
-	})
+	rule, err := ctx.client.CreateFirewallRule(t.Context(), "g1", clienttest.BuildMockFirewallRuleInput(func(in *client.FirewallRuleInput) {
+		in.TeamID, in.Protocol, in.Port = "team-a", "tcp", "443"
+		in.Subnet, in.SubnetSize, in.Description = "203.0.113.0", 24, "web"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, client.FirewallRule{
@@ -100,7 +108,9 @@ func TestCreateFirewallRuleOmitsAnEmptyPortAndDescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
-	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", client.FirewallRuleInput{Protocol: "icmp", Subnet: "::", SubnetSize: 0})
+	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", clienttest.BuildMockFirewallRuleInput(func(in *client.FirewallRuleInput) {
+		in.TeamID, in.Protocol, in.Port, in.Subnet, in.SubnetSize, in.Description = "", "icmp", "", "::", 0, ""
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{{Method: "POST", Path: "/network/firewalls/g1/rules", Body: map[string]any{

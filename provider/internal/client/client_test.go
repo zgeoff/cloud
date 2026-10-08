@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/clienttest"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -233,7 +234,9 @@ func TestClientRetriesAPUT(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g", "description": "c"})
 	ctx.api.RegisterResponse("PUT /network/firewalls/{id}", http.StatusServiceUnavailable, "", 1)
 
-	err := ctx.client.UpdateFirewallGroup(t.Context(), "g", client.FirewallGroupInput{Description: "d"})
+	err := ctx.client.UpdateFirewallGroup(t.Context(), "g", clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+		in.TeamID, in.Description = "", "d"
+	}))
 
 	require.NoError(t, err)
 	assert.Equal(t, []onideltest.Request{
@@ -278,7 +281,9 @@ func TestClientNeverRetriesAPOST(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("POST /network/firewalls", http.StatusServiceUnavailable, "", 1)
 
-	_, err := ctx.client.CreateFirewallGroup(t.Context(), client.FirewallGroupInput{TeamID: "t", Description: "x"})
+	_, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+		in.TeamID, in.Description = "t", "x"
+	}))
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
@@ -293,7 +298,9 @@ func TestClientNeverRetriesAPATCH(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("PATCH /ssh_keys/{id}", http.StatusServiceUnavailable, "", 1)
 
-	err := ctx.client.UpdateSSHKey(t.Context(), "k", client.SSHKeyInput{TeamID: "t", Name: "n", PublicKey: "p"})
+	err := ctx.client.UpdateSSHKey(t.Context(), "k", clienttest.BuildMockSSHKeyInput(func(in *client.SSHKeyInput) {
+		in.TeamID, in.Name, in.PublicKey = "t", "n", "p"
+	}))
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
