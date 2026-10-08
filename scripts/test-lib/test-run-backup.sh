@@ -123,6 +123,8 @@ it_names_the_backup_container_after_the_case_while_it_runs() {
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" --entrypoint /bin/sleep 300 > /dev/null 2>&1 &
+  client=$!
+  trap 'pkill -P "$client" 2> /dev/null || true; kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
 
   wait_for 30 "the container $name-backup to run" docker exec "$name-backup" true > /dev/null 2>&1
   docker inspect -f '{{.Name}} {{.State.Running}} {{.HostConfig.AutoRemove}}' "$name-backup" > "$tree/container"
