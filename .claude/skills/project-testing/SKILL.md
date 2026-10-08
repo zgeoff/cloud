@@ -208,7 +208,9 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   share one VM definition and one reset, `setup_test()`. Each check boots its own VM, and each
   subtest supplies its own scenario data. `impd-restore-reset` checks the reset itself: each
   subtest leaves one kind of state behind, proves it is there, runs `setup_test()` and asserts the
-  whole clean baseline. Cleanup that depends on what a subtest left lives in the reset, never in
+  whole clean baseline. It also resets after a real failed restore, after a real restore killed with
+  SIGKILL while `build-stub-blocking-sqlite3` holds it, and after a reset stopped part-way, as the
+  shared skill's rule on resetting shared infrastructure asks. Cleanup that depends on what a subtest left lives in the reset, never in
   scenario flags. This is the language form of the shared skill's one `setupTest` per file.
 - `setup_test()` returns the generated system paths as runtime handles, like a temporary
   directory. Each subtest names its restore generation and other scenario values in its own body.
