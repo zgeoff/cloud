@@ -7,8 +7,9 @@
 # exit 125) or docker 29.7.2 (one line, exit 1) prints them; the `docker version` cases pin
 # each version's client version on stdout, its socket error on stderr and exit 1, both
 # checked against those two docker CLIs. assert_one_of_outputs accepts each version's whole
-# stdout and stderr only with that version's exit status. No nix runs here, so a failed
-# build's exit 1 is nix's documented exit for a failed build, not pinned against nix.
+# stdout and stderr only with that version's exit status. No nix runs here; a failed build's
+# or copy's exit 1 is the one the stand-in's header records from a one-off check against
+# nix 2.35.2.
 #
 #   bash scripts/test-lib/test-create-stub-nix-docker.sh
 # shellcheck source-path=SCRIPTDIR

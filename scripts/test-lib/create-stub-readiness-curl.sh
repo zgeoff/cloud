@@ -15,10 +15,27 @@
 # - with STUB_GHCR_UNREACHABLE=1, both ghcr calls fail as curl -s does when it cannot
 #   resolve a host: exit 6, with nothing printed but 000 for -w %{http_code}.
 #
-# Any other call ends with exit 97 and "unexpected: <argv>" on stderr. Not checked against
-# ghcr.io or the route (no test reaches the internet): the token value is a fixture, and
-# the statuses are those the registry API documents for a found, unauthorized and unknown
-# repository.
+# Any other call ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# Not checked against ghcr.io or the route (no test reaches the internet); the token value
+# is a fixture. Checked on 2026-10-08 against these documents:
+#
+# - https://github.com/opencontainers/distribution-spec/blob/v1.1.1/spec.md : the tag list,
+#   GET /v2/<name>/tags/list (end-8a), answers 200, or 404 for a repository the registry
+#   does not know (NAME_UNKNOWN);
+# - https://distribution.github.io/distribution/spec/auth/token/ : a registry answers a
+#   request without a valid bearer with 401, and the token endpoint answers a JSON body
+#   with a "token" field;
+# - https://curl.se/docs/manpage.html (EXIT CODES), the same for curl 8.5.0 (CI's
+#   ubuntu-24.04 runner image 20261004) and 8.22.0: 6 "Could not resolve host" and 28
+#   "Operation timeout". test-create-stub-readiness-curl.sh pins the 000 that -w
+#   %{http_code} prints after a failed transfer against the real curl.
+#
+# The documents do not settle, so they stay as they were and need a ghcr.io sample: the
+# other fields of ghcr's token body (the token spec allows access_token, expires_in and
+# issued_at, left out here); that ghcr answers 401, not 403 or 404, to a bearer it did not
+# issue; and that ghcr out of reach fails as an unresolved host (6) rather than a refused
+# connection (7) or a timeout (28).
 create_stub_readiness_curl() {
   local bin="$1"
   cat > "$bin/curl" << 'STUB'

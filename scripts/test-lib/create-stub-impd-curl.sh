@@ -6,6 +6,20 @@
 # {"json": Identity} envelope) and any other bearer impd's 401 {"error":"unauthorized"};
 # STUB_WHOAMI_STATUS and STUB_WHOAMI_BODY set a fixed answer. A call with other arguments
 # ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# Checked on 2026-10-08 against imp's source at the revision the host runs, imp 0.40.0 at
+# 2679ab06fe075530ae1a5010f99cec00009dd4bb (nixos/flake.lock):
+#
+# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/api/src/token-schema.ts :
+#   IdentitySchema (kind, name, scope, imps, grantable);
+# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/daemon/src/build-app.ts
+#   line 287: a /rpc call without a known bearer gets 401 {"error":"unauthorized"};
+# - the same file's RPCHandler, @orpc/server 1.14.15 (imp's package.json), which wraps a
+#   procedure's output as {"json": …}.
+#
+# The source does not settle, so they stay as they were and need an impd sample: whether
+# oRPC adds a "meta" field beside "json" for this output, and the order of the identity's
+# fields.
 create_stub_impd_curl() {
   local bin="$1"
   cat > "$bin/curl" << 'STUB'
