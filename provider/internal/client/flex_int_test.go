@@ -2,6 +2,7 @@ package client_test
 
 import (
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,5 +43,13 @@ func TestFlexIntRejectsANonNumericString(t *testing.T) {
 
 	var typeErr *json.UnmarshalTypeError
 	require.ErrorAs(t, err, &typeErr)
-	assert.Equal(t, &json.UnmarshalTypeError{Value: "subnet size"}, typeErr)
+	assert.Equal(t, &json.UnmarshalTypeError{Value: "non-integer value", Type: reflect.TypeFor[client.FlexInt]()}, typeErr)
+}
+
+func TestFlexIntReportsANonNumericStringWithoutPanicking(t *testing.T) {
+	var got client.FlexInt
+
+	err := json.Unmarshal([]byte(`"x"`), &got)
+
+	assert.EqualError(t, err, "json: cannot unmarshal non-integer value into Go value of type client.FlexInt")
 }
