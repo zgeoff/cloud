@@ -161,6 +161,9 @@ journey. Each shared rule takes its shell form:
 | Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a case that pins the exact stamp a script embeds from `date`, such as in a name it compares, uses a `date` wrapper reading a fixed time (`create_stub_date`); a case that only bounds the stamp reads the clock before and after the act and checks it with `assert_between` |
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                             |
 
+- A case checks its exit status exactly, with
+  `[ "$status" = N ] || { echo "exit $status, want N" >&2; exit 1; }` or `assert_equals`; both
+  are exact.
 - A stand-in lives in `scripts/test-lib/` with its own `test-<file>.sh`, never inline in a suite:
   `create-stub-<thing>.sh` writes an executable to disk, and `start-stub-<thing>.sh` runs a process.
 - A stand-in that replaces a tool logs its argv as one JSON line, matches the real tool's exit codes
