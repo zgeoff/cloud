@@ -14,7 +14,6 @@ let
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
-  stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
   stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
@@ -322,13 +321,13 @@ let
 
         assert_equals "HTTP/1.1 200 OK" "$(head -1 real-health.headers | tr -d '\r')" "imp's /health status line"
         assert_equals "HTTP/1.1 200 OK" "$(head -1 stub-health.headers | tr -d '\r')" "the stand-in's /health status line"
-        assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r ')" \
-          "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r ')" "the /health content type"
+        assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')" \
+          "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "the /health content type"
         assert_files_equal real-health.body stub-health.body
         assert_equals "HTTP/1.1 404 Not Found" "$(head -1 real-missing.headers | tr -d '\r')" "imp's unknown route's status line"
         assert_equals "HTTP/1.1 404 Not Found" "$(head -1 stub-missing.headers | tr -d '\r')" "the stand-in's unknown route's status line"
-        assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r ')" \
-          "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r ')" "the unknown route's content type"
+        assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')" \
+          "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "the unknown route's content type"
         assert_files_equal real-missing.body stub-missing.body
         assert_equals "GET /health" "$(cat health.requests)" "the /health stand-in's requests"
         assert_equals "GET /missing" "$(cat missing.requests)" "the unknown route stand-in's requests"
@@ -363,45 +362,55 @@ let
         assert_missing stub.body "the stand-in's body"
       '';
     }
-    {
-      title = "it buildStubImpHostImage pins the image by its tag and the manifest digest of the layout";
-      script = ''
-        digest=$(jq -r '.manifests[0].digest' ${stubImage.layout}/index.json)
+    (
+      let
+        stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
+      in
+      {
+        title = "it buildStubImpHostImage pins the image by its tag and the manifest digest of the layout";
+        script = ''
+          digest=$(jq -r '.manifests[0].digest' ${stubImage.layout}/index.json)
 
-        assert_equals "ghcr.io/zgeoff/imp-host:0.28.0@$digest" ${lib.escapeShellArg stubImage.ref} "the reference"
-        assert_equals 1 "$(jq '.manifests | length' ${stubImage.layout}/index.json)" "the layout's manifests"
-        assert_equals 0.28.0 "$(jq -r '.manifests[0].annotations."org.opencontainers.image.ref.name"' ${stubImage.layout}/index.json)" \
-          "the layout's tag"
-      '';
-    }
-    {
-      title = "it buildStubImpHostImage sleeps as imp-host, and its imp-docker-proxy only opens the socket";
-      script = ''
-        blobs=${stubImage.layout}/blobs/sha256
-        manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
-        layers=$(jq -r '.layers[].digest | ltrimstr("sha256:")' "$manifest")
-        layer=$blobs/$layers
-        config=$blobs/$(jq -r '.config.digest | ltrimstr("sha256:")' "$manifest")
+          assert_equals "ghcr.io/zgeoff/imp-host:0.28.0@$digest" ${lib.escapeShellArg stubImage.ref} "the reference"
+          assert_equals 1 "$(jq '.manifests | length' ${stubImage.layout}/index.json)" "the layout's manifests"
+          assert_equals 0.28.0 "$(jq -r '.manifests[0].annotations."org.opencontainers.image.ref.name"' ${stubImage.layout}/index.json)" \
+            "the layout's tag"
+        '';
+      }
+    )
+    (
+      let
+        stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
+      in
+      {
+        title = "it buildStubImpHostImage sleeps as imp-host, and its imp-docker-proxy only opens the socket";
+        script = ''
+          blobs=${stubImage.layout}/blobs/sha256
+          manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
+          layers=$(jq -r '.layers[].digest | ltrimstr("sha256:")' "$manifest")
+          layer=$blobs/$layers
+          config=$blobs/$(jq -r '.config.digest | ltrimstr("sha256:")' "$manifest")
 
-        cmd=$(jq -c '.config.Cmd' "$config")
-        tar -tvf "$layer" > listing
-        proxy=$(sed -n 's|^l.* \./usr/local/bin/imp-docker-proxy -> /||p' listing)
-        tar -xOf "$layer" "$proxy" > proxy-script
-        proxy_mode=$(grep -E " $proxy\$" listing | cut -c1-10)
-        sleep_target=$(sed -n 's|^l.* \./bin/sleep -> ||p' listing)
-        # busybox's own bin/sleep is a link to the busybox binary beside it
-        busybox_path=''${sleep_target%/sleep}/busybox
-        busybox=$(grep -cE "^-r-xr-xr-x .* ''${busybox_path#/}\$" listing || true)
+          cmd=$(jq -c '.config.Cmd' "$config")
+          tar -tvf "$layer" > listing
+          proxy=$(sed -n 's|^l.* \./usr/local/bin/imp-docker-proxy -> /||p' listing)
+          tar -xOf "$layer" "$proxy" > proxy-script
+          proxy_mode=$(grep -E " $proxy\$" listing | cut -c1-10)
+          sleep_target=$(sed -n 's|^l.* \./bin/sleep -> ||p' listing)
+          # busybox's own bin/sleep is a link to the busybox binary beside it
+          busybox_path=''${sleep_target%/sleep}/busybox
+          busybox=$(grep -cE "^-r-xr-xr-x .* ''${busybox_path#/}\$" listing || true)
 
-        assert_equals 1 "$(printf '%s\n' "$layers" | wc -l)" "the image's layers"
-        assert_equals '["sleep","infinity"]' "$cmd" "the image's command"
-        printf '%s\n' '#!/bin/sh' 'exec ${pkgs.socat}/bin/socat UNIX-LISTEN:/run/imp-docker/docker.sock,fork EXEC:/bin/true' > expected
-        assert_files_equal expected proxy-script
-        assert_equals -r-xr-xr-x "$proxy_mode" "the proxy's mode"
-        assert_equals "${pkgs.busybox}/bin/sleep" "$sleep_target" "the image's sleep"
-        assert_equals 1 "$busybox" "the image's busybox binaries"
-      '';
-    }
+          assert_equals 1 "$(printf '%s\n' "$layers" | wc -l)" "the image's layers"
+          assert_equals '["sleep","infinity"]' "$cmd" "the image's command"
+          printf '%s\n' '#!/bin/sh' 'exec ${pkgs.socat}/bin/socat UNIX-LISTEN:/run/imp-docker/docker.sock,fork EXEC:/bin/true' > expected
+          assert_files_equal expected proxy-script
+          assert_equals -r-xr-xr-x "$proxy_mode" "the proxy's mode"
+          assert_equals "${pkgs.busybox}/bin/sleep" "$sleep_target" "the image's sleep"
+          assert_equals 1 "$busybox" "the image's busybox binaries"
+        '';
+      }
+    )
     {
       title = "it buildStubImpHostImage holds to the pinned imp: the path and socket of the proxy, and the own command of imp-host";
       script = ''
@@ -916,7 +925,7 @@ pkgs.runCommand "test-utils-check"
     source ${testLib}/assert-files-equal.sh
     source ${testLib}/assert-missing.sh
 
-    echo "#renderCases runs each case's script in a fresh directory of its own, under its title"
+    echo "it renderCases runs each case's script in a fresh directory of its own, under its title"
     (
       cd "$(mktemp -d)"
       log=$PWD
@@ -954,7 +963,7 @@ pkgs.runCommand "test-utils-check"
       assert_not_equals "$log" "$(cat first-dir)" "the first case's directory"
     )
 
-    echo "#renderCases rejects a title with an underscore, which run_cases would print as a space"
+    echo "it renderCases rejects a title with an underscore, which run_cases would print as a space"
     (
       cd "$(mktemp -d)"
 
@@ -971,7 +980,7 @@ pkgs.runCommand "test-utils-check"
       assert_equals false "$rendered" "whether it rendered"
     )
 
-    echo "#renderCases rejects a title that does not start with it"
+    echo "it renderCases rejects a title that does not start with it"
     (
       cd "$(mktemp -d)"
 
@@ -988,7 +997,7 @@ pkgs.runCommand "test-utils-check"
       assert_equals false "$rendered" "whether it rendered"
     )
 
-    echo "#renderCases rejects two cases with one title, where the second would replace the first"
+    echo "it renderCases rejects two cases with one title, where the second would replace the first"
     (
       cd "$(mktemp -d)"
 
