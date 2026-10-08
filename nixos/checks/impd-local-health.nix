@@ -543,8 +543,10 @@ let
         # a reader holding the old file keeps reading the old content
         exec 4< out/impd_local_health.prom
 
+        before=$(date +%s)
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
+        after=$(date +%s)
 
         assert_equals 0 "$status" "the probe's exit status"
         assert_files_equal /dev/null stdout
@@ -554,7 +556,23 @@ let
         new_inode=$(stat -c %i out/impd_local_health.prom)
         assert_not_equals "$old_inode" "$new_inode" "the file's inode"
         assert_equals 'impd_local_health_up 0' "$(cat <&4)" "what the old reader sees"
-        assert_equals 'impd_local_health_up 1' "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" "the new up line"
+        assert_equals 644 "$(stat -c %a out/impd_local_health.prom)" "the file's mode"
+        stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
+        assert_between "$before" "$stamp" "$after" "the timestamp"
+        sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
+          out/impd_local_health.prom > actual
+        cat > expected <<'EOF'
+        # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
+        # TYPE impd_local_health_up gauge
+        impd_local_health_up 1
+        # HELP impd_local_health_status_code HTTP status of the last loopback probe, 0 when it got no answer.
+        # TYPE impd_local_health_status_code gauge
+        impd_local_health_status_code 200
+        # HELP impd_local_health_last_check_timestamp_seconds When the last loopback probe ran.
+        # TYPE impd_local_health_last_check_timestamp_seconds gauge
+        impd_local_health_last_check_timestamp_seconds STAMP
+        EOF
+        assert_files_equal expected actual
       '';
     }
     {

@@ -233,6 +233,38 @@ let
       '';
     }
     {
+      title = "it start-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
+      script = ''
+        mkdir home tmp
+        mkfifo port.fifo
+        exec 3<>port.fifo
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+        stub_pid=$!
+        trap 'kill "$stub_pid"' EXIT
+        read -r -t 5 -u 3 port
+
+        # a raw request, so the check sees every byte the stand-in sends before it closes
+        exec 4<>"/dev/tcp/127.0.0.1/$port"
+        printf 'HEAD /health HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&4
+        cat <&4 > response
+
+        # Date is the time of the answer
+        tr -d '\r' < response | sed 's/^Date: .* GMT$/Date: DATE/' > actual
+        # Content-Length is the length of "unexpected request: HEAD /health", the body a GET would get
+        cat > expected <<'EOF'
+        HTTP/1.1 500 Internal Server Error
+        Server: BaseHTTP/0.6 Python/${pkgs.python3.version}
+        Date: DATE
+        Content-Type: text/plain
+        Content-Length: 32
+
+        EOF
+        assert_files_equal expected actual
+        assert_equals "HEAD /health" "$(cat requests)" "the requests"
+      '';
+    }
+    {
       title = "it start-stub-impd holds to the pinned imp: its /health handler, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \

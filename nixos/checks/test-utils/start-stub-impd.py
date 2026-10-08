@@ -6,7 +6,8 @@
 #
 # It listens on an ephemeral port on 127.0.0.1 and prints that port on one line once it accepts.
 # A request it does not expect, any other method or path, is recorded too and answered with a
-# failure: 500, text/plain, "unexpected request: <method> <path>". The shapes the check passes
+# failure: 500, text/plain, "unexpected request: <method> <path>"; to a HEAD, as HTTP has it,
+# with the headers alone. The shapes the check passes
 # are impd's, as the pinned imp answers them (Elysia 1.4.29 on Bun 1.4.2): /health is 200,
 # "application/json;charset=utf-8", {"status":"ok","ready":true}
 # (packages/daemon/src/build-app.ts), and a route no handler matches is 404,
@@ -23,7 +24,7 @@ request_log = sys.argv[5]
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
-    def answer(self):
+    def send_reply(self):
         with open(request_log, "a") as log:
             log.write(f"{self.command} {self.path}\n")
         if self.command == "GET" and self.path == path:
@@ -39,7 +40,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(payload)
 
-    do_GET = do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = answer
+    do_GET = do_HEAD = do_POST = do_PUT = do_PATCH = do_DELETE = do_OPTIONS = send_reply
 
     def log_message(self, *args):
         pass
