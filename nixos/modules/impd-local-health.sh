@@ -1,11 +1,14 @@
 # Probe impd's /health on loopback and write node-exporter textfile metrics atomically.
 # Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR, and IMPD_HEALTH_TIMEOUT_SECONDS (curl's --max-time,
-# default 5). Writes $TEXTFILE_DIR/impd_local_health.prom.
+# default 5). CURL names the curl it runs (default: the one on PATH, the package's own), so
+# nixos/checks/impd-local-health.nix can put a stand-in in its place. Writes
+# $TEXTFILE_DIR/impd_local_health.prom.
+curl="${CURL:-curl}"
 
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
 
-code=$(curl -s -o "$body" -w '%{http_code}' --max-time "${IMPD_HEALTH_TIMEOUT_SECONDS:-5}" "$IMPD_HEALTH_URL" || true)
+code=$("$curl" -s -o "$body" -w '%{http_code}' --max-time "${IMPD_HEALTH_TIMEOUT_SECONDS:-5}" "$IMPD_HEALTH_URL" || true)
 code=${code:-000}
 
 up=0

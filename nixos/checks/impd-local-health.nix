@@ -1,9 +1,11 @@
 # Checks services.impd-local-health: the units the module generates, each case evaluating its
 # own config through test-utils/build-module-system.nix, and the probe script run against a
-# stand-in impd (test-utils/start-stub-impd.py) in the build sandbox. Each case runs on its own,
-# in a fresh directory, with its own stand-in on an ephemeral port, its own textfile directory,
-# and the probe and stand-in under env -i with a HOME and TMPDIR of their own, under
-# scripts/test-lib/run-cases.sh, which reports each case and fails the check when any case fails.
+# stand-in impd (test-utils/start-stub-impd.py) in the build sandbox, or, for the timeout it gives
+# curl, with a stand-in curl that records its call (test-utils/build-stub-curl.nix) and answers
+# at once. Each case runs on its own, in a fresh directory, with its own stand-in on an ephemeral
+# port or its own call log, its own textfile directory, and the probe and stand-in under env -i
+# with a HOME and TMPDIR of their own, under scripts/test-lib/run-cases.sh, which reports each
+# case and fails the check when any case fails.
 # Run: bun run test:nixos impd-local-health
 { nixpkgs, imp }:
 let
@@ -13,6 +15,7 @@ let
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
+  stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
 
   cases = [
     {
@@ -434,7 +437,7 @@ let
       '';
     }
     {
-      title = "it gives up after a configured 1 s timeout and reports status 0 when impd accepts and never answers";
+      title = "it reports status 0 when impd takes the connection and never answers";
       script =
         let
           probe = "${(buildModuleSystem ../modules/impd-local-health.nix { services.impd-local-health.enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
@@ -450,13 +453,12 @@ let
 
         before=$(date +%s)
         status=0
+        # a short timeout, so the real curl gives up soon on the real connection
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_TIMEOUT_SECONDS=1 IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out \
           ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
         assert_equals 0 "$status" "the probe's exit status"
-        # curl's --max-time 1 ends the probe: at least 1 s, and not much more
-        assert_between 1 "$((after - before))" 3 "the probe's run time in seconds"
         assert_files_equal /dev/null stdout
         assert_files_equal /dev/null stderr
         assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
@@ -479,31 +481,70 @@ let
       '';
     }
     {
-      title = "it gives up after 5 s when no timeout is configured";
+      title = "it gives curl a 5 s timeout when none is configured";
       script =
         let
           probe = "${(buildModuleSystem ../modules/impd-local-health.nix { services.impd-local-health.enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
         in
         ''
         mkdir home tmp out
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
 
         before=$(date +%s)
         status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out \
-          ${probe} > stdout 2> stderr || status=$?
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL=${stubCurl} CURL_LOG="$PWD/curl.log" \
+          IMPD_HEALTH_URL=http://127.0.0.1:7070/health TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
         after=$(date +%s)
 
         assert_equals 0 "$status" "the probe's exit status"
-        # the default --max-time 5 ends the probe: at least 5 s, and not much more
-        assert_between 5 "$((after - before))" 7 "the probe's run time in seconds"
         assert_files_equal /dev/null stdout
         assert_files_equal /dev/null stderr
+        # the -o file is the probe's temp file, removed on its way out
+        sed -E "s#\"$PWD/tmp/tmp\.[A-Za-z0-9]{10}\"#\"TMPFILE\"#" curl.log > curl-calls
+        assert_equals '["-s","-o","TMPFILE","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health"]' \
+          "$(cat curl-calls)" "the probe's call of curl"
+        assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
+        assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
+        stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
+        assert_between "$before" "$stamp" "$after" "the timestamp"
+        sed "s/^impd_local_health_last_check_timestamp_seconds $stamp\$/impd_local_health_last_check_timestamp_seconds STAMP/" \
+          out/impd_local_health.prom > actual
+        cat > expected <<'EOF'
+        # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
+        # TYPE impd_local_health_up gauge
+        impd_local_health_up 0
+        # HELP impd_local_health_status_code HTTP status of the last loopback probe, 0 when it got no answer.
+        # TYPE impd_local_health_status_code gauge
+        impd_local_health_status_code 0
+        # HELP impd_local_health_last_check_timestamp_seconds When the last loopback probe ran.
+        # TYPE impd_local_health_last_check_timestamp_seconds gauge
+        impd_local_health_last_check_timestamp_seconds STAMP
+        EOF
+        assert_files_equal expected actual
+      '';
+    }
+    {
+      title = "it gives curl the configured timeout";
+      script =
+        let
+          probe = "${(buildModuleSystem ../modules/impd-local-health.nix { services.impd-local-health.enable = true; }).config.services.impd-local-health.package}/bin/impd-local-health";
+        in
+        ''
+        mkdir home tmp out
+
+        before=$(date +%s)
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL=${stubCurl} CURL_LOG="$PWD/curl.log" IMPD_HEALTH_TIMEOUT_SECONDS=12 \
+          IMPD_HEALTH_URL=http://127.0.0.1:7070/health TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
+        after=$(date +%s)
+
+        assert_equals 0 "$status" "the probe's exit status"
+        assert_files_equal /dev/null stdout
+        assert_files_equal /dev/null stderr
+        # the -o file is the probe's temp file, removed on its way out
+        sed -E "s#\"$PWD/tmp/tmp\.[A-Za-z0-9]{10}\"#\"TMPFILE\"#" curl.log > curl-calls
+        assert_equals '["-s","-o","TMPFILE","-w","%{http_code}","--max-time","12","http://127.0.0.1:7070/health"]' \
+          "$(cat curl-calls)" "the probe's call of curl"
+        assert_equals "" "$(ls -A tmp)" "the probe's temp directory"
         assert_equals impd_local_health.prom "$(ls -A out)" "the textfile directory"
         stamp=$(sed -n 's/^impd_local_health_last_check_timestamp_seconds //p' out/impd_local_health.prom)
         assert_between "$before" "$stamp" "$after" "the timestamp"
@@ -591,7 +632,7 @@ let
         assert_files_equal /dev/null stdout
         # bash names the probe and the line of its curl call, counted from the lines
         # writeShellApplication puts before the script
-        assert_equals "${probe}: line 15: IMPD_HEALTH_URL: unbound variable" "$(cat stderr)" "the probe's stderr"
+        assert_equals "${probe}: line 18: IMPD_HEALTH_URL: unbound variable" "$(cat stderr)" "the probe's stderr"
         assert_equals "" "$(ls -A out)" "the textfile directory"
       '';
     }
@@ -618,7 +659,7 @@ let
         assert_files_equal /dev/null stdout
         # bash names the probe and the line of its mktemp call, counted from the lines
         # writeShellApplication puts before the script
-        assert_equals "${probe}: line 23: TEXTFILE_DIR: unbound variable" "$(cat stderr)" "the probe's stderr"
+        assert_equals "${probe}: line 26: TEXTFILE_DIR: unbound variable" "$(cat stderr)" "the probe's stderr"
         assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
         assert_equals "" "$(ls -A out)" "the textfile directory"
       '';

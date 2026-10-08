@@ -18,6 +18,7 @@ let
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
   stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
+  stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
 
   # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
   pinnedBun = pkgs.stdenv.mkDerivation {
@@ -705,6 +706,112 @@ let
         assert_equals 1 "$published" "the script's checks of the published database"
         assert_equals 1 "$saved" "the script's checks of the saved files"
         assert_equals 3 "$calls" "the script's comparisons"
+      '';
+    }
+    {
+      title = "it buildStubCurl records the call of the probe as one JSON line, and answers it as curl that timed out";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
+          ${stubCurl} -s -o body -w '%{http_code}' --max-time 5 http://127.0.0.1:7070/health > out 2> err || status=$?
+
+        assert_equals 28 "$status" "the exit status, curl's for a timeout"
+        assert_equals 000 "$(cat out)" "the status code it prints"
+        assert_files_equal /dev/null err
+        assert_missing body "a body"
+        assert_equals '["-s","-o","body","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health"]' \
+          "$(cat curl.log)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubCurl records each call on a line of its own, with its arguments as given";
+      script = ''
+        mkdir home tmp
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
+          ${stubCurl} -s -o 'a body' -w '%{http_code}' --max-time 5 'http://127.0.0.1:7070/health?q="x"' > /dev/null || true
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
+          ${stubCurl} -s -o body -w '%{http_code}' --max-time 0.5 http://127.0.0.1:9090/ready > /dev/null || true
+
+        cat > expected <<'EOF'
+        ["-s","-o","a body","-w","%{http_code}","--max-time","5","http://127.0.0.1:7070/health?q=\"x\""]
+        ["-s","-o","body","-w","%{http_code}","--max-time","0.5","http://127.0.0.1:9090/ready"]
+        EOF
+        assert_files_equal expected curl.log
+      '';
+    }
+    {
+      title = "it buildStubCurl records another call and fails it as unexpected";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
+          ${stubCurl} -s http://127.0.0.1:7070/health > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: -s http://127.0.0.1:7070/health" "$(cat err)" "the error"
+        assert_equals '["-s","http://127.0.0.1:7070/health"]' "$(cat curl.log)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubCurl refuses to run without the file that records its calls";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          ${stubCurl} -s -o body -w '%{http_code}' --max-time 5 http://127.0.0.1:7070/health > out 2> err || status=$?
+
+        assert_equals 2 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "curl-timing-out: set CURL_LOG to the file that records each call" "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubCurl answers as curl does when the server takes the connection and never answers";
+      script = ''
+        mkdir home tmp
+        mkfifo port.fifo
+        exec 3<>port.fifo
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
+        stub_pid=$!
+        trap 'kill "$stub_pid"' EXIT
+        read -r -t 5 -u 3 port
+
+        real_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          curl -s -o real.body -w '%{http_code}' --max-time 0.5 "http://127.0.0.1:$port/health" > real.out 2> real.err || real_status=$?
+        stub_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
+          ${stubCurl} -s -o stub.body -w '%{http_code}' --max-time 0.5 "http://127.0.0.1:$port/health" > stub.out 2> stub.err || stub_status=$?
+
+        assert_equals 28 "$real_status" "curl's exit status"
+        assert_equals "$real_status" "$stub_status" "the exit status"
+        assert_equals 000 "$(cat real.out)" "the status code curl prints"
+        assert_files_equal real.out stub.out
+        assert_files_equal real.err stub.err
+        assert_missing real.body "curl's body"
+        assert_missing stub.body "the stand-in's body"
+      '';
+    }
+    {
+      title = "it buildStubCurl holds to nixos/modules/impd-local-health.sh: it makes its one call through CURL";
+      script = ''
+        curl=$(grep -cxF 'curl="''${CURL:-curl}"' ${../modules/impd-local-health.sh} || true)
+        call=$(grep -cxF 'code=$("$curl" -s -o "$body" -w '"'"'%{http_code}'"'"' --max-time "''${IMPD_HEALTH_TIMEOUT_SECONDS:-5}" "$IMPD_HEALTH_URL" || true)' \
+          ${../modules/impd-local-health.sh} || true)
+        calls=$(grep -cF '"$curl"' ${../modules/impd-local-health.sh} || true)
+        # a call of curl by name, outside a comment, would pass the stand-in by
+        direct=$(grep -cE '^[^#]*(^|[ $(])curl ' ${../modules/impd-local-health.sh} || true)
+
+        assert_equals 1 "$curl" "the probe's curl"
+        assert_equals 1 "$call" "the probe's call"
+        assert_equals 1 "$calls" "the probe's calls through CURL"
+        assert_equals 0 "$direct" "the probe's calls of curl by name"
       '';
     }
   ];
