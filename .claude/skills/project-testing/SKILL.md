@@ -26,6 +26,11 @@ is decided in the shared skill, not here.
 | NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`         |
 
 - A new suite gets a root `package.json` script, and CI calls that script, never the file directly.
+- The `nixos` job reports on every pull request and push to main, and the ruleset requires it.
+  `bun run ci:needs-nixos-checks <base> <head>` decides whether it boots the checks: any change
+  under `nixos/` or `scripts/`, to `package.json`, `.bun-version`, `.gitignore` or the workflow, a
+  new branch or a rewritten base means "true". Otherwise the job passes without booting a VM and
+  says so in its summary. A new input of the checks outside those paths extends that list.
 - Every test case is hermetic: no case reaches a real host, the tailnet, 1Password, Onidel,
   Cloudflare, the Pulumi state or the internet. The image and flake builds that run before the cases
   fetch only pinned inputs. `bun run drift` is a read-only check of a refactor, never part of a test.
@@ -47,6 +52,13 @@ live host.
   a fixed system path, resolved when the stand-in is created.
 - A failure that real state can produce comes from real state on loopback: a dead port
   (`127.0.0.1:1`), a missing socket, a directory without write permission.
+- A DNS lookup (`getent hosts`) and a curl to a URL that is not loopback get stand-ins too. A real
+  `getent` in a stand-in's own test reads the hosts file only (`-s files`).
+- The real `gh` runs only with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, in a case
+  and in the fixture builds alike, because gh otherwise sends telemetry and checks for updates.
+- A stand-in that speaks TLS hands its certificate to the client through the case's environment
+  (`SSL_CERT_FILE`, with `SSL_CERT_DIR` set to an empty case directory), never through a trust
+  store outside the case.
 
 ## infra (TypeScript)
 
@@ -135,14 +147,15 @@ journey. Each shared rule takes its shell form:
 | Shared rule                  | Shell form                                                                                                                                                                                                         |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `test('it …')`               | a function `it_<words>`; its title is the name with spaces; `CASE='<part of a title>'` runs the matching cases                                                                                                     |
+| `#<unit> <behaviour>`        | `it <unit> <behaviour>` in a file that tests several units, here and in the NixOS checks; the runners keep "it" as the first word, and Bun tests keep the shared `#<unit>` form                                       |
 | The runner                   | `run_cases` from `scripts/test-lib/run-cases.sh`: each case in its own errexit subshell, `ok`/`FAIL` per case, exit 1 on any failure or when no case ran                                                            |
 | `setupTest()`                | one `setup_test` per suite: a fresh `mktemp -d` tree and the stand-ins every case needs, with no scenario data; its config chooses which stand-ins to wire                                                          |
-| Dispose and `onTestFinished` | `trap '…' EXIT` inside the case on the line after the acquisition; in a trap with more than one step, every step ends `\|\| true`                                                                                    |
+| Dispose and `onTestFinished` | one `trap '…' EXIT` per case, because bash keeps one EXIT trap: on the line after `mktemp -d`, before `setup_test` acquires containers or processes, with each step safe when its resource was never reached; in a trap with more than one step, every step ends `\|\| true`; a variable a step reads is global, since a `local` is gone when the trap runs |
 | Every test stands alone      | the script under test runs under `env -i` with an explicit `PATH`, `HOME` and `TMPDIR` inside the case tree; git with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`; each suite starts with `umask 022` |
 | `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `scripts/test-lib/`; mask only a temp path, a generated id, or a measurement that changes between runs (a wall-clock time, a duration, a size, a memory or CPU reading), never the value under test                                     |
 | Exact errors                 | the exact exit code, never "non-zero", plus the exact stderr                                                                                                                                                       |
 | Polling `waitFor`            | `wait_for <seconds> <what> <command…>` from `scripts/test-lib/wait-for.sh`                                                                                                                                         |
-| Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds                                                                               |
+| Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a script that embeds `date` output gets a `date` wrapper reading a fixed time |
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                             |
 
 - A stand-in lives in `scripts/test-lib/` with its own `test-<file>.sh`, never inline in a suite:
@@ -150,11 +163,20 @@ journey. Each shared rule takes its shell form:
 - A stand-in that replaces a tool logs its argv as one JSON line, matches the real tool's exit codes
   and messages, and ends with `*) echo "unexpected: $*" >&2; exit 97`. Where the real tool's output
   differs between the versions CI and a developer run, a comment names both versions and the test
-  accepts each version's output only with its own exit code. A process stand-in records an
+  accepts each version's output only with its own exit code, through `assert_one_of_outputs`, which
+  binds each version's stdout, stderr and exit status together. A process stand-in records an
   unexpected request and answers it with a failure.
 - A stand-in that wraps the real tool, such as `create-stub-racing-git.sh`, or that supplies a value
   rather than a tool, such as `create-stub-clock.sh`, states in its header what it changes, and its
   test pins that change.
+- A stand-in checked against documentation rather than the real tool, such as `create-stub-op.sh`,
+  records the pages, the tool version and the check date in its header, and lists what the docs
+  leave unsettled.
+- An ssh stand-in that cannot run the remote command, because it needs root or a container,
+  answers as the host would, and the case writes out the whole remote command as the expected argv.
+  One that runs the command locally runs it under `env -i` from the case's host directory.
+- A guard's tests pass it a search path the case owns, so its expected text never depends on the
+  host.
 - A producer whose output a case compares writes to a file under errexit first, so a failing
   producer fails the case instead of producing an empty match.
 - Every other helper in `scripts/test-lib/` exports one public function, named for its file, and
