@@ -63,6 +63,7 @@ it_answers_whoami_with_401_while_it_holds_no_good_bearer() {
 
   printf '%s' '{"error":"unauthorized"}' | diff - "$tree/body"
   [ "$code" = 401 ] || { echo "HTTP $code, want 401" >&2; exit 1; }
+  assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
 it_answers_whoami_with_401_for_no_bearer_while_it_holds_no_good_bearer() {
@@ -77,6 +78,7 @@ it_answers_whoami_with_401_for_no_bearer_while_it_holds_no_good_bearer() {
 
   printf '%s' '{"error":"unauthorized"}' | diff - "$tree/body"
   [ "$code" = 401 ] || { echo "HTTP $code, want 401" >&2; exit 1; }
+  assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
 it_fails_closed_on_a_post_to_another_path_and_records_it() {

@@ -6,6 +6,14 @@
 # entry ("%-15s %s"), exit 0, or prints nothing and exits 2, getent's code for a key it
 # cannot find. Any other database or argument count ends with exit 97 and "unexpected:
 # <argv>" on stderr.
+#
+# Checked on 2026-10-08 against glibc's source and a real getent. nss/getent.c at glibc-2.39
+# (CI's ubuntu-24.04) prints each address of a found host as printf("%-15s %s", address,
+# name), then " <alias>" for each alias and a newline, and exits 2 when a key is not found.
+# glibc 2.44's `getent -s files hosts localhost` printed "127.0.0.1" padded to 15 columns,
+# a space and "localhost", exit 0. Left open, since no record here needs them: a name with
+# aliases or several addresses, which the real getent prints in full, one line per address;
+# and a name with an IPv6 address, which it looks up first.
 create_stub_getent() {
   local bin="$1"
   cat > "$bin/getent" << 'STUB'

@@ -36,6 +36,15 @@
 # read-only just before the bearer is written; STUB_ALTER_BEARER_BEFORE_SUM appends to the
 # written bearer just before its checksum; STUB_REMOVE_BEARER_BEFORE_STAT removes it
 # before the final stat.
+#
+# The dropped session's line was checked on 2026-10-08 against OpenSSH's source and a real
+# ssh: clientloop.c's quit_message("Connection to %s closed by remote host.") (line 805 at
+# V_9_6_P1, line 804 at V_10_5_P1) appends CR LF, and ssh exits 255 when the session ends
+# without an exit status. OpenSSH 10.5p1 printed exactly that line, with the host as given,
+# and exited 255 when a loopback sshd's session process was killed mid-command. 9.6p1 (CI's
+# ubuntu-24.04 runner) was not run; its source line is the same. Left open: the source prints
+# this line only when the read fails with EPIPE, and "Read from remote host <host>: <error>"
+# for other failures, so which line a real drop gives depends on how the connection ends.
 create_stub_host_ssh() {
   local bin="$1" real_ssh
   real_ssh="$(PATH=/usr/local/bin:/usr/bin:/bin command -v ssh || true)"

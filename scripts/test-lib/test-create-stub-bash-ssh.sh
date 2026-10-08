@@ -130,6 +130,23 @@ it_fails_closed_with_exit_97_on_a_command_that_is_not_one_bash_c_argument() {
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
+it_fails_closed_with_exit_97_on_one_remote_argument_that_is_not_bash_c() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" \
+    ssh -o BatchMode=yes root@geoffcloud "touch $tree/ran" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud touch $tree/ran"
+  diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"touch $tree/ran\"]"
+  assert_missing "$tree/ran" "the command ran"
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
 it_fails_closed_with_exit_97_on_a_command_that_names_a_remote_tool() {
   local status=0
   tree="$(mktemp -d)"
@@ -161,6 +178,42 @@ it_fails_closed_with_exit_97_when_a_remote_tool_on_the_host_PATH_is_not_a_stand_
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: tailscale on the host PATH is not a stand-in in $tree/host-bin"
+  diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
+  assert_missing "$tree/ran" "the command ran"
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
+it_fails_closed_with_exit_97_on_a_command_that_uses_command_p() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" \
+    ssh -o BatchMode=yes root@geoffcloud "bash -c 'touch $tree/ran; command -p true'" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud bash -c 'touch $tree/ran; command -p true'"
+  diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran; command -p true'\"]"
+  assert_missing "$tree/ran" "the command ran"
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
+it_fails_closed_with_exit_97_when_a_host_stand_in_is_not_executable() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  chmod -x "$tree/host-bin/rsync"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" \
+    ssh -o BatchMode=yes root@geoffcloud "bash -c 'touch $tree/ran'" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "unexpected: rsync on the host PATH is not a stand-in in $tree/host-bin"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
   assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }

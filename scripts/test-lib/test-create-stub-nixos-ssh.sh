@@ -4,9 +4,10 @@
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
 # Connection refused" and the CR LF that its log ends a line with on stderr, as OpenSSH
-# 9.6p1 (CI's ubuntu-24.04 runner image 20261004) and 10.5p1 print it. A session that drops after it opens has no real transport here, so the
-# stand-in's drop reuses that exit 255 with OpenSSH's "Connection to <host> closed by
-# remote host." line.
+# 9.6p1 (CI's ubuntu-24.04 runner image 20261004) and 10.5p1 print it. A session that
+# drops after it opens has no real transport here, so the stand-in's drop reuses that exit
+# 255 with OpenSSH's "Connection to <host> closed by remote host." line, whose source and
+# check create-stub-nixos-ssh.sh records with those of the other texts it prints.
 #
 #   bash scripts/test-lib/test-create-stub-nixos-ssh.sh
 # shellcheck source-path=SCRIPTDIR

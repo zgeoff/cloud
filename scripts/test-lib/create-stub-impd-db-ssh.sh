@@ -15,6 +15,16 @@
 #   64-hex ID are docker's (moby daemon/errors.go at v28.0.4, and docker 29.7.2's answer to
 #   an exec in a stopped container, checked on 2026-10-08).
 #
+# The integrity finding was checked on 2026-10-08 against SQLite's source and a real
+# sqlite3. src/pragma.c at version-3.51.2, the sqlite of nixpkgs
+# 4feb8eb8bf30f323a8a5d285f14ee51d6a7197b1 (nixos/flake.lock) that the script runs,
+# reports "wrong # of entries in index <index>" (line 1794). sqlite3 3.53.4 printed that
+# line for a table whose unique index was pointed at another table's index b-tree, among
+# three other lines ("2nd reference to page 5", "Page 3: never used", "row 2 missing from
+# index sqlite_autoindex_imps_1"). Left open: a real integrity_check prints every finding,
+# one per line, and which ones depends on the damage, so the stand-in's one line stands for
+# the shortest failing report.
+#
 # With STUB_SSH_PASS=1, a call to a loopback destination (ssh://<user>@127.0.0.1:<port>)
 # goes to the real ssh after it is logged, with -F /dev/null so no ssh config on the
 # machine applies, so a case reaches a real refused connection. An argument after the

@@ -20,6 +20,32 @@
 # never one from the caller's PATH. A call without
 # `-o BatchMode=yes`, an unknown remote command, or a pass-through to any other
 # destination ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# The dropped session's line was checked on 2026-10-08 against OpenSSH's source and a real
+# ssh: clientloop.c's quit_message("Connection to %s closed by remote host.") (line 805 at
+# V_9_6_P1, line 804 at V_10_5_P1) appends CR LF, and ssh exits 255 when the session ends
+# without an exit status. OpenSSH 10.5p1 printed exactly that line, with the host as given,
+# and exited 255 when a loopback sshd's session process was killed mid-command. 9.6p1 (CI's
+# ubuntu-24.04 runner) was not run; its source line is the same. Left open: the source prints
+# this line only when the read fails with EPIPE, and "Read from remote host <host>: <error>"
+# for other failures, so which line a real drop gives depends on how the connection ends.
+#
+# systemctl's line was checked on 2026-10-08 against systemd v260.4's source, the systemd of
+# nixpkgs 4feb8eb8bf30f323a8a5d285f14ee51d6a7197b1 (nixos/flake.lock):
+# src/systemctl/systemctl-util.c line 240 prints "Failed to list units: %s" with
+# bus_error_message, and src/shared/main-func.h maps the negative error to exit 1. Not run
+# against a real systemd, which needs a bus that times out. Left open: the reason is the bus
+# error's own message when it carries one, else strerror(ETIMEDOUT), "Connection timed out".
+#
+# The activation warning is not what the pinned host prints. It is the summary line of the
+# Perl switch-to-configuration, which nixpkgs 4feb8eb no longer ships:
+# nixos/modules/system/activation/switchable-system.nix links switch-to-configuration-ng as
+# the only implementation. Checked on 2026-10-08, that version's
+# pkgs/by-name/sw/switch-to-configuration-ng/src/main.rs ends a switch whose units failed by
+# printing "warning: the following units failed: <units>" and `systemctl status` of those
+# units on stderr, and exits 4; its "switching to system configuration … failed (status N)"
+# line goes to syslog, not stderr. Which units fail, and so the whole stderr, depends on the
+# failure, so the stand-in keeps the old line as a marker the switch passes through.
 create_stub_nixos_ssh() {
   local bin="$1" real_ssh
   real_ssh="$(PATH=/usr/local/bin:/usr/bin:/bin command -v ssh || true)"

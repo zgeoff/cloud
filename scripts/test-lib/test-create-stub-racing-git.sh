@@ -97,16 +97,21 @@ it_hands_every_other_call_to_the_real_git_unchanged() {
 }
 
 it_passes_the_real_gits_exit_code_through_on_other_calls() {
-  local status=0
+  local head status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  head="$(git -C "$tree/clone" rev-parse HEAD)"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     git -C "$tree/clone" rev-parse --verify -q no-such-ref > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
+  git -C "$tree/clone" rev-parse HEAD > "$tree/head-after"
+  diff - "$tree/head-after" <<< "$head"
+  assert_missing "$tree/clone/nixos/marker" "the stand-in landed a commit"
+  assert_missing "$tree/calls" "the stand-in logged a move"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
