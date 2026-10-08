@@ -546,7 +546,7 @@ it_stops_when_op_item_list_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.
+[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.
 EOF
   diff - "$tree/out" << EOF
 
@@ -1191,7 +1191,7 @@ it_writes_no_host_file_when_creating_the_1Password_item_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.
+[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.
 EOF
   diff - "$tree/out" << EOF
 
