@@ -52,7 +52,7 @@ ERR
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
-it_fails_a_missing_vault_with_ops_error_and_exit_1() {
+it_fails_a_create_in_a_missing_vault_with_ops_error_and_exit_1() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
@@ -68,6 +68,42 @@ ERR
   diff - "$tree/calls" <<< '["op","document","create","--vault","cloud","--title","kc","--file-name","kc.yaml","-"]'
   ls -A "$tree/vault" > "$tree/vaults"
   diff /dev/null "$tree/vaults"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_fails_an_item_get_in_a_missing_vault_with_ops_error_and_exit_1() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op item get kc --vault cloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'ERR'
+[ERROR] 2026/10/07 12:00:00 "cloud" isn't a vault in this account. Specify the vault with its ID or name.
+ERR
+  diff - "$tree/calls" <<< '["op","item","get","kc","--vault","cloud"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_fails_an_edit_in_a_missing_vault_with_ops_error_and_exit_1() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  printf 'new\n' | env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    op document edit kc --vault cloud --file-name kc.yaml - > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'ERR'
+[ERROR] 2026/10/07 12:00:00 "cloud" isn't a vault in this account. Specify the vault with its ID or name.
+ERR
+  ls -A "$tree/vault" > "$tree/vaults"
+  diff /dev/null "$tree/vaults"
+  diff - "$tree/calls" <<< '["op","document","edit","kc","--vault","cloud","--file-name","kc.yaml","-"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -141,7 +177,7 @@ it_fails_a_rate_limited_edit_with_ops_error_and_writes_nothing() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
   diff - "$tree/vault/cloud/kc/kc.yaml" <<< old
   diff - "$tree/calls" <<< '["op","document","edit","kc","--vault","cloud","--file-name","kc.yaml","-"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
@@ -159,7 +195,7 @@ it_fails_a_rate_limited_create_with_ops_error_and_writes_nothing() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/calls" <<< '["op","document","create","--vault","cloud","--title","kc","--file-name","kc.yaml","-"]'
