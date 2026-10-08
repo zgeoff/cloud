@@ -182,14 +182,24 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   interpolated by Nix.
 - A module assertion has a negative case that evaluates a bad config and compares the failing
   assertion messages exactly.
-- In a restore rehearsal (`impd-restore` and `impd-restore-*`), each `with subtest("it …")` starts
+- The restore rehearsals (`impd-restore`, `impd-restore-seams`, `impd-restore-saved-failures`)
+  share one VM definition and one reset, `setup_test()`. Each check boots its own VM, and each
+  subtest supplies its own scenario data. `impd-restore-reset` checks the reset itself: each
+  subtest leaves one kind of state behind, proves it is there, runs `setup_test()` and asserts the
+  whole clean baseline. Cleanup that depends on what a subtest left lives in the reset, never in
+  scenario flags. This is the language form of the shared skill's one `setupTest` per file.
+- `setup_test()` returns the generated system paths as runtime handles, like a temporary
+  directory. Each subtest names its restore generation and other scenario values in its own body.
+- In a restore rehearsal, each `with subtest("it …")` starts
   from `setup_test()`, which resets every state a subtest can leave. It asserts
   `machine.execute`'s status and output exactly, masking only what the shell compares may mask,
   plus every side effect the script promises, including the saved original on each failure path.
   Waits use `wait_for_unit`, `wait_until_succeeds` or `wait_for`.
 - An error the script declares is reached through real VM state where real state can produce it,
-  and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`) only where it
-  cannot.
+  and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`, and the health
+  probe's `CURL`) only where it cannot. The probe's timeout arguments are checked through
+  `build-stub-curl`, never by waiting out the deadline; one fast case against the hung impd
+  stand-in keeps real transport covered, with no elapsed-time assertion.
 - A rehearsal's first subtests assert that no unit failed at boot and that `systemd-detect-virt`
   prints `kvm`, so a run that fell back to emulation fails. `test-nixos.sh` needs a readable and
   writable KVM device for any `impd-restore*` check.
