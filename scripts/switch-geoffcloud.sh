@@ -27,8 +27,9 @@ esac
 repo="$(git rev-parse --show-toplevel)"
 snapshot="$(mktemp -d)"
 
+# the archive sits beside the snapshot, so a failed `git archive` leaves no partial tar
 teardown() {
-  rm -rf "$snapshot"
+  rm -rf "$snapshot" "$snapshot.tar"
 }
 trap teardown EXIT
 
