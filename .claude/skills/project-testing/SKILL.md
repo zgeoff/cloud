@@ -97,8 +97,11 @@ health-check worker in `workers/` is HTTP-mocked.
   literal: `toStrictEqual` fails when a builder swaps or rebuilds it.
 - A hand-written spec (alert rules, Helm values, a Deployment spec, the tailnet policy) is asserted
   whole with `toStrictEqual` against a literal, never an inline snapshot.
-- `expect.stringMatching` returns `any`, which the lint rule `no-unsafe-assignment` refuses inside a
-  literal. Use the typed `expect.toSatisfy((value: string) => /…/u.test(value))`.
+- `expect.stringMatching` and `expect.any` return `any`, which the lint rule `no-unsafe-assignment`
+  refuses inside a literal. Use a typed jest-extended matcher, such as `expect.toBeFunction()` or
+  `expect.toBeValidDate()`, and where none fits, a typed `expect.toSatisfy`: a regex
+  (`(value: string) => /…/u.test(value)`) or an `instanceof` check
+  (`(value: unknown) => value instanceof ArrayBuffer`).
 
 ## provider (Go)
 
