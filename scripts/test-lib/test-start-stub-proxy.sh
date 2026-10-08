@@ -50,7 +50,8 @@ LINES
   diff /dev/null "$tree/second-out"
   diff - "$tree/first-err" <<< 'curl: (52) Empty reply from server'
   diff - "$tree/second-err" <<< 'curl: (52) Empty reply from server'
-  [ "$first $second" = "52 52" ] || { echo "exits $first $second, want 52 52" >&2; exit 1; }
+  [ "$first" = 52 ] || { echo "first exit $first, want 52" >&2; exit 1; }
+  [ "$second" = 52 ] || { echo "second exit $second, want 52" >&2; exit 1; }
 }
 
 it_records_no_connection_until_one_arrives() {
@@ -151,13 +152,13 @@ it_is_bypassed_by_curl_with_noproxy_alone_that_still_traces_under_CURL_HOMEs_cur
     "$tree/trace.txt" > "$tree/sent"
   diff - "$tree/err" <<< "Warning: --trace-ascii overrides an earlier trace/verbose option"
   printf '{"error":"unauthorized"}' | diff - "$tree/out"
-  ls -A "$tree/impd" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << FILES
-$tree/impd:
+  ls -A "$tree/impd" > "$tree/impd-files"
+  diff - "$tree/impd-files" << FILES
 pid
 port
-
-$tree/proxy:
+FILES
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << FILES
 pid
 port
 FILES

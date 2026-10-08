@@ -56,35 +56,74 @@ it_fails_when_a_stand_in_is_not_executable() {
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
-it_fails_for_each_tool_that_is_missing() {
-  local tool status
+it_fails_when_ssh_is_missing() {
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  rm "$tree/bin/ssh"
 
-  for tool in ssh scp sftp rsync tailscale; do
-    mv "$tree/bin/$tool" "$tree/aside"
-    status=0
-    require_remote_tool_stubs "$tree/bin" >> "$tree/out" 2>> "$tree/err" || status=$?
-    echo "$tool $status" >> "$tree/statuses"
-    mv "$tree/aside" "$tree/bin/$tool"
-  done
+  require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" << ERR
-ssh resolves to $(PATH=/usr/bin:/bin command -v ssh || echo nothing), not a stand-in in $tree/bin
-scp resolves to $(PATH=/usr/bin:/bin command -v scp || echo nothing), not a stand-in in $tree/bin
-sftp resolves to $(PATH=/usr/bin:/bin command -v sftp || echo nothing), not a stand-in in $tree/bin
-rsync resolves to $(PATH=/usr/bin:/bin command -v rsync || echo nothing), not a stand-in in $tree/bin
-tailscale resolves to $(PATH=/usr/bin:/bin command -v tailscale || echo nothing), not a stand-in in $tree/bin
-ERR
-  diff - "$tree/statuses" << 'STATUSES'
-ssh 1
-scp 1
-sftp 1
-rsync 1
-tailscale 1
-STATUSES
+  diff - "$tree/err" <<< "ssh resolves to $(PATH=/usr/bin:/bin command -v ssh || echo nothing), not a stand-in in $tree/bin"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_fails_when_scp_is_missing() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  rm "$tree/bin/scp"
+
+  require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "scp resolves to $(PATH=/usr/bin:/bin command -v scp || echo nothing), not a stand-in in $tree/bin"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_fails_when_sftp_is_missing() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  rm "$tree/bin/sftp"
+
+  require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "sftp resolves to $(PATH=/usr/bin:/bin command -v sftp || echo nothing), not a stand-in in $tree/bin"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_fails_when_rsync_is_missing() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  rm "$tree/bin/rsync"
+
+  require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "rsync resolves to $(PATH=/usr/bin:/bin command -v rsync || echo nothing), not a stand-in in $tree/bin"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_fails_when_tailscale_is_missing() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  rm "$tree/bin/tailscale"
+
+  require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "tailscale resolves to $(PATH=/usr/bin:/bin command -v tailscale || echo nothing), not a stand-in in $tree/bin"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 # Runtime every case needs: <tree>/bin with an executable placeholder for each remote

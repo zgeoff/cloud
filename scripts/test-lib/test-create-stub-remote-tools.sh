@@ -42,41 +42,79 @@ tailscale
 TOOLS
 }
 
-it_fails_closed_for_every_named_tool() {
-  local tool status
+it_fails_closed_with_exit_97_for_rsync() {
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  for tool in rsync scp sftp ssh tailscale; do
-    status=0
-    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" "$tool" status \
-      >> "$tree/out" 2>> "$tree/err" || status=$?
-    echo "$tool $status" >> "$tree/statuses"
-  done
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" rsync status \
+    > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" << 'ERR'
-unexpected: rsync status
-unexpected: scp status
-unexpected: sftp status
-unexpected: ssh status
-unexpected: tailscale status
-ERR
-  diff - "$tree/calls" << 'CALLS'
-["rsync","status"]
-["scp","status"]
-["sftp","status"]
-["ssh","status"]
-["tailscale","status"]
-CALLS
-  diff - "$tree/statuses" << 'STATUSES'
-rsync 97
-scp 97
-sftp 97
-ssh 97
-tailscale 97
-STATUSES
+  diff - "$tree/err" <<< 'unexpected: rsync status'
+  diff - "$tree/calls" <<< '["rsync","status"]'
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
+it_fails_closed_with_exit_97_for_scp() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" scp status \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'unexpected: scp status'
+  diff - "$tree/calls" <<< '["scp","status"]'
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
+it_fails_closed_with_exit_97_for_sftp() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" sftp status \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'unexpected: sftp status'
+  diff - "$tree/calls" <<< '["sftp","status"]'
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
+it_fails_closed_with_exit_97_for_ssh() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" ssh status \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'unexpected: ssh status'
+  diff - "$tree/calls" <<< '["ssh","status"]'
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+}
+
+it_fails_closed_with_exit_97_for_tailscale() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" tailscale status \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'unexpected: tailscale status'
+  diff - "$tree/calls" <<< '["tailscale","status"]'
+  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
 # Runtime every case needs: the stand-ins for rsync, scp, sftp, ssh and tailscale in <tree>/bin,

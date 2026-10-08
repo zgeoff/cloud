@@ -208,17 +208,19 @@ it_keeps_one_case_state_out_of_the_next() {
   setup_test "$tree"
   cat > "$tree/suite.sh" << EOF
 source "$lib"
-it_a_sets_a_variable() { leaked=yes; cd /; }
-it_b_sees_neither() { [ -z "\${leaked:-}" ] && [ "\$PWD" = "$tree" ]; }
+it_a_sets_a_variable_and_changes_directory() { leaked=yes; cd /; }
+it_b_sees_no_variable() { [ -z "\${leaked:-}" ]; }
+it_c_starts_in_the_suites_directory() { [ "\$PWD" = "$tree" ]; }
 run_cases
 EOF
 
   (cd "$tree" && env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh") > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
-ok it a sets a variable
-ok it b sees neither
-2 cases, 0 failed
+ok it a sets a variable and changes directory
+ok it b sees no variable
+ok it c starts in the suites directory
+3 cases, 0 failed
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }

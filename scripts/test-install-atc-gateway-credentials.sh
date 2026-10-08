@@ -1220,12 +1220,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  ls -A "$tree/host/secrets" "$tree/vault/cloud" > "$tree/files"
-  diff - "$tree/files" << EOF
-$tree/host/secrets:
-
-$tree/vault/cloud:
-EOF
+  ls -A "$tree/host/secrets" > "$tree/host-secrets-files"
+  diff /dev/null "$tree/host-secrets-files"
+  ls -A "$tree/vault/cloud" > "$tree/vault-items-files"
+  diff /dev/null "$tree/vault-items-files"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -3203,14 +3201,14 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
+  ls -A "$tree/impd-whoami" > "$tree/impd-whoami-files"
+  diff - "$tree/impd-whoami-files" << EOF
 good-token
 pid
 port
-
-$tree/proxy:
+EOF
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << EOF
 pid
 port
 EOF
@@ -3291,14 +3289,14 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" -e "$stale_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
+  ls -A "$tree/impd-whoami" > "$tree/impd-whoami-files"
+  diff - "$tree/impd-whoami-files" << EOF
 good-token
 pid
 port
-
-$tree/proxy:
+EOF
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << EOF
 pid
 port
 EOF
@@ -3380,14 +3378,14 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
+  ls -A "$tree/impd-whoami" > "$tree/impd-whoami-files"
+  diff - "$tree/impd-whoami-files" << EOF
 good-token
 pid
 port
-
-$tree/proxy:
+EOF
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << EOF
 pid
 port
 EOF
