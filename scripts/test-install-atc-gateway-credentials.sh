@@ -19,6 +19,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/build-token.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-op.sh"
@@ -545,7 +546,7 @@ it_stops_when_op_item_list_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.
+[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.
 EOF
   diff - "$tree/out" << EOF
 
@@ -569,8 +570,8 @@ EOF
 
 # The real install on "the host" (test-lib/create-stub-host-install.sh drops only the
 # owner, which needs root), under a parent directory it may not write. coreutils 9.4 (CI's
-# ubuntu-24.04 runner image 20261004) and 9.11 word that failure differently, so the case
-# accepts either exact line.
+# ubuntu-24.04 runner image 20261004) and 9.11 word that failure differently, and the script
+# exits 1 after either, so the case accepts either whole output with that status.
 it_stops_when_the_host_cannot_create_the_secrets_directory() {
   local seed="$1" status=0
   tree="$(mktemp -d)"
@@ -587,15 +588,12 @@ it_stops_when_the_host_cannot_create_the_secrets_directory() {
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  grep -qxF \
-    -e "/usr/bin/install: cannot change permissions of '$tree/host/secrets': No such file or directory" \
-    -e "install: cannot create directory '$tree/host/secrets': Permission denied" \
-    "$tree/err" || { cat "$tree/err"; echo "not coreutils 9.4's or 9.11's install error" >&2; exit 1; }
-  [ "$(wc -l < "$tree/err")" = 1 ] || { cat "$tree/err"; echo "want one line on stderr" >&2; exit 1; }
-  diff - "$tree/out" << EOF
-
-== preflight
-EOF
+  printf '\n== preflight\n' > "$tree/want-out"
+  printf '%s\n' "/usr/bin/install: cannot change permissions of '$tree/host/secrets': No such file or directory" > "$tree/err-coreutils-9.4"
+  printf '%s\n' "install: cannot create directory '$tree/host/secrets': Permission denied" > "$tree/err-coreutils-9.11"
+  assert_one_of_outputs "the script under a secrets parent it may not write" "$tree/out" "$tree/err" "$status" \
+    "coreutils 9.4" "$tree/want-out" "$tree/err-coreutils-9.4" 1 \
+    "coreutils 9.11" "$tree/want-out" "$tree/err-coreutils-9.11" 1
   diff - "$tree/calls" << EOF
 ["op","vault","get","cloud","--format","json"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","true"]
@@ -611,7 +609,6 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_stops_when_glm_exists_with_other_rules() {
@@ -1194,7 +1191,7 @@ it_writes_no_host_file_when_creating_the_1Password_item_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.
+[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.
 EOF
   diff - "$tree/out" << EOF
 
@@ -1223,12 +1220,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  ls -A "$tree/host/secrets" "$tree/vault/cloud" > "$tree/files"
-  diff - "$tree/files" << EOF
-$tree/host/secrets:
-
-$tree/vault/cloud:
-EOF
+  ls -A "$tree/host/secrets" > "$tree/host-secrets-files"
+  diff /dev/null "$tree/host-secrets-files"
+  ls -A "$tree/vault/cloud" > "$tree/vault-items-files"
+  diff /dev/null "$tree/vault-items-files"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -2280,7 +2275,8 @@ EOF
 
 # The real curl on "the host", refused by a loopback port where nothing listens. curl
 # 8.5.0 (CI's ubuntu-24.04 runner image 20261004) and 8.22.0 word that error differently
-# and time it, so the case masks the milliseconds and accepts either exact line.
+# and time it, so the case masks the milliseconds and accepts either version's whole output
+# with the script's exit 1.
 it_leaves_the_saved_token_unchecked_when_impd_refuses_the_connection() {
   local seed="$1" good_token status=0
   tree="$(mktemp -d)"
@@ -2302,17 +2298,17 @@ it_leaves_the_saved_token_unchecked_when_impd_refuses_the_connection() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   sed -E '1s/ after [0-9]+ ms: / after N ms: /' "$tree/err" > "$tree/err-masked"
-  head -n 1 "$tree/err-masked" > "$tree/curl-line"
-  grep -qxF \
-    -e "curl: (7) Failed to connect to 127.0.0.1 port 1 after N ms: Couldn't connect to server" \
-    -e "curl: (7) Failed to connect to 127.0.0.1:1 after N ms: Could not connect to server" \
-    "$tree/curl-line" || { cat "$tree/curl-line"; echo "not curl 8.5's or 8.22's refused-connection error" >&2; exit 1; }
-  tail -n +2 "$tree/err-masked" > "$tree/err-rest"
-  diff - "$tree/err-rest" << EOF
+  cat > "$tree/err-curl-8.5" << EOF
+curl: (7) Failed to connect to 127.0.0.1 port 1 after N ms: Couldn't connect to server
 the check on the host exited 7 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
 Check impd on the host's 127.0.0.1:1, then rerun
 EOF
-  diff - "$tree/out" << EOF
+  cat > "$tree/err-curl-8.22" << EOF
+curl: (7) Failed to connect to 127.0.0.1:1 after N ms: Could not connect to server
+the check on the host exited 7 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
+Check impd on the host's 127.0.0.1:1, then rerun
+EOF
+  cat > "$tree/want-out" << EOF
 
 == preflight
 ok: 1Password vault cloud, atc-key, ssh root@geoffcloud, impd grantableTokens, $tree/host/secrets
@@ -2325,6 +2321,9 @@ skip: both exist and match
 
 == 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to root@geoffcloud:$tree/host/secrets/imp-token
 EOF
+  assert_one_of_outputs "the script against a refused impd port" "$tree/out" "$tree/err-masked" "$status" \
+    "curl 8.5.0" "$tree/want-out" "$tree/err-curl-8.5" 1 \
+    "curl 8.22.0" "$tree/want-out" "$tree/err-curl-8.22" 1
   diff - "$tree/calls" << EOF
 ["op","vault","get","cloud","--format","json"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","true"]
@@ -2346,7 +2345,6 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 # A listener that resets the connection after reading the request drives the real curl
@@ -3203,14 +3201,14 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
+  ls -A "$tree/impd-whoami" > "$tree/impd-whoami-files"
+  diff - "$tree/impd-whoami-files" << EOF
 good-token
 pid
 port
-
-$tree/proxy:
+EOF
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << EOF
 pid
 port
 EOF
@@ -3291,14 +3289,14 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" -e "$stale_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
+  ls -A "$tree/impd-whoami" > "$tree/impd-whoami-files"
+  diff - "$tree/impd-whoami-files" << EOF
 good-token
 pid
 port
-
-$tree/proxy:
+EOF
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << EOF
 pid
 port
 EOF
@@ -3380,14 +3378,14 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  ls -A "$tree/impd-whoami" "$tree/proxy" > "$tree/stand-in-files"
-  diff - "$tree/stand-in-files" << EOF
-$tree/impd-whoami:
+  ls -A "$tree/impd-whoami" > "$tree/impd-whoami-files"
+  diff - "$tree/impd-whoami-files" << EOF
 good-token
 pid
 port
-
-$tree/proxy:
+EOF
+  ls -A "$tree/proxy" > "$tree/proxy-files"
+  diff - "$tree/proxy-files" << EOF
 pid
 port
 EOF

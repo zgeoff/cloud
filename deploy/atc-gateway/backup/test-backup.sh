@@ -306,22 +306,26 @@ sqlite3 /state/a.db 'CREATE TABLE a (x); INSERT INTO a VALUES (1);'
 sqlite3 /state/zz.db 'CREATE TABLE z (x); INSERT INTO z VALUES (1);'
 EOF
 
-  run_backup_shell "$name" "$backup_image" "$tree" > "$tree/seen" << 'EOF'
-STATE_DIR=/state /usr/local/bin/atc-gateway-backup backup < /dev/null > /tmp/out 2> /tmp/err || echo "exit $?"
-echo "stdout: [$(cat /tmp/out)]"
-echo "stderr: [$(cat /tmp/err)]"
-ls -A /tmp/atc-gateway-backup
-sqlite3 /tmp/atc-gateway-backup/gateway.db 'PRAGMA integrity_check;'
+  mkdir "$tree/seen"
+  run_backup_shell "$name" "$backup_image" "$tree" > "$tree/seen.tar" << 'EOF'
+mkdir /tmp/seen
+status=0
+STATE_DIR=/state /usr/local/bin/atc-gateway-backup backup < /dev/null > /tmp/seen/out 2> /tmp/seen/err || status=$?
+echo "$status" > /tmp/seen/status
+ls -A /tmp/atc-gateway-backup > /tmp/seen/work-dir
+sqlite3 /tmp/atc-gateway-backup/gateway.db 'PRAGMA integrity_check;' > /tmp/seen/integrity
+tar -cf - -C /tmp/seen .
 EOF
 
-  diff - "$tree/seen" << 'EOF'
-exit 1
-stdout: []
-stderr: []
+  tar -xf "$tree/seen.tar" -C "$tree/seen"
+  diff /dev/null "$tree/seen/out"
+  diff /dev/null "$tree/seen/err"
+  diff - "$tree/seen/status" <<< 1
+  diff - "$tree/seen/work-dir" << 'EOF'
 a.db
 gateway.db
-row 11 missing from index t_x
 EOF
+  diff - "$tree/seen/integrity" <<< 'row 11 missing from index t_x'
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json' > "$tree/snapshots"
   diff - "$tree/snapshots" <<< '[]'
 }
@@ -364,11 +368,10 @@ EOF
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
 EOF
-  run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state; sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state"
-  diff - "$tree/state" << 'EOF'
-gateway.db
-current
-EOF
+  run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state-files"
+  diff - "$tree/state-files" <<< gateway.db
+  run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state-rows"
+  diff - "$tree/state-rows" <<< current
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -504,12 +507,13 @@ EOF
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @atc-gateway to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
 EOF
-  run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state; sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state"
-  diff - "$tree/state" << 'EOF'
+  run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state-files"
+  diff - "$tree/state-files" << 'EOF'
 gateway.db
 other.db-wal
-restored
 EOF
+  run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state-rows"
+  diff - "$tree/state-rows" <<< restored
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 

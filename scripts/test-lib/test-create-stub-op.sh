@@ -3,7 +3,9 @@
 # and files, answers the four op calls the credentials script makes in op's JSON and error
 # shapes, records the service-account token it ran with, and fails closed on any other
 # call. No op runs here (CI has no 1Password account), so its shapes are pinned as literals
-# of op 2's vault and item JSON and its "[ERROR] <date> <message>" lines.
+# of op 2's vault and item JSON and its "[ERROR] <date> <message>" lines; create-stub-op.sh's
+# header names the 1Password documentation they were checked against and what it leaves
+# unsettled.
 #
 #   bash scripts/test-lib/test-create-stub-op.sh
 # shellcheck source-path=SCRIPTDIR
@@ -128,7 +130,7 @@ it_fails_the_item_list_as_a_rate_limited_op_when_told_to() {
     op item list --vault cloud --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You'"'"'ve reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.'
   diff - "$tree/calls" <<< '["op","item","list","--vault","cloud","--format","json"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -184,7 +186,7 @@ it_creates_no_item_when_told_to_fail_the_create() {
       op item create --vault cloud - --format json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You'"'"'ve reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.'
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/calls" <<< '["op","item","create","--vault","cloud","-","--format","json"]'

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test for create-stub-clock.sh: the fake clock starts at 0 and moves only when the fake
-# pause runs, one second per pause, and the pause records each argument.
+# pause runs, one second per pause, and the pause records each argument, also when it runs
+# as the sleep command on PATH.
 #
 #   bash scripts/test-lib/test-create-stub-clock.sh
 # shellcheck source-path=SCRIPTDIR
@@ -49,6 +50,18 @@ it_keeps_the_time_still_between_reads() {
 1
 1
 READS
+}
+
+it_answers_as_the_sleep_command_on_PATH() {
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  create_stub_clock "$tree"
+
+  PATH="$tree:$PATH" sleep 0.05
+  "$tree/clock" > "$tree/out"
+
+  diff - "$tree/out" <<< 1
+  diff - "$tree/pauses" <<< 0.05
 }
 
 run_cases

@@ -16,14 +16,32 @@
 #   limited;
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
-# Not checked against a real op (no 1Password account runs in a test): the item and vault
-# JSON carry only the fields the credentials script reads (id, name, title) and a few
-# beside them, not every field op 2 prints, such as created_at and updated_at; the
-# missing-vault error repeats op's `vault get` text for item list and item create; and the
-# missing-item read error follows the text 1Password community reports quote for op 2
-# ("could not read secret op://<vault>/<item>/<field>: could not get item <vault>/<item>:
-# "<item>" isn't an item in the "<vault>" vault."), whose quoting of the reference varies
-# between op releases.
+# Checked on 2026-10-08 against 1Password's CLI documentation, which carries no version of
+# its own; op 2.40.0 (2026-10-01, https://app-updates.agilebits.com/product_history/CLI2) was
+# current then and is the version images/agent/Dockerfile pins. developer.1password.com
+# redirects each page to www.1password.dev:
+#
+# - https://www.1password.dev/cli/reference/management-commands/vault/ : `vault get <name>`;
+# - https://www.1password.dev/cli/reference/management-commands/item/ : `item list --vault`,
+#   `item create --vault <vault> -` reading the item JSON on stdin;
+# - https://www.1password.dev/cli/item-template-json/ : the item JSON (id, title, version,
+#   vault, category, fields with id, type, label and value);
+# - https://www.1password.dev/cli/reference/commands/read/ : `read` prints a newline after the
+#   secret unless -n is given;
+# - https://www.1password.dev/service-accounts/rate-limits/ : the rate-limit error text,
+#   "[ERROR] (429) Too Many Requests: You've reached ... Please retry in 59 minutes or try
+#   other requests.", which the stand-in prints for both STUB_OP_FAIL_AT calls.
+#
+# The documentation does not settle, so they stay as they were and need a real op sample:
+# op's exit codes (the stand-in uses 1 for every error, as 1Password community answers
+# describe); the "[ERROR] <date> <time>" frame, which the rate-limit example prints without
+# a timestamp and after "Error: "; the "isn't a vault" and "could not read secret" texts,
+# taken from community reports of op 2; the retry time in the rate-limit text; the fields
+# of `vault get` (only id and name here); the fields of an `item list` element and of the
+# item `item create` prints (the template example shows vault with id alone, created_at,
+# updated_at and last_edited_by, which the stand-in leaves out, and a vault name it adds);
+# the API_CREDENTIAL spelling, which the documentation shows only as "API Credential"; and
+# the credential field's id, "credential", which the script writes and reads.
 create_stub_op() {
   local bin="$1"
   cat > "$bin/op" << 'STUB'
@@ -41,7 +59,7 @@ case "$*" in
     ;;
   "item list --vault "*" --format json")
     if [ "${STUB_OP_FAIL_AT:-}" = item-list ]; then
-      echo "[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later." >&2
+      echo "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests." >&2
       exit 1
     fi
     if [ ! -d "$STUB_TREE/vault/$4" ]; then
@@ -55,7 +73,7 @@ case "$*" in
   "item create --vault "*" - --format json")
     item="$(cat)"
     if [ "${STUB_OP_FAIL_AT:-}" = item-create ]; then
-      echo "[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later." >&2
+      echo "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests." >&2
       exit 1
     fi
     if [ ! -d "$STUB_TREE/vault/$4" ]; then

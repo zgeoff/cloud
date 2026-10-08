@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Test for wait-for.sh: wait_for polls a command until it succeeds, and fails with a
 # named message once its deadline passes. The cases step the fake clock from
-# create-stub-clock.sh, so a deadline costs no real time; the last case alone runs on the
-# real clock and sleep, because nothing else shows that the defaults advance and so ever
-# reach a deadline.
+# create-stub-clock.sh, so a deadline costs no real time. Two cases cover the defaults
+# without waiting: one reaches a deadline on bash's SECONDS by advancing it from the poll,
+# and one finds create_stub_clock's pause as the sleep command on PATH.
 #
 #   bash scripts/test-lib/test-wait-for.sh
 # shellcheck source-path=SCRIPTDIR
@@ -92,19 +92,55 @@ it_passes_the_command_arguments_through_unchanged() {
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-it_times_out_on_the_real_clock_and_sleep_when_neither_is_set() {
-  local started elapsed status=0
+# With no WAIT_FOR_CLOCK, wait_for reads bash's SECONDS. The poll runs in wait_for's own
+# shell through eval, so it moves SECONDS on by 100 each time: the deadline 250 seconds
+# after the start passes at the third poll, however many real seconds tick meanwhile. The
+# tenth poll stops a wait that never reads SECONDS, so a broken default fails the case
+# instead of hanging it.
+it_times_out_on_bashs_SECONDS_when_no_clock_is_set() {
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
-  started="$SECONDS"
+  create_stub_clock "$tree"
 
-  wait_for 1 "a condition that never holds" false > "$tree/out" 2> "$tree/err" || status=$?
+  # shellcheck disable=SC2016 # expanded by eval inside wait_for
+  WAIT_FOR_SLEEP="$tree/sleep" wait_for 250 "a condition that never holds" \
+    eval 'echo poll >> "$tree/polls"; SECONDS=$((SECONDS + 100)); [ "$(wc -l < "$tree/polls")" -ge 10 ]' \
+    > "$tree/out" 2> "$tree/err" || status=$?
 
-  elapsed=$((SECONDS - started))
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'timed out after 1s waiting for a condition that never holds'
-  [ "$elapsed" -ge 1 ] && [ "$elapsed" -le 3 ] || { echo "returned after ${elapsed}s, want 1 to 3" >&2; exit 1; }
+  diff - "$tree/err" <<< 'timed out after 250s waiting for a condition that never holds'
+  wc -l < "$tree/polls" > "$tree/poll-count"
+  diff - "$tree/poll-count" <<< 3
+  diff - "$tree/pauses" << 'PAUSES'
+0.05
+0.05
+PAUSES
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+# With no WAIT_FOR_SLEEP, wait_for pauses with the sleep command it finds on PATH; here
+# that is create_stub_clock's pause, which records each pause and steps the fake clock.
+it_pauses_with_the_sleep_command_on_PATH_when_no_pause_is_set() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  create_stub_clock "$tree"
+  # shellcheck disable=SC2016 # expanded by the poll script
+  printf '#!/usr/bin/env bash\necho poll >> "%s/polls"\n[ "$(wc -l < "%s/polls")" -ge 3 ]\n' "$tree" "$tree" > "$tree/third-poll"
+  chmod +x "$tree/third-poll"
+
+  PATH="$tree:$PATH" WAIT_FOR_CLOCK="$tree/clock" \
+    wait_for 5 "the third poll" "$tree/third-poll" > "$tree/out" 2>&1 || status=$?
+
+  diff /dev/null "$tree/out"
+  wc -l < "$tree/polls" > "$tree/poll-count"
+  diff - "$tree/poll-count" <<< 3
+  diff - "$tree/pauses" << 'PAUSES'
+0.05
+0.05
+PAUSES
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 unset WAIT_FOR_CLOCK WAIT_FOR_SLEEP

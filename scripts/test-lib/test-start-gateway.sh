@@ -15,7 +15,9 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-gateway.sh"
 
-it_starts_the_gateway_with_the_deployments_container_security_env_and_args() {
+# One docker inspect of the started container, projected to the configuration the
+# Deployment sets, is one result: its options, security, env and args come together.
+it_starts_the_gateway_container_with_the_configuration_the_deployment_sets() {
   local gateway_image="$1" backup_image="$2" run="$3"
   name="atc-gw-start-$run-$BASHPID"
   tree="$(mktemp -d)"

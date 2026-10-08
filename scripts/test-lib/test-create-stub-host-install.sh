@@ -9,6 +9,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-host-install.sh"
 
 it_creates_the_directory_with_mode_0700() {
@@ -47,7 +48,8 @@ it_sets_mode_0700_on_a_directory_that_exists() {
 }
 
 # coreutils 9.4 (CI's ubuntu-24.04 runner image 20261004) and 9.11 word install's failure under a
-# parent it may not write differently, so the case accepts either exact line.
+# parent it may not write differently, each with exit 1, so the case accepts either whole
+# output with that status.
 it_fails_with_installs_own_error_under_a_parent_it_may_not_write() {
   local status=0
   tree="$(mktemp -d)"
@@ -58,14 +60,12 @@ it_fails_with_installs_own_error_under_a_parent_it_may_not_write() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     install -d -m 0700 -o root -g root "$tree/host/secrets" > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/out"
-  grep -qxF \
-    -e "/usr/bin/install: cannot change permissions of '$tree/host/secrets': No such file or directory" \
-    -e "install: cannot create directory '$tree/host/secrets': Permission denied" \
-    "$tree/err" || { cat "$tree/err"; echo "not coreutils 9.4's or 9.11's install error" >&2; exit 1; }
-  [ "$(wc -l < "$tree/err")" = 1 ] || { cat "$tree/err"; echo "want one line on stderr" >&2; exit 1; }
+  printf '%s\n' "/usr/bin/install: cannot change permissions of '$tree/host/secrets': No such file or directory" > "$tree/err-coreutils-9.4"
+  printf '%s\n' "install: cannot create directory '$tree/host/secrets': Permission denied" > "$tree/err-coreutils-9.11"
+  assert_one_of_outputs "install under a parent it may not write" "$tree/out" "$tree/err" "$status" \
+    "coreutils 9.4" /dev/null "$tree/err-coreutils-9.4" 1 \
+    "coreutils 9.11" /dev/null "$tree/err-coreutils-9.11" 1
   diff - "$tree/calls" <<< "[\"install\",\"-d\",\"-m\",\"0700\",\"-o\",\"root\",\"-g\",\"root\",\"$tree/host/secrets\"]"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {

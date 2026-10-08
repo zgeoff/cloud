@@ -47,7 +47,8 @@ LINES
   diff /dev/null "$tree/second-out"
   diff - "$tree/first-err" <<< 'curl: (56) Recv failure: Connection reset by peer'
   diff - "$tree/second-err" <<< 'curl: (56) Recv failure: Connection reset by peer'
-  [ "$first $second" = "56 56" ] || { echo "exits $first $second, want 56 56" >&2; exit 1; }
+  [ "$first" = 56 ] || { echo "first exit $first, want 56" >&2; exit 1; }
+  [ "$second" = 56 ] || { echo "second exit $second, want 56" >&2; exit 1; }
 }
 
 it_records_no_connection_until_one_arrives() {
