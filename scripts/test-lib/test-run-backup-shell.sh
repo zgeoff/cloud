@@ -86,8 +86,8 @@ it_stops_the_backup_shell_at_the_first_failing_command() {
 it_names_the_backup_shell_container_after_the_case_while_it_runs() {
   local backup_image="$2" run="$3"
   name="atc-gw-shell-$run-$BASHPID"
-  tree="$(mktemp -d)"
   client=""
+  tree="$(mktemp -d)"
   trap '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
 
