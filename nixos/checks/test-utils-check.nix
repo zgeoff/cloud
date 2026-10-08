@@ -117,6 +117,61 @@ let
       '';
     }
     {
+      title = "it collectCaseRejections lists a title with an underscore, which the runner would print as a space";
+      script = ''
+        rejections=${
+          lib.escapeShellArg (
+            builtins.toJSON (collectCaseRejections [
+              {
+                title = "it reads IMPD_HEALTH_URL";
+                script = "true";
+              }
+            ])
+          )
+        }
+
+        assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: it reads IMPD_HEALTH_URL"]' "$rejections" "the rejections"
+      '';
+    }
+    {
+      title = "it collectCaseRejections lists a title that does not start with it";
+      script = ''
+        rejections=${
+          lib.escapeShellArg (
+            builtins.toJSON (collectCaseRejections [
+              {
+                title = "reads the url";
+                script = "true";
+              }
+            ])
+          )
+        }
+
+        assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url"]' "$rejections" "the rejections"
+      '';
+    }
+    {
+      title = "it collectCaseRejections lists a title two cases share";
+      script = ''
+        rejections=${
+          lib.escapeShellArg (
+            builtins.toJSON (collectCaseRejections [
+              {
+                title = "it reads the url";
+                script = "true";
+              }
+              {
+                title = "it reads the url";
+                script = "false";
+              }
+            ])
+          )
+        }
+
+        assert_equals '["renderCases: titles must be unique: it reads the url"]' "$rejections" "the rejections"
+      '';
+    }
+    {
       title = "it buildModuleSystem evaluates the given module with the given config";
       script =
         let
@@ -1100,19 +1155,8 @@ pkgs.runCommand "test-utils-check"
             }
           ])).success
       }
-      rejections=${
-        lib.escapeShellArg (
-          builtins.toJSON (collectCaseRejections [
-            {
-              title = "it reads IMPD_HEALTH_URL";
-              script = "true";
-            }
-          ])
-        )
-      }
 
       assert_equals false "$rendered" "whether it rendered"
-      assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: it reads IMPD_HEALTH_URL"]' "$rejections" "the rejections"
     )
 
     echo "it renderCases rejects a title that does not start with it"
@@ -1128,19 +1172,8 @@ pkgs.runCommand "test-utils-check"
             }
           ])).success
       }
-      rejections=${
-        lib.escapeShellArg (
-          builtins.toJSON (collectCaseRejections [
-            {
-              title = "reads the url";
-              script = "true";
-            }
-          ])
-        )
-      }
 
       assert_equals false "$rendered" "whether it rendered"
-      assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url"]' "$rejections" "the rejections"
     )
 
     echo "it renderCases rejects two cases with one title, where the second would replace the first"
@@ -1160,23 +1193,8 @@ pkgs.runCommand "test-utils-check"
             }
           ])).success
       }
-      rejections=${
-        lib.escapeShellArg (
-          builtins.toJSON (collectCaseRejections [
-            {
-              title = "it reads the url";
-              script = "true";
-            }
-            {
-              title = "it reads the url";
-              script = "false";
-            }
-          ])
-        )
-      }
 
       assert_equals false "$rendered" "whether it rendered"
-      assert_equals '["renderCases: titles must be unique: it reads the url"]' "$rejections" "the rejections"
     )
 
     source ${testLib}/run-cases.sh
