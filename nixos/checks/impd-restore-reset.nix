@@ -23,8 +23,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
         machine.succeed("cd /mnt/imp && { sleep infinity < /dev/null > /dev/null 2>&1 & echo $! > /tmp/holder.pid; }")
         holder = machine.succeed("cat /tmp/holder.pid").strip()
+        busy_before = machine.execute("umount /mnt/imp")[0]
 
         ctx = setup_test()
+        assert busy_before == 32, f"umount of the held mount exited {busy_before}"
         machine.fail(f"kill -0 {holder}")
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
@@ -70,8 +72,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         ctx = setup_test()
         machine.succeed("mkdir -p /mnt/imp /mnt/imp-again && mount -t zfs tank/imp /mnt/imp")
         machine.succeed("mount --bind /mnt/imp /mnt/imp-again")
+        mounts_before = sorted(machine.succeed("findmnt -rn -S tank/imp -o TARGET").split())
 
         ctx = setup_test()
+        assert mounts_before == ["/mnt/imp", "/mnt/imp-again"], f"tank/imp was mounted on {mounts_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -116,8 +120,11 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         ctx = setup_test()
         machine.succeed("mkdir -p /root/imp-db-backups/copy && mount -t tmpfs copy /root/imp-db-backups/copy")
         machine.succeed("mkdir /root/imp-db-backups/copy/inner && mount -t tmpfs inner /root/imp-db-backups/copy/inner")
+        targets_before = machine.succeed("findmnt -rn -o TARGET").split()
+        backup_mounts_before = [target for target in targets_before if target.startswith("/root/imp-db-backups")]
 
         ctx = setup_test()
+        assert backup_mounts_before == ["/root/imp-db-backups/copy", "/root/imp-db-backups/copy/inner"], f"mounted under the backups were {backup_mounts_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -163,8 +170,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-restore-20261004T000000/secrets")
         machine.succeed("printf 'dummy-secret-value\\n' > /root/imp-db-backups/pre-restore-20261004T000000/secrets/glm")
         machine.succeed("printf 'restore-impd-db: nothing was changed\\n' > /tmp/restore.err")
+        left_before = machine.succeed("find /root/imp-db-backups /tmp/restore.err | sort").split()
 
         ctx = setup_test()
+        assert left_before == ["/root/imp-db-backups", "/root/imp-db-backups/pre-restore-20261004T000000", "/root/imp-db-backups/pre-restore-20261004T000000/secrets", "/root/imp-db-backups/pre-restore-20261004T000000/secrets/glm", "/tmp/restore.err"], f"the files were {left_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -210,8 +219,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
         machine.succeed("printf '{' > /tmp/broken-seccomp.json")
         machine.succeed(f"mount --bind /tmp/broken-seccomp.json {seccomp[0]}")
+        covered_before = machine.succeed(f"cat {seccomp[0]}")
 
         ctx = setup_test()
+        assert covered_before == "{", f"the seccomp profile read {covered_before!r}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -255,8 +266,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
     with subtest("it removes the mount directories a restore left in /run"):
         ctx = setup_test()
         machine.succeed("mkdir /run/impd-restore.AAAAAA /run/impd-restore.BBBBBB")
+        run_before = machine.succeed("ls -d /run/impd-restore.*").split()
 
         ctx = setup_test()
+        assert run_before == ["/run/impd-restore.AAAAAA", "/run/impd-restore.BBBBBB"], f"/run held {run_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -300,8 +313,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
     with subtest("it starts docker again when it is stopped"):
         ctx = setup_test()
         machine.succeed("systemctl stop docker.socket docker.service")
+        docker_before = machine.execute("systemctl is-active docker.socket docker.service")[1].split()
 
         ctx = setup_test()
+        assert docker_before == ["inactive", "inactive"], f"docker was {docker_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -345,8 +360,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
     with subtest("it clears a unit that failed"):
         ctx = setup_test()
         machine.execute("systemd-run --unit=rehearsal-leftover --wait /run/current-system/sw/bin/false")
+        failed_before = machine.execute("systemctl is-failed rehearsal-leftover")[1].strip()
 
         ctx = setup_test()
+        assert failed_before == "failed", f"the leftover unit was {failed_before!r}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -392,8 +409,12 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         machine.succeed("systemctl stop imp-host imp-docker-proxy")
         machine.succeed("docker pull ${image28.ref}")
         machine.succeed("docker run -d --name leftover ${image28.ref}")
+        units_before = machine.execute("systemctl is-active imp-host imp-docker-proxy")[1].split()
+        leftover_before = machine.succeed("docker inspect leftover --format '{{.Config.Image}}'").strip()
 
         ctx = setup_test()
+        assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+        assert leftover_before == "${image28.ref}", f"the leftover container ran {leftover_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -438,8 +459,13 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         ctx = setup_test()
         machine.succeed(f"nix-env -p /nix/var/nix/profiles/system --set {ctx['old_path']}")
         machine.succeed(f"{ctx['old_path']}/bin/switch-to-configuration test")
+        old_before = ctx["old_path"]
+        current_before = machine.succeed("readlink -f /run/current-system").strip()
+        profile_before = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
 
         ctx = setup_test()
+        assert current_before == old_before, f"the system was {current_before}"
+        assert profile_before == "system-4-link", f"the system profile was {profile_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -484,8 +510,13 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         ctx = setup_test()
         machine.succeed(f"ln -sfn {ctx['old_path']} /run/current-system")
         machine.succeed("rm /nix/var/nix/profiles/system-1-link")
+        old_before = ctx["old_path"]
+        current_before = machine.succeed("readlink -f /run/current-system").strip()
+        links_before = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
 
         ctx = setup_test()
+        assert current_before == old_before, f"the system was {current_before}"
+        assert links_before == ["system-2-link", "system-3-link"], f"the generations were {links_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -530,11 +561,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         ctx = setup_test()
         machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
         machine.succeed("install -d -m 0700 /mnt/imp/db && printf 'left\\n' > /mnt/imp/db/imp.sqlite")
+        contents_before = machine.succeed("ls -A /mnt/imp")
         machine.succeed("umount /mnt/imp")
         machine.succeed("zfs snapshot tank/imp@leftover")
         machine.succeed("zfs create tank/imp/leftover")
+        datasets_before = sorted(machine.succeed("zfs list -H -r -t all -o name tank/imp").split())
 
         ctx = setup_test()
+        assert contents_before == "db\n", f"tank/imp held {contents_before!r}"
+        assert datasets_before == ["tank/imp", "tank/imp/leftover", "tank/imp@leftover"], f"the datasets were {datasets_before}"
         booted = machine.succeed("readlink -f /run/booted-system").strip()
         specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
         assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
