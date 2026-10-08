@@ -53,8 +53,11 @@ it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
   setup_test "$tree"
   rm "$tree/bin/ssh"
 
-  bash -ec 'source "$1"; require_remote_tool_stubs "$2" "$3"; touch "$4"' _ "$lib" "$tree/bin" \
-    "$tree/system" "$tree/script-ran" > "$tree/out" 2> "$tree/err" || status=$?
+  # shellcheck disable=SC2016 # expanded by the child bash
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash -ec 'source "$1"; require_remote_tool_stubs "$2" "$3"; touch "$4"' _ \
+    "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh" "$tree/bin" "$tree/system" "$tree/script-ran" \
+    > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to nothing, not a stand-in in $tree/bin"
@@ -227,16 +230,16 @@ it_fails_when_tailscale_is_missing_everywhere() {
 }
 
 # Runtime every case needs: <tree>/bin with an executable placeholder for each remote
-# tool, and an empty <tree>/system for the cases to pass as the system path. The guard only
-# resolves names, so a placeholder that exits 97 serves.
+# tool, an empty <tree>/system for the cases to pass as the system path, and the HOME and
+# TMPDIR a child bash runs with. The guard only resolves names, so a placeholder that
+# exits 97 serves.
 setup_test() {
   local tree="$1" tool
-  mkdir "$tree/bin" "$tree/system"
+  mkdir "$tree/bin" "$tree/system" "$tree/home" "$tree/tmp"
   for tool in ssh scp sftp rsync tailscale; do
     printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/bin/$tool"
     chmod +x "$tree/bin/$tool"
   done
 }
 
-lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/require-remote-tool-stubs.sh"
 run_cases

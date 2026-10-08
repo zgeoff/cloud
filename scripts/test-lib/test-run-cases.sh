@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Test for run-cases.sh, the runner the shell suites source. It cannot run itself on the
 # runner it tests, so it drives each case with the plain loop at the bottom: every case
-# writes a small suite that sources run-cases.sh, runs it under `env -i` with HOME and
-# TMPDIR inside the case tree, and compares the whole output and the exact exit code. It
-# keeps the caller's PATH, so it also runs in the Nix build sandbox
-# (nixos/checks/test-utils-check.nix), which has no /usr/bin.
+# writes a small suite that sources run-cases.sh, runs it under `env -i` with PATH, HOME
+# and TMPDIR inside the case tree, and compares the whole output and the exact exit code.
+# The case's PATH holds only links to the tools the suite runs, found where the caller
+# finds them, so it also runs in the Nix build sandbox (nixos/checks/test-utils-check.nix),
+# which has no /usr/bin.
 #
 #   bash scripts/test-lib/test-run-cases.sh
 #   CASE='exported' bash scripts/test-lib/test-run-cases.sh   # the cases whose title holds it
@@ -25,7 +26,7 @@ it_passes_second() { true; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it passes first
@@ -47,7 +48,7 @@ it_passes_after() { true; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 FAIL it fails (exit 3)
@@ -70,7 +71,7 @@ it_stops_early() { false; echo "after the failure"; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 FAIL it stops early (exit 1)
@@ -90,7 +91,7 @@ it_reads_unset() { echo "\$never_set"; echo "after the read"; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << EOF
 FAIL it reads unset (exit 1)
@@ -111,7 +112,7 @@ it_pipes() { false | true; echo "after the pipeline"; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 FAIL it pipes (exit 1)
@@ -132,7 +133,7 @@ it_writes_a_file() { false; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" CASE='reads a' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" CASE='reads a' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it reads a file
@@ -152,7 +153,7 @@ it_passes() { true; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" CASE='no such title' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" CASE='no such title' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" <<< '0 cases, 0 failed'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
@@ -170,7 +171,7 @@ it_counts_them() { [ "\$#" = 2 ]; }
 run_cases one "two words"
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it counts them
@@ -191,7 +192,7 @@ it_cleans_up() { trap 'touch "$tree/cleaned"' EXIT; false; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   [ -e "$tree/cleaned" ] || { echo "the case's EXIT trap did not run" >&2; exit 1; }
   diff - "$tree/out" << 'EOF'
@@ -214,7 +215,7 @@ it_c_starts_in_the_suites_directory() { [ "\$PWD" = "$tree" ]; }
 run_cases
 EOF
 
-  (cd "$tree" && env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh") > "$tree/out" 2>&1 || status=$?
+  (cd "$tree" && env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh") > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it a sets a variable and changes directory
@@ -238,7 +239,7 @@ it_passes() { true; }
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it passes
@@ -259,7 +260,7 @@ export -f it_is_exported
 run_cases
 EOF
 
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
+  env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" << 'EOF'
 ok it is exported
@@ -268,11 +269,16 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-# Runtime every case needs: the HOME and TMPDIR the suite under test runs with, inside the
-# case tree.
+# Runtime every case needs: the PATH, HOME and TMPDIR the suite under test runs with,
+# inside the case tree. The PATH directory holds a link to each tool the written suites
+# run (bash, and sed and touch, which run-cases.sh and a case's trap call), resolved on
+# the caller's PATH, which in the Nix sandbox is the only place they are.
 setup_test() {
-  local tree="$1"
-  mkdir "$tree/home" "$tree/tmp"
+  local tree="$1" tool
+  mkdir "$tree/bin" "$tree/home" "$tree/tmp"
+  for tool in bash sed touch; do
+    ln -s "$(command -v "$tool")" "$tree/bin/$tool"
+  done
 }
 
 lib="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-cases.sh"

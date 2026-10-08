@@ -58,7 +58,7 @@ it_reports_a_failed_build_with_its_log_and_runs_nothing() {
   release="$(< "$tree/release")"
 
   # shellcheck disable=SC2016 # expanded by the inner shell
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
     GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 \
     GH_HOST="127.0.0.1:$(cat "$tree/github/port")" SSL_CERT_FILE="$tree/github/cert.pem" \
     SSL_CERT_DIR="$tree/no-certs" bash -c 'source "$1"; with_fixture_images touch "$2/ran"' _ \
@@ -93,7 +93,7 @@ it_runs_the_release_fetch_with_ghs_telemetry_and_update_check_off() {
   release="$(< "$tree/release")"
 
   # shellcheck disable=SC2016 # expanded by the inner shell
-  env -i PATH="$tree/bin:$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     bash -c 'source "$1"; with_fixture_images touch "$2/ran"' _ \
     "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh" "$tree" \
     > "$tree/out" 2> "$tree/err" || status=$?
