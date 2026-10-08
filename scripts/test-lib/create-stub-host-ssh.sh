@@ -67,7 +67,7 @@ dir="$ATC_CREDENTIALS_DIR"
 case "$remote" in
   true | "docker exec imp-host imp "*" --json" | "docker exec -i imp-host imp secret add glm "* | \
     "install -d -m 0700 -o root -g root $dir" | "ls $dir" | "sha256sum $dir/gateway-token" | \
-    "umask 077; t=\$(mktemp $dir/.gateway-token.XXXXXX);"* | \
+    "set -euo pipefail; umask 077; t=\$(mktemp $dir/.gateway-token.XXXXXX)"* | \
     "set -euo pipefail; export LC_ALL=C"*"/rpc/tokens/whoami" | \
     "set -euo pipefail; umask 077; t=\$(mktemp $dir/.imp-token.XXXXXX)"* | \
     "stat -c '%n %U %a %s bytes' $dir $dir/gateway-token $dir/imp-token") ;;
@@ -100,7 +100,7 @@ case "$remote" in
       echo '["imp-token-removed-at-whoami"]' >> "$STUB_TREE/calls"
     fi
     ;;
-  "umask 077; t="*)
+  "set -euo pipefail; umask 077; t=\$(mktemp $dir/.gateway-token."*)
     if [ -n "${STUB_READONLY_AT_BEARER_WRITE:-}" ]; then
       chmod 0500 "$dir"
       echo '["secrets-dir-made-read-only"]' >> "$STUB_TREE/calls"

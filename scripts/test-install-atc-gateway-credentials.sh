@@ -92,7 +92,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -220,7 +220,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -293,7 +293,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -423,9 +423,30 @@ EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
-# A failing `imp info` reads as an impd without grantableTokens: the script's one message
-# for both, after docker's own.
-it_reports_missing_grantable_tokens_when_imp_info_fails() {
+it_stops_before_1Password_when_the_settings_file_holds_no_token() {
+  local seed="$1" status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree" atc-key
+  mkdir "$tree/vault/cloud" "$tree/host/secrets"
+  echo '{"env":{}}' > "$tree/settings.json"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" CLOUD_OP_SETTINGS="$tree/settings.json" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << EOF
+$tree/settings.json holds no env.OP_SERVICE_ACCOUNT_TOKEN; nothing changed
+EOF
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/calls"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+# A failing `imp info` stops the script with docker's own message and exit code, never
+# as an impd without grantableTokens.
+it_stops_with_dockers_message_when_imp_info_fails() {
   local seed="$1" status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
@@ -441,7 +462,6 @@ it_reports_missing_grantable_tokens_when_imp_info_fails() {
 
   diff - "$tree/err" << EOF
 Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
-impd lacks grantableTokens; nothing changed
 EOF
   diff - "$tree/out" << EOF
 
@@ -716,7 +736,7 @@ EOF
 ["docker","exec","-i","imp-host","imp","secret","add","glm","--kind","custom","--hosts","api.z.ai","--header","authorization","--scheme","bearer","--json"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -1038,10 +1058,10 @@ EOF
 ["install","-d","-m","0700","-o","root","-g","root","$tree/host/secrets"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","item","create","--vault","cloud","-","--format","json"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX);\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v;\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX)\\n    trap 'rm -f \\"\$t\\"' EXIT\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token; trap - EXIT"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -1109,7 +1129,7 @@ EOF
 ["install","-d","-m","0700","-o","root","-g","root","$tree/host/secrets"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","item","create","--vault","cloud","-","--format","json"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX);\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v;\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX)\\n    trap 'rm -f \\"\$t\\"' EXIT\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token; trap - EXIT"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
 EOF
@@ -1164,7 +1184,7 @@ EOF
 ["install","-d","-m","0700","-o","root","-g","root","$tree/host/secrets"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","item","create","--vault","cloud","-","--format","json"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX);\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v;\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX)\\n    trap 'rm -f \\"\$t\\"' EXIT\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token; trap - EXIT"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
 ["gateway-token-altered"]
@@ -1249,9 +1269,6 @@ it_stops_with_the_item_created_when_the_host_cannot_write_the_bearer() {
 
   diff - "$tree/err" << EOF
 mktemp: failed to create file via template '$tree/host/secrets/.gateway-token.XXXXXX': Permission denied
-bash: line 2: : No such file or directory
-chmod: cannot access '': No such file or directory
-mv: cannot stat '': No such file or directory
 EOF
   diff - "$tree/out" << EOF
 
@@ -1278,7 +1295,7 @@ EOF
 ["install","-d","-m","0700","-o","root","-g","root","$tree/host/secrets"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","item","create","--vault","cloud","-","--format","json"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX);\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v;\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX)\\n    trap 'rm -f \\"\$t\\"' EXIT\\n    IFS= read -r v; printf '%s\\\\n' \\"\$v\\" > \\"\$t\\"; unset v\\n    chmod 0400 \\"\$t\\"; mv \\"\$t\\" $tree/host/secrets/gateway-token; trap - EXIT"]
 ["secrets-dir-made-read-only"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -1347,7 +1364,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -1416,7 +1433,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -1481,7 +1498,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -1546,7 +1563,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -1611,7 +1628,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -1676,7 +1693,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -1744,7 +1761,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -1810,7 +1827,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -1875,7 +1892,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -1940,7 +1957,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2008,7 +2025,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -2075,7 +2092,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2137,7 +2154,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2200,7 +2217,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2263,7 +2280,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2339,12 +2356,78 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:1/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:1/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
+}
+
+it_leaves_the_saved_token_unchecked_when_curl_rejects_the_impd_port() {
+  local seed="$1" good_token status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree" atc-key
+  mkdir "$tree/vault/cloud" "$tree/host/secrets"
+  good_token="$(build_token "$seed" good)"
+  echo '{"version":"0.27.0","features":{"sessionOffsets":true,"leases":true,"grantableTokens":true,"secretRebind":true}}' > "$tree/impd/info.json"
+  echo '[{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/secrets.json"
+  echo '[{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"sshKeys":[],"grantable":["glm"],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/tokens.json"
+  printf fixture-bearer > "$tree/vault/cloud/atc-daemon-token"
+  printf 'fixture-bearer\n' > "$tree/host/secrets/gateway-token"
+  printf '%s\n' "$good_token" > "$tree/host/secrets/imp-token"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
+    STUB_HOST_BIN="$tree/host-bin-real-curl" STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT=7070x \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  # curl 8.5.0 (CI's ubuntu-24.04 runner image) and 8.22.0 print the same line for a
+  # port that is not a number, and both exit 3.
+  cat > "$tree/want-err" << EOF
+curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535
+the check on the host exited 3 (curl's exit code, or 255 from ssh), so $tree/host/secrets/imp-token is unchecked; nothing changed.
+Check impd on the host's 127.0.0.1:7070x, then rerun
+EOF
+  cat > "$tree/want-out" << EOF
+
+== preflight
+ok: 1Password vault cloud, atc-key, ssh root@geoffcloud, impd grantableTokens, $tree/host/secrets
+
+== 1/3 impd secret glm (api.z.ai, authorization: Bearer)
+skip: glm exists with the expected rules
+
+== 2/3 daemon bearer: 1Password cloud/atc-daemon-token and root@geoffcloud:$tree/host/secrets/gateway-token
+skip: both exist and match
+
+== 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to root@geoffcloud:$tree/host/secrets/imp-token
+EOF
+  diff "$tree/want-err" "$tree/err"
+  diff "$tree/want-out" "$tree/out"
+  diff - "$tree/calls" << EOF
+["op","vault","get","cloud","--format","json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","true"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","info","--json"]
+["docker","exec","imp-host","imp","info","--json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
+["docker","exec","imp-host","imp","secret","ls","--json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","token","ls","--json"]
+["docker","exec","imp-host","imp","token","ls","--json"]
+["op","item","list","--vault","cloud","--format","json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","install -d -m 0700 -o root -g root $tree/host/secrets"]
+["install","-d","-m","0700","-o","root","-g","root","$tree/host/secrets"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
+["op","read","op://cloud/atc-daemon-token/credential"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070x/rpc/tokens/whoami"]
+EOF
+  jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
+  diff /dev/null "$tree/mints"
+  grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
+  diff /dev/null "$tree/leaks"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 # A listener that resets the connection after reading the request drives the real curl
@@ -2405,7 +2488,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$listener_port/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$listener_port/rpc/tokens/whoami"]
 EOF
   diff - "$tree/listener/connections" <<< connection
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2472,7 +2555,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh-dropped-at-whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2537,7 +2620,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["imp-token-removed-at-whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
@@ -2599,7 +2682,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -2661,7 +2744,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -3101,7 +3184,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\\"json\\":{}}","-w","\\\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
@@ -3200,7 +3283,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","token","ls","--json"]
@@ -3301,7 +3384,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami"]
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
@@ -3385,7 +3468,7 @@ EOF
 ["ssh","-o","BatchMode=yes","root@geoffcloud","ls $tree/host/secrets"]
 ["op","read","op://cloud/atc-daemon-token/credential"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 3\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 3\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C\\n    test -f $tree/host/secrets/imp-token && test -r $tree/host/secrets/imp-token || exit 120\\n    size=\$(wc -c < $tree/host/secrets/imp-token) || exit 120\\n    v=\$(cat $tree/host/secrets/imp-token && printf x) || exit 120; v=\${v%x}\\n    test \\"\${#v}\\" = \\"\$size\\" || exit 121\\n    v=\${v%\$'\\\\n'}\\n    [[ \\"\$v\\" =~ ^[[:graph:]]+\$ ]] || exit 121\\n    printf 'Authorization: Bearer %s\\\\n' \\"\$v\\" |\\n      env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy         -u ALL_PROXY -u no_proxy -u NO_PROXY         curl -q --noproxy '*' -sS --max-time 10 -H @- -H 'content-type: application/json'         --data '{\\"json\\":{}}' -w '\\\\n%{http_code}' http://127.0.0.1:$impd_port/rpc/tokens/whoami"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","secret","ls","--json"]
 ["docker","exec","imp-host","imp","secret","ls","--json"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","token","ls","--json"]

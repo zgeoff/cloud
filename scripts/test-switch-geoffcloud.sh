@@ -489,6 +489,29 @@ EOF
   [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
 }
 
+it_leaves_no_snapshot_archive_behind_when_the_commit_cannot_be_archived() {
+  local blob status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/clone/nixos"
+  echo committed > "$tree/clone/nixos/marker"
+  git -C "$tree/clone" add nixos/marker
+  git -C "$tree/clone" commit -qm marker
+  git -C "$tree/clone" push -q origin main
+  blob="$(git -C "$tree/clone" rev-parse HEAD:nixos/marker)"
+  rm -f "$tree/clone/.git/objects/${blob:0:2}/${blob:2}"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  ls -A "$tree/tmp" > "$tree/tmp-files"
+  diff /dev/null "$tree/tmp-files"
+  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+}
+
 it_never_builds_outside_a_git_checkout() {
   local status=0
   tree="$(mktemp -d)"

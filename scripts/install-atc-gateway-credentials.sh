@@ -28,6 +28,10 @@ op_settings="${CLOUD_OP_SETTINGS:-$HOME/projects/cloud/.claude/settings.local.js
 
 if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
   OP_SERVICE_ACCOUNT_TOKEN="$(jq -r '.env.OP_SERVICE_ACCOUNT_TOKEN // empty' "$op_settings")"
+  if [ -z "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+    echo "$op_settings holds no env.OP_SERVICE_ACCOUNT_TOKEN; nothing changed" >&2
+    exit 1
+  fi
   export OP_SERVICE_ACCOUNT_TOKEN
 fi
 
@@ -43,8 +47,10 @@ step "preflight"
 op vault get "$vault" --format json > /dev/null
 command -v atc-key > /dev/null
 on_host true
-on_host docker exec imp-host imp info --json |
-  jq -e '.features.grantableTokens == true' > /dev/null ||
+# a failing `imp info` stops here with docker's own message (set -e), so the check below
+# reads only a real answer
+info="$(on_host docker exec imp-host imp info --json)"
+jq -e '.features.grantableTokens == true' <<< "$info" > /dev/null ||
   {
     echo "impd lacks grantableTokens; nothing changed" >&2
     exit 1
@@ -100,9 +106,10 @@ else
       fields: [{id: "credential", type: "CONCEALED", label: "credential", value: .}]}' |
     op item create --vault "$vault" - --format json | jq -r '"1Password: \(.title) (\(.id))"'
   # shellcheck disable=SC2016 # expanded on the host
-  printf '%s\n' "$bearer" | on_host "umask 077; t=\$(mktemp $dir/.gateway-token.XXXXXX);
-    IFS= read -r v; printf '%s\n' \"\$v\" > \"\$t\"; unset v;
-    chmod 0400 \"\$t\"; mv \"\$t\" $dir/gateway-token"
+  printf '%s\n' "$bearer" | on_host "set -euo pipefail; umask 077; t=\$(mktemp $dir/.gateway-token.XXXXXX)
+    trap 'rm -f \"\$t\"' EXIT
+    IFS= read -r v; printf '%s\n' \"\$v\" > \"\$t\"; unset v
+    chmod 0400 \"\$t\"; mv \"\$t\" $dir/gateway-token; trap - EXIT"
   local_sum="$(printf '%s\n' "$bearer" | sha256sum | cut -d' ' -f1)"
   unset bearer
   item_sum="$(op read "op://$vault/$item/credential" | sha256sum | cut -d' ' -f1)"
@@ -127,7 +134,7 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   # the metadata cannot show the file is right, so ask impd who the saved token is: impd's
   # tokens.whoami on loopback. The token goes from the file to curl's stdin on the host,
   # never into argv or back here; only impd's answer and its HTTP status return. Only a
-  # file atc cannot use (exit 3), impd's 401 for an unknown token, or a clear answer naming
+  # file atc cannot use (exit 121), impd's 401 for an unknown token, or a clear answer naming
   # another caller means the file is bad; anything else leaves it unchecked and changes
   # nothing.
   #
@@ -136,17 +143,18 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   # holds a byte that is not printable, non-space ASCII (a second line, a CR, a space, a
   # NUL) is bad. curl runs with -q first (no .curlrc), --noproxy '*' and no proxy
   # variables, so no config on the host can trace the request or route it off loopback.
-  # A path that is not a readable regular file, or that cannot be read, exits 120 (above
-  # curl's and below ssh's codes): unchecked, not bad.
+  # A path that is not a readable regular file, or that cannot be read, exits 120:
+  # unchecked, not bad. 120 and 121 sit above curl's codes and below ssh's, so a curl
+  # failure, such as exit 3 for a port that is not a number, stays unchecked too.
   whoami_status=0
   # shellcheck disable=SC2016 # expanded on the host
   answer="$(on_host "set -euo pipefail; export LC_ALL=C
     test -f $dir/imp-token && test -r $dir/imp-token || exit 120
     size=\$(wc -c < $dir/imp-token) || exit 120
     v=\$(cat $dir/imp-token && printf x) || exit 120; v=\${v%x}
-    test \"\${#v}\" = \"\$size\" || exit 3
+    test \"\${#v}\" = \"\$size\" || exit 121
     v=\${v%\$'\\n'}
-    [[ \"\$v\" =~ ^[[:graph:]]+\$ ]] || exit 3
+    [[ \"\$v\" =~ ^[[:graph:]]+\$ ]] || exit 121
     printf 'Authorization: Bearer %s\n' \"\$v\" |
       env -u http_proxy -u HTTP_PROXY -u https_proxy -u HTTPS_PROXY -u all_proxy \
         -u ALL_PROXY -u no_proxy -u NO_PROXY \
@@ -159,7 +167,7 @@ if [ "$has_token" = true ] && [ "$has_file" = true ]; then
   bad_file=false
   unchecked=""
   unchecked_fix="Check impd on the host's 127.0.0.1:$impd_port, then rerun"
-  if [ "$whoami_status" -eq 3 ]; then
+  if [ "$whoami_status" -eq 121 ]; then
     bad_file=true
   elif [ "$whoami_status" -eq 120 ]; then
     unchecked="the saved token is not a readable regular file on the host"

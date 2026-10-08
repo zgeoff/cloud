@@ -414,19 +414,19 @@ it_makes_the_secrets_directory_read_only_just_before_the_bearer_write() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" STUB_READONLY_AT_BEARER_WRITE=1 \
-    ssh -o BatchMode=yes root@geoffcloud "umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \"\$t\"" \
+    ssh -o BatchMode=yes root@geoffcloud "set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \"\$t\"" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   stat -c %a "$tree/host/secrets" > "$tree/mode"
   diff - "$tree/mode" <<< 500
-  diff - "$tree/out" <<< ''
-  diff - "$tree/host-output" <<< ''
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "mktemp: failed to create file via template '$tree/host/secrets/.gateway-token.XXXXXX': Permission denied"
   diff - "$tree/calls" << CALLS
-["ssh","-o","BatchMode=yes","root@geoffcloud","umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \\"\$t\\""]
+["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \\"\$t\\""]
 ["secrets-dir-made-read-only"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_alters_the_written_bearer_just_before_its_checksum() {
