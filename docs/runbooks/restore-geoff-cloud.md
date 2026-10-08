@@ -158,11 +158,12 @@ from the original stopped the restore before the copy went in place. A third,
 `nixos/checks/impd-restore-seams.nix`, reaches the errors no real state can: a unit whose state
 cannot be read, and a staged or published file that differs from the copy, through a stand-in
 `systemctl` or `cmp` that fails only that one call. Each stopped as before, with nothing started or
-switched. Every failure after the save left the original in its saved directory. Run them on a
-machine with Docker and KVM:
+switched. Every failure after the save left the original in its saved directory. A fourth,
+`nixos/checks/impd-restore-reset.nix`, checks that the machine's reset between subtests clears what
+each subtest can leave. Run them on a machine with Docker and KVM:
 
 ```sh
-bun run test:nixos impd-restore impd-restore-saved-failures impd-restore-seams
+bun run test:nixos impd-restore impd-restore-saved-failures impd-restore-seams impd-restore-reset
 ```
 
 Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
