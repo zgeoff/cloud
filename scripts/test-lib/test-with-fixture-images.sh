@@ -10,7 +10,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/start-stub-github-api.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh"
 
 # The command checks that both images exist while it runs, then exits 7. The run id is
@@ -39,37 +39,41 @@ EOF
   [ "$status" = 7 ] || { echo "exit $status, want 7" >&2; exit 1; }
 }
 
-# GH_HOST points gh at a dead loopback port, so the release fetch fails at once with Go's
-# own connection error and nothing leaves the machine. gh sends its release lookup and a
-# GraphQL query at once and reports whichever fails first, so the log is one of exactly
-# two lines; this is a race inside one gh version, not a difference between versions. The lookup's URL carries the pinned release tag with its slash escaped, as gh
-# escapes it, so the case reads the tag from the pins.
+# GH_HOST and SSL_CERT_FILE point gh at the GitHub API stand-in on loopback, which knows
+# no release, so nothing leaves the machine. gh sends its release lookup and its draft
+# GraphQL query at once; the stand-in answers both as missing, so gh reports "release not
+# found" whichever answer lands first. The lookup's path carries the pinned release tag
+# with its slash escaped, as gh escapes it, so the case reads the tag from the pins; the
+# requests are sorted because the two lookups' order is not part of the contract.
 it_reports_a_failed_build_with_its_log_and_runs_nothing() {
   local release status=0
   tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
-  mkdir "$tree/gh" "$tree/home" "$tree/tmp"
+  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  mkdir "$tree/github" "$tree/gh" "$tree/home" "$tree/tmp"
+  start_stub_github_api "$tree/github"
   sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../deploy/atc-gateway/versions.env" > "$tree/release"
   release="$(< "$tree/release")"
 
   # shellcheck disable=SC2016 # expanded by the inner shell
-  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" GH_HOST=127.0.0.1:1 GH_CONFIG_DIR="$tree/gh" \
+  env -i PATH="$PATH" HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
+    GH_HOST="127.0.0.1:$(cat "$tree/github/port")" SSL_CERT_FILE="$tree/github/cert.pem" \
     bash -c 'source "$1"; with_fixture_images touch "$2/ran"' _ \
     "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh" "$tree" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  cat > "$tree/want-lookup" << EOF
+  diff - "$tree/out" << 'EOF'
 FAIL the images did not build from the pinned, checked binary and pinned bases
-    Get "https://127.0.0.1:1/api/v3/repos/zgeoff/atc/releases/tags/${release//\//%2F}": dial tcp 127.0.0.1:1: connect: connection refused
+    release not found
 EOF
-  cat > "$tree/want-graphql" << 'EOF'
-FAIL the images did not build from the pinned, checked binary and pinned bases
-    Post "https://127.0.0.1:1/api/graphql": dial tcp 127.0.0.1:1: connect: connection refused
+  diff /dev/null "$tree/err"
+  sort "$tree/github/requests" > "$tree/requests"
+  diff - "$tree/requests" << EOF
+GET /api/v3/repos/zgeoff/atc/releases/tags/${release//\//%2F}
+POST /api/graphql {"query":"query RepositoryReleaseByTag(\$name:String!\$owner:String!\$tagName:String!){repository(owner: \$owner, name: \$name){release(tagName: \$tagName){databaseId,isDraft}}}","variables":{"name":"atc","owner":"zgeoff","tagName":"$release"}}
 EOF
-  assert_one_of_outputs "a failed fixture build" "$tree/out" "$tree/err" "$status" \
-    "the release lookup failing first" "$tree/want-lookup" /dev/null 1 \
-    "the GraphQL query failing first" "$tree/want-graphql" /dev/null 1
+  [ ! -e "$tree/github/unexpected" ] || { echo "gh sent an unexpected request" >&2; exit 1; }
   [ ! -e "$tree/ran" ] || { echo "the command ran after a failed build" >&2; exit 1; }
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 run_cases
