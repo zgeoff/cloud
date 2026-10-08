@@ -14,6 +14,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-proxy.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-impd.sh"
 
@@ -88,7 +89,7 @@ Proxy-Connection: Keep-Alive
 LINES
   # curl's own source port is the kernel's pick, so it is masked. curl 8.5.0 (CI's ubuntu-24.04
   # runner image 20261004) and 8.22.0 word the trace's info lines differently; the case accepts
-  # either whole trace, with the same stderr and exit 52 below.
+  # either whole trace, each with the same stderr and exit 52.
   sed -E 's/ from 127\.0\.0\.1 port [0-9]+ $/ from 127.0.0.1 port CLIENT /' "$tree/out" > "$tree/out-masked"
   cat > "$tree/out-curl-8.22" << OUT
 *   Trying 127.0.0.1:$port...
@@ -116,13 +117,13 @@ OUT
 == Info: Empty reply from server
 == Info: Closing connection
 OUT
-  cmp -s "$tree/out-curl-8.22" "$tree/out-masked" || cmp -s "$tree/out-curl-8.5" "$tree/out-masked" ||
-    { cat "$tree/out-masked"; echo "not curl 8.5's or 8.22's trace" >&2; exit 1; }
-  diff - "$tree/err" << 'ERR'
+  cat > "$tree/want-err" << 'ERR'
 Warning: --trace-ascii overrides an earlier trace/verbose option
 curl: (52) Empty reply from server
 ERR
-  [ "$status" = 52 ] || { echo "exit $status, want 52" >&2; exit 1; }
+  assert_one_of_outputs "a plain curl under the .curlrc" "$tree/out-masked" "$tree/err" "$status" \
+    "curl 8.5.0" "$tree/out-curl-8.5" "$tree/want-err" 52 \
+    "curl 8.22.0" "$tree/out-curl-8.22" "$tree/want-err" 52
 }
 
 # The control for the credentials suite's hostile-config cases. It runs curl itself, not

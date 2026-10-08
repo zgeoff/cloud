@@ -15,6 +15,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-nix-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-nixos-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-racing-git.sh"
@@ -554,15 +555,13 @@ it_never_switches_when_docker_cannot_reach_its_daemon() {
     DOCKER_HOST="unix://$tree/docker.sock" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
+  printf '== build %s\n' "${commit:0:7}" > "$tree/want-out"
   printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
   printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
-  # set -e passes docker's status through: 125 from docker 28, 1 from docker 29
-  { cmp -s "$tree/err-docker-28" "$tree/err" && [ "$status" = 125 ]; } ||
-    { cmp -s "$tree/err-docker-29" "$tree/err" && [ "$status" = 1 ]; } ||
-    { cat "$tree/err"; echo "exit $status; not docker 28's or 29's missing-socket error" >&2; exit 1; }
-  diff - "$tree/out" << EOF
-== build ${commit:0:7}
-EOF
+  # set -e passes docker's status through: 125 from docker 28.0.4, 1 from docker 29.7.2
+  assert_one_of_outputs "the switch without a docker daemon" "$tree/out" "$tree/err" "$status" \
+    "docker 28.0.4" "$tree/want-out" "$tree/err-docker-28" 125 \
+    "docker 29.7.2" "$tree/want-out" "$tree/err-docker-29" 1
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","nixos/nix","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]

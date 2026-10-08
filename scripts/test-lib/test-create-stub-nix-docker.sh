@@ -6,7 +6,8 @@
 # and the exit status, as docker 28.0.4 (CI's ubuntu-24.04 runner image 20261004: a help line,
 # exit 125) or docker 29.7.2 (one line, exit 1) prints them; the `docker version` cases pin
 # each version's client version on stdout, its socket error on stderr and exit 1, both
-# checked against those two docker CLIs. No nix runs here, so a failed
+# checked against those two docker CLIs. assert_one_of_outputs accepts each version's whole
+# stdout and stderr only with that version's exit status. No nix runs here, so a failed
 # build's exit 1 is nix's documented exit for a failed build, not pinned against nix.
 #
 #   bash scripts/test-lib/test-create-stub-nix-docker.sh
@@ -15,6 +16,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-nix-docker.sh"
 
 it_copies_the_build_mount_and_prints_the_build_output() {
@@ -146,13 +148,12 @@ it_hands_a_logged_call_to_the_real_docker_which_fails_without_a_daemon_at_its_so
     docker run --rm nixos/nix nix build --no-link --print-out-paths path:. \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/out"
   printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
   printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
-  # docker 28 exits 125 for a run it cannot start, and docker 29 exits 1
-  { cmp -s "$tree/err-docker-28" "$tree/err" && [ "$status" = 125 ]; } ||
-    { cmp -s "$tree/err-docker-29" "$tree/err" && [ "$status" = 1 ]; } ||
-    { cat "$tree/err"; echo "exit $status; not docker 28's or 29's missing-socket error" >&2; exit 1; }
+  # docker 28.0.4 exits 125 for a run it cannot start, and docker 29.7.2 exits 1
+  assert_one_of_outputs "the real docker run without a daemon" "$tree/out" "$tree/err" "$status" \
+    "docker 28.0.4" /dev/null "$tree/err-docker-28" 125 \
+    "docker 29.7.2" /dev/null "$tree/err-docker-29" 1
   diff - "$tree/calls" << 'CALLS'
 ["docker","run","--rm","nixos/nix","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
@@ -225,9 +226,9 @@ it_hands_a_call_to_the_real_docker_with_the_socket_path_normalised() {
   printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
   # docker 28.0.4 and docker 29.7.2 each print their client version and exit 1 for a
   # version they cannot complete; the error names the socket the stand-in normalised
-  { cmp -s "$tree/out-docker-28" "$tree/out" && cmp -s "$tree/err-docker-28" "$tree/err" && [ "$status" = 1 ]; } ||
-    { cmp -s "$tree/out-docker-29" "$tree/out" && cmp -s "$tree/err-docker-29" "$tree/err" && [ "$status" = 1 ]; } ||
-    { cat "$tree/out" "$tree/err"; echo "exit $status; not docker 28's or 29's missing-socket output for the normalised socket" >&2; exit 1; }
+  assert_one_of_outputs "the real docker version at the normalised socket" "$tree/out" "$tree/err" "$status" \
+    "docker 28.0.4" "$tree/out-docker-28" "$tree/err-docker-28" 1 \
+    "docker 29.7.2" "$tree/out-docker-29" "$tree/err-docker-29" 1
   diff - "$tree/calls" <<< '["docker","version","--format","{{.Client.Version}}"]'
 }
 
@@ -265,9 +266,9 @@ it_hands_a_call_to_the_system_docker_not_one_on_the_callers_PATH() {
   printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
   # docker 28.0.4 and docker 29.7.2 each print their client version and exit 1; the fake
   # docker would print "fake docker" and exit 0
-  { cmp -s "$tree/out-docker-28" "$tree/out" && cmp -s "$tree/err-docker-28" "$tree/err" && [ "$status" = 1 ]; } ||
-    { cmp -s "$tree/out-docker-29" "$tree/out" && cmp -s "$tree/err-docker-29" "$tree/err" && [ "$status" = 1 ]; } ||
-    { cat "$tree/out" "$tree/err"; echo "exit $status; not the real docker 28's or 29's output" >&2; exit 1; }
+  assert_one_of_outputs "the system docker version" "$tree/out" "$tree/err" "$status" \
+    "docker 28.0.4" "$tree/out-docker-28" "$tree/err-docker-28" 1 \
+    "docker 29.7.2" "$tree/out-docker-29" "$tree/err-docker-29" 1
   diff - "$tree/calls" <<< '["docker","version","--format","{{.Client.Version}}"]'
 }
 

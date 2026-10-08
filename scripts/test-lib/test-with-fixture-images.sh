@@ -10,6 +10,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh"
 
 # The command checks that both images exist while it runs, then exits 7. The run id is
@@ -41,7 +42,7 @@ EOF
 # GH_HOST points gh at a dead loopback port, so the release fetch fails at once with Go's
 # own connection error and nothing leaves the machine. gh sends its release lookup and a
 # GraphQL query at once and reports whichever fails first, so the log is one of exactly
-# two lines. The lookup's URL carries the pinned release tag with its slash escaped, as gh
+# two lines; this is a race inside one gh version, not a difference between versions. The lookup's URL carries the pinned release tag with its slash escaped, as gh
 # escapes it, so the case reads the tag from the pins.
 it_reports_a_failed_build_with_its_log_and_runs_nothing() {
   local release status=0
@@ -57,7 +58,6 @@ it_reports_a_failed_build_with_its_log_and_runs_nothing() {
     "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh" "$tree" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/err"
   cat > "$tree/want-lookup" << EOF
 FAIL the images did not build from the pinned, checked binary and pinned bases
     Get "https://127.0.0.1:1/api/v3/repos/zgeoff/atc/releases/tags/${release//\//%2F}": dial tcp 127.0.0.1:1: connect: connection refused
@@ -66,10 +66,10 @@ EOF
 FAIL the images did not build from the pinned, checked binary and pinned bases
     Post "https://127.0.0.1:1/api/graphql": dial tcp 127.0.0.1:1: connect: connection refused
 EOF
-  cmp -s "$tree/want-lookup" "$tree/out" || cmp -s "$tree/want-graphql" "$tree/out" ||
-    { diff "$tree/want-lookup" "$tree/out" || diff "$tree/want-graphql" "$tree/out"; exit 1; }
+  assert_one_of_outputs "a failed fixture build" "$tree/out" "$tree/err" "$status" \
+    "the release lookup failing first" "$tree/want-lookup" /dev/null 1 \
+    "the GraphQL query failing first" "$tree/want-graphql" /dev/null 1
   [ ! -e "$tree/ran" ] || { echo "the command ran after a failed build" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 run_cases
