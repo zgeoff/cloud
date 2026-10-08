@@ -7,8 +7,6 @@ import type {
   R2PutOptions,
 } from '@cloudflare/workers-types';
 
-type R2PutValue = Parameters<R2Bucket['put']>[1];
-
 interface StubR2Bucket extends Pick<R2Bucket, 'get' | 'put'> {
   readonly objects: Map<string, string>;
 }
@@ -43,7 +41,11 @@ export function buildStubR2Bucket(initial: Readonly<Record<string, string>> = {}
 
       return Promise.resolve(buildR2ObjectBody(object, value));
     },
-    put: (key: string, value: R2PutValue, options?: R2PutOptions): Promise<R2Object> => {
+    put: (
+      key: string,
+      value: Parameters<R2Bucket['put']>[1],
+      options?: R2PutOptions,
+    ): Promise<R2Object> => {
       if (typeof value !== 'string' || options !== undefined) {
         return Promise.reject(
           new Error('the stub R2 bucket models only a string value with no options'),

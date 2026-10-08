@@ -69,7 +69,13 @@ health-check worker in `workers/` is HTTP-mocked.
   - `resolveOutput` reads an `Output`'s value. Assert secrecy with `isSecret`, separately from the
     value.
   - `buildStubR2Bucket` is an in-memory R2 bucket.
-- The health-check worker is tested through its exported `scheduled` handler. Its HTTP boundary is
+- The health-check worker's logic is tested through `makeScheduledHandler(destination)` in
+  `workers/health-check/make-scheduled-handler.ts`: each test injects a recording destination and
+  asserts every logged change of state through it, never by replacing the global console.
+  `index.test.ts` checks the module Workers loads: its default export's `scheduled`, wired to
+  `console`. `buildStubR2Bucket` implements `Pick<R2Bucket, 'get' | 'put'>` from
+  `@cloudflare/workers-types` with R2's full object shapes, and rejects options and non-string
+  values instead of modelling them. Its HTTP boundary is
   MSW handlers in `workers/mocks/` over two in-memory stores: the probe targets' statuses and the
   alerts sent. The server runs with `onUnhandledRequest: 'error'`, and the preload also fails the
   test on any `request:unhandled` event, because the worker turns a failed probe into a status
