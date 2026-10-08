@@ -18,38 +18,49 @@ source "$(dirname "${BASH_SOURCE[0]}")/run-backup-shell.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/normalize-restic-output.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 
+# The probe writes each observation, with its command's exit status, to its own file in a
+# case directory mounted at /obs, so each one is checked on its own after one run.
 it_runs_the_backup_image_as_the_backup_pods_do() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
+  mkdir "$tree/obs"
+  chmod 0777 "$tree/obs"
   cat > "$tree/probe.sh" << 'EOF'
-id -u
-id -g
-echo "HOME=$HOME STATE_DIR=$STATE_DIR RESTIC_REPOSITORY=$RESTIC_REPOSITORY RESTIC_PASSWORD=$RESTIC_PASSWORD SNAPSHOT=$SNAPSHOT"
-grep -E '^(NoNewPrivs|CapEff):' /proc/self/status
-awk '$2 == "/tmp" { print $2, $3 }' /proc/mounts
-touch /tmp/w /state/w /repo/w && echo wrote /tmp, /state and /repo
-printf '<%s>\n' "$@"
+observe() {
+  name="$1" status=0
+  shift
+  "$@" > "/obs/$name" 2>&1 || status=$?
+  echo "exit $status" >> "/obs/$name"
+}
+observe uid id -u
+observe gid id -g
+observe env sh -c 'echo "HOME=$HOME STATE_DIR=$STATE_DIR RESTIC_REPOSITORY=$RESTIC_REPOSITORY RESTIC_PASSWORD=$RESTIC_PASSWORD SNAPSHOT=$SNAPSHOT"'
+observe privileges grep -E '^(NoNewPrivs|CapEff):' /proc/self/status
+observe tmp-mount awk '$2 == "/tmp" { print $2, $3 }' /proc/mounts
+observe tmp-write touch /tmp/w
+observe state-write touch /state/w
+observe repo-write touch /repo/w
+observe args printf '<%s>\n' "$@"
 EOF
   chmod a+r "$tree/probe.sh"
 
   run_backup "$name" "$backup_image" -e SNAPSHOT=abc12345 -v "$tree/probe.sh:/probe.sh:ro" \
-    --entrypoint /bin/sh /probe.sh one "two words" > "$tree/out" 2> "$tree/err" || status=$?
+    -v "$tree/obs:/obs" --entrypoint /bin/sh /probe.sh one "two words" > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  diff - "$tree/out" << 'EOF'
-65532
-65532
-HOME=/tmp STATE_DIR=/state RESTIC_REPOSITORY=/repo RESTIC_PASSWORD=fixture-only SNAPSHOT=abc12345
-CapEff:	0000000000000000
-NoNewPrivs:	1
-/tmp tmpfs
-wrote /tmp, /state and /repo
-<one>
-<two words>
-EOF
+  printf '65532\nexit 0\n' | diff - "$tree/obs/uid"
+  printf '65532\nexit 0\n' | diff - "$tree/obs/gid"
+  printf 'HOME=/tmp STATE_DIR=/state RESTIC_REPOSITORY=/repo RESTIC_PASSWORD=fixture-only SNAPSHOT=abc12345\nexit 0\n' | diff - "$tree/obs/env"
+  printf 'CapEff:\t0000000000000000\nNoNewPrivs:\t1\nexit 0\n' | diff - "$tree/obs/privileges"
+  printf '/tmp tmpfs\nexit 0\n' | diff - "$tree/obs/tmp-mount"
+  diff - "$tree/obs/tmp-write" <<< 'exit 0'
+  diff - "$tree/obs/state-write" <<< 'exit 0'
+  diff - "$tree/obs/repo-write" <<< 'exit 0'
+  printf '<one>\n<two words>\nexit 0\n' | diff - "$tree/obs/args"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -114,40 +125,46 @@ it_refuses_a_docker_run_option_without_a_value() {
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
 }
 
-# A trap removes the containers by name, so a run that is interrupted leaves none behind
+# A trap removes the containers by name, so a run that is interrupted leaves none behind.
+# client is global, as name and tree are: the EXIT trap runs after the case function has
+# returned, when a local would be gone and the client would never be killed.
 it_names_the_backup_container_after_the_case_while_it_runs() {
   local backup_image="$2" run="$3"
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  client=""
+  trap '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" --entrypoint /bin/sleep 300 > /dev/null 2>&1 &
   client=$!
-  trap 'pkill -P "$client" 2> /dev/null || true; kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
 
   wait_for 30 "the container $name-backup to run" docker exec "$name-backup" true > /dev/null 2>&1
-  docker inspect -f '{{.Name}} {{.State.Running}} {{.HostConfig.AutoRemove}}' "$name-backup" > "$tree/container"
-  diff - "$tree/container" <<< "/$name-backup true true"
+  docker inspect -f '{{.Name}} {{.State.Running}}' "$name-backup" > "$tree/container"
+  diff - "$tree/container" <<< "/$name-backup true"
+  docker inspect -f '{{.HostConfig.AutoRemove}}' "$name-backup" > "$tree/auto-remove"
+  diff - "$tree/auto-remove" <<< true
 }
 
 it_shares_the_state_and_repository_volumes_between_run_backup_shell_and_run_backup() {
-  local backup_image="$2" run="$3" status=0
+  local backup_image="$2" run="$3" state_status=0 repo_status=0
   name="atc-gw-backup-$run-$BASHPID"
   tree="$(mktemp -d)"
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'echo in state > /state/marker; echo in repo > /repo/marker'
 
-  run_backup "$name" "$backup_image" --entrypoint /bin/cat /state/marker /repo/marker \
-    > "$tree/out" 2> "$tree/err" || status=$?
+  run_backup "$name" "$backup_image" --entrypoint /bin/cat /state/marker \
+    > "$tree/state-out" 2> "$tree/state-err" || state_status=$?
+  run_backup "$name" "$backup_image" --entrypoint /bin/cat /repo/marker \
+    > "$tree/repo-out" 2> "$tree/repo-err" || repo_status=$?
 
-  diff /dev/null "$tree/err"
-  diff - "$tree/out" << 'EOF'
-in state
-in repo
-EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  diff - "$tree/state-out" <<< 'in state'
+  diff /dev/null "$tree/state-err"
+  [ "$state_status" = 0 ] || { echo "state read exit $state_status, want 0" >&2; exit 1; }
+  diff - "$tree/repo-out" <<< 'in repo'
+  diff /dev/null "$tree/repo-err"
+  [ "$repo_status" = 0 ] || { echo "repo read exit $repo_status, want 0" >&2; exit 1; }
 }
 
 # Boot data every case needs: a seed directory that run_backup_shell mounts at /seed,
