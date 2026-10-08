@@ -9,6 +9,15 @@
 #   argument) to STUB_BUILD_SAW, then, when STUB_BUILD_ERROR is set, prints it on stderr and
 #   exits 1, nix's exit for a failed build;
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# Nix documents no exit-code table for these commands, so the exit 1 was checked on
+# 2026-10-08 against the real nix: nix 2.35.2 in the nixos/nix image
+# (nixos/nix@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c, the
+# latest tag then), in a container without network. A failed `nix eval --raw`, a `nix
+# build` whose builder exits 1 and a `nix copy --to ssh://` to a refused port each
+# exited 1. The scripts run the image by its bare tag, so no nix version is pinned; a later
+# image could change the exit, and nix's manual gives 100-and-up codes for some build
+# failures under `nix-store --realise`, which this check did not reach.
 create_stub_checks_docker() {
   local bin="$1"
   cat > "$bin/docker" << 'STUB'

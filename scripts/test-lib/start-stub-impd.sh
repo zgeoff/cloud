@@ -4,12 +4,20 @@
 # the process to kill when the case ends.
 #
 # POST /rpc/tokens/whoami with the bearer that <dir>/good-token holds, read at each
-# request, gets atc-cloud's identity (200, in imp's {"json": Identity} envelope,
-# IdentitySchema in imp's packages/api); any other bearer, or any bearer while
-# <dir>/good-token is missing, gets impd's 401 {"error":"unauthorized"}. Every other
+# request, gets atc-cloud's identity (200, in imp's {"json": Identity} envelope); any other
+# bearer, or any bearer while <dir>/good-token is missing, gets impd's 401
+# {"error":"unauthorized"}. Every other
 # request, whatever its method, fails closed, as the shell stand-ins' exit 97 does: it
 # appends "<method> <path>" to <dir>/unexpected and answers 500 with a body naming the
 # stand-in, which no caller reads as impd's answer.
+#
+# Checked on 2026-10-08 against imp's source at the revision the host runs, imp 0.40.0 at
+# 2679ab06fe075530ae1a5010f99cec00009dd4bb (nixos/flake.lock): IdentitySchema in
+# packages/api/src/token-schema.ts, the 401 body in packages/daemon/src/build-app.ts line
+# 287, and the {"json": …} envelope of its RPCHandler, @orpc/server 1.14.15. The source
+# does not settle, so they stay as they were and need an impd sample: whether oRPC adds a
+# "meta" field beside "json", the order of the identity's fields, and impd's response
+# headers: this stand-in answers HTTP/1.0 with Date, content-type and content-length only.
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 
@@ -53,8 +61,11 @@ class Impd(BaseHTTPRequestHandler):
             out.write(f"{self.command} {self.path}\n")
         self.send_answer(500, f'{{"error":"stub-impd: unexpected {self.command} {self.path}"}}'.encode())
 
+    # send_response would add http.server's "Server: BaseHTTP/<v> Python/<v>" header, which
+    # impd does not send and whose versions differ between machines
     def send_answer(self, status, body):
-        self.send_response(status)
+        self.send_response_only(status)
+        self.send_header("Date", self.date_time_string())
         self.send_header("content-type", "application/json")
         self.send_header("content-length", str(len(body)))
         self.end_headers()

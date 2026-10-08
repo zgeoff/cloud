@@ -90,6 +90,7 @@ it_answers_a_name_it_does_not_hold_as_the_real_getent_does() {
 
   diff "$tree/real-out" "$tree/out"
   diff "$tree/real-err" "$tree/err"
+  diff - "$tree/calls" <<< '["getent","hosts","stub-getent-test.invalid"]'
   [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
 }
 

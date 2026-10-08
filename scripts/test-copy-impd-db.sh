@@ -238,7 +238,7 @@ REMOTE
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b is not running'
+  diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running'
   diff "$tree/calls-expected" "$tree/calls"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }

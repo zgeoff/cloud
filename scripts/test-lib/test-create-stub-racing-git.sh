@@ -10,6 +10,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-racing-git.sh"
 
 # The suite's own git calls read no repository, user or system setting from the caller's
@@ -69,7 +70,7 @@ ERR
   git -C "$tree/clone" rev-parse HEAD > "$tree/head-after"
   diff - "$tree/head-after" <<< "$head"
   diff - "$tree/clone/nixos/marker" <<< committed
-  [ ! -e "$tree/calls" ] || { echo "the stand-in logged a move" >&2; exit 1; }
+  assert_missing "$tree/calls" "the stand-in logged a move"
   [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
 }
 
@@ -91,7 +92,7 @@ it_hands_every_other_call_to_the_real_git_unchanged() {
   diff - "$tree/out" <<< "$head"
   diff /dev/null "$tree/err"
   diff - "$tree/clone/nixos/marker" <<< committed
-  [ ! -e "$tree/calls" ] || { echo "the stand-in logged a move" >&2; exit 1; }
+  assert_missing "$tree/calls" "the stand-in logged a move"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 

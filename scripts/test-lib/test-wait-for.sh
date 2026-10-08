@@ -11,6 +11,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
 
@@ -49,7 +50,7 @@ it_returns_without_polling_again_when_the_command_succeeds_at_once() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/polls" <<< poll
-  [ ! -e "$tree/pauses" ] || { echo "wait_for paused after a poll that succeeded" >&2; exit 1; }
+  assert_missing "$tree/pauses" "wait_for paused after a poll that succeeded"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 

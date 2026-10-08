@@ -31,23 +31,23 @@ it_runs_the_backup_shell_script_from_stdin_as_the_backup_pods_do_with_the_seed_r
   mkdir "$tree/obs"
 
   run_backup_shell "$name" "$backup_image" "$tree" > "$tree/out.tar" 2> "$tree/err" << 'EOF' || status=$?
-observe() {
+write_observation() {
   name="$1" status=0
   shift
   "$@" > "/tmp/obs/$name" 2>&1 || status=$?
   echo "exit $status" >> "/tmp/obs/$name"
 }
 mkdir /tmp/obs
-observe uid id -u
-observe gid id -g
-observe env sh -c 'echo "HOME=$HOME RESTIC_REPOSITORY=$RESTIC_REPOSITORY RESTIC_PASSWORD=$RESTIC_PASSWORD STATE_DIR=${STATE_DIR:-unset}"'
-observe privileges grep -E '^(NoNewPrivs|CapEff):' /proc/self/status
-observe tmp-mount awk '$2 == "/tmp" { print $2, $3 }' /proc/mounts
-observe tmp-write touch /tmp/w
-observe state-write touch /state/w
-observe repo-write touch /repo/w
-observe seed-read cat /seed/note
-observe seed-write touch /seed/w
+write_observation uid id -u
+write_observation gid id -g
+write_observation env sh -c 'echo "HOME=$HOME RESTIC_REPOSITORY=$RESTIC_REPOSITORY RESTIC_PASSWORD=$RESTIC_PASSWORD STATE_DIR=${STATE_DIR:-unset}"'
+write_observation privileges grep -E '^(NoNewPrivs|CapEff):' /proc/self/status
+write_observation tmp-mount awk '$2 == "/tmp" { print $2, $3 }' /proc/mounts
+write_observation tmp-write touch /tmp/w
+write_observation state-write touch /state/w
+write_observation repo-write touch /repo/w
+write_observation seed-read cat /seed/note
+write_observation seed-write touch /seed/w
 tar -cf - -C /tmp/obs .
 EOF
 
@@ -86,8 +86,8 @@ it_stops_the_backup_shell_at_the_first_failing_command() {
 it_names_the_backup_shell_container_after_the_case_while_it_runs() {
   local backup_image="$2" run="$3"
   name="atc-gw-shell-$run-$BASHPID"
-  tree="$(mktemp -d)"
   client=""
+  tree="$(mktemp -d)"
   trap '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
 

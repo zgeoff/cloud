@@ -191,6 +191,7 @@ it_reports_an_HTTP_error_as_the_real_curl_does() {
 
   diff "$tree/real-out" "$tree/out"
   diff "$tree/real-err" "$tree/err"
+  diff - "$tree/calls" <<< '["curl","-fsS","-H","Authorization: Bearer k2","https://api.cloud.onidel.com/snapshots"]'
   [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
 }
 

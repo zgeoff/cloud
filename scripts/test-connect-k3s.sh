@@ -187,7 +187,7 @@ it_fails_with_op_exit_1_and_leaves_env_when_the_new_document_is_refused() {
     STUB_HOST=root@geoffcloud STUB_OP_FAIL_AT=document-create bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
   diff - "$tree/calls" << 'CALLS'
 ["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]
 ["op","item","get","k3s-kubeconfig","--vault","cloud"]
@@ -213,7 +213,7 @@ it_fails_with_op_exit_1_and_keeps_the_stored_kubeconfig_when_the_edit_is_refused
     STUB_HOST=root@geoffcloud STUB_OP_FAIL_AT=document-edit bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< '[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later.'
+  diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
   diff - "$tree/calls" << 'CALLS'
 ["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]
 ["op","item","get","k3s-kubeconfig","--vault","cloud"]

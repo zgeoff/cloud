@@ -12,6 +12,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-imp-host-docker.sh"
 
 it_prints_imps_info_from_its_state_file() {
@@ -128,7 +129,7 @@ it_fails_the_secret_add_with_the_named_error_and_imps_exit_2() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: secret glm exists'
-  [ ! -e "$tree/impd/secret-glm" ] || { echo "the failed add stored the key" >&2; exit 1; }
+  assert_missing "$tree/impd/secret-glm" "the failed add stored the key"
   jq -c . "$tree/impd/secrets.json" > "$tree/secrets"
   diff - "$tree/secrets" <<< '[]'
   diff - "$tree/calls" <<< '["docker","exec","-i","imp-host","imp","secret","add","glm","--kind","custom","--hosts","api.z.ai","--header","authorization","--scheme","bearer","--json"]'
@@ -185,7 +186,7 @@ it_fails_the_named_call_as_docker_does_when_imp_host_is_stopped() {
     docker exec imp-host imp token ls --json > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b is not running'
+  diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running'
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","token","ls","--json"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }

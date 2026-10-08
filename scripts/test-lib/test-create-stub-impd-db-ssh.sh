@@ -13,6 +13,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-impd-db-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
@@ -38,7 +39,7 @@ copy: /root/imp-db-backups/pre-x-20261008T120000 (73728 bytes, mode 600)
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran' _ pre-x\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -77,7 +78,7 @@ it_answers_a_stopped_imp_host_with_dockers_error_and_exit_1() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b is not running'
+  diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c true _ pre-x"]'
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }

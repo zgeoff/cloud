@@ -16,49 +16,70 @@
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
 # A vault that is not there fails each call with op's "isn't a vault" error. Its errors are
-# op's "[ERROR] <date> <message>" lines with exit 1. Not checked against a real op (no
-# 1Password account runs in a test): the "isn't an item" text follows op 2's wording for a
-# missing item ("\"<item>\" isn't an item in the \"<vault>\" vault. Specify the item with
-# its UUID, name, or domain."), the vault and rate-limit texts repeat create-stub-op.sh,
-# and the item and document output carry only a few fields, which connect-k3s.sh discards.
+# op's "[ERROR] <date> <message>" lines with exit 1. The "isn't a vault" and rate-limit
+# texts are create-stub-op.sh's, word for word, with its sources: the rate-limit text from
+# the documentation below, the "isn't a vault" text from community reports of op 2.
+#
+# Checked on 2026-10-08 against 1Password's CLI documentation, not a real op (no 1Password
+# account runs in a test). The documentation carries no version of its own; op 2.40.0
+# (https://app-updates.agilebits.com/product_history/CLI2) was current then and is the
+# version images/agent/Dockerfile pins:
+#
+# - https://www.1password.dev/cli/reference/management-commands/item/ : `item get
+#   { <itemName> | <itemID> } --vault <vault>`;
+# - https://www.1password.dev/cli/reference/management-commands/document/ : `document
+#   create [{ <file> | - }]` with --vault, --title and --file-name, which "returns a JSON
+#   object that contains the item's ID", and `document edit { <itemName> | <itemID> }
+#   [{ <file> | - }]` with --vault and --file-name; both read the file from stdin for `-`;
+# - https://www.1password.dev/service-accounts/rate-limits/ : the rate-limit text, as
+#   create-stub-op.sh records it.
+#
+# The documentation does not settle, so they stay as they were and need a real op sample:
+# the "isn't an item" text ("\"<item>\" isn't an item in the \"<vault>\" vault. Specify the
+# item with its UUID, name, or domain."), taken from community reports of op 2; the
+# columns `item get` prints without --format (ID, Title, Vault, Category here) and their
+# padding; the fields of `document create`'s JSON beyond the ID (uuid, createdAt,
+# updatedAt and vaultUuid here); that `document edit` prints nothing; and the exit codes
+# and frame that create-stub-op.sh lists as unsettled. connect-k3s.sh discards the item and
+# document output.
 create_stub_kubeconfig_op() {
   local bin="$1"
   cat > "$bin/op" << 'STUB'
 #!/usr/bin/env bash
 printf '%s\0' op "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_TREE/calls"
-missing() {
+print_missing_item() {
   echo "[ERROR] 2026/10/07 12:00:00 \"$1\" isn't an item in the \"$2\" vault. Specify the item with its UUID, name, or domain." >&2
   exit 1
 }
-no_vault() {
+print_missing_vault() {
   echo "[ERROR] 2026/10/07 12:00:00 \"$1\" isn't a vault in this account. Specify the vault with its ID or name." >&2
   exit 1
 }
-limited() {
-  echo "[ERROR] 2026/10/07 12:00:00 Too many requests. Please try again later." >&2
+print_rate_limit() {
+  echo "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests." >&2
   exit 1
 }
 case "$#:$1 $2" in
   "5:item get")
     if [ "$4" != --vault ]; then echo "unexpected: $*" >&2; exit 97; fi
-    if [ ! -d "$STUB_TREE/vault/$5" ]; then no_vault "$5"; fi
-    if [ ! -d "$STUB_TREE/vault/$5/$3" ]; then missing "$3" "$5"; fi
+    if [ ! -d "$STUB_TREE/vault/$5" ]; then print_missing_vault "$5"; fi
+    if [ ! -d "$STUB_TREE/vault/$5/$3" ]; then print_missing_item "$3" "$5"; fi
     printf 'ID:          fixture-item-id\nTitle:       %s\nVault:       %s (fixture-vault-id)\nCategory:    DOCUMENT\n' "$3" "$5"
     ;;
   "8:document edit")
     if [ "$4 $6 $8" != "--vault --file-name -" ]; then echo "unexpected: $*" >&2; exit 97; fi
     content="$(cat; echo .)"
-    if [ "${STUB_OP_FAIL_AT:-}" = document-edit ]; then limited; fi
-    if [ ! -d "$STUB_TREE/vault/$5" ]; then no_vault "$5"; fi
-    if [ ! -d "$STUB_TREE/vault/$5/$3" ]; then missing "$3" "$5"; fi
+    if [ "${STUB_OP_FAIL_AT:-}" = document-edit ]; then print_rate_limit; fi
+    if [ ! -d "$STUB_TREE/vault/$5" ]; then print_missing_vault "$5"; fi
+    if [ ! -d "$STUB_TREE/vault/$5/$3" ]; then print_missing_item "$3" "$5"; fi
     rm -f "$STUB_TREE/vault/$5/$3"/*
     printf '%s' "${content%.}" > "$STUB_TREE/vault/$5/$3/$7"
     ;;
   "9:document create")
     if [ "$3 $5 $7 $9" != "--vault --title --file-name -" ]; then echo "unexpected: $*" >&2; exit 97; fi
     content="$(cat; echo .)"
-    if [ "${STUB_OP_FAIL_AT:-}" = document-create ]; then limited; fi
-    if [ ! -d "$STUB_TREE/vault/$4" ]; then no_vault "$4"; fi
+    if [ "${STUB_OP_FAIL_AT:-}" = document-create ]; then print_rate_limit; fi
+    if [ ! -d "$STUB_TREE/vault/$4" ]; then print_missing_vault "$4"; fi
     if [ -e "$STUB_TREE/vault/$4/$6" ]; then echo "unexpected: $*" >&2; exit 97; fi
     mkdir "$STUB_TREE/vault/$4/$6"
     printf '%s' "${content%.}" > "$STUB_TREE/vault/$4/$6/$8"

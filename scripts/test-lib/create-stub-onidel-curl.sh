@@ -25,23 +25,23 @@ create_stub_onidel_curl() {
 #!/usr/bin/env bash
 printf '%s\0' curl "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_TREE/calls"
 api=https://api.cloud.onidel.com
-fail() {
+print_http_error() {
   echo "curl: (22) The requested URL returned error: $1" >&2
   exit 22
 }
 if [ "$#" = 10 ] && [ "$1 $2 $3 $4 $6 $7 $8" = "-fsS -X POST -H -H content-type: application/json --data" ] &&
   [[ "$5" == "Authorization: Bearer "* ]] && [[ "${10}" =~ ^$api/vm/([^/]+)/snapshot$ ]]; then
-  if [ "$5" != "Authorization: Bearer ${STUB_ONIDEL_KEY:-}" ]; then fail 401; fi
-  if [ "${BASH_REMATCH[1]}" != "$STUB_ONIDEL_VM" ]; then fail 404; fi
-  if [ -n "${STUB_ONIDEL_LIMIT_REACHED:-}" ]; then fail 403; fi
+  if [ "$5" != "Authorization: Bearer ${STUB_ONIDEL_KEY:-}" ]; then print_http_error 401; fi
+  if [ "${BASH_REMATCH[1]}" != "$STUB_ONIDEL_VM" ]; then print_http_error 404; fi
+  if [ -n "${STUB_ONIDEL_LIMIT_REACHED:-}" ]; then print_http_error 403; fi
   jq -c --argjson body "$9" --arg id "$STUB_ONIDEL_SNAPSHOT_ID" --arg now "$STUB_ONIDEL_NOW" \
     '. + [{id: $id, created_at: $now, name: $body.name, desc: $body.desc, size: 0, status: "pending"}]' \
     "$STUB_TREE/onidel/snapshots.json" > "$STUB_TREE/onidel/snapshots.next"
   mv "$STUB_TREE/onidel/snapshots.next" "$STUB_TREE/onidel/snapshots.json"
   jq -cn --arg id "$STUB_ONIDEL_SNAPSHOT_ID" '{snapshot_id: $id}'
 elif [ "$#" = 4 ] && [ "$1 $2" = "-fsS -H" ] && [[ "$3" == "Authorization: Bearer "* ]] && [ "$4" = "$api/snapshots" ]; then
-  if [ "$3" != "Authorization: Bearer ${STUB_ONIDEL_KEY:-}" ]; then fail 401; fi
-  if [ -n "${STUB_ONIDEL_LIST_STATUS:-}" ]; then fail "$STUB_ONIDEL_LIST_STATUS"; fi
+  if [ "$3" != "Authorization: Bearer ${STUB_ONIDEL_KEY:-}" ]; then print_http_error 401; fi
+  if [ -n "${STUB_ONIDEL_LIST_STATUS:-}" ]; then print_http_error "$STUB_ONIDEL_LIST_STATUS"; fi
   jq -c . "$STUB_TREE/onidel/snapshots.json"
 else
   echo "unexpected: $*" >&2

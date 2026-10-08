@@ -440,7 +440,7 @@ it_reports_missing_grantable_tokens_when_imp_info_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-Error response from daemon: container 4f6c0a2e9d1b is not running
+Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
 impd lacks grantableTokens; nothing changed
 EOF
   diff - "$tree/out" << EOF
@@ -473,7 +473,7 @@ it_stops_when_imp_secret_ls_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-Error response from daemon: container 4f6c0a2e9d1b is not running
+Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
 EOF
   diff - "$tree/out" << EOF
 
@@ -508,7 +508,7 @@ it_stops_when_imp_token_ls_fails() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-Error response from daemon: container 4f6c0a2e9d1b is not running
+Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running
 EOF
   diff - "$tree/out" << EOF
 
@@ -575,7 +575,7 @@ EOF
 it_stops_when_the_host_cannot_create_the_secrets_directory() {
   local seed="$1" status=0
   tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  trap 'chmod u+w "$tree/host" || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" atc-key
   mkdir "$tree/vault/cloud"
   chmod 0500 "$tree/host"
@@ -3119,8 +3119,10 @@ EOF
 
 # Real curl against the impd and proxy stand-ins (test-lib/start-stub-impd.sh and
 # test-lib/start-stub-proxy.sh) under the hostile curl config whose controls are
-# test-lib/test-start-stub-proxy.sh's curlrc and noproxy-alone cases: the token must
-# reach impd's stand-in only, with no proxy connection and no trace.
+# test-lib/test-start-stub-proxy.sh's curlrc and noproxy-alone cases, set on "the host",
+# where the remote curl runs: root's .curlrc, and CURL_HOME, XDG_CONFIG_HOME and every
+# proxy variable in its login environment. The token must reach impd's stand-in only, with
+# no proxy connection and no trace.
 it_sends_the_saved_token_to_impd_alone_under_the_hostile_curl_config() {
   local seed="$1" good_token impd_port proxy_port status=0
   tree="$(mktemp -d)"
@@ -3131,11 +3133,23 @@ it_sends_the_saved_token_to_impd_alone_under_the_hostile_curl_config() {
   printf '%s' "$good_token" > "$tree/impd-whoami/good-token"
   impd_port="$(cat "$tree/impd-whoami/port")"
   proxy_port="$(cat "$tree/proxy/port")"
-  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$proxy_port" > "$tree/home/.curlrc"
+  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$proxy_port" > "$tree/host/root/.curlrc"
   mkdir "$tree/curl-home" "$tree/xdg"
   printf -- '-v\nproxy = %s\ntrace-ascii = %s\n' "http://127.0.0.1:$proxy_port" "$tree/trace.txt" \
     > "$tree/curl-home/.curlrc"
   printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$proxy_port" > "$tree/xdg/curlrc"
+  cat > "$tree/host/environment" << EOF
+CURL_HOME=$tree/curl-home
+XDG_CONFIG_HOME=$tree/xdg
+http_proxy=http://127.0.0.1:$proxy_port
+HTTP_PROXY=http://127.0.0.1:$proxy_port
+https_proxy=http://127.0.0.1:$proxy_port
+HTTPS_PROXY=http://127.0.0.1:$proxy_port
+all_proxy=http://127.0.0.1:$proxy_port
+ALL_PROXY=http://127.0.0.1:$proxy_port
+NO_PROXY=
+no_proxy=
+EOF
   echo '{"version":"0.27.0","features":{"sessionOffsets":true,"leases":true,"grantableTokens":true,"secretRebind":true}}' > "$tree/impd/info.json"
   echo '[{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/secrets.json"
   echo '[{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"sshKeys":[],"grantable":["glm"],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/tokens.json"
@@ -3145,11 +3159,7 @@ it_sends_the_saved_token_to_impd_alone_under_the_hostile_curl_config() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_GOOD_TOKEN="$good_token" CURL_HOME="$tree/curl-home" XDG_CONFIG_HOME="$tree/xdg" \
-    http_proxy="http://127.0.0.1:$proxy_port" HTTP_PROXY="http://127.0.0.1:$proxy_port" \
-    https_proxy="http://127.0.0.1:$proxy_port" HTTPS_PROXY="http://127.0.0.1:$proxy_port" \
-    all_proxy="http://127.0.0.1:$proxy_port" ALL_PROXY="http://127.0.0.1:$proxy_port" NO_PROXY= \
-    no_proxy= ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
+    STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
     ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -3227,11 +3237,23 @@ it_rejects_a_stale_saved_token_without_leaking_it_under_the_hostile_curl_config(
   printf '%s' "$good_token" > "$tree/impd-whoami/good-token"
   impd_port="$(cat "$tree/impd-whoami/port")"
   proxy_port="$(cat "$tree/proxy/port")"
-  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$proxy_port" > "$tree/home/.curlrc"
+  printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$proxy_port" > "$tree/host/root/.curlrc"
   mkdir "$tree/curl-home" "$tree/xdg"
   printf -- '-v\nproxy = %s\ntrace-ascii = %s\n' "http://127.0.0.1:$proxy_port" "$tree/trace.txt" \
     > "$tree/curl-home/.curlrc"
   printf -- '-v\n--trace-ascii -\nproxy = %s\n' "http://127.0.0.1:$proxy_port" > "$tree/xdg/curlrc"
+  cat > "$tree/host/environment" << EOF
+CURL_HOME=$tree/curl-home
+XDG_CONFIG_HOME=$tree/xdg
+http_proxy=http://127.0.0.1:$proxy_port
+HTTP_PROXY=http://127.0.0.1:$proxy_port
+https_proxy=http://127.0.0.1:$proxy_port
+HTTPS_PROXY=http://127.0.0.1:$proxy_port
+all_proxy=http://127.0.0.1:$proxy_port
+ALL_PROXY=http://127.0.0.1:$proxy_port
+NO_PROXY=
+no_proxy=
+EOF
   echo '{"version":"0.27.0","features":{"sessionOffsets":true,"leases":true,"grantableTokens":true,"secretRebind":true}}' > "$tree/impd/info.json"
   echo '[{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/secrets.json"
   echo '[{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"sshKeys":[],"grantable":["glm"],"createdAt":"2026-10-07T12:00:00.000Z"}]' > "$tree/impd/tokens.json"
@@ -3241,11 +3263,7 @@ it_rejects_a_stale_saved_token_without_leaking_it_under_the_hostile_curl_config(
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_GOOD_TOKEN="$good_token" CURL_HOME="$tree/curl-home" XDG_CONFIG_HOME="$tree/xdg" \
-    http_proxy="http://127.0.0.1:$proxy_port" HTTP_PROXY="http://127.0.0.1:$proxy_port" \
-    https_proxy="http://127.0.0.1:$proxy_port" HTTPS_PROXY="http://127.0.0.1:$proxy_port" \
-    all_proxy="http://127.0.0.1:$proxy_port" ALL_PROXY="http://127.0.0.1:$proxy_port" NO_PROXY= \
-    no_proxy= ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
+    STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
     ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -3394,7 +3412,9 @@ EOF
 }
 
 # Boot data every case needs: the script, the roots of the 1Password stand-in's vaults
-# (vault/) and of "the host" (host/), impd's state directory (impd/), and the stand-ins
+# (vault/) and of "the host" (host/) with root's HOME on it (host/root/, which the ssh
+# stand-in runs each remote command with, made here so a case that makes host/ read-only
+# still has it), impd's state directory (impd/), and the stand-ins
 # from test-lib for op, ssh, and the host's docker (impd), install and curl, which log
 # each call's argv as a JSON line and end with exit 97 on a call they do not know.
 # host-bin-real-curl holds the same host stand-ins without curl, for the cases that run
@@ -3407,7 +3427,7 @@ EOF
 setup_test() {
   local tree="$1" part
   mkdir -p "$tree/bin" "$tree/host-bin" "$tree/host-bin-real-curl" "$tree/home" "$tree/tmp" \
-    "$tree/vault" "$tree/impd" "$tree/host"
+    "$tree/vault" "$tree/impd" "$tree/host/root"
   : > "$tree/calls"
   : > "$tree/host-output"
   cp "$(dirname "${BASH_SOURCE[0]}")/install-atc-gateway-credentials.sh" "$tree/"

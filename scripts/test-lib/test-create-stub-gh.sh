@@ -28,26 +28,36 @@ it_answers_a_release_download_with_release_not_found_and_exit_1() {
 }
 
 it_records_the_opt_outs_it_ran_with() {
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 \
-    gh release download v1.0.0 > /dev/null 2>&1 || true
+    gh release download v1.0.0 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/gh-env" <<< 'GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'release not found'
+  diff - "$tree/calls" <<< '["gh","release","download","v1.0.0"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_records_unset_for_each_opt_out_it_ran_without() {
+  local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    gh release download v1.0.0 > /dev/null 2>&1 || true
+    gh release download v1.0.0 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/gh-env" <<< 'GH_TELEMETRY=unset DO_NOT_TRACK=unset GH_NO_UPDATE_NOTIFIER=unset'
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'release not found'
+  diff - "$tree/calls" <<< '["gh","release","download","v1.0.0"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {

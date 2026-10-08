@@ -13,6 +13,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-bash-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
@@ -91,7 +92,7 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: root@geoffcloud bash -c 'touch $tree/ran'"
   diff - "$tree/calls" <<< "[\"ssh\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -108,7 +109,7 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@other bash -c 'touch $tree/ran'"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@other\",\"bash -c 'touch $tree/ran'\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -125,7 +126,7 @@ it_fails_closed_with_exit_97_on_a_command_that_is_not_one_bash_c_argument() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud touch $tree/ran"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"touch\",\"$tree/ran\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -143,7 +144,7 @@ it_fails_closed_with_exit_97_on_a_command_that_names_a_remote_tool() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud bash -c 'touch $tree/ran; /usr/bin/rsync x y'"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran; /usr/bin/rsync x y'\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 
@@ -161,7 +162,7 @@ it_fails_closed_with_exit_97_when_a_remote_tool_on_the_host_PATH_is_not_a_stand_
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: tailscale on the host PATH is not a stand-in in $tree/host-bin"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
-  [ ! -e "$tree/ran" ] || { echo "the command ran" >&2; exit 1; }
+  assert_missing "$tree/ran" "the command ran"
   [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
 }
 

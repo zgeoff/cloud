@@ -167,6 +167,7 @@ it_prints_000_for_a_failed_transfer_as_the_real_curl_does() {
 
   diff "$tree/real-out" "$tree/out"
   diff "$tree/real-err" "$tree/err"
+  diff - "$tree/calls" <<< '["curl","-s","-o","/dev/null","-w","%{http_code}","--max-time","10","https://atc.geoff.cloud/.well-known/oauth-protected-resource/mcp"]'
   [ "$status" = 28 ] || { echo "exit $status, want 28" >&2; exit 1; }
 }
 

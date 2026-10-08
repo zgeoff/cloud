@@ -1,9 +1,8 @@
 # shellcheck shell=bash
 # create_stub_imp_host_docker <bin>: writes <bin>/docker, a stand-in for docker on the host
 # running imp's CLI in the imp-host container. impd's state is STUB_TREE/impd: info.json,
-# secrets.json and tokens.json, whose shapes follow imp's own schemas (SecretSchema and
-# TokenSchema in imp's packages/api). It logs each call's argv as a JSON line to
-# STUB_TREE/calls and answers:
+# secrets.json and tokens.json, whose shapes follow imp's own schemas. It logs each call's
+# argv as a JSON line to STUB_TREE/calls and answers:
 #
 # - `exec imp-host imp info|secret ls|token ls --json`: that state file;
 # - `exec -i imp-host imp secret add glm …`: stores its stdin in STUB_TREE/impd/secret-glm,
@@ -15,6 +14,29 @@
 # - STUB_IMPD_FAIL_AT (info, secret-ls, token-ls) fails that call as docker does when
 #   imp-host is stopped (exit 1);
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# Checked on 2026-10-08 against imp's source at the revision the host runs, imp 0.40.0 at
+# 2679ab06fe075530ae1a5010f99cec00009dd4bb (nixos/flake.lock), and against docker:
+#
+# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/api/src/secret-schema.ts :
+#   SecretSchema (name, kind, rules with host, header and scheme, imps, createdAt) and
+#   SecretAddedSchema, which adds droppedGrants, for what `secret add` prints;
+# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/api/src/token-schema.ts :
+#   TokenSchema (name, scope, imps, sshKeys, grantable, createdAt);
+# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/cli/src/commands/tokens.ts
+#   lines 167-168: "imp: token <name> made; impd shows its secret only this once" on
+#   stderr, then the secret alone on stdout;
+# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/cli/src/run-action.ts
+#   line 38: a failed command exits 2 for a usage error and 1 otherwise;
+# - https://github.com/moby/moby/blob/v28.0.4/daemon/errors.go : "container %s is not
+#   running", which docker 29.7.2 printed for an exec in a stopped container here, after
+#   "Error response from daemon: ", with the container's full 64-hex ID and exit 1.
+#
+# The sources do not settle, so they stay as they were and need an imp-host sample: the
+# JSON form of createdAt (the schemas hold a Date, printed here as an ISO string); the
+# shape of `imp info --json` (version and features here); whether impd's refusal of a
+# `secret add` reaches the CLI as a usage error (exit 2, as here) or not (exit 1); and the
+# docker version the host runs.
 create_stub_imp_host_docker() {
   local bin="$1"
   cat > "$bin/docker" << 'STUB'
@@ -30,7 +52,7 @@ case "$*" in
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac
 if [ "${STUB_IMPD_FAIL_AT:-}" = "$call" ]; then
-  echo "Error response from daemon: container 4f6c0a2e9d1b is not running" >&2
+  echo "Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running" >&2
   exit 1
 fi
 case "$call" in
