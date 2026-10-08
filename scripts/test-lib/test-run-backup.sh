@@ -29,21 +29,21 @@ it_runs_the_backup_image_as_the_backup_pods_do() {
   mkdir "$tree/obs"
   chmod 0777 "$tree/obs"
   cat > "$tree/probe.sh" << 'EOF'
-observe() {
+write_observation() {
   name="$1" status=0
   shift
   "$@" > "/obs/$name" 2>&1 || status=$?
   echo "exit $status" >> "/obs/$name"
 }
-observe uid id -u
-observe gid id -g
-observe env sh -c 'echo "HOME=$HOME STATE_DIR=$STATE_DIR RESTIC_REPOSITORY=$RESTIC_REPOSITORY RESTIC_PASSWORD=$RESTIC_PASSWORD SNAPSHOT=$SNAPSHOT"'
-observe privileges grep -E '^(NoNewPrivs|CapEff):' /proc/self/status
-observe tmp-mount awk '$2 == "/tmp" { print $2, $3 }' /proc/mounts
-observe tmp-write touch /tmp/w
-observe state-write touch /state/w
-observe repo-write touch /repo/w
-observe args printf '<%s>\n' "$@"
+write_observation uid id -u
+write_observation gid id -g
+write_observation env sh -c 'echo "HOME=$HOME STATE_DIR=$STATE_DIR RESTIC_REPOSITORY=$RESTIC_REPOSITORY RESTIC_PASSWORD=$RESTIC_PASSWORD SNAPSHOT=$SNAPSHOT"'
+write_observation privileges grep -E '^(NoNewPrivs|CapEff):' /proc/self/status
+write_observation tmp-mount awk '$2 == "/tmp" { print $2, $3 }' /proc/mounts
+write_observation tmp-write touch /tmp/w
+write_observation state-write touch /state/w
+write_observation repo-write touch /repo/w
+write_observation args printf '<%s>\n' "$@"
 EOF
   chmod a+r "$tree/probe.sh"
 
