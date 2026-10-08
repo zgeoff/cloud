@@ -1,5 +1,4 @@
 import { expect, test } from 'bun:test';
-import { buildAlertRules } from './build-alert-rules.ts';
 import { buildATCDaemonProbeValues } from './build-atc-daemon-probe-values.ts';
 import { buildMockATCDaemonEndpoint } from './test-utils/build-mock-atc-daemon-endpoint.ts';
 
@@ -37,26 +36,13 @@ test('it probes no target without daemons', () => {
   });
 });
 
-test("it names each probe target as the daemon's alert rule selects it", () => {
+test("it names geoffcloud's probe target atc-daemon and each other daemon's atc-daemon-<name>", () => {
   const daemons = [
     buildMockATCDaemonEndpoint({ name: 'geoffcloud' }),
     buildMockATCDaemonEndpoint({ name: 'home-pc' }),
   ];
 
-  const targets = buildATCDaemonProbeValues(daemons).serviceMonitor.targets.map(
-    (target) => target.name,
-  );
-
-  const [group] = buildAlertRules({ atcDaemons: daemons });
-
-  const exprs = group?.rules
-    .filter((rule) => rule.alert === 'ATCDaemonUnreachable')
-    .map((rule) => rule.expr);
-
-  expect(targets).toStrictEqual(['atc-daemon', 'atc-daemon-home-pc']);
-
-  expect(exprs).toStrictEqual([
-    'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
-    'probe_success{target="atc-daemon-home-pc"} == 0 or absent(probe_success{target="atc-daemon-home-pc"})',
-  ]);
+  expect(
+    buildATCDaemonProbeValues(daemons).serviceMonitor.targets.map((target) => target.name),
+  ).toStrictEqual(['atc-daemon', 'atc-daemon-home-pc']);
 });

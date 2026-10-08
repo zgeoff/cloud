@@ -19,6 +19,11 @@ it_prints_true_for_a_change_under_nixos() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir "$tree/repo/nixos"
+  echo '{ }' > "$tree/repo/nixos/flake.nix"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the flake'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo changed >> "$tree/repo/nixos/flake.nix"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the flake'
 
@@ -34,6 +39,11 @@ it_prints_true_for_a_change_under_scripts() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir "$tree/repo/scripts"
+  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/test-nixos.sh"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add a script'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo changed >> "$tree/repo/scripts/test-nixos.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change a script'
 
@@ -49,6 +59,10 @@ it_prints_true_for_a_change_to_the_root_package_json() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  echo '{"name":"fixture"}' > "$tree/repo/package.json"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add package.json'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo '{"name":"changed"}' > "$tree/repo/package.json"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change package.json'
 
@@ -64,6 +78,10 @@ it_prints_true_for_a_change_to_the_bun_version() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  echo 1.0.0 > "$tree/repo/.bun-version"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the bun version'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo 9.9.9 > "$tree/repo/.bun-version"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the bun version'
 
@@ -79,6 +97,10 @@ it_prints_true_for_a_change_to_the_gitignore() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  echo node_modules > "$tree/repo/.gitignore"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the gitignore'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo '*.log' >> "$tree/repo/.gitignore"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the gitignore'
 
@@ -94,6 +116,11 @@ it_prints_true_for_a_change_to_the_nixos_checks_workflow() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir -p "$tree/repo/.github/workflows"
+  echo 'name: NixOS checks' > "$tree/repo/.github/workflows/nixos-checks.yml"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the workflow'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo '# changed' >> "$tree/repo/.github/workflows/nixos-checks.yml"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the workflow'
 
@@ -109,6 +136,13 @@ it_prints_false_for_a_change_to_no_input_of_the_checks() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir -p "$tree/repo/infra" "$tree/repo/docs" "$tree/repo/.github/workflows"
+  echo 'export {};' > "$tree/repo/infra/index.ts"
+  echo '# notes' > "$tree/repo/docs/notes.md"
+  echo 'name: CI' > "$tree/repo/.github/workflows/ci.yml"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add infra, docs and another workflow'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo changed >> "$tree/repo/infra/index.ts"
   echo changed >> "$tree/repo/docs/notes.md"
   echo '# changed' >> "$tree/repo/.github/workflows/ci.yml"
@@ -126,6 +160,12 @@ it_prints_true_when_a_rename_moves_a_file_out_of_nixos() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir "$tree/repo/nixos"
+  echo '{ }' > "$tree/repo/nixos/flake.nix"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the flake'
+  mkdir "$tree/repo/docs"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" mv nixos/flake.nix docs/flake.nix
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'move the flake out of nixos'
 
@@ -141,6 +181,11 @@ it_prints_true_when_a_file_under_nixos_is_deleted() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir "$tree/repo/nixos"
+  echo '{ }' > "$tree/repo/nixos/flake.nix"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the flake'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rm -q nixos/flake.nix
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'remove the flake'
 
@@ -156,6 +201,11 @@ it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir "$tree/repo/nixos" "$tree/repo/infra"
+  echo '{ }' > "$tree/repo/nixos/flake.nix"
+  echo 'export {};' > "$tree/repo/infra/index.ts"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the flake and infra'
   # as for a pull request: main changes the flake after the fork, and the head under test is the
   # merge of the feature branch into main
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" switch -qc feature
@@ -178,6 +228,10 @@ it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  mkdir "$tree/repo/nixos"
+  echo '{ }' > "$tree/repo/nixos/flake.nix"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the flake'
   # as for a push that rewrote main: the old tip changed the flake, and the new tip is its parent
   echo changed >> "$tree/repo/nixos/flake.nix"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the flake'
@@ -196,6 +250,8 @@ it_prints_true_for_a_change_to_a_file_under_nixos_whose_name_git_quotes() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
+  mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/é.nix"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add a file whose name git quotes'
@@ -281,28 +337,16 @@ it_rejects_a_call_without_two_arguments_with_its_usage() {
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
 }
 
-# Runtime every case needs: a git repository on main whose first commit holds one file for each
-# input of the checks and for some files outside them, with that commit's id in <tree>/base. The
-# repository's own config holds the identity the cases commit with.
+# Runtime every case needs: a git repository on main, with the identity the cases commit with in
+# its own config. Each case commits the files its scenario starts from.
 setup_test() {
   local tree="$1"
-  mkdir -p "$tree/home" "$tree/tmp" "$tree/repo/nixos" "$tree/repo/scripts" "$tree/repo/infra" \
-    "$tree/repo/docs" "$tree/repo/.github/workflows"
-  echo '{ }' > "$tree/repo/nixos/flake.nix"
-  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/test-nixos.sh"
-  echo 'export {};' > "$tree/repo/infra/index.ts"
-  echo '# notes' > "$tree/repo/docs/notes.md"
-  echo '{"name":"fixture"}' > "$tree/repo/package.json"
-  echo 1.0.0 > "$tree/repo/.bun-version"
-  echo node_modules > "$tree/repo/.gitignore"
-  echo 'name: NixOS checks' > "$tree/repo/.github/workflows/nixos-checks.yml"
-  echo 'name: CI' > "$tree/repo/.github/workflows/ci.yml"
+  mkdir -p "$tree/home" "$tree/tmp" "$tree/repo"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" init -q -b main
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" config user.name fixture
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" config user.email fixture@example.invalid
-  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
-  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the fixture files'
-  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
+  # boot data: an empty root commit, so HEAD resolves before a case commits anything of its own
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -q --allow-empty -m 'start the history'
 }
 
 run_cases

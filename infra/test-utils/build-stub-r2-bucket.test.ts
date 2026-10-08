@@ -14,22 +14,20 @@ test('it reads a stored key as an R2 object body with the metadata of a single-p
     httpEtag: '"46c48bec0d282018b9d167eef7711b2c"',
     checksums: {
       md5: expect.toSatisfy((value: unknown) => value instanceof ArrayBuffer),
-      toJSON: expect.toSatisfy((value: unknown) => typeof value === 'function'),
+      toJSON: expect.toBeFunction(),
     },
-    uploaded: expect.toSatisfy(
-      (value: unknown) => value instanceof Date && !Number.isNaN(value.getTime()),
-    ),
+    uploaded: expect.toBeValidDate(),
     httpMetadata: {},
     customMetadata: {},
     storageClass: 'Standard',
-    writeHttpMetadata: expect.toSatisfy((value: unknown) => typeof value === 'function'),
+    writeHttpMetadata: expect.toBeFunction(),
     body: expect.toSatisfy((value: unknown) => value instanceof ReadableStream),
     bodyUsed: false,
-    arrayBuffer: expect.toSatisfy((value: unknown) => typeof value === 'function'),
-    bytes: expect.toSatisfy((value: unknown) => typeof value === 'function'),
-    text: expect.toSatisfy((value: unknown) => typeof value === 'function'),
-    json: expect.toSatisfy((value: unknown) => typeof value === 'function'),
-    blob: expect.toSatisfy((value: unknown) => typeof value === 'function'),
+    arrayBuffer: expect.toBeFunction(),
+    bytes: expect.toBeFunction(),
+    text: expect.toBeFunction(),
+    json: expect.toBeFunction(),
+    blob: expect.toBeFunction(),
   });
 });
 
@@ -74,15 +72,13 @@ test('it resolves a put with the R2 object it stored', () => {
     httpEtag: '"e4eaaf55afff2d80da80b59cf9be2f77"',
     checksums: {
       md5: expect.toSatisfy((value: unknown) => value instanceof ArrayBuffer),
-      toJSON: expect.toSatisfy((value: unknown) => typeof value === 'function'),
+      toJSON: expect.toBeFunction(),
     },
-    uploaded: expect.toSatisfy(
-      (value: unknown) => value instanceof Date && !Number.isNaN(value.getTime()),
-    ),
+    uploaded: expect.toBeValidDate(),
     httpMetadata: {},
     customMetadata: {},
     storageClass: 'Standard',
-    writeHttpMetadata: expect.toSatisfy((value: unknown) => typeof value === 'function'),
+    writeHttpMetadata: expect.toBeFunction(),
   });
 });
 

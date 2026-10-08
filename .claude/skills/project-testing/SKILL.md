@@ -97,8 +97,11 @@ health-check worker in `workers/` is HTTP-mocked.
   literal: `toStrictEqual` fails when a builder swaps or rebuilds it.
 - A hand-written spec (alert rules, Helm values, a Deployment spec, the tailnet policy) is asserted
   whole with `toStrictEqual` against a literal, never an inline snapshot.
-- `expect.stringMatching` returns `any`, which the lint rule `no-unsafe-assignment` refuses inside a
-  literal. Use the typed `expect.toSatisfy((value: string) => /…/u.test(value))`.
+- `expect.stringMatching` and `expect.any` return `any`, which the lint rule `no-unsafe-assignment`
+  refuses inside a literal. Use a typed jest-extended matcher, such as `expect.toBeFunction()` or
+  `expect.toBeValidDate()`, and where none fits, a typed `expect.toSatisfy`: a regex
+  (`(value: string) => /…/u.test(value)`) or an `instanceof` check
+  (`(value: unknown) => value instanceof ArrayBuffer`).
 
 ## provider (Go)
 
@@ -155,7 +158,7 @@ journey. Each shared rule takes its shell form:
 | `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `scripts/test-lib/`; mask only a temp path, a generated id, or a measurement that changes between runs (a wall-clock time, a duration, a size, a memory or CPU reading), never the value under test                                     |
 | Exact errors                 | the exact exit code, never "non-zero", plus the exact stderr                                                                                                                                                       |
 | Polling `waitFor`            | `wait_for <seconds> <what> <command…>` from `scripts/test-lib/wait-for.sh`                                                                                                                                         |
-| Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a script that embeds `date` output gets a `date` wrapper reading a fixed time |
+| Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a case that pins the exact stamp a script embeds from `date`, such as in a name it compares, uses a `date` wrapper reading a fixed time (`create_stub_date`); a case that only bounds the stamp reads the clock before and after the act and checks it with `assert_between` |
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                             |
 
 - A stand-in lives in `scripts/test-lib/` with its own `test-<file>.sh`, never inline in a suite:
