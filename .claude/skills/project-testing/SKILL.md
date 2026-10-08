@@ -183,9 +183,10 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
 - A module assertion has a negative case that evaluates a bad config and compares the failing
   assertion messages exactly.
 - In a restore rehearsal (`impd-restore` and `impd-restore-*`), each `with subtest("it …")` starts
-  from `setup_test()`, which resets every state a subtest can leave. It asserts `machine.execute`'s status and output exactly, plus every side effect the script
-  promises, including the saved original on each failure path. Waits use `wait_for_unit`,
-  `wait_until_succeeds` or `wait_for`.
+  from `setup_test()`, which resets every state a subtest can leave. It asserts
+  `machine.execute`'s status and output exactly, masking only what the shell compares may mask,
+  plus every side effect the script promises, including the saved original on each failure path.
+  Waits use `wait_for_unit`, `wait_until_succeeds` or `wait_for`.
 - An error the script declares is reached through real VM state where real state can produce it,
   and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`) only where it
   cannot.
