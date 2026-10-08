@@ -3,7 +3,7 @@
 # answers. The kernel still completes each connection into the listen backlog, so a client
 # connects and then waits for an answer that never comes, as it would on a hung impd.
 #
-#   python3 start-stub-hung-impd.py
+#   python3 run-stub-hung-impd.py
 #
 # nixos/checks/test-utils-check.nix tests it.
 import signal

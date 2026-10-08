@@ -1,6 +1,6 @@
 # Checks services.impd-local-health: the units the module generates, each case evaluating its
 # own config through test-utils/build-module-system.nix, and the probe script run against a
-# stand-in impd (test-utils/start-stub-impd.py) in the build sandbox, or, for the timeout it gives
+# stand-in impd (test-utils/run-stub-impd.py) in the build sandbox, or, for the timeout it gives
 # curl, with a stand-in curl that records its call (test-utils/build-stub-curl.nix) and answers
 # at once. Each case runs on its own, in a fresh directory, with its own stand-in on an ephemeral
 # port or its own call log, its own textfile directory, and the probe and stand-in under env -i
@@ -218,7 +218,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -263,7 +263,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":false}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -308,7 +308,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -353,7 +353,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 500 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -399,7 +399,7 @@ let
         # a port that answered once and is closed now
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid" 2>/dev/null || true' EXIT
@@ -446,7 +446,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-hung-impd.py} >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -574,7 +574,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -646,7 +646,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -674,7 +674,7 @@ let
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -702,7 +702,7 @@ let
         mkdir home tmp out
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT

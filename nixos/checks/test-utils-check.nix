@@ -12,6 +12,7 @@ let
   lib = pkgs.lib;
   testLib = ../../scripts/test-lib;
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
+  collectCaseRejections = import ./test-utils/collect-case-rejections.nix { inherit lib; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
@@ -20,78 +21,6 @@ let
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
-
-  # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
-  pinnedBun = pkgs.stdenv.mkDerivation {
-    pname = "bun";
-    version = "1.4.2";
-    src = pkgs.fetchurl {
-      url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-linux-x64.zip";
-      hash = "sha256-NjaPrvdSeHXV/6UuU81IAhdB8qg+tiCKjdZAaNQiqRM=";
-    };
-    nativeBuildInputs = [
-      pkgs.unzip
-      pkgs.autoPatchelfHook
-    ];
-    installPhase = "install -Dm755 bun $out/bin/bun";
-    # stripping breaks the bun binary
-    dontStrip = true;
-  };
-
-  # Elysia and its runtime dependencies at the versions and hashes of the pinned imp's bun.lock,
-  # with an app that serves imp's /health handler and nothing else
-  pinnedElysiaApp = pkgs.runCommand "pinned-elysia-app" { } ''
-    unpack() {
-      mkdir -p "$out/node_modules/$1"
-      tar -xzf "$2" -C "$out/node_modules/$1" --strip-components=1
-    }
-    unpack elysia ${
-      pkgs.fetchurl {
-        url = "https://registry.npmjs.org/elysia/-/elysia-1.4.29.tgz";
-        hash = "sha512-GwMRGGwSdjfPt+w3LA0fqTuYJtS8uVRJicvoar98/HrO5qdFKDc9CwjIb6Kja+v39lkY+58hr2JvdR9jQzlUuA==";
-      }
-    }
-    unpack @sinclair/typebox ${
-      pkgs.fetchurl {
-        url = "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.52.tgz";
-        hash = "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==";
-      }
-    }
-    unpack cookie ${
-      pkgs.fetchurl {
-        url = "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz";
-        hash = "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==";
-      }
-    }
-    unpack exact-mirror ${
-      pkgs.fetchurl {
-        url = "https://registry.npmjs.org/exact-mirror/-/exact-mirror-0.2.7.tgz";
-        hash = "sha512-+MeEmDcLA4o/vjK2zujgk+1VTxPR4hdp23qLqkWfStbECtAq9gmsvQa3LW6z/0GXZyHJobrCnmy1cdeE7BjsYg==";
-      }
-    }
-    unpack fast-decode-uri-component ${
-      pkgs.fetchurl {
-        url = "https://registry.npmjs.org/fast-decode-uri-component/-/fast-decode-uri-component-1.0.1.tgz";
-        hash = "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==";
-      }
-    }
-    unpack memoirist ${
-      pkgs.fetchurl {
-        url = "https://registry.npmjs.org/memoirist/-/memoirist-0.4.0.tgz";
-        hash = "sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==";
-      }
-    }
-    cat > $out/app.ts <<'EOF'
-    import { Elysia } from 'elysia';
-
-    // packages/daemon/src/build-app.ts's /health handler, with impd ready
-    const app = new Elysia()
-      .get('/health', () => ({ status: 'ok', ready: true }))
-      .listen({ hostname: '127.0.0.1', port: 0 });
-
-    console.log(app.server?.port);
-    EOF
-  '';
 
   cases = [
     {
@@ -141,6 +70,53 @@ let
       '';
     }
     {
+      title = "it collectCaseRejections lists nothing for titles that are valid and unique";
+      script = ''
+        rejections=${
+          lib.escapeShellArg (
+            builtins.toJSON (collectCaseRejections [
+              {
+                title = "it reads the url, 2 times: a/b.c-d";
+                script = "true";
+              }
+              {
+                title = "it reads the url again";
+                script = "true";
+              }
+            ])
+          )
+        }
+
+        assert_equals '[]' "$rejections" "the rejections"
+      '';
+    }
+    {
+      title = "it collectCaseRejections lists an invalid title before a title two cases share";
+      script = ''
+        rejections=${
+          lib.escapeShellArg (
+            builtins.toJSON (collectCaseRejections [
+              {
+                title = "it reads the url";
+                script = "true";
+              }
+              {
+                title = "reads the url";
+                script = "true";
+              }
+              {
+                title = "it reads the url";
+                script = "true";
+              }
+            ])
+          )
+        }
+
+        assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url","renderCases: titles must be unique: it reads the url"]' \
+          "$rejections" "the rejections"
+      '';
+    }
+    {
       title = "it buildModuleSystem evaluates the given module with the given config";
       script =
         let
@@ -174,12 +150,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
+      title = "it run-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -195,12 +171,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd records a request for another path and answers it with a failure";
+      title = "it run-stub-impd records a request for another path and answers it with a failure";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -215,12 +191,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd records a request with another method and answers it with a failure";
+      title = "it run-stub-impd records a request with another method and answers it with a failure";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -235,12 +211,12 @@ let
       '';
     }
     {
-      title = "it start-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
+      title = "it run-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
@@ -267,7 +243,7 @@ let
       '';
     }
     {
-      title = "it start-stub-impd holds to the pinned imp: its /health handler, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \
           ${imp}/packages/daemon/src/build-app.ts || true)
@@ -294,53 +270,129 @@ let
         assert_files_equal expected-sorted locked
       '';
     }
-    {
-      title = "it start-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.2 does";
-      script = ''
-        mkdir home tmp
-        mkfifo real.fifo stub-health.fifo stub-missing.fifo
-        exec 3<>real.fifo 4<>stub-health.fifo 5<>stub-missing.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pinnedBun}/bin/bun ${pinnedElysiaApp}/app.ts >&3 &
-        real_pid=$!
-        trap 'kill "$real_pid"' EXIT
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/health.requests" >&4 &
-        health_pid=$!
-        trap 'kill "$real_pid" "$health_pid"' EXIT
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-impd.py} \
-          /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &
-        missing_pid=$!
-        trap 'kill "$real_pid" "$health_pid" "$missing_pid"' EXIT
-        read -r -t 30 -u 3 real_port
-        read -r -t 5 -u 4 health_port
-        read -r -t 5 -u 5 missing_port
+    (
+      let
+        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
+        pinnedBun = pkgs.stdenv.mkDerivation {
+          pname = "bun";
+          version = "1.4.2";
+          src = pkgs.fetchurl {
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-linux-x64.zip";
+            hash = "sha256-NjaPrvdSeHXV/6UuU81IAhdB8qg+tiCKjdZAaNQiqRM=";
+          };
+          nativeBuildInputs = [
+            pkgs.unzip
+            pkgs.autoPatchelfHook
+          ];
+          installPhase = "install -Dm755 bun $out/bin/bun";
+          # stripping breaks the bun binary
+          dontStrip = true;
+        };
 
-        curl -s -D real-health.headers -o real-health.body "http://127.0.0.1:$real_port/health"
-        curl -s -D real-missing.headers -o real-missing.body "http://127.0.0.1:$real_port/missing"
-        curl -s -D stub-health.headers -o stub-health.body "http://127.0.0.1:$health_port/health"
-        curl -s -D stub-missing.headers -o stub-missing.body "http://127.0.0.1:$missing_port/missing"
+        # Elysia and its runtime dependencies at the versions and hashes of the pinned imp's bun.lock,
+        # with an app that serves imp's /health handler and nothing else
+        pinnedElysiaApp = pkgs.runCommand "pinned-elysia-app" { } ''
+          unpack() {
+            mkdir -p "$out/node_modules/$1"
+            tar -xzf "$2" -C "$out/node_modules/$1" --strip-components=1
+          }
+          unpack elysia ${
+            pkgs.fetchurl {
+              url = "https://registry.npmjs.org/elysia/-/elysia-1.4.29.tgz";
+              hash = "sha512-GwMRGGwSdjfPt+w3LA0fqTuYJtS8uVRJicvoar98/HrO5qdFKDc9CwjIb6Kja+v39lkY+58hr2JvdR9jQzlUuA==";
+            }
+          }
+          unpack @sinclair/typebox ${
+            pkgs.fetchurl {
+              url = "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.52.tgz";
+              hash = "sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==";
+            }
+          }
+          unpack cookie ${
+            pkgs.fetchurl {
+              url = "https://registry.npmjs.org/cookie/-/cookie-1.1.1.tgz";
+              hash = "sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==";
+            }
+          }
+          unpack exact-mirror ${
+            pkgs.fetchurl {
+              url = "https://registry.npmjs.org/exact-mirror/-/exact-mirror-0.2.7.tgz";
+              hash = "sha512-+MeEmDcLA4o/vjK2zujgk+1VTxPR4hdp23qLqkWfStbECtAq9gmsvQa3LW6z/0GXZyHJobrCnmy1cdeE7BjsYg==";
+            }
+          }
+          unpack fast-decode-uri-component ${
+            pkgs.fetchurl {
+              url = "https://registry.npmjs.org/fast-decode-uri-component/-/fast-decode-uri-component-1.0.1.tgz";
+              hash = "sha512-WKgKWg5eUxvRZGwW8FvfbaH7AXSh2cL+3j5fMGzUMCxWBJ3dV3a7Wz8y2f/uQ0e3B6WmodD3oS54jTQ9HVTIIg==";
+            }
+          }
+          unpack memoirist ${
+            pkgs.fetchurl {
+              url = "https://registry.npmjs.org/memoirist/-/memoirist-0.4.0.tgz";
+              hash = "sha512-zxTgA0mSYELa66DimuNQDvyLq36AwDlTuVRbnQtB+VuTcKWm5Qc4z3WkSpgsFWHNhexqkIooqpv4hdcqrX5Nmg==";
+            }
+          }
+          cat > $out/app.ts <<'EOF'
+          import { Elysia } from 'elysia';
 
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 real-health.headers | tr -d '\r')" "imp's /health status line"
-        assert_equals "HTTP/1.1 200 OK" "$(head -1 stub-health.headers | tr -d '\r')" "the stand-in's /health status line"
-        assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')" \
-          "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "the /health content type"
-        assert_files_equal real-health.body stub-health.body
-        assert_equals "HTTP/1.1 404 Not Found" "$(head -1 real-missing.headers | tr -d '\r')" "imp's unknown route's status line"
-        assert_equals "HTTP/1.1 404 Not Found" "$(head -1 stub-missing.headers | tr -d '\r')" "the stand-in's unknown route's status line"
-        assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')" \
-          "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "the unknown route's content type"
-        assert_files_equal real-missing.body stub-missing.body
-        assert_equals "GET /health" "$(cat health.requests)" "the /health stand-in's requests"
-        assert_equals "GET /missing" "$(cat missing.requests)" "the unknown route stand-in's requests"
-      '';
-    }
+          // packages/daemon/src/build-app.ts's /health handler, with impd ready
+          const app = new Elysia()
+            .get('/health', () => ({ status: 'ok', ready: true }))
+            .listen({ hostname: '127.0.0.1', port: 0 });
+
+          console.log(app.server?.port);
+          EOF
+        '';
+      in
+      {
+        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.2 does";
+        script = ''
+          mkdir home tmp
+          mkfifo real.fifo stub-health.fifo stub-missing.fifo
+          exec 3<>real.fifo 4<>stub-health.fifo 5<>stub-missing.fifo
+          real_pid=
+          health_pid=
+          missing_pid=
+          trap '[ -n "$real_pid" ] && kill "$real_pid" || true; [ -n "$health_pid" ] && kill "$health_pid" || true; [ -n "$missing_pid" ] && kill "$missing_pid" || true' EXIT
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pinnedBun}/bin/bun ${pinnedElysiaApp}/app.ts >&3 &
+          real_pid=$!
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/health.requests" >&4 &
+          health_pid=$!
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
+            /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &
+          missing_pid=$!
+          read -r -t 30 -u 3 real_port
+          read -r -t 5 -u 4 health_port
+          read -r -t 5 -u 5 missing_port
+
+          curl -s -D real-health.headers -o real-health.body "http://127.0.0.1:$real_port/health"
+          curl -s -D real-missing.headers -o real-missing.body "http://127.0.0.1:$real_port/missing"
+          curl -s -D stub-health.headers -o stub-health.body "http://127.0.0.1:$health_port/health"
+          curl -s -D stub-missing.headers -o stub-missing.body "http://127.0.0.1:$missing_port/missing"
+
+          assert_equals "HTTP/1.1 200 OK" "$(head -1 real-health.headers | tr -d '\r')" "imp's /health status line"
+          assert_equals "HTTP/1.1 200 OK" "$(head -1 stub-health.headers | tr -d '\r')" "the stand-in's /health status line"
+          assert_equals "$(grep -i '^content-type:' real-health.headers | cut -d: -f2- | tr -d '\r')" \
+            "$(grep -i '^content-type:' stub-health.headers | cut -d: -f2- | tr -d '\r')" "the /health content type"
+          assert_files_equal real-health.body stub-health.body
+          assert_equals "HTTP/1.1 404 Not Found" "$(head -1 real-missing.headers | tr -d '\r')" "imp's unknown route's status line"
+          assert_equals "HTTP/1.1 404 Not Found" "$(head -1 stub-missing.headers | tr -d '\r')" "the stand-in's unknown route's status line"
+          assert_equals "$(grep -i '^content-type:' real-missing.headers | cut -d: -f2- | tr -d '\r')" \
+            "$(grep -i '^content-type:' stub-missing.headers | cut -d: -f2- | tr -d '\r')" "the unknown route's content type"
+          assert_files_equal real-missing.body stub-missing.body
+          assert_equals "GET /health" "$(cat health.requests)" "the /health stand-in's requests"
+          assert_equals "GET /missing" "$(cat missing.requests)" "the unknown route stand-in's requests"
+        '';
+      }
+    )
     {
-      title = "it start-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
+      title = "it run-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
         exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-hung-impd.py} >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -431,10 +483,11 @@ let
         mkdir home tmp db
         sqlite3 db/imp.sqlite.restore 'CREATE TABLE t (v TEXT);'
 
+        # the stand-in starts the holder and writes its PID file as it runs
+        trap '[ -f holder.pid ] && kill "$(cat holder.pid)" || true' EXIT
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" HOLDER_PID_FILE=$PWD/holder.pid \
           ${stubSqlite3} "file:$PWD/db/imp.sqlite.restore?mode=ro&immutable=1" 'PRAGMA integrity_check;' > out 2> err
         holder=$(cat holder.pid)
-        trap 'kill "$holder"' EXIT
 
         assert_equals ok "$(cat out)" "sqlite3's answer"
         assert_files_equal /dev/null err
@@ -1047,8 +1100,19 @@ pkgs.runCommand "test-utils-check"
             }
           ])).success
       }
+      rejections=${
+        lib.escapeShellArg (
+          builtins.toJSON (collectCaseRejections [
+            {
+              title = "it reads IMPD_HEALTH_URL";
+              script = "true";
+            }
+          ])
+        )
+      }
 
       assert_equals false "$rendered" "whether it rendered"
+      assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: it reads IMPD_HEALTH_URL"]' "$rejections" "the rejections"
     )
 
     echo "it renderCases rejects a title that does not start with it"
@@ -1064,8 +1128,19 @@ pkgs.runCommand "test-utils-check"
             }
           ])).success
       }
+      rejections=${
+        lib.escapeShellArg (
+          builtins.toJSON (collectCaseRejections [
+            {
+              title = "reads the url";
+              script = "true";
+            }
+          ])
+        )
+      }
 
       assert_equals false "$rendered" "whether it rendered"
+      assert_equals '["renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: reads the url"]' "$rejections" "the rejections"
     )
 
     echo "it renderCases rejects two cases with one title, where the second would replace the first"
@@ -1085,8 +1160,23 @@ pkgs.runCommand "test-utils-check"
             }
           ])).success
       }
+      rejections=${
+        lib.escapeShellArg (
+          builtins.toJSON (collectCaseRejections [
+            {
+              title = "it reads the url";
+              script = "true";
+            }
+            {
+              title = "it reads the url";
+              script = "false";
+            }
+          ])
+        )
+      }
 
       assert_equals false "$rendered" "whether it rendered"
+      assert_equals '["renderCases: titles must be unique: it reads the url"]' "$rejections" "the rejections"
     )
 
     source ${testLib}/run-cases.sh
