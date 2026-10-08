@@ -6,10 +6,16 @@
 # changes under the copy. Each subtest checks what the script saved before it stopped. They live
 # beside impd-restore because its script reached nixpkgs' cap on a test script's size.
 #
-# Each subtest writes its own database, secret, copy and COPY-INFO, so every subtest stands
-# alone. It needs KVM, and it reads scripts/ beside nixos/, so it builds only from the repo root:
-# run `bun run test:nixos impd-restore-saved-failures`.
+# Stand-ins, from test-utils, beside the rehearsal's own: a sleep that records each pause and
+# returns at once (build-stub-sleep.nix), so the wait for imp-host's container is counted, not
+# waited out. Each subtest writes its own database, secret, copy and COPY-INFO, so every
+# subtest stands alone. It needs KVM, and it reads scripts/ beside nixos/, so it builds only
+# from the repo root: run `bun run test:nixos impd-restore-saved-failures`.
 { nixpkgs, imp }:
+let
+  pkgs = nixpkgs.legacyPackages.x86_64-linux;
+  stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
+in
 import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
   name = "impd-restore-saved-failures-rehearsal";
   subtests =
@@ -97,7 +103,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             "restarting sysinit-reactivation.target",
             "reloading the following units: dbus-broker.service",
             "warning: the following units failed: fail-on-switch.service",
-            "restore-impd-db: failed at line 176",
+            "restore-impd-db: failed at line 177",
             f"restore-impd-db: the copy is in place (the original is in {saved}); "
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
         ], err
@@ -163,7 +169,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
         machine.succeed("printf '{' > /tmp/broken-seccomp.json")
         machine.succeed(f"mount --bind /tmp/broken-seccomp.json {seccomp[0]}")
 
-        status, out = machine.execute("IMPD_START_WAIT_SECONDS=1 SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+        status, out = machine.execute("IMPD_START_WAIT_SECONDS=3 IMPD_START_SLEEP=${stubSleep} SLEEP_LOG=/tmp/sleep.log SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
         err = machine.succeed("cat /tmp/restore.err")
 
         assert status == 1, f"exit {status}: {out}{err}"
@@ -183,10 +189,13 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
             "== start",
         ], out
         assert err.splitlines() == [
-            "restore-impd-db: no imp-host container appeared within 1 s of the start",
+            "restore-impd-db: no imp-host container appeared within 3 s of the start",
             f"restore-impd-db: the copy is in place (the original is in {saved}); "
             "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
         ], err
+        # one pause of a second after each of the three tries; the stand-in returns at once
+        pauses = machine.succeed("cat /tmp/sleep.log").splitlines()
+        assert pauses == ['["1"]', '["1"]', '["1"]'], f"the pauses are {pauses}"
         units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
         assert units == ["inactive", "failed"], f"the units are {units}"
         containers = machine.succeed("docker ps -a --format '{{.Names}}'").split()

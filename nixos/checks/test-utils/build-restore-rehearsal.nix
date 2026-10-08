@@ -161,7 +161,7 @@ pkgs.testers.runNixOSTest {
         machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
         images = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
         assert images == "", f"images are left: {images}"
-        machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err")
+        machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err /tmp/sleep.log")
 
         machine.succeed("zfs destroy -r tank/imp")
         # imp's module makes the dataset again

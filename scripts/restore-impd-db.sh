@@ -12,9 +12,9 @@
 # it starts nothing and switches nothing. It preserves the stopped database and its WAL files
 # in /root/imp-db-backups/pre-restore-<UTC time>/, stages the copy beside the database,
 # checks it there, publishes it with one rename, and moves on only after a clean unmount.
-# A copy needs COPY-INFO from scripts/copy-impd-db.sh. SQLITE3, SYSTEMCTL and CMP name the
-# sqlite3, systemctl and cmp it runs (default: those on PATH), so the rehearsals in
-# nixos/checks/impd-restore.nix and impd-restore-seams.nix can put a stand-in in place of one.
+# A copy needs COPY-INFO from scripts/copy-impd-db.sh. SQLITE3, SYSTEMCTL, CMP and
+# IMPD_START_SLEEP name the sqlite3, systemctl, cmp and sleep it runs (default: those on PATH),
+# so the rehearsals in nixos/checks/impd-restore*.nix can put a stand-in in place of one.
 set -euo pipefail
 
 copy="${1:?usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>}"
@@ -26,6 +26,7 @@ sqlite="${SQLITE3:-sqlite3}"
 systemctl="${SYSTEMCTL:-systemctl}"
 cmp="${CMP:-cmp}"
 start_wait="${IMPD_START_WAIT_SECONDS:-60}"
+start_sleep="${IMPD_START_SLEEP:-sleep}"
 units=(imp-host imp-docker-proxy)
 
 # what has happened so far, for the error message
@@ -184,7 +185,7 @@ running_image=""
 for _ in $(seq "$start_wait"); do
   running_image="$(docker inspect imp-host --format '{{.Config.Image}}' 2> /dev/null)" && break
   running_image=""
-  sleep 1
+  "$start_sleep" 1
 done
 [ -n "$running_image" ] || fail "no imp-host container appeared within $start_wait s of the start"
 [ "$running_image" = "$copy_image" ] ||

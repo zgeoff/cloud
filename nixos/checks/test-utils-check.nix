@@ -19,6 +19,7 @@ let
   stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
+  stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
 
   # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
   pinnedBun = pkgs.stdenv.mkDerivation {
@@ -334,7 +335,7 @@ let
       '';
     }
     {
-      title = "it start-stub-hung-impd takes a connection and never answers it";
+      title = "it start-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''
         mkdir home tmp
         mkfifo port.fifo
@@ -344,13 +345,22 @@ let
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
 
-        status=0
-        # curl's own deadline is the only end such a wait has
-        curl -s --max-time 1 -o body -w '%{http_code} %{num_connects}' "http://127.0.0.1:$port/health" > got || status=$?
+        # one real wait serves both units: curl's own deadline is the only end it has
+        real_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          curl -s --max-time 1 -o real.body -w '%{http_code} %{num_connects}' "http://127.0.0.1:$port/health" > real.out 2> real.err || real_status=$?
+        stub_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
+          ${stubCurl} -s -o stub.body -w '%{http_code}' --max-time 1 "http://127.0.0.1:$port/health" > stub.out 2> stub.err || stub_status=$?
 
-        assert_equals 28 "$status" "curl's exit status, a timeout"
-        assert_equals "000 1" "$(cat got)" "curl's status code and connections"
-        assert_missing body "a body"
+        assert_equals 28 "$real_status" "curl's exit status, a timeout"
+        assert_equals "000 1" "$(cat real.out)" "curl's status code and connections"
+        assert_missing real.body "curl's body"
+        assert_equals "$real_status" "$stub_status" "the stand-in's exit status"
+        # the probe asks for the status code alone, the first of the two curl printed
+        assert_equals "$(cut -d' ' -f1 real.out)" "$(cat stub.out)" "the stand-in's status code"
+        assert_files_equal real.err stub.err
+        assert_missing stub.body "the stand-in's body"
       '';
     }
     {
@@ -772,33 +782,6 @@ let
       '';
     }
     {
-      title = "it buildStubCurl answers as curl does when the server takes the connection and never answers";
-      script = ''
-        mkdir home tmp
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/start-stub-hung-impd.py} >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
-
-        real_status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
-          curl -s -o real.body -w '%{http_code}' --max-time 0.5 "http://127.0.0.1:$port/health" > real.out 2> real.err || real_status=$?
-        stub_status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CURL_LOG="$PWD/curl.log" \
-          ${stubCurl} -s -o stub.body -w '%{http_code}' --max-time 0.5 "http://127.0.0.1:$port/health" > stub.out 2> stub.err || stub_status=$?
-
-        assert_equals 28 "$real_status" "curl's exit status"
-        assert_equals "$real_status" "$stub_status" "the exit status"
-        assert_equals 000 "$(cat real.out)" "the status code curl prints"
-        assert_files_equal real.out stub.out
-        assert_files_equal real.err stub.err
-        assert_missing real.body "curl's body"
-        assert_missing stub.body "the stand-in's body"
-      '';
-    }
-    {
       title = "it buildStubCurl holds to nixos/modules/impd-local-health.sh: it makes its one call through CURL";
       script = ''
         curl=$(grep -cxF 'curl="''${CURL:-curl}"' ${../modules/impd-local-health.sh} || true)
@@ -812,6 +795,95 @@ let
         assert_equals 1 "$call" "the probe's call"
         assert_equals 1 "$calls" "the probe's calls through CURL"
         assert_equals 0 "$direct" "the probe's calls of curl by name"
+      '';
+    }
+    {
+      title = "it buildStubSleep records a pause of one duration as one JSON line, and returns as sleep does";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" \
+          ${stubSleep} 1 > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_equals '["1"]' "$(cat sleep.log)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubSleep answers a pause as the real sleep does";
+      script = ''
+        mkdir home tmp
+
+        real_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" sleep 0 > real.out 2> real.err || real_status=$?
+        stub_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" \
+          ${stubSleep} 0 > stub.out 2> stub.err || stub_status=$?
+
+        assert_equals 0 "$real_status" "sleep's exit status"
+        assert_equals "$real_status" "$stub_status" "the exit status"
+        assert_files_equal real.out stub.out
+        assert_files_equal real.err stub.err
+      '';
+    }
+    {
+      title = "it buildStubSleep records each call on a line of its own";
+      script = ''
+        mkdir home tmp
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" ${stubSleep} 1
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" ${stubSleep} 0.5
+
+        printf '%s\n' '["1"]' '["0.5"]' > expected
+        assert_files_equal expected sleep.log
+      '';
+    }
+    {
+      title = "it buildStubSleep records another call and fails it as unexpected";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" SLEEP_LOG="$PWD/sleep.log" \
+          ${stubSleep} 1 'two words' > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: 1 two words" "$(cat err)" "the error"
+        assert_equals '["1","two words"]' "$(cat sleep.log)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubSleep refuses to run without the file that records its calls";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubSleep} 1 > out 2> err || status=$?
+
+        assert_equals 2 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "sleep-returning-at-once: set SLEEP_LOG to the file that records each call" "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubSleep holds to scripts/restore-impd-db.sh: its start loop pauses a second each try through the pause it is given";
+      script = ''
+        sleep_cmd=$(grep -cxF 'start_sleep="''${IMPD_START_SLEEP:-sleep}"' ${../../scripts/restore-impd-db.sh} || true)
+        loop=$(grep -cxF 'for _ in $(seq "$start_wait"); do' ${../../scripts/restore-impd-db.sh} || true)
+        pause=$(grep -cxF '  "$start_sleep" 1' ${../../scripts/restore-impd-db.sh} || true)
+        pauses=$(grep -cF '"$start_sleep"' ${../../scripts/restore-impd-db.sh} || true)
+        # a pause by name, outside a comment, would pass the stand-in by
+        direct=$(grep -cE '^[^#]*(^|[ ;&|(])sleep ' ${../../scripts/restore-impd-db.sh} || true)
+
+        assert_equals 1 "$sleep_cmd" "the script's sleep"
+        assert_equals 1 "$loop" "the script's start loop"
+        assert_equals 1 "$pause" "the start loop's pause"
+        assert_equals 1 "$pauses" "the script's pauses through IMPD_START_SLEEP"
+        assert_equals 0 "$direct" "the script's pauses by name"
       '';
     }
   ];

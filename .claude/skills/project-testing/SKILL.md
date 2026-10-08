@@ -196,10 +196,13 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   plus every side effect the script promises, including the saved original on each failure path.
   Waits use `wait_for_unit`, `wait_until_succeeds` or `wait_for`.
 - An error the script declares is reached through real VM state where real state can produce it,
-  and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`, and the health
-  probe's `CURL`) only where it cannot. The probe's timeout arguments are checked through
-  `build-stub-curl`, never by waiting out the deadline; one fast case against the hung impd
-  stand-in keeps real transport covered, with no elapsed-time assertion.
+  and through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`, the start loop's
+  pause `IMPD_START_SLEEP`, and the health probe's `CURL`) only where it cannot. The start wait
+  is counted through `build-stub-sleep` and the probe's timeout arguments are checked through
+  `build-stub-curl`, never by waiting out a deadline. Two cases wait out a real 1 s curl timeout
+  against the hung impd stand-in, with no elapsed-time assertion: the stand-in's own test in
+  `test-utils`, which also checks `build-stub-curl` against that real curl, and one probe case
+  in `impd-local-health`, the only real-transport proof that a hung impd reads as status 0.
 - A rehearsal's first subtests assert that no unit failed at boot and that `systemd-detect-virt`
   prints `kvm`, so a run that fell back to emulation fails. `test-nixos.sh` needs a readable and
   writable KVM device for any `impd-restore*` check.
