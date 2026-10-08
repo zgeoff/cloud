@@ -7,41 +7,37 @@
 // - anything else: up (atc answers 401 or 404 to an unauthenticated probe)
 //
 // Each target's last state lives in R2; a change of state posts to ALERT_URL when
-// that secret is set, and is always logged.
+// that secret is set, and is always logged to the destination the handler is made with.
+import type { R2Bucket } from '@cloudflare/workers-types';
 
-interface R2Object {
-  text: () => Promise<string>;
-}
-
-interface R2Bucket {
-  get: (key: string) => Promise<R2Object | null>;
-  put: (key: string, value: string) => Promise<unknown>;
-}
+// the R2 methods the check calls, typed by Cloudflare's runtime types
+type StateBucket = Pick<R2Bucket, 'get' | 'put'>;
 
 interface Env {
-  readonly STATE: R2Bucket;
+  readonly STATE: StateBucket;
   readonly TARGETS: string;
   readonly ALERT_URL?: string;
+}
+
+// where a change of state is logged; the console in production
+interface LogDestination {
+  readonly log: (message: string) => void;
+}
+
+type ScheduledHandler = (controller: unknown, env: Env) => Promise<void>;
+
+export function makeScheduledHandler(destination: LogDestination): ScheduledHandler {
+  return async (_controller, env) => {
+    const targets = parseTargets(env.TARGETS);
+
+    await Promise.all(targets.map((target) => checkTarget(target, env, destination)));
+  };
 }
 
 interface Target {
   readonly name: string;
   readonly url: string;
 }
-
-type Health = 'up' | 'tunnel-down' | 'origin-down' | 'unreachable';
-
-const probeTimeoutMs = 10_000;
-
-const handler = {
-  async scheduled(_controller: unknown, env: Env): Promise<void> {
-    const targets = parseTargets(env.TARGETS);
-
-    await Promise.all(targets.map((target) => checkTarget(target, env)));
-  },
-};
-
-export default handler;
 
 function parseTargets(raw: string): Target[] {
   const parsed: unknown = JSON.parse(raw);
@@ -64,7 +60,7 @@ function isTarget(value: unknown): value is Target {
   );
 }
 
-async function checkTarget(target: Target, env: Env): Promise<void> {
+async function checkTarget(target: Target, env: Env, destination: LogDestination): Promise<void> {
   const health = await readHealth(target.url);
 
   const key = `state:${target.name}`;
@@ -79,18 +75,22 @@ async function checkTarget(target: Target, env: Env): Promise<void> {
 
   const message = `geoff.cloud: ${target.name} is ${health} (was ${previous ?? 'unknown'})`;
 
-  console.log(message);
+  destination.log(message);
 
   if (env.ALERT_URL !== undefined && env.ALERT_URL !== '') {
     await sendAlert(env.ALERT_URL, message);
   }
 }
 
-async function readStoredHealth(bucket: R2Bucket, key: string): Promise<string | null> {
+async function readStoredHealth(bucket: StateBucket, key: string): Promise<string | null> {
   const stored = await bucket.get(key);
 
   return stored === null ? null : stored.text();
 }
+
+type Health = 'up' | 'tunnel-down' | 'origin-down' | 'unreachable';
+
+const probeTimeoutMs = 10_000;
 
 async function readHealth(url: string): Promise<Health> {
   try {
