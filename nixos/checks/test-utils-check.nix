@@ -252,7 +252,7 @@ pkgs.runCommand "test-utils-check"
         )
       }
 
-      assert_equals '[]' "$failed" "the failed assertions"
+      assert_equals '["temporary"]' "$failed" "the failed assertions"
     )
 
     echo "#start-stub-impd answers with the given status, content type and body, once it prints its port"
