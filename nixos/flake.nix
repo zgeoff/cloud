@@ -38,8 +38,8 @@
         };
       };
       # bun run test:nixos builds them all. Every check reads ../scripts (scripts/test-lib, and
-      # impd-restore and impd-restore-seams the script they rehearse), so they build only with the
-      # repo root as the flake's source (path:.?dir=nixos); those two boot one VM each, from
+      # the impd-restore checks the script they rehearse), so they build only with the repo root
+      # as the flake's source (path:.?dir=nixos); the impd-restore checks boot one VM each, from
       # checks/test-utils/build-restore-rehearsal.nix, and need KVM
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.test-utils = import ./checks/test-utils-check.nix {
@@ -51,6 +51,9 @@
       };
       checks.x86_64-linux.impd-restore = import ./checks/impd-restore.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.impd-restore-seams = import ./checks/impd-restore-seams.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.impd-restore-saved-failures = import ./checks/impd-restore-saved-failures.nix {
         inherit nixpkgs imp;
       };
     };
