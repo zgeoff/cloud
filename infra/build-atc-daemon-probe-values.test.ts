@@ -53,11 +53,10 @@ test("it names each probe target as the daemon's alert rule selects it", () => {
     .filter((rule) => rule.alert === 'ATCDaemonUnreachable')
     .map((rule) => rule.expr);
 
-  expect({ targets, exprs }).toStrictEqual({
-    targets: ['atc-daemon', 'atc-daemon-home-pc'],
-    exprs: [
-      'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
-      'probe_success{target="atc-daemon-home-pc"} == 0 or absent(probe_success{target="atc-daemon-home-pc"})',
-    ],
-  });
+  expect(targets).toStrictEqual(['atc-daemon', 'atc-daemon-home-pc']);
+
+  expect(exprs).toStrictEqual([
+    'probe_success{target="atc-daemon"} == 0 or absent(probe_success{target="atc-daemon"})',
+    'probe_success{target="atc-daemon-home-pc"} == 0 or absent(probe_success{target="atc-daemon-home-pc"})',
+  ]);
 });

@@ -82,8 +82,16 @@ test('it marks every daemon token secret', () => {
   }
 
   expect(
-    Promise.all(Object.values(result.atcGateway.secrets.tokens).map((token) => isSecret(token))),
-  ).resolves.toStrictEqual([true, true]);
+    Promise.all(
+      Object.entries(result.atcGateway.secrets.tokens).map(async ([name, token]) => [
+        name,
+        await isSecret(token),
+      ]),
+    ),
+  ).resolves.toStrictEqual([
+    ['geoffcloud', true],
+    ['home-pc', true],
+  ]);
 });
 
 test('it gives each daemon the token from its own ATC_GATEWAY_TOKEN_<NAME> variable', () => {
@@ -139,14 +147,10 @@ test('it marks every backup value secret when the backup variables are set', () 
     throw new Error('expected the backup secrets');
   }
 
-  expect(
-    Promise.all([
-      isSecret(backup.repository),
-      isSecret(backup.password),
-      isSecret(backup.accessKeyID),
-      isSecret(backup.secretAccessKey),
-    ]),
-  ).resolves.toStrictEqual([true, true, true, true]);
+  expect(isSecret(backup.repository)).resolves.toBeTrue();
+  expect(isSecret(backup.password)).resolves.toBeTrue();
+  expect(isSecret(backup.accessKeyID)).resolves.toBeTrue();
+  expect(isSecret(backup.secretAccessKey)).resolves.toBeTrue();
 });
 
 test('it carries the backup values, with the restic repository built from the R2 endpoint and bucket', () => {
@@ -172,19 +176,13 @@ test('it carries the backup values, with the restic repository built from the R2
     throw new Error('expected the backup secrets');
   }
 
-  expect(
-    Promise.all([
-      resolveOutput(backup.repository),
-      resolveOutput(backup.password),
-      resolveOutput(backup.accessKeyID),
-      resolveOutput(backup.secretAccessKey),
-    ]),
-  ).resolves.toStrictEqual([
+  expect(resolveOutput(backup.repository)).resolves.toBe(
     's3:https://0123456789abcdef.r2.cloudflarestorage.com/atc-gateway-backups/atc-gateway',
-    'p'.repeat(32),
-    'a'.repeat(32),
-    's'.repeat(64),
-  ]);
+  );
+
+  expect(resolveOutput(backup.password)).resolves.toBe('p'.repeat(32));
+  expect(resolveOutput(backup.accessKeyID)).resolves.toBe('a'.repeat(32));
+  expect(resolveOutput(backup.secretAccessKey)).resolves.toBe('s'.repeat(64));
 });
 
 test("it throws when a daemon's token is missing from the environment it is given", () => {

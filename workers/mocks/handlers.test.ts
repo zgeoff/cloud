@@ -29,7 +29,22 @@ test('it leaves a probe of a URL with no stored status unhandled', async () => {
   expect(response).toBeUndefined();
 });
 
-test("it records each alert's content type and body, and answers it with 204", async () => {
+test("it records each alert's content type and body", async () => {
+  await getResponse(
+    handlers,
+    new Request(alertWebhookURL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"content":"down"}',
+    }),
+  );
+
+  expect(sentAlerts).toStrictEqual([
+    { contentType: 'application/json', body: '{"content":"down"}' },
+  ]);
+});
+
+test('it answers an alert with 204', async () => {
   const response = await getResponse(
     handlers,
     new Request(alertWebhookURL, {
@@ -39,8 +54,5 @@ test("it records each alert's content type and body, and answers it with 204", a
     }),
   );
 
-  expect({ status: response?.status, sentAlerts }).toStrictEqual({
-    status: 204,
-    sentAlerts: [{ contentType: 'application/json', body: '{"content":"down"}' }],
-  });
+  expect(response?.status).toBe(204);
 });
