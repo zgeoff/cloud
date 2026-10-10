@@ -172,8 +172,8 @@ RUN curl -fsSL -o /tmp/op.zip \
 # has no dependencies. The mod sits at the fixed path /opt/auto-mode/mods/auto-mode,
 # for --plugin-dir. The sum is the tarball's; npm's dist.integrity is its sha512:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=0.15.0
-ARG AUTO_MODE_SHA256=22f5192137baae7b41ead26c3ed05513a37981ddf334f0e55910f312446ea962
+ARG AUTO_MODE_VERSION=0.16.0
+ARG AUTO_MODE_SHA256=cc5d99ff689e2f1d0a5a0c0d7da496ab5584df0ab337ce91776267abc131d1d8
 RUN curl -fsSL -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
