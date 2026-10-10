@@ -123,7 +123,7 @@ Items that `.env` does not reference:
 
 | Item                    | Used by                                                              |
 | ----------------------- | -------------------------------------------------------------------- |
-| `imp-tailscale-authkey` | imp's scripts. Pulumi writes each new `tag:imp` key into it          |
+| `imp-tailscale-authkey` | imp's dev instances, not its e2e. Pulumi writes each `tag:imp` key   |
 | `imp-restic`            | imp's backup password, staged on the host at reinstall               |
 | `r2-backups`            | imp's backup repository and R2 keys, staged on the host at reinstall |
 | `imp-dns-cloudflare`    | imp's DNS token and ACME email (`install-imp-dns-token.sh`)          |

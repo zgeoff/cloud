@@ -70,8 +70,10 @@ const hostKey = new TailnetKey(
 
 export const hostAuthKey = hostKey.key;
 
-// imp's key (tag:imp) for impd nodes: dev, e2e and hosts. imp's scripts read it from
-// op://cloud/imp-tailscale-authkey, so Pulumi writes each new key into that item.
+// imp's key (tag:imp) for impd nodes: dev instances and hosts. imp's dev.sh reads it
+// from op://cloud/imp-tailscale-authkey, so Pulumi writes each new key into that item.
+// imp's e2e suites no longer use it: they join as tag:imp-e2e with their own OAuth
+// client (docs/runbooks/imp-e2e-tailnet.md).
 // Expiry is Tailscale's 90-day maximum; an apply after expiry mints a fresh one.
 const impKey = new TailnetKey(
   'imp',

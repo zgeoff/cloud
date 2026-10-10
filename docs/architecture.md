@@ -116,10 +116,11 @@ the same VM.
 
 Pulumi owns the whole tailnet policy file (`infra/tailnet-policy.ts`).
 
-| Tag         | Holder                                                    | May reach                                          |
-| ----------- | --------------------------------------------------------- | -------------------------------------------------- |
-| `tag:cloud` | the host's own tailscaled, and so every pod's egress      | `home-pc` on tcp 8415; `imp-geoffcloud` on tcp 443 |
-| `tag:imp`   | impd nodes: `imp-geoffcloud`, and imp's dev and e2e nodes | other `tag:imp` nodes on tcp 7070                  |
+| Tag           | Holder                                                | May reach                                           |
+| ------------- | ----------------------------------------------------- | --------------------------------------------------- |
+| `tag:cloud`   | the host's own tailscaled, and so every pod's egress  | `home-pc` on tcp 8415; `imp-geoffcloud` on tcp 443  |
+| `tag:imp`     | impd nodes: `imp-geoffcloud`, and imp's dev instances | other `tag:imp` nodes on tcp 7070                   |
+| `tag:imp-e2e` | imp's e2e test nodes, ephemeral                       | other `tag:imp-e2e` nodes on tcp 7070; no `tag:imp` |
 
 - Members reach every device on any port.
 - Admins SSH to `tag:cloud` hosts as root or a non-root user, with no browser check, so scripts run
