@@ -112,6 +112,31 @@ it_leaves_a_config_that_already_names_the_image_alone() {
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_sets_guest_atc_when_the_config_names_the_image_without_it() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '{"images":[{"name":"agent-abc1234","digest":"imp-build-2"}],"imps":[]}' > "$tree/imp-state.json"
+  echo '{"targets":{"cloud":{"provider":"imp","image":"agent-abc1234","guestATC":"/missing/atc"}}}' > "$tree/home/.config/atc/config.json"
+  chmod 600 "$tree/home/.config/atc/config.json"
+  cp -p "$tree/home/.config/atc/config.json" "$tree/before"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_NOW=2026-10-10T05:06:07Z \
+    bash "$script" agent-abc1234 "$tree/home/.config/atc/config.json" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << EOF
+backed up $tree/home/.config/atc/config.json to $tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234
+set targets.cloud.image to agent-abc1234 (was agent-abc1234)
+the daemon reads its targets at startup: restart it when no session needs it, with
+  systemctl --user restart atc-daemon.service
+EOF
+  diff /dev/null "$tree/err"
+  cmp "$tree/before" "$tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234"
+  diff - <(jq -c . "$tree/home/.config/atc/config.json") <<< '{"targets":{"cloud":{"provider":"imp","image":"agent-abc1234","guestATC":"/usr/local/bin/atc"}}}'
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 it_refuses_an_image_the_host_lacks() {
   local status=0
   tree="$(mktemp -d)"

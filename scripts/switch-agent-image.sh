@@ -25,7 +25,8 @@ if ! jq -e '.targets.cloud | type == "object"' "$config" > /dev/null 2>&1; then
   exit 1
 fi
 current="$(jq -r '.targets.cloud.image // ""' "$config")"
-if [ "$current" = "$image" ]; then
+guest_atc="$(jq -r '.targets.cloud.guestATC // ""' "$config")"
+if [ "$current" = "$image" ] && [ "$guest_atc" = /usr/local/bin/atc ]; then
   echo "the cloud target already runs $image"
   exit 0
 fi
