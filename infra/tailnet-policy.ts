@@ -24,7 +24,7 @@ const impNode = {
 // - tag:imp-e2e — the throwaway impd nodes of imp's e2e suites. They reach only each
 //   other's API, never a tag:imp node, so a test run cannot touch a live impd. Their
 //   keys come from an OAuth client of their own (auth_keys scope, this tag only),
-//   kept in the 1Password imp-e2e vault (docs/runbooks/imp-e2e-tailnet.md).
+//   kept in imp's own 1Password vault (docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
