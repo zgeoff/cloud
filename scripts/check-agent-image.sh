@@ -151,6 +151,7 @@ check_tool uvx "$UV_VERSION" uvx --version
 check_tool op "$OP_VERSION" op --version
 check_package docker-compose-plugin "$DOCKER_COMPOSE_VERSION"
 check_tool auto-mode "$AUTO_MODE_VERSION" jq -r .version /opt/auto-mode/package.json
+check_tool gitleaks "$GITLEAKS_VERSION" gitleaks version
 if auto-mode --help > /dev/null 2>&1; then
   pass auto-mode "auto-mode --help exits 0"
 else
