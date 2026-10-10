@@ -100,8 +100,10 @@ mints a release bot token scoped to zgeoff/cloud, clones this repository, and ru
   `chore: pin atc <version> in the agent image`. A later release replaces the branch and updates the
   same pull request. It turns that pull request's auto-merge off first, so the new pin waits for its
   own checks.
-- It does nothing when `main` or the branch already pins that release or a newer one, so an older
-  release's job that finishes last never moves the pin back.
+- It does nothing when `main` already pins that release or a newer one, or the branch pins a newer
+  one, so an older release's job that finishes last never moves the pin back. When the branch
+  already pins that release, it pushes nothing and opens the pull request if none is open, so
+  running it again repairs a run that failed after its push.
 - The `auto-merge` job in `.github/workflows/agent-image.yml` runs after the image check passes. It
   runs only for the release bot's pull request from this repository's `atc-pin/agent-image` branch.
   `scripts/check-atc-pin-diff.sh` proves that the diff changes the two atc pins and nothing else,

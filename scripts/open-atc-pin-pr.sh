@@ -13,8 +13,9 @@
 # workflow turns auto-merge back on once those pass.
 #
 # It stops, with no push and no pull request, when main already pins the release or a newer one,
-# and when the branch already holds the release or a newer one, as when an older release's job
-# finishes last.
+# and when the branch already holds a newer one, as when an older release's job finishes last.
+# When the branch already holds this release, it pushes nothing and opens the pull request if none
+# is open, so a run that failed after its push is repaired by running it again.
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
@@ -29,9 +30,16 @@ title="chore: pin atc $version in the agent image"
 body="Pins atc $version in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."
 
 git fetch -q origin main
+git checkout -q -B "$branch" origin/main
+bash scripts/pin-agent-atc.sh "$version" "$sums"
+if git diff --quiet; then
+  exit 0
+fi
 
-# the branch's current commit, for the push's lease; empty when the branch does not exist
+# the branch's current commit, for the push's lease (empty when the branch does not exist), and
+# the release it pins
 lease=""
+branch_version=""
 status=0
 git ls-remote --exit-code --heads origin "refs/heads/$branch" > /dev/null || status=$?
 case "$status" in
@@ -39,23 +47,30 @@ case "$status" in
     git fetch -q origin "refs/heads/$branch"
     lease="$(git rev-parse FETCH_HEAD)"
     branch_version="$(git show FETCH_HEAD:images/agent/Dockerfile | sed -n 's/^ARG ATC_VERSION=//p')"
-    if [ "$(printf '%s\n' "$branch_version" "$version" | sort -V | tail -1)" = "$branch_version" ]; then
-      echo "$branch already pins atc $branch_version, which is not older than $version"
-      exit 0
-    fi
     ;;
   2) ;;
   *) exit "$status" ;;
 esac
-
-git checkout -q -B "$branch" origin/main
-bash scripts/pin-agent-atc.sh "$version" "$sums"
-if git diff --quiet; then
+if [ -n "$branch_version" ] && [ "$branch_version" != "$version" ] &&
+  [ "$(printf '%s\n' "$branch_version" "$version" | sort -V | tail -1)" = "$branch_version" ]; then
+  echo "$branch already pins atc $branch_version, which is newer than $version"
   exit 0
 fi
 
-prs="$(gh pr list --repo "$repo" --head "$branch" --state open --json number,autoMergeRequest)"
+prs="$(gh pr list --repo "$repo" --head "$branch" --state open --json number,url,autoMergeRequest)"
 number="$(jq -r '.[0].number // empty' <<< "$prs")"
+
+# a branch that already pins this release needs no push: a run that pushed it and then failed to
+# open its pull request is repaired by opening it
+if [ "$branch_version" = "$version" ]; then
+  if [ -n "$number" ]; then
+    echo "$(jq -r '.[0].url' <<< "$prs") already pins atc $version"
+  else
+    gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body "$body"
+  fi
+  exit 0
+fi
+
 if [ -n "$number" ] && [ "$(jq -r '.[0].autoMergeRequest != null' <<< "$prs")" = true ]; then
   gh pr merge "$number" --repo "$repo" --disable-auto >&2
 fi

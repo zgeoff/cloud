@@ -64,7 +64,7 @@ ARG ATC_SHA256=4444444444444444444444444444444444444444444444444444444444444444
 EOF
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..atc-pin/agent-image) <<< 'chore: pin atc 3.11.0 in the agent image'
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,autoMergeRequest"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","atc-pin/agent-image","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -90,7 +90,7 @@ EOF
   "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore: pin atc 3.10.9 in the agent image'
   "${case_env[@]}" git -C "$tree/seed" push -q origin atc-pin/agent-image
   "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
-  echo '[{"autoMergeRequest":{"mergeMethod":"SQUASH"},"number":12}]' > "$tree/open-prs"
+  echo '[{"autoMergeRequest":{"mergeMethod":"SQUASH"},"number":12,"url":"https://github.com/zgeoff/cloud/pull/12"}]' > "$tree/open-prs"
   echo '4444444444444444444444444444444444444444444444444444444444444444  atc-linux-x64' > "$tree/SHA256SUMS"
 
   (cd "$tree/clone" && "${case_env[@]}" bash "$script" 3.11.0 "$tree/SHA256SUMS") > "$tree/out" 2> "$tree/err" || status=$?
@@ -106,7 +106,7 @@ ARG ATC_SHA256=4444444444444444444444444444444444444444444444444444444444444444
 EOF
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..atc-pin/agent-image) <<< 'chore: pin atc 3.11.0 in the agent image'
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,autoMergeRequest"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
 ["gh","pr","merge","12","--repo","zgeoff/cloud","--disable-auto"]
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
@@ -127,7 +127,7 @@ EOF
   "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the image'
   "${case_env[@]}" git -C "$tree/seed" push -q origin main
   "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
-  echo '[{"autoMergeRequest":null,"number":12}]' > "$tree/open-prs"
+  echo '[{"autoMergeRequest":null,"number":12,"url":"https://github.com/zgeoff/cloud/pull/12"}]' > "$tree/open-prs"
   echo '4444444444444444444444444444444444444444444444444444444444444444  atc-linux-x64' > "$tree/SHA256SUMS"
 
   (cd "$tree/clone" && "${case_env[@]}" bash "$script" 3.11.0 "$tree/SHA256SUMS") > "$tree/out" 2> "$tree/err" || status=$?
@@ -138,7 +138,7 @@ https://github.com/zgeoff/cloud/pull/12
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,autoMergeRequest"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -194,10 +194,87 @@ EOF
 
   (cd "$tree/clone" && "${case_env[@]}" bash "$script" 3.11.0 "$tree/SHA256SUMS") > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" <<< 'atc-pin/agent-image already pins atc 3.11.1, which is not older than 3.11.0'
+  diff - "$tree/out" << 'EOF'
+pinned atc 3.11.0: 4444444444444444444444444444444444444444444444444444444444444444
+atc-pin/agent-image already pins atc 3.11.1, which is newer than 3.11.0
+EOF
   diff /dev/null "$tree/err"
   diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image)
   [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_opens_the_missing_pull_request_when_the_branch_already_holds_the_release() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/seed/images/agent"
+  cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
+ARG ATC_VERSION=3.10.2
+ARG ATC_SHA256=8f47233eab37dbfc0b700f2665a6caf69cbc986a73651d2b6f8f26eb908818c4
+EOF
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the image'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc atc-pin/agent-image
+  sed -i -e 's/^ARG ATC_VERSION=.*/ARG ATC_VERSION=3.11.0/' \
+    -e 's/^ARG ATC_SHA256=.*/ARG ATC_SHA256=4444444444444444444444444444444444444444444444444444444444444444/' \
+    "$tree/seed/images/agent/Dockerfile"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore: pin atc 3.11.0 in the agent image'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin atc-pin/agent-image
+  "${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image > "$tree/before"
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  echo '4444444444444444444444444444444444444444444444444444444444444444  atc-linux-x64' > "$tree/SHA256SUMS"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" 3.11.0 "$tree/SHA256SUMS") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+pinned atc 3.11.0: 4444444444444444444444444444444444444444444444444444444444444444
+https://github.com/zgeoff/cloud/pull/200
+EOF
+  diff /dev/null "$tree/err"
+  diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image)
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
+["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","atc-pin/agent-image","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_leaves_an_open_pull_request_that_already_holds_the_release_alone() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/seed/images/agent"
+  cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
+ARG ATC_VERSION=3.10.2
+ARG ATC_SHA256=8f47233eab37dbfc0b700f2665a6caf69cbc986a73651d2b6f8f26eb908818c4
+EOF
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the image'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc atc-pin/agent-image
+  sed -i -e 's/^ARG ATC_VERSION=.*/ARG ATC_VERSION=3.11.0/' \
+    -e 's/^ARG ATC_SHA256=.*/ARG ATC_SHA256=4444444444444444444444444444444444444444444444444444444444444444/' \
+    "$tree/seed/images/agent/Dockerfile"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore: pin atc 3.11.0 in the agent image'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin atc-pin/agent-image
+  "${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image > "$tree/before"
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  echo '[{"autoMergeRequest":{"mergeMethod":"SQUASH"},"number":12,"url":"https://github.com/zgeoff/cloud/pull/12"}]' > "$tree/open-prs"
+  echo '4444444444444444444444444444444444444444444444444444444444444444  atc-linux-x64' > "$tree/SHA256SUMS"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" 3.11.0 "$tree/SHA256SUMS") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+pinned atc 3.11.0: 4444444444444444444444444444444444444444444444444444444444444444
+https://github.com/zgeoff/cloud/pull/12 already pins atc 3.11.0
+EOF
+  diff /dev/null "$tree/err"
+  diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image)
+  diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
