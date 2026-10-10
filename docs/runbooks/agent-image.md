@@ -25,29 +25,26 @@ rollback.
 
 ## Build
 
-Build from a clean checkout of the merge commit on `main`, on a machine whose `imp` CLI calls the
+Build and check in one command, from any zgeoff/cloud clone, on a machine whose `imp` CLI calls the
 geoffcloud host. The token needs `manage` scope with no imp patterns.
 
 ```sh
-git switch --detach <merge commit> && git status --short   # prints nothing
-image="agent-$(git rev-parse --short HEAD)"
-imp image build images/agent --name "$image"
-imp image ls
+bash scripts/build-agent-image.sh            # origin/main's head, after a fetch
+bash scripts/build-agent-image.sh <commit>   # or an older commit on main
 ```
 
-`imp image ls` shows a short digest. Read the full one with
-`imp image ls --json | jq -r --arg image "$image" '.[] | select(.name == $image) | .digest'`, and
-record the name and the digest on the PR.
+The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
+image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
+runs that commit's `scripts/check-agent-image.sh` there, and removes the imp. Its last line is
+`agent-<short sha> <digest> check passed`; record that line on the PR. A failed check removes the
+image, unless `--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is
+not on `main`, and an image or check imp name that already exists.
+
+`imp image build` prints no progress off a terminal, so the build runs quietly for several minutes.
+`AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
+build afterwards, so read `imp image ls` before a retry.
 
 ## Check
-
-Boot a fresh imp from the image, run the check, then remove the imp:
-
-```sh
-imp new agent-check --image "$image"
-bash scripts/check-agent-image.sh --imp agent-check
-imp rm agent-check
-```
 
 The check prints one line per item and exits non-zero on any failure:
 
@@ -74,20 +71,14 @@ The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs
 into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB, before each new
 imp's first session starts.
 
-1. Copy the file to `config.json.bak-<UTC stamp>-pre-<issue or image>`. Other sessions can write the
-   same file, so read it again just before the edit.
-2. Set `targets.cloud.image` and `targets.cloud.guestATC`, and change nothing else:
-
-   ```sh
-   f=~/.config/atc/config.json
-   jq --arg image "agent-<short sha>" \
-     '.targets.cloud.image = $image | .targets.cloud.guestATC = "/usr/local/bin/atc"' "$f" > "$f.new"
-   chmod 600 "$f.new" && mv "$f.new" "$f"
-   ```
-
-3. Restart the daemon when no session needs it. The daemon reads its targets at startup only, so the
-   change reaches the next spawn after the restart.
-4. Spawn a session on `cloud`, and check that its imp runs the new image: `imp ls` shows the image
+1. Run `bash scripts/switch-agent-image.sh agent-<short sha>` on the machine that runs the daemon.
+   It refuses an image the host lacks, copies the config to
+   `config.json.bak-<UTC stamp>-pre-<image>`, then sets `targets.cloud.image` and
+   `targets.cloud.guestATC` and changes nothing else. A second argument names another config file.
+2. Restart the daemon when no session needs it, with the command the script prints. The script never
+   restarts it. The daemon reads its targets at startup only, so the change reaches the next spawn
+   after the restart.
+3. Spawn a session on `cloud`, and check that its imp runs the new image: `imp ls` shows the image
    of each imp.
 
 A switch changes new imps only. An imp keeps the image it was created from.
@@ -132,8 +123,7 @@ After the pin merges, build and check the image, then switch the `cloud` target,
    above its pin.
 2. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
    its check; run it locally first to find a failure sooner.
-3. After the PR merges, build and check the new image on the host from the merge commit, as above,
-   and record its name and digest on the PR.
+3. After the PR merges, run `bash scripts/build-agent-image.sh`, and record its last line on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
    `imp image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
