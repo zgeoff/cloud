@@ -21,6 +21,10 @@ const impNode = {
 //   health probe.
 // - tag:imp — impd nodes. Members reach them on any port (one port per imp);
 //   they reach nothing, which is imp's isolation goal.
+// - tag:imp-e2e — the throwaway impd nodes of imp's e2e suites. They reach only each
+//   other's API, never a tag:imp node, so a test run cannot touch a live impd. Their
+//   keys come from an OAuth client of their own (auth_keys scope, this tag only),
+//   kept in the 1Password imp-e2e vault (docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
@@ -32,6 +36,10 @@ export const tailnetPolicy = {
   tagOwners: {
     'tag:cloud': ['autogroup:admin', 'tag:cloud'],
     'tag:imp': ['autogroup:admin', 'tag:imp'],
+
+    // owns itself, so the e2e OAuth client (tag:imp-e2e) may mint keys for it; no
+    // other tag owns it, and it owns no other tag
+    'tag:imp-e2e': ['autogroup:admin', 'tag:imp-e2e'],
   },
   grants: [
     // members reach every device; tagged nodes get only what a grant gives them
@@ -47,6 +55,10 @@ export const tailnetPolicy = {
     // the cluster's probe of imp's /health (#29) → imp's node, 443 only; last, so
     // adding it shifts no other grant
     { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: [`tcp:${impNode.httpsPort}`] },
+
+    // imp's e2e nodes reach each other's API only, for the two-node moves suite; no
+    // grant takes them to tag:imp. Last, so adding it shifts no other grant
+    { src: ['tag:imp-e2e'], dst: ['tag:imp-e2e'], ip: ['tcp:7070'] },
   ],
   ssh: [
     {
