@@ -44,7 +44,7 @@ OUT
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-it_answers_a_failed_integrity_check_with_its_finding_and_exit_1() {
+it_answers_a_failed_integrity_check_with_its_findings_on_one_line_and_exit_1() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
