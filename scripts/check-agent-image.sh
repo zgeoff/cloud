@@ -162,6 +162,14 @@ if [[ -f /opt/auto-mode/mods/auto-mode/.claude-plugin/plugin.json ]]; then
 else
   fail auto-mode-mod "/opt/auto-mode/mods/auto-mode/.claude-plugin/plugin.json is missing"
 fi
+# the boot service that lets oxc's allocator reserve its buffers on a small imp
+overcommit=/etc/imp/services.d/overcommit.json
+if [[ "$(jq -c '[.argv, .user, .restart]' "$overcommit" 2> /dev/null)" == '[["sysctl","-w","vm.overcommit_memory=1"],"root","never"]' ]] \
+  && command -v sysctl > /dev/null; then
+  pass overcommit "$overcommit"
+else
+  fail overcommit "$overcommit is missing or does not run sysctl -w vm.overcommit_memory=1 once as root"
+fi
 if [[ "${DISABLE_UPDATES:-}" == 1 ]]; then
   pass DISABLE_UPDATES "1"
 else
