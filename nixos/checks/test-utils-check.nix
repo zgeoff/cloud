@@ -16,6 +16,7 @@ let
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   stubSqlite3 = import ./test-utils/build-stub-sqlite3.nix { inherit pkgs; };
+  stubIntegritySqlite3 = import ./test-utils/build-stub-integrity-sqlite3.nix { inherit pkgs; };
   stubBlockingSqlite3 = import ./test-utils/build-stub-blocking-sqlite3.nix { inherit pkgs; };
   stubSystemctl = import ./test-utils/build-stub-systemctl.nix { inherit pkgs; };
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
@@ -491,7 +492,7 @@ let
         stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
       in
       {
-        title = "it buildStubImpHostImage sleeps as imp-host, and its imp-docker-proxy only opens the socket";
+        title = "it buildStubImpHostImage sleeps as imp-host, its imp-docker-proxy only opens the socket, and its imp info prints the version";
         script = ''
           blobs=${stubImage.layout}/blobs/sha256
           manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
@@ -516,6 +517,22 @@ let
           assert_equals -r-xr-xr-x "$proxy_mode" "the proxy's mode"
           assert_equals "${pkgs.busybox}/bin/sleep" "$sleep_target" "the image's sleep"
           assert_equals 1 "$busybox" "the image's busybox binaries"
+
+          imp=$(sed -n 's|^l.* \./usr/local/bin/imp -> /||p' listing)
+          tar -xOf "$layer" "$imp" > imp-script
+          tmp_mode=$(grep -E ' \./tmp/?$' listing | cut -c1-10)
+          info_status=0
+          sh imp-script info > info.out 2> info.err || info_status=$?
+          other_status=0
+          sh imp-script ls > other.out 2> other.err || other_status=$?
+
+          assert_equals 0 "$info_status" "imp info's exit"
+          assert_equals 'version     0.28.0' "$(cat info.out)" "imp info's output"
+          assert_files_equal /dev/null info.err
+          assert_equals 97 "$other_status" "another imp command's exit"
+          assert_files_equal /dev/null other.out
+          assert_equals 'unexpected: imp ls' "$(cat other.err)" "another imp command's error"
+          assert_equals drwxrwxrwt "$tmp_mode" "the image's /tmp"
         '';
       }
     )
@@ -530,6 +547,17 @@ let
         assert_equals '["/usr/local/bin/imp-docker-proxy"]' "$command" "the proxy's command"
         assert_equals 1 "$waits" "the module's waits for the proxy's socket"
         assert_equals 1 "$runs" "the module's imp-host runs that end at the image, with no command"
+      '';
+    }
+    {
+      title = "it buildStubImpHostImage holds to the pinned imp info: the version line first, each label padded to 12 characters";
+      script = ''
+        info=${imp}/packages/cli/src/commands/info.ts
+        first=$(grep -A1 -F 'const lines = [' "$info" | tail -n1 | tr -d ' ')
+        pads=$(grep -cF 'console.log(`''${label.padEnd(12)}''${value}`);' "$info" || true)
+
+        assert_equals "['version',info.version]," "$first" "imp info's first line"
+        assert_equals 1 "$pads" "imp info's padded labels"
       '';
     }
     {
@@ -561,6 +589,49 @@ let
         assert_equals ok "$(cat out)" "sqlite3's answer"
         assert_files_equal /dev/null err
         assert_missing holder.pid "a holder's PID file"
+      '';
+    }
+    {
+      title = "it buildStubIntegritySqlite3 answers an integrity check with the real report on a damaged index, and exit 0";
+      script = ''
+        mkdir home tmp
+        sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);'
+        status=0
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          ${stubIntegritySqlite3} copy.sqlite 'PRAGMA integrity_check;' > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the stand-in's exit"
+        printf '%s\n' 'wrong # of entries in index sqlite_autoindex_imps_1' \
+          'row 1 missing from index sqlite_autoindex_imps_1' 'row 2 missing from index sqlite_autoindex_imps_1' \
+          'row 3 missing from index sqlite_autoindex_imps_1' > expected
+        assert_files_equal expected out
+        assert_files_equal /dev/null err
+      '';
+    }
+    {
+      title = "it buildStubIntegritySqlite3 is sqlite3 alone for any other statement";
+      script = ''
+        mkdir home tmp
+        sqlite3 copy.sqlite 'CREATE TABLE t (v TEXT);' "INSERT INTO t VALUES ('x');"
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          ${stubIntegritySqlite3} copy.sqlite 'SELECT v FROM t;' > out 2> err
+
+        assert_equals x "$(cat out)" "sqlite3's answer"
+        assert_files_equal /dev/null err
+      '';
+    }
+    {
+      title = "it buildStubIntegritySqlite3 holds to scripts/copy-impd-db-host.sh: it checks the copy through SQLITE3";
+      script = ''
+        sqlite=$(grep -cxF 'sqlite=''${SQLITE3:-$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3}' \
+          ${../../scripts/copy-impd-db-host.sh} || true)
+        checked=$(grep -cxF 'integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")' \
+          ${../../scripts/copy-impd-db-host.sh} || true)
+
+        assert_equals 1 "$sqlite" "the host script's SQLITE3"
+        assert_equals 1 "$checked" "the host script's integrity_check"
       '';
     }
     {
