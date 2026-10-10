@@ -7,12 +7,12 @@ tcp 7070. No grant takes them to `tag:imp`, so a test run cannot reach a live im
 
 ## What holds what
 
-| Where                                       | Holds                                                                |
-| ------------------------------------------- | -------------------------------------------------------------------- |
-| the tailnet policy (Pulumi)                 | the tag `tag:imp-e2e`, owned by admins and itself; its one grant     |
-| the OAuth client `imp-e2e` (made by hand)   | scope `auth_keys` only, tag `tag:imp-e2e` only                       |
-| imp's own 1Password vault (not `cloud`)     | the client's ID and secret                                           |
-| vault `cloud`, item `imp-tailscale-authkey` | the `tag:imp` key, still used by imp's dev instances, not by its e2e |
+| Where                                           | Holds                                                                |
+| ----------------------------------------------- | -------------------------------------------------------------------- |
+| the tailnet policy (Pulumi)                     | the tag `tag:imp-e2e`, owned by admins and itself; its one grant     |
+| the OAuth client `imp-e2e` (made by hand)       | scope `auth_keys` only, tag `tag:imp-e2e` only                       |
+| vault `imp-e2e`, item `imp-e2e-tailscale-oauth` | the client's `client-id` and `client-secret`                         |
+| vault `cloud`, item `imp-tailscale-authkey`     | the `tag:imp` key, still used by imp's dev instances, not by its e2e |
 
 imp's e2e harness passes the client secret to `tailscale up` as the auth key, with
 `?ephemeral=true&preauthorized=true` and `--advertise-tags=tag:imp-e2e`. Each node is ephemeral, so
@@ -34,8 +34,9 @@ keeps its secret out of this public repo's Pulumi state.
    [trust credentials](https://console.tailscale.com/admin/settings/trust-credentials), add a
    credential of type OAuth: description `imp-e2e`, scope **Auth Keys** (write) only, tag
    `tag:imp-e2e` only.
-3. Store the client ID and secret in imp's own 1Password vault, the item imp's e2e harness reads
-   (imp's `docs/guides/configuration.md`). Never paste the secret into a terminal command line.
+3. Store the client ID and secret in the vault `imp-e2e`, item `imp-e2e-tailscale-oauth`, fields
+   `client-id` and `client-secret`. Never paste the secret into a terminal command line. The vault
+   `imp` is a different vault: imps read it through 1Password Connect.
 4. Revoke the old client, if any, in the same console page.
 
 The secret does not expire. Replace it when it may have leaked.
