@@ -195,4 +195,10 @@ RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
  && install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks \
  && rm /tmp/gitleaks.tar.gz /tmp/gitleaks
 
+# A boot service that sets vm.overcommit_memory=1 in the guest once at each
+# boot. oxlint's allocator reserves more address space than a 2 GiB imp holds
+# and aborts under the kernel's default heuristic; with overcommit it runs in
+# about 230 MiB. The imp agent runs each file in services.d at boot.
+COPY services.d/overcommit.json /etc/imp/services.d/overcommit.json
+
 ENV PATH=/root/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin

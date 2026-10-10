@@ -4,17 +4,20 @@
 needs, each at a pinned version and checked against a published sum. atc's `cloud` execution target
 names it. It replaces imp's `dev` and `coder` images, so imp ships `imp-base` only.
 
-The image holds binaries only. It holds no configuration, no login state and no secret: atc sets up
-grants, placeholder variables, the config bundle and the seed for each session at launch. Its build
-runs no tool, because a tool can write state when it runs (`codex --version` creates `~/.codex`).
+The image holds binaries and one boot service, which sets `vm.overcommit_memory=1` so oxlint's
+allocator runs on a 2 GiB imp. It holds no other configuration, no login state and no secret: atc
+sets up grants, placeholder variables, the config bundle and the seed for each session at launch.
+Its build runs no tool, because a tool can write state when it runs (`codex --version` creates
+`~/.codex`).
 
-| Path                                | Holds                                                   |
-| ----------------------------------- | ------------------------------------------------------- |
-| `images/agent/Dockerfile`           | the pins, each with the command that checks its sum     |
-| `scripts/check-agent-image.sh`      | the version sweep, login-state check and secret scan    |
-| `scripts/agent-image-gitleaks.toml` | gitleaks' default rules, less named upstream test files |
-| `/opt/auto-mode/mods/auto-mode`     | the auto-mode mod in the guest, for `--plugin-dir`      |
-| `/usr/local/bin/atc`                | atc in the guest, which the `cloud` target's hooks use  |
+| Path                                  | Holds                                                   |
+| ------------------------------------- | ------------------------------------------------------- |
+| `images/agent/Dockerfile`             | the pins, each with the command that checks its sum     |
+| `scripts/check-agent-image.sh`        | the version sweep, login-state check and secret scan    |
+| `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files |
+| `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`      |
+| `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use  |
+| `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`     |
 
 Each image is named `agent-<short sha>`, after the zgeoff/cloud commit on `main` it builds from. So
 each build gets a new imp image name, and the image that ran before stays on the host for a
