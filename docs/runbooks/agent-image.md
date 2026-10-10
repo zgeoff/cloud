@@ -89,6 +89,38 @@ imp's first session starts.
 
 A switch changes new imps only. An imp keeps the image it was created from.
 
+## A new atc release
+
+atc's release job opens the pin pull request itself. After it attaches the release's binaries, it
+mints a release bot token scoped to zgeoff/cloud, clones this repository, and runs
+`scripts/open-atc-pin-pr.sh <version> <SHA256SUMS>` with the SHA256SUMS it just published:
+
+- The script builds the `atc-pin/agent-image` branch from `main` with `scripts/pin-agent-atc.sh`,
+  which changes only `ARG ATC_VERSION` and `ARG ATC_SHA256`. It then opens one pull request,
+  `chore: pin atc <version> in the agent image`. A later release replaces the branch and updates the
+  same pull request. It turns that pull request's auto-merge off first, so the new pin waits for its
+  own checks.
+- It does nothing when `main` or the branch already pins that release or a newer one, so an older
+  release's job that finishes last never moves the pin back.
+- The `auto-merge` job in `.github/workflows/agent-image.yml` runs after the image check passes. It
+  runs only for the release bot's pull request from this repository's `atc-pin/agent-image` branch.
+  `scripts/check-atc-pin-diff.sh` proves that the diff changes the two atc pins and nothing else,
+  and the job then runs `gh pr merge --auto --squash` against the head commit it checked. The
+  ruleset's required checks still gate the merge.
+
+Any other change to that branch fails the diff check, and the pull request then waits for a person.
+The check stops mistakes, not a hostile writer: the ruleset needs no approval, so any token that can
+push here can already merge.
+
+If the release job's step fails, pin the release by hand from a clean checkout of `main`:
+
+```sh
+gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -D /tmp/atc-sums
+bash scripts/open-atc-pin-pr.sh "$VERSION" /tmp/atc-sums/SHA256SUMS
+```
+
+After the pin merges, build and check the image, then switch the `cloud` target, as above.
+
 ## Update
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
