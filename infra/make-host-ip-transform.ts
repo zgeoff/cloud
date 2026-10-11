@@ -5,41 +5,61 @@ import type { ResourceTransform } from '@pulumi/pulumi';
 // cannot bind, so the host address goes on the rendered port instead. Other resources pass through.
 export function makeHostIPTransform(hostIP: string, portName: string): ResourceTransform {
   return (args) => {
-    // chart children carry plain values, never Outputs, so a structured clone copies them whole
-    const props = structuredClone(args.props);
-
-    if (args.type === 'kubernetes:apps/v1:Deployment') {
-      for (const port of collectPorts(props).filter(
-        (candidate) => candidate['name'] === portName,
-      )) {
-        port['hostIP'] = hostIP;
-      }
+    if (args.type !== 'kubernetes:apps/v1:Deployment') {
+      return { props: args.props, opts: args.opts };
     }
 
-    return { props, opts: args.opts };
+    return { props: buildBoundProps(args.props, hostIP, portName), opts: args.opts };
   };
 }
 
 type Fields = Record<string, unknown>;
 
-// every container port of a Deployment's pod template, or none when the shape differs
-function collectPorts(props: unknown): Fields[] {
-  const template = getField(getField(props, 'spec'), 'template');
-  const containers = getField(getField(template, 'spec'), 'containers');
-
-  return toRecords(containers).flatMap((container) => toRecords(container['ports']));
+// Copies only the objects on the path to the ports, so every other value keeps its identity: a
+// chart child's props can hold Outputs, which carry functions and cannot be cloned
+function buildBoundProps(props: Fields, hostIP: string, portName: string): Fields {
+  return buildWithField(props, 'spec', (spec) =>
+    buildWithNested(spec, 'template', (template) =>
+      buildWithNested(template, 'spec', (podSpec) =>
+        buildWithNested(podSpec, 'containers', (containers) =>
+          buildMappedRecords(containers, (container) =>
+            buildWithField(container, 'ports', (ports) =>
+              buildMappedRecords(ports, (port) =>
+                port['name'] === portName ? { ...port, hostIP } : port,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
-function getField(value: unknown, key: string): unknown {
-  return isFields(value) ? value[key] : undefined;
+function buildWithField(value: Fields, key: string, change: (field: unknown) => unknown): Fields {
+  return key in value ? { ...value, [key]: change(value[key]) } : value;
 }
 
-function toRecords(value: unknown): Fields[] {
-  const items: unknown[] = Array.isArray(value) ? value : [];
+// a value that is not a plain object, such as an Output during a preview, passes through whole
+function buildWithNested(
+  value: unknown,
+  key: string,
+  change: (field: unknown) => unknown,
+): unknown {
+  return isFields(value) ? buildWithField(value, key, change) : value;
+}
 
-  return items.filter((item) => isFields(item));
+function buildMappedRecords(value: unknown, change: (record: Fields) => Fields): unknown {
+  return Array.isArray(value)
+    ? value.map((item: unknown) => (isFields(item) ? change(item) : item))
+    : value;
 }
 
 function isFields(value: unknown): value is Fields {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype: unknown = Object.getPrototypeOf(value);
+
+  return prototype === Object.prototype || prototype === null;
 }
