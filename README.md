@@ -1,6 +1,6 @@
 # cloud
 
-**cloud** is the whole of `geoff.cloud`, a small private cloud on a tailnet, written down as code.
+**cloud** is the repo behind `geoff.cloud`, a small private cloud on a tailnet.
 
 Today that's one Onidel VM running NixOS, k3s and [imp](https://github.com/zgeoff/imp), and its main
 job is hosting coding agents: [atc](https://github.com/zgeoff/atc) runs each session in its own imp,
