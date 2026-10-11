@@ -79,5 +79,5 @@ test('it passes a resource that is not a Deployment through unchanged', async ()
     opts: {},
   });
 
-  expect(result).toBeUndefined();
+  expect(result).toStrictEqual({ props: { spec: { type: 'ClusterIP' } }, opts: {} });
 });

@@ -1,5 +1,3 @@
-// the test asserts the whole spec as one literal, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildNixieWebSpec } from './build-nixie-web-spec.ts';
