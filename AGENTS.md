@@ -2,7 +2,7 @@
 
 Infrastructure as code for `geoff.cloud`, Geoff's general-purpose private cloud on the tailnet:
 today one Onidel VM running a single-node k3s cluster, with imp microVMs on the host as the first
-workload. `docs/architecture.md` is the design; issue #1 tracks the work.
+workload. `docs/architecture/overview.md` describes the system, and Linear holds the planned work.
 
 ## Required reading
 
@@ -73,8 +73,7 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 ## Rules
 
 - Every change lands through a squash PR. The `main protection` ruleset blocks a direct push to
-  `main` and needs the `checks` and `gitleaks` checks green.
-- CodeRabbit is not installed on this repo, so a PR here gets no bot review.
+  `main` and needs the `checks`, `gitleaks` and `nixos` checks green.
 - This repo is public. Never commit a secret. Secrets live in the 1Password `cloud` vault; `.env`
   holds only `op://` references, resolved with `op run --env-file=.env -- <command>`.
 - A new service in the cloud stays host-local or on the tailnet by default. A public route (a tunnel

@@ -209,7 +209,7 @@ in
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
     # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
-    # for both names at the host's tailnet IP. imp.geoff.cloud stays free for imp's
+    # for both names at the tailnet IP of imp's own node. imp.geoff.cloud stays free for imp's
     # public MCP route. The token lives in dnsApiTokenFile (root-only, re-read on change, so
     # a rotation needs no restart) and the ACME email in environmentFile, both installed by
     # scripts/install-imp-dns-token.sh. environmentFile must not also set IMP_DNS_API_TOKEN.
@@ -223,8 +223,8 @@ in
     ];
   };
 
-  # atc's daemon for the atc gateway (docs/plans/atc-gateway.md section 7). The token files
-  # are root-only and staged by hand (operator checklist C1); systemd passes them in as
+  # atc's daemon for the atc gateway (docs/architecture/workloads/atc-gateway.md). The token
+  # files are root-only and staged by scripts/install-atc-gateway-credentials.sh; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
   # the targets it may reach; a client not listed here is refused every request.
   services.atc-daemon = {

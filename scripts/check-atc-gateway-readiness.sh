@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only readiness checks for the atc-gateway plan (docs/plans/atc-gateway.md).
+# Read-only readiness checks for the atc gateway (docs/architecture/workloads/atc-gateway.md).
 # Prints one line per check: ok, missing (expected before the deploy) or FAIL. It
 # changes nothing, and prints nothing secret.
 set -uo pipefail

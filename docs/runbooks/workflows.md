@@ -4,7 +4,7 @@ Common tasks on geoff.cloud. Each change lands through a squash PR to `main`; ru
 a clean checkout of `main`.
 
 **CAUTION:** No live change without a preview first. A change that costs money, deletes data or
-cannot be undone needs Geoff's approval of its exact effect.
+cannot be undone needs the owner's approval of its exact effect.
 
 ## Change infrastructure
 
@@ -16,8 +16,8 @@ cannot be undone needs Geoff's approval of its exact effect.
    bun run preview
    ```
 
-   Read every replace and delete. If the preview changes the tailnet policy, Geoff reviews the diff
-   first: Pulumi replaces the whole policy file.
+   Read every replace and delete. If the preview changes the tailnet policy, the owner reviews the
+   diff first: Pulumi replaces the whole policy file.
 
 3. Check the baseline from a clean checkout of the last deployed revision:
 
@@ -57,8 +57,8 @@ cd infra
 op run --env-file=../.env -- pulumi config set --stack prod <key> <value>
 ```
 
-Land the YAML change through a PR, then preview and apply as above.
-[The reference](./reference.md#stack-config) lists the keys.
+Land the YAML change through a PR, then preview and apply as above. `infra/Pulumi.prod.yaml` holds
+the keys, and the program's input loaders describe each one.
 
 ## Switch the host
 
@@ -120,8 +120,7 @@ imp is pinned in two places, and both move together:
    ```
 
    The copy and its `COPY-INFO` land in `/root/imp-db-backups/`.
-   [The restore runbook](./runbooks/restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy
-   back.
+   [The restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy back.
 
 3. [Switch the host](#switch-the-host). The switch restarts impd.
 4. Check: `ssh root@geoffcloud docker exec imp-host imp info` shows the new version,
@@ -185,10 +184,10 @@ Then open `http://localhost:9090` or `http://localhost:9093`.
 The Worker `geoff-cloud-health-check` logs each state change. Read its logs in the Cloudflare
 dashboard, under Workers.
 
-## Turn on Discord alerts
+## Turn Discord alerts on or off
 
-**PENDING approval.** The Discord receiver is built but off. Turning it on, and sending a test
-alert, each need Geoff's approval first.
+Discord alerts are on in `prod`. Changing the flag, or sending a test alert, needs the owner's
+approval first.
 
 1. Set the flag and land the change through a PR:
 
@@ -220,17 +219,17 @@ Store the new value in its 1Password item first, then deliver it.
 | the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                               |
 | imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                    |
 
-**PENDING:** the atc daemon is not deployed. Once it runs, a rotation of its gateway or imp token
-needs `systemctl restart atc-daemon` on the host. systemd's `LoadCredential` copies the token files
-when the service starts, so a reload rereads only the old copy.
+A rotation of the atc daemon's gateway or imp token needs `systemctl restart atc-daemon` on the
+host. systemd's `LoadCredential` copies the token files when the service starts, so a reload rereads
+only the old copy.
 
 ## Reinstall the host
 
-Follow [the reinstall runbook](./runbooks/reinstall-geoffcloud.md). It wipes `vda` only; imp's pool
-on `vdb` survives.
+Follow [the reinstall runbook](./reinstall-geoffcloud.md). It wipes `vda` only; imp's pool on `vdb`
+survives.
 
 ## Recover
 
-[The restore runbook](./runbooks/restore-geoff-cloud.md) covers imps, impd's database, the host, the
-root disk and the cluster. The atc gateway (PENDING) has
-[its own backup and restore runbook](./runbooks/atc-gateway-backup-restore.md).
+[The restore runbook](./restore-geoff-cloud.md) covers imps, impd's database, the host, the root
+disk and the cluster. The atc gateway has
+[its own backup and restore runbook](./atc-gateway-backup-restore.md).

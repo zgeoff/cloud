@@ -1,8 +1,8 @@
 # 1Password Connect for imps
 
-**PENDING:** Connect is built, not deployed. A Connect server in k3s lets a granted imp read vault
-items with `op read`, through imp's credential broker. It has no public route. The design is in
-[the architecture](../architecture.md#secrets-for-imps-1password-connect). Tracked as GEO-120.
+A Connect server in k3s lets a granted imp read vault items with `op read`, through imp's credential
+broker. It has no public route.
+[1Password Connect](../architecture/workloads/onepassword-connect.md) explains the path.
 
 ## The path
 

@@ -18,7 +18,7 @@ interface ClusterInputs {
   readonly kubeconfig: string;
   readonly tunnelToken: Output<string>;
 
-  // set only after the operator checklist's approval step
+  // set only after the owner approves the deploy
   readonly atcGateway?: ATCGatewayInputs;
 
   // 1Password Connect for imps (GEO-120)
