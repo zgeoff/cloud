@@ -97,6 +97,10 @@ export function createNixie(
   return { statefulSet, web, ...ingress };
 }
 
+// Pulumi waits for readiness, and nixie turns ready only once impd has pulled its sandbox images
+// and booted the conversation imp, which a cold start takes longer than Pulumi's default wait for
+const rolloutTimeouts = { create: '30m', update: '30m' };
+
 interface WebShape {
   readonly image: string;
   readonly api: Output<string>;
@@ -118,7 +122,7 @@ function createWebDeployment(
         apiURL: interpolate`http://${shape.api}.${namespace}.svc.cluster.local:${nixieAPIPort}`,
       }),
     },
-    { provider: cluster, dependsOn: [shape.statefulSet] },
+    { provider: cluster, dependsOn: [shape.statefulSet], customTimeouts: rolloutTimeouts },
   );
 }
 
@@ -164,7 +168,7 @@ function createStatefulSet(
         definitionsSecret: createDefinitionsKey(cluster, namespace, shape.inputs),
       }),
     },
-    { provider: cluster },
+    { provider: cluster, customTimeouts: rolloutTimeouts },
   );
 }
 

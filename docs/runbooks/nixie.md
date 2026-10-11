@@ -30,7 +30,7 @@ decrypts with. Run these in the repo root first:
 NIXIE_IMAGE=$(sed -n '/geoff-cloud:nixie:/,/hostname:/s/^ *image: //p' infra/Pulumi.prod.yaml)
 sops_nixie() {
   SOPS_AGE_KEY="$(op read op://cloud/nixie-age-recovery/credential)" docker run --rm -i \
-    -e SOPS_AGE_KEY -v "$PWD/deploy/nixie:/w" -w /w --entrypoint /usr/local/bin/sops \
+    --user "$(id -u):$(id -g)" -e HOME=/tmp -e SOPS_AGE_KEY -v "$PWD/deploy/nixie:/w" -w /w --entrypoint /usr/local/bin/sops \
     "$NIXIE_IMAGE" "$@"
 }
 host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
@@ -74,6 +74,9 @@ secrets file, so its value never prints:
 host_imp token new nixie --scope manage --imps 'nixie-*' --grantable "$secret" < /dev/null \
   | tr -d '\n' | jq -Rs . | sops_nixie set --value-stdin secrets.sops.yaml '["impd_token"]'
 ```
+
+impd shows the secret only once, so if the sops step fails, remove the token with
+`host_imp token rm nixie < /dev/null` and mint it again.
 
 After a model credential rotation, point the token at the new secret instead with
 `host_imp token set nixie --grantable "$secret"`, and remove the old secret once nixie runs on the
