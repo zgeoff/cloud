@@ -1,11 +1,11 @@
 # cloud
 
-**cloud** is the repo behind `geoff.cloud`, a small private cloud on a tailnet.
+**cloud** is the infrastructure for `geoff.cloud`, a private cloud on a tailnet.
 
-It's one Onidel VM running NixOS, k3s and [imp](https://github.com/zgeoff/imp), and its main job is
-hosting coding agents: [atc](https://github.com/zgeoff/atc) runs each session in its own imp, and
-assistants reach atc through one public endpoint. Pulumi manages the cloud resources and the
-cluster, and a NixOS flake manages the host.
+One Onidel VM runs NixOS, k3s and [imp](https://github.com/zgeoff/imp), and hosts coding agents:
+[atc](https://github.com/zgeoff/atc) runs each session in its own imp, and assistants reach atc
+through one public endpoint. Pulumi manages the cloud resources and the cluster, and a NixOS flake
+manages the host.
 
 ## Quick start
 
@@ -33,11 +33,11 @@ CI runs these plus the type-aware lint, gitleaks, the Go checks and the NixOS ch
 ## Layout
 
 - `infra/`: the Pulumi program
-- `provider/`, `sdk/onidel/`: our Onidel provider and its generated SDK
-- `nixos/`: the host
+- `provider/`, `sdk/onidel/`: the Onidel Pulumi provider and its generated SDK
+- `nixos/`: the host flake
 - `images/agent/`: the image agent sessions run on
 - `deploy/atc-gateway/`: the atc gateway's images
-- `workers/`: the health check that runs from Cloudflare's edge
+- `workers/`: the external health-check Worker
 - `scripts/`: repo and host tooling
 
 ## Documentation
