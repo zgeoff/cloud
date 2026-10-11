@@ -154,10 +154,12 @@ an apply would renew it.
 
 ## Failures
 
-| Symptom                                           | Cause                                   | Fix                                             |
-| ------------------------------------------------- | --------------------------------------- | ----------------------------------------------- |
-| `imp_host` unready, `FORBIDDEN` in logs           | an image or the model secret is missing | add it, as above                                |
-| `definitions` unready                             | git-sync has no checkout yet            | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
-| the pod restarts with `sops could not decrypt`    | the host key is not a recipient         | add it to `.sops.yaml` and run `updatekeys`     |
-| the pod restarts with `nixie refuses the secrets` | a key is missing from the file          | set it, as above                                |
-| TLS error on the name                             | the certificate expired                 | `bun run up`                                    |
+| Symptom                                           | Cause                                    | Fix                                             |
+| ------------------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| `imp_host` unready, `FORBIDDEN` in logs           | an image or the model secret is missing  | add it, as above                                |
+| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
+| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe         |
+| an upgrade's rollout never replaces `nixie-0`     | a rolling update waits on an unready pod | `k3s kubectl -n nixie delete pod nixie-0`       |
+| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
+| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
+| TLS error on the name                             | the certificate expired                  | `bun run up`                                    |
