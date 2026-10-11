@@ -5,8 +5,7 @@
 Today that's one Onidel VM running NixOS, k3s and [imp](https://github.com/zgeoff/imp), and its main
 job is hosting coding agents: [atc](https://github.com/zgeoff/atc) runs each session in its own imp,
 and assistants reach atc through one public endpoint. Pulumi manages the cloud resources and the
-cluster, a NixOS flake manages the host, and nothing changes live without a reviewed PR and a
-preview.
+cluster, and a NixOS flake manages the host.
 
 ## Quick start
 
