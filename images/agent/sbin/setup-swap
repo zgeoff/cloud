@@ -1,26 +1,81 @@
 #!/bin/sh
-# Boot service: give the guest a 2 GiB swapfile, so a command that needs more memory than a 2 GiB
-# imp holds pages out and slows down instead of freezing the guest. imp's agent runs it once at
-# each boot from /etc/imp/services.d/swap.json. It creates /swapfile on the first boot, and on every
-# boot turns the swapfile on and sets vm.swappiness. fallocate costs no host disk until the kernel
-# writes a page out.
+# Boot service: give the guest a swapfile of up to 2 GiB, so a command that needs more memory than a
+# 2 GiB imp holds pages out and slows down instead of freezing the guest. imp's agent runs it once at
+# each boot from /etc/imp/services.d/swap.json. On the first boot it sizes /swapfile from the free
+# space on /, or makes none on a small disk, and prints its choice to the service log. On every boot
+# it turns an existing swapfile on and sets vm.swappiness. fallocate costs no host disk until the
+# kernel writes a page out, but it takes the guest's free space at once.
+#
+#   setup-swap                        # the boot service
+#   setup-swap --size-for <free KiB>  # print the swapfile size in MiB for that much free space
+#
+# The size is the smallest of three bounds, and no swapfile when that is under the floor:
+#   - 2048 MiB at most, the size a type-aware lint on a 2 GiB imp needs to page out to
+#   - a quarter of the free space at most, so swap never takes most of a disk
+#   - 2048 MiB of free space kept after the swapfile, for the session's checkout, caches and the
+#     broker's files; a fixed 2 GiB swapfile filled a 4 GiB test imp, so the broker CA install failed
+#   - 256 MiB at least: a smaller swapfile saves no workload, so the disk keeps that space
+# A 32 GiB agent imp gets the full 2048 MiB; a 4 GiB test imp gets a small swapfile or none.
 set -eu
 
 swapfile=/swapfile
-size=2G
+max_mib=2048
+share_divisor=4
+margin_mib=2048
+floor_mib=256
 # the kernel default, written down: lower values make the kernel drop file pages, such as the
 # running binaries' code, before it pages out anonymous memory
 swappiness=60
 
+# size_for <free KiB>: the swapfile size in MiB for that much free space, 0 for none
+size_for() {
+  free_mib=$(($1 / 1024))
+  size=$max_mib
+  share=$((free_mib / share_divisor))
+  [ "$share" -lt "$size" ] && size=$share
+  room=$((free_mib - margin_mib))
+  [ "$room" -lt "$size" ] && size=$room
+  [ "$size" -lt "$floor_mib" ] && size=0
+  echo "$size"
+}
+
+case "$#:${1:-}" in
+  0:) ;;
+  2:--size-for)
+    case "$2" in
+      '' | *[!0-9]*)
+        echo "setup-swap: --size-for takes the free space in KiB, a whole number" >&2
+        exit 2
+        ;;
+    esac
+    size_for "$2"
+    exit 0
+    ;;
+  *)
+    echo "usage: setup-swap [--size-for <free KiB>]" >&2
+    exit 2
+    ;;
+esac
+
 if [ ! -f "$swapfile" ]; then
   # build it under another name, so a boot cut short never leaves a half-made /swapfile
   rm -f "$swapfile.new"
-  /usr/bin/fallocate -l "$size" "$swapfile.new"
-  chmod 600 "$swapfile.new"
-  /usr/sbin/mkswap "$swapfile.new" > /dev/null
-  mv "$swapfile.new" "$swapfile"
+  free_kib=$(df -Pk / | awk 'NR == 2 { print $4 }')
+  size=$(size_for "$free_kib")
+  if [ "$size" = 0 ]; then
+    echo "setup-swap: $((free_kib / 1024)) MiB free on /, too little for a swapfile; made none"
+  else
+    # a failed step removes the part-made file, which holds space on a disk that is already tight
+    trap 'rm -f "$swapfile.new"' EXIT
+    /usr/bin/fallocate -l "${size}M" "$swapfile.new"
+    chmod 600 "$swapfile.new"
+    /usr/sbin/mkswap "$swapfile.new" > /dev/null
+    mv "$swapfile.new" "$swapfile"
+    trap - EXIT
+    echo "setup-swap: $((free_kib / 1024)) MiB free on /; made a $size MiB $swapfile"
+  fi
 fi
-if ! /usr/sbin/swapon --show=NAME --noheadings | grep -qx "$swapfile"; then
+if [ -f "$swapfile" ] && ! /usr/sbin/swapon --show=NAME --noheadings | grep -qx "$swapfile"; then
   /usr/sbin/swapon "$swapfile"
 fi
 /usr/sbin/sysctl -w "vm.swappiness=$swappiness"

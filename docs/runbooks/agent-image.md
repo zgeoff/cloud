@@ -7,9 +7,15 @@ names it. It replaces imp's `dev` and `coder` images, so imp ships `imp-base` on
 The image holds binaries and two boot services for a 2 GiB imp:
 
 - `overcommit` sets `vm.overcommit_memory=1`, so oxlint's allocator can reserve its buffers.
-- `swap` creates a 2 GiB `/swapfile` at the first boot, turns it on at each boot, and sets
-  `vm.swappiness` to the kernel default of 60. A command that needs more memory than the imp holds,
-  such as a type-aware lint, then pages out and slows down. Without swap, the imp stops answering.
+- `swap` creates `/swapfile` at the first boot, turns it on at each boot, and sets `vm.swappiness`
+  to the kernel default of 60. A command that needs more memory than the imp holds, such as a
+  type-aware lint, then pages out and slows down. Without swap, the imp stops answering.
+
+The swap service sizes `/swapfile` from the free space on `/`, so the swapfile never fills the disk.
+A 32 GiB agent imp gets 2 GiB. A small disk, such as a 4 GiB test imp, gets a smaller swapfile or
+none, because the service keeps room free for the session's checkout and the broker's files. The
+service prints its choice and the free space it read, which `imp logs <name> swap` shows.
+`images/agent/sbin/setup-swap` holds the bounds and the reason for each.
 
 The image holds no other configuration, no login state and no secret: atc sets up grants,
 placeholder variables, the config bundle and the seed for each session at launch. Its build runs no

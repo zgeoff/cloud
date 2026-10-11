@@ -201,9 +201,10 @@ RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
 # about 230 MiB. The imp agent runs each file in services.d at boot.
 COPY services.d/overcommit.json /etc/imp/services.d/overcommit.json
 
-# A boot service that turns on a 2 GiB swapfile, made at the first boot. A
-# type-aware lint holds about 1.4 GiB, which leaves a 2 GiB imp without free
-# memory; with no swap the guest stops answering, and with swap it slows down.
+# A boot service that turns on a swapfile of up to 2 GiB, made at the first
+# boot and sized from the free disk space. A type-aware lint holds about
+# 1.4 GiB, which leaves a 2 GiB imp without free memory; with no swap the guest
+# stops answering, and with swap it slows down.
 # Git keeps the script executable, and COPY keeps its mode.
 COPY sbin/setup-swap /usr/local/sbin/setup-swap
 COPY services.d/swap.json /etc/imp/services.d/swap.json
