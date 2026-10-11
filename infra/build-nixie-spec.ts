@@ -16,9 +16,10 @@ export const definitionsKnownHostsKey = 'known_hosts';
 // the key of nixie's ConfigMap, mounted as /etc/nixie/config.yaml
 export const nixieConfigKey = 'config.yaml';
 
-// GitHub's ed25519 host key, from https://api.github.com/meta (ssh_keys), checked 2026-10-12
+// GitHub's ed25519 host key, from https://api.github.com/meta (ssh_keys), checked 2026-10-12. The
+// host blocks outbound port 22, so git-sync reaches GitHub's SSH on 443, which serves the same key
 export const githubKnownHosts =
-  'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n';
+  '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n';
 
 // git-sync v4.7.1, by digest; bump deliberately
 const gitSyncImage =
@@ -149,7 +150,7 @@ function buildGitSyncContainer(): input.core.v1.Container {
     name: 'git-sync',
     image: gitSyncImage,
     env: [
-      { name: 'GITSYNC_REPO', value: 'git@github.com:zgeoff/nixie-definitions.git' },
+      { name: 'GITSYNC_REPO', value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git' },
       { name: 'GITSYNC_REF', value: 'main' },
       { name: 'GITSYNC_ROOT', value: definitionsRoot },
       { name: 'GITSYNC_LINK', value: 'current' },

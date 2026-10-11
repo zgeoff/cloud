@@ -62,7 +62,7 @@ export function createNixieIngress(
       dependsOn: [inputs.namespaceResource],
 
       // 443 answers on the host's tailnet address and no other
-      transforms: [makeHostIPTransform(geoffcloudNode.ip, 'websecure')],
+      transforms: [makeHostIPTransform(geoffcloudNode.ip, 'websecure', cluster)],
     },
   );
 

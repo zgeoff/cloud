@@ -1,15 +1,23 @@
-import type { ResourceTransform } from '@pulumi/pulumi';
+import type { ProviderResource, ResourceTransform } from '@pulumi/pulumi';
 
 // Makes a transform that binds one named container port of a chart's Deployment to a host address.
 // Traefik's chart also writes its hostIP value into the entry point's listen address, which a pod
 // cannot bind, so the host address goes on the rendered port instead. Other resources pass through.
-export function makeHostIPTransform(hostIP: string, portName: string): ResourceTransform {
+export function makeHostIPTransform(
+  hostIP: string,
+  portName: string,
+  provider: ProviderResource,
+): ResourceTransform {
   return (args) => {
     if (args.type !== 'kubernetes:apps/v1:Deployment') {
-      return { props: args.props, opts: args.opts };
+      return;
     }
 
-    return { props: buildBoundProps(args.props, hostIP, portName), opts: args.opts };
+    // returned opts replace the child's whole, dropping the provider it inherits from the chart
+    return {
+      props: buildBoundProps(args.props, hostIP, portName),
+      opts: { ...args.opts, provider },
+    };
   };
 }
 

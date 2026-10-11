@@ -64,7 +64,8 @@ that wraps every record key, the model credential, and nixie's impd token.
 Pulumi puts the encrypted file and the host's age identity into one Secret, and only the nixie
 container mounts it. git-sync's deploy key and GitHub's pinned host key sit in a second Secret that
 only git-sync mounts, so neither container holds the other's credential. The deploy key reads the
-definitions repo and nothing else.
+definitions repo and nothing else. git-sync reaches GitHub's SSH on port 443, because the host
+blocks outbound port 22.
 
 ## Reaching impd
 

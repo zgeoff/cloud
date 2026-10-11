@@ -98,7 +98,10 @@ test('it runs nixie as one replica on a retained volume, with git-sync beside it
             image:
               'registry.k8s.io/git-sync/git-sync:v4.7.1@sha256:c5e1976da735bf0b53979f079a07475d77174c51863cd084e928ff6074480717',
             env: [
-              { name: 'GITSYNC_REPO', value: 'git@github.com:zgeoff/nixie-definitions.git' },
+              {
+                name: 'GITSYNC_REPO',
+                value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git',
+              },
               { name: 'GITSYNC_REF', value: 'main' },
               { name: 'GITSYNC_ROOT', value: '/etc/nixie/definitions' },
               { name: 'GITSYNC_LINK', value: 'current' },

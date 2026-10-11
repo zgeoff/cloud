@@ -1,11 +1,15 @@
 // the test asserts whole resource props as literals, so its bodies are long
 /* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
-import { output } from '@pulumi/pulumi';
+import { DependencyProviderResource, output } from '@pulumi/pulumi';
 import { makeHostIPTransform } from './make-host-ip-transform.ts';
 
 test("it binds the named port of a Deployment's containers to the host address and leaves every other port alone", async () => {
-  const transform = makeHostIPTransform('100.69.47.33', 'websecure');
+  const provider = new DependencyProviderResource(
+    'urn:pulumi:prod::geoff-cloud::pulumi:providers:kubernetes::geoffcloud::0b8c8d3e',
+  );
+
+  const transform = makeHostIPTransform('100.69.47.33', 'websecure', provider);
 
   const result = await transform({
     custom: true,
@@ -65,12 +69,16 @@ test("it binds the named port of a Deployment's containers to the host address a
         },
       },
     },
-    opts: { protect: false },
+    opts: { protect: false, provider },
   });
 });
 
 test("it keeps the Outputs in a Deployment's props by reference when it binds the port", async () => {
-  const transform = makeHostIPTransform('100.69.47.33', 'websecure');
+  const provider = new DependencyProviderResource(
+    'urn:pulumi:prod::geoff-cloud::pulumi:providers:kubernetes::geoffcloud::0b8c8d3e',
+  );
+
+  const transform = makeHostIPTransform('100.69.47.33', 'websecure', provider);
   const namespace = output('nixie');
   const image = output('traefik:v3');
 
@@ -116,12 +124,16 @@ test("it keeps the Outputs in a Deployment's props by reference when it binds th
         },
       },
     },
-    opts: {},
+    opts: { provider },
   });
 });
 
 test('it passes a pod template that is an Output through unchanged', async () => {
-  const transform = makeHostIPTransform('100.69.47.33', 'websecure');
+  const provider = new DependencyProviderResource(
+    'urn:pulumi:prod::geoff-cloud::pulumi:providers:kubernetes::geoffcloud::0b8c8d3e',
+  );
+
+  const transform = makeHostIPTransform('100.69.47.33', 'websecure', provider);
   const template = output({ spec: { containers: [] } });
 
   const result = await transform({
@@ -132,11 +144,18 @@ test('it passes a pod template that is an Output through unchanged', async () =>
     opts: {},
   });
 
-  expect(result).toStrictEqual({ props: { spec: { replicas: 1, template } }, opts: {} });
+  expect(result).toStrictEqual({
+    props: { spec: { replicas: 1, template } },
+    opts: { provider },
+  });
 });
 
-test('it passes a resource that is not a Deployment through unchanged', async () => {
-  const transform = makeHostIPTransform('100.69.47.33', 'websecure');
+test('it leaves a resource that is not a Deployment to keep its own options', async () => {
+  const provider = new DependencyProviderResource(
+    'urn:pulumi:prod::geoff-cloud::pulumi:providers:kubernetes::geoffcloud::0b8c8d3e',
+  );
+
+  const transform = makeHostIPTransform('100.69.47.33', 'websecure', provider);
 
   const result = await transform({
     custom: true,
@@ -146,5 +165,5 @@ test('it passes a resource that is not a Deployment through unchanged', async ()
     opts: {},
   });
 
-  expect(result).toStrictEqual({ props: { spec: { type: 'ClusterIP' } }, opts: {} });
+  expect(result).toBeUndefined();
 });
