@@ -39,10 +39,11 @@ echo "$gitleaks_sha256  $work/gitleaks.tar.gz" | sha256sum -c --quiet -
 tar -xzf "$work/gitleaks.tar.gz" -C "$work/agent-image-check" gitleaks
 cp "$repo/scripts/agent-image-gitleaks.toml" "$work/agent-image-check/gitleaks.toml"
 
-# the guest script, led by the pins: every `ARG NAME=value` line of the Dockerfile but the
-# snapshot stamp and the sums, as shell assignments
+# the guest script, led by the pins and the check's mode: every `ARG NAME=value` line of the
+# Dockerfile but the snapshot stamp and the sums, as shell assignments, then check_mode, imp or docker
 {
   grep -E '^ARG [A-Z0-9_]+_VERSION=' "$dockerfile" | sed -E "s/^ARG ([A-Z0-9_]+)=(.*)$/\1='\2'/"
+  echo "check_mode='${mode#--}'"
   cat << 'GUEST'
 set -uo pipefail
 failures=0
@@ -174,10 +175,50 @@ fi
 swap=/etc/imp/services.d/swap.json
 if [[ "$(jq -c '[.argv, .user, .restart]' "$swap" 2> /dev/null)" == '[["/usr/local/sbin/setup-swap"],"root","never"]' ]] \
   && [[ -x /usr/local/sbin/setup-swap ]] \
-  && [[ -x /usr/bin/fallocate && -x /usr/sbin/mkswap && -x /usr/sbin/swapon && -x /usr/sbin/sysctl ]]; then
+  && [[ -x /usr/bin/fallocate && -x /usr/sbin/mkswap && -x /usr/sbin/swapon && -x /usr/sbin/sysctl ]] \
+  && command -v df > /dev/null && command -v awk > /dev/null; then
   pass swap "$swap"
 else
   fail swap "$swap is missing or does not run /usr/local/sbin/setup-swap once as root, or a tool it runs is missing"
+fi
+# the swapfile size the service picks, in MiB, for the free space on / that `imp logs <name> swap`
+# printed at the first boot of a fresh imp from this image: 1434 MiB on a 4096 MiB test disk, which
+# gets no swapfile, and 28215 MiB on a 32 GiB agent disk, which gets the full 2048 MiB
+check_swap_size() {
+  local name="$1" free_kib="$2" expected="$3" out
+  if ! out=$(/usr/local/sbin/setup-swap --size-for "$free_kib" 2>&1); then
+    fail "$name" "setup-swap --size-for $free_kib failed: $out"
+  elif [[ "$out" != "$expected" ]]; then
+    fail "$name" "setup-swap --size-for $free_kib gave '$out' MiB, want $expected"
+  else
+    pass "$name" "$out MiB for $((free_kib / 1024)) MiB free"
+  fi
+}
+check_swap_size swap-4g $((1434 * 1024)) 0
+check_swap_size swap-32g $((28215 * 1024)) 2048
+# in an imp, the swapfile the service made at this boot: none when the free space it found was too
+# little, or an active one of the size it picks for that free space, which is what is free now plus
+# the swapfile itself. Docker has no boot service, and swapon there reads the host's swap.
+if [[ "$check_mode" == imp ]]; then
+  free_kib=$(df -Pk / | awk 'NR == 2 { print $4 }')
+  active=$(/usr/sbin/swapon --show=NAME --noheadings)
+  if [[ ! -e /swapfile ]]; then
+    want=$(/usr/local/sbin/setup-swap --size-for "$free_kib")
+    if [[ -z "$active" && "$want" == 0 ]]; then
+      pass swap-live "no swapfile, $((free_kib / 1024)) MiB free"
+    else
+      fail swap-live "no /swapfile, but swap is '$active' and $((free_kib / 1024)) MiB free would get $want MiB"
+    fi
+  else
+    size_mib=$(($(stat -c %s /swapfile) / 1048576))
+    want=$(/usr/local/sbin/setup-swap --size-for "$((free_kib + size_mib * 1024))")
+    # what the guest wrote to / since the boot, such as the broker CA, can move want by a few MiB
+    if [[ "$active" == /swapfile ]] && ((size_mib >= want - 8 && size_mib <= want + 8)); then
+      pass swap-live "$size_mib MiB /swapfile on, $((free_kib / 1024)) MiB free"
+    else
+      fail swap-live "/swapfile is $size_mib MiB with swap '$active' and $((free_kib / 1024)) MiB free, want $want MiB on"
+    fi
+  fi
 fi
 if [[ "${DISABLE_UPDATES:-}" == 1 ]]; then
   pass DISABLE_UPDATES "1"
