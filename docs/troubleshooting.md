@@ -62,15 +62,6 @@ a new token scoped to the `cloud` vault, and set it in the environment.
 
 ## CI
 
-### `Check AGENTS.md Drift` fails
-
-`AGENTS.md` is generated. CI rebuilds it and fails on any difference. Edit `agents/project.md`,
-never `AGENTS.md`, then regenerate and commit both:
-
-```sh
-bun run build:agents
-```
-
 ### `format:check` fails
 
 Run `bun run format`, which rewrites the files, including Markdown tables, and commit the result.

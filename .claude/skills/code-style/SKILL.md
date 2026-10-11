@@ -1,28 +1,16 @@
-# Agent Guidelines
+---
+name: code-style
+description:
+  Load before writing, reviewing, or renaming any TypeScript in this repo — every function name must
+  start with a verb from the taxonomy here, and the lint rule enforcing it reads the same list.
+  Covers module layout and file naming, and the function-verb taxonomy.
+---
 
-## Operations
+# Code style
 
-- AGENTS.md is generated from `agents/shared.md` and `agents/project.md` — edit the partials, never
-  AGENTS.md itself. The shared partial is synced from
-  [zgeoff/tools](https://github.com/zgeoff/tools); cross-project rule changes belong there.
-- Perform all work on a branch in a git worktree under `.worktrees/` (e.g.
-  `git worktree add .worktrees/<branch> -b <branch>`) — never commit directly on `main`.
-- Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
-- A squash merge makes the PR title the commit subject, so a PR title is a Conventional Commit too.
-  `feat(#412): add the retry budget` is a title; `add the retry budget` is not.
-- Commit subjects and PR titles use the imperative mood ("add X", never "added X" or a bare noun
-  phrase).
-- Open PRs against `main` using the PR template (`.github/PULL_REQUEST_TEMPLATE.md`). Descriptions
-  are condensed: lead paragraph ≤2 sentences, one-line bullets, ≤150 words — write the short version
-  first, don't draft long and trim.
-- After pushing, link the PR URL in your response.
-- A PR is ready only when its checks are green: watch CI (`gh pr checks <n> --watch`) after opening
-  or updating, and report a failure with what you're doing about it.
-
-## Code style
-
-Mechanically enforced rules (oxfmt, oxlint, format-codemod) aren't repeated here — this file covers
+Mechanically enforced rules (oxfmt, oxlint, format-codemod) aren't repeated here — this skill covers
 what tooling can't check.
+
 
 - One primary export per file, and the file name kebab-cases that export (`with-jest-context.ts`
   exports `withJestContext`). Exceptions: `index.ts` entrypoints, `types.ts` for a package's shared
@@ -37,10 +25,10 @@ what tooling can't check.
   it starts a name. File names are unaffected: kebab-case lowercases everything (`parse-cli-args.ts`
   exports `parseCLIArgs`).
 
-### Function naming
+## Function naming
 
 Every function name starts with a prefix from the closed list below: pick from it, or extend this
-file in the same PR that introduces the new verb. The prefix is a contract — a reader should know
+skill in the same PR that introduces the new verb. The prefix is a contract — a reader should know
 the function's shape without opening it.
 
 **Predicates** — return boolean, no side effects:
@@ -124,7 +112,7 @@ the function's shape without opening it.
 | `with<X>` | HOF that runs a callback inside a context | `withJestContext` |
 | `make<X>` | factory whose result is itself a function | `makeExcluder`    |
 
-**Framework conventions** — where the ecosystem's prefix is load-bearing, it wins:
+**Framework conventions** — where the ecosystem's prefix is required, it wins:
 
 | Prefix                   | Contract                                                                                                                | Example          |
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------- | ---------------- |
@@ -140,30 +128,3 @@ it does), `execute` (→ `run`), `compute` (→ `build`), `fetch` (→ `read`), 
 
 Algorithm-native vocabulary (`walk`, `backtrack`, `slideDiagonal`) is allowed inside the module
 implementing that algorithm — forcing list verbs onto textbook terms hides the algorithm.
-
-## Dependencies
-
-- Pin exact versions — no `^`/`~` ranges. (`bun add` saves exact automatically via `exact = true` in
-  bunfig.toml — the rule applies to hand-written edits.)
-
-## Review bots
-
-CodeRabbit reviews every PR. Its shared config lives in the zgeoff/coderabbit repo, and a repo-root
-`.coderabbit.yaml` with `inheritance: true` layers repo-specific settings on top. CodeRabbit reads
-this file as its guidelines. A repo that runs another review bot names it and its config in
-`agents/project.md`, and these rules cover that bot too.
-
-- A PR is ready only after every bot review is read and every finding is answered: a fixed finding's
-  reply cites the commit that fixed it; a declined finding's reply states the reason — when a
-  finding contradicts this file, this file wins and the reply names the rule. Reviews land within a
-  few minutes of opening; read them with `gh pr view <n> --comments` and
-  `gh api repos/<owner>/<repo>/pulls/<n>/comments`. A finding outside the diff arrives in the review
-  body, not as a thread, so its answer is a PR comment.
-- Resolve a thread once its reply is posted, fixed and declined alike (GraphQL
-  `resolveReviewThread`). A finding the agent cannot confidently judge is escalation, not
-  disposition: reply saying so and leave the thread open for a human.
-- Never teach a bot through chat (`@coderabbitai` learnings and the like) — a correction to bot
-  behaviour is an edit to its config, reviewed in a PR.
-- Bots review a PR once, at open; an agent invokes a re-review only when asked. The exception is a
-  PR that got no review at all, such as one opened before the bot was installed: request it once
-  with that bot's documented trigger, such as `@coderabbitai review` for CodeRabbit.

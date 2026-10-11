@@ -1,13 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": [
-    "bun.lock",
-    "agents/shared.md",
-    "AGENTS.md",
-    "sdk/**",
-    "provider/**",
-    ".claude/**"
-  ],
+  "ignorePatterns": ["bun.lock", "sdk/**", "provider/**", ".claude/**"],
   "proseWrap": "always",
   "semi": true,
   "trailingComma": "all",

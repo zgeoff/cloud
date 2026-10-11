@@ -45,16 +45,11 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      - name: Check AGENTS.md Drift
-        run: |
-          bun run build:agents
-          git diff --exit-code AGENTS.md
-
       - name: Format
         run: bun run format:check
 
       - name: Lint
-        run: bun run lint
+        run: bun run lint:full
 
       - name: Doc links
         run: bash .claude/skills/docs-writing/scripts/check-links.sh
