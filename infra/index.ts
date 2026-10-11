@@ -69,9 +69,9 @@ const hostKey = new TailnetKey(
 
 export const hostAuthKey = hostKey.key;
 
-// imp's key (tag:imp) for impd nodes, at Tailscale's 90-day maximum expiry; imp's dev.sh reads
-// it from op://cloud/imp-tailscale-authkey, so Pulumi writes each new key into that item.
-// E2e suites use tag:imp-e2e with their own OAuth client (docs/runbooks/imp-e2e-tailnet.md).
+// imp's key (tag:imp) for impd nodes, at Tailscale's 90-day maximum expiry (an apply after expiry
+// mints a fresh one); imp's dev.sh reads it from op://cloud/imp-tailscale-authkey, so Pulumi writes
+// each new key into that item. E2e suites use tag:imp-e2e with their own OAuth client (docs/runbooks/imp-e2e-tailnet.md).
 const impKey = new TailnetKey(
   'imp',
   {
@@ -120,7 +120,7 @@ export const impHostAuthKey = impHostKey.key;
 
 // The Onidel VM, hand-made on 2026-10-02 and adopted here (#4): every input but name replaces
 // it, so protect/retainOnDelete guard typos, and vdb (200 GB, imp's pool, no API) is manual.
-// Set hostOnTailnet once NixOS answers tailnet SSH to attach the edge firewall (no public SSH).
+// Once NixOS answers tailnet SSH, `pulumi config set hostOnTailnet true` attaches edge, drops public SSH.
 const hostOnTailnet = new Config().getBoolean('hostOnTailnet') ?? false;
 
 // Onidel's cloud firewall, outside the VM. Attaching it closes every port it does

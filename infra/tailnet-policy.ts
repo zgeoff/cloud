@@ -14,9 +14,9 @@ const impNode = {
   httpsPort: 443,
 };
 
-// Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; tag:imp nodes reach
-// each other on any port but nothing else; tag:imp-e2e nodes reach only each other's API,
-// keyed by their own OAuth client (1Password imp-e2e vault, docs/runbooks/imp-e2e-tailnet.md).
+// Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; members reach tag:imp nodes on any port,
+// while those reach each other on tcp:7070 and nothing else (imp's isolation goal). tag:imp-e2e reaches only its
+// own API, never a live impd, keyed by its own OAuth client (1Password imp-e2e vault, docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,

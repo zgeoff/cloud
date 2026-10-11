@@ -30,9 +30,9 @@ interface AlertmanagerValues {
   };
 }
 
-// kube-prometheus-stack's `alertmanager` values (#29); Helm merges `config` over chart
-// defaults, keeping global/inhibit_rules/templates. Without a webhook all alerts go to null;
-// with one, all but Watchdog/InfoInhibitor go to Discord via the mounted Secret's file.
+// kube-prometheus-stack's `alertmanager` values (#29); Helm merges `config` over chart defaults, keeping
+// global/inhibit_rules/templates, with route and receivers given whole. Without a webhook all alerts go to
+// null; with one, all but Watchdog/InfoInhibitor go to Discord via the mounted Secret's file.
 export function buildAlertmanagerValues(
   webhook: AlertWebhookMount | undefined,
 ): AlertmanagerValues {

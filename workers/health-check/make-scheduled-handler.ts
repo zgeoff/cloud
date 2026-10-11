@@ -1,6 +1,6 @@
-// External health check (#8): host monitoring cannot report the host down, so this
-// Worker probes tunnel hostnames from Cloudflare's edge. A probe reads 530/1033 as
-// tunnel down, 502/504 as gateway down, anything else as up; state lives in R2.
+// External health check (#8): host monitoring cannot report the host down, so this Worker probes
+// tunnel hostnames from the edge — 530/1033 reads tunnel down, 502/504 gateway down, else up. Each
+// target's last state lives in R2; a change posts to ALERT_URL when set and always logs to destination.
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 // the R2 methods the check calls, typed by Cloudflare's runtime types
