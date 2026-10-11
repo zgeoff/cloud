@@ -7,7 +7,7 @@
   },
   "rules": {
     // cloud's comments predate this rule of the shared config;
-    // GEO-TBD-cloud-comments adopts it
+    // GEO-473 adopts it
     "zgeoff/max-consecutive-line-comments": "off"
   },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
