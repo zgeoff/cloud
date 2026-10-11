@@ -32,15 +32,19 @@ Pass Pulumi flags after `--`: `bun run up -- --yes`.
 
 ## Checks
 
-| Where                | Runs                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------- |
-| pre-commit           | `oxlint --fix`, `oxfmt`, `format-codemod`, `gofmt` on staged files, then `gitleaks`                  |
-| commit-msg           | commitlint (Conventional Commits)                                                                    |
-| pre-push             | `format:check`, `lint`, `typecheck`, `test`, `deadcode`, `provider:check`                            |
-| CI `checks`          | the `AGENTS.md` drift check, `format:check`, `lint`, `typecheck`, `test`, `test:scripts`, `deadcode` |
-| CI `provider`        | `gofmt`, `go vet`, `go test`                                                                         |
-| CI `gitleaks`        | gitleaks over the whole history                                                                      |
-| `atc-gateway images` | the gateway fixture test on image changes; publishes to GHCR only on a manual run with `push: true`  |
+| Where                | Runs                                                                                                                  |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| pre-commit           | `oxlint --fix`, `oxfmt`, `format-codemod`, `gofmt` on staged files, then `gitleaks`                                   |
+| commit-msg           | commitlint (Conventional Commits)                                                                                     |
+| pre-push             | `format:check`, `lint`, `typecheck`, `test`, `deadcode`, `provider:check`                                             |
+| CI `checks`          | the `AGENTS.md` drift check, `format:check`, `lint`, the docs checks, `typecheck`, `test`, `test:scripts`, `deadcode` |
+| CI `provider`        | `gofmt`, `go vet`, `go test`                                                                                          |
+| CI `gitleaks`        | gitleaks over the whole history                                                                                       |
+| `atc-gateway images` | the gateway fixture test on image changes; publishes to GHCR only on a manual run with `push: true`                   |
+
+The docs checks are the docs-writing skill's scripts: `check-links.sh` fails the job on a broken
+relative link or anchor, and `check-length.sh` reports README and docs/ lengths and runs
+`check-prose.sh` without failing the job.
 
 The `main protection` ruleset needs `checks` and `gitleaks` green.
 
