@@ -108,6 +108,30 @@ test('it exits non-zero with a message when run in a repository with no origin',
   );
 });
 
+test('it lists nothing when the branch only deletes a file', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git rm --quiet README.md`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git commit --quiet -m remove`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+
+  expect(files).toStrictEqual([]);
+});
+
+test('it lists a deleted file when deletions are included', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git rm --quiet README.md`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git commit --quiet -m remove`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env, includeDeleted: true });
+
+  expect(files).toStrictEqual(['README.md']);
+});
+
 // A bare upstream and a clone of it whose main holds one pushed commit, so
 // every test starts from a repository whose history predates the branch. The
 // environment strips the hook's GIT_* variables and switches the host's git
@@ -120,7 +144,11 @@ async function setupTest() {
   });
 
   const env = {
-    ...Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_'))),
+    ...Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([name]: readonly [string, string | undefined]) => !name.startsWith('GIT_'),
+      ),
+    ),
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_CONFIG_GLOBAL: '/dev/null',
   };

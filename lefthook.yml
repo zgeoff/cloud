@@ -52,6 +52,8 @@ pre-push:
       glob: '*.ts'
       run: bun run test:related {files}
     - name: provider
-      files: bun run --silent files:branch
+      # Deletions count: a branch that only deletes provider/ files must still
+      # run the check, so this listing keeps them.
+      files: bun run --silent files:branch --include-deleted
       glob: 'provider/**'
       run: bun run provider:check

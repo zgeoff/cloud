@@ -1,7 +1,8 @@
 // Prints, one per line, the files the current branch changes against the
-// remote default branch, leaving out deleted files. A branch with no commits
-// of its own prints nothing. Exits 1 with a message when no base commit can
-// be found, so a hook never checks nothing by accident.
+// remote default branch, leaving out deleted files unless --include-deleted
+// is passed. A branch with no commits of its own prints nothing. Exits 1 with
+// a message when no base commit can be found, so a hook never checks nothing
+// by accident.
 import { resolve } from 'node:path';
 
 interface CollectBranchFilesOptions {
@@ -9,6 +10,9 @@ interface CollectBranchFilesOptions {
 
   // The whole environment of the git runs; left out, they inherit this process's.
   readonly env?: Readonly<Record<string, string | undefined>>;
+
+  // Deleted files are listed too, so a hook can gate on a deletion-only change.
+  readonly includeDeleted?: boolean;
 }
 
 // Returns the paths changed between the merge base of HEAD and the remote
@@ -33,7 +37,7 @@ export async function collectBranchFiles(
   const diff = await runGit(options, [
     'diff',
     '--name-only',
-    '--diff-filter=d',
+    ...(options.includeDeleted === true ? [] : ['--diff-filter=d']),
     base.stdout.trim(),
     'HEAD',
   ]);
@@ -64,8 +68,10 @@ async function runGit(options: Readonly<CollectBranchFilesOptions>, args: readon
 }
 
 async function runCLI(): Promise<void> {
+  const includeDeleted = process.argv.includes('--include-deleted');
+
   try {
-    const files = await collectBranchFiles({ cwd: resolve('.') });
+    const files = await collectBranchFiles({ cwd: resolve('.'), includeDeleted });
 
     if (files.length > 0) {
       process.stdout.write(`${files.join('\n')}\n`);
