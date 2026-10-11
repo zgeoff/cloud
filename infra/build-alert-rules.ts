@@ -28,9 +28,9 @@ interface AlertRuleInputs {
   readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
 }
 
-// geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for
-// `promtool check rules`. A missing metric must alert, never read healthy: every
-// metric-backed check also fires when its metric is absent.
+// geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
+// rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
+// branch, except ImpdLocalHealthDown, TargetDown and ContainerOOMKilled, which stay silent without theirs.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -125,9 +125,9 @@ const cloudflaredRule: AlertRule = {
   annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
 };
 
-// A failing TCP connect to an atc daemon (or no report) means no gateway call reaches it.
-// One rule per daemon while the gateway is configured; the summary carries the address
-// since the absent() series has no instance label.
+// A failing TCP connect to an atc daemon fires, as does a missing probe report (unknown reachability,
+// not proven downtime). One rule per daemon while the gateway is configured; the summary carries
+// the address since the absent() series has no instance label.
 function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
   const series = `probe_success{target="${toATCDaemonProbeTarget(daemon.name)}"}`;
 
