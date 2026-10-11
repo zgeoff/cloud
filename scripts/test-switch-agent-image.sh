@@ -51,7 +51,7 @@ EOF
 backed up $tree/home/.config/atc/config.json to $tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234
 set targets.cloud.image to agent-abc1234 (was agent-14d3c9d)
 the daemon reads its targets at startup: restart it when no session needs it, with
-  systemctl --user restart atc-daemon.service
+  atc daemon restart
 EOF
   diff /dev/null "$tree/err"
   cmp "$tree/before" "$tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234"
@@ -129,7 +129,7 @@ it_sets_guest_atc_when_the_config_names_the_image_without_it() {
 backed up $tree/home/.config/atc/config.json to $tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234
 set targets.cloud.image to agent-abc1234 (was agent-abc1234)
 the daemon reads its targets at startup: restart it when no session needs it, with
-  systemctl --user restart atc-daemon.service
+  atc daemon restart
 EOF
   diff /dev/null "$tree/err"
   cmp "$tree/before" "$tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234"
