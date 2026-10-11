@@ -136,3 +136,29 @@ test.each([
     }),
   ).toThrowWithMessage(Error, `stack config "nixie.${key}" must name an image by tag and digest`);
 });
+
+test.each([
+  ['no host name', undefined],
+  ['a host outside geoff.cloud', 'nixie.example.com'],
+  ['the zone apex', 'geoff.cloud'],
+  ['a name with a space', 'nixie .geoff.cloud'],
+] as const)('it throws when the hostname is %s', (_label, hostname) => {
+  expect(() =>
+    loadNixieInputs(
+      buildStubConfig({
+        nixie: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+          webImage:
+            'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          hostname,
+        }),
+      }),
+      {
+        NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+        NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+      },
+    ),
+  ).toThrowWithMessage(Error, 'stack config "nixie.hostname" must name a host under geoff.cloud');
+});

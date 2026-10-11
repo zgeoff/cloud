@@ -22,6 +22,7 @@ export function loadNixieInputs(
 
   requirePinnedImage('image', config.image);
   requirePinnedImage('webImage', config.webImage);
+  requireHostname(config.hostname);
 
   return {
     nixie: {
@@ -41,6 +42,15 @@ const pinnedImagePattern = /^[^\s@:]+(?::\d+)?(?:\/[^\s@:]+)*:[^\s@:]+@sha256:[0
 function requirePinnedImage(key: string, image: string | undefined): void {
   if (image === undefined || !pinnedImagePattern.test(image)) {
     throw new Error(`stack config "nixie.${key}" must name an image by tag and digest`);
+  }
+}
+
+// the DNS record and the certificate live in the geoff.cloud zone
+const hostnamePattern = /^(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+geoff\.cloud$/u;
+
+function requireHostname(hostname: string | undefined): void {
+  if (hostname === undefined || !hostnamePattern.test(hostname)) {
+    throw new Error('stack config "nixie.hostname" must name a host under geoff.cloud');
   }
 }
 
