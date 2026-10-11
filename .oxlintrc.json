@@ -5,6 +5,11 @@
     "node": true,
     "es2024": true
   },
+  "rules": {
+    // cloud's comments predate this rule of the shared config;
+    // GEO-473 adopts it
+    "zgeoff/max-consecutive-line-comments": "off"
+  },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [
     {
