@@ -9,11 +9,9 @@ type ATCGatewayStackConfig = Pick<Config, 'getObject'>;
 
 type Environment = Readonly<Record<string, string | undefined>>;
 
-// The atc gateway's inputs, or nothing while the stack config leaves atcGateway
-// unset; setting it is an approval step.
-// Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_<NAME> for each daemon
-// (its bearer token, such as ATC_GATEWAY_TOKEN_GEOFFCLOUD) and the backup's
-// ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
+// The gateway's inputs, or nothing while atcGateway is unset (setting it approves the deploy).
+// Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_<NAME> per daemon plus the
+// backup's ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
 export function loadATCGatewayInputs(
   stackConfig: ATCGatewayStackConfig,
   env: Environment,

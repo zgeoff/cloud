@@ -4,10 +4,8 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Returns the test files related to the given paths, in order and without
-// duplicates. A path ending in .test.ts selects itself when it exists; any
-// other .ts path (declaration files excluded) selects its sibling .test.ts
-// when that exists. Paths resolve against cwd.
+// Test files related to the given paths, ordered and deduplicated: a .test.ts selects itself;
+// another .ts (not .d.ts) selects its sibling .test.ts. Paths resolve against cwd.
 export function collectRelatedTests(paths: readonly string[], cwd: string): string[] {
   const selected = new Set<string>();
 

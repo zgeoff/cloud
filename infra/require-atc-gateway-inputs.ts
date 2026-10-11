@@ -27,10 +27,9 @@ interface CheckedGatewayInputs {
   readonly defaultDaemon: string;
 }
 
-// Throws, naming the fix, unless the gateway can deploy: a real gateway image, and for
-// each daemon a name atc takes, its pinned daemonID and address, and its bearer token,
-// with defaultDaemon among them. Each check matches what atc's gateway refuses at
-// start, so a mistake fails the preview instead of the pod.
+// Throws naming the fix unless the gateway can deploy: a real image, and per daemon a valid
+// name, daemonID, address, and token with defaultDaemon among them. Each check matches what
+// atc's gateway refuses at start, so mistakes fail the preview instead of the pod.
 export function requireATCGatewayInputs(
   config: GatewayConfigFields,
   env: Readonly<Record<string, string | undefined>>,

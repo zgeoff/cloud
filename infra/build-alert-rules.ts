@@ -28,11 +28,9 @@ interface AlertRuleInputs {
   readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
 }
 
-// geoff.cloud's own alerts (#29), as Prometheus rule groups: the `spec.groups` of a
-// PrometheusRule, and also a valid rule file for `promtool check rules`.
-//
-// A missing metric must alert, never read as healthy: each check that rests on one
-// metric also fires when that metric is absent.
+// geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
+// rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
+// branch, except ImpdLocalHealthDown, TargetDown and ContainerOOMKilled, which stay silent without theirs.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -127,10 +125,9 @@ const cloudflaredRule: AlertRule = {
   annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
 };
 
-// The blackbox exporter's TCP connect to one of atc's daemons fails, or reports
-// nothing: no gateway call can reach that daemon then. One rule per daemon, only while
-// the gateway is configured, so an unset gateway, which has no probe, fires nothing.
-// The address is in the summary itself: the absent() series carries no instance label.
+// A failing TCP connect to an atc daemon fires, as does a missing probe report (unknown reachability,
+// not proven downtime). One rule per daemon while the gateway is configured; the summary carries
+// the address since the absent() series has no instance label.
 function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
   const series = `probe_success{target="${toATCDaemonProbeTarget(daemon.name)}"}`;
 

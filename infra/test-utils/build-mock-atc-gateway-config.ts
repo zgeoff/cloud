@@ -3,10 +3,8 @@ import type { ATCGatewayConfig } from '../atc-gateway.ts';
 import { buildMockATCGatewayDaemonConfig } from './build-mock-atc-gateway-daemon-config.ts';
 import type { ATCGatewayDaemonConfigOverrides } from './build-mock-atc-gateway-daemon-config.ts';
 
-// An optional field's absence is behaviour (no daemons, no default daemon, the default
-// state dir), so an override of undefined leaves it out: with exactOptionalPropertyTypes
-// a plain override cannot. daemons is keyed by name, so its override names the daemons
-// the config holds, and each daemon's override merges into fresh daemon defaults.
+// An absent optional field is behaviour, so undefined leaves it out (exactOptionalPropertyTypes
+// forbids plain overrides). `daemons` names the daemons held; each merges into fresh defaults.
 type ATCGatewayConfigOverrides = Partial<
   Omit<ATCGatewayConfig, 'daemons' | 'defaultDaemon' | 'stateDir'>
 > & {

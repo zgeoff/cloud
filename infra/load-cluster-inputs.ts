@@ -16,10 +16,9 @@ interface ClusterConfigInputs {
   readonly onePasswordConnectCredentials: Output<string>;
 }
 
-// What a managed cluster needs from the stack config and the environment, or nothing when
-// the stack's "cluster" config leaves the cluster out. Everything is checked here, at the
-// top of the program, so a missing value fails the run before any resource registers,
-// instead of planning to delete the cluster's resources.
+// What a managed cluster needs, or nothing when "cluster" leaves it out. Checked at the top of
+// the program, so a missing value fails before any resource registers instead of planning to
+// delete the cluster's resources.
 export function loadClusterInputs(
   stackConfig: ClusterStackConfig,
   env: NodeJS.ProcessEnv,

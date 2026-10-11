@@ -11,13 +11,9 @@ interface StubR2Bucket extends Pick<R2Bucket, 'get' | 'put'> {
   readonly objects: Map<string, string>;
 }
 
-// A stand-in for the get and put methods of a Workers R2 bucket binding, typed by
-// @cloudflare/workers-types, over an in-memory map of text values. get resolves an
-// R2ObjectBody for a stored key, or null for a key never put, as R2 does; put replaces the
-// value and resolves its R2Object. Each object carries R2's metadata for a single-part
-// upload: an MD5 etag, a 32-hex version, the byte size and the Standard storage class.
-// objects exposes the stored text so a test can read what was stored. The stand-in models
-// string values without options only, and rejects anything else instead of guessing.
+// Stand-in for R2 get/put over an in-memory text map, typed by @cloudflare/workers-types: get resolves
+// an R2ObjectBody or null; put replaces and resolves its R2Object with single-part-upload metadata.
+// `objects` exposes stored text; strings without options only, rejecting the rest instead of guessing.
 export function buildStubR2Bucket(initial: Readonly<Record<string, string>> = {}): StubR2Bucket {
   const objects = new Map(Object.entries(initial));
 
@@ -94,10 +90,9 @@ type R2Blob = Awaited<ReturnType<R2ObjectBody['blob']>>;
 
 type R2ReadableStream = R2ObjectBody['body'];
 
-// One Response holds the body, so it reads once, as an R2 object body does. Bun's
-// ReadableStream and Blob are the real web types, but their declared reader overloads differ
-// from workers-types' declarations, and R2's own json() types its value as the caller's T
-// unchecked, so the stand-in asserts those three types.
+// One Response holds the body, so it reads once as R2 does. Bun's ReadableStream/Blob
+// reader overloads differ from workers-types', and R2's json() types its value as the
+// caller's T unchecked, so the stand-in asserts those three types.
 /* oxlint-disable typescript/no-unsafe-type-assertion */
 function buildR2ObjectBody(object: R2ObjectFields, value: string): R2ObjectBody {
   const response = new Response(value);

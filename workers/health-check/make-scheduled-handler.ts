@@ -1,13 +1,6 @@
-// External health check for geoff.cloud (#8). Monitoring on the host cannot report
-// that the host is down, so this Worker probes from Cloudflare's edge on a cron.
-//
-// A probe of a tunnel hostname tells three failures apart:
-// - 530 or 1033: no tunnel connector, so cloudflared or the host is down
-// - 502 or 504: the tunnel is up, but the atc gateway behind it is not
-// - anything else: up (atc answers 401 or 404 to an unauthenticated probe)
-//
-// Each target's last state lives in R2; a change of state posts to ALERT_URL when
-// that secret is set, and is always logged to the destination the handler is made with.
+// External health check (#8): host monitoring cannot report the host down, so this Worker probes
+// tunnel hostnames from the edge — 530/1033 reads tunnel down, 502/504 gateway down, else up. Each
+// target's last state lives in R2; a change posts to ALERT_URL when set and always logs to destination.
 import type { R2Bucket } from '@cloudflare/workers-types';
 
 // the R2 methods the check calls, typed by Cloudflare's runtime types

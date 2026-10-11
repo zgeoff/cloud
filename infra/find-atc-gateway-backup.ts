@@ -5,11 +5,9 @@ interface GatewayBackupValues {
   readonly secretAccessKey: string;
 }
 
-// The gateway backup's inputs from .env, or undefined when none is set (no backup
-// CronJob). Throws when only some are set, so a missing reference fails the preview
-// instead of silently dropping the backup, and when one holds only whitespace. The
-// restic repository is built from the R2 item's endpoint and bucket:
-// s3:<endpoint>/<bucket>/atc-gateway.
+// The gateway backup's inputs from .env, or undefined when none set (no CronJob). Throws on
+// a partial set or whitespace-only value so a missing reference fails the preview. Repository
+// is s3:<endpoint>/<bucket>/atc-gateway from the R2 item's endpoint and bucket.
 export function findATCGatewayBackup(
   env: Readonly<Record<string, string | undefined>>,
 ): GatewayBackupValues | undefined {

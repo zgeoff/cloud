@@ -4,14 +4,9 @@ import type { ComponentResourceOptions } from '@pulumi/pulumi';
 import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { buildATCDaemonProbeValues } from './build-atc-daemon-probe-values.ts';
 
-// The blackbox exporter, probing each of atc's daemons with a TCP connect from a pod
-// every 30s, one ServiceMonitor per daemon. The pod's connection takes the same path as
-// the gateway's: to geoffcloud's daemon, cni0 from 10.42.0.0/16, which the host's
-// cloud_host table admits to the daemon's port; to another host's, the tailnet. ATCDaemonUnreachable
-// (build-alert-rules.ts) alerts on the result. The chart's ServiceMonitor carries the
-// probe, and Prometheus picks up every ServiceMonitor (observability.ts). opts
-// carries the cluster and the dependency on kube-prometheus-stack, which brings the
-// ServiceMonitor CRD.
+// Blackbox TCP probe of each atc daemon every 30s from a pod, down the gateway's own path (host cloud_host admits
+// cni0 10.42.0.0/16 to geoffcloud's daemon; otherwise the tailnet). The chart's ServiceMonitor carries the probe for
+// Prometheus (observability.ts); opts brings the cluster plus the stack dep owning the CRDs, and ATCDaemonUnreachable alerts on it.
 export function createATCDaemonProbe(
   ns: Namespace,
   daemons: readonly ATCDaemonEndpoint[],
