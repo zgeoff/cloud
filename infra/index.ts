@@ -190,6 +190,8 @@ const workloads =
         onePasswordConnect: {
           credentials: clusterInputs.onePasswordConnectCredentials,
         },
+        ...(clusterInputs.nixie === undefined ? {} : { nixie: clusterInputs.nixie }),
+        zoneID: zone.zoneId,
       });
 
 // the tunnel's one route: atc.geoff.cloud, a workload in k3s
@@ -206,6 +208,7 @@ export const onePasswordConnectServiceURL = workloads?.onePasswordConnectService
 export const grafanaURL = workloads?.grafanaURL;
 export const grafanaAdminPassword = workloads?.grafanaAdminPassword;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
+export const nixieURL = workloads?.nixieURL;
 
 // External health check (#8). ALERT_WEBHOOK_URL is optional; without it, state
 // changes show only in the Worker's logs.

@@ -1,0 +1,26 @@
+# nixie's deployment configuration, mounted read-only at /etc/nixie/config.yaml from a ConfigMap
+# (infra/nixie.ts). nixie reads it once at start and refuses an unknown key. It holds no secret:
+# `deployment:<name>` names an entry in the sops file beside it.
+server:
+  data_dir: /data
+  hostname: 0.0.0.0
+  port: 8080
+  secrets_file: /etc/nixie/secrets.yaml
+models:
+  profiles:
+    opus:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-opus-5-5
+      effort: medium
+  roles:
+    conversation: opus
+imp:
+  # impd's API on its own tailnet node; the pod reaches it through the host's node (tag:cloud)
+  url: https://imps.geoff.cloud
+definitions:
+  source:
+    kind: path
+    # git-sync's link to its newest checkout of zgeoff/nixie-definitions
+    path: /etc/nixie/definitions/current

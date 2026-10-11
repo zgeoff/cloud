@@ -11,6 +11,8 @@
     "@pulumi/pulumi": "3.264.0",
     "@pulumi/random": "4.21.2",
     "@pulumi/tailscale": "0.29.1",
+    "@pulumi/tls": "5.6.1",
+    "@pulumiverse/acme": "0.18.0",
     "@zgeoff/pulumi-onidel": "workspace:*"
   }
 }

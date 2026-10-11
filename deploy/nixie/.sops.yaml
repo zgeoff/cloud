@@ -1,0 +1,8 @@
+# sops encrypts nixie's secrets file to 2 age recipients: the host key, which the pod mounts
+# read-only (op://cloud/nixie-age-host), and the recovery key, which stays off the host
+# (op://cloud/nixie-age-recovery). Only the public halves live here.
+creation_rules:
+  - path_regex: secrets\.sops\.yaml$
+    age: >-
+      age15kka5hsg9s3rk8t6z7z272gv3s236sj3tjeylj4ure20stfgfulsapfjs8,
+      age1gak63tz7qnwx6amc80s8rjn79euv6rr7u5a47fd3ylmf4wnnpvvqtgagxe
