@@ -10,7 +10,7 @@ type ATCGatewayStackConfig = Pick<Config, 'getObject'>;
 type Environment = Readonly<Record<string, string | undefined>>;
 
 // The atc gateway's inputs, or nothing while the stack config leaves atcGateway
-// unset; setting it is an approval step in docs/runbooks/atc-gateway-operator-checklist.md.
+// unset; setting it is an approval step.
 // Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_<NAME> for each daemon
 // (its bearer token, such as ATC_GATEWAY_TOKEN_GEOFFCLOUD) and the backup's
 // ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.

@@ -29,7 +29,7 @@
         ];
       };
 
-      # atc's daemon (docs/plans/atc-gateway.md), and the release binary geoffcloud runs it from
+      # atc's daemon (docs/architecture/workloads/atc-gateway.md), and the release binary geoffcloud runs it from
       nixosModules.atc-daemon = ./modules/atc-daemon.nix;
       packages.x86_64-linux = rec {
         atc = nixpkgs.legacyPackages.x86_64-linux.callPackage ./packages/atc.nix { };

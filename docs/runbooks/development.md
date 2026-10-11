@@ -1,4 +1,4 @@
-# Getting started
+# Development
 
 This page sets up a machine to work on geoff.cloud, and ends with a preview of the live stack.
 
@@ -6,8 +6,8 @@ This page sets up a machine to work on geoff.cloud, and ends with a preview of t
 
 | Tool                      | Version or source                  | Used for                                                                |
 | ------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| Bun                       | `.bun-version` (1.4.2)             | every root script, and the Pulumi program's runtime                     |
-| Go                        | `provider/go.mod` (1.26.6)         | building the Onidel provider, which every preview builds                |
+| Bun                       | `.bun-version`                     | every root script, and the Pulumi program's runtime                     |
+| Go                        | `provider/go.mod`                  | building the Onidel provider, which every preview builds                |
 | Pulumi CLI                | current                            | `preview`, `up`, `drift`, stack config                                  |
 | 1Password CLI (`op`)      | with a token for the `cloud` vault | resolving `.env`                                                        |
 | Tailscale                 | a tailnet admin's device           | the k3s API and Grafana (any member), SSH to `root@geoffcloud` (admins) |
@@ -26,21 +26,23 @@ bun install
 ```
 
 `bun install` also installs the lefthook git hooks. pre-commit fixes and checks staged files and
-runs gitleaks. pre-push runs the CI checks except the `AGENTS.md` drift check.
+runs gitleaks. pre-push runs the format check, lint, typecheck, the tests, the dead-code check and
+the provider's checks; CI adds the type-aware lint, the script tests, the docs checks and the NixOS
+checks.
 
 ## Secrets
 
 The repo is public, so it holds no secret. Every deployment input lives in the 1Password vault
-`cloud`. Some secrets live elsewhere: see [Secrets](./architecture.md#secrets). The committed `.env`
-holds only `op://` references, and each command that needs them runs through `op run`:
+`cloud`. Some secrets live elsewhere: see [secrets](../architecture/secrets.md). The committed
+`.env` holds only `op://` references, and each command that needs them runs through `op run`:
 
 ```sh
 op run --env-file=.env -- <command>
 ```
 
 The root scripts `preview`, `drift` and `up` already do this. `op` needs a service-account token
-that can read the `cloud` vault, in `OP_SERVICE_ACCOUNT_TOKEN`. [The reference](./reference.md#env)
-lists each variable and its 1Password item.
+that can read the `cloud` vault, in `OP_SERVICE_ACCOUNT_TOKEN`. `.env` names each variable and its
+1Password item.
 
 Never print a resolved value. Never log a whole Onidel VM object: the API returns the VM's root
 password in it.
@@ -81,5 +83,5 @@ ssh root@geoffcloud k3s kubectl get nodes
 
 ## Next
 
-- [Architecture](./architecture.md): what runs where, and why.
+- [The architecture overview](../architecture/overview.md): what runs where, and why.
 - [Workflows](./workflows.md): how to change things.

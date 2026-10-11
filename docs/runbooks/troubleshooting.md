@@ -38,20 +38,19 @@ with `op run --env-file=../.env --` from `infra/`.
 The kubeconfig in `k3s-kubeconfig` does not match the cluster, such as after k3s was rebuilt. The
 run fails and changes nothing. Store the new kubeconfig with `bash scripts/connect-k3s.sh`. After a
 cluster rebuild, follow
-[the cluster section of the restore runbook](./runbooks/restore-geoff-cloud.md#5-rebuild-the-cluster).
+[the cluster section of the restore runbook](./restore-geoff-cloud.md#5-rebuild-the-cluster).
 
 ### `atcGateway.daemons.<name>.daemonID is unset`, or another `atcGateway` error
 
-**PENDING.** These come from `infra/require-atc-gateway-inputs.ts` when `atcGateway` is set. Each
-message names its fix. The gateway's order of steps is in
-[the operator checklist](./runbooks/atc-gateway-operator-checklist.md).
+These come from `infra/require-atc-gateway-inputs.ts` when `atcGateway` is set. Each message names
+its fix.
 
 ### The preview shows changes on a clean `main`
 
 If every merged change is applied, that is drift: the live resources differ from the code, and
 `bun run drift` fails on it. A merged change that nobody has applied yet shows the same way; compare
 the changes with the ones reviewed on its PR. Find the cause before an apply. A change to the
-tailnet policy needs Geoff's review, because the apply replaces the whole policy file.
+tailnet policy needs the owner's review, because the apply replaces the whole policy file.
 
 ## 1Password
 

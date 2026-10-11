@@ -1,8 +1,7 @@
 name: atc-gateway images
 
 # Runs the fixture test on every change to the images. Publishing to GHCR happens
-# only on a manual run with push: true, an operator step in
-# docs/runbooks/atc-gateway-operator-checklist.md.
+# only on a manual run with push: true, an operator step that needs approval.
 on:
   push:
     branches: [main]

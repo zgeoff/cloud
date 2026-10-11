@@ -2,19 +2,20 @@
 
 The gateway's durable state is two SQLite files on its volume. This runbook covers what is backed
 up, where, and how to restore it. The procedure is tested by `e2e/test-atc-gateway-restore.sh` and
-`deploy/atc-gateway/backup/test-backup.sh` against a local restic repository; it has not run against
-R2 or k3s yet.
+`deploy/atc-gateway/backup/test-backup.sh` against a local restic repository, and a restore of a
+real backup from R2 into a scratch claim matched the live `mcp-auth.db` row for row.
 
 ## Data boundary
 
-| Data                                                                         | Where it lives                                                | Backed up by this runbook                   | Secret-bearing |
-| ---------------------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------- | -------------- |
-| `mcp-auth.db`: OAuth clients, consents, grants, token records                | gateway volume (`atc-gateway-state` claim)                    | yes                                         | yes            |
-| `gateway.db`: daemon registry, event cursors, daemon token hashes (atc's PR) | gateway volume                                                | yes                                         | yes            |
-| daemon bearer tokens, impd token, restic password, R2 keys                   | 1Password `cloud` vault → k8s Secrets / host credential files | no: 1Password is the source                 | yes            |
-| daemon registry entries (non-secret)                                         | stack config → ConfigMap                                      | no: the repo is the source                  | no             |
-| harness imps and their disks                                                 | imp's ZFS pool on geoffcloud                                  | no: imp's own restic backups (`imp backup`) | per imp        |
-| atc's daemon state on geoffcloud                                             | `/var/lib/atc-daemon` on the root disk                        | no (decide with atc's daemon PR)            | possibly       |
+| Data                                                          | Where it lives                                                | Backed up by this runbook                                 | Secret-bearing |
+| ------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- | -------------- |
+| `mcp-auth.db`: OAuth clients, consents, grants, token records | gateway volume (`atc-gateway-state` claim)                    | yes                                                       | yes            |
+| `gateway.db`: the routing and outcome of each keyed request   | gateway volume                                                | yes                                                       | yes            |
+| daemon bearer tokens, restic password, R2 keys                | 1Password `cloud` vault → k8s Secrets / host credential files | no: 1Password is the source                               | yes            |
+| the impd token `atc-cloud`                                    | impd's database → host credential file                        | no: impd issues it; the credential script makes a new one | yes            |
+| daemon registry entries (non-secret)                          | stack config → ConfigMap                                      | no: the repo is the source                                | no             |
+| harness imps and their disks                                  | imp's ZFS pool on geoffcloud                                  | no: imp's own restic backups (`imp backup`)               | per imp        |
+| atc's daemon state on geoffcloud                              | `/var/lib/atc-daemon` on the root disk                        | no (decide with atc's daemon PR)                          | possibly       |
 
 Rules:
 
@@ -28,9 +29,8 @@ Rules:
 
 ## Where
 
-- Repository: `s3:<r2-endpoint>/<bucket>/atc-gateway/geoffcloud`. The bucket is an approval
-  decision: a new bucket with its own R2 key (narrow), or `geoff-cloud-backups` with the existing
-  key (broad, since that key also reaches imp's backups).
+- Repository: `s3:<r2-endpoint>/<bucket>/atc-gateway`. The endpoint, the bucket and its R2 key are
+  in the 1Password item `r2-atc-gateway-backup`, and the restic password in `atc-gateway-restic`.
 - Schedule: the `atc-gateway-backup` CronJob, 03:30 Australia/Melbourne, retention 7 daily and 4
   weekly snapshots.
 - Image: `ghcr.io/zgeoff/atc-gateway-backup` (restic 0.18.1 plus sqlite3), pinned by digest.

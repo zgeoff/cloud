@@ -267,7 +267,7 @@ volume was gone). Not covered: the gateway (not released) and its restic restore
 
 ## 6. Restore the atc gateway
 
-See `docs/runbooks/atc-gateway-backup-restore.md`.
+Follow [the gateway's backup and restore runbook](./atc-gateway-backup-restore.md).
 
 ## After any restore
 

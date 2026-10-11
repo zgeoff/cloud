@@ -21,9 +21,8 @@ import { buildATCGatewayTokenData } from './build-atc-gateway-token-data.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
-// daemons (docs/plans/atc-gateway.md). Off until the stack config sets atcGateway;
-// setting it is an operator step that needs Geoff's approval
-// (docs/runbooks/atc-gateway-operator-checklist.md).
+// daemons (docs/architecture/workloads/atc-gateway.md). Off until the stack config sets
+// atcGateway; setting it is an operator step that needs Geoff's approval.
 
 // one daemon the gateway dials: its tailnet host:port and the daemonID `atc daemon id`
 // prints there. Both are required; the deploy refuses without them.
