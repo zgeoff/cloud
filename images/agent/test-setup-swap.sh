@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test for the agent image's boot service, sbin/setup-swap, through its --size-for
 # mode: the swapfile size it picks for an amount of free space is at most 2048 MiB, at most a
-# quarter of the free space, and leaves 2048 MiB free, and it makes none under 256 MiB. It refuses
+# quarter of the free space, and leaves 2048 MiB free, and it makes none under 256 MiB, across every
+# free space up to 64 GiB. It refuses
 # a free space that is not a whole number and an unknown argument. Each case runs the script with
 # `sh` under `env -i`, so CI runs it with dash, the guest's /bin/sh. The boot mode writes /swapfile
 # and runs swapon as root, so check-agent-image.sh checks it in a fresh imp instead.
@@ -90,6 +91,24 @@ it_picks_no_swapfile_when_less_than_2048_mib_is_free() {
   diff - "$tree/out" <<< 0
   diff /dev/null "$tree/err"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_keeps_2048_mib_free_for_every_free_space_up_to_64_gib() {
+  local free size
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+
+  # every 16 MiB from 0 to 64 GiB, plus each MiB around the floor and the 2048 MiB cap
+  for free in $(seq 0 16 65536) $(seq 2296 2312) $(seq 8184 8200); do
+    size=$(env -i PATH=/usr/bin:/bin HOME="$tree" TMPDIR="$tree" sh "$script" --size-for $((free * 1024)))
+    echo "$free $size" >> "$tree/sizes"
+  done
+
+  # a violation is a size off the bounds, a skip when 256 MiB fits every bound, or a swapfile when
+  # it does not
+  awk '!(($2 == 0 && $1 < 2304) || ($2 >= 256 && $2 <= 2048 && $2 <= int($1 / 4) && $1 - $2 >= 2048))' "$tree/sizes" > "$tree/violations"
+  diff /dev/null "$tree/violations"
+  [ "$(wc -l < "$tree/sizes")" = 4131 ] || { echo "$(wc -l < "$tree/sizes") sizes, want 4131" >&2; exit 1; }
 }
 
 it_refuses_a_free_space_that_is_not_a_whole_number() {
