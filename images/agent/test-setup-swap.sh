@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Test for the agent image's boot service, images/agent/sbin/setup-swap, through its --size-for
+# Test for the agent image's boot service, sbin/setup-swap, through its --size-for
 # mode: the swapfile size it picks for an amount of free space is at most 2048 MiB, at most a
 # quarter of the free space, and leaves 2048 MiB free, and it makes none under 256 MiB. It refuses
 # a free space that is not a whole number and an unknown argument. Each case runs the script with
 # `sh` under `env -i`, so CI runs it with dash, the guest's /bin/sh. The boot mode writes /swapfile
 # and runs swapon as root, so check-agent-image.sh checks it in a fresh imp instead.
 #
-#   bash scripts/test-setup-swap.sh
-# shellcheck source-path=SCRIPTDIR
+#   bash images/agent/test-setup-swap.sh
+# shellcheck source-path=SCRIPTDIR/../../scripts
 set -euo pipefail
 umask 022
-scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$here/../../scripts/test-lib/run-cases.sh"
 
-script="$scripts/../images/agent/sbin/setup-swap"
+script="$here/sbin/setup-swap"
 
 it_picks_2048_mib_for_the_free_space_of_a_32_gib_imp() {
   local status=0
