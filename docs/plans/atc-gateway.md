@@ -68,7 +68,7 @@ owns a thin one:
   root.
 - Build: a CI job in this repo downloads the release binary for a pinned version, checks its
   checksum, and pushes `ghcr.io/zgeoff/atc-gateway:<atc-version>`. GHCR is free for a public image.
-- Template: [Image build](#template-image-build).
+- Template: [Templates](#templates).
 
 ### 2. Workload (k3s)
 
