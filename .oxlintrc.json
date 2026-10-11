@@ -5,6 +5,11 @@
     "node": true,
     "es2024": true
   },
+  "rules": {
+    // cloud's comments are written to the rules of the shared config before
+    // this one existed; adopting it is a rewrite of its own
+    "zgeoff/max-consecutive-line-comments": "off"
+  },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [
     {
