@@ -170,6 +170,15 @@ if [[ "$(jq -c '[.argv, .user, .restart]' "$overcommit" 2> /dev/null)" == '[["sy
 else
   fail overcommit "$overcommit is missing or does not run sysctl -w vm.overcommit_memory=1 once as root"
 fi
+# the boot service that turns on the swapfile, so a heavy command slows a small imp down
+swap=/etc/imp/services.d/swap.json
+if [[ "$(jq -c '[.argv, .user, .restart]' "$swap" 2> /dev/null)" == '[["/usr/local/sbin/setup-swap"],"root","never"]' ]] \
+  && [[ -x /usr/local/sbin/setup-swap ]] \
+  && [[ -x /usr/bin/fallocate && -x /usr/sbin/mkswap && -x /usr/sbin/swapon && -x /usr/sbin/sysctl ]]; then
+  pass swap "$swap"
+else
+  fail swap "$swap is missing or does not run /usr/local/sbin/setup-swap once as root, or a tool it runs is missing"
+fi
 if [[ "${DISABLE_UPDATES:-}" == 1 ]]; then
   pass DISABLE_UPDATES "1"
 else

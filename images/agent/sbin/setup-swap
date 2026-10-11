@@ -1,0 +1,26 @@
+#!/bin/sh
+# Boot service: give the guest a 2 GiB swapfile, so a command that needs more memory than a 2 GiB
+# imp holds pages out and slows down instead of freezing the guest. imp's agent runs it once at
+# each boot from /etc/imp/services.d/swap.json. It creates /swapfile on the first boot, and on every
+# boot turns the swapfile on and sets vm.swappiness. fallocate costs no host disk until the kernel
+# writes a page out.
+set -eu
+
+swapfile=/swapfile
+size=2G
+# the kernel default, written down: lower values make the kernel drop file pages, such as the
+# running binaries' code, before it pages out anonymous memory
+swappiness=60
+
+if [ ! -f "$swapfile" ]; then
+  # build it under another name, so a boot cut short never leaves a half-made /swapfile
+  rm -f "$swapfile.new"
+  /usr/bin/fallocate -l "$size" "$swapfile.new"
+  chmod 600 "$swapfile.new"
+  /usr/sbin/mkswap "$swapfile.new" > /dev/null
+  mv "$swapfile.new" "$swapfile"
+fi
+if ! /usr/sbin/swapon --show=NAME --noheadings | grep -qx "$swapfile"; then
+  /usr/sbin/swapon "$swapfile"
+fi
+/usr/sbin/sysctl -w "vm.swappiness=$swappiness"
