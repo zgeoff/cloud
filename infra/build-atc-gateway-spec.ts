@@ -20,11 +20,9 @@ interface GatewaySpecInputs {
   readonly registry: Output<string>;
 }
 
-// The gateway's Deployment spec. `atc-gateway serve` keeps gateway.db and
-// mcp-auth.db in --state-dir (the volume) and reads the daemons from --registry;
-// atc writes its config under $HOME/.config/atc and its sockets in $XDG_RUNTIME_DIR. A Bun
-// binary extracts native code to /tmp and maps it, so /tmp must allow exec, which an
-// emptyDir does.
+// The gateway's Deployment spec: `serve` keeps gateway.db/mcp-auth.db in --state-dir and
+// reads daemons from --registry; atc writes config under $HOME/.config/atc, sockets in
+// $XDG_RUNTIME_DIR. /tmp needs exec for Bun's extracted natives, which an emptyDir allows.
 export function buildATCGatewaySpec(inputs: GatewaySpecInputs): input.apps.v1.DeploymentSpec {
   return {
     replicas: 1,

@@ -19,10 +19,9 @@ import { loadClusterInputs } from './load-cluster-inputs.ts';
 import { requireCloudflareAccountID } from './require-cloudflare-account-id.ts';
 import { tailnetPolicy } from './tailnet-policy.ts';
 
-// K3S_KUBECONFIG comes from op://cloud/k3s-kubeconfig, and ONEPASSWORD_CONNECT_CREDENTIALS
-// from op://cloud/onepassword-connect-credentials. The stack's "cluster" config says
-// whether the cluster is managed, so a missing value fails the run before any resource
-// registers, instead of planning to delete the cluster's resources.
+// K3S_KUBECONFIG and ONEPASSWORD_CONNECT_CREDENTIALS come from op:// refs. "cluster" says if
+// managed, so a missing value fails before any resource registers instead of planning to
+// delete the cluster's resources.
 const clusterInputs = loadClusterInputs(new Config(), process.env);
 const accountID = requireCloudflareAccountID(process.env['CLOUDFLARE_ACCOUNT_ID']);
 
@@ -70,11 +69,9 @@ const hostKey = new TailnetKey(
 
 export const hostAuthKey = hostKey.key;
 
-// imp's key (tag:imp) for impd nodes: dev instances and hosts. imp's dev.sh reads it
-// from op://cloud/imp-tailscale-authkey, so Pulumi writes each new key into that item.
-// imp's e2e suites no longer use it: they join as tag:imp-e2e with their own OAuth
-// client (docs/runbooks/imp-e2e-tailnet.md).
-// Expiry is Tailscale's 90-day maximum; an apply after expiry mints a fresh one.
+// imp's key (tag:imp) for impd nodes, at Tailscale's 90-day maximum expiry; imp's dev.sh reads
+// it from op://cloud/imp-tailscale-authkey, so Pulumi writes each new key into that item.
+// E2e suites use tag:imp-e2e with their own OAuth client (docs/runbooks/imp-e2e-tailnet.md).
 const impKey = new TailnetKey(
   'imp',
   {
@@ -121,11 +118,9 @@ const impHostKey = new TailnetKey(
 
 export const impHostAuthKey = impHostKey.key;
 
-// The Onidel VM, made by hand on 2026-10-02 and adopted here (#4). Every input but
-// the name replaces the VM, so protect and retainOnDelete keep a typo from
-// destroying it. vdb (the 200 GB volume for imp's pool) has no API and is manual.
-// Set once the NixOS host answers tailnet SSH (`pulumi config set hostOnTailnet true`):
-// the edge firewall attaches to the VM and public SSH leaves it.
+// The Onidel VM, hand-made on 2026-10-02 and adopted here (#4): every input but name replaces
+// it, so protect/retainOnDelete guard typos, and vdb (200 GB, imp's pool, no API) is manual.
+// Set hostOnTailnet once NixOS answers tailnet SSH to attach the edge firewall (no public SSH).
 const hostOnTailnet = new Config().getBoolean('hostOnTailnet') ?? false;
 
 // Onidel's cloud firewall, outside the VM. Attaching it closes every port it does

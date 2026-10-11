@@ -1,12 +1,9 @@
 import { RunError } from '@pulumi/pulumi';
 import type { Config } from '@pulumi/pulumi';
 
-// A stand-in for Pulumi's Config, over the stack config's raw values by bare key, as
-// `pulumi config set` stores them: strings, with an object as its JSON text. get returns
-// the raw string and getObject JSON-parses it without checking its shape, as Config does;
-// a key the stack does not set reads as undefined from both. A value that is not JSON
-// throws as Config's getObject does: its ConfigTypeError is a RunError (the class itself is
-// not exported) naming the full key, the project's name and the bare key.
+// Stand-in for Pulumi's Config over raw stack values: get returns the string, getObject
+// JSON-parses it unchecked, and a missing key reads undefined. Non-JSON throws Config's
+// RunError naming project, key, and value (ConfigTypeError itself is unexported).
 export function buildStubConfig(
   values: Readonly<Record<string, string>>,
 ): Pick<Config, 'get' | 'getObject'> {

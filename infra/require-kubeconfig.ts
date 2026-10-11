@@ -2,10 +2,9 @@
 // cluster out (a host that has no k3s yet). Set it with `pulumi config set cluster <mode>`.
 const clusterModes = ['managed', 'none'] as const;
 
-// The kubeconfig for the cluster, or undefined when the stack leaves the cluster out.
-// An unset mode, or `managed` without a kubeconfig, throws:
-// otherwise a missing K3S_KUBECONFIG would read as "no cluster" and plan to delete every
-// cluster resource.
+// The cluster's kubeconfig, or undefined when the stack leaves it out. An unset mode (or
+// managed without kubeconfig) throws: a missing K3S_KUBECONFIG must not read as "no cluster"
+// and plan to delete every cluster resource.
 export function requireKubeconfig(
   mode: string | undefined,
   kubeconfig: string | undefined,

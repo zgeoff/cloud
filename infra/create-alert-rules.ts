@@ -4,10 +4,8 @@ import type { CustomResourceOptions } from '@pulumi/pulumi';
 import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { buildAlertRules } from './build-alert-rules.ts';
 
-// buildAlertRules' groups as a PrometheusRule (#29). Prometheus picks up every
-// PrometheusRule (ruleSelectorNilUsesHelmValues: false in observability.ts); the chart
-// brings the CRD, so opts makes this wait for it. atcDaemons, set only with the atc
-// gateway, adds ATCDaemonUnreachable for each daemon.
+// buildAlertRules' groups as a PrometheusRule (#29), picked up via ruleSelectorNilUsesHelmValues.
+// The chart brings the CRD, so opts waits for it; atcDaemons adds ATCDaemonUnreachable per daemon.
 export function createAlertRules(
   ns: Namespace,
   atcDaemons: readonly ATCDaemonEndpoint[] | undefined,

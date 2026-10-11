@@ -1,7 +1,6 @@
-// The whole tailnet policy file. Pulumi's tailscale.Acl replaces the live file
-// with this one, so every rule the tailnet relies on must be here.
-//
-// home-pc (the WSL node, home-wsl), where atc's daemon listens on its tailnet address.
+// The whole tailnet policy file: Pulumi's tailscale.Acl replaces the live file with this,
+// so every relied-on rule must be here.
+// home-pc is the WSL node (home-wsl), where atc's daemon listens on its tailnet address.
 const homePC = {
   ip: '100.67.122.120',
   daemonPort: 8415,
@@ -15,16 +14,9 @@ const impNode = {
   httpsPort: 443,
 };
 
-// Tags:
-// - tag:cloud — cloud hosts and their egress (cloudflared, the atc gateway). It reaches
-//   only the PC's atc daemon port, for the gateway, and imp's node on 443 only, for the
-//   health probe.
-// - tag:imp — impd nodes. Members reach them on any port (one port per imp);
-//   they reach nothing, which is imp's isolation goal.
-// - tag:imp-e2e — the throwaway impd nodes of imp's e2e suites. They reach only each
-//   other's API, never a tag:imp node, so a test run cannot touch a live impd. Their
-//   keys come from an OAuth client of their own (auth_keys scope, this tag only),
-//   kept in the 1Password imp-e2e vault (docs/runbooks/imp-e2e-tailnet.md).
+// Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; tag:imp nodes reach
+// each other on any port but nothing else; tag:imp-e2e nodes reach only each other's API,
+// keyed by their own OAuth client (1Password imp-e2e vault, docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,

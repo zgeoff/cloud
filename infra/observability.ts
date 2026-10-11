@@ -54,10 +54,9 @@ const lokiValues = {
   test: { enabled: false },
 };
 
-// Prometheus, Alertmanager, Grafana, Loki and Alloy, sized for about 1 GiB on one node
-// (#8). Retention is 30 days for metrics and logs. Alertmanager delivers to Discord only
-// when alertWebhookURL is set (#29); otherwise it sends nothing. atcDaemons, set only
-// with the atc gateway, adds a TCP probe of each of atc's daemons and its alert.
+// Prometheus, Alertmanager, Grafana, Loki, Alloy on one node (~1 GiB, #8); 30-day retention.
+// Alertmanager reaches Discord only with alertWebhookURL (#29). atcDaemons adds a TCP probe
+// plus alert per atc daemon.
 export function createObservability(
   cluster: Provider,
   alertWebhookURL: string | undefined,

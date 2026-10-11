@@ -6,10 +6,9 @@ import { createAlertRules } from './create-alert-rules.ts';
 import { createATCDaemonProbe } from './create-atc-daemon-probe.ts';
 import { createImpHealthProbe } from './create-imp-health-probe.ts';
 
-// What Prometheus watches beyond kube-prometheus-stack's own targets: cloudflared,
-// geoff.cloud's alert rules, imp's /health over the tailnet and, only with the atc gateway, a TCP probe of each of
-// atc's daemons. opts carries the cluster and the dependency on the stack, which brings the
-// CRDs.
+// Beyond the stack's own targets: cloudflared, geoff.cloud's alert rules, imp's /health, and,
+// only with the gateway, a TCP probe per atc daemon. opts carries the cluster and the stack
+// dependency that brings the CRDs.
 export function createMonitors(
   ns: Namespace,
   atcDaemons: readonly ATCDaemonEndpoint[] | undefined,

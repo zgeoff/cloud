@@ -12,13 +12,9 @@ import {
   onePasswordConnectCredentialsKey,
 } from './build-onepassword-connect-spec.ts';
 
-// 1Password Connect, for imps (GEO-120): imp's credential broker swaps a placeholder
-// bearer for the real Connect token on requests to op-connect.imp.internal and forwards
-// them to a relay on the host, which dials this Service's ClusterIP. Connect has no public
-// route. The pod follows 1Password's Helm chart (charts/connect in
-// 1Password/connect-helm-charts). The token is read-only (vault `imp`, read), so Connect
-// itself refuses a write. Pods in the cluster can reach the Service too; they need the
-// bearer token either way.
+// 1Password Connect for imps (GEO-120), per 1Password's connect-helm-charts: the broker swaps a
+// placeholder bearer for the real token on op-connect.imp.internal requests, relayed from the host
+// to this ClusterIP Service (no public route). Token is read-only (vault `imp`); pods need it too.
 
 export interface OnePasswordConnectInputs {
   // the Connect server's credentials file (JSON)
