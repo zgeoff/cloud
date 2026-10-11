@@ -51,17 +51,22 @@ failures=0
 pass() { printf 'ok    %-16s %s\n' "$1" "$2"; }
 fail() { printf 'FAIL  %-16s %s\n' "$1" "$2"; failures=$((failures + 1)); }
 
-# a tool answers its version command, and the answer holds the pinned version
+# a tool answers its version command, and the answer holds the pinned version.
+# The whole output is read before its first line is taken: piping into head -1
+# under pipefail fails the check when the tool writes into the closing pipe.
 check_tool() {
   local name="$1" expected="$2"
   shift 2
   local out
-  if ! out=$("$@" 2>&1 | head -1); then
+  if ! out=$("$@" 2>&1); then
     fail "$name" "\`$*\` failed: $out"
-  elif [[ "$out" != *"$expected"* ]]; then
-    fail "$name" "\`$*\` gave '$out', want $expected"
   else
-    pass "$name" "$out"
+    local first=${out%%$'\n'*}
+    if [[ "$first" != *"$expected"* ]]; then
+      fail "$name" "\`$*\` gave '$first', want $expected"
+    else
+      pass "$name" "$first"
+    fi
   fi
 }
 
