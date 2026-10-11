@@ -8,17 +8,15 @@ export function makeHostIPTransform(
   portName: string,
   provider: ProviderResource,
 ): ResourceTransform {
-  return (args) => {
-    if (args.type !== 'kubernetes:apps/v1:Deployment') {
-      return;
-    }
-
-    // returned opts replace the child's whole, dropping the provider it inherits from the chart
-    return {
-      props: buildBoundProps(args.props, hostIP, portName),
-      opts: { ...args.opts, provider },
-    };
-  };
+  // returned opts replace the child's whole, dropping the provider it inherits from the chart, so
+  // only the Deployment returns any and names that provider again
+  return (args) =>
+    args.type === 'kubernetes:apps/v1:Deployment'
+      ? {
+          props: buildBoundProps(args.props, hostIP, portName),
+          opts: { ...args.opts, provider },
+        }
+      : undefined;
 }
 
 type Fields = Record<string, unknown>;
