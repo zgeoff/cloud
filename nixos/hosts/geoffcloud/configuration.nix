@@ -202,8 +202,8 @@ in
     tailscaleAuthKeyFile = "/var/lib/imp-host/secrets/tailscale-authkey";
     environmentFile = "/var/lib/imp-host/secrets/imp-host.env";
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
-    # pinned: the module's default is imp-host:latest, which moves on every imp release
-    # and is not tied to the flake's pin of the module
+    # pinned by digest: the module's default names only its release's tag, which a later push
+    # could move
     image = "ghcr.io/zgeoff/imp-host:0.40.0@sha256:7add8234e6acd9fcc9db402a486ae7671606a0c55b46987b17eb097fa01178b7";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";

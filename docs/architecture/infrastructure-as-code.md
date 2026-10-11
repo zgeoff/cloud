@@ -66,8 +66,8 @@ ignores later changes to it, so a refresh never reads it as drift
 ## Guards
 
 A missing input can read as "this subsystem is gone", and Pulumi would then plan to delete it. The
-program therefore checks every input that decides whether a subsystem exists before any resource
-registers, and throws instead:
+program therefore checks every input that decides whether a subsystem exists, and throws instead.
+Every check but the alert webhook's runs before any resource registers:
 
 - **The cluster mode.** The stack config states whether the cluster is managed. An unset mode fails
   the run, and a managed cluster with no kubeconfig fails it too, because otherwise a run outside
@@ -81,7 +81,8 @@ registers, and throws instead:
 - **The gateway's backup.** Its backup inputs are all set or all unset. A partial set fails the run,
   because a silent drop of the backup job would read as success.
 - **The alert webhook.** Discord alerts turned on with no webhook fail the run, so the flag never
-  deploys an Alertmanager that sends nothing.
+  deploys an Alertmanager that sends nothing. This check runs when the cluster's workloads register,
+  after the cloud resources, so an apply that fails on it may already have applied those.
 
 The guards fail closed, so the one setting that removes a subsystem on purpose is an explicit one: a
 cluster mode of `none` plans the delete of every cluster resource, and nothing in the program sets

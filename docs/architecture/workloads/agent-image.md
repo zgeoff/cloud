@@ -52,9 +52,9 @@ moves backwards. Every other pin change is an ordinary reviewed PR.
 ## How a daemon uses the image
 
 An atc daemon names the image in the config of its imp execution target, outside this repo. The
-switch script rewrites that one target's image in the daemon's config on the machine that runs it,
-after it copies the config aside, and points the target's session hooks at the atc inside the image,
-so the daemon never uploads its own binary into a fresh imp. A daemon reads its targets only at
-start, so a switch takes effect at the daemon's next restart, which the script never runs itself. A
-switch changes new imps only; an imp keeps the image it was created from
+image switch script rewrites that one target's image in the daemon's config on the machine that runs
+it, after it copies the config aside, and points the target's session hooks at the atc inside the
+image, so the daemon never uploads its own binary into a fresh imp. A daemon reads its targets only
+at start, so a switch takes effect at the daemon's next restart, which the script never runs itself.
+A switch changes new imps only; an imp keeps the image it was created from
 ([the agent image runbook](../../runbooks/agent-image.md)).

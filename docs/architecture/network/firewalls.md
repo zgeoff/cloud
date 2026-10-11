@@ -1,6 +1,6 @@
 # Firewalls
 
-Three layers filter traffic to the host, and each covers a gap in the one before it. Onidel's cloud
+Four layers filter traffic to the host, and each covers a gap in the one before it. Onidel's cloud
 firewall, outside the VM, admits only Tailscale's port and ICMP from the internet. NixOS's own
 nftables table filters what reaches the host and what it forwards, and trusts the tailnet and the
 cluster's interfaces. A table of this repo's own narrows two ports that the trusted interfaces would

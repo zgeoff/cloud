@@ -7,14 +7,15 @@ real backup from R2 into a scratch claim matched the live `mcp-auth.db` row for 
 
 ## Data boundary
 
-| Data                                                              | Where it lives                                                | Backed up by this runbook                   | Secret-bearing |
-| ----------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------- | -------------- |
-| `mcp-auth.db`: OAuth clients, consents, grants, token records     | gateway volume (`atc-gateway-state` claim)                    | yes                                         | yes            |
-| `gateway.db`: daemon registry, event cursors, daemon token hashes | gateway volume                                                | yes                                         | yes            |
-| daemon bearer tokens, impd token, restic password, R2 keys        | 1Password `cloud` vault → k8s Secrets / host credential files | no: 1Password is the source                 | yes            |
-| daemon registry entries (non-secret)                              | stack config → ConfigMap                                      | no: the repo is the source                  | no             |
-| harness imps and their disks                                      | imp's ZFS pool on geoffcloud                                  | no: imp's own restic backups (`imp backup`) | per imp        |
-| atc's daemon state on geoffcloud                                  | `/var/lib/atc-daemon` on the root disk                        | no (decide with atc's daemon PR)            | possibly       |
+| Data                                                          | Where it lives                                                | Backed up by this runbook                                 | Secret-bearing |
+| ------------------------------------------------------------- | ------------------------------------------------------------- | --------------------------------------------------------- | -------------- |
+| `mcp-auth.db`: OAuth clients, consents, grants, token records | gateway volume (`atc-gateway-state` claim)                    | yes                                                       | yes            |
+| `gateway.db`: the routing and outcome of each keyed request   | gateway volume                                                | yes                                                       | yes            |
+| daemon bearer tokens, restic password, R2 keys                | 1Password `cloud` vault → k8s Secrets / host credential files | no: 1Password is the source                               | yes            |
+| the impd token `atc-cloud`                                    | impd's database → host credential file                        | no: impd issues it; the credential script makes a new one | yes            |
+| daemon registry entries (non-secret)                          | stack config → ConfigMap                                      | no: the repo is the source                                | no             |
+| harness imps and their disks                                  | imp's ZFS pool on geoffcloud                                  | no: imp's own restic backups (`imp backup`)               | per imp        |
+| atc's daemon state on geoffcloud                              | `/var/lib/atc-daemon` on the root disk                        | no (decide with atc's daemon PR)                          | possibly       |
 
 Rules:
 

@@ -11,10 +11,10 @@ impd's secret files arrive.
 ## Two pins
 
 The host pins imp twice, and an upgrade moves both together. The flake pins imp's NixOS module,
-which sets up the container, its units and its firewall table. The host's configuration pins the
-`imp-host` image by tag and digest, because the module's default image tag moves with every imp
-release and is not tied to the module's pin. A mismatched pair would run one release's daemon under
-another release's module.
+which sets up the container, its units and its firewall table. The module's default image is the
+`imp-host` tag of the module's own release, and the host's configuration pins that image by digest
+as well, so a tag that is pushed again can never change what runs. The two pins must name the same
+release, because a mismatched pair would run one release's daemon under another release's module.
 
 ## How impd is reached
 

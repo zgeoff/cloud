@@ -3,8 +3,9 @@
 The estate watches itself from two places. A monitoring stack in k3s collects metrics and logs from
 the cluster and the host, evaluates the alert rules and sends alerts to Discord. A Cloudflare Worker
 probes the public route from Cloudflare's edge, because monitoring on the host cannot report that
-the host is down. Every rule fires on a missing metric as well as a bad one, so a probe, an exporter
-or a timer that stops reporting raises an alert instead of reading as healthy.
+the host is down. Every rule that rests on one probe's metric fires when that metric is missing as
+well as when it is bad, so a probe, an exporter or a timer that stops reporting raises an alert
+instead of reading as healthy.
 
 ## The stack in the cluster
 
@@ -37,8 +38,9 @@ dead probe never reads as a healthy impd.
 
 ## Alert rules
 
-This repo's rules live in one PrometheusRule, built in code, and each one rests on a metric whose
-absence fires it too. They cover:
+This repo's rules live in one PrometheusRule, built in code, and each rule that rests on one probe's
+metric fires on its absence too. A rule over many targets, such as the one for scrape targets, fires
+only on a bad value, because a target that vanishes is no longer a target. They cover:
 
 - impd's loopback health, and the age of its last probe;
 - impd's health over HTTPS on the tailnet;
@@ -66,6 +68,6 @@ A Cloudflare Worker runs on a schedule and fetches the gateway's OAuth metadata 
 route. It classifies the answer by its status: a tunnel error means the tunnel or the host is down,
 a bad-gateway or gateway-timeout status means the gateway is down, a failed fetch means the route is
 unreachable, and any other answer counts as up. The Worker keeps each target's last state in R2 and
-acts only on a change, so it logs the change and posts it to the same webhook Alertmanager uses, and
-a long outage sends one alert, not one per run. Pulumi bundles the Worker with Bun at deploy time
-and uploads it with its bindings, so the Worker has no deploy of its own.
+acts only on a change, the recovery included, so it logs the change and posts it to the same webhook
+Alertmanager uses, and a long outage sends one alert, not one per run. Pulumi bundles the Worker
+with Bun at deploy time and uploads it with its bindings, so the Worker has no deploy of its own.

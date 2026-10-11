@@ -48,9 +48,9 @@ their host header, because the gateway refuses any other name.
 ## State and backup
 
 The gateway's state is two SQLite files: one holds the OAuth clients, consents, grants and token
-records, and one holds the daemon registry's runtime state and event cursors. Both hold secrets.
-SQLite takes one writer, so the gateway runs as one replica that a rollout stops before it starts
-the next.
+records, and one holds the routing and outcome of each keyed request the gateway forwards, so a
+retried call reaches the daemon that took the first one. The OAuth file holds secrets. SQLite takes
+one writer, so the gateway runs as one replica that a rollout stops before it starts the next.
 
 The state sits on a claim of a storage class that keeps its volume when the claim is deleted. k3s's
 default local-path class deletes the volume with its claim, and losing the OAuth state would sign
@@ -77,7 +77,10 @@ pins by checksum. It stays byte-identical to the release because an imp target c
 own binary into each guest. It listens on the host's tailnet address, and systemd hands it two
 tokens as credentials: the bearer the gateway must present, and the impd token it uses itself.
 systemd copies both when the service starts, so a rotated token reaches the daemon only after a
-restart; a reload rereads the old copy.
+restart; a reload rereads the old copy. The bearer comes from one 1Password item that both the
+gateway's Secret and the host's file take, and the daemon's file holds one token or two, so a
+rotation needs no outage: add the new token to the host's file beside the old one and restart the
+daemon, apply so the gateway rolls onto the new token, then remove the old one and restart again.
 
 The daemon has one execution target, impd on the host's loopback, and names every imp it creates
 with a fixed prefix. Its impd token can create, wake and destroy only imps with that prefix, so a

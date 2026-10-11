@@ -96,7 +96,7 @@ flowchart TB
 
 The host's tailnet node carries every pod's tailnet traffic, so a pod reaches the tailnet with the
 host's identity. The tailnet policy therefore grants the host only the ports its workloads dial
-([the tailnet](./network/tailnet.md)). Three firewall layers keep the public internet off everything
+([the tailnet](./network/tailnet.md)). Four firewall layers keep the public internet off everything
 but Tailscale's own port ([firewalls](./network/firewalls.md)).
 
 ## Data
@@ -129,9 +129,10 @@ its imps rely on impd's own backups.
 - **Secrets never in the repo.** The repo is public. Every secret reaches its user through
   1Password, Pulumi's encrypted state or a root-only file on the host, and never through a command
   line, because the host's journal records each SSH command line ([secrets](./secrets.md)).
-- **A missing metric alerts.** Every alert rule fires on an absent metric as well as a bad one, so a
-  probe that stops reporting never reads as healthy, and a check from Cloudflare's edge covers the
-  case where the host itself is down ([observability](./workloads/observability.md)).
+- **A missing metric alerts.** Every rule built on a probe fires when the probe's metric is absent
+  as well as when it is bad, so a probe that stops reporting never reads as healthy, and a check
+  from Cloudflare's edge covers the case where the host itself is down
+  ([observability](./workloads/observability.md)).
 - **Guards fail the preview.** An input that would make Pulumi plan to delete a whole subsystem
-  stops the run before any resource registers
+  fails the run instead of planning the delete
   ([infrastructure as code](./infrastructure-as-code.md#guards)).
