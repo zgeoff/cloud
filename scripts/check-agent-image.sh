@@ -196,27 +196,23 @@ check_swap_size() {
 }
 check_swap_size swap-4g $((1434 * 1024)) 0
 check_swap_size swap-32g $((28215 * 1024)) 2048
-# in an imp, the swapfile the service made at this boot: none when the free space it found was too
-# little, or an active one of the size it picks for that free space, which is what is free now plus
-# the swapfile itself. Docker has no boot service, and swapon there reads the host's swap.
+# in an imp, the swapfile the service made at the first boot, against the free space it read then,
+# which its first line in the imp agent's log for the service holds: none when it picks none, or an
+# active /swapfile of the size it picks. Docker has no boot service, and swapon there reads the
+# host's swap.
 if [[ "$check_mode" == imp ]]; then
-  free_kib=$(df -Pk / | awk 'NR == 2 { print $4 }')
+  boot_free_mib=$(sed -n 's|^setup-swap: \([0-9][0-9]*\) MiB free on /.*|\1|p' /var/log/imp/swap.log 2> /dev/null | head -1)
   active=$(/usr/sbin/swapon --show=NAME --noheadings)
-  if [[ ! -e /swapfile ]]; then
-    want=$(/usr/local/sbin/setup-swap --size-for "$free_kib")
-    if [[ -z "$active" && "$want" == 0 ]]; then
-      pass swap-live "no swapfile, $((free_kib / 1024)) MiB free"
-    else
-      fail swap-live "no /swapfile, but swap is '$active' and $((free_kib / 1024)) MiB free would get $want MiB"
-    fi
+  if [[ -z "$boot_free_mib" ]]; then
+    fail swap-live "/var/log/imp/swap.log has no 'setup-swap: <n> MiB free on /' line"
   else
-    size_mib=$(($(stat -c %s /swapfile) / 1048576))
-    want=$(/usr/local/sbin/setup-swap --size-for "$((free_kib + size_mib * 1024))")
-    # what the guest wrote to / since the boot, such as the broker CA, can move want by a few MiB
-    if [[ "$active" == /swapfile ]] && ((size_mib >= want - 8 && size_mib <= want + 8)); then
-      pass swap-live "$size_mib MiB /swapfile on, $((free_kib / 1024)) MiB free"
+    want=$(/usr/local/sbin/setup-swap --size-for "$((boot_free_mib * 1024))")
+    if [[ "$want" == 0 && ! -e /swapfile && -z "$active" ]]; then
+      pass swap-live "no swapfile for $boot_free_mib MiB free at the first boot"
+    elif [[ "$want" != 0 && -f /swapfile && "$active" == /swapfile && "$(stat -c %s /swapfile)" == "$((want * 1048576))" ]]; then
+      pass swap-live "$want MiB /swapfile on for $boot_free_mib MiB free at the first boot"
     else
-      fail swap-live "/swapfile is $size_mib MiB with swap '$active' and $((free_kib / 1024)) MiB free, want $want MiB on"
+      fail swap-live "$boot_free_mib MiB free at the first boot wants $want MiB, but /swapfile is $(stat -c %s /swapfile 2> /dev/null || echo missing) bytes and swap is '$active'"
     fi
   fi
 fi
