@@ -1,10 +1,11 @@
 import { expect, test } from 'bun:test';
 import { buildNixieIngressValues } from './build-nixie-ingress-values.ts';
 
-test("it holds the host's port 443 and reads Ingress objects from nixie's namespace alone", () => {
+test("it holds the host's port 443, reads Ingress objects from nixie's namespace alone and reports the host's tailnet address as their endpoint", () => {
   expect(
     buildNixieIngressValues({
       httpsPort: 443,
+      endpointIP: '100.69.47.33',
       ingressClass: 'nixie',
       namespace: 'nixie',
     }),
@@ -20,7 +21,12 @@ test("it holds the host's port 443 and reads Ingress objects from nixie's namesp
     providers: {
       kubernetesCRD: { enabled: false },
       kubernetesGateway: { enabled: false },
-      kubernetesIngress: { enabled: true, namespaces: ['nixie'] },
+      kubernetesIngress: {
+        enabled: true,
+        namespaces: ['nixie'],
+        publishedService: { enabled: false },
+        ingressEndpoint: { ip: '100.69.47.33' },
+      },
     },
     ports: {
       web: { expose: { default: false } },

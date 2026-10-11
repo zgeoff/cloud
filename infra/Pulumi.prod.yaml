@@ -16,7 +16,3 @@ config:
         alertSeverity: warning
     defaultDaemon: geoffcloud
   geoff-cloud:discordAlerts: 'true'
-  geoff-cloud:nixie:
-    image: ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309
-    webImage: ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754
-    hostname: nixie.geoff.cloud

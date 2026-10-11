@@ -52,6 +52,7 @@ export function createNixieIngress(
       skipCrds: true,
       values: buildNixieIngressValues({
         httpsPort: geoffcloudNode.httpsPort,
+        endpointIP: geoffcloudNode.ip,
         ingressClass,
         namespace: 'nixie',
       }),

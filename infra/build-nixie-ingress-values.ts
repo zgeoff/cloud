@@ -6,6 +6,10 @@ export interface NixieIngressValuesInputs {
   // the host port for HTTPS; makeHostIPTransform binds it to the host's tailnet address
   readonly httpsPort: number;
 
+  // the address Traefik writes into each Ingress's status, which Pulumi waits on: the Service is a
+  // ClusterIP with no external address to publish
+  readonly endpointIP: string;
+
   // the ingress class nixie's Ingress names, and the one namespace Traefik watches
   readonly ingressClass: string;
   readonly namespace: string;
@@ -29,7 +33,12 @@ export function buildNixieIngressValues(inputs: NixieIngressValuesInputs): Recor
     providers: {
       kubernetesCRD: { enabled: false },
       kubernetesGateway: { enabled: false },
-      kubernetesIngress: { enabled: true, namespaces: [inputs.namespace] },
+      kubernetesIngress: {
+        enabled: true,
+        namespaces: [inputs.namespace],
+        publishedService: { enabled: false },
+        ingressEndpoint: { ip: inputs.endpointIP },
+      },
     },
     ports: {
       web: { expose: { default: false } },

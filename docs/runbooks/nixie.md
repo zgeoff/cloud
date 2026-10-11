@@ -27,7 +27,7 @@ Each step below runs sops from the nixie image of the pinned release, because th
 decrypts with. Run these in the repo root first:
 
 ```bash
-NIXIE_IMAGE=$(sed -n '/geoff-cloud:nixie:/,/hostname:/s/^ *image: //p' infra/Pulumi.prod.yaml)
+NIXIE_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>' # the release to deploy
 sops_nixie() {
   SOPS_AGE_KEY="$(op read op://cloud/nixie-age-recovery/credential)" docker run --rm -i \
     --user "$(id -u):$(id -g)" -e HOME=/tmp -e SOPS_AGE_KEY -v "$PWD/deploy/nixie:/w" -w /w --entrypoint /usr/local/bin/sops \
@@ -102,8 +102,19 @@ Expect `["deployment_key","impd_token","model_credentials"]`. A new host key goe
 
 ## Deploy or upgrade
 
-1. For an upgrade, set `image` and `webImage` in the stack config `nixie` to the new release's tag
+1. For the first deploy, once the secrets file holds `impd_token`, add the stack config `nixie` in
+   one PR. Setting it approves the deploy, and the program creates nothing for nixie without it:
+
+   ```yaml
+   geoff-cloud:nixie:
+     image: ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>
+     webImage: ghcr.io/zgeoff/nixie-web:<version>@sha256:<web_digest>
+     hostname: nixie.geoff.cloud
+   ```
+
+   For an upgrade, set `image` and `webImage` in the stack config `nixie` to the new release's tag
    and digest, from its release notes, in one PR.
+
 2. Add the release's sandbox images to impd, as above.
 3. Preview, then apply:
 
