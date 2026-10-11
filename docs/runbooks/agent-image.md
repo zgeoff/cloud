@@ -75,10 +75,10 @@ imp's first session starts.
    It refuses an image the host lacks, copies the config to
    `config.json.bak-<UTC stamp>-pre-<image>`, then sets `targets.cloud.image` and
    `targets.cloud.guestATC` and changes nothing else. A second argument names another config file.
-2. Restart the daemon when no session needs it, with the command the script prints, `atc daemon restart`.
-   It restarts the daemon through its systemd unit and restores the fleet; `--dry-run` first lists the
-   sessions a restart interrupts. The script never restarts it. The daemon reads its targets at startup only, so the change reaches the next spawn
-   after the restart.
+2. Restart the daemon when no session needs it, with the command the script prints,
+   `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
+   `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The
+   daemon reads its targets at startup only, so the change reaches the next spawn after the restart.
 3. Spawn a session on `cloud`, and check that its imp runs the new image: `imp ls` shows the image
    of each imp.
 
