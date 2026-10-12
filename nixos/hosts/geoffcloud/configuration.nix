@@ -38,7 +38,7 @@ in
   networking.hostName = "geoffcloud";
   # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
   # so NixOS imports tank without -f
-  networking.hostId = "not-a-host-id";
+  networking.hostId = "5ca71846";
   time.timeZone = "Australia/Melbourne";
 
   boot = {
