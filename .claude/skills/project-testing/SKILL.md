@@ -204,6 +204,8 @@ builds every check the flake declares, from the repo root as the flake source (`
 because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` container on the
 `cloud-nixos-checks-store` volume, never the switch's `geoffcloud-nix-store`.
 
+- `geoffcloud-eval` evaluates the host's system derivation and builds nothing of the host, so a
+  change that breaks the host config fails CI instead of the switch.
 - A module check renders its cases through `nixos/checks/test-utils/render-cases.nix` into
   `run_cases` calls, each in its own fresh directory, with the `assert_*` helpers.
 - Shared Nix helpers and stand-ins live in `nixos/checks/test-utils/`, one export per file, and the

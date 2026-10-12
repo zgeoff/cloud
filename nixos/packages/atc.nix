@@ -1,8 +1,7 @@
 # atc's release binary for the host's atc daemon. The atc daemon pin lives here; the gateway
 # images pin their own release in deploy/atc-gateway/versions.env. The two may differ while
 # the daemon protocol stays the same: the daemon runs 2.26.2 for its listener log (atc #255)
-# and for an imp spawn's workspace on the session host (atc #262), and the gateway stays on
-# 2.24.0.
+# and for an imp spawn's workspace on the session host (atc #262), and the gateway runs 2.27.0.
 # The binary stays byte-identical to the release: an imp target copies the daemon's own
 # executable into each Ubuntu guest, so a /nix/store interpreter would break every guest.
 # It asks for /lib64/ld-linux-x86-64.so.2, which the atc-daemon module binds into the
