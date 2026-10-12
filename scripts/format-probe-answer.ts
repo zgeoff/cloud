@@ -8,7 +8,8 @@ export interface ProbeAnswer {
   readonly status: number | null;
 }
 
-// One line of the report, such as `node 10.0.0.5:10250 blocked (exit 124)`
+// One line of the report, such as `node 10.0.0.5:10250 blocked (exit 124)`; the probe's statuses
+// are those `buildTCPProbe` prints
 export function formatProbeAnswer(answer: ProbeAnswer): string {
   const address =
     isIP(answer.target.host) === 6
@@ -23,5 +24,15 @@ function formatStatus(status: number | null): string {
     return 'probe did not run';
   }
 
-  return status === 0 ? 'connected' : `blocked (exit ${status})`;
+  if (status === 0) {
+    return 'connected';
+  }
+
+  return isBlocked(status) ? `blocked (exit ${status})` : `probe failed (exit ${status})`;
+}
+
+// 1 is a refused or unreachable connection and 124 a timeout; any other status, such as 127 for a
+// missing tool, proves nothing about the network
+function isBlocked(status: number): boolean {
+  return status === 1 || status === 124;
 }

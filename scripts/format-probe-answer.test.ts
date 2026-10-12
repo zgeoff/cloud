@@ -19,6 +19,11 @@ test.each([
     'tailnet [fd7a:115c:a1e0::5]:443 blocked (exit 124)',
   ],
   [
+    'a probe whose tool is missing as a failed probe, not a block',
+    { target: { role: 'pod', host: '10.42.0.17', port: 8080 }, status: 127 },
+    'pod 10.42.0.17:8080 probe failed (exit 127)',
+  ],
+  [
     'a probe that did not run',
     { target: { role: 'impd', host: '100.88.1.2', port: 443 }, status: null },
     'impd 100.88.1.2:443 probe did not run',

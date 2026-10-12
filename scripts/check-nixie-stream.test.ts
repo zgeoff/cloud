@@ -1,6 +1,8 @@
 // each test states its stand-in and the whole output inline, so its body is long
 /* oxlint-disable max-lines-per-function, max-statements */
 import { expect, mock, test } from 'bun:test';
+import { HttpResponse, http } from 'msw';
+import { server } from '../workers/mocks/node.ts';
 import { checkNixieStream } from './check-nixie-stream.ts';
 import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
 
@@ -220,6 +222,49 @@ test('it stops with no session when nixie refuses the enrolment code', async () 
   expect(printErr.mock.calls).toStrictEqual([
     [
       'check-nixie-stream: cannot enrol a check session: sessions/enrol answered 400 ENROLMENT_CODE_INVALID\n',
+    ],
+  ]);
+});
+
+test('it revokes its session when a read breaks off after the headers', async () => {
+  const stub = startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: ['ABCD-2345'],
+    sequences: [1],
+    keepaliveMs: 50,
+    closeAfterMs: null,
+  });
+
+  server.use(
+    http.post('https://nixie.test/rpc/conversation/read', () => {
+      const body = new ReadableStream({
+        start: (controller) => {
+          controller.error(new Error('the ingress closed the connection'));
+        },
+      });
+
+      return new HttpResponse(body, { headers: { 'content-type': 'application/json' } });
+    }),
+  );
+
+  const printErr = mock<(text: string) => void>();
+
+  const exitCode = await checkNixieStream({
+    url: 'https://nixie.test',
+    holdMs: 400,
+    maxGapMs: 200,
+    minKeepalives: 3,
+    runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
+    printOut: mock<(text: string) => void>(),
+    printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(stub.sessions).toStrictEqual([{ sessionID: expect.toBeString(), revoked: true }]);
+
+  expect(printErr.mock.calls).toStrictEqual([
+    [
+      "check-nixie-stream: cannot count the conversation's records before: conversation/read answered 200 with a body that broke off\n",
     ],
   ]);
 });

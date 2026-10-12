@@ -41,11 +41,15 @@ export async function sendNixieRPC<T>(call: Readonly<NixieCall<T>>): Promise<RPC
   const value = call.parse(findJSONField(parseJSON(text), 'json'));
 
   return value === undefined
-    ? { ok: false, error: `${call.procedure} answered an unexpected output: ${text.trim()}` }
+    ? {
+        ok: false,
+        error: `${call.procedure} answered an output that lacks the fields the check reads`,
+      }
     : { ok: true, value };
 }
 
-// an error's code when nixie defines it, or the body as it came
+// an error's code when nixie defines it; the body itself never reaches the output, because a
+// body can hold a session token
 function formatFailure(procedure: string, status: number, text: string | null): string {
   if (text === null) {
     return `${procedure} answered ${status} with a body that broke off`;
@@ -53,7 +57,7 @@ function formatFailure(procedure: string, status: number, text: string | null): 
 
   const code = findJSONField(findJSONField(parseJSON(text), 'json'), 'code');
 
-  return `${procedure} answered ${status} ${typeof code === 'string' ? code : text.trim()}`;
+  return `${procedure} answered ${status} ${typeof code === 'string' ? code : 'with no error code'}`;
 }
 
 function parseJSON(text: string): unknown {

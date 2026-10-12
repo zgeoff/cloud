@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { http, passthrough } from 'msw';
+import { HttpResponse, http, passthrough } from 'msw';
 import { server } from '../workers/mocks/node.ts';
 import { findJSONField } from './find-json-field.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
@@ -78,7 +78,7 @@ test('it reports a call that reaches no server', async () => {
   });
 });
 
-test('it reports an output that lacks what the call reads', async () => {
+test('it reports an output that lacks what the call reads, and never prints the body that holds the token', async () => {
   startStubNixieAPI({
     url: 'https://nixie.test',
     enrolCodes: ['ABCD-2345'],
@@ -102,8 +102,55 @@ test('it reports an output that lacks what the call reads', async () => {
 
   expect(result).toStrictEqual({
     ok: false,
-    error: expect.toStartWith(
-      'sessions/enrol answered an unexpected output: {"json":{"sessionID":',
+    error: 'sessions/enrol answered an output that lacks the fields the check reads',
+  });
+});
+
+test('it reports a body that breaks off after the headers', async () => {
+  server.use(
+    http.post('https://nixie.test/rpc/conversation/read', () => {
+      const body = new ReadableStream({
+        start: (controller) => {
+          controller.enqueue(new TextEncoder().encode('{"json":'));
+          controller.error(new Error('the ingress closed the connection'));
+        },
+      });
+
+      return new HttpResponse(body, { headers: { 'content-type': 'application/json' } });
+    }),
+  );
+
+  const result = await sendNixieRPC({
+    url: 'https://nixie.test',
+    token: 'a7c3e9f1-token',
+    procedure: 'conversation/read',
+    input: { thread: 'conversation' },
+    parse: (output) => output,
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error: 'conversation/read answered 200 with a body that broke off',
+  });
+});
+
+test('it reports an error status without the body when nixie defines no code', async () => {
+  server.use(
+    http.post('https://nixie.test/rpc/conversation/read', () =>
+      HttpResponse.text('<html>bad gateway, token a7c3e9f1</html>', { status: 502 }),
     ),
+  );
+
+  const result = await sendNixieRPC({
+    url: 'https://nixie.test',
+    token: 'a7c3e9f1-token',
+    procedure: 'conversation/read',
+    input: { thread: 'conversation' },
+    parse: (output) => output,
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error: 'conversation/read answered 502 with no error code',
   });
 });

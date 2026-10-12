@@ -242,7 +242,7 @@ function printReached(
   options: Readonly<CheckFetchSandboxOptions>,
   answers: readonly ProbeAnswer[],
 ): boolean {
-  const failures = answers.filter((answer) => answer.status === 0 || answer.status === null);
+  const failures = answers.filter((answer) => answer.status !== 1 && answer.status !== 124);
 
   for (const answer of failures) {
     options.printErr(
