@@ -36,8 +36,19 @@ git -C "$repo" ls-files -z --cached --others --exclude-standard --deduplicate |
   done |
   tar -C "$repo" --null -T - -cf - | tar -C "$snapshot" -xf -
 
+# NIXOS_CHECKS_CPUS (a docker --cpuset-cpus list, such as 0-1) and NIXOS_CHECKS_MEMORY (a docker
+# size, such as 7g, with swap off) cap the Nix container, so a bigger runner can prove the checks
+# fit a smaller one; CI sets them to a 2 CPU / 8 GB runner's share
+limits=()
+if [ -n "${NIXOS_CHECKS_CPUS:-}" ]; then
+  limits+=(--cpuset-cpus "$NIXOS_CHECKS_CPUS")
+fi
+if [ -n "${NIXOS_CHECKS_MEMORY:-}" ]; then
+  limits+=(--memory "$NIXOS_CHECKS_MEMORY" --memory-swap "$NIXOS_CHECKS_MEMORY")
+fi
+
 run_nix() {
-  docker run --rm --network host "$@"
+  docker run --rm --network host "${limits[@]}" "$@"
 }
 
 nix_args=(--extra-experimental-features "nix-command flakes")
@@ -78,10 +89,12 @@ for check in "${checks[@]}"; do
   installables+=("path:/src?dir=nixos#checks.x86_64-linux.$check")
 done
 
+# two builds at once: each restore rehearsal boots a 2048 MB VM, so two of them fit in 8 GB beside
+# Nix, where all four would not
 if [ "${#installables[@]}" -gt 0 ]; then
   run_nix "${kvm[@]}" -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
     nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
-    build --no-link -L "${installables[@]}"
+    --max-jobs 2 build --no-link -L "${installables[@]}"
 fi
 
 if [ "${#missing_kvm[@]}" -eq 1 ]; then

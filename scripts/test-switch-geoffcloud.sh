@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Hermetic test for switch-geoffcloud.sh: a switch never follows a failed build, and it
-# activates the exact store path the build printed, built from the checked commit. It
-# touches no host and runs no Nix: docker and ssh are stand-ins from test-lib that log
+# Hermetic test for switch-geoffcloud.sh: a switch never builds a commit that no green NixOS
+# checks run covers, never follows a failed build, and activates the exact store path the build
+# printed, built from the checked commit. It touches no host and runs no Nix: gh lists the
+# green runs (with none named, one for HEAD), and docker and ssh are stand-ins from test-lib that log
 # their argv as JSON lines (two cases hand them to the real docker and ssh, to fail on a
 # missing daemon socket and a refused loopback port), and each case runs the script in
 # its own temporary clone with its own origin, under `env -i` with only the variables it
@@ -19,6 +20,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-nix-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-nixos-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-racing-git.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-runs-gh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
@@ -28,6 +30,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 while read -r name; do unset "$name"; done < <(compgen -e GIT_)
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GIT_COMMITTER_NAME=test \
   GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_EMAIL=test@example.invalid
+
+# the call find-nixos-check-run.sh makes to list the green runs, which every switch makes first
+gh_runs_call='["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]'
 
 it_activates_the_store_path_its_build_printed() {
   local commit status=0
@@ -50,6 +55,7 @@ it_activates_the_store_path_its_build_printed() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -58,6 +64,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -89,6 +96,7 @@ it_prints_the_failed_units_the_host_reports_after_the_switch() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -98,6 +106,7 @@ alloy.service loaded failed failed Alloy
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -129,6 +138,7 @@ it_builds_the_checked_commit_when_the_checkout_is_edited_during_the_build() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -137,6 +147,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -170,6 +181,7 @@ it_never_builds_an_untracked_file() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -178,6 +190,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -211,10 +224,12 @@ it_builds_the_checked_commit_when_a_commit_lands_after_the_check() {
     STUB_BUILD_SAW="$tree/build-saw" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_RUNS="$checked https://github.com/zgeoff/cloud/actions/runs/1" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${checked:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -224,6 +239,7 @@ EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git-moved-head"]
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -268,6 +284,76 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_never_builds_or_switches_a_commit_that_no_green_nixos_run_covers() {
+  local commit status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_RUNS= \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << EOF
+no green NixOS checks run covers ${commit:0:7}; start one with \`gh workflow run nixos-checks.yml --ref main\` and switch once it passes
+EOF
+  diff /dev/null "$tree/out"
+  diff - "$tree/calls" <<< "$gh_runs_call"
+  ls -A "$tree/tmp" > "$tree/tmp-left"
+  diff /dev/null "$tree/tmp-left"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_never_builds_or_switches_a_commit_that_changed_nixos_after_the_last_green_run() {
+  local checked commit status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/clone/nixos"
+  echo checked > "$tree/clone/nixos/marker"
+  git -C "$tree/clone" add nixos/marker
+  git -C "$tree/clone" commit -qm checked
+  checked="$(git -C "$tree/clone" rev-parse HEAD)"
+  echo unchecked > "$tree/clone/nixos/marker"
+  git -C "$tree/clone" commit -qam unchecked
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_RUNS="$checked https://github.com/zgeoff/cloud/actions/runs/1" \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << EOF
+no green NixOS checks run covers ${commit:0:7}; start one with \`gh workflow run nixos-checks.yml --ref main\` and switch once it passes
+EOF
+  diff /dev/null "$tree/out"
+  diff - "$tree/calls" <<< "$gh_runs_call"
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
+it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" \
+    STUB_GH_ERROR='To get started with GitHub CLI, please run:  gh auth login' STUB_GH_EXIT=4 \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
+  diff /dev/null "$tree/out"
+  diff - "$tree/calls" <<< "$gh_runs_call"
+  ls -A "$tree/tmp" > "$tree/tmp-left"
+  diff /dev/null "$tree/tmp-left"
+  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+}
+
 it_switches_the_host_that_the_environment_names() {
   local commit status=0
   tree="$(mktemp -d)"
@@ -285,6 +371,7 @@ it_switches_the_host_that_the_environment_names() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@other.test
@@ -293,6 +380,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@other.test","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@other.test","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -558,10 +646,12 @@ it_never_switches_after_a_failed_build() {
 error: builder for '/nix/store/x.drv' failed with exit code 1
 EOF
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
@@ -585,7 +675,7 @@ it_never_switches_when_docker_cannot_reach_its_daemon() {
     DOCKER_HOST="unix://$tree/docker.sock" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
-  printf '== build %s\n' "${commit:0:7}" > "$tree/want-out"
+  printf '== checked by https://github.com/zgeoff/cloud/actions/runs/1\n== build %s\n' "${commit:0:7}" > "$tree/want-out"
   printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
   printf 'failed to connect to the docker API at unix://%s/docker.sock; check if the path is correct and if the daemon is running: dial unix %s/docker.sock: connect: no such file or directory\n' "$tree" "$tree" > "$tree/err-docker-29"
   # set -e passes docker's status through: 125 from docker 28.0.4, 1 from docker 29.7.2
@@ -594,6 +684,7 @@ it_never_switches_when_docker_cannot_reach_its_daemon() {
     "docker 29.7.2" "$tree/want-out" "$tree/err-docker-29" 1
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
@@ -616,10 +707,12 @@ it_never_switches_when_the_build_prints_no_system_path() {
 the build printed no system path: warning: x
 EOF
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
@@ -645,12 +738,14 @@ it_never_activates_when_the_copy_fails() {
 error: cannot connect to 'root@geoffcloud'
 EOF
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 EOF
@@ -676,6 +771,7 @@ it_stops_with_ssh_exit_255_when_the_host_is_unreachable() {
 
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to ssh://root@127.0.0.1:1
@@ -683,6 +779,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://ssh://root@127.0.0.1:1","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -710,6 +807,7 @@ it_stops_with_the_activation_exit_code_when_switch_to_configuration_fails() {
 warning: the following units failed: atc-daemon.service
 EOF
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -719,6 +817,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -745,6 +844,7 @@ it_stops_with_ssh_exit_255_when_the_connection_drops_before_the_check() {
 
   diff - "$tree/err" <<< $'Connection to geoffcloud closed by remote host.\r'
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -752,6 +852,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -778,6 +879,7 @@ it_fails_when_the_host_runs_another_system_after_the_switch() {
 the host runs /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-geoffcloud-old, not the built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 EOF
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -785,6 +887,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -812,6 +915,7 @@ it_fails_with_systemctls_exit_code_when_listing_failed_units_fails() {
 Failed to list units: Connection timed out
 EOF
   diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
 == build ${commit:0:7}
 built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == copy to root@geoffcloud
@@ -820,6 +924,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
+$gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
@@ -842,6 +947,7 @@ setup_test() {
   : > "$tree/calls"
   create_stub_nix_docker "$tree/bin"
   create_stub_nixos_ssh "$tree/bin"
+  create_stub_runs_gh "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
   require_remote_tool_stubs "$tree/bin"
   git init -q --bare -b main "$tree/origin.git"
@@ -849,7 +955,9 @@ setup_test() {
   git -C "$tree/clone" commit -q --allow-empty -m init
   git -C "$tree/clone" push -q origin main
   mkdir "$tree/clone/scripts"
-  cp "$(dirname "${BASH_SOURCE[0]}")/switch-geoffcloud.sh" "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh" "$tree/clone/scripts/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/switch-geoffcloud.sh" "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh" \
+    "$(dirname "${BASH_SOURCE[0]}")/find-nixos-check-run.sh" "$(dirname "${BASH_SOURCE[0]}")/needs-nixos-checks.sh" \
+    "$tree/clone/scripts/"
 }
 
 run_cases

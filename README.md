@@ -28,7 +28,8 @@ bun run test
 bun run test:scripts
 ```
 
-CI runs these plus the type-aware lint, gitleaks, the Go checks and the NixOS checks.
+CI runs these plus the type-aware lint, gitleaks and the Go checks. The NixOS checks run nightly and
+gate the host switch.
 
 ## Layout
 

@@ -73,7 +73,7 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 ## Rules
 
 - Every change lands through a squash PR. The `main protection` ruleset blocks a direct push to
-  `main` and needs the `ci` and `nixos` checks green.
+  `main` and needs the `ci` check green.
 - This repo is public. Never commit a secret. Secrets live in the 1Password `cloud` vault; `.env`
   holds only `op://` references, resolved with `op run --env-file=.env -- <command>`.
 - A new service in the cloud stays host-local or on the tailnet by default. A public route (a tunnel
@@ -96,6 +96,10 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
   0 copies that exact store path to the host and activates it. Tailscale SSH authenticates
   `root@geoffcloud`. `--build-only` stops after the build. Never switch by hand after a failed
   build, and never re-evaluate the flake to switch.
+- The NixOS checks gate the switch, not the merge: the switch script refuses a commit that no green
+  `NixOS checks` run on `main` covers. Dispatch one with
+  `gh workflow run nixos-checks.yml --ref main` when the nightly run has not covered the commit yet,
+  and never switch around the gate.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`: a `VACUUM INTO` copy taken inside imp-host while impd
   runs, with its integrity check, schema migration and imp version in `COPY-INFO`. Never tar the

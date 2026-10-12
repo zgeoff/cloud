@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Hermetic test for test-nixos.sh: it builds the flake's checks from a snapshot of the tracked and
-# unignored files, every check the flake declares or only the ones named, and it passes KVM to
-# the build only when the device is there for it. It runs no Nix and no container: git and docker
+# unignored files, every check the flake declares or only the ones named, two builds at a time,
+# in a container capped at the CPUs and memory the environment names, and it passes KVM to the
+# build only when the device is there for it. It runs no Nix and no container: git and docker
 # are stubs that log their argv as JSON lines and exit 97 on a call they do not expect, and each
 # case runs the script under `env -i` with only the variables it sets, KVM_DEVICE among them, so
 # no case depends on the machine's /dev/kvm. Each case compares the script's whole stdout, stderr
@@ -47,7 +48,7 @@ it_builds_every_check_the_flake_declares_from_a_snapshot_of_the_tracked_and_unig
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
-["docker","run","--rm","--network","host","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.impd-restore","path:/src?dir=nixos#checks.x86_64-linux.impd-restore-seams"]
+["docker","run","--rm","--network","host","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.impd-restore","path:/src?dir=nixos#checks.x86_64-linux.impd-restore-seams"]
 EOF
   # the deleted nixos/gone.nix and the untracked, ignored notes.txt stay out
   find "$tree/build-saw" -type f -printf '%P\n' | sort > "$tree/build-saw-files"
@@ -58,6 +59,32 @@ EOF
   diff - "$tree/build-saw/nixos/flake.nix" <<< 'tracked'
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_caps_every_nix_container_at_the_cpus_and_memory_the_environment_names() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  touch "$tree/kvm"
+  chmod 0600 "$tree/kvm"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
+    STUB_CHECKS=$'atc-daemon\nimpd-restore\n' KVM_DEVICE="$tree/kvm" \
+    NIXOS_CHECKS_CPUS=0-1 NIXOS_CHECKS_MEMORY=7g \
+    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+["docker","run","--rm","--network","host","--cpuset-cpus","0-1","--memory","7g","--memory-swap","7g","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
+["docker","run","--rm","--network","host","--cpuset-cpus","0-1","--memory","7g","--memory-swap","7g","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.impd-restore"]
+EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -78,7 +105,7 @@ it_builds_only_the_checks_named_without_listing_the_flake() {
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.test-utils"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.test-utils"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -100,7 +127,7 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -125,7 +152,7 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -147,7 +174,7 @@ it_builds_the_other_checks_then_fails_naming_every_restore_check_when_the_kvm_de
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -170,7 +197,7 @@ it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_ch
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
@@ -261,7 +288,7 @@ it_fails_with_the_build_when_a_check_fails() {
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
