@@ -166,7 +166,7 @@ check prints the name of an imp it could not remove: remove it with
 2. Check the fetch sandbox's egress:
 
    ```bash
-   bun run nixie:check-sandbox
+   bun run nixie:check-sandbox 100.69.47.33:443
    ```
 
    The check creates one imp, `fetch-check-<8 hex>`, from nixie's fetch image under imp's `public`
@@ -176,9 +176,13 @@ check prints the name of an imp it could not remove: remove it with
    `from the sandbox` line `blocked`, and the last line `fetch sandbox check passed`.
 
    Each target must first connect from the host, because an address with no listener refuses the
-   sandbox whatever the firewall does. The tailnet target is Tailscale's resolver,
-   `100.100.100.100:53`. To probe another tailnet address, pass it with a port that listens:
-   `bun run nixie:check-sandbox <tailnet address>:<port>`.
+   sandbox whatever the firewall does. The argument names the tailnet target, and the check has no
+   default: `100.69.47.33:443` is nixie's ingress. To probe another tailnet address, pass it with a
+   port that listens: `bun run nixie:check-sandbox <tailnet address>:<port>`.
+
+   The tailnet target must not use port 53, and the check refuses one. imp redirects a public
+   sandbox's DNS connections to its own DNS proxy, so a probe of port 53 connects even from a
+   correctly isolated sandbox and fails the check.
 
 ## Enrol a device
 

@@ -17,7 +17,7 @@ test('it reads a public page from the sandbox, finds every internal address bloc
       '104.250.100.18:10250',
       '10.42.0.17:8080',
       '10.43.12.9:8080',
-      '100.100.100.100:53',
+      '100.69.47.33:443',
     ],
     sandboxReaches: [],
     page: '200 true\n',
@@ -28,7 +28,7 @@ test('it reads a public page from the sandbox, finds every internal address bloc
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
     printOut,
@@ -51,14 +51,14 @@ test('it reads a public page from the sandbox, finds every internal address bloc
     ['from the host: node 104.250.100.18:10250 connected\n'],
     ['from the host: pod 10.42.0.17:8080 connected\n'],
     ['from the host: service 10.43.12.9:8080 connected\n'],
-    ['from the host: tailnet 100.100.100.100:53 connected\n'],
+    ['from the host: tailnet 100.69.47.33:443 connected\n'],
     ['created sandbox fetch-check-1a2b3c4d on nixie-fetch-9c4e2a71b0d3, policy public\n'],
     ['public page: https://example.com/ answered 200 true\n'],
     ['from the sandbox: impd 100.88.1.2:443 blocked (exit 124)\n'],
     ['from the sandbox: node 104.250.100.18:10250 blocked (exit 124)\n'],
     ['from the sandbox: pod 10.42.0.17:8080 blocked (exit 124)\n'],
     ['from the sandbox: service 10.43.12.9:8080 blocked (exit 124)\n'],
-    ['from the sandbox: tailnet 100.100.100.100:53 blocked (exit 124)\n'],
+    ['from the sandbox: tailnet 100.69.47.33:443 blocked (exit 124)\n'],
     ['removed sandbox fetch-check-1a2b3c4d\n'],
     ['fetch sandbox check passed\n'],
   ]);
@@ -77,7 +77,7 @@ test('it fails when the sandbox reaches an internal address, and still removes t
       '104.250.100.18:10250',
       '10.42.0.17:8080',
       '10.43.12.9:8080',
-      '100.100.100.100:53',
+      '100.69.47.33:443',
     ],
     sandboxReaches: ['10.43.12.9:8080'],
     page: '200 true\n',
@@ -87,7 +87,7 @@ test('it fails when the sandbox reaches an internal address, and still removes t
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
     printOut: mock<(text: string) => void>(),
@@ -115,7 +115,7 @@ test('it fails when a sandbox probe exits with a status that proves no block, su
       '104.250.100.18:10250',
       '10.42.0.17:8080',
       '10.43.12.9:8080',
-      '100.100.100.100:53',
+      '100.69.47.33:443',
     ],
     sandboxReaches: [],
     page: '200 true\n',
@@ -125,7 +125,7 @@ test('it fails when a sandbox probe exits with a status that proves no block, su
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: async (command: string) => {
       const result = await host.runRemote(command);
@@ -155,7 +155,7 @@ test('it fails when a sandbox probe exits with a status that proves no block, su
       "check-nixie-fetch-sandbox: the sandbox's probe of service 10.43.12.9:8080 probe failed (exit 127)\n",
     ],
     [
-      "check-nixie-fetch-sandbox: the sandbox's probe of tailnet 100.100.100.100:53 probe failed (exit 127)\n",
+      "check-nixie-fetch-sandbox: the sandbox's probe of tailnet 100.69.47.33:443 probe failed (exit 127)\n",
     ],
   ]);
 });
@@ -173,7 +173,7 @@ test('it fails when the sandbox cannot read the public page', async () => {
       '104.250.100.18:10250',
       '10.42.0.17:8080',
       '10.43.12.9:8080',
-      '100.100.100.100:53',
+      '100.69.47.33:443',
     ],
     sandboxReaches: [],
     page: '',
@@ -183,7 +183,7 @@ test('it fails when the sandbox cannot read the public page', async () => {
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
     printOut: mock<(text: string) => void>(),
@@ -211,7 +211,7 @@ test('it removes the sandbox when a command fails mid-check', async () => {
       '104.250.100.18:10250',
       '10.42.0.17:8080',
       '10.43.12.9:8080',
-      '100.100.100.100:53',
+      '100.69.47.33:443',
     ],
     sandboxReaches: [],
     page: '200 true\n',
@@ -221,7 +221,7 @@ test('it removes the sandbox when a command fails mid-check', async () => {
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: (command: string) =>
       command.includes('/usr/local/bin/bun')
@@ -256,7 +256,7 @@ test('it creates no sandbox when a target does not answer the host', async () =>
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
     printOut: mock<(text: string) => void>(),
@@ -286,7 +286,7 @@ test('it stops when impd cannot create the sandbox, and names it for imp ls', as
       '104.250.100.18:10250',
       '10.42.0.17:8080',
       '10.43.12.9:8080',
-      '100.100.100.100:53',
+      '100.69.47.33:443',
     ],
     sandboxReaches: [],
     page: '200 true\n',
@@ -296,7 +296,7 @@ test('it stops when impd cannot create the sandbox, and names it for imp ls', as
   const printErr = mock<(text: string) => void>();
 
   const exitCode = await checkNixieFetchSandbox({
-    args: [],
+    args: ['100.69.47.33:443'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
     printOut: mock<(text: string) => void>(),
@@ -371,6 +371,56 @@ test('it rejects an argument that is not an address and a port, and never reache
   expect(runRemote).not.toHaveBeenCalled();
 
   expect(printErr.mock.calls).toStrictEqual([
-    ['usage: bun run nixie:check-sandbox [<tailnet address>:<port>]\n'],
+    [
+      'check-nixie-fetch-sandbox: give one tailnet address and port, such as 100.69.47.33:443\nusage: bun run nixie:check-sandbox <tailnet address>:<port>\n',
+    ],
+  ]);
+});
+
+test('it refuses to run with no tailnet target, and never reaches the host', async () => {
+  const runRemote =
+    mock<(command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>>();
+
+  const printErr = mock<(text: string) => void>();
+
+  const exitCode = await checkNixieFetchSandbox({
+    args: [],
+    sandboxName: 'fetch-check-1a2b3c4d',
+    runRemote,
+    printOut: mock<(text: string) => void>(),
+    printErr,
+  });
+
+  expect(exitCode).toBe(2);
+  expect(runRemote).not.toHaveBeenCalled();
+
+  expect(printErr.mock.calls).toStrictEqual([
+    [
+      'check-nixie-fetch-sandbox: give a tailnet address and port to probe, such as 100.69.47.33:443\nusage: bun run nixie:check-sandbox <tailnet address>:<port>\n',
+    ],
+  ]);
+});
+
+test('it refuses a tailnet target on port 53, and never reaches the host', async () => {
+  const runRemote =
+    mock<(command: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>>();
+
+  const printErr = mock<(text: string) => void>();
+
+  const exitCode = await checkNixieFetchSandbox({
+    args: ['100.100.100.100:53'],
+    sandboxName: 'fetch-check-1a2b3c4d',
+    runRemote,
+    printOut: mock<(text: string) => void>(),
+    printErr,
+  });
+
+  expect(exitCode).toBe(2);
+  expect(runRemote).not.toHaveBeenCalled();
+
+  expect(printErr.mock.calls).toStrictEqual([
+    [
+      "check-nixie-fetch-sandbox: cannot probe 100.100.100.100:53: imp redirects a public sandbox's DNS connections to its own DNS proxy, so a probe of port 53 can connect even when the sandbox is isolated; pick a tailnet port that is not 53, such as 100.69.47.33:443\nusage: bun run nixie:check-sandbox <tailnet address>:<port>\n",
+    ],
   ]);
 });
