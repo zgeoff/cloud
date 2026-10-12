@@ -304,7 +304,10 @@ device enrolled after the snapshot is lost. Back up first if the current data st
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n nixie scale statefulset/nixie --replicas=0
+   ssh root@geoffcloud k3s kubectl -n nixie wait --for=delete pod/nixie-0 --timeout=120s
    ```
+
+   Expect `pod/nixie-0 condition met`. nixie writes until its pod stops.
 
 2. Restore with `deploy/nixie/restore-job.yaml`. To list the snapshots first, set `args: ["ls"]`; to
    pick one, set `SNAPSHOT`. The script restores into a scratch directory, checks both databases,

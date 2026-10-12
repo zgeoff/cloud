@@ -353,6 +353,49 @@ current key
 EOF
 }
 
+# The state directory refuses new files, as a full volume would, so staging the first copy fails
+# and the restore stops before it deletes or replaces either current database.
+it_fails_a_restore_that_cannot_stage_its_copies_and_keeps_the_state() {
+  local image="$1" script="$2" status=0
+  name="nixie-backup-$3-$BASHPID"
+  tree="$(mktemp -d)"
+  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" "$name" "$image"
+  run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
+restic init -q
+mkdir /tmp/snap
+sqlite3 /tmp/snap/nixie.db "CREATE TABLE records (v); INSERT INTO records VALUES ('from the snapshot');"
+sqlite3 /tmp/snap/keys.db "CREATE TABLE record_keys (v); INSERT INTO record_keys VALUES ('snapshot key');"
+(cd /tmp/snap && restic backup -q --tag nixie --host nixie --time "2020-01-06 10:00:00" .)
+sqlite3 /state/nixie.db "CREATE TABLE records (v); INSERT INTO records VALUES ('current');"
+sqlite3 /state/keys.db "CREATE TABLE record_keys (v); INSERT INTO record_keys VALUES ('current key');"
+echo current-wal > /state/nixie.db-wal
+chmod 0555 /state
+EOF
+
+  run_backup "$name" "$image" --user 10001:10001 --entrypoint /bin/sh \
+    -v "$script:/opt/nixie-backup/backup.sh:ro" /opt/nixie-backup/backup.sh restore \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << 'EOF'
+cp: can't create '/state/nixie.db.restoring': Permission denied
+cannot stage nixie.db in /state
+EOF
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
+ls -A /state
+cat /state/nixie.db-wal
+sqlite3 -readonly /state/keys.db 'SELECT v FROM record_keys'
+EOF
+  diff - "$tree/state" << 'EOF'
+keys.db
+nixie.db
+nixie.db-wal
+current-wal
+current key
+EOF
+}
+
 it_restores_the_snapshot_that_SNAPSHOT_names_instead_of_the_latest() {
   local image="$1" script="$2" older status=0
   name="nixie-backup-$3-$BASHPID"

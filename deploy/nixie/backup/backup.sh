@@ -5,7 +5,8 @@
 #          nixie writes), check each copy with PRAGMA integrity_check, upload both with restic,
 #          then apply retention.
 # restore: restore the latest snapshot (or $SNAPSHOT) into a scratch directory, check both
-#          databases, and only then replace them in $STATE_DIR, with their -wal and -shm files.
+#          databases, stage both on $STATE_DIR, and only then replace them, with their -wal and
+#          -shm files.
 #          Run it only while nixie is stopped.
 # ls:      list snapshots.
 #
@@ -55,9 +56,15 @@ case "${1:-}" in
       sqlite3 "$work/$name" 'PRAGMA integrity_check;' | grep -qx ok ||
         { echo "the restored $name failed the integrity check" >&2; exit 1; }
     done
+    # stage both copies on the state volume first, so a full volume or an I/O error stops the
+    # restore before it deletes anything, and each database then replaces its old one by rename
     for name in $databases; do
-      rm -f "$state_dir/$name" "$state_dir/$name-wal" "$state_dir/$name-shm"
-      cp "$work/$name" "$state_dir/$name"
+      cp "$work/$name" "$state_dir/$name.restoring" ||
+        { rm -f "$state_dir"/*.restoring; echo "cannot stage $name in $state_dir" >&2; exit 1; }
+    done
+    for name in $databases; do
+      rm -f "$state_dir/$name-wal" "$state_dir/$name-shm"
+      mv "$state_dir/$name.restoring" "$state_dir/$name"
       echo "restored $name: integrity_check ok"
     done
     rm -rf "$work"
