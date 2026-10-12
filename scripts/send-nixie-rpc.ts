@@ -33,6 +33,7 @@ export async function sendNixieRPC<T>(call: Readonly<NixieCall<T>>): Promise<RPC
   }
 
   const text = await response.text();
+
   const body = parseJSON(text);
 
   if (!response.ok) {

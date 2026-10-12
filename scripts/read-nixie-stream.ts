@@ -60,6 +60,7 @@ interface StreamSource {
 
 async function startStream(hold: Readonly<StreamHold>): Promise<RPCResult<StreamSource>> {
   const stopping = new AbortController();
+
   const response = await fetch(new URL('/rpc/log/follow', hold.url), {
     method: 'POST',
     headers: buildNixieHeaders(hold.token),
