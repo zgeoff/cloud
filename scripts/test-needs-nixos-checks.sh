@@ -121,11 +121,11 @@ it_prints_true_for_a_change_to_the_nix_image_pin() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
-  echo 'NIX_IMAGE=nixos/nix:1.0.0' > "$tree/repo/scripts/nix-image.sh"
+  echo '# the first pin' > "$tree/repo/scripts/nix-image.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'pin the nix image'
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
-  echo 'NIX_IMAGE=nixos/nix:9.9.9' > "$tree/repo/scripts/nix-image.sh"
+  echo '# the next pin' > "$tree/repo/scripts/nix-image.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'bump the nix image'
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
