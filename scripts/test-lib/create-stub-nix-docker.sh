@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # create_stub_nix_docker <bin>: writes <bin>/docker, a stand-in for the docker CLI that
-# switch-geoffcloud.sh runs the nixos/nix image with. It logs each call's argv as a JSON
+# switch-geoffcloud.sh runs the pinned Nix image with. It logs each call's argv as a JSON
 # line to STUB_LOG, then:
 #
 # - a build (`run … build --no-link --print-out-paths …`) edits STUB_EDIT_DURING_BUILD
@@ -21,13 +21,12 @@
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
 # Nix documents no exit-code table for these commands, so the exit 1 was checked on
-# 2026-10-08 against the real nix: nix 2.35.2 in the nixos/nix image
-# (nixos/nix@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c, the
-# latest tag then), in a container without network. A failed `nix eval --raw`, a `nix
+# 2026-10-08 against the real nix: nix 2.35.2 in the pinned image
+# (nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c,
+# scripts/nix-image.sh), in a container without network. A failed `nix eval --raw`, a `nix
 # build` whose builder exits 1 and a `nix copy --to ssh://` to a refused port each
-# exited 1. The scripts run the image by its bare tag, so no nix version is pinned; a later
-# image could change the exit, and nix's manual gives 100-and-up codes for some build
-# failures under `nix-store --realise`, which this check did not reach.
+# exited 1. A later image could change the exit, and nix's manual gives 100-and-up codes for
+# some build failures under `nix-store --realise`, which this check did not reach.
 create_stub_nix_docker() {
   local bin="$1" real_docker
   real_docker="$(PATH=/usr/local/bin:/usr/bin:/bin command -v docker || true)"

@@ -19,6 +19,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-nix-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../nix-image.sh"
 
 it_copies_the_build_mount_and_prints_the_build_output() {
   local status=0
@@ -30,14 +31,14 @@ it_copies_the_build_mount_and_prints_the_build_output() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-test \
-    docker run --rm -v "$tree/src:/src:ro" nixos/nix nix build --no-link --print-out-paths path:. \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link --print-out-paths path:. \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-test
   diff - "$tree/saw/marker" <<< committed
   diff - "$tree/calls" << CALLS
-["docker","run","--rm","-v","$tree/src:/src:ro","nixos/nix","nix","build","--no-link","--print-out-paths","path:."]
+["docker","run","--rm","-v","$tree/src:/src:ro","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -53,14 +54,14 @@ it_edits_the_named_file_before_it_copies_the_build_mount() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-test \
     STUB_EDIT_DURING_BUILD="$tree/src/marker" \
-    docker run --rm -v "$tree/src:/src:ro" nixos/nix nix build --no-link --print-out-paths path:. \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link --print-out-paths path:. \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-test
   diff - "$tree/saw/marker" <<< edited
   diff - "$tree/calls" << CALLS
-["docker","run","--rm","-v","$tree/src:/src:ro","nixos/nix","nix","build","--no-link","--print-out-paths","path:."]
+["docker","run","--rm","-v","$tree/src:/src:ro","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -74,14 +75,14 @@ it_fails_a_build_with_the_named_error_and_exit_1() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
     STUB_BUILD_ERROR="error: builder for '/nix/store/x.drv' failed with exit code 1" \
-    docker run --rm -v "$tree/src:/src:ro" nixos/nix nix build --no-link --print-out-paths path:. \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link --print-out-paths path:. \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: builder for '/nix/store/x.drv' failed with exit code 1"
   [ -d "$tree/saw" ] || { echo "the failed build did not copy its mount" >&2; exit 1; }
   diff - "$tree/calls" << CALLS
-["docker","run","--rm","-v","$tree/src:/src:ro","nixos/nix","nix","build","--no-link","--print-out-paths","path:."]
+["docker","run","--rm","-v","$tree/src:/src:ro","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -93,13 +94,13 @@ it_answers_a_copy_with_nothing() {
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    docker run --rm nixos/nix nix copy --to ssh://root@geoffcloud /nix/store/x \
+    docker run --rm "$NIX_IMAGE" nix copy --to ssh://root@geoffcloud /nix/store/x \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" << 'CALLS'
-["docker","run","--rm","nixos/nix","nix","copy","--to","ssh://root@geoffcloud","/nix/store/x"]
+  diff - "$tree/calls" << CALLS
+["docker","run","--rm","$NIX_IMAGE","nix","copy","--to","ssh://root@geoffcloud","/nix/store/x"]
 CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -112,13 +113,13 @@ it_fails_a_copy_with_the_named_error_and_exit_1() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_COPY_ERROR="error: cannot connect to 'root@geoffcloud'" \
-    docker run --rm nixos/nix nix copy --to ssh://root@geoffcloud /nix/store/x \
+    docker run --rm "$NIX_IMAGE" nix copy --to ssh://root@geoffcloud /nix/store/x \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: cannot connect to 'root@geoffcloud'"
-  diff - "$tree/calls" << 'CALLS'
-["docker","run","--rm","nixos/nix","nix","copy","--to","ssh://root@geoffcloud","/nix/store/x"]
+  diff - "$tree/calls" << CALLS
+["docker","run","--rm","$NIX_IMAGE","nix","copy","--to","ssh://root@geoffcloud","/nix/store/x"]
 CALLS
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
@@ -146,7 +147,7 @@ it_hands_a_logged_call_to_the_real_docker_which_fails_without_a_daemon_at_its_so
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_DOCKER_PASS=1 DOCKER_HOST="unix://$tree/docker.sock" \
-    docker run --rm nixos/nix nix build --no-link --print-out-paths path:. \
+    docker run --rm "$NIX_IMAGE" nix build --no-link --print-out-paths path:. \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   printf 'docker: Cannot connect to the Docker daemon at unix://%s/docker.sock. Is the docker daemon running?\n\nRun '"'"'docker run --help'"'"' for more information\n' "$tree" > "$tree/err-docker-28"
@@ -155,8 +156,8 @@ it_hands_a_logged_call_to_the_real_docker_which_fails_without_a_daemon_at_its_so
   assert_one_of_outputs "the real docker run without a daemon" "$tree/out" "$tree/err" "$status" \
     "docker 28.0.4" /dev/null "$tree/err-docker-28" 125 \
     "docker 29.7.2" /dev/null "$tree/err-docker-29" 1
-  diff - "$tree/calls" << 'CALLS'
-["docker","run","--rm","nixos/nix","nix","build","--no-link","--print-out-paths","path:."]
+  diff - "$tree/calls" << CALLS
+["docker","run","--rm","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
 }
 

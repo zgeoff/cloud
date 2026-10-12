@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build the NixOS flake's checks in a nixos/nix container, as scripts/switch-geoffcloud.sh builds
-# the host, so you need no local Nix:
+# Build the NixOS flake's checks in the pinned Nix image (scripts/nix-image.sh), as
+# scripts/switch-geoffcloud.sh builds the host, so you need no local Nix:
 #
 #   bash scripts/test-nixos.sh            # every check in checks.x86_64-linux
 #   bash scripts/test-nixos.sh atc-daemon # one check, by its name there
@@ -16,6 +16,7 @@
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it
 # is not the switch's geoffcloud-nix-store, so a test build never shares the deploy cache.
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
 repo="$(git rev-parse --show-toplevel)"
@@ -47,7 +48,7 @@ else
   # written to a file first, so a failing eval stops the script instead of building nothing
   names="$(mktemp)"
   trap 'teardown; rm -f "$names"' EXIT
-  run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src nixos/nix \
+  run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
     nix "${nix_args[@]}" eval --raw "path:/src?dir=nixos#checks.x86_64-linux" \
     --apply 'checks: builtins.concatStringsSep "\n" (builtins.attrNames checks) + "\n"' > "$names"
   # an empty set of checks evaluates to one empty line, which names no check
@@ -78,7 +79,7 @@ for check in "${checks[@]}"; do
 done
 
 if [ "${#installables[@]}" -gt 0 ]; then
-  run_nix "${kvm[@]}" -v "$volume":/nix -v "$snapshot":/src:ro -w /src nixos/nix \
+  run_nix "${kvm[@]}" -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
     nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
     build --no-link -L "${installables[@]}"
 fi
