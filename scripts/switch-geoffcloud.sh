@@ -5,7 +5,9 @@
 #   bash scripts/switch-geoffcloud.sh               # build, then switch
 #   bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 #
-# The switch runs only after the build exits 0: a failed build stops the script before
+# A switch first needs a green NixOS checks run that covers the commit; with none, it stops
+# before the build and names the command that starts one. The switch runs only after the build
+# exits 0: a failed build stops the script before
 # anything reaches the host. The build reads a `git archive` snapshot of the checked commit,
 # not the working tree, so an edit made while the script runs changes nothing. The switch
 # activates that build's exact store path: it copies the closure to the host, points the
@@ -66,6 +68,19 @@ commit="$verified_commit"
 git -C "$repo" archive -o "$snapshot.tar" "$commit"
 tar -x -f "$snapshot.tar" -C "$snapshot"
 rm -f "$snapshot.tar"
+
+# The NixOS checks gate the switch, not the merge: a switch takes only a commit that a green run
+# of the checks covers (scripts/find-nixos-check-run.sh). --build-only reaches no host, so it
+# builds any commit. A gh failure stops the script (set -e) rather than reading as unchecked.
+if [[ "$mode" == switch ]]; then
+  checked_by="$(bash "$(dirname "${BASH_SOURCE[0]}")/find-nixos-check-run.sh" "$commit")"
+  if [[ -z "$checked_by" ]]; then
+    echo "no green NixOS checks run covers ${commit:0:7}; start one with" \
+      "\`gh workflow run nixos-checks.yml --ref main\` and switch once it passes" >&2
+    exit 1
+  fi
+  echo "== checked by $checked_by"
+fi
 echo "== build ${commit:0:7}"
 
 # a failed build exits non-zero here, and set -e stops the script before the switch

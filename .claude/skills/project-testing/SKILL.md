@@ -26,11 +26,12 @@ is decided in the shared skill, not here.
 | NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`            |
 
 - A new suite gets a root `package.json` script, and CI calls that script, never the file directly.
-- The `nixos` job reports on every pull request and push to main, and the ruleset requires it.
-  `bun run ci:needs-nixos-checks <base> <head>` decides whether it boots the checks: any change
-  under `nixos/` or `scripts/`, to `package.json`, `.bun-version`, `.gitignore` or the workflow, a
-  new branch or a rewritten base means "true". Otherwise the job passes without booting a VM and
-  says so in its summary. A new input of the checks outside those paths extends that list.
+- The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main,
+  and on an app's pull request that changes `nixos/`. A person's pull request never runs it, so
+  run `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can
+  break a check. `scripts/switch-geoffcloud.sh` refuses a commit that no green run on main covers.
+  `scripts/needs-nixos-checks.sh` lists the inputs of the checks, and a run stops covering later
+  commits once one of them changes. A new input of the checks extends that list.
 - Every test case is hermetic: no case reaches a real host, the tailnet, 1Password, Onidel,
   Cloudflare, the Pulumi state or the internet. The image and flake builds that run before the cases
   fetch only pinned inputs. `bun run drift` is a read-only check of a refactor, never part of a test.

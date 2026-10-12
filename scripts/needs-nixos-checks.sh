@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Decides whether a change needs the NixOS checks, which boot VMs and take minutes. It prints
 # "true" when any file changed between <base> and <head> is an input of those checks, and "false"
-# otherwise; the NixOS checks workflow runs the checks only on "true", and reports a result on
-# every pull request either way. The inputs are the flake (nixos/), the scripts and test helpers
-# the checks read (scripts/, which holds this script and test-nixos.sh), the root package.json
-# whose test:nixos script runs them, .bun-version, .gitignore (test-nixos.sh snapshots the
-# unignored files) and the workflow itself. A rename counts both its old and new path.
+# otherwise; scripts/find-nixos-check-run.sh uses it to decide whether a green run of the checks
+# still covers a later commit. The inputs are the flake (nixos/), the test helpers and scripts the
+# checks read (scripts/test-lib/, restore-impd-db.sh and copy-impd-db-host.sh), the scripts that
+# run them and pin their image (test-nixos.sh and nix-image.sh), the scripts that decide when they
+# run (this script and find-nixos-check-run.sh), .bun-version and the workflow itself. A rename
+# counts both its old and new path.
 #
 # A base of all zeros, as a push that creates a branch reports, has nothing to compare with, so
 # it prints "true", and so does a base that is not an ancestor of <head>, such as main before a
@@ -39,7 +40,9 @@ fi
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    nixos/* | scripts/* | package.json | .bun-version | .gitignore | .github/workflows/nixos-checks.yml)
+    nixos/* | scripts/test-lib/* | scripts/restore-impd-db.sh | scripts/copy-impd-db-host.sh | \
+      scripts/test-nixos.sh | scripts/nix-image.sh | scripts/needs-nixos-checks.sh | \
+      scripts/find-nixos-check-run.sh | .bun-version | .github/workflows/nixos-checks.yml)
       echo true
       exit 0
       ;;

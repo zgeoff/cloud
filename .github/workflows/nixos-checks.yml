@@ -1,24 +1,36 @@
 name: NixOS checks
 
 # Builds the NixOS flake's checks, including the impd restore rehearsals, which boot VMs and
-# need KVM on the runner. The workflow runs on every pull request and every push to main, so the
-# nixos job always reports a result; scripts/needs-nixos-checks.sh decides whether the change
-# touches an input of the checks, and the job builds them only then. A failed decision or a
-# failed check fails the job.
+# need KVM on the runner. The checks gate the host switch, not the merge:
+# scripts/switch-geoffcloud.sh refuses a commit that no green scheduled or dispatched run on main
+# covers (scripts/find-nixos-check-run.sh). So the workflow runs:
+#
+# - nightly on main, building the checks only when no green run covers the commit yet, which is
+#   when an input of the checks (scripts/needs-nixos-checks.sh) changed since the last one;
+# - on workflow_dispatch, always building them, on main before a switch or on a branch;
+# - on a pull request that an app opened and that touches nixos/, such as a release check's imp
+#   or host atc bump, so the bump can merge on its own only after a green run. A person's pull
+#   request skips the job; the nightly run checks it once it lands.
 on:
-  push:
-    branches: [main]
+  schedule:
+    # 03:17 UTC: GitHub's docs say scheduled runs queue at the start of each hour, so off the hour
+    - cron: '17 3 * * *'
+  workflow_dispatch:
   pull_request:
+    paths:
+      - 'nixos/**'
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   nixos:
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.type == 'Bot'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      # the full history, so the decision can find the merge base with the pull request's base
+      # the full history, so a green run's commit can be compared with the commit under test
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -29,26 +41,27 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # a pull request compares its base with the merge commit under test; a push compares the
-      # commit before it (all zeros for a new branch, which needs the checks)
-      - name: Decide whether the change needs the checks
+      # a nightly run skips a commit a green run already covers; a dispatch and an app's pull
+      # request always build. A gh failure fails the job rather than skipping the checks.
+      - name: Decide whether the commit needs the checks
         id: decide
         env:
-          BASE:
-            ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
-            github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
         run: |
-          needed="$(bun run --silent ci:needs-nixos-checks "$BASE" "$GITHUB_SHA")"
-          case "$needed" in
-            true | false) echo "needed=$needed" >> "$GITHUB_OUTPUT" ;;
-            *) echo "unexpected decision: $needed" >&2; exit 1 ;;
-          esac
-
-      - name: Report the skipped checks
-        if: steps.decide.outputs.needed == 'false'
-        run:
-          echo "No input of the NixOS checks changed, so the checks did not run." | tee -a
-          "$GITHUB_STEP_SUMMARY"
+          if [ "$GITHUB_EVENT_NAME" != schedule ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          covered="$(bun run --silent ci:find-nixos-check-run "$GITHUB_SHA")"
+          if [ -n "$covered" ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "No input of the NixOS checks changed since $covered, so the checks did not run." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
 
       # the runner has /dev/kvm, but QEMU, which runs as a nixbld user in the nixos/nix
       # container, got "Permission denied" on it and fell back to emulation; this rule opens it
@@ -60,6 +73,11 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # capped at a private repo's standard runner (2 CPUs, 8 GB, of which the runner itself
+      # takes about 1 GB), so the checks keep passing once the repo goes private
       - name: NixOS checks
         if: steps.decide.outputs.needed == 'true'
+        env:
+          NIXOS_CHECKS_CPUS: '0-1'
+          NIXOS_CHECKS_MEMORY: 7g
         run: bun run test:nixos

@@ -76,18 +76,21 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
 
 1. It refuses a branch other than `main`, uncommitted changes, a `main` behind `origin/main`, or any
    git command that fails.
-2. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
+2. It refuses a commit that no green run of the NixOS checks covers, as
+   [Check the host before a switch](#check-the-host-before-a-switch) describes. `--build-only` skips
+   this gate, because it reaches no host.
+3. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-3. It copies the built store path to the host with `nix copy`, sets the system profile to it and
+4. It copies the built store path to the host with `nix copy`, sets the system profile to it and
    runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
    is not evaluated again.
-4. It fails unless the host's `/run/current-system` is the built path, then prints
+5. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
 
-`bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gate with stub
-`docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show the node
-`Ready`.
+`bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gates with stub
+`gh`, `docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show
+the node `Ready`.
 
 Before a risky host change, take an Onidel snapshot of the root disk:
 
@@ -102,6 +105,38 @@ holds the errors only a stand-in `systemctl` or `cmp` reaches. `bun run test:nix
 check the flake declares in a `nixos/nix` container, from a snapshot of the working tree's tracked
 and unignored files. Its Nix store is the Docker volume `cloud-nixos-checks-store`, never the
 switch's `geoffcloud-nix-store`. `bun run test:nixos atc-daemon` builds one check.
+
+### Check the host before a switch
+
+The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
+without them. The `NixOS checks` workflow builds them on `main` every night, and skips the build
+when an earlier green run covers the commit. A green scheduled or dispatched run on `main` covers
+every later commit that changes no input of the checks: `nixos/`, the scripts and test helpers the
+checks read or run, the scripts that decide when they run, `.bun-version` and the workflow. An app's
+pull request that changes `nixos/`, such as a release bump, runs the checks before it merges; a
+person's pull request skips them.
+
+To switch before the nightly run covers the commit:
+
+1. Start a run on `main`:
+
+   ```sh
+   gh workflow run nixos-checks.yml --ref main
+   ```
+
+2. Find the run's id, the first column of the newest `workflow_dispatch` row, and wait for it:
+
+   ```sh
+   gh run list --workflow nixos-checks.yml --branch main --limit 3
+   gh run watch <run_id> --exit-status
+   ```
+
+   Expect exit 0. A failed run means the commit breaks a check: fix it in a PR rather than
+   switching.
+
+3. Run `bash scripts/switch-geoffcloud.sh`. Expect its first line to be `== checked by <run url>`.
+
+`bash scripts/find-nixos-check-run.sh <commit>` prints the run that covers a commit, or nothing.
 
 ## Upgrade imp
 
