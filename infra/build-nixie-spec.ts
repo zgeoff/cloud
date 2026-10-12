@@ -44,6 +44,10 @@ export interface NixieSpecInputs {
 export function buildNixieSpec(inputs: NixieSpecInputs): input.apps.v1.StatefulSetSpec {
   return {
     replicas: 1,
+
+    // a StatefulSet's rolling update stops nixie-0 before it starts the new one, so two pods never
+    // hold the database at once
+    updateStrategy: { type: 'RollingUpdate' },
     serviceName: inputs.serviceName,
     selector: { matchLabels: nixieLabels },
     template: {

@@ -39,6 +39,8 @@
     "drift": "bun run sdk:build && bun run preview --refresh --expect-no-changes",
     "up": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi up --stack prod",
     "nixie:reset": "bun scripts/reset-nixie.ts",
+    "nixie:check-stream": "bun scripts/check-nixie-stream.ts",
+    "nixie:check-sandbox": "bun scripts/check-nixie-fetch-sandbox.ts",
     "sdk:build": "tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json"
   },
   "devDependencies": {

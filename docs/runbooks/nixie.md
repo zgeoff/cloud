@@ -136,6 +136,50 @@ Expect `["deployment_key","impd_token","model_credentials"]`. A new host key goe
 5. Check the route from a tailnet device: `curl -sS https://nixie.geoff.cloud/health/live`. Expect
    HTTP 200.
 
+6. Run the deploy checks, as [Check a deploy](#check-a-deploy) describes.
+
+## Check a deploy
+
+Two checks prove a deploy end to end. Run both after each deploy or upgrade of nixie, from a repo
+checkout on a tailnet device that reaches `root@geoffcloud` over SSH. They create nothing in the
+cluster and write nothing to nixie's conversation, and CI never runs them, because they need the
+live host.
+
+**CAUTION:** A check that stops early can leave its session or its imp behind. The stream check
+prints the ID of a session it could not revoke: revoke it from nixie's device list. The sandbox
+check prints the name of an imp it could not remove: remove it with
+`host_imp rm <name> < /dev/null`.
+
+1. Check the live stream through the ingress:
+
+   ```bash
+   bun run nixie:check-stream
+   ```
+
+   The check enrols a device session with a code from nixie's pod, counts the conversation's
+   records, holds the conversation's stream open for 30 s, counts the records again, and revokes the
+   session. It sends no message. Expect the last line `stream check passed`, after a `stream held`
+   line with at least 5 keepalives and 0 records, and the same count on the `records before` and
+   `records after` lines. A message sent from a device during the hold fails the check, so run it
+   while nobody uses nixie.
+
+2. Check the fetch sandbox's egress:
+
+   ```bash
+   bun run nixie:check-sandbox
+   ```
+
+   The check creates one imp, `fetch-check-<8 hex>`, from nixie's fetch image under imp's `public`
+   policy, as nixie's web fetch tool does. The imp must read `https://example.com/`, and must not
+   connect to impd, the node's addresses, nixie's pod and Service, or a tailnet address. It removes
+   the imp at the end. Expect `public page: https://example.com/ answered 200 true`, every
+   `from the sandbox` line `blocked`, and the last line `fetch sandbox check passed`.
+
+   Each target must first connect from the host, because an address with no listener refuses the
+   sandbox whatever the firewall does. The tailnet target is Tailscale's resolver,
+   `100.100.100.100:53`. To probe another tailnet address, pass it with a port that listens:
+   `bun run nixie:check-sandbox <tailnet address>:<port>`.
+
 ## Enrol a device
 
 nixie signs a device in with a one-time code:
