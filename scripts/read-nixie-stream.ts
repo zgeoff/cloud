@@ -1,3 +1,4 @@
+import type { ReadableStreamDefaultReader } from 'node:stream/web';
 import { buildNixieHeaders } from './build-nixie-headers.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 
@@ -62,7 +63,7 @@ interface StreamReading {
 }
 
 async function readStream(
-  body: ReadableStream<Uint8Array>,
+  body: NonNullable<Response['body']>,
   stopping: AbortController,
   holdMs: number,
 ): Promise<StreamReport> {
