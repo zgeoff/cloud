@@ -23,6 +23,9 @@ test.each([
     { target: { role: 'impd', host: '100.88.1.2', port: 443 }, status: null },
     'impd 100.88.1.2:443 probe did not run',
   ],
-] satisfies [string, ProbeAnswer, string][])('it formats %s', (_label, answer, line) => {
-  expect(formatProbeAnswer(answer)).toBe(line);
-});
+] satisfies [string, ProbeAnswer, string][])(
+  'it formats %s',
+  (_label: string, answer: ProbeAnswer, line: string) => {
+    expect(formatProbeAnswer(answer)).toBe(line);
+  },
+);
