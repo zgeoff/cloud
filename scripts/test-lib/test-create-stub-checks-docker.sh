@@ -10,6 +10,7 @@ set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-checks-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../nix-image.sh"
 
 it_prints_the_check_names_without_a_trailing_newline_for_an_eval() {
   local status=0
@@ -18,12 +19,12 @@ it_prints_the_check_names_without_a_trailing_newline_for_an_eval() {
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CHECKS=$'atc-daemon\nimpd-restore\n' \
-    docker run --rm nixos/nix nix eval --raw 'path:/src?dir=nixos#checks.x86_64-linux' --apply builtins.attrNames \
+    docker run --rm "$NIX_IMAGE" nix eval --raw 'path:/src?dir=nixos#checks.x86_64-linux' --apply builtins.attrNames \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   printf 'atc-daemon\nimpd-restore\n' | cmp - "$tree/out"
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["docker","run","--rm","nixos/nix","nix","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","builtins.attrNames"]'
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"eval\",\"--raw\",\"path:/src?dir=nixos#checks.x86_64-linux\",\"--apply\",\"builtins.attrNames\"]"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -35,12 +36,12 @@ it_fails_an_eval_with_the_set_error_and_exit_1() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CHECKS=atc-daemon \
     STUB_EVAL_ERROR="error: undefined variable 'x'" \
-    docker run --rm nixos/nix nix eval --raw 'path:/src?dir=nixos#checks.x86_64-linux' --apply builtins.attrNames \
+    docker run --rm "$NIX_IMAGE" nix eval --raw 'path:/src?dir=nixos#checks.x86_64-linux' --apply builtins.attrNames \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: undefined variable 'x'"
-  diff - "$tree/calls" <<< '["docker","run","--rm","nixos/nix","nix","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","builtins.attrNames"]'
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"eval\",\"--raw\",\"path:/src?dir=nixos#checks.x86_64-linux\",\"--apply\",\"builtins.attrNames\"]"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
@@ -53,13 +54,13 @@ it_copies_the_directory_mounted_at_src_for_a_build() {
   echo '{ }' > "$tree/src/nixos/flake.nix"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
-    docker run --rm -v "$tree/src:/src:ro" nixos/nix nix build --no-link -L 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link -L 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff -r "$tree/src" "$tree/saw"
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"nixos/nix\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -73,13 +74,13 @@ it_copies_the_source_then_fails_a_build_with_the_set_error_and_exit_1() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
     STUB_BUILD_ERROR="error: Cannot build 'x.drv'." \
-    docker run --rm -v "$tree/src:/src:ro" nixos/nix nix build --no-link -L 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link -L 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff -r "$tree/src" "$tree/saw"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: Cannot build 'x.drv'."
-  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"nixos/nix\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 

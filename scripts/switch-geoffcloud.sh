@@ -12,6 +12,7 @@
 # system profile at it and runs its switch-to-configuration, as nixos-rebuild does, with no
 # second evaluation of the flake.
 set -euo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 mode="${1:-switch}"
 host="${GEOFFCLOUD_HOST:-root@geoffcloud}"
@@ -69,7 +70,7 @@ echo "== build ${commit:0:7}"
 
 # a failed build exits non-zero here, and set -e stops the script before the switch
 built="$(docker run --rm --network host -v geoffcloud-nix-store:/nix -v "$snapshot":/src:ro -w /src \
-  nixos/nix nix --extra-experimental-features "nix-command flakes" build --no-link \
+  "$NIX_IMAGE" nix --extra-experimental-features "nix-command flakes" build --no-link \
   --print-out-paths path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel)"
 
 if [[ ! "$built" =~ ^/nix/store/[a-z0-9]{32}-nixos-system-geoffcloud-[A-Za-z0-9._-]+$ ]]; then
@@ -85,7 +86,7 @@ fi
 echo "== copy to $host"
 docker run --rm --network host -v geoffcloud-nix-store:/nix \
   -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro -e NIX_SSHOPTS="-o BatchMode=yes" \
-  nixos/nix nix --extra-experimental-features "nix-command flakes" shell nixpkgs#openssh \
+  "$NIX_IMAGE" nix --extra-experimental-features "nix-command flakes" shell nixpkgs#openssh \
   -c nix --extra-experimental-features nix-command copy --to "ssh://$host" "$built"
 
 # as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a boot after a failed activation still picks the
