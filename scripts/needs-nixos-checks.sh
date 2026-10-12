@@ -6,7 +6,10 @@
 # checks read (scripts/test-lib/, restore-impd-db.sh and copy-impd-db-host.sh), the scripts that
 # run them and pin their image (test-nixos.sh and nix-image.sh), the scripts that decide when they
 # run (this script and find-nixos-check-run.sh), .bun-version and the workflow itself. A rename
-# counts both its old and new path.
+# counts both its old and new path. The root package.json is no input, although its test:nixos
+# script runs the checks: it changes with every dependency bump, and a bump would otherwise
+# re-run the VM rehearsals. An edit to test:nixos runs at the next change to an input, or on a
+# dispatch.
 #
 # A base of all zeros, as a push that creates a branch reports, has nothing to compare with, so
 # it prints "true", and so does a base that is not an ancestor of <head>, such as main before a

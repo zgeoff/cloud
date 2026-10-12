@@ -33,7 +33,8 @@ gh api -X GET "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs" \
 
 while read -r sha url; do
   git cat-file -e "$sha^{commit}" 2> /dev/null || continue
-  git merge-base --is-ancestor "$sha" "$commit" || continue
+  # a run on a commit off <commit>'s history never covers it: needs-nixos-checks.sh prints
+  # "true" for a base that is not an ancestor of the head
   needed="$(bash "$(dirname "${BASH_SOURCE[0]}")/needs-nixos-checks.sh" "$sha" "$commit")"
   if [ "$needed" = false ]; then
     echo "$url"
