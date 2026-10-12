@@ -15,7 +15,7 @@
   };
 
   outputs =
-    { nixpkgs, disko, imp, ... }:
+    { self, nixpkgs, disko, imp, ... }:
     {
       nixosConfigurations.geoffcloud = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
@@ -29,19 +29,16 @@
         ];
       };
 
-      # atc's daemon (docs/architecture/workloads/atc-gateway.md), and the release binary geoffcloud runs it from
-      nixosModules.atc-daemon = ./modules/atc-daemon.nix;
-      packages.x86_64-linux = rec {
-        atc = nixpkgs.legacyPackages.x86_64-linux.callPackage ./packages/atc.nix { };
-        atc-interactive = nixpkgs.legacyPackages.x86_64-linux.callPackage ./packages/atc-interactive.nix {
-          inherit atc;
-        };
-      };
-      # bun run test:nixos builds them all. Every check reads ../scripts (scripts/test-lib, and
+      # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config. Every other
+      # check reads ../scripts (scripts/test-lib, and
       # the impd-restore checks the script they rehearse), so they build only with the repo root
       # as the flake's source (path:.?dir=nixos); the impd-restore checks boot one VM each, from
       # checks/test-utils/build-restore-rehearsal.nix, and need KVM. impd-restore-reset tests that
       # rehearsal's own reset
+      checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.test-utils = import ./checks/test-utils-check.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;

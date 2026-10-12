@@ -5,9 +5,12 @@ let
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = "100.69.47.33";
   atcDaemonPort = 8415;
-  # k3s's default cluster CIDR (no --cluster-cidr override below); services.imp.forwardDeny
-  # names the same range
+  # k3s's default cluster and service CIDRs (no --cluster-cidr or --service-cidr override
+  # below); services.imp.forwardDeny names both
   k3sPodCIDR = "10.42.0.0/16";
+  k3sServiceCIDR = "10.43.0.0/16";
+  # impd's API on the host's loopback, for the atc daemon's imp target and the health probe
+  impdLoopbackURL = "http://127.0.0.1:7070";
   # 1Password Connect for imps (GEO-120). The imp broker in imp-host forwards granted requests
   # for op-connect.imp.internal to the relay below, on docker0's host address. imp-forward
   # drops imp-host's traffic to the k3s ranges, so the container cannot reach the Service
@@ -28,7 +31,10 @@ in
   system.stateVersion = "26.05";
 
   # impd local health as a node-exporter textfile metric (#29): loopback only, not HTTPS
-  services.impd-local-health.enable = true;
+  services.impd-local-health = {
+    enable = true;
+    url = "${impdLoopbackURL}/health";
+  };
   networking.hostName = "geoffcloud";
   # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
   # so NixOS imports tank without -f
@@ -218,8 +224,8 @@ in
     settings.IMP_DNS_PROVIDER = "cloudflare";
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
     forwardDeny = [
-      "10.42.0.0/16"
-      "10.43.0.0/16"
+      k3sPodCIDR
+      k3sServiceCIDR
     ];
   };
 
@@ -235,8 +241,7 @@ in
     impTokenFile = "/var/lib/atc-daemon-secrets/imp-token";
     targets.geoffcloud = {
       provider = "imp";
-      # impd on the host's loopback
-      url = "http://127.0.0.1:7070";
+      url = impdLoopbackURL;
       tokenFile = "/run/credentials/atc-daemon.service/imp-token";
       impPrefix = "harness-";
     };
