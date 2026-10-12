@@ -238,9 +238,8 @@ test('it revokes its session when a read breaks off after the headers', async ()
   server.use(
     http.post('https://nixie.test/rpc/conversation/read', () => {
       const body = new ReadableStream({
-        start: (controller) => {
-          controller.error(new Error('the ingress closed the connection'));
-        },
+        // a start that rejects errors the body, as a connection closed mid-body does
+        start: () => Promise.reject(new Error('the ingress closed the connection')),
       });
 
       return new HttpResponse(body, { headers: { 'content-type': 'application/json' } });
