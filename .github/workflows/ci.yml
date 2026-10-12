@@ -29,12 +29,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_VERSION: 8.30.1
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
@@ -87,6 +81,15 @@ jobs:
 
       - name: Dead Code
         run: bun run deadcode
+
+      # last, because the action leaves results.sarif in the checkout, which the format check
+      # would flag; it runs even after a failed check, so every run still scans for secrets
+      - name: Gitleaks
+        if: ${{ !cancelled() }}
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
 
       - name: Report the skipped provider checks
         if: steps.decide.outputs.provider == 'false'
