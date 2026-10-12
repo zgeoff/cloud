@@ -20,18 +20,23 @@ visible change to the test as well.
 A tagged node holds only what a grant gives it, while a member's device reaches every device on any
 port.
 
-| Identity          | Holder                                         | Reaches                                    |
-| ----------------- | ---------------------------------------------- | ------------------------------------------ |
-| a member's device | the owner's devices, the PC among them         | every device, on any port                  |
-| `tag:cloud`       | the host's node, and through it every pod      | the PC's atc daemon; impd's node for HTTPS |
-| `tag:imp`         | impd's node on the host, and imp's dev nodes   | other `tag:imp` nodes' API                 |
-| `tag:imp-e2e`     | the throwaway nodes of imp's end-to-end suites | other `tag:imp-e2e` nodes' API only        |
+| Identity          | Holder                                         | Reaches                                               |
+| ----------------- | ---------------------------------------------- | ----------------------------------------------------- |
+| a member's device | the owner's devices, the PC among them         | every device, on any port; the host's HTTPS for nixie |
+| `tag:cloud`       | the host's node, and through it every pod      | the PC's atc daemon; impd's node for HTTPS            |
+| `tag:imp`         | impd's node on the host, and imp's dev nodes   | other `tag:imp` nodes' API                            |
+| `tag:imp-e2e`     | the throwaway nodes of imp's end-to-end suites | other `tag:imp-e2e` nodes' API only                   |
 
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the cluster
 as a whole is `tag:cloud`, and every pod gains whatever the host is granted. The grants for
 `tag:cloud` are therefore single ports to single hosts: the PC's daemon port for the gateway, and
 impd's HTTPS port for the cluster's health probe. Each names its destination by a host alias for one
-node rather than by a tag, so a later node with the same tag gains nothing.
+node rather than by a tag, so a later node with the same tag gains nothing. nixie's calls to impd
+use the same HTTPS grant as the probe ([nixie](../workloads/nixie.md)).
+
+Members hold a second grant, to the host's HTTPS port for nixie, beside the grant that lets them
+reach every device. The policy lists nixie's route in its own grant, so the route stays open if the
+wider grant narrows.
 
 impd's nodes reach each other's API only, which is what lets impd move an imp between hosts and
 nothing more. The end-to-end nodes reach each other and never a `tag:imp` node, so a test run can
@@ -58,4 +63,5 @@ the journal to Loki, so a secret never travels in an SSH command line ([secrets]
 MagicDNS names every node, so the host is `geoffcloud` on the tailnet, and impd's node is
 `imp-geoffcloud`. impd's HTTPS names under `imps.geoff.cloud` are public DNS records that point at
 that node's tailnet address, so they resolve anywhere and answer only on the tailnet
-([imp on the host](../host/imp.md#dns-and-certificates)).
+([imp on the host](../host/imp.md#dns-and-certificates)). nixie's name, `nixie.geoff.cloud`, follows
+the same pattern at the host's own tailnet address.

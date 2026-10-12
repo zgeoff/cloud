@@ -8,6 +8,8 @@ import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
 import type { CloudflaredOutputs } from './create-cloudflared.ts';
 import { createCloudflared } from './create-cloudflared.ts';
+import type { NixieInputs } from './nixie.ts';
+import { createNixie } from './nixie.ts';
 import type { ObservabilityOutputs } from './observability.ts';
 import { createObservability } from './observability.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
@@ -23,6 +25,12 @@ interface ClusterInputs {
 
   // 1Password Connect for imps (GEO-120)
   readonly onePasswordConnect: OnePasswordConnectInputs;
+
+  // set only after the owner approves the deploy (GEO-343)
+  readonly nixie?: NixieInputs;
+
+  // geoff.cloud's zone, for nixie's DNS record
+  readonly zoneID: Output<string>;
 }
 
 // cloudflared's and observability's outputs, and the gateway's and Connect's
@@ -30,6 +38,7 @@ interface ClusterOutputs extends CloudflaredOutputs, ObservabilityOutputs {
   readonly atcGatewayServiceURL?: Output<string>;
   readonly atcGatewayRoute?: ATCGatewayRoute;
   readonly onePasswordConnectServiceURL: Output<string>;
+  readonly nixieURL?: Output<string>;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7, #8). Pulumi reaches the k3s API
@@ -55,10 +64,14 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
 
   const connect = createOnePasswordConnect(cluster, inputs.onePasswordConnect);
 
+  const nixie =
+    inputs.nixie === undefined ? undefined : createNixie(cluster, inputs.nixie, inputs.zoneID);
+
   return {
     ...ingress,
     ...observability,
     onePasswordConnectServiceURL: connect.serviceURL,
+    ...(nixie === undefined ? {} : { nixieURL: nixie.url }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
 }

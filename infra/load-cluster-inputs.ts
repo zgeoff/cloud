@@ -2,6 +2,8 @@ import { secret } from '@pulumi/pulumi';
 import type { Config, Output } from '@pulumi/pulumi';
 import type { ATCGatewayInputs } from './atc-gateway.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
+import { loadNixieInputs } from './load-nixie-inputs.ts';
+import type { NixieInputs } from './nixie.ts';
 import { requireKubeconfig } from './require-kubeconfig.ts';
 import { requireOnePasswordConnectCredentials } from './require-onepassword-connect-credentials.ts';
 
@@ -11,6 +13,7 @@ type ClusterStackConfig = Pick<Config, 'get' | 'getObject'>;
 interface ClusterConfigInputs {
   readonly kubeconfig: string;
   readonly atcGateway?: ATCGatewayInputs;
+  readonly nixie?: NixieInputs;
 
   // the 1Password Connect server's credentials file
   readonly onePasswordConnectCredentials: Output<string>;
@@ -35,5 +38,6 @@ export function loadClusterInputs(
       requireOnePasswordConnectCredentials(env['ONEPASSWORD_CONNECT_CREDENTIALS']),
     ),
     ...loadATCGatewayInputs(stackConfig, env),
+    ...loadNixieInputs(stackConfig, env),
   };
 }

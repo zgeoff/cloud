@@ -71,6 +71,7 @@ flowchart TB
       CF["cloudflared"]
       GW["atc gateway"]
       OP["1Password Connect"]
+      NX["nixie"]
       OB["observability"]
     end
     subgraph IH["imp-host container"]
@@ -83,11 +84,12 @@ flowchart TB
   CFE["Cloudflare"]
   CFE --- CF
   TS --- PC
+  NX -->|"tailnet HTTPS"| IMPD
 ```
 
 - **k3s** runs every workload that a Helm chart or a manifest describes: cloudflared, the gateway,
-  1Password Connect and the monitoring stack. It is chosen for that tooling, since a single node
-  needs no scheduler.
+  1Password Connect, nixie and the monitoring stack. It is chosen for that tooling, since a single
+  node needs no scheduler.
 - **imp** runs as imp ships it, in one container on the host's Docker, outside k3s, because impd
   schedules its own microVMs and needs KVM and a ZFS pool on the host
   ([imp on the host](./host/imp.md)).

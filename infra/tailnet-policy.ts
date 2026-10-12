@@ -1,3 +1,5 @@
+import { geoffcloudNode } from './geoffcloud-node.ts';
+
 // The whole tailnet policy file: Pulumi's tailscale.Acl replaces the live file with this,
 // so every relied-on rule must be here.
 // home-pc is the WSL node (home-wsl), where atc's daemon listens on its tailnet address.
@@ -21,6 +23,7 @@ export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
     'imp-geoffcloud': impNode.ip,
+    geoffcloud: geoffcloudNode.ip,
   },
 
   // Each tag also owns itself: Pulumi's OAuth client carries tag:cloud and tag:imp,
@@ -51,6 +54,11 @@ export const tailnetPolicy = {
     // imp's e2e nodes reach each other's API only, for the two-node moves suite; no
     // grant takes them to tag:imp. Last, so adding it shifts no other grant
     { src: ['tag:imp-e2e'], dst: ['tag:imp-e2e'], ip: ['tcp:7070'] },
+
+    // members → nixie's web client and API on the host's 443. The first grant already covers it;
+    // this one names the route, so it stays open if that grant narrows. Last, so adding it shifts
+    // no other grant
+    { src: ['autogroup:member'], dst: ['geoffcloud'], ip: [`tcp:${geoffcloudNode.httpsPort}`] },
   ],
   ssh: [
     {

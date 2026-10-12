@@ -8,6 +8,7 @@ test('it holds every host, tag owner, grant, SSH rule and node attribute the tai
     hosts: {
       'home-pc': '100.67.122.120',
       'imp-geoffcloud': '100.75.9.119',
+      geoffcloud: '100.69.47.33',
     },
     tagOwners: {
       'tag:cloud': ['autogroup:admin', 'tag:cloud'],
@@ -20,6 +21,7 @@ test('it holds every host, tag owner, grant, SSH rule and node attribute the tai
       { src: ['tag:cloud'], dst: ['home-pc'], ip: ['tcp:8415'] },
       { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: ['tcp:443'] },
       { src: ['tag:imp-e2e'], dst: ['tag:imp-e2e'], ip: ['tcp:7070'] },
+      { src: ['autogroup:member'], dst: ['geoffcloud'], ip: ['tcp:443'] },
     ],
     ssh: [
       {
