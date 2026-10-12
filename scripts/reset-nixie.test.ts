@@ -6,8 +6,8 @@ test('it refuses without a confirmation flag and never reaches the host', async 
     Promise.resolve({ exitCode: 97, stdout: '', stderr: `unexpected: ${command}` }),
   );
 
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await resetNixie({ args: [], runRemote, printOut, printErr });
 
@@ -26,13 +26,13 @@ test.each([
   ['both flags', ['--dry-run', '--confirm']],
   ['an unknown flag', ['--yes']],
   ['a misspelt confirmation flag', ['--confirmed']],
-])('it rejects %s and never reaches the host', async (_label, args) => {
+])('it rejects %s and never reaches the host', async (_label: string, args: readonly string[]) => {
   const runRemote = mock((command: string) =>
     Promise.resolve({ exitCode: 97, stdout: '', stderr: `unexpected: ${command}` }),
   );
 
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await resetNixie({ args, runRemote, printOut, printErr });
 
@@ -63,8 +63,8 @@ test('it lists the files and the steps on a dry run and runs only read-only comm
     return Promise.resolve(result);
   });
 
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await resetNixie({ args: ['--dry-run'], runRemote, printOut, printErr });
 
@@ -107,8 +107,8 @@ test('it stops nixie before it removes the data, then restarts it and asks for a
   const exitCode = await resetNixie({
     args: ['--confirm'],
     runRemote,
-    printOut: mock(),
-    printErr: mock(),
+    printOut: () => {},
+    printErr: () => {},
   });
 
   expect(exitCode).toBe(0);
@@ -139,8 +139,8 @@ test('it prints the plan and each step before it runs it, then the enrolment cod
     'k3s kubectl -n nixie exec nixie-0 -c nixie -- bun /app/main.js enrol-code': 'ABCD-EFGH\n',
   };
 
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   await resetNixie({
     args: ['--confirm'],
@@ -200,9 +200,14 @@ test('it never removes the data when the pod does not stop', async () => {
     return Promise.resolve(result);
   });
 
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
-  const exitCode = await resetNixie({ args: ['--confirm'], runRemote, printOut: mock(), printErr });
+  const exitCode = await resetNixie({
+    args: ['--confirm'],
+    runRemote,
+    printOut: () => {},
+    printErr,
+  });
 
   expect(exitCode).toBe(1);
 
@@ -228,8 +233,8 @@ test('it refuses a data volume path outside the storage directory and changes no
     Promise.resolve({ exitCode: 0, stdout: answers[command] ?? '', stderr: '' }),
   );
 
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await resetNixie({ args: ['--confirm'], runRemote, printOut, printErr });
 
@@ -260,8 +265,8 @@ test('it stops before any change when the data volume cannot be listed', async (
     return Promise.resolve(result);
   });
 
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await resetNixie({ args: ['--confirm'], runRemote, printOut, printErr });
 

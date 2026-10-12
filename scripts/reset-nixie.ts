@@ -173,7 +173,7 @@ interface Step {
   readonly command: string;
 
   // the step's stdout is the result the operator needs
-  readonly printsOutput: boolean;
+  readonly printsOutput?: boolean;
 }
 
 // The pod must be gone before the rm, because SQLite holds the WAL open while nixie runs
@@ -182,27 +182,22 @@ function planSteps(dataDir: string): Step[] {
     {
       title: 'scale statefulset/nixie to 0',
       command: `${kubectl} scale statefulset nixie --replicas=0`,
-      printsOutput: false,
     },
     {
       title: 'wait for pod nixie-0 to stop',
       command: `${kubectl} wait --for=delete pod/nixie-0 --timeout=180s`,
-      printsOutput: false,
     },
     {
       title: `remove ${dataFiles.join(', ')} from ${dataDir}`,
       command: `rm -f -- ${dataFiles.map((name) => `${dataDir}/${name}`).join(' ')}`,
-      printsOutput: false,
     },
     {
       title: 'scale statefulset/nixie to 1',
       command: `${kubectl} scale statefulset nixie --replicas=1`,
-      printsOutput: false,
     },
     {
       title: 'wait for nixie to be ready',
       command: `${kubectl} rollout status statefulset/nixie --timeout=600s`,
-      printsOutput: false,
     },
     {
       title: 'print a fresh enrolment code',
@@ -259,7 +254,7 @@ async function runSteps(
     );
   }
 
-  if (step.printsOutput) {
+  if (step.printsOutput === true) {
     options.printOut(result.stdout);
   }
 
@@ -292,7 +287,11 @@ if (import.meta.main) {
   process.exitCode = await resetNixie({
     args: process.argv.slice(2),
     runRemote: runSSH,
-    printOut: (text) => process.stdout.write(text),
-    printErr: (text) => process.stderr.write(text),
+    printOut: (text) => {
+      process.stdout.write(text);
+    },
+    printErr: (text) => {
+      process.stderr.write(text);
+    },
   });
 }
