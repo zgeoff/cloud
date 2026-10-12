@@ -21,6 +21,7 @@ test('it runs nixie as one replica on a retained volume, with git-sync beside it
     }),
   ).toStrictEqual({
     replicas: 1,
+    updateStrategy: { type: 'RollingUpdate' },
     serviceName,
     selector: { matchLabels: { app: 'nixie' } },
     template: {
@@ -139,4 +140,18 @@ test('it runs nixie as one replica on a retained volume, with git-sync beside it
       },
     ],
   });
+});
+
+test('it keeps nixie to one pod that a rollout stops before it starts the next, so the database never has two writers', () => {
+  const spec = buildNixieSpec({
+    image:
+      'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+    serviceName: output('nixie'),
+    configMap: output('nixie-config-0a1b2c3d'),
+    secret: output('nixie-secrets-4e5f6a7b'),
+    definitionsSecret: output('nixie-definitions-key-8c9d0e1f'),
+  });
+
+  expect(spec.replicas).toBe(1);
+  expect(spec.updateStrategy).toStrictEqual({ type: 'RollingUpdate' });
 });

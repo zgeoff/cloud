@@ -1,0 +1,75 @@
+import { expect, test } from 'bun:test';
+import { http, passthrough } from 'msw';
+import { server } from '../workers/mocks/node.ts';
+import { sendNixieRPC } from './send-nixie-rpc.ts';
+import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
+
+test('it returns the output from the json field of the answer', async () => {
+  startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: ['ABCD-2345'],
+    sequences: [],
+    keepaliveMs: null,
+    closeAfterMs: null,
+  });
+
+  const result = await sendNixieRPC({
+    url: 'https://nixie.test',
+    token: null,
+    procedure: 'sessions/enrol',
+    input: {
+      clientActionID: '0d7f5c1e-2b4a-4c8e-9f31-6a2d8b0e4c57',
+      code: 'ABCD-2345',
+      deviceName: 'deploy check',
+      tokenDelivery: 'bearer',
+    },
+  });
+
+  expect(result).toStrictEqual({
+    ok: true,
+    value: { sessionID: expect.toBeString(), token: expect.toBeString() },
+  });
+});
+
+test('it reports the status and the code of an error nixie defines', async () => {
+  startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: [],
+    sequences: [],
+    keepaliveMs: null,
+    closeAfterMs: null,
+  });
+
+  const result = await sendNixieRPC({
+    url: 'https://nixie.test',
+    token: null,
+    procedure: 'sessions/enrol',
+    input: {
+      clientActionID: '0d7f5c1e-2b4a-4c8e-9f31-6a2d8b0e4c57',
+      code: 'WXYZ-6789',
+      deviceName: 'deploy check',
+      tokenDelivery: 'bearer',
+    },
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error: 'sessions/enrol answered 400 ENROLMENT_CODE_INVALID',
+  });
+});
+
+test('it reports a call that reaches no server', async () => {
+  server.use(http.post('http://127.0.0.1:1/rpc/sessions/enrol', () => passthrough()));
+
+  const result = await sendNixieRPC({
+    url: 'http://127.0.0.1:1',
+    token: null,
+    procedure: 'sessions/enrol',
+    input: {},
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error: expect.toStartWith('sessions/enrol failed: '),
+  });
+});
