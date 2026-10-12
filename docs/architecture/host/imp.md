@@ -73,6 +73,8 @@ steps and what a restore loses.
 ## Backups
 
 impd backs each imp up to R2 with restic, under its own password, and a restore of imps runs through
-impd ([the restore runbook](../../runbooks/restore-geoff-cloud.md#1-restore-imps-from-restic)). The
-copies of impd's database stay on the host's root disk, so an Onidel snapshot of the root disk
-carries them too. The pool itself has no backup of its own beyond what impd backs up.
+impd ([the restore runbook](../../runbooks/restore-geoff-cloud.md#1-restore-imps-from-restic)). An
+imp created with the backup opt-out stays out of every backup for its life. nixie creates each of
+its sandboxes that way, so a forget in nixie leaves no copy in R2. The copies of impd's database
+stay on the host's root disk, so an Onidel snapshot of the root disk carries them too. The pool
+itself has no backup of its own beyond what impd backs up.

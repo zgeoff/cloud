@@ -25,7 +25,9 @@ nixie's design in its own repo sets the shape, and this repo keeps its own versi
 as one replica of a StatefulSet, because SQLite takes one writer, and a rollout stops the old pod
 before it starts the new one. The data volume is a claim of the retaining storage class that the atc
 gateway's volume uses, so deleting the claim keeps `nixie.db` and the key store beside it. The
-volume sits on the root disk, so each Onidel snapshot of the disk holds the database in plain form.
+volume sits on the root disk, so each Onidel snapshot of the disk holds the database in plain form,
+and [the runbook](../../runbooks/nixie.md#disk-snapshots) deletes each manual snapshot once its
+change is checked.
 
 The web client is a Deployment of its own, because it holds no state, no secret and no database. It
 calls nixie's API at its cluster address, and the browser calls `/rpc` on the web client's own

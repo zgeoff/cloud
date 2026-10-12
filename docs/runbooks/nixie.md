@@ -53,34 +53,40 @@ after a release that changes nixie's sandbox images, and after a model credentia
      | while read -r ref name; do host_imp image add "$ref" --name "$name" < /dev/null; done
    ```
 
-2. Add the model secret under the name nixie derives,
-   `model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`:
+2. Add a model secret for each profile in `config.yaml`, under the name nixie derives,
+   `model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`.
+   Every profile uses the same credential, so the names differ only by profile:
 
    ```bash
-   secret=model-opus-$(op read op://cloud/nixie-model-credential/credential \
+   hash=$(op read op://cloud/nixie-model-credential/credential \
      | { IFS= read -r c; printf 'bearer\napi.anthropic.com\n%s' "$c"; } | sha256sum | cut -c1-16)
-   op read op://cloud/nixie-model-credential/credential | host_imp secret add "$secret" \
-     --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
+   secrets=model-opus-$hash,model-haiku-$hash,model-sonnet-$hash
+   for secret in ${secrets//,/ }; do
+     op read op://cloud/nixie-model-credential/credential | host_imp secret add "$secret" \
+       --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
+   done
    ```
 
-   Expect `host_imp secret ls` to list the name with the host `api.anthropic.com`.
+   Expect `host_imp secret ls` to list each name with the host `api.anthropic.com`. A profile
+   without its secret leaves its role's sandbox unmade, and `imp_host` unready.
 
 ## Mint nixie's impd token
 
-The token manages only nixie's imps and grants only the model secret. Mint it straight into the
+The token manages only nixie's imps and grants only the model secrets. Mint it straight into the
 secrets file, so its value never prints:
 
 ```bash
-host_imp token new nixie --scope manage --imps 'nixie-*' --grantable "$secret" < /dev/null \
+host_imp token new nixie --scope manage --imps 'nixie-*' --grantable "$secrets" < /dev/null \
   | tr -d '\n' | jq -Rs . | sops_nixie set --value-stdin secrets.sops.yaml '["impd_token"]'
 ```
 
 impd shows the secret only once, so if the sops step fails, remove the token with
 `host_imp token rm nixie < /dev/null` and mint it again.
 
-After a model credential rotation, point the token at the new secret instead with
-`host_imp token set nixie --grantable "$secret"`, and remove the old secret once nixie runs on the
-new one.
+After a model credential rotation, or after a profile joins `config.yaml`, point the token at the
+new list with `host_imp token set nixie --grantable "$secrets" < /dev/null`. The flag takes the
+whole list, and a secret left out loses its grants on nixie's imps. Remove an old secret once nixie
+runs on the new one.
 
 ## Change a secret
 
@@ -203,7 +209,8 @@ deletes `nixie.db` and `keys.db` with their WAL and SHM files from the data volu
 again, and prints a fresh enrolment code.
 
 **CAUTION:** A reset cannot be undone. It deletes every record and key in nixie and signs out every
-device, and no copy is kept. Take an Onidel snapshot first if any of the data matters.
+device, and no copy is kept. Take an Onidel snapshot first if any of the data matters, and delete it
+once the reset is checked ([disk snapshots](#disk-snapshots)).
 
 1. List what the reset deletes. The dry run reads the volume and changes nothing:
 
@@ -226,6 +233,47 @@ device, and no copy is kept. Take an Onidel snapshot first if any of the data ma
 Without a flag the script refuses and reaches nothing. A step that fails stops the reset and leaves
 the later steps unrun, so nixie can stay at 0 replicas. Fix the cause and run the reset again: every
 step is safe to repeat.
+
+## Keep nixie's data out of copies
+
+A forget in nixie removes an item everywhere nixie holds it, but a copy taken outside nixie keeps
+it. Two kinds of copy exist on the host, and each has its rule.
+
+### Disk snapshots
+
+Each manual Onidel snapshot of the root disk holds `nixie.db` and `keys.db` in plain form. Delete
+each one once the host change it guarded is checked, through `DELETE /snapshots/<snapshot_id>` on
+the Onidel API.
+
+### imp backups
+
+nixie creates each sandbox with imp's backup opt-out, so no backup holds a nixie sandbox. A sandbox
+made before the opt-out stays backed up until nixie replaces it at its next start. Check the
+repository with a helper that runs restic in imp-host with impd's own settings:
+
+```bash
+host_restic() {
+  ssh root@geoffcloud "docker exec imp-host sh -c 'export RESTIC_REPOSITORY=\$IMP_BACKUP_REPOSITORY RESTIC_PASSWORD_FILE=\$IMP_BACKUP_PASSWORD_FILE; restic $*'" < /dev/null
+}
+host_restic snapshots --no-lock --json \
+  | jq -r '.[] | select(any(.tags[]; startswith("imp=nixie-"))) | .short_id'
+host_restic dump --no-lock latest /var/lib/imp/backup/tree/manifest.json \
+  | jq -c '[.imps[].name | select(startswith("nixie-"))]'
+```
+
+Expect no snapshot ID and `[]`. An `excluded=nixie-<id>` tag is expected, because impd tags each
+sandbox that a backup leaves out. If a snapshot holds a nixie sandbox, first check that
+`host_imp ls --json` shows `"backup": false` on every `nixie-*` imp, or the next backup brings the
+copy back.
+
+**CAUTION:** A forget cannot be undone. It also removes every other imp's copy in that snapshot, so
+forget only snapshots older than the newest one that holds no nixie sandbox. Run it away from the
+6-hourly backup, because impd unlocks the repository before each run.
+
+```bash
+host_restic forget <short_id> <short_id>
+host_restic prune
+```
 
 ## Renew the certificate
 
