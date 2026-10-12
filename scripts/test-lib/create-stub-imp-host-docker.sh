@@ -15,18 +15,18 @@
 #   imp-host is stopped (exit 1);
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
-# Checked on 2026-10-08 against imp's source at the revision the host runs, imp 0.40.0 at
-# 2679ab06fe075530ae1a5010f99cec00009dd4bb (nixos/flake.lock), and against docker:
+# Checked on 2026-10-12 against imp's source at the revision the host runs, imp 0.41.0 at
+# 62b41528487e67fee183a40b34affb5422a44ae0 (nixos/flake.lock), and against docker:
 #
-# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/api/src/secret-schema.ts :
+# - https://github.com/zgeoff/imp/blob/62b41528487e67fee183a40b34affb5422a44ae0/packages/api/src/secret-schema.ts :
 #   SecretSchema (name, kind, rules with host, header and scheme, imps, createdAt) and
 #   SecretAddedSchema, which adds droppedGrants, for what `secret add` prints;
-# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/api/src/token-schema.ts :
+# - https://github.com/zgeoff/imp/blob/62b41528487e67fee183a40b34affb5422a44ae0/packages/api/src/token-schema.ts :
 #   TokenSchema (name, scope, imps, sshKeys, grantable, createdAt);
-# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/cli/src/commands/tokens.ts
+# - https://github.com/zgeoff/imp/blob/62b41528487e67fee183a40b34affb5422a44ae0/packages/cli/src/commands/tokens.ts
 #   lines 167-168: "imp: token <name> made; impd shows its secret only this once" on
 #   stderr, then the secret alone on stdout;
-# - https://github.com/zgeoff/imp/blob/2679ab06fe075530ae1a5010f99cec00009dd4bb/packages/cli/src/run-action.ts
+# - https://github.com/zgeoff/imp/blob/62b41528487e67fee183a40b34affb5422a44ae0/packages/cli/src/run-action.ts
 #   line 38: a failed command exits 2 for a usage error and 1 otherwise;
 # - https://github.com/moby/moby/blob/v28.0.4/daemon/errors.go : "container %s is not
 #   running", which docker 29.7.2 printed for an exec in a stopped container here, after

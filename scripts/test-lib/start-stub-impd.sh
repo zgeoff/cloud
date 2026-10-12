@@ -11,10 +11,10 @@
 # appends "<method> <path>" to <dir>/unexpected and answers 500 with a body naming the
 # stand-in, which no caller reads as impd's answer.
 #
-# Checked on 2026-10-08 against imp's source at the revision the host runs, imp 0.40.0 at
-# 2679ab06fe075530ae1a5010f99cec00009dd4bb (nixos/flake.lock): IdentitySchema in
+# Checked on 2026-10-12 against imp's source at the revision the host runs, imp 0.41.0 at
+# 62b41528487e67fee183a40b34affb5422a44ae0 (nixos/flake.lock): IdentitySchema in
 # packages/api/src/token-schema.ts, the 401 body in packages/daemon/src/build-app.ts line
-# 287, and the {"json": …} envelope of its RPCHandler, @orpc/server 1.14.15. The source
+# 296, and the {"json": …} envelope of its RPCHandler, @orpc/server 1.14.15. The source
 # does not settle, so they stay as they were and need an impd sample: whether oRPC adds a
 # "meta" field beside "json", the order of the identity's fields, and impd's response
 # headers: this stand-in answers HTTP/1.0 with Date, content-type and content-length only.
