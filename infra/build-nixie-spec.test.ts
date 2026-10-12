@@ -4,7 +4,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildNixieSpec } from './build-nixie-spec.ts';
 
-test('it runs nixie as one replica on a retained volume, with git-sync beside it holding the deploy key and nixie alone holding the age identity', () => {
+test('it runs nixie as one replica that a rollout stops before it starts the next, on a retained volume, with git-sync beside it holding the deploy key and nixie alone holding the age identity', () => {
   const serviceName = output('nixie');
   const configMap = output('nixie-config-0a1b2c3d');
   const secret = output('nixie-secrets-4e5f6a7b');
@@ -140,18 +140,4 @@ test('it runs nixie as one replica on a retained volume, with git-sync beside it
       },
     ],
   });
-});
-
-test('it keeps nixie to one pod that a rollout stops before it starts the next, so the database never has two writers', () => {
-  const spec = buildNixieSpec({
-    image:
-      'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
-    serviceName: output('nixie'),
-    configMap: output('nixie-config-0a1b2c3d'),
-    secret: output('nixie-secrets-4e5f6a7b'),
-    definitionsSecret: output('nixie-definitions-key-8c9d0e1f'),
-  });
-
-  expect(spec.replicas).toBe(1);
-  expect(spec.updateStrategy).toStrictEqual({ type: 'RollingUpdate' });
 });

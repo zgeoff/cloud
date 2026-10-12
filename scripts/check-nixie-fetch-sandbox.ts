@@ -43,7 +43,7 @@ export async function checkNixieFetchSandbox(
   return plan === undefined ? 1 : runSandboxCheck(options, plan);
 }
 
-// Removes the sandbox whatever the probes found, once it exists
+// Removes the sandbox once it exists, whatever the probes found and even when a probe throws
 async function runSandboxCheck(
   options: Readonly<CheckFetchSandboxOptions>,
   plan: Plan,
@@ -54,7 +54,12 @@ async function runSandboxCheck(
     return 1;
   }
 
-  const passed = await checkSandbox(options, plan);
+  const passed = await checkSandbox(options, plan).catch((error: unknown) => {
+    options.printErr(`check-nixie-fetch-sandbox: the check stopped: ${String(error)}\n`);
+
+    return false;
+  });
+
   const removed = await removeSandbox(options);
 
   if (!passed || !removed) {

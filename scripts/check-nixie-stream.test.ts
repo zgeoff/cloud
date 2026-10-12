@@ -30,6 +30,7 @@ test('it holds the stream open, reads the same record count before and after, an
     url: 'https://nixie.test',
     holdMs: 400,
     maxGapMs: 200,
+    minKeepalives: 3,
     runRemote,
     printOut,
     printErr,
@@ -83,6 +84,7 @@ test('it fails when a record arrives during the hold, and still revokes its sess
     url: 'https://nixie.test',
     holdMs: 400,
     maxGapMs: 200,
+    minKeepalives: 3,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
     printOut: mock<(text: string) => void>(),
     printErr,
@@ -118,6 +120,7 @@ test('it fails when nixie closes the stream before the hold ends', async () => {
     url: 'https://nixie.test',
     holdMs: 400,
     maxGapMs: 200,
+    minKeepalives: 1,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
     printOut: mock<(text: string) => void>(),
     printErr,
@@ -145,6 +148,7 @@ test('it fails when the stream waits longer than the allowed wait for a keepaliv
     url: 'https://nixie.test',
     holdMs: 400,
     maxGapMs: 200,
+    minKeepalives: 3,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
     printOut: mock<(text: string) => void>(),
     printErr,
@@ -154,6 +158,7 @@ test('it fails when the stream waits longer than the allowed wait for a keepaliv
 
   expect(printErr.mock.calls).toStrictEqual([
     ['check-nixie-stream: the stream went more than 0.2 s without a keepalive\n'],
+    ['check-nixie-stream: the stream carried 1 keepalives, fewer than 3\n'],
   ]);
 });
 
@@ -172,6 +177,7 @@ test('it calls nixie nowhere when the pod gives no enrolment code', async () => 
     url: 'https://nixie.test',
     holdMs: 400,
     maxGapMs: 200,
+    minKeepalives: 3,
     runRemote: () =>
       Promise.resolve({ exitCode: 1, stdout: '', stderr: 'error: pod nixie-0 not found\n' }),
     printOut: mock<(text: string) => void>(),
@@ -201,6 +207,7 @@ test('it stops with no session when nixie refuses the enrolment code', async () 
     url: 'https://nixie.test',
     holdMs: 400,
     maxGapMs: 200,
+    minKeepalives: 3,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'WXYZ-6789\n', stderr: '' }),
     printOut: mock<(text: string) => void>(),
     printErr,

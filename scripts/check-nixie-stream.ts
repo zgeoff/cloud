@@ -17,9 +17,11 @@ export interface CheckNixieStreamOptions {
   // nixie's origin, such as https://nixie.geoff.cloud
   readonly url: string;
 
-  // how long the stream must stay open, and the longest wait for a keepalive the check accepts
+  // how long the stream must stay open, the longest wait for a keepalive the check accepts, and
+  // the fewest keepalives the hold must carry
   readonly holdMs: number;
   readonly maxGapMs: number;
+  readonly minKeepalives: number;
 
   // runs one command line as root on geoffcloud; the line lands in the host's journal, so it never
   // carries a secret
@@ -39,7 +41,13 @@ export async function checkNixieStream(
     return 1;
   }
 
-  const passed = await checkStream(options, session);
+  // a check that throws still revokes its session
+  const passed = await checkStream(options, session).catch((error: unknown) => {
+    options.printErr(`check-nixie-stream: the check stopped: ${String(error)}\n`);
+
+    return false;
+  });
+
   const revoked = await removeCheckSession(options, session);
 
   if (!passed || !revoked) {
@@ -195,6 +203,9 @@ function findFailures(outcome: Outcome): string[] {
     outcome.stream.longestGapMs <= outcome.options.maxGapMs
       ? null
       : `the stream went more than ${formatSeconds(outcome.options.maxGapMs)} without a keepalive`,
+    outcome.stream.keepalives >= outcome.options.minKeepalives
+      ? null
+      : `the stream carried ${outcome.stream.keepalives} keepalives, fewer than ${outcome.options.minKeepalives}`,
     outcome.stream.records === 0
       ? null
       : `the stream carried ${outcome.stream.records} new records`,
@@ -266,6 +277,7 @@ if (import.meta.main) {
     // row as dead
     holdMs: 30_000,
     maxGapMs: 15_000,
+    minKeepalives: 5,
     runRemote: runSSH,
     printOut: (text) => {
       process.stdout.write(text);

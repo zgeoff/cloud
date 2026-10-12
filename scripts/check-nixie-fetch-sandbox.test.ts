@@ -140,6 +140,47 @@ test('it fails when the sandbox cannot read the public page', async () => {
   ]);
 });
 
+test('it removes the sandbox when a command fails mid-check', async () => {
+  const host = buildStubGeoffcloud({
+    manifest:
+      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+    impdAddresses: ['100.88.1.2'],
+    nodeAddresses: ['104.250.100.18'],
+    podAddress: '10.42.0.17',
+    serviceAddress: '10.43.12.9',
+    hostReaches: [
+      '100.88.1.2:443',
+      '104.250.100.18:10250',
+      '10.42.0.17:8080',
+      '10.43.12.9:8080',
+      '100.100.100.100:53',
+    ],
+    sandboxReaches: [],
+    page: '200 true\n',
+    createExitCode: 0,
+  });
+
+  const printErr = mock<(text: string) => void>();
+
+  const exitCode = await checkNixieFetchSandbox({
+    args: [],
+    sandboxName: 'fetch-check-1a2b3c4d',
+    runRemote: (command: string) =>
+      command.includes('/usr/local/bin/bun')
+        ? Promise.reject(new Error('ssh: connection closed'))
+        : host.runRemote(command),
+    printOut: mock<(text: string) => void>(),
+    printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(host.sandboxes).toBeEmpty();
+
+  expect(printErr.mock.calls).toStrictEqual([
+    ['check-nixie-fetch-sandbox: the check stopped: Error: ssh: connection closed\n'],
+  ]);
+});
+
 test('it creates no sandbox when a target does not answer the host', async () => {
   const host = buildStubGeoffcloud({
     manifest:

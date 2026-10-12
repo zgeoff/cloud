@@ -32,24 +32,28 @@ export async function sendNixieRPC<T>(call: Readonly<NixieCall<T>>): Promise<RPC
     return { ok: false, error: response.message };
   }
 
-  const text = await response.text();
+  const text = await response.text().catch(() => null);
 
-  const body = parseJSON(text);
-
-  if (!response.ok) {
-    const code = findJSONField(findJSONField(body, 'json'), 'code');
-
-    return {
-      ok: false,
-      error: `${call.procedure} answered ${response.status} ${typeof code === 'string' ? code : text.trim()}`,
-    };
+  if (!response.ok || text === null) {
+    return { ok: false, error: formatFailure(call.procedure, response.status, text) };
   }
 
-  const value = call.parse(findJSONField(body, 'json'));
+  const value = call.parse(findJSONField(parseJSON(text), 'json'));
 
   return value === undefined
     ? { ok: false, error: `${call.procedure} answered an unexpected output: ${text.trim()}` }
     : { ok: true, value };
+}
+
+// an error's code when nixie defines it, or the body as it came
+function formatFailure(procedure: string, status: number, text: string | null): string {
+  if (text === null) {
+    return `${procedure} answered ${status} with a body that broke off`;
+  }
+
+  const code = findJSONField(findJSONField(parseJSON(text), 'json'), 'code');
+
+  return `${procedure} answered ${status} ${typeof code === 'string' ? code : text.trim()}`;
 }
 
 function parseJSON(text: string): unknown {
