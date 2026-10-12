@@ -11,8 +11,8 @@
 # appends "<method> <path>" to <dir>/unexpected and answers 500 with a body naming the
 # stand-in, which no caller reads as impd's answer.
 #
-# Checked on 2026-10-12 against imp's source at the revision the host runs, imp 0.41.0 at
-# 62b41528487e67fee183a40b34affb5422a44ae0 (nixos/flake.lock): IdentitySchema in
+# Checked on 2026-10-12 against imp's source at the revision the host runs, imp 0.42.0 at
+# 36182bb486748d5437132eb14a79a936f190cb07 (nixos/flake.lock): IdentitySchema in
 # packages/api/src/token-schema.ts, the 401 body in packages/daemon/src/build-app.ts line
 # 296, and the {"json": …} envelope of its RPCHandler, @orpc/server 1.14.15. The source
 # does not settle, so they stay as they were and need an impd sample: whether oRPC adds a
