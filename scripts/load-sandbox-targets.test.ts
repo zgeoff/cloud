@@ -20,7 +20,7 @@ test('it targets impd on 443, each node on the kubelet port, and nixie’s pod a
     return Promise.resolve(result);
   });
 
-  const result = await loadSandboxTargets(runRemote, { host: '100.100.100.100', port: 53 });
+  const result = await loadSandboxTargets(runRemote, { host: '100.69.47.33', port: 443 });
 
   expect(result).toStrictEqual({
     ok: true,
@@ -30,7 +30,7 @@ test('it targets impd on 443, each node on the kubelet port, and nixie’s pod a
       { role: 'node', host: '2401:a4a0:4:17f::1', port: 10_250 },
       { role: 'pod', host: '10.42.0.17', port: 8080 },
       { role: 'service', host: '10.43.12.9', port: 8080 },
-      { role: 'tailnet', host: '100.100.100.100', port: 53 },
+      { role: 'tailnet', host: '100.69.47.33', port: 443 },
     ],
   });
 });
@@ -48,7 +48,7 @@ test('it reports the stderr of a read that fails', async () => {
     return Promise.resolve(result);
   });
 
-  const result = await loadSandboxTargets(runRemote, { host: '100.100.100.100', port: 53 });
+  const result = await loadSandboxTargets(runRemote, { host: '100.69.47.33', port: 443 });
 
   expect(result).toStrictEqual({
     ok: false,
@@ -66,7 +66,7 @@ test('it refuses a role with no address, so no target goes unchecked', async () 
     }),
   );
 
-  const result = await loadSandboxTargets(runRemote, { host: '100.100.100.100', port: 53 });
+  const result = await loadSandboxTargets(runRemote, { host: '100.69.47.33', port: 443 });
 
   expect(result).toStrictEqual({ ok: false, error: 'found no address for: service' });
 });
@@ -80,7 +80,7 @@ test('it drops every word that is not an IP address before it reaches a command 
     }),
   );
 
-  const result = await loadSandboxTargets(runRemote, { host: '100.100.100.100', port: 53 });
+  const result = await loadSandboxTargets(runRemote, { host: '100.69.47.33', port: 443 });
 
   expect(result).toMatchObject({
     ok: true,

@@ -24,7 +24,7 @@ export interface CheckFetchSandboxOptions {
   readonly printErr: (text: string) => void;
 }
 
-const usage = 'usage: bun run nixie:check-sandbox [<tailnet address>:<port>]\n';
+const usage = 'usage: bun run nixie:check-sandbox <tailnet address>:<port>\n';
 
 // Runs the check and returns the exit code: 0 when it passes, 1 when it fails, 2 on bad arguments
 export async function checkNixieFetchSandbox(
@@ -32,13 +32,13 @@ export async function checkNixieFetchSandbox(
 ): Promise<number> {
   const tailnet = parseTailnetTarget(options.args);
 
-  if (tailnet === undefined) {
-    options.printErr(usage);
+  if (!tailnet.ok) {
+    options.printErr(`check-nixie-fetch-sandbox: ${tailnet.error}\n${usage}`);
 
     return 2;
   }
 
-  const plan = await loadPlan(options, tailnet);
+  const plan = await loadPlan(options, tailnet.target);
 
   return plan === undefined ? 1 : runSandboxCheck(options, plan);
 }
