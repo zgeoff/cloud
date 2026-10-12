@@ -146,6 +146,37 @@ ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- bun /app/main.
 
 Open `https://nixie.geoff.cloud` on the device and enter the code before it expires.
 
+## Reset nixie's data
+
+The reset wipes nixie's state so that a test starts again from an empty database. It stops nixie,
+deletes `nixie.db` and `keys.db` with their WAL and SHM files from the data volume, starts nixie
+again, and prints a fresh enrolment code.
+
+**CAUTION:** A reset cannot be undone. It deletes every record and key in nixie and signs out every
+device, and no copy is kept. Take an Onidel snapshot first if any of the data matters.
+
+1. List what the reset deletes. The dry run reads the volume and changes nothing:
+
+   ```bash
+   bun run nixie:reset --dry-run
+   ```
+
+2. Run the reset:
+
+   ```bash
+   bun run nixie:reset --confirm
+   ```
+
+   Expect the steps to run in order and the last line to be
+   `reset done: enter the code above at https://nixie.geoff.cloud`, after the enrolment code.
+
+3. Enrol each device again: open `https://nixie.geoff.cloud` and enter the code before it expires.
+   Every other device needs a code of its own, as [Enrol a device](#enrol-a-device) describes.
+
+Without a flag the script refuses and reaches nothing. A step that fails stops the reset and leaves
+the later steps unrun, so nixie can stay at 0 replicas. Fix the cause and run the reset again: every
+step is safe to repeat.
+
 ## Renew the certificate
 
 The certificate lives 90 days, and an apply in its last 30 days renews it. Nothing renews it between
@@ -163,3 +194,4 @@ an apply would renew it.
 | the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
 | the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
 | TLS error on the name                             | the certificate expired                  | `bun run up`                                    |
+| no `nixie-0` pod after a reset                    | the reset stopped after it scaled to 0   | `bun run nixie:reset --confirm` again           |
