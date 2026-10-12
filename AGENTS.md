@@ -73,7 +73,7 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
 ## Rules
 
 - Every change lands through a squash PR. The `main protection` ruleset blocks a direct push to
-  `main` and needs the `checks`, `gitleaks` and `nixos` checks green.
+  `main` and needs the `ci` and `nixos` checks green.
 - This repo is public. Never commit a secret. Secrets live in the 1Password `cloud` vault; `.env`
   holds only `op://` references, resolved with `op run --env-file=.env -- <command>`.
 - A new service in the cloud stays host-local or on the tailnet by default. A public route (a tunnel

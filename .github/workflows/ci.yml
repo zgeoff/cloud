@@ -1,5 +1,9 @@
 name: CI
 
+# One job for the secret scan, the Bun checks and the provider's Go checks, so a run bills one
+# runner minute where three jobs billed three. The job runs on every pull request and every push
+# to main; scripts/needs-provider-check.sh decides whether the change touches an input of the Go
+# checks, and the job runs them only then. A failed decision or a failed check fails the job.
 on:
   push:
     branches: [main]
@@ -9,14 +13,17 @@ permissions:
   contents: read
 
 jobs:
-  gitleaks:
+  ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    # the action comments findings on the PR, which needs write on pull-requests
+    timeout-minutes: 15
+    # the gitleaks action comments findings on the PR, which needs write on pull-requests
     permissions:
       contents: read
       pull-requests: write
+    env:
+      LEFTHOOK: 0
     steps:
+      # the full history, for gitleaks' commit range and the provider decision's merge base
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -28,19 +35,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_VERSION: 8.30.1
 
-  checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    env:
-      LEFTHOOK: 0
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
+
+      # a pull request compares its base with the merge commit under test; a push compares the
+      # commit before it (all zeros for a new branch, which needs the checks)
+      - name: Decide whether the change needs the provider checks
+        id: decide
+        env:
+          BASE:
+            ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
+            github.event.before }}
+        run: |
+          needed="$(bun run --silent ci:needs-provider-check "$BASE" "$GITHUB_SHA")"
+          case "$needed" in
+            true | false) echo "provider=$needed" >> "$GITHUB_OUTPUT" ;;
+            *) echo "unexpected decision: $needed" >&2; exit 1 ;;
+          esac
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -75,25 +88,20 @@ jobs:
       - name: Dead Code
         run: bun run deadcode
 
-  provider:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - name: Report the skipped provider checks
+        if: steps.decide.outputs.provider == 'false'
+        run:
+          echo "No input of the provider checks changed, so the Go checks did not run." | tee -a
+          "$GITHUB_STEP_SUMMARY"
 
+      # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
       - name: Setup Go
-        if: hashFiles('provider/go.mod') != ''
+        if: steps.decide.outputs.provider == 'true' && hashFiles('provider/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
 
-      # provider:check is plain shell and Go, so the job needs Bun but no install.
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-        with:
-          bun-version-file: .bun-version
-
-      - name: Check
-        if: hashFiles('provider/go.mod') != ''
+      - name: Provider checks
+        if: steps.decide.outputs.provider == 'true'
         run: bun run provider:check
