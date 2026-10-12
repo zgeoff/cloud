@@ -17,13 +17,13 @@ is decided in the shared skill, not here.
 
 ## Suites and where they run
 
-| Suite                                              | Command                            | Runs in CI                       |
-| -------------------------------------------------- | ---------------------------------- | -------------------------------- |
-| TypeScript unit tests in `infra/` and `workers/`   | `bun run test`                     | `CI` → `checks`                  |
-| Go tests in `provider/`                            | `bun run provider:check`           | `CI` → `provider`                |
-| Shell suites and `scripts/test-lib/` tests         | `bun run test:scripts`             | `CI` → `checks`                  |
-| Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture` | `atc-gateway images` → `fixture` |
-| NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`         |
+| Suite                                              | Command                            | Runs in CI                          |
+| -------------------------------------------------- | ---------------------------------- | ----------------------------------- |
+| TypeScript unit tests in `infra/` and `workers/`   | `bun run test`                     | `CI` → `ci`                         |
+| Go tests in `provider/`                            | `bun run provider:check`           | `CI` → `ci`, if `provider/` changed |
+| Shell suites and `scripts/test-lib/` tests         | `bun run test:scripts`             | `CI` → `ci`                         |
+| Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture` | `atc-gateway images` → `fixture`    |
+| NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`            |
 
 - A new suite gets a root `package.json` script, and CI calls that script, never the file directly.
 - The `nixos` job reports on every pull request and push to main, and the ruleset requires it.
