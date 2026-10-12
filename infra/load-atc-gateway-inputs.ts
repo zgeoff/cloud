@@ -1,7 +1,7 @@
 import { secret } from '@pulumi/pulumi';
 import type { Config } from '@pulumi/pulumi';
 import type { ATCGatewayBackupSecrets, ATCGatewayConfig, ATCGatewayInputs } from './atc-gateway.ts';
-import { findATCGatewayBackup } from './find-atc-gateway-backup.ts';
+import { findResticBackup } from './find-restic-backup.ts';
 import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
 
 // the stack config methods this reads: Pulumi's Config, or a stand-in in a test
@@ -48,9 +48,13 @@ export function loadATCGatewayInputs(
   };
 }
 
-// all set, or no backup; findATCGatewayBackup throws on a partial set
+// all set, or no backup; findResticBackup throws on a partial set
 function findBackupSecrets(env: Environment): ATCGatewayBackupSecrets | undefined {
-  const backup = findATCGatewayBackup(env);
+  const backup = findResticBackup(env, {
+    prefix: 'ATC_GATEWAY',
+    label: "the atc gateway's backup",
+    path: 'atc-gateway',
+  });
 
   if (backup === undefined) {
     return undefined;

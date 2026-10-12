@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
+import type { CronJob } from '@pulumi/kubernetes/batch/v1';
 import { ConfigMap, Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
@@ -16,6 +17,7 @@ import {
   nixieSecretsFileKey,
 } from './build-nixie-spec.ts';
 import { buildNixieWebSpec, nixieWebLabels, nixieWebPort } from './build-nixie-web-spec.ts';
+import { createNixieBackupJob } from './create-nixie-backup-job.ts';
 import type { NixieIngressOutputs } from './create-nixie-ingress.ts';
 import { createNixieIngress } from './create-nixie-ingress.ts';
 
@@ -31,6 +33,20 @@ export interface NixieConfig {
 
   // the one public DNS name, which points at the host's tailnet address
   readonly hostname: string;
+
+  // the image the backup CronJob runs its script in, by tag and digest; needed only with the backup
+  readonly backupImage?: string;
+}
+
+// a nightly restic backup of nixie.db and keys.db to nixie's own R2 bucket
+export interface NixieBackupInputs {
+  readonly image: string;
+  readonly secrets: {
+    readonly repository: Output<string>;
+    readonly password: Output<string>;
+    readonly accessKeyID: Output<string>;
+    readonly secretAccessKey: Output<string>;
+  };
 }
 
 export interface NixieInputs {
@@ -45,11 +61,15 @@ export interface NixieInputs {
     // Pulumi's own Cloudflare token, for the certificate's DNS-01 challenge
     readonly dnsToken: Output<string>;
   };
+
+  // without it there is no backup CronJob
+  readonly backup?: NixieBackupInputs;
 }
 
 export interface NixieOutputs extends NixieIngressOutputs {
   readonly statefulSet: StatefulSet;
   readonly web: Deployment;
+  readonly backupJob?: CronJob;
 }
 
 export function createNixie(
@@ -94,7 +114,12 @@ export function createNixie(
     web: { service: webService.metadata.name, port: nixieWebPort },
   });
 
-  return { statefulSet, web, ...ingress };
+  const backupJob =
+    inputs.backup === undefined
+      ? undefined
+      : createNixieBackupJob(cluster, { namespace, statefulSet, backup: inputs.backup });
+
+  return { statefulSet, web, ...ingress, ...(backupJob === undefined ? {} : { backupJob }) };
 }
 
 // Pulumi waits for readiness, and nixie turns ready only once impd has pulled its sandbox images

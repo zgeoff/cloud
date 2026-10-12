@@ -1,0 +1,67 @@
+# The restore test's nixie (docs/runbooks/nixie.md): the pinned nixie image serving the scratch
+# claim, with nixie's own Secret and the ConfigMap nixie-restore-check, which is deploy/nixie's
+# config.yaml with imp.url pointed at a dead port. nixie opens both databases, runs its
+# migrations and integrity check, and listens, but never reaches impd: with impd's real address,
+# its recovery would remove the live nixie's sandboxes. The runbook fills in NIXIE_IMAGE and
+# NIXIE_SECRETS before it creates the pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nixie-restore-check
+  namespace: nixie
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    fsGroup: 10001
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: nixie
+      image: NIXIE_IMAGE
+      env:
+        - name: SOPS_AGE_KEY_FILE
+          value: /etc/nixie/age/age-key.txt
+      volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: config
+          mountPath: /etc/nixie/config.yaml
+          subPath: config.yaml
+          readOnly: true
+        - name: secrets
+          mountPath: /etc/nixie/secrets.yaml
+          subPath: secrets.yaml
+          readOnly: true
+        - name: secrets
+          mountPath: /etc/nixie/age/age-key.txt
+          subPath: age-key.txt
+          readOnly: true
+        - name: definitions
+          mountPath: /etc/nixie/definitions
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ['ALL']
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: nixie-restore-check
+    - name: config
+      configMap:
+        name: nixie-restore-check
+    - name: secrets
+      secret:
+        secretName: NIXIE_SECRETS
+        defaultMode: 0440
+    - name: definitions
+      emptyDir: {}
+    - name: tmp
+      emptyDir: {}

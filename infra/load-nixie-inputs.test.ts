@@ -162,3 +162,163 @@ test.each([
     ),
   ).toThrowWithMessage(Error, 'stack config "nixie.hostname" must name a host under geoff.cloud');
 });
+
+test('it returns the backup with its pinned image when every NIXIE backup variable is set', () => {
+  const stackConfig = buildStubConfig({
+    nixie: JSON.stringify({
+      image:
+        'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+      webImage:
+        'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+      hostname: 'nixie.geoff.cloud',
+      backupImage:
+        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    }),
+  });
+
+  expect(
+    loadNixieInputs(stackConfig, {
+      NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+      NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+      CLOUDFLARE_API_TOKEN: 'cf-token',
+      NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+      NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      NIXIE_R2_BUCKET: 'nixie-backups',
+    }).nixie?.backup,
+  ).toStrictEqual({
+    image:
+      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    secrets: {
+      repository: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      password: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      accessKeyID: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+      secretAccessKey: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+    },
+  });
+});
+
+test.each([
+  ['repository', 's3:https://0123456789abcdef.r2.cloudflarestorage.com/nixie-backups/nixie'],
+  ['password', 'p'.repeat(32)],
+  ['accessKeyID', 'a'.repeat(32)],
+  ['secretAccessKey', 's'.repeat(64)],
+] as const)('it marks the backup %s secret and carries its value', async (name, expected) => {
+  const inputs = loadNixieInputs(
+    buildStubConfig({
+      nixie: JSON.stringify({
+        image:
+          'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+        webImage:
+          'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+        hostname: 'nixie.geoff.cloud',
+        backupImage:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      }),
+    }),
+    {
+      NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+      NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+      CLOUDFLARE_API_TOKEN: 'cf-token',
+      NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+      NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      NIXIE_R2_BUCKET: 'nixie-backups',
+    },
+  );
+
+  if (inputs.nixie?.backup === undefined) {
+    throw new Error('expected the nixie backup inputs');
+  }
+
+  const isMarkedSecret = await isSecret(inputs.nixie.backup.secrets[name]);
+  const value = await resolveOutput(inputs.nixie.backup.secrets[name]);
+
+  expect(isMarkedSecret).toBeTrue();
+  expect(value).toBe(expected);
+});
+
+test('it returns no backup when no NIXIE backup variable is set, even with backupImage set', () => {
+  const inputs = loadNixieInputs(
+    buildStubConfig({
+      nixie: JSON.stringify({
+        image:
+          'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+        webImage:
+          'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+        hostname: 'nixie.geoff.cloud',
+        backupImage:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      }),
+    }),
+    {
+      NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+      NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+      CLOUDFLARE_API_TOKEN: 'cf-token',
+    },
+  );
+
+  expect(inputs.nixie).not.toContainKey('backup');
+});
+
+test.each([
+  ['unset', undefined],
+  ['a tag alone', 'ghcr.io/zgeoff/atc-gateway-backup:1.0.0'],
+] as const)('it throws when the backup is set and backupImage is %s', (_label, backupImage) => {
+  expect(() =>
+    loadNixieInputs(
+      buildStubConfig({
+        nixie: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+          webImage:
+            'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          hostname: 'nixie.geoff.cloud',
+          backupImage,
+        }),
+      }),
+      {
+        NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+        NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+        NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+        NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+        NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+        NIXIE_R2_BUCKET: 'nixie-backups',
+      },
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "nixie.backupImage" must name an image by tag and digest',
+  );
+});
+
+test('it throws, naming the gap, when the nixie backup variables are partial', () => {
+  expect(() =>
+    loadNixieInputs(
+      buildStubConfig({
+        nixie: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+          webImage:
+            'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          hostname: 'nixie.geoff.cloud',
+          backupImage:
+            'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        }),
+      }),
+      {
+        NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+        NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+        NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+      },
+    ),
+  ).toThrowWithMessage(
+    Error,
+    "nixie's backup needs every one of NIXIE_RESTIC_PASSWORD, NIXIE_R2_ACCESS_KEY_ID, NIXIE_R2_SECRET_ACCESS_KEY, NIXIE_R2_ENDPOINT, NIXIE_R2_BUCKET; unset: NIXIE_R2_ACCESS_KEY_ID, NIXIE_R2_SECRET_ACCESS_KEY, NIXIE_R2_ENDPOINT, NIXIE_R2_BUCKET",
+  );
+});

@@ -1,0 +1,43 @@
+name: nixie backup
+
+# Runs the fixture test of nixie's backup script, in the backup image the stack config pins, on
+# every change to the script, its test, the helpers it uses, or the pin.
+on:
+  push:
+    branches: [main]
+    paths:
+      - deploy/nixie/backup/**
+      - scripts/test-lib/run-cases.sh
+      - scripts/test-lib/run-backup.sh
+      - scripts/test-lib/run-backup-shell.sh
+      - scripts/test-lib/normalize-restic-output.sh
+      - infra/Pulumi.prod.yaml
+      - .github/workflows/nixie-backup.yml
+  pull_request:
+    paths:
+      - deploy/nixie/backup/**
+      - scripts/test-lib/run-cases.sh
+      - scripts/test-lib/run-backup.sh
+      - scripts/test-lib/run-backup-shell.sh
+      - scripts/test-lib/normalize-restic-output.sh
+      - infra/Pulumi.prod.yaml
+      - .github/workflows/nixie-backup.yml
+
+permissions:
+  contents: read
+
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Fixture test
+        run: bun run test:nixie-backup-fixture

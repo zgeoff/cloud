@@ -1,0 +1,63 @@
+# One-off restore (or snapshot list) of nixie.db and keys.db, from the nixie-backup CronJob's
+# repository. Stop nixie first (docs/runbooks/nixie.md), set the command and SNAPSHOT, and set
+# claimName to the claim to restore into, then:
+#   ssh root@geoffcloud k3s kubectl create -f - < deploy/nixie/restore-job.yaml
+# The image is the stack config's nixie.backupImage; the script and the Secret come from the
+# CronJob's fixed-name ConfigMap and Secret.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: nixie-restore-
+  namespace: nixie
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: restore
+          image: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377
+          command: ['/bin/sh', '/opt/nixie-backup/backup.sh']
+          # restore, or ls to list snapshots
+          args: ['restore']
+          env:
+            - name: STATE_DIR
+              value: /state
+            - name: HOME
+              value: /tmp
+            - name: SNAPSHOT
+              value: latest
+          envFrom:
+            - secretRef:
+                name: nixie-backup
+          volumeMounts:
+            - name: state
+              mountPath: /state
+            - name: script
+              mountPath: /opt/nixie-backup
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ['ALL']
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            # data-nixie-0 is nixie's own claim; nixie-restore-check is the restore test's scratch claim
+            claimName: data-nixie-0
+        - name: script
+          configMap:
+            name: nixie-backup-script
+        - name: tmp
+          emptyDir: {}
