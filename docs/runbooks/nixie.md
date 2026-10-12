@@ -309,9 +309,8 @@ device enrolled after the snapshot is lost. Back up first if the current data st
 
    Expect `pod/nixie-0 condition met`. nixie writes until its pod stops.
 
-2. Restore with `deploy/nixie/restore-job.yaml`. To list the snapshots first, set `args: ["ls"]`; to
-   pick one, set `SNAPSHOT`. The script restores into a scratch directory, checks both databases,
-   and only then replaces them with their `-wal` and `-shm` files:
+2. Restore with `deploy/nixie/restore-job.yaml`, which checks both databases before it replaces
+   either. Set `args: ["ls"]` to list the snapshots first, and `SNAPSHOT` to pick one:
 
    ```bash
    ssh root@geoffcloud k3s kubectl create -f - < deploy/nixie/restore-job.yaml
