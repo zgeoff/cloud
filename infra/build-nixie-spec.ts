@@ -43,7 +43,7 @@ export interface NixieSpecInputs {
 // git-sync mounts the deploy key, and only nixie mounts the age identity.
 export function buildNixieSpec(inputs: NixieSpecInputs): input.apps.v1.StatefulSetSpec {
   return {
-    replicas: 2,
+    replicas: 1,
 
     // a StatefulSet's rolling update stops nixie-0 before it starts the new one, so two pods never
     // hold the database at once
