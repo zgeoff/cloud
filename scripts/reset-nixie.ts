@@ -95,7 +95,10 @@ async function loadPlan(options: Readonly<ResetNixieOptions>): Promise<Plan | un
     return undefined;
   }
 
-  const present = listing.stdout.split('\n').filter((line) => line !== '');
+  const present = listing.stdout
+    .split('\n')
+    .filter((line) => line !== '')
+    .toSorted();
 
   return { dataDir, present, steps: planSteps(dataDir) };
 }
@@ -162,7 +165,7 @@ const dataFiles = [
 function buildListCommand(dataDir: string): string {
   const names = dataFiles.map((name) => `-name ${name}`).join(' -o ');
 
-  return `find ${dataDir} -maxdepth 1 -type f \\( ${names} \\) -printf '%f %s bytes\\n' | sort`;
+  return `find ${dataDir} -maxdepth 1 -type f \\( ${names} \\) -printf '%f %s bytes\\n'`;
 }
 
 interface Step {

@@ -50,8 +50,8 @@ test('it lists the files and the steps on a dry run and runs only read-only comm
   const answers: Record<string, string> = {
     'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
     'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': `${dir}\n`,
-    [`find ${dir} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n' | sort`]:
-      'keys.db 12288 bytes\nnixie.db 258048 bytes\n',
+    [`find ${dir} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n'`]:
+      'nixie.db 258048 bytes\nkeys.db 12288 bytes\n',
   };
 
   const runRemote = mock((command: string) => {
@@ -117,7 +117,7 @@ test('it stops nixie before it removes the data, then restarts it and asks for a
     ['k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}'],
     ['k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}'],
     [
-      `find ${dir} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n' | sort`,
+      `find ${dir} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n'`,
     ],
     ['k3s kubectl -n nixie scale statefulset nixie --replicas=0'],
     ['k3s kubectl -n nixie wait --for=delete pod/nixie-0 --timeout=180s'],
@@ -241,5 +241,35 @@ test('it refuses a data volume path outside the storage directory and changes no
     [
       `reset-nixie: refusing the data volume path "/var/lib/rancher": not nixie's local-path directory\n`,
     ],
+  ]);
+});
+
+test('it stops before any change when the data volume cannot be listed', async () => {
+  const dir = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
+
+  const answers: Record<string, string> = {
+    'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
+    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': dir,
+  };
+
+  const runRemote = mock((command: string) => {
+    const result = command.startsWith('find ')
+      ? { exitCode: 1, stdout: '', stderr: `find: '${dir}': No such file or directory\n` }
+      : { exitCode: 0, stdout: answers[command] ?? '', stderr: '' };
+
+    return Promise.resolve(result);
+  });
+
+  const printOut = mock();
+  const printErr = mock();
+
+  const exitCode = await resetNixie({ args: ['--confirm'], runRemote, printOut, printErr });
+
+  expect(exitCode).toBe(1);
+  expect(runRemote).toHaveBeenCalledTimes(3);
+  expect(printOut).not.toHaveBeenCalled();
+
+  expect(printErr.mock.calls).toStrictEqual([
+    [`reset-nixie: cannot list the data volume: find: '${dir}': No such file or directory\n`],
   ]);
 });
