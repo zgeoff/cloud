@@ -22,6 +22,6 @@ test.each([
   ['an address with no port', ['100.64.0.5']],
   ['a port out of range', ['100.64.0.5:70000']],
   ['two targets', ['100.64.0.5:443', '100.64.0.6:443']],
-])('it rejects %s', (_label: string, args: string[]) => {
+])('it rejects %s', (_label: string, args: readonly string[]) => {
   expect(parseTailnetTarget(args)).toBeUndefined();
 });

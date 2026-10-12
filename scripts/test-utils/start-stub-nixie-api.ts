@@ -1,6 +1,9 @@
+// the stand-in's state is mutable by design, and a Request has no readonly form
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { onTestFinished } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { server } from '../../workers/mocks/node.ts';
+import { findJSONField } from '../find-json-field.ts';
 import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
 import type { StubStream } from './start-stub-nixie-stream.ts';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';
@@ -78,7 +81,8 @@ interface StubState {
   readonly opened: PromiseWithResolvers<void>;
 }
 
-type Input = Readonly<Record<string, unknown>>;
+// a field of the call's input
+type Input = (key: string) => unknown;
 
 function buildHandlers(state: StubState) {
   return [
@@ -103,13 +107,13 @@ function makeRoute(
       return new HttpResponse('the client header is missing', { status: 403 });
     }
 
-    const body = (await info.request.json()) as { readonly json: Input };
+    const body: unknown = await info.request.json();
 
     if (procedure !== 'sessions/enrol' && findSession(state, info.request) === undefined) {
       return buildError(401, 'UNAUTHORIZED', 'The device session is missing, lapsed or revoked');
     }
 
-    return answer(info.request, body.json);
+    return answer(info.request, (key) => findJSONField(findJSONField(body, 'json'), key));
   });
 }
 
@@ -124,7 +128,7 @@ function buildError(status: number, code: string, message: string): Response {
 }
 
 function createSession(state: StubState, input: Input): Response {
-  if (input['tokenDelivery'] !== 'bearer' || !state.codes.delete(String(input['code']))) {
+  if (input('tokenDelivery') !== 'bearer' || !state.codes.delete(String(input('code')))) {
     return buildError(
       400,
       'ENROLMENT_CODE_INVALID',
@@ -138,7 +142,7 @@ function createSession(state: StubState, input: Input): Response {
 }
 
 function updateRevoked(state: StubState, input: Input): Response {
-  const session = state.sessions.find((row) => row.sessionID === input['sessionID']);
+  const session = state.sessions.find((row) => row.sessionID === input('sessionID'));
 
   if (session === undefined) {
     return buildError(404, 'SESSION_NOT_FOUND', 'No session has this ID');
@@ -154,8 +158,10 @@ function updateRevoked(state: StubState, input: Input): Response {
 
 // a page holds the newest records before beforeSequence, oldest first
 function buildReadResponse(state: StubState, input: Input): Response {
-  const before = typeof input['beforeSequence'] === 'number' ? input['beforeSequence'] : Infinity;
-  const limit = typeof input['limit'] === 'number' ? input['limit'] : 50;
+  const beforeSequence = input('beforeSequence');
+  const pageLimit = input('limit');
+  const before = typeof beforeSequence === 'number' ? beforeSequence : Infinity;
+  const limit = typeof pageLimit === 'number' ? pageLimit : 50;
   const earlier = state.sequences.filter((sequence) => sequence < before);
   const page = earlier.slice(-limit);
 
@@ -185,7 +191,7 @@ function startFollow(state: StubState, call: FollowCall): Response {
   state.streams.push(stream);
 
   for (const sequence of state.sequences.filter(
-    (row) => row > Number(call.input['afterSequence']),
+    (row) => row > Number(call.input('afterSequence')),
   )) {
     stream.sendRecord(sequence);
   }

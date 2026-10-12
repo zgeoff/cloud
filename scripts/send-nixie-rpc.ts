@@ -1,6 +1,7 @@
 import { buildNixieHeaders } from './build-nixie-headers.ts';
+import { findJSONField } from './find-json-field.ts';
 
-export interface NixieCall {
+export interface NixieCall<T> {
   // nixie's origin; the ingress serves the API under /rpc
   readonly url: string;
   readonly token: string | null;
@@ -8,6 +9,9 @@ export interface NixieCall {
   // the procedure's path, such as sessions/enrol
   readonly procedure: string;
   readonly input: unknown;
+
+  // reads the output the check needs, or undefined when the output lacks it
+  readonly parse: (output: unknown) => T | undefined;
 }
 
 export type RPCResult<T> =
@@ -17,31 +21,42 @@ export type RPCResult<T> =
 // Sends one call in oRPC's RPC protocol: the input goes as {json} in a POST to /rpc/<procedure>,
 // and the output comes back as {json, meta}. A failed call answers an error status, with the
 // error's code in the body when nixie defines it.
-export async function sendNixieRPC<T>(call: Readonly<NixieCall>): Promise<RPCResult<T>> {
-  try {
-    const response = await fetch(new URL(`/rpc/${call.procedure}`, call.url), {
-      method: 'POST',
-      headers: buildNixieHeaders(call.token),
-      body: JSON.stringify({ json: call.input }),
-    });
+export async function sendNixieRPC<T>(call: Readonly<NixieCall<T>>): Promise<RPCResult<T>> {
+  const response = await fetch(new URL(`/rpc/${call.procedure}`, call.url), {
+    method: 'POST',
+    headers: buildNixieHeaders(call.token),
+    body: JSON.stringify({ json: call.input }),
+  }).catch((error: unknown) => new Error(`${call.procedure} failed: ${String(error)}`));
 
-    const text = await response.text();
-
-    return response.ok
-      ? { ok: true, value: (JSON.parse(text) as { readonly json: T }).json }
-      : { ok: false, error: `${call.procedure} answered ${response.status} ${findCode(text)}` };
-  } catch (error) {
-    return { ok: false, error: `${call.procedure} failed: ${(error as Error).message}` };
+  if (response instanceof Error) {
+    return { ok: false, error: response.message };
   }
+
+  const text = await response.text();
+  const body = parseJSON(text);
+
+  if (!response.ok) {
+    const code = findJSONField(findJSONField(body, 'json'), 'code');
+
+    return {
+      ok: false,
+      error: `${call.procedure} answered ${response.status} ${typeof code === 'string' ? code : text.trim()}`,
+    };
+  }
+
+  const value = call.parse(findJSONField(body, 'json'));
+
+  return value === undefined
+    ? { ok: false, error: `${call.procedure} answered an unexpected output: ${text.trim()}` }
+    : { ok: true, value };
 }
 
-// a defined error's code, or the body itself when it is not oRPC's error
-function findCode(text: string): string {
+function parseJSON(text: string): unknown {
   try {
-    const body = JSON.parse(text) as { readonly json?: { readonly code?: unknown } };
+    const value: unknown = JSON.parse(text);
 
-    return typeof body.json?.code === 'string' ? body.json.code : text.trim();
+    return value;
   } catch {
-    return text.trim();
+    return undefined;
   }
 }

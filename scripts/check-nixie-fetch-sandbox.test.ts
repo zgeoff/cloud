@@ -90,7 +90,7 @@ test('it fails when the sandbox reaches an internal address, and still removes t
     args: [],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -128,7 +128,7 @@ test('it fails when the sandbox cannot read the public page', async () => {
     args: [],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -160,7 +160,7 @@ test('it creates no sandbox when a target does not answer the host', async () =>
     args: [],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -200,7 +200,7 @@ test('it stops when impd cannot create the sandbox, and names it for imp ls', as
     args: [],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -244,7 +244,7 @@ test('it probes the tailnet address given as its argument', async () => {
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote: host.runRemote,
     printOut,
-    printErr: mock(),
+    printErr: mock<(text: string) => void>(),
   });
 
   expect(exitCode).toBe(0);
@@ -264,7 +264,7 @@ test('it rejects an argument that is not an address and a port, and never reache
     args: ['geoffcloud'],
     sandboxName: 'fetch-check-1a2b3c4d',
     runRemote,
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 

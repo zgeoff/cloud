@@ -8,7 +8,9 @@ test('it prints status 0 for a port with a listener', async () => {
     socket: { data: () => {} },
   });
 
-  onTestFinished(() => listener.stop(true));
+  onTestFinished(() => {
+    listener.stop(true);
+  });
 
   const proc = Bun.spawn(
     ['bash', '-c', buildTCPProbe({ host: '127.0.0.1', port: listener.port })],

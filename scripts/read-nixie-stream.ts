@@ -1,4 +1,3 @@
-import type { ReadableStreamDefaultReader } from 'node:stream/web';
 import { buildNixieHeaders } from './build-nixie-headers.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 
@@ -28,106 +27,130 @@ export interface StreamReport {
 export async function readNixieStream(
   hold: Readonly<StreamHold>,
 ): Promise<RPCResult<StreamReport>> {
-  const stopping = new AbortController();
+  const opened = await startStream(hold);
 
-  try {
-    const response = await fetch(new URL('/rpc/log/follow', hold.url), {
-      method: 'POST',
-      headers: buildNixieHeaders(hold.token),
-      body: JSON.stringify({ json: { afterSequence: hold.afterSequence, thread: 'conversation' } }),
-      signal: stopping.signal,
-    });
-
-    const type = response.headers.get('content-type') ?? '';
-
-    if (!response.ok || !type.startsWith('text/event-stream') || response.body === null) {
-      await response.body?.cancel();
-
-      return { ok: false, error: `log/follow answered ${response.status} ${type}`.trim() };
-    }
-
-    return { ok: true, value: await readStream(response.body, stopping, hold.holdMs) };
-  } catch (error) {
-    return { ok: false, error: `log/follow failed: ${(error as Error).message}` };
+  if (!opened.ok) {
+    return opened;
   }
-}
 
-interface StreamReading {
-  readonly reader: ReadableStreamDefaultReader<Uint8Array>;
-  readonly decoder: TextDecoder;
-  readonly signal: AbortSignal;
-  readonly openedAt: number;
-  readonly keepaliveTimes: number[];
-  buffer: string;
-  records: number;
-}
-
-async function readStream(
-  body: NonNullable<Response['body']>,
-  stopping: AbortController,
-  holdMs: number,
-): Promise<StreamReport> {
   const timer = setTimeout(() => {
-    stopping.abort();
-  }, holdMs);
+    opened.value.stop();
+  }, hold.holdMs);
 
-  const reading: StreamReading = {
-    reader: body.getReader(),
-    decoder: new TextDecoder(),
-    signal: stopping.signal,
+  const report = await readEvents(opened.value, {
     openedAt: performance.now(),
-    keepaliveTimes: [],
     buffer: '',
+    keepaliveTimes: [],
     records: 0,
-  };
-
-  const end = await readEvents(reading);
+  });
 
   clearTimeout(timer);
 
-  return buildReport(reading, end);
+  return { ok: true, value: report };
 }
 
-// The hold's abort ends the read, so an end after the abort is a stream that stayed open
-async function readEvents(reading: StreamReading): Promise<StreamReport['end']> {
-  const chunk = await reading.reader.read().catch((error: unknown) => ({ failed: error }));
-
-  if ('failed' in chunk) {
-    return reading.signal.aborted ? 'held' : `failed: ${(chunk.failed as Error).message}`;
-  }
-
-  if (chunk.done) {
-    return reading.signal.aborted ? 'held' : 'closed';
-  }
-
-  const failure = updateReadingFromChunk(reading, chunk.value);
-
-  if (failure === null) {
-    return readEvents(reading);
-  }
-
-  await reading.reader.cancel();
-
-  return `failed: ${failure}`;
+// The open stream's reader, behind functions. The hold's stop ends a read, so an end after the
+// stop is a stream that stayed open.
+interface StreamSource {
+  readonly next: () => Promise<{ readonly done: boolean; readonly value?: string | undefined }>;
+  readonly cancel: () => Promise<void>;
+  readonly stop: () => void;
+  readonly isHeld: () => boolean;
 }
 
-// An event block ends at a blank line, so the text after the last one waits for the next chunk
-function updateReadingFromChunk(reading: StreamReading, chunk: Uint8Array): string | null {
-  const blocks = (reading.buffer + reading.decoder.decode(chunk, { stream: true })).split('\n\n');
+async function startStream(hold: Readonly<StreamHold>): Promise<RPCResult<StreamSource>> {
+  const stopping = new AbortController();
+  const response = await fetch(new URL('/rpc/log/follow', hold.url), {
+    method: 'POST',
+    headers: buildNixieHeaders(hold.token),
+    body: JSON.stringify({ json: { afterSequence: hold.afterSequence, thread: 'conversation' } }),
+    signal: stopping.signal,
+  }).catch((error: unknown) => new Error(`log/follow failed: ${String(error)}`));
 
-  reading.buffer = blocks.pop() ?? '';
+  if (response instanceof Error) {
+    return { ok: false, error: response.message };
+  }
 
-  return blocks.map((block) => updateReading(reading, block)).find((text) => text !== null) ?? null;
+  const type = response.headers.get('content-type') ?? '';
+
+  if (!response.ok || !type.startsWith('text/event-stream') || response.body === null) {
+    await response.body?.cancel();
+
+    return { ok: false, error: `log/follow answered ${response.status} ${type}`.trim() };
+  }
+
+  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+
+  return {
+    ok: true,
+    value: {
+      next: () => reader.read(),
+      cancel: () => reader.cancel(),
+      stop: () => {
+        stopping.abort();
+      },
+      isHeld: () => stopping.signal.aborted,
+    },
+  };
 }
 
-// Counts one event block, and returns the reason when the block ends the stream
-function updateReading(reading: StreamReading, block: string): string | null {
+interface Tally {
+  readonly openedAt: number;
+
+  // the text after the last complete event, which waits for the next chunk
+  readonly buffer: string;
+
+  // when each keepalive arrived, in ms after the open
+  readonly keepaliveTimes: readonly number[];
+  readonly records: number;
+}
+
+async function readEvents(source: StreamSource, tally: Tally): Promise<StreamReport> {
+  const chunk = await source.next().catch((error: unknown) => ({ failed: String(error) }));
+
+  if ('failed' in chunk || chunk.done) {
+    const cause: StreamReport['end'] = 'failed' in chunk ? `failed: ${chunk.failed}` : 'closed';
+    const end = source.isHeld() ? 'held' : cause;
+
+    return buildReport(tally, end);
+  }
+
+  const step = countChunk(tally, chunk.value ?? '');
+
+  if (step.failure === null) {
+    return readEvents(source, step.tally);
+  }
+
+  await source.cancel();
+
+  return buildReport(step.tally, `failed: ${step.failure}`);
+}
+
+interface TallyStep {
+  readonly tally: Tally;
+
+  // why the stream ends, when an event ends it
+  readonly failure: string | null;
+}
+
+// An event block ends at a blank line
+function countChunk(tally: Tally, text: string): TallyStep {
+  const blocks = (tally.buffer + text).split('\n\n');
+  const buffer = blocks.pop() ?? '';
+
+  return blocks.reduce<TallyStep>(
+    (step, block) => (step.failure === null ? countEvent(step.tally, block) : step),
+    { tally: { ...tally, buffer }, failure: null },
+  );
+}
+
+function countEvent(tally: Tally, block: string): TallyStep {
   const lines = block.split('\n').filter((line) => line !== '');
 
   if (lines.length > 0 && lines.every((line) => line.startsWith(':'))) {
-    reading.keepaliveTimes.push(performance.now() - reading.openedAt);
+    const keepaliveTimes = [...tally.keepaliveTimes, performance.now() - tally.openedAt];
 
-    return null;
+    return { tally: { ...tally, keepaliveTimes }, failure: null };
   }
 
   const event = lines
@@ -136,23 +159,23 @@ function updateReading(reading: StreamReading, block: string): string | null {
     .trim();
 
   if (event === 'message') {
-    reading.records += 1;
-
-    return null;
+    return { tally: { ...tally, records: tally.records + 1 }, failure: null };
   }
 
-  return `the stream sent ${event === undefined ? 'an event with no name' : `a ${event} event`}`;
+  const name = event === undefined ? 'an event with no name' : `a ${event} event`;
+
+  return { tally, failure: `the stream sent ${name}` };
 }
 
-function buildReport(reading: StreamReading, end: StreamReport['end']): StreamReport {
-  const openMs = performance.now() - reading.openedAt;
-  const times = [0, ...reading.keepaliveTimes, openMs];
+function buildReport(tally: Tally, end: StreamReport['end']): StreamReport {
+  const openMs = performance.now() - tally.openedAt;
+  const times = [0, ...tally.keepaliveTimes, openMs];
 
   return {
     openMs,
-    keepalives: reading.keepaliveTimes.length,
+    keepalives: tally.keepaliveTimes.length,
     longestGapMs: Math.max(...times.slice(1).map((time, index) => time - (times[index] ?? 0))),
-    records: reading.records,
+    records: tally.records,
     end,
   };
 }

@@ -84,7 +84,7 @@ test('it fails when a record arrives during the hold, and still revokes its sess
     holdMs: 400,
     maxGapMs: 200,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -119,7 +119,7 @@ test('it fails when nixie closes the stream before the hold ends', async () => {
     holdMs: 400,
     maxGapMs: 200,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -146,7 +146,7 @@ test('it fails when the stream waits longer than the allowed wait for a keepaliv
     holdMs: 400,
     maxGapMs: 200,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'ABCD-2345\n', stderr: '' }),
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -174,7 +174,7 @@ test('it calls nixie nowhere when the pod gives no enrolment code', async () => 
     maxGapMs: 200,
     runRemote: () =>
       Promise.resolve({ exitCode: 1, stdout: '', stderr: 'error: pod nixie-0 not found\n' }),
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 
@@ -202,7 +202,7 @@ test('it stops with no session when nixie refuses the enrolment code', async () 
     holdMs: 400,
     maxGapMs: 200,
     runRemote: () => Promise.resolve({ exitCode: 0, stdout: 'WXYZ-6789\n', stderr: '' }),
-    printOut: mock(),
+    printOut: mock<(text: string) => void>(),
     printErr,
   });
 

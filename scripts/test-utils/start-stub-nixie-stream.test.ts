@@ -8,7 +8,9 @@ test('it opens with an empty comment and writes a record as a message event with
     signal: new AbortController().signal,
   });
 
-  onTestFinished(() => stream.stop());
+  onTestFinished(() => {
+    stream.stop();
+  });
 
   stream.sendRecord(4);
   stream.stop();
@@ -27,7 +29,9 @@ test('it sends an empty comment at each keepalive', async () => {
     signal: new AbortController().signal,
   });
 
-  onTestFinished(() => stream.stop());
+  onTestFinished(() => {
+    stream.stop();
+  });
 
   const text = await new Response(stream.body).text();
 
@@ -43,7 +47,9 @@ test('it ends the stream when the client aborts', async () => {
     signal: leaving.signal,
   });
 
-  onTestFinished(() => stream.stop());
+  onTestFinished(() => {
+    stream.stop();
+  });
 
   leaving.abort();
 

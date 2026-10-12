@@ -1,5 +1,6 @@
 import type { NixieSession, RecordCount } from './count-nixie-records.ts';
 import { countNixieRecords } from './count-nixie-records.ts';
+import { findJSONField } from './find-json-field.ts';
 import type { StreamReport } from './read-nixie-stream.ts';
 import { readNixieStream } from './read-nixie-stream.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
@@ -63,7 +64,7 @@ async function createCheckSession(
     return undefined;
   }
 
-  const enrolled = await sendNixieRPC<{ readonly sessionID: string; readonly token?: string }>({
+  const enrolled = await sendNixieRPC({
     url: options.url,
     token: null,
     procedure: 'sessions/enrol',
@@ -73,12 +74,11 @@ async function createCheckSession(
       deviceName: 'deploy check',
       tokenDelivery: 'bearer',
     },
+    parse: parseEnrolment,
   });
 
-  if (!enrolled.ok || enrolled.value.token === undefined) {
-    const reason = enrolled.ok ? 'no bearer token' : enrolled.error;
-
-    options.printErr(`check-nixie-stream: cannot enrol a check session: ${reason}\n`);
+  if (!enrolled.ok) {
+    options.printErr(`check-nixie-stream: cannot enrol a check session: ${enrolled.error}\n`);
 
     return undefined;
   }
@@ -86,6 +86,16 @@ async function createCheckSession(
   options.printOut(`enrolled check session ${enrolled.value.sessionID}\n`);
 
   return { url: options.url, token: enrolled.value.token, sessionID: enrolled.value.sessionID };
+}
+
+// a session the check can call with: its ID, and the bearer token that enrol returns once
+function parseEnrolment(output: unknown) {
+  const sessionID = findJSONField(output, 'sessionID');
+  const token = findJSONField(output, 'token');
+
+  return typeof sessionID === 'string' && typeof token === 'string'
+    ? { sessionID, token }
+    : undefined;
 }
 
 const enrolCodeCommand =
@@ -216,6 +226,7 @@ async function removeCheckSession(
     token: session.token,
     procedure: 'sessions/revoke',
     input: { clientActionID: crypto.randomUUID(), sessionID: session.sessionID },
+    parse: (output) => output,
   });
 
   if (!revoked.ok) {

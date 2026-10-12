@@ -107,10 +107,9 @@ test('it reads the newest page before a sequence, oldest first, with the log seq
     body: JSON.stringify({ json: { thread: 'conversation', limit: 2, beforeSequence: 5 } }),
   });
 
-  const body = (await response.json()) as {
-    readonly json: { readonly records: readonly { readonly sequence: number }[] };
-  };
+  const body: unknown = await response.json();
 
-  expect(body).toMatchObject({ json: { hasEarlier: true, readAtSequence: 5 } });
-  expect(body.json.records.map((record) => record.sequence)).toStrictEqual([3, 4]);
+  expect(body).toMatchObject({
+    json: { hasEarlier: true, readAtSequence: 5, records: [{ sequence: 3 }, { sequence: 4 }] },
+  });
 });

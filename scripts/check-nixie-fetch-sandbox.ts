@@ -92,15 +92,30 @@ async function loadPlan(
 
   options.printOut(`fetch image: ${image}\n`);
 
+  const answered = await checkHostReaches(options, loaded.targets);
+
+  return answered ? { image, targets: loaded.targets } : undefined;
+}
+
+async function checkHostReaches(
+  options: Readonly<CheckFetchSandboxOptions>,
+  targets: readonly SandboxTarget[],
+): Promise<boolean> {
   const answers = await Promise.all(
-    loaded.targets.map((target) => runProbe(options, { target, command: buildTCPProbe(target) })),
+    targets.map((target) => runProbe(options, { target, command: buildTCPProbe(target) })),
   );
 
   printProbes(options, 'from the host', answers);
 
-  return answers.every((answer) => answer.status === 0)
-    ? { image, targets: loaded.targets }
-    : printNoListener(options);
+  if (answers.every((answer) => answer.status === 0)) {
+    return true;
+  }
+
+  options.printErr(
+    'check-nixie-fetch-sandbox: a target does not answer from the host, so a refusal from the sandbox would prove nothing\n',
+  );
+
+  return false;
 }
 
 const manifestCommand =
@@ -146,14 +161,6 @@ function printProbes(
   for (const answer of answers) {
     options.printOut(`${from}: ${formatProbeAnswer(answer)}\n`);
   }
-}
-
-function printNoListener(options: Readonly<CheckFetchSandboxOptions>): undefined {
-  options.printErr(
-    'check-nixie-fetch-sandbox: a target does not answer from the host, so a refusal from the sandbox would prove nothing\n',
-  );
-
-  return undefined;
 }
 
 const impCommand = 'docker exec imp-host imp';

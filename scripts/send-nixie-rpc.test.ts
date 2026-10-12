@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { http, passthrough } from 'msw';
 import { server } from '../workers/mocks/node.ts';
+import { findJSONField } from './find-json-field.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
 import { startStubNixieAPI } from './test-utils/start-stub-nixie-api.ts';
 
@@ -23,6 +24,7 @@ test('it returns the output from the json field of the answer', async () => {
       deviceName: 'deploy check',
       tokenDelivery: 'bearer',
     },
+    parse: (output) => output,
   });
 
   expect(result).toStrictEqual({
@@ -50,6 +52,7 @@ test('it reports the status and the code of an error nixie defines', async () =>
       deviceName: 'deploy check',
       tokenDelivery: 'bearer',
     },
+    parse: (output) => output,
   });
 
   expect(result).toStrictEqual({
@@ -66,10 +69,41 @@ test('it reports a call that reaches no server', async () => {
     token: null,
     procedure: 'sessions/enrol',
     input: {},
+    parse: (output) => output,
   });
 
   expect(result).toStrictEqual({
     ok: false,
     error: expect.toStartWith('sessions/enrol failed: '),
+  });
+});
+
+test('it reports an output that lacks what the call reads', async () => {
+  startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: ['ABCD-2345'],
+    sequences: [],
+    keepaliveMs: null,
+    closeAfterMs: null,
+  });
+
+  const result = await sendNixieRPC({
+    url: 'https://nixie.test',
+    token: null,
+    procedure: 'sessions/enrol',
+    input: {
+      clientActionID: '0d7f5c1e-2b4a-4c8e-9f31-6a2d8b0e4c57',
+      code: 'ABCD-2345',
+      deviceName: 'deploy check',
+      tokenDelivery: 'bearer',
+    },
+    parse: (output) => findJSONField(output, 'sessionToken'),
+  });
+
+  expect(result).toStrictEqual({
+    ok: false,
+    error: expect.toStartWith(
+      'sessions/enrol answered an unexpected output: {"json":{"sessionID":',
+    ),
   });
 });

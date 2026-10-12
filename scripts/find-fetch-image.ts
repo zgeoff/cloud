@@ -1,3 +1,5 @@
+import { findJSONField } from './find-json-field.ts';
+
 // Finds the name impd holds nixie's fetch image under, from nixie's sandbox manifest: nixie names
 // each sandbox image nixie-<kind>-<first 12 hex of the digest>
 export function findFetchImage(manifestText: string): string | undefined {
@@ -9,9 +11,10 @@ export function findFetchImage(manifestText: string): string | undefined {
 
 function findFetchRef(text: string): string | undefined {
   try {
-    const manifest = JSON.parse(text) as { readonly fetch?: unknown };
+    const manifest: unknown = JSON.parse(text);
+    const ref = findJSONField(manifest, 'fetch');
 
-    return typeof manifest.fetch === 'string' ? manifest.fetch : undefined;
+    return typeof ref === 'string' ? ref : undefined;
   } catch {
     return undefined;
   }

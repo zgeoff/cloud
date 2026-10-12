@@ -1,3 +1,5 @@
+// the stream's state is mutable by design, and an AbortSignal has no readonly form
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
 
 // An open stream of nixie's stand-in API, in the server-sent events oRPC 1.15.4 writes: an empty
@@ -36,19 +38,33 @@ export function startStubNixieStream(options: StubStreamOptions): StubStream {
   });
 
   if (options.keepaliveMs !== null) {
-    state.timers.push(setInterval(() => sendText(state, ': \n\n'), options.keepaliveMs));
+    state.timers.push(
+      setInterval(() => {
+        sendText(state, ': \n\n');
+      }, options.keepaliveMs),
+    );
   }
 
   if (options.closeAfterMs !== null) {
-    state.timers.push(setTimeout(() => stopStream(state), options.closeAfterMs));
+    state.timers.push(
+      setTimeout(() => {
+        stopStream(state);
+      }, options.closeAfterMs),
+    );
   }
 
-  options.signal.addEventListener('abort', () => stopStream(state));
+  options.signal.addEventListener('abort', () => {
+    stopStream(state);
+  });
 
   return {
     body,
-    sendRecord: (sequence) => sendText(state, renderRecordEvent(sequence)),
-    stop: () => stopStream(state),
+    sendRecord: (sequence) => {
+      sendText(state, renderRecordEvent(sequence));
+    },
+    stop: () => {
+      stopStream(state);
+    },
   };
 }
 
