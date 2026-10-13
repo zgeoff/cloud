@@ -57,10 +57,10 @@ func (FirewallRule) Create(
 	if req.DryRun {
 		return infer.CreateResponse[FirewallRuleState]{Output: FirewallRuleState{FirewallRuleArgs: req.Inputs}}, nil
 	}
-	api, cfg := getClient(ctx)
+	api, teamID := getClient(ctx)
 	in := req.Inputs
 	rule, err := api.CreateFirewallRule(ctx, in.FirewallID, client.FirewallRuleInput{
-		TeamID:      cfg.teamID,
+		TeamID:      teamID,
 		Protocol:    in.Protocol,
 		Port:        getOrDefault(in.Port, ""),
 		Subnet:      in.Subnet,
@@ -84,8 +84,8 @@ func (FirewallRule) Read(
 	if err != nil {
 		return infer.ReadResponse[FirewallRuleArgs, FirewallRuleState]{}, err
 	}
-	api, cfg := getClient(ctx)
-	rule, err := api.ReadFirewallRule(ctx, firewallID, ruleID, cfg.teamID)
+	api, teamID := getClient(ctx)
+	rule, err := api.ReadFirewallRule(ctx, firewallID, ruleID, teamID)
 	if client.IsNotFound(err) {
 		return infer.ReadResponse[FirewallRuleArgs, FirewallRuleState]{}, nil
 	}
@@ -111,8 +111,8 @@ func (FirewallRule) Update(
 	if err != nil {
 		return infer.UpdateResponse[FirewallRuleState]{}, err
 	}
-	api, cfg := getClient(ctx)
-	err = api.UpdateFirewallRuleDescription(ctx, firewallID, ruleID, cfg.teamID, getOrDefault(req.Inputs.Description, ""))
+	api, teamID := getClient(ctx)
+	err = api.UpdateFirewallRuleDescription(ctx, firewallID, ruleID, teamID, getOrDefault(req.Inputs.Description, ""))
 	if err != nil {
 		return infer.UpdateResponse[FirewallRuleState]{}, err
 	}
@@ -125,8 +125,8 @@ func (FirewallRule) Delete(ctx context.Context, req infer.DeleteRequest[Firewall
 	if err != nil {
 		return infer.DeleteResponse{}, err
 	}
-	api, cfg := getClient(ctx)
-	err = api.RemoveFirewallRule(ctx, firewallID, ruleID, cfg.teamID)
+	api, teamID := getClient(ctx)
+	err = api.RemoveFirewallRule(ctx, firewallID, ruleID, teamID)
 	if client.IsNotFound(err) {
 		err = nil
 	}

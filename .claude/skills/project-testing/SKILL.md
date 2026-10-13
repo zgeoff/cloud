@@ -142,7 +142,8 @@ Each shared rule takes its Go form:
     change state mid-request, or a transport fault `RegisterResponse` cannot express (such as a
     body shorter than its `Content-Length`), is `RegisterHandler`. Assert the requests the code sent with
     `GetRequests()`, as a whole list.
-- Run `bun run provider:check` (`gofmt`, `go vet`, then `go test -race ./...`), then
+- Run `bun run provider:check` (`gofmt`, `go vet`, golangci-lint, `deadcode -test`, then
+  `go test -race ./...`), then
   `go test -race -shuffle=on -count=3 ./...`. A test that touches a context or time also passes
   `-count=200` before it lands.
 

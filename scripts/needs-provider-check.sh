@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Decides whether a change needs the provider's Go checks, which compile with -race and take
-# minutes from a cold cache. It prints "true" when any file changed between <base> and <head> is
-# an input of those checks, and "false" otherwise; the CI job runs the checks only on "true", and
-# reports a result on every pull request either way. The inputs are the Go module and its check
-# script (provider/) and the CI workflow, which sets Go up. The root package.json only calls
-# provider/check.sh, so it is not an input. A rename counts both its old and new path.
+# minutes from a cold cache, and the SDK check, which builds the provider and regenerates
+# sdk/onidel. It prints "true" when any file changed between <base> and <head> is an input of
+# those checks, and "false" otherwise; the CI job runs the checks only on "true", and reports a
+# result on every pull request either way. The inputs are the Go module and its check script
+# (provider/), the generated SDK (sdk/), the scripts that generate and check it, and the CI
+# workflow, which sets Go and the Pulumi CLI up. The root package.json only calls those scripts,
+# so it is not an input. A rename counts both its old and new path.
 #
 # A base of all zeros, as a push that creates a branch reports, has nothing to compare with, so
 # it prints "true", and so does a base that is not an ancestor of <head>, such as main before a
@@ -38,7 +40,7 @@ fi
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    provider/* | .github/workflows/ci.yml)
+    provider/* | sdk/* | scripts/gen-sdk.sh | scripts/check-sdk.sh | .github/workflows/ci.yml)
       echo true
       exit 0
       ;;

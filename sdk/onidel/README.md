@@ -1,1 +1,1 @@
-A partial provider for the Onidel cloud API: VMs, SSH keys, firewalls and rDNS.
+A partial provider for the Onidel cloud API: VMs and firewalls.

@@ -45,9 +45,9 @@ func (FirewallGroup) Create(
 	if req.DryRun {
 		return infer.CreateResponse[FirewallGroupState]{Output: FirewallGroupState{FirewallGroupArgs: req.Inputs}}, nil
 	}
-	api, cfg := getClient(ctx)
+	api, teamID := getClient(ctx)
 	group, err := api.CreateFirewallGroup(ctx, client.FirewallGroupInput{
-		TeamID: cfg.teamID, Description: req.Inputs.Description,
+		TeamID: teamID, Description: req.Inputs.Description,
 	})
 	if err != nil {
 		return infer.CreateResponse[FirewallGroupState]{}, err
@@ -82,9 +82,9 @@ func (FirewallGroup) Update(
 	if req.DryRun {
 		return infer.UpdateResponse[FirewallGroupState]{Output: next}, nil
 	}
-	api, cfg := getClient(ctx)
+	api, teamID := getClient(ctx)
 	err := api.UpdateFirewallGroup(ctx, req.ID, client.FirewallGroupInput{
-		TeamID: cfg.teamID, Description: req.Inputs.Description,
+		TeamID: teamID, Description: req.Inputs.Description,
 	})
 	if err != nil {
 		return infer.UpdateResponse[FirewallGroupState]{}, err
@@ -100,8 +100,8 @@ func (FirewallGroup) Update(
 func (FirewallGroup) Delete(
 	ctx context.Context, req infer.DeleteRequest[FirewallGroupState],
 ) (infer.DeleteResponse, error) {
-	api, cfg := getClient(ctx)
-	err := api.RemoveFirewallGroup(ctx, req.ID, cfg.teamID)
+	api, teamID := getClient(ctx)
+	err := api.RemoveFirewallGroup(ctx, req.ID, teamID)
 	if client.IsNotFound(err) {
 		err = nil
 	}
