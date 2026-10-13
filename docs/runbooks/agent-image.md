@@ -135,11 +135,14 @@ After the pin merges, roll the release out in the order that
 
 ## Roll out an atc release
 
-A daemon whose atc differs from the atc in its `cloud` target's image copies its own binary into
-each imp it wakes, before the imp's first session starts. A restore of a busy fleet after the
-daemon's restart then waits on one upload per imp. So the image that ships a release reaches the
-`cloud` target before the daemon runs that release. The daemon reads its targets at startup only, so
-one restart brings the new release and the new image together.
+The daemon copies its own binary into an imp whose image ships another atc, before the imp's first
+session starts, so a fleet of such imps waits on one upload per imp. A new imp on an image that
+ships the daemon's release skips the copy. So the image that ships a release reaches the `cloud`
+target before the daemon runs that release. The daemon reads its targets at startup only, so one
+restart brings the new release and the new image together.
+
+An imp that exists at the restart keeps the image it was created from, and takes the upload at its
+next wake. Restart the daemon when few imps are live, so few wakes pay for it.
 
 Run these steps on the machine that runs the daemon, after the pin pull request merges. `$VERSION`
 is the release, such as `4.5.0`.
@@ -177,26 +180,27 @@ is the release, such as `4.5.0`.
    ```bash
    bin="$(command -v atc)"
    gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p atc-linux-x64 -p SHA256SUMS -D "/tmp/atc-$VERSION"
-   (cd "/tmp/atc-$VERSION" && grep ' atc-linux-x64$' SHA256SUMS | sha256sum -c -)
-   install -m 0755 "/tmp/atc-$VERSION/atc-linux-x64" "$bin.new" && mv "$bin.new" "$bin"
+   (cd "/tmp/atc-$VERSION" && grep ' atc-linux-x64$' SHA256SUMS | sha256sum -c -) \
+     && install -m 0755 "/tmp/atc-$VERSION/atc-linux-x64" "$bin.new" && mv "$bin.new" "$bin"
    atc daemon restart --dry-run
    atc daemon restart
    ```
 
-   The `mv` replaces the binary in one rename, so the running daemon keeps its open file. Run the
-   restart when the dry run lists no session that needs the daemon. atc's install script installs
-   the newest release, which may not be the one the image pins, so this step downloads `$VERSION` by
-   name.
+   A failed sum check stops the install. The `mv` replaces the binary in one rename, so the running
+   daemon keeps its open file. Run the restart when the dry run lists no session that needs the
+   daemon. atc's install script installs the newest release, which may not be the one the image
+   pins, so this step downloads `$VERSION` by name.
 
-5. Wake an imp on `cloud`, such as by a spawn, and read the daemon's journal:
+5. Spawn a session on `cloud`, so the daemon creates a new imp, and read the daemon's journal:
 
    ```bash
    journalctl --user -u atc-daemon --since -10min | grep 'runs hooks through'
    ```
 
-   Expect `runs hooks through the image's atc $VERSION at /usr/local/bin/atc` for each wake. A line
-   that reads `runs hooks through the daemon's atc $VERSION, copied to /tmp/atc/bin/atc` means the
-   target's image ships another atc: go back to step 2.
+   Expect `runs hooks through the image's atc $VERSION at /usr/local/bin/atc` for the new imp. When
+   the new imp logs `runs hooks through the daemon's atc $VERSION, copied to /tmp/atc/bin/atc`, the
+   target's image ships another atc: go back to step 2. An imp that existed before the restart logs
+   that copy line too, as expected.
 
 ## A new auto-mode release
 
