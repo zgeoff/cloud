@@ -31,8 +31,13 @@ A pod has no tailnet identity of its own. Its traffic leaves through the host's 
 as a whole is `tag:cloud`, and every pod gains whatever the host is granted. The grants for
 `tag:cloud` are therefore single ports to single hosts: the PC's daemon port for the gateway, and
 impd's HTTPS port for the cluster's health probe. Each names its destination by a host alias for one
-node rather than by a tag, so a later node with the same tag gains nothing. nixie's calls to impd
-use the same HTTPS grant as the probe ([nixie](../workloads/nixie.md)).
+node rather than by a tag, so a later node with the same tag gains nothing.
+
+nixie's pod calls impd's API over the same route, so `tag:cloud` holds a second grant to impd's node
+for HTTPS, named in the policy as nixie's route to impd
+([nixie](../workloads/nixie.md#reaching-impd)). It matches the probe's grant exactly and gives the
+cluster nothing beyond it. The route stays open if the probe's grant changes or goes, and removing
+nixie's grant cuts nixie off from impd.
 
 Members hold a second grant, to the host's HTTPS port for nixie, beside the grant that lets them
 reach every device. The policy lists nixie's route in its own grant, so the route stays open if the

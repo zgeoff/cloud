@@ -59,6 +59,11 @@ export const tailnetPolicy = {
     // this one names the route, so it stays open if that grant narrows. Last, so adding it shifts
     // no other grant
     { src: ['autogroup:member'], dst: ['geoffcloud'], ip: [`tcp:${geoffcloudNode.httpsPort}`] },
+
+    // nixie's route to impd: nixie's pod, as tag:cloud → imp's node, 443 only. Removing it breaks
+    // nixie. It repeats the probe's grant, giving nothing beyond it, so the route stays open if the
+    // probe's grant changes. Last, so adding it shifts no other grant
+    { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: [`tcp:${impNode.httpsPort}`] },
   ],
   ssh: [
     {
