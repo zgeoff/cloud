@@ -99,11 +99,12 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
 2. It refuses a commit that no green run of the NixOS checks covers, as
    [Check the host before a switch](#check-the-host-before-a-switch) describes. `--build-only` skips
    this gate, because it reaches no host.
-3. It refuses a commit whose atc daemon pin is another atc major release than the image of the
-   cluster's atc gateway, because atc breaks the daemon protocol only in a major release and the
-   daemon handshake does not catch the break. For an atc major bump, publish the atc-gateway images
-   and merge the pull request that pins their digests, let the `Deploy prod` workflow apply it, then
-   switch. `--build-only` skips this gate too.
+3. It refuses a commit whose atc daemon pin is another atc major release than a running atc gateway
+   pod's image, or that finds no gateway pod, because atc breaks the daemon protocol only in a major
+   release and the daemon handshake does not catch the break. It checks again before the activation.
+   For an atc major bump, publish the atc-gateway images and merge the pull request that pins their
+   digests, let the `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate
+   too.
 4. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.

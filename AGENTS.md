@@ -96,7 +96,7 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
   0 copies that exact store path to the host and activates it. Tailscale SSH authenticates
   `root@geoffcloud`. `--build-only` stops after the build. Never switch by hand after a failed
   build, and never re-evaluate the flake to switch. The script also refuses an atc daemon pin of
-  another atc major than the deployed atc gateway's image: roll the gateway out first.
+  another atc major than the running atc gateway's image: roll the gateway out first.
 - The NixOS checks gate the switch, not the merge: the switch script refuses a commit that no green
   `NixOS checks` run on `main` covers. Dispatch one with
   `gh workflow run nixos-checks.yml --ref main` when the nightly run has not covered the commit yet,

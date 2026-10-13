@@ -84,42 +84,69 @@ CALLS
   [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
 }
 
-it_prints_the_named_gateway_image_without_a_newline_for_the_kubectl_query() {
+it_prints_the_named_gateway_images_without_a_newline_for_the_kubectl_query() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    STUB_GATEWAY_IMAGE=ghcr.io/zgeoff/atc-gateway:2.27.0 ssh -o BatchMode=yes root@geoffcloud \
-    "k3s kubectl -n atc get deployment atc-gateway -o 'jsonpath={.spec.template.spec.containers[0].image}'" \
+    STUB_GATEWAY_IMAGES='ghcr.io/zgeoff/atc-gateway:2.27.0 ghcr.io/zgeoff/atc-gateway:4.5.0' \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  printf '%s' ghcr.io/zgeoff/atc-gateway:2.27.0 | cmp - "$tree/out"
+  printf '%s' 'ghcr.io/zgeoff/atc-gateway:2.27.0 ghcr.io/zgeoff/atc-gateway:4.5.0' | cmp - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'CALLS'
-["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get deployment atc-gateway -o 'jsonpath={.spec.template.spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
-it_fails_the_kubectl_query_as_kubectl_reports_a_missing_deployment() {
+it_prints_nothing_for_the_kubectl_query_when_no_gateway_pod_is_named() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    STUB_GATEWAY_IMAGE=ghcr.io/zgeoff/atc-gateway:2.27.0 STUB_GATEWAY_MISSING=1 ssh -o BatchMode=yes root@geoffcloud \
-    "k3s kubectl -n atc get deployment atc-gateway -o 'jsonpath={.spec.template.spec.containers[0].image}'" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error from server (NotFound): deployments.apps "atc-gateway" not found'
+  cmp /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'CALLS'
-["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get deployment atc-gateway -o 'jsonpath={.spec.template.spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  for query in first second third; do
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+      STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 STUB_GATEWAY_LATER_IMAGES=ghcr.io/zgeoff/atc-gateway:4.5.0 \
+      ssh -o BatchMode=yes root@geoffcloud \
+      "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'" \
+      > "$tree/out-$query" 2>> "$tree/err" || status=$?
+  done
+
+  printf '%s' ghcr.io/zgeoff/atc-gateway:2.27.0 | cmp - "$tree/out-first"
+  printf '%s' ghcr.io/zgeoff/atc-gateway:4.5.0 | cmp - "$tree/out-second"
+  printf '%s' ghcr.io/zgeoff/atc-gateway:4.5.0 | cmp - "$tree/out-third"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+CALLS
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 it_prints_the_named_current_system_for_readlink() {
