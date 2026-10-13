@@ -182,14 +182,21 @@ is the release, such as `4.5.0`.
    gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p atc-linux-x64 -p SHA256SUMS -D "/tmp/atc-$VERSION"
    (cd "/tmp/atc-$VERSION" && grep ' atc-linux-x64$' SHA256SUMS | sha256sum -c -) \
      && install -m 0755 "/tmp/atc-$VERSION/atc-linux-x64" "$bin.new" && mv "$bin.new" "$bin"
+   "$bin" --version
+   ```
+
+   A failed sum check stops the install. Expect `$VERSION` from the last command, and stop when it
+   prints another version, because a restart then runs the old release against the new image. The
+   `mv` replaces the binary in one rename, so the running daemon keeps its open file. atc's install
+   script installs the newest release, which may not be the one the image pins, so this step
+   downloads `$VERSION` by name.
+
+   Restart the daemon when the dry run lists no session that needs it:
+
+   ```bash
    atc daemon restart --dry-run
    atc daemon restart
    ```
-
-   A failed sum check stops the install. The `mv` replaces the binary in one rename, so the running
-   daemon keeps its open file. Run the restart when the dry run lists no session that needs the
-   daemon. atc's install script installs the newest release, which may not be the one the image
-   pins, so this step downloads `$VERSION` by name.
 
 5. Spawn a session on `cloud`, so the daemon creates a new imp, and read the daemon's journal:
 
