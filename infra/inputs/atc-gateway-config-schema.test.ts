@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
 import { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
+import type { ATCGatewayRawConfig } from './types.ts';
 
 test('it passes a config through as given', () => {
-  const payload = {
+  const payload: ATCGatewayRawConfig = {
     image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0-r2@sha256:${'1'.repeat(64)}`,
     publicURL: 'https://atc.geoff.cloud',
@@ -20,7 +21,7 @@ test('it passes a config through as given', () => {
     },
     defaultDaemon: 'geoffcloud',
     stateDir: '/var/lib/atc',
-  } as const;
+  };
 
   expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
 });

@@ -17,8 +17,6 @@ export type ATCGatewayConfig = z.output<typeof atcGatewayConfigSchema>;
 // one daemon the gateway dials, checked
 export type ATCGatewayDaemon = ATCGatewayConfig['daemons'][string];
 
-export type ATCDaemonAlertSeverity = ATCGatewayDaemon['alertSeverity'];
-
 // one daemon as the probe and its alert see it: its name in the registry and its host:port
 export type ATCDaemonEndpoint = { readonly name: string } & Pick<
   ATCGatewayDaemon,
