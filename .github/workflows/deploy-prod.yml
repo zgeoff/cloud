@@ -37,6 +37,10 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read lists CI's runs for a dispatch
+    permissions:
+      contents: read
+      actions: read
     outputs:
       apply: ${{ steps.decide.outputs.apply }}
       revision: ${{ steps.decide.outputs.revision }}
@@ -48,6 +52,8 @@ jobs:
       DISPATCH_REF: ${{ github.ref }}
       DISPATCH_SHA: ${{ github.sha }}
       DISPATCH_REVISION: ${{ inputs.revision }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       # the full history and tags, for the deployed/prod tag and the comparison with it
       - name: Checkout
@@ -61,8 +67,9 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # a dispatch applies main's tip, and only when the person named it, so the run applies the
-      # plan they read; a CI run applies the commit it checked, which must be on main
+      # a dispatch applies main's tip, only when the person named it and only after CI passed on
+      # it, since a dispatch skips the trigger that waits for CI; a CI run applies the commit it
+      # checked, which must be on main
       - name: Decide whether the commit needs an apply
         id: decide
         run: |
@@ -71,6 +78,12 @@ jobs:
               echo "a dispatch applies main's tip only: dispatch on main with revision $DISPATCH_SHA" >&2
               exit 1
             fi
+            ci_run="$(bun run --silent ci:find-ci-run "$DISPATCH_SHA")"
+            if [ -z "$ci_run" ]; then
+              echo "no green CI run of a push to main on $DISPATCH_SHA: wait for CI to pass" >&2
+              exit 1
+            fi
+            echo "CI passed on $DISPATCH_SHA: $ci_run"
             revision="$DISPATCH_SHA"
           else
             revision="$RUN_HEAD"

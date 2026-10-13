@@ -97,7 +97,8 @@ A held run fails at the step `Hold for a manual dispatch`, and Discord shows
    bun run preview -- --refresh --diff
    ```
 
-2. To apply it, dispatch the workflow on `main` with main's tip, which must be the held revision:
+2. To apply it, dispatch the workflow on `main` with main's tip, which must be the held revision.
+   The dispatch refuses a revision that has no green CI run of a push to `main`:
 
    ```bash
    gh workflow run deploy-prod.yml --ref main -f revision="$(git rev-parse origin/main)"

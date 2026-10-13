@@ -106,10 +106,12 @@ these:
   reviewed.
 
 A held run fails and alerts on Discord. A manual dispatch of the workflow on `main` applies whatever
-its own preview plans, so the person who dispatches it has read the held plan first. Until someone
-applies or reverts the held change, every later push to `main` runs the job and holds again, because
-the tag still sits behind the change. A failed apply or a failed second drift check leaves the tag
-where it was, so the next run's first drift check fails and holds until a person repairs the stack.
+its own preview plans, so the person who dispatches it has read the held plan first. The dispatch
+applies only once CI has passed on main's tip, because a dispatch skips the trigger that waits for
+CI. Until someone applies or reverts the held change, every later push to `main` runs the job and
+holds again, because the tag still sits behind the change. A failed apply or a failed second drift
+check leaves the tag where it was, so the next run's first drift check fails and holds until a
+person repairs the stack.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
