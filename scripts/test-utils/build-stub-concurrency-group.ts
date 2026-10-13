@@ -10,7 +10,7 @@ export interface StubConcurrencyGroup<Holder> {
   readonly finish: () => Holder | undefined;
 }
 
-export interface JoinResult<Holder> {
+interface JoinResult<Holder> {
   readonly started: boolean;
   readonly cancelled: readonly Holder[];
 }
