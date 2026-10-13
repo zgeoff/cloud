@@ -56,6 +56,10 @@ definitions:
     kind: path
     # git-sync's link to its newest checkout of zgeoff/nixie-definitions
     path: /etc/nixie/definitions/current
+# the owner's name, which the conversation reads in place of "the owner"; the name stays out of
+# this public file, in the sops file's settings
+owner:
+  name: deployment:owner_name
 # the names the owner calls the agent by, which per-turn retrieval leaves out of its query
 agent:
   names:

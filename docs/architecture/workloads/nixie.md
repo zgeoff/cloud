@@ -65,7 +65,9 @@ nixie decrypts its own secrets file in its own process at start and keeps the pl
 The file is `deploy/nixie/secrets.sops.yaml`, encrypted with sops to two age recipients: the host
 key, which the pod holds, and the recovery key, which stays in 1Password and off the host. The repo
 holds only the public halves, in the sops config beside the file. The file holds the deployment key
-that wraps every record key, the model credential, and nixie's impd token.
+that wraps every record key, the model credential, nixie's impd token, and the owner's name under
+`settings`, which the configuration names as `deployment:owner_name` so the name stays out of this
+public repo.
 
 Pulumi puts the encrypted file and the host's age identity into one Secret, and only the nixie
 container mounts it. git-sync's deploy key and GitHub's pinned host key sit in a second Secret that
