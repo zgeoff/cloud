@@ -14,21 +14,27 @@
 # as db/imp.sqlite.restore inside the mount and checks it through $SQLITE3 with a file: URI.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
-pkgs.writeShellScript "sqlite3-blocking-on-staged-check" ''
-  set -euo pipefail
-  if [ -z "''${HOLDER_PID_FILE:-}" ]; then
-    echo "sqlite3-blocking-on-staged-check: set HOLDER_PID_FILE to the file that names the blocked process" >&2
-    exit 2
-  fi
-  for arg in "$@"; do
-    case "$arg" in
-      file:*/imp.sqlite.restore\?*)
-        # written whole, then renamed, so a reader never sees a partial PID
-        echo "$$" > "$HOLDER_PID_FILE.partial"
-        mv "$HOLDER_PID_FILE.partial" "$HOLDER_PID_FILE"
-        exec ${pkgs.coreutils}/bin/sleep infinity < /dev/null
-        ;;
-    esac
-  done
-  exec ${pkgs.sqlite}/bin/sqlite3 "$@"
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "sqlite3-blocking-on-staged-check";
+    text = ''
+      if [ -z "''${HOLDER_PID_FILE:-}" ]; then
+        echo "sqlite3-blocking-on-staged-check: set HOLDER_PID_FILE to the file that names the blocked process" >&2
+        exit 2
+      fi
+      for arg in "$@"; do
+        case "$arg" in
+          file:*/imp.sqlite.restore\?*)
+            # written whole, then renamed, so a reader never sees a partial PID
+            echo "$$" > "$HOLDER_PID_FILE.partial"
+            mv "$HOLDER_PID_FILE.partial" "$HOLDER_PID_FILE"
+            # stdin from /dev/null, so the held process keeps no pipe of the caller's open
+            # shellcheck disable=SC2217
+            exec ${pkgs.coreutils}/bin/sleep infinity < /dev/null
+            ;;
+        esac
+      done
+      exec ${pkgs.sqlite}/bin/sqlite3 "$@"
+    '';
+  }
+)

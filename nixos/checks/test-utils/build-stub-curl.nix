@@ -12,21 +12,25 @@
 # exits 28 when the server never answers; the probe makes that call through $CURL.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
-pkgs.writeShellScript "curl-timing-out" ''
-  set -euo pipefail
-  if [ -z "''${CURL_LOG:-}" ]; then
-    echo "curl-timing-out: set CURL_LOG to the file that records each call" >&2
-    exit 2
-  fi
-  ${pkgs.jq}/bin/jq -cn '$ARGS.positional' --args -- "$@" >> "$CURL_LOG"
-  case "$#:''${1-}:''${2-}:''${4-}:''${5-}:''${6-}" in
-    "8:-s:-o:-w:%{http_code}:--max-time")
-      printf 000
-      exit 28
-      ;;
-    *)
-      echo "unexpected: $*" >&2
-      exit 97
-      ;;
-  esac
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "curl-timing-out";
+    text = ''
+      if [ -z "''${CURL_LOG:-}" ]; then
+        echo "curl-timing-out: set CURL_LOG to the file that records each call" >&2
+        exit 2
+      fi
+      ${pkgs.jq}/bin/jq -cn '$ARGS.positional' --args -- "$@" >> "$CURL_LOG"
+      case "$#:''${1-}:''${2-}:''${4-}:''${5-}:''${6-}" in
+        "8:-s:-o:-w:%{http_code}:--max-time")
+          printf 000
+          exit 28
+          ;;
+        *)
+          echo "unexpected: $*" >&2
+          exit 97
+          ;;
+      esac
+    '';
+  }
+)

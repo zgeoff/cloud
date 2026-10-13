@@ -35,7 +35,9 @@ let
   unknownGrants = lib.concatLists (
     lib.mapAttrsToList (
       id: principal:
-      map (target: "${id} -> ${target}") (lib.filter (target: !(cfg.targets ? ${target})) principal.targets)
+      map (target: "${id} -> ${target}") (
+        lib.filter (target: !(cfg.targets ? ${target})) principal.targets
+      )
     ) cfg.principals
   );
 in

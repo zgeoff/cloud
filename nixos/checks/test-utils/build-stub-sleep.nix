@@ -12,16 +12,20 @@
 # exits 0; the script's start loop pauses through $IMPD_START_SLEEP with `1`, once for each of
 # its IMPD_START_WAIT_SECONDS tries. nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
-pkgs.writeShellScript "sleep-returning-at-once" ''
-  set -euo pipefail
-  if [ -z "''${SLEEP_LOG:-}" ]; then
-    echo "sleep-returning-at-once: set SLEEP_LOG to the file that records each call" >&2
-    exit 2
-  fi
-  ${pkgs.jq}/bin/jq -cn '$ARGS.positional' --args -- "$@" >> "$SLEEP_LOG"
-  if [ "$#" -eq 1 ] && [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-    exit 0
-  fi
-  echo "unexpected: $*" >&2
-  exit 97
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "sleep-returning-at-once";
+    text = ''
+      if [ -z "''${SLEEP_LOG:-}" ]; then
+        echo "sleep-returning-at-once: set SLEEP_LOG to the file that records each call" >&2
+        exit 2
+      fi
+      ${pkgs.jq}/bin/jq -cn '$ARGS.positional' --args -- "$@" >> "$SLEEP_LOG"
+      if [ "$#" -eq 1 ] && [[ "$1" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+        exit 0
+      fi
+      echo "unexpected: $*" >&2
+      exit 97
+    '';
+  }
+)

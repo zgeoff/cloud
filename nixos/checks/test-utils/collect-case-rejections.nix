@@ -11,5 +11,6 @@ let
 in
 lib.optional (invalid != [ ])
   "renderCases: titles must be \"it \" and letters, digits, spaces or , . / : -: ${lib.concatStringsSep "; " invalid}"
-++ lib.optional (repeated != [ ])
-  "renderCases: titles must be unique: ${lib.concatStringsSep "; " repeated}"
+++ lib.optional (
+  repeated != [ ]
+) "renderCases: titles must be unique: ${lib.concatStringsSep "; " repeated}"

@@ -1,6 +1,11 @@
 # geoffcloud: Onidel VM, Melbourne. 8 vCPU (EPYC 7513, nested KVM), 31 GiB RAM.
 # vda: root (disko.nix). vdb: imp's ZFS pool, imported, never formatted here.
-{ config, modulesPath, pkgs, ... }:
+{
+  config,
+  modulesPath,
+  pkgs,
+  ...
+}:
 let
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = "100.69.47.33";

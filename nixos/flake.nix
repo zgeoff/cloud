@@ -15,7 +15,13 @@
   };
 
   outputs =
-    { self, nixpkgs, disko, imp, ... }:
+    {
+      self,
+      nixpkgs,
+      disko,
+      imp,
+      ...
+    }:
     {
       nixosConfigurations.geoffcloud = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
