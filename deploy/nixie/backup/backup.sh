@@ -2,7 +2,7 @@
 # nixie-backup backup|restore|ls, run in the atc-gateway-backup image (restic and sqlite3)
 #
 # backup:  copy nixie.db, then keys.db, from $STATE_DIR with sqlite3 .backup (consistent while
-#          nixie writes), copy both again if nixie removed a record key in between, check each
+#          nixie writes), copy both again if nixie wrote keys.db during the copies, check each
 #          copy with PRAGMA integrity_check, upload both with restic, then apply retention.
 # restore: restore the latest snapshot (or $SNAPSHOT) into a scratch directory, check both
 #          databases, stage both on $STATE_DIR, and only then replace them, with their -wal and
@@ -36,30 +36,45 @@ case "${1:-}" in
     done
     restic cat config > /dev/null 2>&1 || restic init
     work="$source_dir"
-    # nixie creates a record key before the record that uses it, and commits an item's forget
-    # before it removes the key. So nixie.db is copied first, and a key removed between the two
-    # copies leaves a pair that holds the item without its forget: the copy runs again then.
-    before=/tmp/nixie-backup-keys-before.db
+    # nixie commits a record key before the record that uses it, and an item's forget before it
+    # removes the item's key. One sqlite3 connection to keys.db reads PRAGMA data_version, a
+    # second sqlite3 copies nixie.db, and the connection copies keys.db and reads data_version
+    # again. The value changes only when another connection commits to keys.db. So an unchanged
+    # value means nixie created and removed no key from before the nixie.db copy to after the
+    # keys.db copy, and the keys.db copy holds the key of every item that the nixie.db copy
+    # holds unforgotten. A changed value copies both again. .system ignores the exit status of
+    # its command, so the nixie.db copy leaves a mark when it succeeds.
+    copier=/tmp/nixie-backup-copy.sh
+    copied=/tmp/nixie-backup-copied
+    cat > "$copier" << EOF
+sqlite3 '$state_dir/nixie.db' ".backup '$work/nixie.db'" && touch '$copied'
+EOF
     attempt=1
     while :; do
-      rm -rf "$work" "$before"
+      rm -rf "$work" "$copied"
       mkdir -m 0700 "$work"
-      sqlite3 "$state_dir/keys.db" ".backup '$before'"
+      versions=$(sqlite3 -bail "$state_dir/keys.db" << EOF
+PRAGMA data_version;
+.system sh $copier
+.backup main '$work/keys.db'
+PRAGMA data_version;
+EOF
+      )
+      [ -e "$copied" ] || { echo "the copy of nixie.db failed" >&2; exit 1; }
       for name in $databases; do
-        sqlite3 "$state_dir/$name" ".backup '$work/$name'"
         sqlite3 "$work/$name" 'PRAGMA integrity_check;' | grep -qx ok ||
           { echo "the copy of $name failed the integrity check" >&2; exit 1; }
       done
-      removed=$(sqlite3 "$work/keys.db" "ATTACH '$before' AS before;
-        SELECT count(*) FROM before.record_keys
-        WHERE key_id NOT IN (SELECT key_id FROM main.record_keys);")
-      rm -f "$before"
-      [ "$removed" = 0 ] && break
+      # shellcheck disable=SC2086 # split the two versions into $1 and $2
+      set -- $versions
+      [ "$#" = 2 ] || { echo "unexpected keys.db versions: $versions" >&2; exit 1; }
+      [ "$1" = "$2" ] && break
       [ "$attempt" -lt 5 ] ||
-        { echo "nixie removed record keys during each of $attempt copies" >&2; exit 1; }
-      echo "nixie removed $removed record keys during the copy; copying again"
+        { echo "nixie wrote keys.db during each of $attempt copies" >&2; exit 1; }
+      echo "nixie wrote keys.db during the copy; copying again"
       attempt=$((attempt + 1))
     done
+    rm -f "$copier" "$copied"
     (cd "$work" && restic backup --tag "$tag" --host "$host" .)
     restic forget --tag "$tag" --host "$host" --group-by host,tags \
       --keep-daily 7 --keep-weekly 4 --prune
