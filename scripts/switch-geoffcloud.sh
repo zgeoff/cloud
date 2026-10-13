@@ -6,7 +6,10 @@
 #   bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 #
 # A switch first needs a green NixOS checks run that covers the commit; with none, it stops
-# before the build and names the command that starts one. The switch runs only after the build
+# before the build and names the command that starts one. It also stops, before the build and
+# again before the activation, when the commit's atc daemon pin and a running atc gateway pod's
+# image differ in atc major version, since atc breaks its daemon protocol only in a major release.
+# The switch runs only after the build
 # exits 0: a failed build stops the script before
 # anything reaches the host. The build reads a `git archive` snapshot of the checked commit,
 # not the working tree, so an edit made while the script runs changes nothing. The switch
@@ -62,6 +65,21 @@ require_clean_main() {
   verified_commit="$head"
 }
 
+# The running atc gateway dials the host's atc daemon, so a switch takes only an atc daemon pin of
+# the gateway's atc major (scripts/check-atc-gateway-skew.sh). It reads the gateway's pods, not its
+# Deployment's spec: a rollout changes the spec first, and the old pod runs until it ends. It runs
+# before the build and again before the activation, so a gateway rollout during the build or the
+# copy cannot slip past. An ssh or kubectl failure stops the script (set -e) rather than reading
+# as no skew.
+require_gateway_major() {
+  local images
+  images="$(ssh -o BatchMode=yes "$host" \
+    "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'")"
+  # kubectl's jsonpath joins the pods' images with spaces, and an image reference holds none
+  # shellcheck disable=SC2086
+  bash "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$snapshot/nixos/packages/atc.nix" $images
+}
+
 verified_commit=""
 require_clean_main
 commit="$verified_commit"
@@ -80,6 +98,7 @@ if [[ "$mode" == switch ]]; then
     exit 1
   fi
   echo "== checked by $checked_by"
+  require_gateway_major
 fi
 echo "== build ${commit:0:7}"
 
@@ -106,6 +125,7 @@ docker run --rm --network host -v geoffcloud-nix-store:/nix \
 
 # as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a boot after a failed activation still picks the
 # new system, then switch-to-configuration in its own unit, so it survives a dropped SSH
+require_gateway_major
 echo "== switch $host"
 ssh -o BatchMode=yes "$host" "nix-env -p /nix/var/nix/profiles/system --set '$built' \
   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER \

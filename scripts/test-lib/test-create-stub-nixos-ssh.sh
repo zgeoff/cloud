@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the three
+# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the four
 # remote commands of a switch, fails closed on anything else, and hands a loopback call to
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
@@ -82,6 +82,71 @@ it_prints_no_status_text_for_failed_units_when_none_is_given() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
   [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+}
+
+it_prints_the_named_gateway_images_without_a_newline_for_the_kubectl_query() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_GATEWAY_IMAGES='ghcr.io/zgeoff/atc-gateway:2.27.0 ghcr.io/zgeoff/atc-gateway:4.5.0' \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  printf '%s' 'ghcr.io/zgeoff/atc-gateway:2.27.0 ghcr.io/zgeoff/atc-gateway:4.5.0' | cmp - "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+CALLS
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_prints_nothing_for_the_kubectl_query_when_no_gateway_pod_is_named() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  cmp /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+CALLS
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  for query in first second third; do
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+      STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 STUB_GATEWAY_LATER_IMAGES=ghcr.io/zgeoff/atc-gateway:4.5.0 \
+      ssh -o BatchMode=yes root@geoffcloud \
+      "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'" \
+      > "$tree/out-$query" 2>> "$tree/err" || status=$?
+  done
+
+  printf '%s' ghcr.io/zgeoff/atc-gateway:2.27.0 | cmp - "$tree/out-first"
+  printf '%s' ghcr.io/zgeoff/atc-gateway:4.5.0 | cmp - "$tree/out-second"
+  printf '%s' ghcr.io/zgeoff/atc-gateway:4.5.0 | cmp - "$tree/out-third"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+CALLS
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 it_prints_the_named_current_system_for_readlink() {

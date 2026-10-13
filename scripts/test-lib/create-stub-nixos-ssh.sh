@@ -1,8 +1,15 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the three remote commands the switch runs:
+# answers the four remote commands the switch runs:
 #
+# - the kubectl query for the atc gateway pods' images: prints STUB_GATEWAY_IMAGES (images
+#   separated by spaces, as jsonpath joins an `[*]` list) with no newline, as kubectl's jsonpath
+#   output ends, and nothing when it is unset, as for a selector that matches no pod. Left
+#   open, with no cluster sample: whether a real kubectl adds a "No resources found" line on
+#   stderr for that empty match, which the switch would pass through. From the
+#   second query on it prints STUB_GATEWAY_LATER_IMAGES instead, when that is set, so a case
+#   can roll the gateway out between the switch's two checks;
 # - the profile set and switch-to-configuration: prints nothing, or with
 #   STUB_ACTIVATE_FAILED_UNITS (unit names separated by spaces) fails as
 #   switch-to-configuration-ng does when units failed: "warning: the following units
@@ -71,6 +78,14 @@ if [ -n "${STUB_SSH_PASS:-}" ]; then
   exit 97
 fi
 case "${*:4}" in
+  "k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'")
+    queries="$(grep -cF 'k3s kubectl -n atc get pods -l app=atc-gateway' "$STUB_LOG")"
+    if [ "$queries" -gt 1 ] && [ -n "${STUB_GATEWAY_LATER_IMAGES+set}" ]; then
+      printf '%s' "$STUB_GATEWAY_LATER_IMAGES"
+    else
+      printf '%s' "${STUB_GATEWAY_IMAGES:-}"
+    fi
+    ;;
   "nix-env -p /nix/var/nix/profiles/system --set "*"/bin/switch-to-configuration' switch")
     if [ -n "${STUB_ACTIVATE_FAILED_UNITS:-}" ]; then
       read -ra failed <<< "$STUB_ACTIVATE_FAILED_UNITS"

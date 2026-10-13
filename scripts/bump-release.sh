@@ -38,7 +38,7 @@ case "$dependency" in
     url="https://github.com/zgeoff/atc/releases/tag/%40zgeoff/atc%40$version"
     gh release download "@zgeoff/atc@$version" -R zgeoff/atc -p SHA256SUMS -D "$work"
     pin=(bash "$here/pin-atc.sh" "$version" "$work/SHA256SUMS")
-    rollout="Rebuild the agent image (\`docs/runbooks/agent-image.md\`), switch the host (\`docs/runbooks/workflows.md\`), and publish the atc-gateway images. The \`Deploy prod\` workflow applies the pull request that pins their digests once it merges (\`docs/runbooks/prod-apply.md\`)."
+    rollout="Rebuild the agent image (\`docs/runbooks/agent-image.md\`) and publish the atc-gateway images. The \`Deploy prod\` workflow applies the pull request that pins their digests once it merges (\`docs/runbooks/prod-apply.md\`). Then switch the host (\`docs/runbooks/workflows.md\`), which refuses while the deployed gateway runs another atc major than the daemon pin."
     ;;
   imp)
     names=("imp's NixOS module and the imp-host image (\`nixos/\`)" "the imp-base image (\`images/agent/Dockerfile\`)")
