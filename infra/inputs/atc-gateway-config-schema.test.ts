@@ -1,5 +1,3 @@
-// each case repeats the whole valid config and alters one field, so its body is long
-/* oxlint-disable max-lines */
 import { expect, test } from 'bun:test';
 import { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
 

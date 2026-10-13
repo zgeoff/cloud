@@ -1,5 +1,3 @@
-// each case repeats the whole valid config, so its body is long
-/* oxlint-disable max-lines */
 import { expect, test } from 'bun:test';
 import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
 
