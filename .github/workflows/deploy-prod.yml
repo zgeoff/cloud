@@ -34,12 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # One decision at a time, so the runs' applies join the deploy-prod group in the order the runs
-    # started: a slow decision for an older commit never lands behind a newer commit's apply and
-    # takes its place. A newer decision that replaces a waiting one loses nothing, because the newer
-    # commit carries every change of the older one.
+    # started. queue: max keeps every waiting decision, in the order each began to wait, so a run
+    # that starts later, such as an older commit's whose CI finished last, never replaces a waiting
+    # one. actionlint 1.7.12 rejects the queue key, so .github/actionlint.yaml ignores that error.
     concurrency:
       group: deploy-prod-decide
       cancel-in-progress: false
+      queue: max
     # actions: read lists CI's runs for a dispatch
     permissions:
       contents: read
@@ -83,14 +84,15 @@ jobs:
     timeout-minutes: 45
     environment: prod
     # One apply at a time, and never cancel one in progress: a cancelled apply leaves the stack half
-    # changed. GitHub keeps only the newest pending job, which applies everything an older one
-    # would. The group sits after decide's filter, so a failed CI run, a pull request's run or a
-    # commit with nothing to apply never joins it and never takes the place of a waiting apply.
-    # The job decides again once it holds the group, so one that waited behind a newer commit's
-    # apply finds nothing left to do.
+    # changed. queue: max keeps every waiting apply, up to GitHub's 100, and starts them in the
+    # order each began to wait, so no apply takes the place of another. The group sits after
+    # decide's filter, so a failed CI run, a pull request's run or a commit with nothing to apply
+    # never joins it. The job decides again once it holds the group, so an older commit's apply
+    # that starts after a newer commit's finds nothing left to do, and the tag only moves forward.
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
+      queue: max
     outputs:
       verdict: ${{ steps.guard.outputs.verdict }}
     # contents: write moves the deployed/prod tag; id-token: write joins the tailnet through the

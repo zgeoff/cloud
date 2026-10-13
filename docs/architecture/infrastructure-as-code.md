@@ -120,12 +120,14 @@ the apply partway, which leaves the stack half changed.
 
 One apply runs at a time, and GitHub never cancels one in progress, because a cancelled apply leaves
 the stack half changed. The queue holds only the apply step, which a run reaches after its decision,
-so a failed CI run, a pull request's run and a commit with nothing to apply never join it. GitHub
-keeps only the newest apply that waits, and the one it drops loses nothing, because the newer apply
-covers every change since the tag. The decisions run one at a time in a queue of their own, so the
-applies join their queue in the order the runs started, and a slow decision for an older commit
-never takes the place of a newer commit's apply. A waiting apply reads the tag again once its turn
-comes, so an apply that a newer commit's apply overtook finds nothing left and skips.
+so a failed CI run, a pull request's run and a commit with nothing to apply never join it. The queue
+keeps every apply that waits, up to GitHub's cap on a concurrency group, and starts each in the
+order it began to wait, so no apply takes the place of another. A run starts when CI on its commit
+passes, so a newer commit's apply can join the queue before an older commit's. A waiting apply reads
+the tag again once its turn comes, so the older apply finds its commit already deployed and skips,
+and the tag moves only forward along `main`. The decisions run one at a time in a queue of their
+own, which keeps every waiting decision in the same way, so the applies join their queue in the
+order the runs started.
 
 The decision counts every commit since the tag that touches a Pulumi input, not the difference
 between the two trees. A commit that reverts an input change while that change applies therefore
