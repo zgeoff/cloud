@@ -540,9 +540,9 @@ let
       title = "it buildStubImpHostImage holds to the pinned imp: the path and socket of the proxy, and the own command of imp-host";
       script = ''
         command=$(jq -c '.proxy.command' ${imp}/deploy/imp-host.args.json)
-        waits=$(grep -cF '[ -S /run/imp-docker/docker.sock ] && exit 0' ${imp}/deploy/nixos/module.nix || true)
+        waits=$(grep -cF '[ -S /run/imp-docker/docker.sock ] && exit 0' ${imp}/deploy/nixos/config.nix || true)
         runs=$(grep -cxF '  runArgs = privileges ++ probedArgs ++ sharedArgs ++ secretArgs ++ dnsArgs ++ [ cfg.image ];' \
-          ${imp}/deploy/nixos/module.nix || true)
+          ${imp}/deploy/nixos/config.nix || true)
 
         assert_equals '["/usr/local/bin/imp-docker-proxy"]' "$command" "the proxy's command"
         assert_equals 1 "$waits" "the module's waits for the proxy's socket"
