@@ -56,3 +56,8 @@ definitions:
     kind: path
     # git-sync's link to its newest checkout of zgeoff/nixie-definitions
     path: /etc/nixie/definitions/current
+# the names the owner calls the agent by, which per-turn retrieval leaves out of its query
+agent:
+  names:
+    - Nix
+    - Nixie
