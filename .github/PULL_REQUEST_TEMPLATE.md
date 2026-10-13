@@ -18,6 +18,8 @@ words. No narrative about prior attempts or review cycles.
 - [ ] `bun run typecheck` passes
 - [ ] `bun run test` passes
 - [ ] `bun run lint` passes
+- [ ] `bun run test:scripts` passes
+- [ ] `bun run lint:sh`, `lint:nix`, `lint:py` and `lint:actions` pass
 - [ ] New tests added for new functionality
 
 ## Context

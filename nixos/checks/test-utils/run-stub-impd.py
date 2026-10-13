@@ -30,7 +30,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.command == "GET" and self.path == path:
             self.send(status, content_type, body)
         else:
-            self.send(500, "text/plain", f"unexpected request: {self.command} {self.path}".encode())
+            self.send(
+                500,
+                "text/plain",
+                f"unexpected request: {self.command} {self.path}".encode(),
+            )
 
     def send(self, code, kind, payload):
         self.send_response(code)

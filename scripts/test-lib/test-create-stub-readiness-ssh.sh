@@ -26,7 +26,10 @@ it_prints_the_named_node_line() {
   diff - "$tree/out" <<< 'geoffcloud   Ready   control-plane   1d   v1'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","nodes","--no-headers"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_a_namespace_it_holds() {
@@ -46,7 +49,10 @@ atc    Active   2d
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","namespace","atc"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_missing_namespace_with_kubectls_NotFound_and_exit_1() {
@@ -61,7 +67,10 @@ it_fails_a_missing_namespace_with_kubectls_NotFound_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error from server (NotFound): namespaces "atc" not found'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","namespace","atc"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_a_storage_class_it_holds() {
@@ -81,7 +90,10 @@ local-path-retain   rancher.io/local-path   Retain          WaitForFirstConsumer
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","storageclass","local-path-retain"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_missing_storage_class_with_kubectls_NotFound_and_exit_1() {
@@ -96,7 +108,10 @@ it_fails_a_missing_storage_class_with_kubectls_NotFound_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error from server (NotFound): storageclasses.storage.k8s.io "local-path-retain" not found'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","storageclass","local-path-retain"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_a_deployment_it_holds_with_the_namespace_before_get() {
@@ -116,7 +131,10 @@ atc-gateway   1/1     1            1           2d
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_a_deployment_it_holds_with_the_namespace_after_get() {
@@ -136,7 +154,10 @@ atc-gateway   1/1     1            1           2d
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","-n","atc","deploy","atc-gateway"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_missing_deployment_with_kubectls_NotFound_and_exit_1() {
@@ -151,7 +172,10 @@ it_fails_a_missing_deployment_with_kubectls_NotFound_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error from server (NotFound): deployments.apps "atc-gateway" not found'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","get","-n","atc","deploy","atc-gateway"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_a_deployments_ready_replicas_with_no_newline() {
@@ -168,7 +192,10 @@ it_prints_a_deployments_ready_replicas_with_no_newline() {
   printf '%s' '2' | diff - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","ingress","get","deploy","cloudflared","-o","jsonpath={.status.readyReplicas}"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_ready_replicas_of_a_missing_deployment_with_kubectls_NotFound_and_exit_1() {
@@ -183,7 +210,10 @@ it_fails_the_ready_replicas_of_a_missing_deployment_with_kubectls_NotFound_and_e
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error from server (NotFound): deployments.apps "cloudflared" not found'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","ingress","get","deploy","cloudflared","-o","jsonpath={.status.readyReplicas}"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_the_named_status_for_the_in_cluster_probe() {
@@ -198,7 +228,10 @@ it_prints_the_named_status_for_the_in_cluster_probe() {
   printf '%s' '403' | diff - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_named_available_memory() {
@@ -215,7 +248,10 @@ it_prints_the_named_available_memory() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","free -m | awk '/^Mem:/ {print $7}'"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_an_active_daemon_with_exit_0() {
@@ -230,7 +266,10 @@ it_answers_an_active_daemon_with_exit_0() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","is-active","--quiet","atc-daemon"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_an_inactive_daemon_with_systemctls_exit_3() {
@@ -245,7 +284,10 @@ it_answers_an_inactive_daemon_with_systemctls_exit_3() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","is-active","--quiet","atc-daemon"]'
-  [ "$status" = 3 ] || { echo "exit $status, want 3" >&2; exit 1; }
+  [ "$status" = 3 ] || {
+    echo "exit $status, want 3" >&2
+    exit 1
+  }
 }
 
 it_times_out_with_exit_255_when_the_host_does_not_answer() {
@@ -262,7 +304,10 @@ it_times_out_with_exit_255_when_the_host_does_not_answer() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","free -m | awk '/^Mem:/ {print $7}'"]
 CALLS
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_host() {
@@ -277,7 +322,10 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@other systemctl is-active --quiet atc-daemon'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@other","systemctl","is-active","--quiet","atc-daemon"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
@@ -292,7 +340,10 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@geoffcloud systemctl is-active --quiet atc-daemon'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","systemctl","is-active","--quiet","atc-daemon"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_kubectl_call() {
@@ -307,7 +358,10 @@ it_fails_closed_with_exit_97_on_another_kubectl_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud k3s kubectl delete namespace atc'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","delete","namespace","atc"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_command() {
@@ -322,7 +376,10 @@ it_fails_closed_with_exit_97_on_another_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@geoffcloud reboot'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","reboot"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the

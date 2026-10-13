@@ -54,28 +54,14 @@ jobs:
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'
-        run: |
-          if [ "$GITHUB_EVENT_NAME" != schedule ]; then
-            echo "needed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          covered="$(bun run --silent ci:find-nixos-check-run "$GITHUB_SHA")"
-          if [ -n "$covered" ]; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            echo "No input of the NixOS checks changed since $covered, so the checks did not run." | tee -a "$GITHUB_STEP_SUMMARY"
-          else
-            echo "needed=true" >> "$GITHUB_OUTPUT"
-          fi
+        run: bun run --silent ci:decide-nixos-checks
 
       # the runner has /dev/kvm, but QEMU, which runs as a nixbld user in the nixos/nix
       # container, got "Permission denied" on it and fell back to emulation; this rule opens it
       # to every user, as GitHub's changelog of 2024-04-02 documents for the hosted Linux runners
       - name: Open /dev/kvm to QEMU
         if: steps.decide.outputs.needed == 'true'
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
+        run: bun run --silent ci:open-kvm
 
       # capped at a private repo's standard runner (2 CPUs, 8 GB, of which the runner itself
       # takes about 1 GB), so the checks keep passing once the repo goes private

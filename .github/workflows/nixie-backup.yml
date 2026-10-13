@@ -7,6 +7,7 @@ on:
     branches: [main]
     paths:
       - deploy/nixie/backup/**
+      - scripts/run-shell-suites.sh
       - scripts/test-lib/run-cases.sh
       - scripts/test-lib/run-backup.sh
       - scripts/test-lib/run-backup-shell.sh
@@ -18,6 +19,7 @@ on:
   pull_request:
     paths:
       - deploy/nixie/backup/**
+      - scripts/run-shell-suites.sh
       - scripts/test-lib/run-cases.sh
       - scripts/test-lib/run-backup.sh
       - scripts/test-lib/run-backup-shell.sh

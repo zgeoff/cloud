@@ -17,6 +17,7 @@
 # `bun run test:nixie-backup-fixture` runs it; one case alone:
 #
 #   CASE='ls mode' bash deploy/nixie/backup/test-backup.sh
+# shell-suite: nixie-backup-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -69,7 +70,10 @@ ID  NOW  nixie       nixie       daily snapshot   /tmp/nixie-backup  SIZE
 1 snapshots
 
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/snapshot" << 'EOF'
 restic ls --tag nixie --host nixie latest | tail -n +2
 restic dump latest /nixie.db > /tmp/nixie.db && sqlite3 /tmp/nixie.db 'SELECT v FROM records'
@@ -264,7 +268,10 @@ it_fails_a_backup_without_keys_db_before_restic() {
 
   diff - "$tree/err" <<< 'no keys.db in /state'
   diff /dev/null "$tree/out"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'ls -A /state /repo' > "$tree/left"
   diff - "$tree/left" << 'EOF'
 /repo:
@@ -309,7 +316,10 @@ EOF
 
   diff - "$tree/err" <<< 'the copy of keys.db failed the integrity check'
   diff /dev/null "$tree/out"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'restic snapshots --json' > "$tree/snapshots"
   diff - "$tree/snapshots" <<< '[]'
 }
@@ -342,7 +352,10 @@ EOF
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'restic snapshots --json' > "$tree/snapshots"
   jq -r '[.[] | "\(.hostname) \(.paths[0]) \(if .paths == ["/tmp/nixie-backup"] then "NOW" else .time end)"] | sort[]' \
     "$tree/snapshots" > "$tree/kept"
@@ -386,7 +399,10 @@ Summary: Restored 2 files/dirs (SIZE) in T
 restored nixie.db: integrity_check ok
 restored keys.db: integrity_check ok
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
 cd /state && stat -c '%n %u:%g' * | sort
 sqlite3 /state/nixie.db 'SELECT v FROM records'
@@ -425,7 +441,10 @@ EOF
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @nixie to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< \
     "sqlite3 /state/nixie.db 'SELECT v FROM records'" > "$tree/state"
   diff - "$tree/state" <<< current
@@ -474,7 +493,10 @@ EOF
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @nixie to /tmp/tmp.X
 Summary: Restored 2 files/dirs (SIZE) in T
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
 sqlite3 /state/nixie.db 'SELECT v FROM records'
 sqlite3 /state/keys.db 'SELECT v FROM record_keys'
@@ -513,7 +535,10 @@ EOF
 cp: can't create '/state/nixie.db.restoring': Permission denied
 cannot stage nixie.db in /state
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
 ls -A /state
 cat /state/nixie.db-wal
@@ -545,14 +570,20 @@ sqlite3 /tmp/snap/nixie.db "UPDATE records SET v = 'newer';"
 EOF
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'restic snapshots --json' > "$tree/snapshots"
   older="$(jq -r '.[] | select(.time == "2020-01-06T10:00:00Z") | .short_id' "$tree/snapshots")"
-  [ -n "$older" ] || { echo "no snapshot from 2020-01-06" >&2; exit 1; }
+  [ -n "$older" ] || {
+    echo "no snapshot from 2020-01-06" >&2
+    exit 1
+  }
 
   run_backup "$name" "$image" --user 10001:10001 --entrypoint /bin/sh -e "SNAPSHOT=$older" \
     -v "$script:/opt/nixie-backup/backup.sh:ro" /opt/nixie-backup/backup.sh restore \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< \
     "sqlite3 /state/nixie.db 'SELECT v FROM records'" > "$tree/value"
   diff - "$tree/value" <<< older
@@ -585,7 +616,10 @@ ID  2020-01-06 10:00:00  nixie       nixie       /tmp/a  SIZE
 -------------------------------------------------------------------
 1 snapshots
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_rejects_an_unknown_mode_with_its_usage() {
@@ -601,7 +635,10 @@ it_rejects_an_unknown_mode_with_its_usage() {
 
   diff - "$tree/err" <<< 'usage: nixie-backup backup|restore|ls'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 # A sqlite3 wrapper at <path>, which the nixie.db copy cases put first on PATH. Around each copy

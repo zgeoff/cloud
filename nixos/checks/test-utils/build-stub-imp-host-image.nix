@@ -61,7 +61,5 @@ let
 in
 {
   inherit layout;
-  ref = "ghcr.io/zgeoff/imp-host:${tag}@${
-    (builtins.head (pkgs.lib.importJSON "${layout}/index.json").manifests).digest
-  }";
+  ref = "ghcr.io/zgeoff/imp-host:${tag}@${(builtins.head (pkgs.lib.importJSON "${layout}/index.json").manifests).digest}";
 }

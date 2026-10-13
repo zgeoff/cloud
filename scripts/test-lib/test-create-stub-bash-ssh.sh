@@ -36,7 +36,10 @@ it_runs_the_command_here_with_its_stdin_and_the_hosts_PATH() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c 'read -r line; host-tool \"$1\" \"$line\"; exit 3' _ arg"]
 CALLS
-  [ "$status" = 3 ] || { echo "exit $status, want 3" >&2; exit 1; }
+  [ "$status" = 3 ] || {
+    echo "exit $status, want 3" >&2
+    exit 1
+  }
 }
 
 it_forwards_none_of_the_callers_environment() {
@@ -54,7 +57,10 @@ it_forwards_none_of_the_callers_environment() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c 'printenv STUB_TREE'"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_runs_the_command_from_the_host_directory_with_a_HOME_inside_it() {
@@ -76,7 +82,10 @@ OUT
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c 'pwd; printenv HOME; ls -A \"$HOME\"'"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
@@ -93,7 +102,10 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff - "$tree/err" <<< "unexpected: root@geoffcloud bash -c 'touch $tree/ran'"
   diff - "$tree/calls" <<< "[\"ssh\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_host() {
@@ -110,7 +122,10 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@other bash -c 'touch $tree/ran'"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@other\",\"bash -c 'touch $tree/ran'\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_command_that_is_not_one_bash_c_argument() {
@@ -127,7 +142,10 @@ it_fails_closed_with_exit_97_on_a_command_that_is_not_one_bash_c_argument() {
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud touch $tree/ran"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"touch\",\"$tree/ran\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_one_remote_argument_that_is_not_bash_c() {
@@ -144,7 +162,10 @@ it_fails_closed_with_exit_97_on_one_remote_argument_that_is_not_bash_c() {
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud touch $tree/ran"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"touch $tree/ran\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_command_that_names_a_remote_tool() {
@@ -162,7 +183,10 @@ it_fails_closed_with_exit_97_on_a_command_that_names_a_remote_tool() {
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud bash -c 'touch $tree/ran; /usr/bin/rsync x y'"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran; /usr/bin/rsync x y'\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_when_a_remote_tool_on_the_host_PATH_is_not_a_stand_in() {
@@ -180,7 +204,10 @@ it_fails_closed_with_exit_97_when_a_remote_tool_on_the_host_PATH_is_not_a_stand_
   diff - "$tree/err" <<< "unexpected: tailscale on the host PATH is not a stand-in in $tree/host-bin"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_command_that_uses_command_p() {
@@ -198,7 +225,10 @@ it_fails_closed_with_exit_97_on_a_command_that_uses_command_p() {
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud bash -c 'touch $tree/ran; command -p true'"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran; command -p true'\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_when_a_host_stand_in_is_not_executable() {
@@ -216,7 +246,10 @@ it_fails_closed_with_exit_97_when_a_host_stand_in_is_not_executable() {
   diff - "$tree/err" <<< "unexpected: rsync on the host PATH is not a stand-in in $tree/host-bin"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"bash -c 'touch $tree/ran'\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255() {
@@ -231,7 +264,10 @@ it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -c true"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # 127.0.0.2 is loopback too, so a broken guard would only reach a dead local port, never a
@@ -248,7 +284,10 @@ it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.2:1 bash -c true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.2:1","bash -c true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # OpenSSH reads an option even after the destination, so the stand-in refuses one there
@@ -266,7 +305,10 @@ it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.1:1 -oProxyCommand=false bash -c true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","-oProxyCommand=false","bash -c true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
@@ -287,7 +329,10 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -c true"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin and fail-closed stand-ins for the

@@ -38,7 +38,10 @@ v1.0.0
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","release","list","-R","zgeoff/imp","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_no_release_when_the_test_wrote_no_tags() {
@@ -52,7 +55,10 @@ it_lists_no_release_when_the_test_wrote_no_tags() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_shows_the_notes_of_a_tag_whose_slashes_become_underscores() {
@@ -72,7 +78,10 @@ it_shows_the_notes_of_a_tag_whose_slashes_become_underscores() {
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","release","view","@zgeoff/atc@4.3.0","-R","zgeoff/atc","--json","body","--jq",".body"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_a_view_of_a_missing_release_as_gh_does() {
@@ -85,7 +94,10 @@ it_answers_a_view_of_a_missing_release_as_gh_does() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'release not found'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_downloads_a_release_asset_into_a_new_directory() {
@@ -101,7 +113,10 @@ it_downloads_a_release_asset_into_a_new_directory() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/dl/new/SHA256SUMS" <<< '4444444444444444444444444444444444444444444444444444444444444444  atc-linux-x64'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_a_download_of_a_missing_release_as_gh_does() {
@@ -114,8 +129,14 @@ it_answers_a_download_of_a_missing_release_as_gh_does() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'release not found'
-  [ ! -e "$tree/dl" ] || { echo "the download made $tree/dl" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/dl" ] || {
+    echo "the download made $tree/dl" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_the_commit_of_a_tag() {
@@ -131,7 +152,10 @@ it_prints_the_commit_of_a_tag() {
   diff - "$tree/out" <<< 'c5bea94080fdde9e21e9720295c1ca727302662e'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","repos/zgeoff/imp/commits/v1.0.1","--jq",".sha"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_the_commit_of_a_missing_tag_with_the_apis_422() {
@@ -142,10 +166,19 @@ it_answers_the_commit_of_a_missing_tag_with_the_apis_422() {
 
   "${case_env[@]}" gh api repos/zgeoff/imp/commits/v9.9.9 --jq .sha > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - <(cat "$tree/out"; echo) <<< '{"message":"No commit found for SHA: v9.9.9","documentation_url":"https://docs.github.com/rest/commits/commits#get-a-commit","status":"422"}'
-  [ "$(tail -c 1 "$tree/out")" = '}' ] || { echo "stdout ends in a newline" >&2; exit 1; }
+  diff - <(
+    cat "$tree/out"
+    echo
+  ) <<< '{"message":"No commit found for SHA: v9.9.9","documentation_url":"https://docs.github.com/rest/commits/commits#get-a-commit","status":"422"}'
+  [ "$(tail -c 1 "$tree/out")" = '}' ] || {
+    echo "stdout ends in a newline" >&2
+    exit 1
+  }
   diff - "$tree/err" <<< 'gh: No commit found for SHA: v9.9.9 (HTTP 422)'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_lists_no_open_pull_request_when_the_test_wrote_none() {
@@ -159,7 +192,10 @@ it_lists_no_open_pull_request_when_the_test_wrote_none() {
   diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_the_open_pull_requests_the_test_wrote() {
@@ -173,7 +209,10 @@ it_lists_the_open_pull_requests_the_test_wrote() {
 
   diff - "$tree/out" <<< '[{"number":12,"url":"https://github.com/zgeoff/cloud/pull/12"}]'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_the_closed_pull_requests_the_test_wrote_apart_from_the_open_ones() {
@@ -188,7 +227,10 @@ it_lists_the_closed_pull_requests_the_test_wrote_apart_from_the_open_ones() {
 
   diff - "$tree/out" <<< '[{"number":15}]'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_filters_the_open_pull_requests_through_the_calls_jq() {
@@ -202,7 +244,10 @@ it_filters_the_open_pull_requests_through_the_calls_jq() {
 
   diff - "$tree/out" <<< '12'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_shows_the_pull_request_the_test_wrote() {
@@ -217,7 +262,10 @@ it_shows_the_pull_request_the_test_wrote() {
   diff - "$tree/out" <<< '{"headRefOid":"abc"}'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","view","12","--repo","zgeoff/cloud","--json","headRefOid"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_turns_auto_merge_off_silently() {
@@ -231,7 +279,10 @@ it_turns_auto_merge_off_silently() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","merge","12","--repo","zgeoff/cloud","--disable-auto"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_squash_merges_silently_and_logs_the_token_it_ran_with() {
@@ -246,7 +297,10 @@ it_squash_merges_silently_and_logs_the_token_it_ran_with() {
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","merge","12","--repo","zgeoff/cloud","--squash","--match-head-commit","abc"]'
   diff - "$tree/tokens" <<< 'app-token'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_logs_unset_for_a_call_without_a_token() {
@@ -258,7 +312,10 @@ it_logs_unset_for_a_call_without_a_token() {
   "${case_env[@]}" gh pr merge 12 --repo zgeoff/cloud --disable-auto > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/tokens" <<< 'unset'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_creates_a_label_silently() {
@@ -272,7 +329,10 @@ it_creates_a_label_silently() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_a_create_with_the_new_pull_requests_url_and_keeps_its_body() {
@@ -287,7 +347,10 @@ it_answers_a_create_with_the_new_pull_requests_url_and_keeps_its_body() {
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/200'
   diff /dev/null "$tree/err"
   diff - "$tree/body" <<< 'Bumps atc to 4.3.0.'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_an_edit_with_the_pull_requests_url_and_keeps_its_body() {
@@ -302,7 +365,10 @@ it_answers_an_edit_with_the_pull_requests_url_and_keeps_its_body() {
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/12'
   diff /dev/null "$tree/err"
   diff - "$tree/body" <<< 'Bumps atc to 4.3.1.'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_no_body_for_an_edit_without_a_body_file() {
@@ -315,8 +381,14 @@ it_keeps_no_body_for_an_edit_without_a_body_file() {
 
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/12'
   diff /dev/null "$tree/err"
-  [ ! -e "$tree/body" ] || { echo "the edit kept a body: $(cat "$tree/body")" >&2; exit 1; }
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ ! -e "$tree/body" ] || {
+    echo "the edit kept a body: $(cat "$tree/body")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_on_an_unexpected_call() {
@@ -330,7 +402,10 @@ it_fails_closed_on_an_unexpected_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: repo delete zgeoff/cloud'
   diff - "$tree/calls" <<< '["gh","repo","delete","zgeoff/cloud"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 run_cases

@@ -14,7 +14,7 @@ print_check() {
 }
 
 run_kubectl() {
-  ssh -o BatchMode=yes -o ConnectTimeout=15 "root@$host" k3s kubectl "$@" 2>/dev/null
+  ssh -o BatchMode=yes -o ConnectTimeout=15 "root@$host" k3s kubectl "$@" 2> /dev/null
 }
 
 # the cluster
@@ -24,14 +24,14 @@ else
   print_check FAIL "k3s node on $host is not Ready, or $host is unreachable over the tailnet"
 fi
 
-free_mib=$(ssh -o BatchMode=yes "root@$host" "free -m | awk '/^Mem:/ {print \$7}'" 2>/dev/null)
+free_mib=$(ssh -o BatchMode=yes "root@$host" "free -m | awk '/^Mem:/ {print \$7}'" 2> /dev/null)
 if [ "${free_mib:-0}" -ge 1024 ]; then
   print_check ok "host has ${free_mib} MiB available (gateway needs 256 MiB)"
 else
   print_check FAIL "host has ${free_mib:-?} MiB available"
 fi
 
-if [ "$(run_kubectl -n ingress get deploy cloudflared -o jsonpath='{.status.readyReplicas}')" -ge 1 ] 2>/dev/null; then
+if [ "$(run_kubectl -n ingress get deploy cloudflared -o jsonpath='{.status.readyReplicas}')" -ge 1 ] 2> /dev/null; then
   print_check ok "cloudflared has ready replicas"
 else
   print_check FAIL "cloudflared has no ready replica"
@@ -74,7 +74,7 @@ else
 fi
 
 # the cloud daemon on the host
-if ssh -o BatchMode=yes "root@$host" systemctl is-active --quiet atc-daemon 2>/dev/null; then
+if ssh -o BatchMode=yes "root@$host" systemctl is-active --quiet atc-daemon 2> /dev/null; then
   print_check ok "atc-daemon is active on $host"
 else
   print_check missing "atc-daemon service on $host"

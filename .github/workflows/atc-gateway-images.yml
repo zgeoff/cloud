@@ -8,6 +8,8 @@ on:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
+      - scripts/publish-atc-gateway-images.sh
+      - scripts/run-shell-suites.sh
       - e2e/test-atc-gateway-restore.sh
       - infra/build-atc-gateway-spec.ts
       - infra/create-atc-gateway-backup-job.ts
@@ -18,6 +20,8 @@ on:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
+      - scripts/publish-atc-gateway-images.sh
+      - scripts/run-shell-suites.sh
       - e2e/test-atc-gateway-restore.sh
       - infra/build-atc-gateway-spec.ts
       - infra/create-atc-gateway-backup-job.ts
@@ -64,30 +68,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
       - name: Build and push
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          source deploy/atc-gateway/versions.env
-          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-          bash scripts/fetch-atc-release.sh context
-          cp deploy/atc-gateway/Dockerfile context/
-          gateway="ghcr.io/zgeoff/atc-gateway:$GATEWAY_IMAGE_TAG"
-          backup="ghcr.io/zgeoff/atc-gateway-backup:$BACKUP_IMAGE_TAG"
-          docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway" context
-          docker build --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup" deploy/atc-gateway/backup
-          # a published tag is immutable: skip it, and push only when the registry confirms
-          # the tag is missing; any other lookup error stops the run
-          for ref in "$gateway" "$backup"; do
-            if lookup=$(docker manifest inspect "$ref" 2>&1); then
-              echo "$ref: already published, not replaced" >> "$GITHUB_STEP_SUMMARY"
-              continue
-            fi
-            if ! grep -qiE 'no such manifest|manifest unknown' <<< "$lookup"; then
-              echo "cannot tell whether $ref exists: $lookup" >&2
-              exit 1
-            fi
-            docker push "$ref"
-            echo "$ref: $(docker inspect --format '{{index .RepoDigests 0}}' "$ref")" >> "$GITHUB_STEP_SUMMARY"
-          done
+        run: bun run ci:publish-atc-gateway-images

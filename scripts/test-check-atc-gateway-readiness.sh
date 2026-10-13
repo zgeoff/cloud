@@ -66,7 +66,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_reports_what_the_deploy_creates_as_missing_and_exits_0_before_the_deploy() {
@@ -109,7 +112,10 @@ OUT
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","is-active","--quiet","atc-daemon"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_three_host_checks_and_exits_3_when_the_host_does_not_answer() {
@@ -156,7 +162,10 @@ OUT
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","is-active","--quiet","atc-daemon"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 CALLS
-  [ "$status" = 3 ] || { echo "exit $status, want 3" >&2; exit 1; }
+  [ "$status" = 3 ] || {
+    echo "exit $status, want 3" >&2
+    exit 1
+  }
 }
 
 it_fails_the_node_check_and_exits_1_when_the_node_is_not_Ready() {
@@ -205,7 +214,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_the_memory_check_and_exits_1_below_1024_MiB_available() {
@@ -254,7 +266,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_passes_the_memory_check_at_exactly_1024_MiB_available() {
@@ -303,7 +318,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_cloudflared_check_and_exits_1_when_no_replica_is_ready() {
@@ -352,7 +370,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_two_checks_and_exits_2_when_the_node_is_not_Ready_and_memory_is_low() {
@@ -401,7 +422,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_reports_the_image_missing_when_ghcr_does_not_answer() {
@@ -449,7 +473,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_public_route_and_exits_1_when_its_metadata_answers_another_status() {
@@ -498,7 +525,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_the_public_route_with_000_and_exits_1_when_its_metadata_times_out() {
@@ -547,7 +577,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_the_in_cluster_check_and_exits_1_when_the_gateway_answers_another_status() {
@@ -596,7 +629,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_checks_the_named_host() {
@@ -645,7 +681,10 @@ OUT
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud-2","k3s","kubectl","-n","atc","get","deploy","atc-gateway"]
 ["ssh","-o","BatchMode=yes","-o","ConnectTimeout=15","root@geoffcloud-2","k3s","kubectl","-n","atc","run","readiness-probe","--rm","-i","--restart=Never","--quiet","--image=curlimages/curl:8.16.0","--","curl","-s","-o","/dev/null","-w","%{http_code}","-H","Host: atc.geoff.cloud","http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the script in <tree>/scripts, where it finds <tree>/infra as

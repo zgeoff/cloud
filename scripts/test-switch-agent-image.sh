@@ -73,7 +73,10 @@ EOF
 EOF
   diff - <(stat -c %a "$tree/home/.config/atc/config.json") <<< 600
   diff - <(stat -c %a "$tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234") <<< 600
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_switches_the_config_in_its_home_by_default() {
@@ -90,7 +93,10 @@ it_switches_the_config_in_its_home_by_default() {
 
   diff - <(jq -c . "$tree/home/.config/atc/config.json") <<< '{"targets":{"cloud":{"provider":"imp","image":"agent-abc1234","guestATC":"/usr/local/bin/atc"}}}'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_config_that_already_names_the_image_alone() {
@@ -109,7 +115,10 @@ it_leaves_a_config_that_already_names_the_image_alone() {
   diff /dev/null "$tree/err"
   cmp "$tree/before" "$tree/home/.config/atc/config.json"
   diff - <(ls "$tree/home/.config/atc") <<< 'config.json'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_sets_guest_atc_when_the_config_names_the_image_without_it() {
@@ -134,7 +143,10 @@ EOF
   diff /dev/null "$tree/err"
   cmp "$tree/before" "$tree/home/.config/atc/config.json.bak-20261010T050607Z-pre-agent-abc1234"
   diff - <(jq -c . "$tree/home/.config/atc/config.json") <<< '{"targets":{"cloud":{"provider":"imp","image":"agent-abc1234","guestATC":"/usr/local/bin/atc"}}}'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_image_the_host_lacks() {
@@ -153,7 +165,10 @@ it_refuses_an_image_the_host_lacks() {
   diff - "$tree/err" <<< 'the imp host has no image agent-abc1234: build it with scripts/build-agent-image.sh first'
   cmp "$tree/before" "$tree/home/.config/atc/config.json"
   diff - <(ls "$tree/home/.config/atc") <<< 'config.json'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_config_without_a_cloud_target() {
@@ -172,7 +187,10 @@ it_refuses_a_config_without_a_cloud_target() {
   diff - "$tree/err" <<< "$tree/home/.config/atc/config.json has no targets.cloud object"
   cmp "$tree/before" "$tree/home/.config/atc/config.json"
   diff - <(ls "$tree/home/.config/atc") <<< 'config.json'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_missing_config() {
@@ -187,7 +205,10 @@ it_refuses_a_missing_config() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$tree/home/.config/atc/config.json has no targets.cloud object"
   diff /dev/null <(ls "$tree/home/.config/atc")
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_an_image() {
@@ -201,7 +222,10 @@ it_prints_its_usage_without_an_image() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: switch-agent-image.sh <image> [<atc config file>]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

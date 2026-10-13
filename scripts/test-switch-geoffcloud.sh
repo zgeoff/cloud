@@ -86,7 +86,10 @@ nixos/marker
 nixos/packages/atc.nix
 EOF
   diff - "$tree/build-saw/nixos/marker" <<< committed
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_failed_units_the_host_reports_after_the_switch() {
@@ -132,7 +135,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_the_checked_commit_when_the_checkout_is_edited_during_the_build() {
@@ -180,7 +186,10 @@ $gh_runs_call
 EOF
   diff - "$tree/clone/nixos/marker" <<< edited
   diff - "$tree/build-saw/nixos/marker" <<< committed
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_never_builds_an_untracked_file() {
@@ -231,7 +240,10 @@ EOF
 nixos/marker
 nixos/packages/atc.nix
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # The script reads HEAD once, while it checks; a commit landing after that check must not
@@ -291,7 +303,10 @@ EOF
   git -C "$tree/clone" rev-parse HEAD~1 > "$tree/parent"
   diff - "$tree/parent" <<< "$checked"
   diff - "$tree/build-saw/nixos/marker" <<< committed
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_and_never_copies_with_build_only() {
@@ -318,7 +333,10 @@ EOF
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_never_builds_or_switches_a_commit_that_no_green_nixos_run_covers() {
@@ -340,7 +358,10 @@ EOF
   diff - "$tree/calls" <<< "$gh_runs_call"
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_or_switches_a_commit_that_changed_nixos_after_the_last_green_run() {
@@ -368,7 +389,10 @@ no green NixOS checks run covers ${commit:0:7}; start one with \`gh workflow run
 EOF
   diff /dev/null "$tree/out"
   diff - "$tree/calls" <<< "$gh_runs_call"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
@@ -388,7 +412,10 @@ it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
   diff - "$tree/calls" <<< "$gh_runs_call"
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 # cloud#207's skew: the bump pins daemon 4.5.0 while the cluster still runs gateway 2.27.0,
@@ -419,7 +446,10 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # a gateway rollout recreates its one pod, so for a while no gateway pod runs
@@ -448,7 +478,10 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The check runs again after the copy, so a gateway rollout that lands during the build or the
@@ -491,7 +524,10 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_or_switches_a_commit_without_the_atc_daemon_pin() {
@@ -515,7 +551,10 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_switches_the_host_that_the_environment_names() {
@@ -560,7 +599,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@other.test","readlink","/run/current-system"]
 ["ssh","-o","BatchMode=yes","root@other.test","systemctl","--failed","--no-legend","--plain"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_rejects_an_unknown_argument_with_its_usage() {
@@ -580,7 +622,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_never_builds_from_a_branch_other_than_main() {
@@ -603,7 +648,10 @@ EOF
   diff /dev/null "$tree/calls-masked"
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_with_uncommitted_changes() {
@@ -629,7 +677,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_when_git_status_fails() {
@@ -651,7 +702,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_never_builds_when_the_fetch_fails() {
@@ -676,7 +730,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_never_builds_when_origin_main_has_moved_on() {
@@ -699,7 +756,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_main_with_an_unpushed_commit() {
@@ -720,7 +780,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_never_builds_when_the_commit_cannot_be_archived() {
@@ -748,7 +811,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_leaves_no_snapshot_archive_behind_when_the_commit_cannot_be_archived() {
@@ -777,7 +843,10 @@ error: cannot read '$blob'
 EOF
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/calls"
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_never_builds_outside_a_git_checkout() {
@@ -799,7 +868,10 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_never_switches_after_a_failed_build() {
@@ -836,7 +908,10 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The real docker CLI, behind the logging stand-in, with no daemon at its socket: docker
@@ -908,7 +983,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The copy runs nix inside the pinned Nix image, which no hermetic case can start, so
@@ -949,7 +1027,10 @@ $gh_runs_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:./nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The real ssh, behind the logging stand-in, refused by a loopback port where nothing
@@ -981,7 +1062,10 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_stops_with_the_activation_exit_code_when_switch_to_configuration_fails() {
@@ -1028,7 +1112,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 EOF
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 # Only an interception drops an open session at the readlink check, so the ssh stand-in
@@ -1073,7 +1160,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 EOF
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_host_runs_another_system_after_the_switch() {
@@ -1117,7 +1207,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_systemctls_exit_code_when_listing_failed_units_fails() {
@@ -1164,7 +1257,10 @@ $gh_runs_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Boot data every case needs: a clone of a bare origin whose main holds one empty commit,

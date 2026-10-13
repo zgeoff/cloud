@@ -26,7 +26,10 @@ it_creates_the_directory_with_mode_0700() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"install\",\"-d\",\"-m\",\"0700\",\"-o\",\"root\",\"-g\",\"root\",\"$tree/host/secrets\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_sets_mode_0700_on_a_directory_that_exists() {
@@ -44,7 +47,10 @@ it_sets_mode_0700_on_a_directory_that_exists() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"install\",\"-d\",\"-m\",\"0700\",\"-o\",\"root\",\"-g\",\"root\",\"$tree/host/secrets\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # coreutils 9.4 (CI's ubuntu-24.04 runner image 20261004) and 9.11 word install's failure under a
@@ -82,7 +88,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff - "$tree/calls" <<< "[\"install\",\"-m\",\"0600\",\"$tree/calls\",\"$tree/host/copy\"]"
   ls -A "$tree/host" > "$tree/host-files"
   diff /dev/null "$tree/host-files"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_second_directory() {
@@ -100,7 +109,10 @@ it_fails_closed_with_exit_97_on_a_second_directory() {
   diff - "$tree/calls" <<< "[\"install\",\"-d\",\"-m\",\"0700\",\"-o\",\"root\",\"-g\",\"root\",\"$tree/host/secrets\",\"$tree/host/other\"]"
   ls -A "$tree/host" > "$tree/host-files"
   diff /dev/null "$tree/host-files"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, the host's root, and the HOME and

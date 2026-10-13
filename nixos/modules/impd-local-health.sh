@@ -1,8 +1,8 @@
-# Probe impd's /health on loopback and write node-exporter textfile metrics atomically.
-# Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR, and IMPD_HEALTH_TIMEOUT_SECONDS (curl's --max-time,
-# default 5). CURL names the curl it runs (default: the one on PATH, the package's own), so
-# nixos/checks/impd-local-health.nix can put a stand-in in its place. Writes
-# $TEXTFILE_DIR/impd_local_health.prom.
+# shellcheck shell=bash
+# Probe impd's /health on loopback and write node-exporter textfile metrics atomically to
+# $TEXTFILE_DIR/impd_local_health.prom. Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR, and
+# IMPD_HEALTH_TIMEOUT_SECONDS (curl's --max-time, default 5). CURL names the curl it runs (default:
+# the one on PATH, the package's own), so nixos/checks/impd-local-health.nix can swap in a stand-in.
 curl="${CURL:-curl}"
 
 body=$(mktemp)
@@ -17,7 +17,7 @@ if [ "$code" = "200" ] && grep -q '"ready":true' "$body"; then
 fi
 
 tmp=$(mktemp -p "$TEXTFILE_DIR" .impd_local_health.XXXXXX)
-cat > "$tmp" <<EOF
+cat > "$tmp" << EOF
 # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
 # TYPE impd_local_health_up gauge
 impd_local_health_up $up

@@ -23,7 +23,10 @@ it_logs_a_call_and_fails_closed_with_exit_97() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: scp -o BatchMode=yes $tree/calls root@geoffcloud:/tmp/"
   diff - "$tree/calls" <<< "[\"scp\",\"-o\",\"BatchMode=yes\",\"$tree/calls\",\"root@geoffcloud:/tmp/\"]"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_writes_one_stand_in_for_each_named_tool() {
@@ -54,7 +57,10 @@ it_fails_closed_with_exit_97_for_rsync() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: rsync status'
   diff - "$tree/calls" <<< '["rsync","status"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_for_scp() {
@@ -69,7 +75,10 @@ it_fails_closed_with_exit_97_for_scp() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: scp status'
   diff - "$tree/calls" <<< '["scp","status"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_for_sftp() {
@@ -84,7 +93,10 @@ it_fails_closed_with_exit_97_for_sftp() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: sftp status'
   diff - "$tree/calls" <<< '["sftp","status"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_for_ssh() {
@@ -99,7 +111,10 @@ it_fails_closed_with_exit_97_for_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: ssh status'
   diff - "$tree/calls" <<< '["ssh","status"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_for_tailscale() {
@@ -114,7 +129,10 @@ it_fails_closed_with_exit_97_for_tailscale() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: tailscale status'
   diff - "$tree/calls" <<< '["tailscale","status"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-ins for rsync, scp, sftp, ssh and tailscale in <tree>/bin,

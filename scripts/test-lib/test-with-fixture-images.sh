@@ -5,6 +5,9 @@
 # images once, in the case that runs a command.
 #
 #   bash scripts/test-lib/test-with-fixture-images.sh
+#
+# It tests the wrapper itself, so it runs outside it, in its own group:
+# shell-suite: fixture-images
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -28,7 +31,11 @@ it_runs_the_command_with_both_images_built_then_removes_them_and_returns_its_sta
     > "$tree/out" 2> "$tree/err" || status=$?
 
   run="$(sed -n 's/^run=\([0-9a-f]\{8\}\) .*$/\1/p' "$tree/out")"
-  [ -n "$run" ] || { cat "$tree/out"; echo "no run id in the output" >&2; exit 1; }
+  [ -n "$run" ] || {
+    cat "$tree/out"
+    echo "no run id in the output" >&2
+    exit 1
+  }
   diff - "$tree/out" << EOF
 built atc-gateway:fixture-$run and atc-gateway-backup:fixture-$run
 run=$run gateway=atc-gateway:fixture-$run backup=atc-gateway-backup:fixture-$run
@@ -38,7 +45,10 @@ EOF
   docker images -q --filter "reference=atc-gateway-backup:fixture-$run" > "$tree/backup-left"
   diff /dev/null "$tree/gateway-left"
   diff /dev/null "$tree/backup-left"
-  [ "$status" = 7 ] || { echo "exit $status, want 7" >&2; exit 1; }
+  [ "$status" = 7 ] || {
+    echo "exit $status, want 7" >&2
+    exit 1
+  }
 }
 
 # GH_HOST, SSL_CERT_FILE and an empty SSL_CERT_DIR point gh at the GitHub API stand-in on
@@ -77,7 +87,10 @@ POST /api/graphql RepositoryReleaseByTag tagName=$release
 EOF
   assert_missing "$tree/github/unexpected" "gh sent an unexpected request"
   assert_missing "$tree/ran" "the command ran after a failed build"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # A gh stand-in first on PATH records the environment the release fetch gives gh. The case
@@ -108,7 +121,10 @@ FAIL the images did not build from the pinned, checked binary and pinned bases
 EOF
   diff /dev/null "$tree/err"
   assert_missing "$tree/ran" "the command ran after a failed build"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

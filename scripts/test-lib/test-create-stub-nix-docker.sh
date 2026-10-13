@@ -40,7 +40,10 @@ it_copies_the_build_mount_and_prints_the_build_output() {
   diff - "$tree/calls" << CALLS
 ["docker","run","--rm","-v","$tree/src:/src:ro","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_edits_the_named_file_before_it_copies_the_build_mount() {
@@ -63,7 +66,10 @@ it_edits_the_named_file_before_it_copies_the_build_mount() {
   diff - "$tree/calls" << CALLS
 ["docker","run","--rm","-v","$tree/src:/src:ro","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_build_with_the_named_error_and_exit_1() {
@@ -80,11 +86,17 @@ it_fails_a_build_with_the_named_error_and_exit_1() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: builder for '/nix/store/x.drv' failed with exit code 1"
-  [ -d "$tree/saw" ] || { echo "the failed build did not copy its mount" >&2; exit 1; }
+  [ -d "$tree/saw" ] || {
+    echo "the failed build did not copy its mount" >&2
+    exit 1
+  }
   diff - "$tree/calls" << CALLS
 ["docker","run","--rm","-v","$tree/src:/src:ro","$NIX_IMAGE","nix","build","--no-link","--print-out-paths","path:."]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_answers_a_copy_with_nothing() {
@@ -102,7 +114,10 @@ it_answers_a_copy_with_nothing() {
   diff - "$tree/calls" << CALLS
 ["docker","run","--rm","$NIX_IMAGE","nix","copy","--to","ssh://root@geoffcloud","/nix/store/x"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_copy_with_the_named_error_and_exit_1() {
@@ -121,7 +136,10 @@ it_fails_a_copy_with_the_named_error_and_exit_1() {
   diff - "$tree/calls" << CALLS
 ["docker","run","--rm","$NIX_IMAGE","nix","copy","--to","ssh://root@geoffcloud","/nix/store/x"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
@@ -136,7 +154,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: ps -a'
   diff - "$tree/calls" <<< '["docker","ps","-a"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_logged_call_to_the_real_docker_which_fails_without_a_daemon_at_its_socket() {
@@ -175,7 +196,10 @@ it_never_hands_a_call_to_the_real_docker_without_a_DOCKER_HOST() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: version (DOCKER_HOST=)'
   diff - "$tree/calls" <<< '["docker","version"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_never_hands_a_call_to_the_real_docker_for_a_socket_outside_the_case_tree() {
@@ -190,7 +214,10 @@ it_never_hands_a_call_to_the_real_docker_for_a_socket_outside_the_case_tree() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: version (DOCKER_HOST=unix:///var/run/docker.sock)'
   diff - "$tree/calls" <<< '["docker","version"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # The `..` climbs out of the case tree to a socket path under its parent that does not
@@ -208,7 +235,10 @@ it_never_hands_a_call_to_the_real_docker_for_a_socket_that_climbs_out_of_the_cas
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: version (DOCKER_HOST=unix://$tree/../$(basename "$tree")-outside/docker.sock)"
   diff - "$tree/calls" <<< '["docker","version"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_call_to_the_real_docker_with_the_socket_path_normalised() {
@@ -246,7 +276,10 @@ it_never_hands_a_call_to_the_real_docker_for_a_tcp_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: version (DOCKER_HOST=tcp://127.0.0.1:1)'
   diff - "$tree/calls" <<< '["docker","version"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_call_to_the_system_docker_not_one_on_the_callers_PATH() {

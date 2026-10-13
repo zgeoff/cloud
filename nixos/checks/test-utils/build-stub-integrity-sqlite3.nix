@@ -20,10 +20,14 @@ let
     mv db $out
   '';
 in
-pkgs.writeShellScript "sqlite3-failing-integrity-check" ''
-  set -euo pipefail
-  if [ "$#" = 2 ] && [ "$2" = "PRAGMA integrity_check;" ]; then
-    exec ${pkgs.sqlite}/bin/sqlite3 -readonly ${damaged} 'PRAGMA integrity_check;'
-  fi
-  exec ${pkgs.sqlite}/bin/sqlite3 "$@"
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "sqlite3-failing-integrity-check";
+    text = ''
+      if [ "$#" = 2 ] && [ "$2" = "PRAGMA integrity_check;" ]; then
+        exec ${pkgs.sqlite}/bin/sqlite3 -readonly ${damaged} 'PRAGMA integrity_check;'
+      fi
+      exec ${pkgs.sqlite}/bin/sqlite3 "$@"
+    '';
+  }
+)

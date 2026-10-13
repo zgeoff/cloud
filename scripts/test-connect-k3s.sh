@@ -53,7 +53,10 @@ ONIDEL_API_KEY=op://cloud/onidel/credential
 # k3s API over the tailnet (#6)
 K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml
 ENV
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_replaces_the_stored_kubeconfig_and_leaves_an_env_that_has_its_reference() {
@@ -81,7 +84,10 @@ apiVersion: v1
     server: https://geoffcloud:6443
 DOC
   diff - "$tree/.env" <<< 'K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_reads_the_named_host_and_points_the_server_at_it() {
@@ -104,7 +110,10 @@ it_reads_the_named_host_and_points_the_server_at_it() {
 ["op","document","create","--vault","cloud","--title","k3s-kubeconfig","--file-name","kubeconfig.yaml","-"]
 CALLS
   diff - "$tree/vault/cloud/k3s-kubeconfig/kubeconfig.yaml" <<< '    server: https://geoffcloud-2:6443'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_writes_env_with_its_reference_when_none_is_there() {
@@ -130,7 +139,10 @@ CALLS
 # k3s API over the tailnet (#6)
 K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml
 ENV
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_ssh_exit_255_and_stores_nothing_when_the_host_does_not_answer() {
@@ -151,7 +163,10 @@ it_fails_with_ssh_exit_255_and_stores_nothing_when_the_host_does_not_answer() {
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/.env" <<< 'ONIDEL_API_KEY=op://cloud/onidel/credential'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_fails_with_exit_1_and_stores_nothing_when_the_host_has_no_k3s_kubeconfig() {
@@ -171,7 +186,10 @@ it_fails_with_exit_1_and_stores_nothing_when_the_host_has_no_k3s_kubeconfig() {
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/.env" <<< 'ONIDEL_API_KEY=op://cloud/onidel/credential'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_op_exit_1_and_leaves_env_when_the_new_document_is_refused() {
@@ -196,7 +214,10 @@ CALLS
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/.env" <<< 'ONIDEL_API_KEY=op://cloud/onidel/credential'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_op_exit_1_and_keeps_the_stored_kubeconfig_when_the_edit_is_refused() {
@@ -221,7 +242,10 @@ it_fails_with_op_exit_1_and_keeps_the_stored_kubeconfig_when_the_edit_is_refused
 CALLS
   diff - "$tree/vault/cloud/k3s-kubeconfig/kubeconfig.yaml" <<< 'old: kubeconfig'
   diff - "$tree/.env" <<< 'ONIDEL_API_KEY=op://cloud/onidel/credential'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_exit_1_after_storing_when_it_may_not_append_to_env() {
@@ -246,7 +270,10 @@ it_fails_with_exit_1_after_storing_when_it_may_not_append_to_env() {
 CALLS
   diff - "$tree/vault/cloud/k3s-kubeconfig/kubeconfig.yaml" <<< '    server: https://geoffcloud:6443'
   diff - "$tree/.env" <<< 'ONIDEL_API_KEY=op://cloud/onidel/credential'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_completes_env_on_a_second_run_after_a_failed_env_write() {
@@ -281,8 +308,14 @@ ONIDEL_API_KEY=op://cloud/onidel/credential
 K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml
 ENV
   diff - "$tree/first-err" <<< 'connect-k3s.sh: line 20: .env: Permission denied'
-  [ "$first_status" = 1 ] || { echo "first exit $first_status, want 1" >&2; exit 1; }
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$first_status" = 1 ] || {
+    echo "first exit $first_status, want 1" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the script in <tree>, the ssh and op stand-ins with fail-closed

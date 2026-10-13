@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hermetic test for test-nixos.sh: it builds the flake's checks from a snapshot of the tracked and
+# Hermetic test for run-nixos-checks.sh: it builds the flake's checks from a snapshot of the tracked and
 # unignored files, every check the flake declares or only the ones named, two builds at a time,
 # in a container capped at the CPUs and memory the environment names, and it passes KVM to the
 # build only when the device is there for it. It runs no Nix and no container: git and docker
@@ -8,8 +8,8 @@
 # no case depends on the machine's /dev/kvm. Each case compares the script's whole stdout, stderr
 # and call log, masking only the temporary paths.
 #
-#   bash scripts/test-test-nixos.sh
-#   CASE='kvm' bash scripts/test-test-nixos.sh   # the cases whose title holds it
+#   bash scripts/test-run-nixos-checks.sh
+#   CASE='kvm' bash scripts/test-run-nixos-checks.sh   # the cases whose title holds it
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -19,7 +19,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-checks-git.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-checks-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
-script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-nixos.sh"
+script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-nixos-checks.sh"
 
 it_builds_every_check_the_flake_declares_from_a_snapshot_of_the_tracked_and_unignored_files() {
   local status=0
@@ -59,7 +59,10 @@ EOF
   diff - "$tree/build-saw/nixos/flake.nix" <<< 'tracked'
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_caps_every_nix_container_at_the_cpus_and_memory_the_environment_names() {
@@ -85,7 +88,10 @@ it_caps_every_nix_container_at_the_cpus_and_memory_the_environment_names() {
 ["docker","run","--rm","--network","host","--cpuset-cpus","0-1","--memory","7g","--memory-swap","7g","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
 ["docker","run","--rm","--network","host","--cpuset-cpus","0-1","--memory","7g","--memory-swap","7g","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.impd-restore"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_only_the_checks_named_without_listing_the_flake() {
@@ -107,7 +113,10 @@ it_builds_only_the_checks_named_without_listing_the_flake() {
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.test-utils"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is_missing() {
@@ -122,14 +131,17 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
     bash "$script" impd-restore atc-daemon > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "test-nixos: $tree/no-kvm is missing or not readable and writable; impd-restore needs KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore needs KVM"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is_not_readable_and_writable() {
@@ -147,14 +159,17 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
     bash "$script" impd-restore atc-daemon > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "test-nixos: $tree/kvm is missing or not readable and writable; impd-restore needs KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/kvm is missing or not readable and writable; impd-restore needs KVM"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_builds_the_other_checks_then_fails_naming_every_restore_check_when_the_kvm_device_is_missing() {
@@ -169,14 +184,17 @@ it_builds_the_other_checks_then_fails_naming_every_restore_check_when_the_kvm_de
     bash "$script" impd-restore atc-daemon impd-restore-seams > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "test-nixos: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_checks_without_kvm() {
@@ -191,7 +209,7 @@ it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_ch
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "test-nixos: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
@@ -201,7 +219,10 @@ it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_ch
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_naming_impd_restore_and_builds_nothing_when_it_is_the_only_check_and_kvm_is_missing() {
@@ -216,12 +237,15 @@ it_fails_naming_impd_restore_and_builds_nothing_when_it_is_the_only_check_and_kv
     bash "$script" impd-restore > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "test-nixos: $tree/no-kvm is missing or not readable and writable; impd-restore needs KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore needs KVM"
   diff - "$tree/calls" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_without_building_when_the_flake_fails_to_evaluate() {
@@ -245,7 +269,10 @@ it_stops_without_building_when_the_flake_fails_to_evaluate() {
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_flake_declares_no_checks() {
@@ -260,14 +287,17 @@ it_fails_when_the_flake_declares_no_checks() {
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "test-nixos: the flake declares no checks.x86_64-linux"
+  diff - "$tree/err" <<< "run-nixos-checks: the flake declares no checks.x86_64-linux"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_the_build_when_a_check_fails() {
@@ -292,7 +322,10 @@ it_fails_with_the_build_when_a_check_fails() {
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 setup_test() {

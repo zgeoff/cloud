@@ -110,7 +110,10 @@ EOF
 ["gh","label","create","needs-review","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","waits for a review before it merges"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/atc","--title","chore(atc): bump atc to 5.0.0","--body-file","<work>/body","--label","update:major,needs-review"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_opens_an_imp_patch_bump_that_merges_on_its_own() {
@@ -174,7 +177,10 @@ EOF
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/imp","--title","chore(imp): bump imp to 1.0.1","--body-file","<work>/body","--label","update:patch,auto-merge"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_flags_a_nixie_bump_with_the_migrations_of_a_release_between() {
@@ -260,7 +266,10 @@ EOF
 ["gh","label","create","needs-review","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","waits for a review before it merges"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/nixie","--title","chore(nixie): bump nixie to 0.7.2","--body-file","<work>/body","--label","update:patch,migrations,needs-review"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_opens_an_auto_mode_patch_bump_that_merges_on_its_own() {
@@ -315,7 +324,10 @@ EOF
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/auto-mode","--title","chore(auto-mode): bump auto-mode to 0.19.4","--body-file","<work>/body","--label","update:patch,auto-merge"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_without_a_pull_request_when_npm_lacks_the_auto_mode_release() {
@@ -329,7 +341,10 @@ it_fails_without_a_pull_request_when_npm_lacks_the_auto_mode_release() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'curl: (22) The requested URL returned error: 404'
   diff - "$tree/calls" <<< '["curl","-fsSL","https://registry.npmjs.org/auto-mode/0.19.4"]'
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_auto_mode_tarball_away_from_where_the_image_fetches_it() {
@@ -345,7 +360,10 @@ it_refuses_an_auto_mode_tarball_away_from_where_the_image_fetches_it() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "npm lists auto-mode 0.19.4's tarball at https://registry.example.invalid/auto-mode-0.19.4.tgz, not where the agent image fetches it"
   diff - "$tree/calls" <<< '["curl","-fsSL","https://registry.npmjs.org/auto-mode/0.19.4"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_without_a_pull_request_when_the_release_lacks_its_sums() {
@@ -360,7 +378,10 @@ it_fails_without_a_pull_request_when_the_release_lacks_its_sums() {
   diff - "$tree/err" <<< 'release not found'
   sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g" "$tree/calls" > "$tree/calls.masked"
   diff - "$tree/calls.masked" <<< '["gh","release","download","@zgeoff/atc@5.0.0","-R","zgeoff/atc","-p","SHA256SUMS","-D","<work>"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_dependency_it_does_not_know() {
@@ -373,8 +394,14 @@ it_refuses_a_dependency_it_does_not_know() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a release check dependency: 'atc-gateway'"
-  [ ! -e "$tree/calls" ] || { echo "a stand-in ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "a stand-in ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_pinned_version_count_that_does_not_match_the_pins() {
@@ -389,7 +416,10 @@ it_refuses_a_pinned_version_count_that_does_not_match_the_pins() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'atc has 3 pins, but 1 pinned versions were given'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_pinned_version() {
@@ -402,8 +432,14 @@ it_prints_its_usage_without_a_pinned_version() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: bump-release.sh <dependency> <version> <pinned version>...'
-  [ ! -e "$tree/calls" ] || { echo "a stand-in ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "a stand-in ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_fails_without_a_pull_request_when_the_release_list_misses_the_pinned_release() {
@@ -425,7 +461,10 @@ it_fails_without_a_pull_request_when_the_release_list_misses_the_pinned_release(
 ["gh","release","view","v0.7.2","-R","zgeoff/nixie","--json","body","--jq",".body"]
 ["gh","release","list","-R","zgeoff/nixie","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

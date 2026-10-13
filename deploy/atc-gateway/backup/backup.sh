@@ -34,7 +34,10 @@ case "${1:-}" in
       sqlite3 "$work/$(basename "$db")" 'PRAGMA integrity_check;' | grep -qx ok
       found=$((found + 1))
     done
-    [ "$found" -gt 0 ] || { echo "no databases in $state_dir" >&2; exit 1; }
+    [ "$found" -gt 0 ] || {
+      echo "no databases in $state_dir" >&2
+      exit 1
+    }
     (cd "$work" && restic backup --tag "$tag" --host "$host" .)
     restic forget --tag "$tag" --host "$host" --group-by host,tags \
       --keep-daily 7 --keep-weekly 4 --prune
@@ -44,7 +47,10 @@ case "${1:-}" in
     work=$(mktemp -d)
     restic restore "${SNAPSHOT:-latest}" --tag "$tag" --host "$host" --target "$work"
     for db in "$work"/*.db; do
-      [ -e "$db" ] || { echo "snapshot holds no databases" >&2; exit 1; }
+      [ -e "$db" ] || {
+        echo "snapshot holds no databases" >&2
+        exit 1
+      }
       sqlite3 "$db" 'PRAGMA integrity_check;' | grep -qx ok
     done
     for db in "$work"/*.db; do

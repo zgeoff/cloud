@@ -45,18 +45,7 @@ jobs:
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'
-        run: |
-          bumps="$(bun run --silent ci:find-release-bumps)"
-          if [ -z "$bumps" ]; then
-            echo "Every pin holds its newest release." | tee -a "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          printf 'bumps<<EOF\n%s\nEOF\n' "$bumps" >> "$GITHUB_OUTPUT"
-          {
-            echo 'Pins older than their newest release (dependency, newest, pinned):'
-            echo
-            sed 's/^/- /' <<< "$bumps"
-          } | tee -a "$GITHUB_STEP_SUMMARY"
+        run: bun run --silent ci:write-release-bumps
 
   bump:
     needs: check
@@ -90,10 +79,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           SLUG: ${{ steps.app-token.outputs.app-slug }}
-        run: |
-          id="$(gh api "users/$SLUG%5Bbot%5D" --jq .id)"
-          git config user.name "$SLUG[bot]"
-          git config user.email "$id+$SLUG[bot]@users.noreply.github.com"
+        run: bun run --silent ci:set-release-bot-identity "$SLUG"
 
       # every line runs, so one dependency's failure leaves the others' pull requests current;
       # any failure fails the job once all have run
@@ -104,14 +90,4 @@ jobs:
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'
           BUMPS: ${{ needs.check.outputs.bumps }}
-        run: |
-          failed=0
-          while read -r -a bump; do
-            echo "::group::${bump[0]} ${bump[1]}"
-            # a failed pin can leave tracked files changed; each bump starts from a clean tree
-            git reset -q --hard
-            git clean -fdq
-            bun run --silent ci:bump-release "${bump[@]}" || { echo "::error::the ${bump[0]} bump failed"; failed=1; }
-            echo "::endgroup::"
-          done <<< "$BUMPS"
-          exit "$failed"
+        run: bun run --silent ci:bump-releases

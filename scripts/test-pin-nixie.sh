@@ -62,7 +62,10 @@ pinned nixie 0.7.1: sha256:33333333333333333333333333333333333333333333333333333
 pinned nixie-web 0.7.1: sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_release_that_is_already_pinned_alone() {
@@ -90,7 +93,10 @@ nixie 0.7.1 is already pinned
 nixie-web 0.7.1 is already pinned
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_newer_pin_alone() {
@@ -118,7 +124,10 @@ nixie 0.8.0 is pinned, which is newer than 0.7.1
 nixie-web 0.8.0 is pinned, which is newer than 0.7.1
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_the_release_pinned_with_another_digest_without_writing() {
@@ -143,7 +152,10 @@ EOF
   cmp "$tree/before" "$tree/repo/infra/Pulumi.prod.yaml"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'nixie-web 0.7.1 is pinned with sha256:2222222222222222222222222222222222222222222222222222222222222222, but the release notes list sha256:4444444444444444444444444444444444444444444444444444444444444444'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_notes_without_the_web_image_without_writing() {
@@ -171,7 +183,10 @@ EOF
   cmp "$tree/before" "$tree/repo/infra/Pulumi.prod.yaml"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the release notes list 0 ghcr.io/zgeoff/nixie-web digests under ## Images, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_notes_file() {
@@ -184,7 +199,10 @@ it_prints_its_usage_without_a_notes_file() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: pin-nixie.sh <version> <release notes file>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

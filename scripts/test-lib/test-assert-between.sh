@@ -18,7 +18,10 @@ it_passes_silently_for_the_low_bound() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_silently_for_a_value_between_the_bounds() {
@@ -30,7 +33,10 @@ it_passes_silently_for_a_value_between_the_bounds() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_silently_for_the_high_bound() {
@@ -42,7 +48,10 @@ it_passes_silently_for_the_high_bound() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_below_the_range() {
@@ -54,7 +63,10 @@ it_fails_below_the_range() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the label: expected 1..9, got 0'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_above_the_range() {
@@ -66,7 +78,10 @@ it_fails_above_the_range() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the label: expected 1..9, got 10'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_an_empty_value() {
@@ -78,7 +93,10 @@ it_fails_for_an_empty_value() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the label: expected 1..9, got ''"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_a_value_that_is_not_a_whole_number() {
@@ -90,7 +108,10 @@ it_fails_for_a_value_that_is_not_a_whole_number() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the label: expected 1..9, got 5.5'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

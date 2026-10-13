@@ -12,17 +12,21 @@
 # it reads each unit's state through $SYSTEMCTL as `show -p ActiveState --value <unit>`.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
-pkgs.writeShellScript "systemctl-failing-one-state-read" ''
-  set -euo pipefail
-  if [ -z "''${FAIL_SHOW_UNIT:-}" ]; then
-    echo "systemctl-failing-one-state-read: set FAIL_SHOW_UNIT to the unit whose state read fails" >&2
-    exit 2
-  fi
-  if [ "$#" -eq 5 ] && [ "$1" = show ] && [ "$2" = -p ] && [ "$3" = ActiveState ] &&
-    [ "$4" = --value ] && [ "$5" = "$FAIL_SHOW_UNIT" ]; then
-    # systemctl show's own message for a property read that fails
-    echo "Failed to get properties: Connection timed out" >&2
-    exit 1
-  fi
-  exec ${pkgs.systemd}/bin/systemctl "$@"
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "systemctl-failing-one-state-read";
+    text = ''
+      if [ -z "''${FAIL_SHOW_UNIT:-}" ]; then
+        echo "systemctl-failing-one-state-read: set FAIL_SHOW_UNIT to the unit whose state read fails" >&2
+        exit 2
+      fi
+      if [ "$#" -eq 5 ] && [ "$1" = show ] && [ "$2" = -p ] && [ "$3" = ActiveState ] &&
+        [ "$4" = --value ] && [ "$5" = "$FAIL_SHOW_UNIT" ]; then
+        # systemctl show's own message for a property read that fails
+        echo "Failed to get properties: Connection timed out" >&2
+        exit 1
+      fi
+      exec ${pkgs.systemd}/bin/systemctl "$@"
+    '';
+  }
+)

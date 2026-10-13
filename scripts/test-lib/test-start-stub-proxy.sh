@@ -39,8 +39,14 @@ it_records_each_connection_with_its_first_bytes() {
   diff /dev/null "$tree/second-out"
   diff - "$tree/first-err" <<< 'curl: (52) Empty reply from server'
   diff - "$tree/second-err" <<< 'curl: (52) Empty reply from server'
-  [ "$first" = 52 ] || { echo "first exit $first, want 52" >&2; exit 1; }
-  [ "$second" = 52 ] || { echo "second exit $second, want 52" >&2; exit 1; }
+  [ "$first" = 52 ] || {
+    echo "first exit $first, want 52" >&2
+    exit 1
+  }
+  [ "$second" = 52 ] || {
+    echo "second exit $second, want 52" >&2
+    exit 1
+  }
 }
 
 it_records_no_connection_until_one_arrives() {
@@ -211,7 +217,10 @@ TRACE
   assert_one_of_outputs "the trace under CURL_HOME's .curlrc" "$tree/trace-masked" "$tree/err" "$status" \
     "curl 8.5.0" "$tree/trace-curl-8.5" "$tree/want-err" 0 \
     "curl 8.22.0" "$tree/trace-curl-8.22" "$tree/want-err" 0
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in, started in <tree>/proxy, and the HOME and

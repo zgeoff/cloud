@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# create_stub_checks_git <bin>: writes <bin>/git, a stand-in for the git that test-nixos.sh calls
+# create_stub_checks_git <bin>: writes <bin>/git, a stand-in for the git that run-nixos-checks.sh calls
 # to find the repository and list its files. It logs each call's argv as a JSON line to STUB_LOG:
 #
 # - `rev-parse --show-toplevel`: STUB_TOPLEVEL and a newline, as git prints the toplevel;

@@ -29,7 +29,10 @@ it_answers_whoami_with_atc_clouds_identity_for_the_good_bearer() {
       -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"json":{"kind":"token","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}' | diff - "$tree/body"
-  [ "$code" = 200 ] || { echo "HTTP $code, want 200" >&2; exit 1; }
+  [ "$code" = 200 ] || {
+    echo "HTTP $code, want 200" >&2
+    exit 1
+  }
   assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
@@ -46,7 +49,10 @@ it_answers_whoami_with_401_for_another_bearer() {
       -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"error":"unauthorized"}' | diff - "$tree/body"
-  [ "$code" = 401 ] || { echo "HTTP $code, want 401" >&2; exit 1; }
+  [ "$code" = 401 ] || {
+    echo "HTTP $code, want 401" >&2
+    exit 1
+  }
   assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
@@ -62,7 +68,10 @@ it_answers_whoami_with_401_while_it_holds_no_good_bearer() {
       -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"error":"unauthorized"}' | diff - "$tree/body"
-  [ "$code" = 401 ] || { echo "HTTP $code, want 401" >&2; exit 1; }
+  [ "$code" = 401 ] || {
+    echo "HTTP $code, want 401" >&2
+    exit 1
+  }
   assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
@@ -73,11 +82,14 @@ it_answers_whoami_with_401_for_no_bearer_while_it_holds_no_good_bearer() {
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
-      curl -q --noproxy '*' -sS --max-time 5 --data '{"json":{}}' \
+    curl -q --noproxy '*' -sS --max-time 5 --data '{"json":{}}' \
     -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"error":"unauthorized"}' | diff - "$tree/body"
-  [ "$code" = 401 ] || { echo "HTTP $code, want 401" >&2; exit 1; }
+  [ "$code" = 401 ] || {
+    echo "HTTP $code, want 401" >&2
+    exit 1
+  }
   assert_missing "$tree/impd/unexpected" "whoami was recorded as unexpected"
 }
 
@@ -95,7 +107,10 @@ it_fails_closed_on_a_post_to_another_path_and_records_it() {
 
   printf '%s' '{"error":"stub-impd: unexpected POST /rpc/tokens/list"}' | diff - "$tree/body"
   diff - "$tree/impd/unexpected" <<< 'POST /rpc/tokens/list'
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_on_a_get_of_whoami_and_records_it() {
@@ -106,12 +121,15 @@ it_fails_closed_on_a_get_of_whoami_and_records_it() {
   build_token "$seed" good > "$tree/impd/good-token"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
-      curl -q --noproxy '*' -sS --max-time 5 -o "$tree/body" \
+    curl -q --noproxy '*' -sS --max-time 5 -o "$tree/body" \
     -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"error":"stub-impd: unexpected GET /rpc/tokens/whoami"}' | diff - "$tree/body"
   diff - "$tree/impd/unexpected" <<< 'GET /rpc/tokens/whoami'
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_on_a_put_of_whoami_and_records_it() {
@@ -121,12 +139,15 @@ it_fails_closed_on_a_put_of_whoami_and_records_it() {
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
-      curl -q --noproxy '*' -sS --max-time 5 -X PUT --data '{"json":{}}' \
+    curl -q --noproxy '*' -sS --max-time 5 -X PUT --data '{"json":{}}' \
     -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"error":"stub-impd: unexpected PUT /rpc/tokens/whoami"}' | diff - "$tree/body"
   diff - "$tree/impd/unexpected" <<< 'PUT /rpc/tokens/whoami'
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_on_a_delete_of_whoami_and_records_it() {
@@ -136,12 +157,15 @@ it_fails_closed_on_a_delete_of_whoami_and_records_it() {
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
-      curl -q --noproxy '*' -sS --max-time 5 -X DELETE \
+    curl -q --noproxy '*' -sS --max-time 5 -X DELETE \
     -o "$tree/body" -w '%{http_code}' "http://127.0.0.1:$(cat "$tree/impd/port")/rpc/tokens/whoami")"
 
   printf '%s' '{"error":"stub-impd: unexpected DELETE /rpc/tokens/whoami"}' | diff - "$tree/body"
   diff - "$tree/impd/unexpected" <<< 'DELETE /rpc/tokens/whoami'
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in, started in <tree>/impd, and the HOME and

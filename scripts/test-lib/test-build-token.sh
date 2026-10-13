@@ -27,7 +27,10 @@ it_builds_a_token_in_imps_format() {
 
   build_token 42 good > "$tree/token"
 
-  [[ "$(< "$tree/token")" =~ ^imp_[0-9a-f]{16}\.[0-9a-f]{43}$ ]] || { echo "$(< "$tree/token") is not imp_<16>.<43>" >&2; exit 1; }
+  [[ "$(< "$tree/token")" =~ ^imp_[0-9a-f]{16}\.[0-9a-f]{43}$ ]] || {
+    echo "$(< "$tree/token") is not imp_<16>.<43>" >&2
+    exit 1
+  }
 }
 
 it_builds_the_same_token_for_the_same_seed_and_label() {
@@ -47,7 +50,10 @@ it_builds_another_token_for_another_label() {
   build_token 42 good > "$tree/good"
   build_token 42 stale > "$tree/stale"
 
-  ! cmp -s "$tree/good" "$tree/stale" || { echo "both labels built $(< "$tree/good")" >&2; exit 1; }
+  ! cmp -s "$tree/good" "$tree/stale" || {
+    echo "both labels built $(< "$tree/good")" >&2
+    exit 1
+  }
 }
 
 it_builds_another_token_for_another_seed() {
@@ -57,7 +63,10 @@ it_builds_another_token_for_another_seed() {
   build_token 42 good > "$tree/seed-42"
   build_token 43 good > "$tree/seed-43"
 
-  ! cmp -s "$tree/seed-42" "$tree/seed-43" || { echo "both seeds built $(< "$tree/seed-42")" >&2; exit 1; }
+  ! cmp -s "$tree/seed-42" "$tree/seed-43" || {
+    echo "both seeds built $(< "$tree/seed-42")" >&2
+    exit 1
+  }
 }
 
 run_cases

@@ -32,7 +32,10 @@ case "${1:-}" in
   backup)
     # sqlite3 creates a database it cannot find, so check for each before any copy
     for name in $databases; do
-      [ -e "$state_dir/$name" ] || { echo "no $name in $state_dir" >&2; exit 1; }
+      [ -e "$state_dir/$name" ] || {
+        echo "no $name in $state_dir" >&2
+        exit 1
+      }
     done
     restic cat config > /dev/null 2>&1 || restic init
     work="$source_dir"
@@ -53,24 +56,37 @@ EOF
     while :; do
       rm -rf "$work" "$copied"
       mkdir -m 0700 "$work"
-      versions=$(sqlite3 -bail "$state_dir/keys.db" << EOF
+      versions=$(
+        sqlite3 -bail "$state_dir/keys.db" << EOF
 PRAGMA data_version;
 .system sh $copier
 .backup main '$work/keys.db'
 PRAGMA data_version;
 EOF
       )
-      [ -e "$copied" ] || { echo "the copy of nixie.db failed" >&2; exit 1; }
+      [ -e "$copied" ] || {
+        echo "the copy of nixie.db failed" >&2
+        exit 1
+      }
       for name in $databases; do
         sqlite3 "$work/$name" 'PRAGMA integrity_check;' | grep -qx ok ||
-          { echo "the copy of $name failed the integrity check" >&2; exit 1; }
+          {
+            echo "the copy of $name failed the integrity check" >&2
+            exit 1
+          }
       done
       # shellcheck disable=SC2086 # split the two versions into $1 and $2
       set -- $versions
-      [ "$#" = 2 ] || { echo "unexpected keys.db versions: $versions" >&2; exit 1; }
+      [ "$#" = 2 ] || {
+        echo "unexpected keys.db versions: $versions" >&2
+        exit 1
+      }
       [ "$1" = "$2" ] && break
       [ "$attempt" -lt 5 ] ||
-        { echo "nixie wrote keys.db during each of $attempt copies" >&2; exit 1; }
+        {
+          echo "nixie wrote keys.db during each of $attempt copies" >&2
+          exit 1
+        }
       echo "nixie wrote keys.db during the copy; copying again"
       attempt=$((attempt + 1))
     done
@@ -84,15 +100,25 @@ EOF
     work=$(mktemp -d)
     restic restore "${SNAPSHOT:-latest}" --tag "$tag" --host "$host" --target "$work"
     for name in $databases; do
-      [ -e "$work/$name" ] || { echo "the snapshot holds no $name" >&2; exit 1; }
+      [ -e "$work/$name" ] || {
+        echo "the snapshot holds no $name" >&2
+        exit 1
+      }
       sqlite3 "$work/$name" 'PRAGMA integrity_check;' | grep -qx ok ||
-        { echo "the restored $name failed the integrity check" >&2; exit 1; }
+        {
+          echo "the restored $name failed the integrity check" >&2
+          exit 1
+        }
     done
     # stage both copies on the state volume first, so a full volume or an I/O error stops the
     # restore before it deletes anything, and each database then replaces its old one by rename
     for name in $databases; do
       cp "$work/$name" "$state_dir/$name.restoring" ||
-        { rm -f "$state_dir"/*.restoring; echo "cannot stage $name in $state_dir" >&2; exit 1; }
+        {
+          rm -f "$state_dir"/*.restoring
+          echo "cannot stage $name in $state_dir" >&2
+          exit 1
+        }
     done
     for name in $databases; do
       rm -f "$state_dir/$name-wal" "$state_dir/$name-shm"

@@ -30,7 +30,10 @@ apiVersion: v1
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_cats_error_and_exit_1_when_the_host_has_no_kubeconfig() {
@@ -45,7 +48,10 @@ it_fails_with_cats_error_and_exit_1_when_the_host_has_no_kubeconfig() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'cat: /etc/rancher/k3s/k3s.yaml: No such file or directory'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The host's missing file and the real cat agree: the same message for the same path.
@@ -63,7 +69,10 @@ it_fails_a_missing_kubeconfig_as_the_real_cat_does() {
   sed "s|$tree/host/k3s.yaml|/etc/rancher/k3s/k3s.yaml|" "$tree/real-err" > "$tree/real-err-at-host-path"
   diff "$tree/real-err-at-host-path" "$tree/err"
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
+  [ "$status" = "$real_status" ] || {
+    echo "exit $status, want $real_status" >&2
+    exit 1
+  }
 }
 
 it_times_out_with_exit_255_when_the_host_does_not_answer() {
@@ -79,7 +88,10 @@ it_times_out_with_exit_255_when_the_host_does_not_answer() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host geoffcloud port 22: Connection timed out\r'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_host() {
@@ -95,7 +107,10 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@other cat /etc/rancher/k3s/k3s.yaml'
   diff - "$tree/calls" <<< '["ssh","root@other","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_command() {
@@ -111,7 +126,10 @@ it_fails_closed_with_exit_97_on_another_command() {
   diff - "$tree/err" <<< "unexpected: root@geoffcloud touch $tree/ran"
   diff - "$tree/calls" <<< "[\"ssh\",\"root@geoffcloud\",\"touch $tree/ran\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the

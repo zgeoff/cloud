@@ -51,7 +51,10 @@ ARG GITLEAKS_VERSION=8.30.1
 EOF
   diff - "$tree/out" <<< "pinned auto-mode 0.19.3: $sum"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_pin_that_already_matches_alone() {
@@ -71,7 +74,10 @@ it_leaves_a_pin_that_already_matches_alone() {
   diff "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff - "$tree/out" <<< 'auto-mode 0.19.3 is already pinned'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_newer_pin_alone() {
@@ -93,7 +99,10 @@ EOF
   diff "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff - "$tree/out" <<< 'auto-mode 0.20.0 is pinned, which is newer than 0.19.3'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_another_sum_for_the_pinned_version() {
@@ -116,7 +125,10 @@ EOF
   diff "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "auto-mode 0.19.3 is pinned with sum 1111111111111111111111111111111111111111111111111111111111111111, but the tarball's is $sum"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_tarball_that_does_not_match_its_integrity() {
@@ -139,7 +151,10 @@ EOF
   diff "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the tarball does not match $integrity"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_tarball_of_another_version() {
@@ -161,7 +176,10 @@ EOF
   diff "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the tarball holds auto-mode 0.19.2, not 0.19.3'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_dockerfile_without_an_auto_mode_version_pin() {
@@ -179,7 +197,10 @@ it_refuses_a_dockerfile_without_an_auto_mode_version_pin() {
   diff - "$tree/repo/images/agent/Dockerfile" <<< 'ARG AUTO_MODE_SHA256=1111111111111111111111111111111111111111111111111111111111111111'
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'images/agent/Dockerfile has 0 ARG AUTO_MODE_VERSION= lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_dockerfile_with_two_auto_mode_sha256_pins() {
@@ -202,7 +223,10 @@ EOF
   diff "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'images/agent/Dockerfile has 2 ARG AUTO_MODE_SHA256= lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_version_that_is_not_a_release() {
@@ -215,7 +239,10 @@ it_refuses_a_version_that_is_not_a_release() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a release version: '0.19.3-rc.1'"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_integrity_that_is_not_sha512() {
@@ -228,7 +255,10 @@ it_refuses_an_integrity_that_is_not_sha512() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a sha512 integrity: 'sha1-CO9z/T8qyTDy8QmgjOvz7kAppJw='"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

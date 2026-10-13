@@ -9,6 +9,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-run-backup-shell.sh
 #   CASE='first failing' bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-run-backup-shell.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -52,7 +53,10 @@ tar -cf - -C /tmp/obs .
 EOF
 
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
   tar -xf "$tree/out.tar" -C "$tree/obs"
   printf '65532\nexit 0\n' | diff - "$tree/obs/uid"
   printf '65532\nexit 0\n' | diff - "$tree/obs/gid"
@@ -78,7 +82,10 @@ it_stops_the_backup_shell_at_the_first_failing_command() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< before
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_replaces_a_default_with_a_trailing_docker_run_option() {
@@ -88,12 +95,17 @@ it_replaces_a_default_with_a_trailing_docker_run_option() {
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
 
+  # the shell in the container expands the command, so it stays unexpanded here
+  # shellcheck disable=SC2016
   run_backup_shell "$name" "$backup_image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
     <<< 'echo "$(id -u):$(id -g) $STATE_DIR"' > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< '10001:10001 /state'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_trailing_docker_run_option_without_a_value() {
@@ -108,7 +120,10 @@ it_refuses_a_trailing_docker_run_option_without_a_value() {
 
   diff - "$tree/err" <<< 'run_backup_shell: the docker run option --user has no value'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state"
   diff /dev/null "$tree/state"
 }

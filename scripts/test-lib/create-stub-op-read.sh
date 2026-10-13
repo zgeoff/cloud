@@ -1,6 +1,7 @@
 # shellcheck shell=bash
 # create_stub_op_read <bin>: writes <bin>/op, a stand-in for the 1Password CLI's
-# `op read --no-newline op://<vault>/<item>/<field>`, as install-imp-dns-token.sh calls it.
+# `op read --no-newline op://<vault>/<item>/<field>`, as install-imp-dns-token.sh and
+# alert-prod-apply.sh call it.
 # A vault is a directory under STUB_TREE/vault/, an item a directory in it, and a field a
 # file in that, holding the field's value. It logs each call's argv as a JSON line to
 # STUB_TREE/calls and prints the field's value with no newline added. For an item that is

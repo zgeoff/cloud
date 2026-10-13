@@ -45,7 +45,10 @@ it_prints_the_url_of_a_green_run_on_the_commit_itself() {
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_newest_run_on_an_ancestor_when_no_input_changed_since() {
@@ -73,7 +76,10 @@ $older https://github.com/zgeoff/cloud/actions/runs/8" \
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/9
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_nothing_when_nixos_changed_since_the_newest_green_run() {
@@ -96,7 +102,10 @@ it_prints_nothing_when_nixos_changed_since_the_newest_green_run() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_skips_a_run_on_a_commit_the_checkout_lacks_and_a_run_off_the_history_of_the_commit() {
@@ -123,7 +132,10 @@ $checked https://github.com/zgeoff/cloud/actions/runs/8" \
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/8
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_nothing_when_gh_lists_no_green_run() {
@@ -138,7 +150,10 @@ it_prints_nothing_when_gh_lists_no_green_run() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_the_exit_and_error_of_gh_when_gh_fails() {
@@ -156,7 +171,10 @@ it_fails_with_the_exit_and_error_of_gh_when_gh_fails() {
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 it_fails_without_calling_gh_for_a_commit_git_cannot_resolve() {
@@ -172,7 +190,10 @@ it_fails_without_calling_gh_for_a_commit_git_cannot_resolve() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'find-nixos-check-run: no-such-commit is not a commit'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_call_without_one_commit_with_its_usage() {
@@ -188,7 +209,10 @@ it_rejects_a_call_without_one_commit_with_its_usage() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: find-nixos-check-run.sh <commit>'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the gh stand-in and a git repository on main. Each case commits the

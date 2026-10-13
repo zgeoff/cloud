@@ -18,7 +18,10 @@ it_passes_silently_for_different_strings() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_for_equal_strings_naming_the_value_quoted() {
@@ -30,7 +33,10 @@ it_fails_for_equal_strings_naming_the_value_quoted() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the label: expected anything but a\ b'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

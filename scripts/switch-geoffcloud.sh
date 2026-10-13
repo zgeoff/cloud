@@ -17,6 +17,7 @@
 # system profile at it and runs its switch-to-configuration, as nixos-rebuild does, with no
 # second evaluation of the flake.
 set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 mode="${1:-switch}"

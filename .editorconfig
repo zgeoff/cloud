@@ -11,3 +11,12 @@ trim_trailing_whitespace = true
 [*.md]
 max_line_length = off
 trim_trailing_whitespace = false
+
+# shfmt reads these; scripts/lint.sh passes it no printer flags
+[*.sh]
+switch_case_indent = true
+space_redirects = true
+
+[images/agent/sbin/setup-swap]
+switch_case_indent = true
+space_redirects = true

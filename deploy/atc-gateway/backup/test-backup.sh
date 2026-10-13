@@ -19,6 +19,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/backup/test-backup.sh
 #   CASE='ls mode' bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/backup/test-backup.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -219,7 +220,10 @@ it_rejects_a_run_without_a_mode_with_its_usage() {
 
   diff - "$tree/err" <<< 'usage: atc-gateway-backup backup|restore|ls'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_rejects_an_unknown_mode_with_its_usage() {
@@ -233,7 +237,10 @@ it_rejects_an_unknown_mode_with_its_usage() {
 
   diff - "$tree/err" <<< 'usage: atc-gateway-backup backup|restore|ls'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_stops_before_restic_when_STATE_DIR_is_unset() {
@@ -251,7 +258,10 @@ it_stops_before_restic_when_STATE_DIR_is_unset() {
   diff /dev/null "$tree/out"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /repo' > "$tree/repo"
   diff /dev/null "$tree/repo"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_fails_a_backup_of_a_state_dir_without_databases() {
@@ -268,7 +278,10 @@ it_fails_a_backup_of_a_state_dir_without_databases() {
   diff /dev/null "$tree/out"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json' > "$tree/snapshots"
   diff - "$tree/snapshots" <<< '[]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The database's index holds a key its table does not (row0010 rewritten as row0019), so
@@ -374,7 +387,10 @@ EOF
   diff - "$tree/state-files" <<< gateway.db
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state-rows"
   diff - "$tree/state-rows" <<< current
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_a_restore_of_a_snapshot_without_databases() {
@@ -399,7 +415,10 @@ Summary: Restored 1 files/dirs (SIZE) in T
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state"
   diff /dev/null "$tree/state"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_a_restore_when_the_repository_holds_no_gateway_snapshot() {
@@ -420,7 +439,10 @@ EOF
 Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[atc-gateway]] Hosts:[atc-gateway]): no snapshot found
 EOF
   diff /dev/null "$tree/out"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # ls lists the gateway's snapshots alone; each ID is random, so the case masks that column
@@ -450,7 +472,10 @@ ID  2020-01-07 10:00:00  atc-gateway  atc-gateway  /tmp/a  SIZE
 ---------------------------------------------------------------------
 2 snapshots
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_restores_the_snapshot_that_SNAPSHOT_names_instead_of_the_latest() {
@@ -469,7 +494,10 @@ sqlite3 /tmp/snap/gateway.db "UPDATE f SET v = 'newer';"
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json' > "$tree/snapshots"
   older="$(jq -r '.[] | select(.time == "2020-01-06T10:00:00Z") | .short_id' "$tree/snapshots")"
-  [ -n "$older" ] || { echo "no snapshot from 2020-01-06" >&2; exit 1; }
+  [ -n "$older" ] || {
+    echo "no snapshot from 2020-01-06" >&2
+    exit 1
+  }
 
   run_backup "$name" "$backup_image" -e "SNAPSHOT=$older" restore > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -481,7 +509,10 @@ Summary: Restored 1 files/dirs (SIZE) in T
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/value"
   diff - "$tree/value" <<< older
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_removes_stale_wal_and_shm_files_when_it_restores_a_database() {
@@ -516,7 +547,10 @@ other.db-wal
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state-rows"
   diff - "$tree/state-rows" <<< restored
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Boot data every case needs: a seed directory the backup shell reads at /seed, and a

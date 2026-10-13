@@ -23,7 +23,10 @@ it_prints_the_named_z_ai_key_and_logs_the_call() {
   diff - "$tree/out" <<< fixture-zai-key
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["atc-key","zai"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_an_empty_line_for_an_empty_key() {
@@ -38,7 +41,10 @@ it_prints_an_empty_line_for_an_empty_key() {
   diff - "$tree/out" <<< ''
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["atc-key","zai"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_provider() {
@@ -53,7 +59,10 @@ it_fails_closed_with_exit_97_on_another_provider() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: openai'
   diff - "$tree/calls" <<< '["atc-key","openai"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each call

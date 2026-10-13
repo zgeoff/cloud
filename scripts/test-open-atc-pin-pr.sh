@@ -67,7 +67,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","atc-pin/agent-image","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_updates_the_open_pull_request_after_it_turns_auto_merge_off() {
@@ -110,7 +113,10 @@ EOF
 ["gh","pr","merge","12","--repo","zgeoff/cloud","--disable-auto"]
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_updates_an_open_pull_request_without_auto_merge_directly() {
@@ -141,7 +147,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_when_main_already_pins_the_release() {
@@ -165,8 +174,14 @@ EOF
   diff - "$tree/out" <<< 'atc 3.11.0 is already pinned'
   diff /dev/null "$tree/err"
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" for-each-ref --format='%(refname)') <<< 'refs/heads/main'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_when_the_branch_already_holds_a_newer_release() {
@@ -200,8 +215,14 @@ atc-pin/agent-image already pins atc 3.11.1, which is newer than 3.11.0
 EOF
   diff /dev/null "$tree/err"
   diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image)
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_opens_the_missing_pull_request_when_the_branch_already_holds_the_release() {
@@ -239,7 +260,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","atc-pin/agent-image","--title","chore: pin atc 3.11.0 in the agent image","--body","Pins atc 3.11.0 in the agent image, with the atc-linux-x64 sum from the release's SHA256SUMS. The agent image workflow turns on auto-merge once the image builds and passes its check and the diff changes only the two atc pins. After the merge, build and check the image as docs/runbooks/agent-image.md describes."]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_an_open_pull_request_that_already_holds_the_release_alone() {
@@ -275,7 +299,10 @@ EOF
   diff /dev/null "$tree/err"
   diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse atc-pin/agent-image)
   diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,url,autoMergeRequest"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_without_a_push_when_the_pin_fails() {
@@ -299,8 +326,14 @@ EOF
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'SHA256SUMS has 0 atc-linux-x64 lines, want 1'
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" for-each-ref --format='%(refname)') <<< 'refs/heads/main'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_sha256sums_file() {
@@ -313,8 +346,14 @@ it_prints_its_usage_without_a_sha256sums_file() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: open-atc-pin-pr.sh <version> <SHA256SUMS file>'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

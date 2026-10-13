@@ -10,12 +10,14 @@ on:
       - images/agent/**
       - scripts/check-agent-image.sh
       - scripts/agent-image-gitleaks.toml
+      - scripts/enable-atc-pin-auto-merge.sh
       - .github/workflows/agent-image.yml
   pull_request:
     paths:
       - images/agent/**
       - scripts/check-agent-image.sh
       - scripts/agent-image-gitleaks.toml
+      - scripts/enable-atc-pin-auto-merge.sh
       - .github/workflows/agent-image.yml
 
 permissions:
@@ -80,6 +82,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run:
-          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --match-head-commit
-          "$HEAD_SHA"
+        run: bun run --silent ci:enable-atc-pin-auto-merge "$PR" "$HEAD_SHA"

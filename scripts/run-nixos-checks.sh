@@ -2,8 +2,8 @@
 # Build the NixOS flake's checks in the pinned Nix image (scripts/nix-image.sh), as
 # scripts/switch-geoffcloud.sh builds the host, so you need no local Nix:
 #
-#   bash scripts/test-nixos.sh            # every check in checks.x86_64-linux
-#   bash scripts/test-nixos.sh atc-daemon # one check, by its name there
+#   bash scripts/run-nixos-checks.sh            # every check in checks.x86_64-linux
+#   bash scripts/run-nixos-checks.sh atc-daemon # one check, by its name there
 #
 # impd-restore and every other check named impd-restore-* boot a NixOS VM, so they need KVM:
 # unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the
@@ -16,6 +16,7 @@
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it
 # is not the switch's geoffcloud-nix-store, so a test build never shares the deploy cache.
 set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
@@ -65,7 +66,7 @@ else
   # an empty set of checks evaluates to one empty line, which names no check
   mapfile -t checks < <(sed '/^$/d' "$names")
   if [ "${#checks[@]}" -eq 0 ]; then
-    echo "test-nixos: the flake declares no checks.x86_64-linux" >&2
+    echo "run-nixos-checks: the flake declares no checks.x86_64-linux" >&2
     exit 1
   fi
 fi
@@ -98,10 +99,10 @@ if [ "${#installables[@]}" -gt 0 ]; then
 fi
 
 if [ "${#missing_kvm[@]}" -eq 1 ]; then
-  echo "test-nixos: $kvm_device is missing or not readable and writable; ${missing_kvm[0]} needs KVM" >&2
+  echo "run-nixos-checks: $kvm_device is missing or not readable and writable; ${missing_kvm[0]} needs KVM" >&2
   exit 1
 elif [ "${#missing_kvm[@]}" -gt 1 ]; then
   kvm_checks="$(printf '%s, ' "${missing_kvm[@]}")"
-  echo "test-nixos: $kvm_device is missing or not readable and writable; ${kvm_checks%, } need KVM" >&2
+  echo "run-nixos-checks: $kvm_device is missing or not readable and writable; ${kvm_checks%, } need KVM" >&2
   exit 1
 fi

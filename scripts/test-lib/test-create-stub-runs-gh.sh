@@ -36,7 +36,10 @@ bbbb https://example.invalid/1
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_nothing_for_an_empty_list_of_runs() {
@@ -53,7 +56,10 @@ it_prints_nothing_for_an_empty_list_of_runs() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_one_run_for_head_when_the_case_names_no_runs() {
@@ -72,7 +78,10 @@ it_prints_one_run_for_head_when_the_case_names_no_runs() {
   diff - "$tree/out" <<< "$commit https://github.com/zgeoff/cloud/actions/runs/1"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_with_the_error_and_exit_the_case_names() {
@@ -90,7 +99,10 @@ it_answers_with_the_error_and_exit_the_case_names() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs"]'
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 it_exits_1_for_an_error_the_case_gives_no_exit_for() {
@@ -107,7 +119,10 @@ it_exits_1_for_an_error_the_case_gives_no_exit_for() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'gh: Not Found (HTTP 404)'
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_on_any_other_call() {
@@ -122,7 +137,10 @@ it_fails_closed_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: run list'
   diff - "$tree/calls" <<< '["gh","run","list"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in, and a git repository with an empty root commit for it to

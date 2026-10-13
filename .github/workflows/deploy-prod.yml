@@ -72,41 +72,7 @@ jobs:
       # checked, which must be on main
       - name: Decide whether the commit needs an apply
         id: decide
-        run: |
-          if [ "$EVENT" = workflow_dispatch ]; then
-            if [ "$DISPATCH_REF" != refs/heads/main ] || [ "$DISPATCH_REVISION" != "$DISPATCH_SHA" ]; then
-              echo "a dispatch applies main's tip only: dispatch on main with revision $DISPATCH_SHA" >&2
-              exit 1
-            fi
-            ci_run="$(bun run --silent ci:find-ci-run "$DISPATCH_SHA")"
-            if [ -z "$ci_run" ]; then
-              echo "no green CI run of a push to main on $DISPATCH_SHA: wait for CI to pass" >&2
-              exit 1
-            fi
-            echo "CI passed on $DISPATCH_SHA: $ci_run"
-            revision="$DISPATCH_SHA"
-          else
-            revision="$RUN_HEAD"
-          fi
-          git merge-base --is-ancestor "$revision" origin/main || {
-            echo "$revision is not on main" >&2
-            exit 1
-          }
-          # resolved once, so a tag moved during the run never reaches the apply job
-          deployed="$(git rev-parse --verify 'deployed/prod^{commit}')"
-          apply="$(bun run --silent ci:needs-prod-apply "$deployed" "$revision")"
-          case "$apply" in
-            true | false) ;;
-            *) echo "unexpected decision: $apply" >&2; exit 1 ;;
-          esac
-          {
-            echo "apply=$apply"
-            echo "revision=$revision"
-            echo "deployed=$deployed"
-          } >> "$GITHUB_OUTPUT"
-          if [ "$apply" = false ]; then
-            echo "No Pulumi input changed since deployed/prod, so nothing applied." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
+        run: bun run --silent ci:decide-prod-apply
 
   apply:
     needs: decide
@@ -134,14 +100,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      # the job's service account reads only the cloud-deploy vault
-      - name: Point .env at the deploy vault
-        run: bash scripts/write-deploy-env.sh .env
-
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
+
+      # the job's service account reads only the cloud-deploy vault
+      - name: Point .env at the deploy vault
+        run: bun run ci:write-deploy-env .env
 
       # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
       - name: Setup Go
@@ -172,22 +138,13 @@ jobs:
       # a new node reaches its peers only once the tailnet has spread its key; any HTTP answer,
       # a 401 included, shows the route is open
       - name: Wait for the k3s API
-        run: |
-          for _ in $(seq 1 30); do
-            if curl -sk -o /dev/null --max-time 5 https://geoffcloud:6443/livez; then exit 0; fi
-            sleep 2
-          done
-          echo "k3s's API on geoffcloud:6443 did not answer" >&2
-          exit 1
+        run: bun run ci:wait-for-k3s-api
 
       - name: Install
         run: bun install --frozen-lockfile
 
       - name: Check out the deployed revision
-        run: |
-          git worktree add --detach "$RUNNER_TEMP/deployed" "$DEPLOYED"
-          bash scripts/write-deploy-env.sh "$RUNNER_TEMP/deployed/.env"
-          cd "$RUNNER_TEMP/deployed" && bun install --frozen-lockfile
+        run: bun run ci:check-out-deployed-revision
 
       # a failure here holds the apply rather than failing the run, so the plan still shows
       - name: Check drift from the deployed revision
@@ -205,28 +162,11 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           DRIFT: ${{ steps.drift.outcome }}
-        run: |
-          bun run sdk:build
-          preview=0
-          bun run --silent preview -- --refresh --json > "$RUNNER_TEMP/plan.json" || preview=$?
-          guard=0
-          bun run --silent ci:check-prod-plan "$RUNNER_TEMP/plan.json" "$DRIFT" > "$RUNNER_TEMP/guard.txt" || guard=$?
-          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/guard.txt"
-          if [ "$preview" != 0 ]; then
-            echo "the preview failed (exit $preview)" >&2
-            exit 1
-          fi
-          case "$guard" in
-            0) echo "verdict=apply" >> "$GITHUB_OUTPUT" ;;
-            3) echo "verdict=hold" >> "$GITHUB_OUTPUT" ;;
-            *) exit 1 ;;
-          esac
+        run: bun run --silent ci:preview-and-guard-prod
 
       - name: Hold for a manual dispatch
         if: steps.guard.outputs.verdict == 'hold' && github.event_name != 'workflow_dispatch'
-        run: |
-          echo "::error::The guard held the apply. To apply this plan, dispatch Deploy prod on main with revision $REVISION."
-          exit 1
+        run: bun run ci:hold-prod-apply "$REVISION"
 
       - name: Apply
         if: steps.guard.outputs.verdict == 'apply' || github.event_name == 'workflow_dispatch'
@@ -243,10 +183,7 @@ jobs:
       - name: Move deployed/prod
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/deployed/prod" \
-            -f sha="$REVISION" -F force=false > /dev/null
-          echo "deployed/prod moved to $REVISION." | tee -a "$GITHUB_STEP_SUMMARY"
+        run: bun run ci:move-deployed-prod "$REVISION"
 
   alert:
     needs: [decide, apply]
@@ -266,8 +203,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
       - name: Point .env at the deploy vault
-        run: bash scripts/write-deploy-env.sh .env
+        run: bun run ci:write-deploy-env .env
 
       - name: Setup 1Password CLI
         uses: 1password/install-cli-action@1a3160d5e9de1ae0803eaa08a88746f5ae3daa50 # v4.1.0
@@ -277,13 +219,4 @@ jobs:
       - name: Alert on Discord
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: |
-          if [ "$VERDICT" = hold ] && [ "$EVENT" != workflow_dispatch ]; then
-            what="is held for a manual dispatch"
-          else
-            what="failed"
-          fi
-          url="$(op read "$(sed -n 's/^ALERT_WEBHOOK_URL=//p' .env)")"
-          echo "::add-mask::$url"
-          jq -n --arg content "The prod apply $what: $RUN_URL" '{content: $content}' |
-            curl -fsS -H 'Content-Type: application/json' --data @- "$url" > /dev/null
+        run: bun run ci:alert-prod-apply .env

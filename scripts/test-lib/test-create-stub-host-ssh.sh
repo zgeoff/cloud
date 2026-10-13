@@ -36,7 +36,10 @@ it_runs_a_known_remote_command_on_the_host_and_copies_its_output() {
   diff - "$tree/host-output" <<< gateway-token
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"ls $tree/host/secrets\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_and_runs_nothing_when_a_remote_tool_on_the_host_path_is_not_a_stand_in() {
@@ -56,7 +59,10 @@ it_fails_closed_with_exit_97_and_runs_nothing_when_a_remote_tool_on_the_host_pat
   diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "unexpected: tailscale on the host PATH is not a stand-in in $tree/host-bin"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"ls $tree/host/secrets\"]"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_before_any_interception_when_a_remote_tool_on_the_host_path_is_not_a_stand_in() {
@@ -78,7 +84,10 @@ it_fails_closed_before_any_interception_when_a_remote_tool_on_the_host_path_is_n
   ls -A "$tree/host/secrets" > "$tree/secrets-left"
   diff - "$tree/secrets-left" <<< imp-token
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C; curl http://127.0.0.1/rpc/tokens/whoami"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_before_any_interception_when_a_host_stand_in_is_not_executable() {
@@ -99,7 +108,10 @@ it_fails_closed_before_any_interception_when_a_host_stand_in_is_not_executable()
   diff - "$tree/err" <<< "unexpected: rsync on the host PATH is not a stand-in in $tree/host-bin"
   diff - "$tree/host/secrets/gateway-token" <<< bearer
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"sha256sum $tree/host/secrets/gateway-token\"]"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_when_a_known_command_names_a_remote_tool_by_path() {
@@ -117,7 +129,10 @@ it_fails_closed_with_exit_97_when_a_known_command_names_a_remote_tool_by_path() 
   diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud docker exec -i imp-host imp secret add glm x; /usr/bin/ssh root@geoffcloud true"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec -i imp-host imp secret add glm x; /usr/bin/ssh root@geoffcloud true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_when_a_known_command_bypasses_path_with_command_p() {
@@ -135,7 +150,10 @@ it_fails_closed_with_exit_97_when_a_known_command_bypasses_path_with_command_p()
   diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud docker exec -i imp-host imp secret add glm x; command -p true"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec -i imp-host imp secret add glm x; command -p true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_runs_the_remote_command_with_the_host_stand_ins_first_on_PATH() {
@@ -155,7 +173,10 @@ it_runs_the_remote_command_with_the_host_stand_ins_first_on_PATH() {
   diff - "$tree/host-output" <<< 'host docker: exec imp-host imp info --json'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","info","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Real ssh forwards none of the caller's environment or working directory, so the remote
@@ -184,7 +205,10 @@ OUT
   diff "$tree/out" "$tree/host-output"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","info","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # The host's side of the environment: the lines of host/environment, as the host's login
@@ -213,7 +237,10 @@ OUT
   diff "$tree/out" "$tree/host-output"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker","exec","imp-host","imp","info","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_returns_the_remote_commands_exit_code_and_stderr() {
@@ -232,7 +259,10 @@ it_returns_the_remote_commands_exit_code_and_stderr() {
   diff /dev/null "$tree/host-output"
   diff - "$tree/err" <<< "sha256sum: $tree/host/secrets/gateway-token: No such file or directory"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"sha256sum $tree/host/secrets/gateway-token\"]"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
@@ -248,8 +278,14 @@ it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: -o BatchMode=yes root@geoffcloud rm -rf $tree/host"
   diff - "$tree/calls" <<< "[\"ssh\",\"-o\",\"BatchMode=yes\",\"root@geoffcloud\",\"rm -rf $tree/host\"]"
-  [ -d "$tree/host" ] || { echo "the unknown command ran" >&2; exit 1; }
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ -d "$tree/host" ] || {
+    echo "the unknown command ran" >&2
+    exit 1
+  }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_host() {
@@ -265,7 +301,10 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@other.test true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@other.test","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
@@ -281,7 +320,10 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@geoffcloud true'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255() {
@@ -298,7 +340,10 @@ it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # 127.0.0.2 is loopback too, so a broken guard would only reach a dead local port, never a
@@ -317,7 +362,10 @@ it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.2:1 true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.2:1","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # OpenSSH reads an option even after the destination, so the stand-in refuses one there
@@ -336,7 +384,10 @@ it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.1:1 -oProxyCommand=false true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","-oProxyCommand=false","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
@@ -358,7 +409,10 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_drops_the_connection_at_the_whoami_check_with_exit_255() {
@@ -379,7 +433,10 @@ it_drops_the_connection_at_the_whoami_check_with_exit_255() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C; echo ran http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["ssh-dropped-at-whoami"]
 CALLS
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_removes_the_saved_token_just_before_the_whoami_check() {
@@ -402,7 +459,10 @@ it_removes_the_saved_token_just_before_the_whoami_check() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; export LC_ALL=C; ls $tree/host/secrets; echo http://127.0.0.1:7070/rpc/tokens/whoami"]
 ["imp-token-removed-at-whoami"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_makes_the_secrets_directory_read_only_just_before_the_bearer_write() {
@@ -426,7 +486,10 @@ it_makes_the_secrets_directory_read_only_just_before_the_bearer_write() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); echo \\"\$t\\""]
 ["secrets-dir-made-read-only"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_makes_gateway_token_a_read_only_directory_just_before_the_bearer_write() {
@@ -448,7 +511,10 @@ it_makes_gateway_token_a_read_only_directory_just_before_the_bearer_write() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","set -euo pipefail; umask 077; t=\$(mktemp $tree/host/secrets/.gateway-token.XXXXXX); stat -c %a $tree/host/secrets/gateway-token"]
 ["gateway-token-made-a-read-only-directory"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_alters_the_written_bearer_just_before_its_checksum() {
@@ -476,7 +542,10 @@ TOKEN
 ["ssh","-o","BatchMode=yes","root@geoffcloud","sha256sum $tree/host/secrets/gateway-token"]
 ["gateway-token-altered"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_removes_the_bearer_just_before_the_final_stat() {
@@ -504,7 +573,10 @@ OUT
 ["ssh","-o","BatchMode=yes","root@geoffcloud","stat -c '%n %U %a %s bytes' $tree/host/secrets $tree/host/secrets/gateway-token $tree/host/secrets/imp-token"]
 ["gateway-token-removed-before-stat"]
 CALLS
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, a <tree>/host-bin for the host's

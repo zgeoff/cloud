@@ -18,7 +18,10 @@ it_passes_silently_for_equal_strings() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_for_different_strings_printing_both_quoted() {
@@ -30,7 +33,10 @@ it_fails_for_different_strings_printing_both_quoted() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the label: expected a\ b, got a\ c'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_an_empty_actual_string() {
@@ -42,7 +48,10 @@ it_fails_for_an_empty_actual_string() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the label: expected a, got ''"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

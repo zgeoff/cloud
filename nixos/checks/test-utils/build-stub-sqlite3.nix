@@ -11,21 +11,27 @@
 # it stages the copy as db/imp.sqlite.restore inside the mount and checks it through $SQLITE3
 # with a file: URI. nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
-pkgs.writeShellScript "sqlite3-holding-staged-dir" ''
-  set -euo pipefail
-  for arg in "$@"; do
-    case "$arg" in
-      file:*/imp.sqlite.restore\?*)
-        staged="''${arg#file:}"
-        staged="''${staged%%\?*}"
-        # the holder forks from this directory, so it is busy before the fork returns
-        here="$PWD"
-        cd "''${staged%/*}"
-        ${pkgs.coreutils}/bin/sleep infinity < /dev/null > /dev/null 2>&1 &
-        echo "$!" > "$HOLDER_PID_FILE"
-        cd "$here"
-        ;;
-    esac
-  done
-  exec ${pkgs.sqlite}/bin/sqlite3 "$@"
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "sqlite3-holding-staged-dir";
+    text = ''
+      for arg in "$@"; do
+        case "$arg" in
+          file:*/imp.sqlite.restore\?*)
+            staged="''${arg#file:}"
+            staged="''${staged%%\?*}"
+            # the holder forks from this directory, so it is busy before the fork returns
+            here="$PWD"
+            cd "''${staged%/*}"
+            # stdin from /dev/null, so the holder keeps no pipe of the caller's open
+            # shellcheck disable=SC2217
+            ${pkgs.coreutils}/bin/sleep infinity < /dev/null > /dev/null 2>&1 &
+            echo "$!" > "$HOLDER_PID_FILE"
+            cd "$here"
+            ;;
+        esac
+      done
+      exec ${pkgs.sqlite}/bin/sqlite3 "$@"
+    '';
+  }
+)

@@ -25,7 +25,10 @@ it_formats_the_fixed_instant_in_UTC() {
   diff - "$tree/out" <<< 2026-10-08T12:34:56Z
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["date","-u","+%Y-%m-%dT%H:%M:%SZ"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_the_real_date_error_and_exit_code_through() {
@@ -41,7 +44,10 @@ it_passes_the_real_date_error_and_exit_code_through() {
   diff "$tree/real-out" "$tree/out"
   diff "$tree/real-err" "$tree/err"
   diff - "$tree/calls" <<< '["date","--bogus"]'
-  [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
+  [ "$status" = "$real_status" ] || {
+    echo "exit $status, want $real_status" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_call_that_names_its_own_instant() {
@@ -56,7 +62,10 @@ it_fails_closed_with_exit_97_on_a_call_that_names_its_own_instant() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -u -d @0 +%s'
   diff - "$tree/calls" <<< '["date","-u","-d","@0","+%s"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_without_a_fixed_instant() {
@@ -71,7 +80,10 @@ it_fails_closed_with_exit_97_without_a_fixed_instant() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -u +%s'
   diff - "$tree/calls" <<< '["date","-u","+%s"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_runs_the_system_date_not_one_on_the_callers_PATH() {
@@ -92,7 +104,10 @@ it_runs_the_system_date_not_one_on_the_callers_PATH() {
   diff - "$tree/out" <<< 2026-10-08
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["date","-u","+%F"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for every

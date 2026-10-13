@@ -14,16 +14,20 @@
 # database in db/ of a /run/impd-restore.XXXXXX mount, and each saved file second to its
 # original. nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
-pkgs.writeShellScript "cmp-failing-one-comparison" ''
-  set -euo pipefail
-  if [ -z "''${FAIL_CMP_FIRST:-}" ] || [ -z "''${FAIL_CMP_SECOND:-}" ]; then
-    echo "cmp-failing-one-comparison: set FAIL_CMP_FIRST and FAIL_CMP_SECOND to the comparison that fails" >&2
-    exit 2
-  fi
-  # the glob is unquoted on purpose: FAIL_CMP_SECOND is a pattern
-  # shellcheck disable=SC2053
-  if [ "$#" -eq 3 ] && [ "$1" = -s ] && [ "$2" = "$FAIL_CMP_FIRST" ] && [[ "$3" == $FAIL_CMP_SECOND ]]; then
-    exit 1
-  fi
-  exec ${pkgs.diffutils}/bin/cmp "$@"
-''
+pkgs.lib.getExe (
+  pkgs.writeShellApplication {
+    name = "cmp-failing-one-comparison";
+    text = ''
+      if [ -z "''${FAIL_CMP_FIRST:-}" ] || [ -z "''${FAIL_CMP_SECOND:-}" ]; then
+        echo "cmp-failing-one-comparison: set FAIL_CMP_FIRST and FAIL_CMP_SECOND to the comparison that fails" >&2
+        exit 2
+      fi
+      # the glob is unquoted on purpose: FAIL_CMP_SECOND is a pattern
+      # shellcheck disable=SC2053
+      if [ "$#" -eq 3 ] && [ "$1" = -s ] && [ "$2" = "$FAIL_CMP_FIRST" ] && [[ "$3" == $FAIL_CMP_SECOND ]]; then
+        exit 1
+      fi
+      exec ${pkgs.diffutils}/bin/cmp "$@"
+    '';
+  }
+)

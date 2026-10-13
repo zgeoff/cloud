@@ -32,27 +32,33 @@ it_prints_true_for_a_change_under_nixos() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
-it_prints_true_for_a_change_to_test_nixos_sh() {
+it_prints_true_for_a_change_to_run_nixos_checks_sh() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
-  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/test-nixos.sh"
+  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/run-nixos-checks.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add a script'
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
-  echo changed >> "$tree/repo/scripts/test-nixos.sh"
+  echo changed >> "$tree/repo/scripts/run-nixos-checks.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change a script'
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_under_scripts_test_lib() {
@@ -72,7 +78,10 @@ it_prints_true_for_a_change_under_scripts_test_lib() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_restore_impd_db_sh() {
@@ -92,7 +101,10 @@ it_prints_true_for_a_change_to_restore_impd_db_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_copy_impd_db_host_sh() {
@@ -112,7 +124,10 @@ it_prints_true_for_a_change_to_copy_impd_db_host_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_the_nix_image_pin() {
@@ -132,7 +147,10 @@ it_prints_true_for_a_change_to_the_nix_image_pin() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_needs_nixos_checks_sh() {
@@ -152,7 +170,10 @@ it_prints_true_for_a_change_to_needs_nixos_checks_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_find_nixos_check_run_sh() {
@@ -172,7 +193,56 @@ it_prints_true_for_a_change_to_find_nixos_check_run_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_true_for_a_change_to_decide_nixos_checks_sh() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/repo/scripts"
+  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/decide-nixos-checks.sh"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the decision'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
+  echo changed >> "$tree/repo/scripts/decide-nixos-checks.sh"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the decision'
+
+  (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< true
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_true_for_a_change_to_open_kvm_sh() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/repo/scripts"
+  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/open-kvm.sh"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the kvm opener'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
+  echo changed >> "$tree/repo/scripts/open-kvm.sh"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the kvm opener'
+
+  (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< true
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_change_to_a_script_the_checks_never_read() {
@@ -192,7 +262,10 @@ it_prints_false_for_a_change_to_a_script_the_checks_never_read() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_change_to_the_root_package_json() {
@@ -211,7 +284,10 @@ it_prints_false_for_a_change_to_the_root_package_json() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_the_bun_version() {
@@ -230,7 +306,10 @@ it_prints_true_for_a_change_to_the_bun_version() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_change_to_the_gitignore() {
@@ -249,7 +328,10 @@ it_prints_false_for_a_change_to_the_gitignore() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_the_nixos_checks_workflow() {
@@ -269,7 +351,10 @@ it_prints_true_for_a_change_to_the_nixos_checks_workflow() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_change_to_no_input_of_the_checks() {
@@ -293,7 +378,10 @@ it_prints_false_for_a_change_to_no_input_of_the_checks() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_when_a_rename_moves_a_file_out_of_nixos() {
@@ -314,7 +402,10 @@ it_prints_true_when_a_rename_moves_a_file_out_of_nixos() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_when_a_file_under_nixos_is_deleted() {
@@ -334,7 +425,10 @@ it_prints_true_when_a_file_under_nixos_is_deleted() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_changed_nixos() {
@@ -361,7 +455,10 @@ it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
@@ -383,7 +480,10 @@ it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_to_a_file_under_nixos_whose_name_git_quotes() {
@@ -401,7 +501,10 @@ it_prints_true_for_a_change_to_a_file_under_nixos_whose_name_git_quotes() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_rejects_an_empty_base_with_its_usage() {
@@ -414,7 +517,10 @@ it_rejects_an_empty_base_with_its_usage() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-nixos-checks.sh <base> <head>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
@@ -430,7 +536,10 @@ it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
   diff - "$tree/err" << 'ERR'
 fatal: Invalid symmetric difference expression 1111111111111111111111111111111111111111...HEAD
 ERR
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_an_all_zero_base_without_reading_git() {
@@ -445,7 +554,10 @@ it_prints_true_for_an_all_zero_base_without_reading_git() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_gits_error_for_a_base_git_cannot_resolve() {
@@ -462,7 +574,10 @@ fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in 
 Use '--' to separate paths from revisions, like this:
 'git <command> [<revision>...] -- [<file>...]'
 ERR
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_call_without_two_arguments_with_its_usage() {
@@ -475,7 +590,10 @@ it_rejects_a_call_without_two_arguments_with_its_usage() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-nixos-checks.sh <base> <head>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: a git repository on main, with the identity the cases commit with in

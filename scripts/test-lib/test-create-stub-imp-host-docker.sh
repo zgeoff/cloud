@@ -35,7 +35,10 @@ it_prints_imps_info_from_its_state_file() {
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","info","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_the_secrets_from_its_state_file() {
@@ -61,7 +64,10 @@ it_lists_the_secrets_from_its_state_file() {
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","secret","ls","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_the_tokens_from_its_state_file() {
@@ -77,7 +83,10 @@ it_lists_the_tokens_from_its_state_file() {
   diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","token","ls","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_adds_the_glm_secret_from_its_stdin() {
@@ -112,7 +121,10 @@ OUT
   diff - "$tree/secrets" <<< '[{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[],"createdAt":"2026-10-07T12:00:00.000Z"}]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","exec","-i","imp-host","imp","secret","add","glm","--kind","custom","--hosts","api.z.ai","--header","authorization","--scheme","bearer","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_secret_add_with_the_named_error_and_imps_exit_2() {
@@ -133,7 +145,10 @@ it_fails_the_secret_add_with_the_named_error_and_imps_exit_2() {
   jq -c . "$tree/impd/secrets.json" > "$tree/secrets"
   diff - "$tree/secrets" <<< '[]'
   diff - "$tree/calls" <<< '["docker","exec","-i","imp-host","imp","secret","add","glm","--kind","custom","--hosts","api.z.ai","--header","authorization","--scheme","bearer","--json"]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_mints_atc_cloud_and_prints_its_secret_alone_on_stdout() {
@@ -152,7 +167,10 @@ it_mints_atc_cloud_and_prints_its_secret_alone_on_stdout() {
   jq -c . "$tree/impd/tokens.json" > "$tree/tokens"
   diff - "$tree/tokens" <<< '[{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"sshKeys":[],"grantable":["glm"],"createdAt":"2026-10-07T12:00:00.000Z"}]'
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_mint_with_the_named_error_and_exit_1() {
@@ -172,7 +190,10 @@ it_fails_the_mint_with_the_named_error_and_exit_1() {
   jq -c . "$tree/impd/tokens.json" > "$tree/tokens"
   diff - "$tree/tokens" <<< '[]'
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_the_named_call_as_docker_does_when_imp_host_is_stopped() {
@@ -188,7 +209,10 @@ it_fails_the_named_call_as_docker_does_when_imp_host_is_stopped() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running'
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","token","ls","--json"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_answers_the_calls_it_is_not_told_to_fail() {
@@ -204,7 +228,10 @@ it_answers_the_calls_it_is_not_told_to_fail() {
   diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","secret","ls","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
@@ -219,7 +246,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: exec imp-host imp token rm atc-cloud'
   diff - "$tree/calls" <<< '["docker","exec","imp-host","imp","token","rm","atc-cloud"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, impd's state directory, and the

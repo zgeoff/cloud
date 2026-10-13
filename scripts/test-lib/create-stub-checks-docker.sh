@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # create_stub_checks_docker <bin>: writes <bin>/docker, a stand-in for the docker that
-# test-nixos.sh runs nix in. It logs each call's argv as a JSON line to STUB_LOG:
+# run-nixos-checks.sh runs nix in. It logs each call's argv as a JSON line to STUB_LOG:
 #
 # - a `run … eval --raw path:/src?dir=nixos#checks.x86_64-linux --apply …`: prints STUB_CHECKS
 #   with no trailing newline, as `nix eval --raw` prints a string, or, when STUB_EVAL_ERROR is

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-checks-git.sh: the git stand-in answers the two calls test-nixos.sh makes,
+# Test for create-stub-checks-git.sh: the git stand-in answers the two calls run-nixos-checks.sh makes,
 # prints the toplevel as git does and the file list byte for byte, logs every call, and fails
 # closed on any other call.
 #
@@ -22,7 +22,10 @@ it_prints_the_toplevel_with_a_newline_and_logs_the_call() {
   diff - "$tree/out" <<< "$tree/repo"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["git","rev-parse","--show-toplevel"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_nul_separated_file_list_unchanged_for_the_toplevels_ls_files() {
@@ -40,7 +43,10 @@ it_prints_the_nul_separated_file_list_unchanged_for_the_toplevels_ls_files() {
   cmp "$tree/ls-files" "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"git\",\"-C\",\"$tree/repo\",\"ls-files\",\"-z\",\"--cached\",\"--others\",\"--exclude-standard\",\"--deduplicate\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_ls_files_for_another_directory() {
@@ -56,7 +62,10 @@ it_fails_closed_with_exit_97_on_ls_files_for_another_directory() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: -C $tree/other ls-files -z --cached --others --exclude-standard --deduplicate"
   diff - "$tree/calls" <<< "[\"git\",\"-C\",\"$tree/other\",\"ls-files\",\"-z\",\"--cached\",\"--others\",\"--exclude-standard\",\"--deduplicate\"]"
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each call

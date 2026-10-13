@@ -8,6 +8,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-start-gateway.sh
 #   CASE='readyz' bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-start-gateway.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
@@ -99,7 +100,10 @@ it_returns_from_start_gateway_only_once_readyz_answers_200() {
   diff - "$tree/log.out" <<< 'atc-gateway: serving https://atc.fixture.invalid/mcp, listening on http://0.0.0.0:8414'
   sed -E 's/ [0-9.]+ms$/ Tms/' "$tree/log.err" > "$tree/requests"
   diff - "$tree/requests" <<< 'GET /readyz 200 Tms'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a

@@ -30,7 +30,10 @@ it_lists_no_open_pull_request_when_the_test_wrote_none() {
   diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,autoMergeRequest"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_the_open_pull_requests_the_test_wrote() {
@@ -46,7 +49,10 @@ it_lists_the_open_pull_requests_the_test_wrote() {
   diff - "$tree/out" <<< '[{"autoMergeRequest":null,"number":12}]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","atc-pin/agent-image","--state","open","--json","number,autoMergeRequest"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_turns_auto_merge_off_silently() {
@@ -61,7 +67,10 @@ it_turns_auto_merge_off_silently() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","merge","12","--repo","zgeoff/cloud","--disable-auto"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_a_create_with_the_new_pull_requests_url() {
@@ -76,7 +85,10 @@ it_answers_a_create_with_the_new_pull_requests_url() {
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/200'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","atc-pin/agent-image","--title","t","--body","b"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_an_edit_with_the_edited_pull_requests_url() {
@@ -91,7 +103,10 @@ it_answers_an_edit_with_the_edited_pull_requests_url() {
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/12'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","edit","12","--repo","zgeoff/cloud","--title","t","--body","b"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
@@ -106,7 +121,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: pr merge 12 --squash'
   diff - "$tree/calls" <<< '["gh","pr","merge","12","--squash"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 run_cases
