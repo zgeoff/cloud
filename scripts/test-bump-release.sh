@@ -100,7 +100,7 @@ It waits for a review, because:
 
 - it is a major release.
 
-After the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`), switch the host (`docs/runbooks/workflows.md`), and publish the atc-gateway images. The `Deploy prod` workflow applies the pull request that pins their digests once it merges (`docs/runbooks/prod-apply.md`).
+After the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`) and publish the atc-gateway images. The `Deploy prod` workflow applies the pull request that pins their digests once it merges (`docs/runbooks/prod-apply.md`). Then switch the host (`docs/runbooks/workflows.md`), which refuses while the deployed gateway runs another atc major than the daemon pin.
 EOF
   sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g" "$tree/calls" > "$tree/calls.masked"
   diff - "$tree/calls.masked" << 'EOF'

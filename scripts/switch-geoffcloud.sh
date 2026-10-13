@@ -6,7 +6,9 @@
 #   bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 #
 # A switch first needs a green NixOS checks run that covers the commit; with none, it stops
-# before the build and names the command that starts one. The switch runs only after the build
+# before the build and names the command that starts one. It also stops before the build when
+# the commit's atc daemon pin and the deployed atc gateway's image differ in atc major version,
+# since atc breaks its daemon protocol only in a major release. The switch runs only after the build
 # exits 0: a failed build stops the script before
 # anything reaches the host. The build reads a `git archive` snapshot of the checked commit,
 # not the working tree, so an edit made while the script runs changes nothing. The switch
@@ -80,6 +82,14 @@ if [[ "$mode" == switch ]]; then
     exit 1
   fi
   echo "== checked by $checked_by"
+
+  # The deployed atc gateway dials the host's atc daemon, so a switch takes only an atc daemon pin
+  # of the gateway's atc major (scripts/check-atc-gateway-skew.sh). The gateway Deployment
+  # recreates its one pod, so the image in its spec is the gateway that runs. An ssh or kubectl
+  # failure stops the script (set -e) rather than reading as no skew.
+  gateway_image="$(ssh -o BatchMode=yes "$host" \
+    "k3s kubectl -n atc get deployment atc-gateway -o 'jsonpath={.spec.template.spec.containers[0].image}'")"
+  bash "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$snapshot/nixos/packages/atc.nix" "$gateway_image"
 fi
 echo "== build ${commit:0:7}"
 

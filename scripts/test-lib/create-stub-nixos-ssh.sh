@@ -1,8 +1,13 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the three remote commands the switch runs:
+# answers the four remote commands the switch runs:
 #
+# - the kubectl query for the atc-gateway Deployment's image: prints STUB_GATEWAY_IMAGE with no
+#   newline, as kubectl's jsonpath output ends, or with STUB_GATEWAY_MISSING fails as kubectl
+#   reports a missing Deployment: "Error from server (NotFound): deployments.apps
+#   \"atc-gateway\" not found" on stderr and exit 1, the text and code that
+#   create-stub-readiness-ssh.sh records from kubectl v1.35.8's source;
 # - the profile set and switch-to-configuration: prints nothing, or with
 #   STUB_ACTIVATE_FAILED_UNITS (unit names separated by spaces) fails as
 #   switch-to-configuration-ng does when units failed: "warning: the following units
@@ -71,6 +76,13 @@ if [ -n "${STUB_SSH_PASS:-}" ]; then
   exit 97
 fi
 case "${*:4}" in
+  "k3s kubectl -n atc get deployment atc-gateway -o 'jsonpath={.spec.template.spec.containers[0].image}'")
+    if [ -n "${STUB_GATEWAY_MISSING:-}" ]; then
+      echo 'Error from server (NotFound): deployments.apps "atc-gateway" not found' >&2
+      exit 1
+    fi
+    printf '%s' "${STUB_GATEWAY_IMAGE:-}"
+    ;;
   "nix-env -p /nix/var/nix/profiles/system --set "*"/bin/switch-to-configuration' switch")
     if [ -n "${STUB_ACTIVATE_FAILED_UNITS:-}" ]; then
       read -ra failed <<< "$STUB_ACTIVATE_FAILED_UNITS"
