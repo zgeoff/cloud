@@ -3,7 +3,7 @@ import { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
 import type { ATCGatewayRawConfig } from './types.ts';
 
 test('it passes a config through as given', () => {
-  const payload: ATCGatewayRawConfig = {
+  const payload = {
     image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0-r2@sha256:${'1'.repeat(64)}`,
     publicURL: 'https://atc.geoff.cloud',
@@ -21,26 +21,26 @@ test('it passes a config through as given', () => {
     },
     defaultDaemon: 'geoffcloud',
     stateDir: '/var/lib/atc',
-  };
+  } as const;
 
   expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
 });
 
 test('it gives a daemon with no alertSeverity the severity critical', () => {
-  expect(
-    atcGatewayConfigSchema.safeParse({
-      image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
-      backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
-      publicURL: 'https://atc.geoff.cloud',
-      daemons: {
-        geoffcloud: {
-          address: '100.69.47.33:8415',
-          daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
-        },
+  const payload: ATCGatewayRawConfig = {
+    image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
+    backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+    publicURL: 'https://atc.geoff.cloud',
+    daemons: {
+      geoffcloud: {
+        address: '100.69.47.33:8415',
+        daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
       },
-      defaultDaemon: 'geoffcloud',
-    }).data,
-  ).toStrictEqual({
+    },
+    defaultDaemon: 'geoffcloud',
+  };
+
+  expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual({
     image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
     publicURL: 'https://atc.geoff.cloud',
