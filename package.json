@@ -72,6 +72,7 @@
     "ci:merge-release-bump-with-summary": "bash scripts/merge-release-bump-with-summary.sh",
     "ci:enable-atc-pin-auto-merge": "bash scripts/enable-atc-pin-auto-merge.sh",
     "ci:decide-provider-checks": "bash scripts/decide-provider-checks.sh",
+    "ci:decide-full-checks": "bash scripts/decide-full-checks.sh",
     "ci:install-pulumi-cli": "bash scripts/install-pulumi-cli.sh",
     "ci:publish-atc-gateway-images": "bash scripts/publish-atc-gateway-images.sh"
   },

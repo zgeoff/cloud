@@ -22,7 +22,7 @@ is decided in the shared skill, not here.
 | TypeScript unit tests in `infra/` and `scripts/`   | `bun run test`                     | `CI` → `ci`                         |
 | The health-check Worker's tests                    | `bun run test:health-check`        | `CI` → `ci`                         |
 | Go tests in `provider/`                            | `bun run provider:check`           | `CI` → `ci`, if `provider/` changed |
-| Shell suites and `scripts/test-lib/` tests         | `bun run test:scripts`             | `CI` → `ci`                         |
+| Shell suites and `scripts/test-lib/` tests         | `bun run test:scripts`             | `CI` → `ci`, unless only Markdown changed |
 | Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture` | `atc-gateway images` → `fixture`    |
 | nixie's backup script in its pinned image (Docker) | `bun run test:nixie-backup-fixture` | `nixie backup` → `fixture`         |
 | NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`            |
