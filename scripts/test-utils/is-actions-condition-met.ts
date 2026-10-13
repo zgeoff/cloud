@@ -1,3 +1,5 @@
+import { findJSONField } from '../find-json-field.ts';
+
 // Evaluates a job's `if` as GitHub's expression docs describe it: literals, `github` and `needs`
 // paths, `!`, `==`, `!=`, `&&`, `||`, parentheses, and the status check functions. Anything else,
 // such as another function or context, throws.
@@ -208,13 +210,7 @@ function resolvePath(path: string, context: Readonly<ActionsConditionContext>): 
     throw new Error(`unsupported context: ${path}`);
   }
 
-  const value = keys.reduce<unknown>(
-    (current, key) =>
-      typeof current === 'object' && current !== null
-        ? (current as Readonly<Record<string, unknown>>)[key]
-        : undefined,
-    contexts[root],
-  );
+  const value = keys.reduce<unknown>((current, key) => findJSONField(current, key), contexts[root]);
 
   return toValue(value ?? null, path);
 }

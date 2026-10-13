@@ -21,8 +21,8 @@ on:
 permissions:
   contents: read
 
-# The concurrency group sits on the apply job, not here, so a run that decide filters out never
-# joins it and never takes the place of an apply that waits.
+# The concurrency groups sit on the jobs, not here, so a run that decide filters out never joins
+# one and never takes the place of a decision or an apply that waits.
 jobs:
   # Decides from the repo alone, with no secret, whether the commit needs an apply. A CI run of a
   # pull request, a fork or a failed check starts nothing.
@@ -33,6 +33,13 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # One decision at a time, so the runs' applies join the deploy-prod group in the order the runs
+    # started: a slow decision for an older commit never lands behind a newer commit's apply and
+    # takes its place. A newer decision that replaces a waiting one loses nothing, because the newer
+    # commit carries every change of the older one.
+    concurrency:
+      group: deploy-prod-decide
+      cancel-in-progress: false
     # actions: read lists CI's runs for a dispatch
     permissions:
       contents: read

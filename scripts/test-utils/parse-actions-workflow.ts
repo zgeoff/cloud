@@ -27,7 +27,9 @@ export function parseActionsWorkflow(text: string): ActionsWorkflow {
 
   return {
     concurrency: parseConcurrency(document['concurrency']),
-    jobs: Object.entries(document['jobs']).map(([name, definition]) => parseJob(name, definition)),
+    jobs: Object.entries(document['jobs']).map((entry: readonly [string, unknown]) =>
+      parseJob(entry[0], entry[1]),
+    ),
   };
 }
 

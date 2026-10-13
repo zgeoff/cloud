@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { findJSONField } from '../scripts/find-json-field.ts';
 import { buildMockWorkflowRunContext } from '../scripts/test-utils/build-mock-workflow-run-context.ts';
 import { buildStubActionsScheduler } from '../scripts/test-utils/build-stub-actions-scheduler.ts';
 
@@ -86,6 +87,39 @@ test('it applies the newer revision, and alerts on the older, when two successfu
   });
 });
 
+test('it holds a newer decision until the older one ends, so the newer revision s apply waits behind the older one', async () => {
+  const ctx = await setupTest();
+
+  const older = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'b'.repeat(40) }));
+  const newer = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'c'.repeat(40) }));
+  const newerBeforeOlderDecided = ctx.scheduler.getRun(newer);
+
+  ctx.scheduler.finishJob(older, 'decide', {
+    status: 'success',
+    outputs: { apply: 'true', revision: 'b'.repeat(40) },
+  });
+
+  ctx.scheduler.finishJob(newer, 'decide', {
+    status: 'success',
+    outputs: { apply: 'true', revision: 'c'.repeat(40) },
+  });
+
+  expect(newerBeforeOlderDecided).toStrictEqual({
+    status: 'in_progress',
+    jobs: { decide: 'pending', apply: 'waiting', alert: 'waiting' },
+  });
+
+  expect(ctx.scheduler.getRun(older)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { decide: 'success', apply: 'in_progress', alert: 'waiting' },
+  });
+
+  expect(ctx.scheduler.getRun(newer)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { decide: 'success', apply: 'pending', alert: 'waiting' },
+  });
+});
+
 test('it never queues an apply for a commit with nothing to apply', async () => {
   const ctx = await setupTest();
 
@@ -137,17 +171,20 @@ test('it starts nothing for the CI run of a pull request', async () => {
 test('it gates every apply step after the queued decision on that decision', async () => {
   const ctx = await setupTest();
 
-  const workflow = Bun.YAML.parse(ctx.workflowText) as {
-    readonly jobs: { readonly apply: { readonly steps: readonly { id?: string; if?: string }[] } };
-  };
+  const workflow: unknown = Bun.YAML.parse(ctx.workflowText);
+  const found = findJSONField(findJSONField(findJSONField(workflow, 'jobs'), 'apply'), 'steps');
 
-  const steps = workflow.jobs.apply.steps;
-  const queued = steps.findIndex((step) => step.id === 'queued');
+  if (!Array.isArray(found)) {
+    throw new TypeError('the apply job has no steps');
+  }
+
+  const steps: readonly unknown[] = found;
+  const queued = steps.findIndex((step: unknown) => findJSONField(step, 'id') === 'queued');
 
   expect(queued).toBe(2);
 
-  expect(steps.slice(queued + 1).map((step) => step.if)).toSatisfyAll(
-    (condition: string | undefined) =>
-      condition?.startsWith("steps.queued.outputs.apply == 'true'") === true,
+  expect(steps.slice(queued + 1).map((step: unknown) => findJSONField(step, 'if'))).toSatisfyAll(
+    (condition: unknown) =>
+      typeof condition === 'string' && condition.startsWith("steps.queued.outputs.apply == 'true'"),
   );
 });
