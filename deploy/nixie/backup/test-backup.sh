@@ -94,9 +94,9 @@ it_backs_up_the_rows_in_a_live_writers_wal() {
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
     -v "$script:/opt/nixie-backup/backup.sh:ro" > "$tree/out" << 'EOF'
 sqlite3 /state/keys.db 'CREATE TABLE record_keys (v);'
+sqlite3 /state/nixie.db 'PRAGMA journal_mode=WAL; CREATE TABLE records (v);' > /dev/null
 {
-  echo "PRAGMA journal_mode=WAL;"
-  echo "CREATE TABLE records (v); INSERT INTO records VALUES ('in the wal');"
+  echo "INSERT INTO records VALUES ('in the wal');"
   sleep 60
 } | sqlite3 /state/nixie.db > /dev/null &
 writer=$!
