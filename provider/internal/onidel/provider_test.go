@@ -51,7 +51,7 @@ func TestSchemaPublishesEveryResourceToken(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal([]byte(resp.Schema), &schema))
 	assert.ElementsMatch(t, []string{
-		"onidel:index:FirewallGroup", "onidel:index:FirewallRule", "onidel:index:Rdns", "onidel:index:SshKey", "onidel:index:Vm",
+		"onidel:index:FirewallGroup", "onidel:index:FirewallRule", "onidel:index:Vm",
 	}, slices.Collect(maps.Keys(schema.Resources)))
 }
 

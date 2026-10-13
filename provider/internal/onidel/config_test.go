@@ -123,17 +123,16 @@ func TestConfigListsTeamsOnlyOnce(t *testing.T) {
 	}, ctx.api.GetRequests())
 }
 
-func TestConfigFailsWhenTheAPIKeyDoesNotSeeExactlyOneTeam(t *testing.T) {
+func TestConfigSendsNoTeamWhenTheAPIKeyDoesNotSeeExactlyOneTeam(t *testing.T) {
 	rows := []struct {
 		name  string
 		teams []map[string]any
-		want  string
 	}{
-		{"it fails for no team", nil, "onidel: the API key can see 0 teams; set the teamId config"},
-		{"it fails for two teams", []map[string]any{
+		{"it sends no team for no team", nil},
+		{"it sends no team for two teams", []map[string]any{
 			{"id": "team-a", "name": "a", "role": "Team Owner"},
 			{"id": "team-b", "name": "b", "role": "Team Member"},
-		}, "onidel: the API key can see 2 teams; set the teamId config"},
+		}},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -141,12 +140,15 @@ func TestConfigFailsWhenTheAPIKeyDoesNotSeeExactlyOneTeam(t *testing.T) {
 			ctx.api.SetTeams(row.teams...)
 
 			_, err := ctx.server.Create(p.CreateRequest{
-				Urn:        onideltest.BuildURN("onidel:index:SshKey", "me"),
-				Properties: onideltest.BuildProps(map[string]any{"name": "me", "publicKey": "ssh-ed25519 AAAA me@host"}),
+				Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "fw"),
+				Properties: onideltest.BuildProps(map[string]any{"description": "edge"}),
 			})
 
-			assert.EqualError(t, err, row.want)
-			assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}}, ctx.api.GetRequests())
+			assert.EqualError(t, err, "onidel: POST /network/firewalls: HTTP 401: UNAUTHORIZED")
+			assert.Equal(t, []onideltest.Request{
+				{Method: "GET", Path: "/teams"},
+				{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"description": "edge"}},
+			}, ctx.api.GetRequests())
 		})
 	}
 }
@@ -155,11 +157,35 @@ func TestConfigSendsNoTeamOnAReadWhenTheTeamLookupFails(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("GET /teams", http.StatusInternalServerError, "", 1)
 
-	read, err := ctx.server.Read(p.ReadRequest{ID: "k", Urn: onideltest.BuildURN("onidel:index:SshKey", "me")})
+	read, err := ctx.server.Read(p.ReadRequest{ID: "v", Urn: onideltest.BuildURN("onidel:index:Vm", "edge")})
 
 	require.NoError(t, err)
 	assert.Equal(t, "", read.ID)
-	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/ssh_keys/k"}}, ctx.api.GetRequests())
+	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/vm/v"}}, ctx.api.GetRequests())
+}
+
+func TestConfigLooksTheTeamUpAgainAfterAFailedLookup(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.RegisterResponse("GET /teams", http.StatusInternalServerError, "", 1)
+	ctx.api.SetTeams(map[string]any{"id": "team-a", "name": "team", "role": "Team Owner"})
+	_, err := ctx.server.Create(p.CreateRequest{
+		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "a"),
+		Properties: onideltest.BuildProps(map[string]any{"description": "a"}),
+	})
+	require.EqualError(t, err, "onidel: POST /network/firewalls: HTTP 401: UNAUTHORIZED")
+
+	_, err = ctx.server.Create(p.CreateRequest{
+		Urn:        onideltest.BuildURN("onidel:index:FirewallGroup", "b"),
+		Properties: onideltest.BuildProps(map[string]any{"description": "b"}),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, []onideltest.Request{
+		{Method: "GET", Path: "/teams"},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"description": "a"}},
+		{Method: "GET", Path: "/teams"},
+		{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "team-a", "description": "b"}},
+	}, ctx.api.GetRequests())
 }
 
 func TestConfigSendsNoTeamOnADeleteWhenTheTeamLookupFails(t *testing.T) {

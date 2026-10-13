@@ -4,16 +4,16 @@ This page sets up a machine to work on geoff.cloud, and ends with a preview of t
 
 ## Prerequisites
 
-| Tool                      | Version or source                  | Used for                                                                |
-| ------------------------- | ---------------------------------- | ----------------------------------------------------------------------- |
-| Bun                       | `.bun-version`                     | every root script, and the Pulumi program's runtime                     |
-| Go                        | `provider/go.mod`                  | building the Onidel provider, which every preview builds                |
-| Pulumi CLI                | current                            | `preview`, `up`, `drift`, stack config                                  |
-| 1Password CLI (`op`)      | with a token for the `cloud` vault | resolving `.env`                                                        |
-| Tailscale                 | a tailnet admin's device           | the k3s API and Grafana (any member), SSH to `root@geoffcloud` (admins) |
-| Docker                    | current                            | NixOS builds and switches (`nixos/nix` image), fixture test             |
-| gitleaks                  | on `PATH`                          | the pre-commit hook                                                     |
-| `jq`, `gh`, `ssh`, `curl` | current                            | the scripts in `scripts/`                                               |
+| Tool                      | Version or source                        | Used for                                                                |
+| ------------------------- | ---------------------------------------- | ----------------------------------------------------------------------- |
+| Bun                       | `.bun-version`                           | every root script, and the Pulumi program's runtime                     |
+| Go                        | `provider/go.mod`                        | building the Onidel provider, which every preview builds                |
+| Pulumi CLI                | `@pulumi/pulumi` in `infra/package.json` | `preview`, `up`, `drift`, stack config, `sdk:gen`                       |
+| 1Password CLI (`op`)      | with a token for the `cloud` vault       | resolving `.env`                                                        |
+| Tailscale                 | a tailnet admin's device                 | the k3s API and Grafana (any member), SSH to `root@geoffcloud` (admins) |
+| Docker                    | current                                  | NixOS builds and switches (`nixos/nix` image), fixture test             |
+| gitleaks                  | on `PATH`                                | the pre-commit hook                                                     |
+| `jq`, `gh`, `ssh`, `curl` | current                                  | the scripts in `scripts/`                                               |
 
 You need no local Nix: every Nix command here runs in the `nixos/nix` image.
 
@@ -26,9 +26,13 @@ bun install
 ```
 
 `bun install` also installs the lefthook git hooks. pre-commit fixes and checks staged files and
-runs gitleaks. pre-push runs the format check, lint, typecheck, the tests, the dead-code check and
-the provider's checks; CI adds the type-aware lint, the script tests, the docs checks and the NixOS
-checks.
+runs gitleaks. pre-push runs the format check, lint, the Pulumi pin check, typecheck, the tests, the
+dead-code check, the provider's checks and the SDK check; CI adds the type-aware lint, the script
+tests, the docs checks and the NixOS checks.
+
+The Pulumi CLI runs at the version `infra/package.json` pins for `@pulumi/pulumi`, the one Pulumi
+pin in the repo. CI installs that version for the SDK check, and `check:sdk` warns when the local
+CLI differs, because another CLI version can generate a different SDK.
 
 ## Secrets
 

@@ -36,12 +36,10 @@ type StubOnidelAPI struct {
 	seq        int
 	autoSettle bool
 	teams      []map[string]any
-	sshKeys    map[string]map[string]any
 	vms        map[string]map[string]any
 	vmOrder    []string
 	firewalls  map[string]map[string]any
 	rules      map[string]map[string]any
-	rdns       map[string]map[string]string // VM ID -> IP -> domain
 	requests   []Request
 	problems   []string
 	// canned holds, per pattern, the status and body of each response still to send.
@@ -64,11 +62,9 @@ func StartStubOnidelAPI(t testing.TB) *StubOnidelAPI {
 	f := &StubOnidelAPI{
 		autoSettle: true,
 		teams:      []map[string]any{},
-		sshKeys:    map[string]map[string]any{},
 		vms:        map[string]map[string]any{},
 		firewalls:  map[string]map[string]any{},
 		rules:      map[string]map[string]any{},
-		rdns:       map[string]map[string]string{},
 		canned: map[string][]struct {
 			status int
 			body   string
@@ -148,13 +144,6 @@ func (f *StubOnidelAPI) SetFirewallGroup(group map[string]any) {
 	f.firewalls[group["id"].(string)] = maps.Clone(group)
 }
 
-// SetSSHKey stores key under its "id", replacing any key with that ID.
-func (f *StubOnidelAPI) SetSSHKey(key map[string]any) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.sshKeys[key["id"].(string)] = maps.Clone(key)
-}
-
 // SetFirewallRule stores rule under its "id", replacing any rule with that ID. The
 // rule's "group" names the group it belongs to; the group's rule_count is left as
 // the test set it.
@@ -162,13 +151,6 @@ func (f *StubOnidelAPI) SetFirewallRule(rule map[string]any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.rules[rule["id"].(string)] = maps.Clone(rule)
-}
-
-// SetRDNS replaces the PTR records of the VM vmID with records, IP -> domain.
-func (f *StubOnidelAPI) SetRDNS(vmID string, records map[string]string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.rdns[vmID] = maps.Clone(records)
 }
 
 // GetRequests returns every request received so far, in order.
@@ -186,13 +168,6 @@ func (f *StubOnidelAPI) DrainProblems() []string {
 	problems := f.problems
 	f.problems = nil
 	return problems
-}
-
-// GetSSHKeys returns the stored SSH keys by ID.
-func (f *StubOnidelAPI) GetSSHKeys() map[string]map[string]any {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	return buildStoreCopy(f.sshKeys)
 }
 
 func buildStoreCopy(store map[string]map[string]any) map[string]map[string]any {
@@ -222,17 +197,6 @@ func (f *StubOnidelAPI) GetFirewallRules() map[string]map[string]any {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return buildStoreCopy(f.rules)
-}
-
-// GetRDNS returns the stored PTR records as VM ID -> IP -> domain.
-func (f *StubOnidelAPI) GetRDNS() map[string]map[string]string {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	out := make(map[string]map[string]string, len(f.rdns))
-	for vmID, records := range f.rdns {
-		out[vmID] = maps.Clone(records)
-	}
-	return out
 }
 
 // APIKey is the bearer token the stub API accepts. Any other token gets a 401.
@@ -309,11 +273,6 @@ func (f *StubOnidelAPI) registerRoutes() {
 	route("GET /teams", f.sendTeams)
 	route("GET /os_templates", f.sendOSTemplates)
 
-	route("POST /ssh_keys", f.createSSHKey)
-	route("GET /ssh_keys/{id}", f.sendSSHKey)
-	route("PATCH /ssh_keys/{id}", f.updateSSHKey)
-	route("DELETE /ssh_keys/{id}", f.removeSSHKey)
-
 	route("GET /vm", f.sendVMs)
 	route("POST /vm", f.createVM)
 	route("GET /vm/{id}", f.sendVM)
@@ -329,10 +288,6 @@ func (f *StubOnidelAPI) registerRoutes() {
 	route("GET /network/firewalls/{id}/rules/{rule}", f.sendFirewallRule)
 	route("PATCH /network/firewalls/{id}/rules/{rule}", f.updateFirewallRule)
 	route("DELETE /network/firewalls/{id}/rules/{rule}", f.removeFirewallRule)
-
-	route("GET /vm/{id}/rdns", f.sendRDNS)
-	route("POST /vm/{id}/rdns", f.upsertRDNS)
-	route("DELETE /vm/{id}/rdns/{ip}", f.removeRDNS)
 }
 
 func (f *StubOnidelAPI) checkUnhandled(w http.ResponseWriter, r *http.Request, _ map[string]any) {
@@ -361,19 +316,6 @@ func (f *StubOnidelAPI) sendOSTemplates(w http.ResponseWriter, _ *http.Request, 
 	})
 }
 
-// NewSSHKey and UpdateSSHKey both require team_id, name and ssh_key.
-func (f *StubOnidelAPI) createSSHKey(w http.ResponseWriter, _ *http.Request, body map[string]any) {
-	if !hasStrings(body, "team_id", "name", "ssh_key") {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	key := map[string]any{
-		"id": f.claimID(), "created": "2026-10-02T05:35:28Z", "name": body["name"], "ssh_key": body["ssh_key"],
-	}
-	f.sshKeys[key["id"].(string)] = key
-	sendJSON(w, http.StatusCreated, map[string]any{"ssh_key": key})
-}
-
 func hasStrings(body map[string]any, keys ...string) bool {
 	for _, key := range keys {
 		if s, _ := body[key].(string); s == "" {
@@ -386,38 +328,6 @@ func hasStrings(body map[string]any, keys ...string) bool {
 func (f *StubOnidelAPI) claimID() string {
 	f.seq++
 	return fmt.Sprintf("00000000-0000-4000-8000-%012d", f.seq)
-}
-
-func (f *StubOnidelAPI) sendSSHKey(w http.ResponseWriter, r *http.Request, _ map[string]any) {
-	key, ok := f.sshKeys[r.PathValue("id")]
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	sendJSON(w, http.StatusOK, map[string]any{"ssh_key": key})
-}
-
-func (f *StubOnidelAPI) updateSSHKey(w http.ResponseWriter, r *http.Request, body map[string]any) {
-	if !hasStrings(body, "team_id", "name", "ssh_key") {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	key, ok := f.sshKeys[r.PathValue("id")]
-	if !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	key["name"], key["ssh_key"] = body["name"], body["ssh_key"]
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (f *StubOnidelAPI) removeSSHKey(w http.ResponseWriter, r *http.Request, _ map[string]any) {
-	if _, ok := f.sshKeys[r.PathValue("id")]; !ok {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	delete(f.sshKeys, r.PathValue("id"))
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // sendVMs lists VMs in the order they were stored.
@@ -699,69 +609,5 @@ func (f *StubOnidelAPI) removeFirewallRule(w http.ResponseWriter, r *http.Reques
 		count, _ := group["rule_count"].(int)
 		group["rule_count"] = count - 1
 	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// sendRDNS lists a VM's PTR records sorted by IP. A VM with none, or an unknown VM,
-// lists none: the spec documents no 404 here.
-func (f *StubOnidelAPI) sendRDNS(w http.ResponseWriter, r *http.Request, _ map[string]any) {
-	records := f.rdns[r.PathValue("id")]
-	list := []any{}
-	for _, ip := range slices.Sorted(maps.Keys(records)) {
-		list = append(list, map[string]any{"ip": ip, "domain": records[ip]})
-	}
-	sendJSON(w, http.StatusOK, map[string]any{"rdns": list})
-}
-
-// upsertRDNS sets a PTR record: 400 for a missing or invalid IP or domain, 401 when
-// the IP is not the VM's (the spec's "IP not owned by this VM").
-func (f *StubOnidelAPI) upsertRDNS(w http.ResponseWriter, r *http.Request, body map[string]any) {
-	ip, _ := body["ip_addr"].(string)
-	domain, _ := body["domain"].(string)
-	if net.ParseIP(ip) == nil || domain == "" {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if !f.isVMAddress(r.PathValue("id"), ip) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	if f.rdns[r.PathValue("id")] == nil {
-		f.rdns[r.PathValue("id")] = map[string]string{}
-	}
-	f.rdns[r.PathValue("id")][ip] = domain
-	w.WriteHeader(http.StatusOK)
-}
-
-// isVMAddress compares parsed addresses, so another spelling of the VM's IPv6 address
-// (such as its expanded form) is the VM's own. The spec types ip_addr as "the VM IP
-// address" and does not say how it compares spellings; the provider makes the same
-// assumption when it matches a listed record (findRDNSRecord in onidel/rdns.go).
-func (f *StubOnidelAPI) isVMAddress(vmID, ip string) bool {
-	vm, ok := f.vms[vmID]
-	if !ok {
-		return false
-	}
-	want := net.ParseIP(ip)
-	for _, key := range []string{"main_ipv4", "main_ipv6"} {
-		address, _ := vm[key].(string)
-		if got := net.ParseIP(address); got != nil && got.Equal(want) {
-			return true
-		}
-	}
-	return false
-}
-
-func (f *StubOnidelAPI) removeRDNS(w http.ResponseWriter, r *http.Request, _ map[string]any) {
-	ip := r.PathValue("ip")
-	if net.ParseIP(ip) == nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-	if !f.isVMAddress(r.PathValue("id"), ip) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	delete(f.rdns[r.PathValue("id")], ip)
 	w.WriteHeader(http.StatusNoContent)
 }

@@ -80,7 +80,7 @@ func (a *VMArgs) Annotate(an infer.Annotator) {
 	an.Describe(&a.InstanceType, "Instance type UUID. Replaces the VM.")
 	an.Describe(&a.PaymentCycle, "Billing cycle: hourly, monthly, quarterly, semiannually, annually, "+
 		"biennially or triennially. Replaces the VM.")
-	an.Describe(&a.SSHKeys, "SshKey IDs installed at provisioning. Replaces the VM.")
+	an.Describe(&a.SSHKeys, "Onidel SSH key IDs installed at provisioning. Replaces the VM.")
 	an.Describe(&a.VPCs, "VPC IDs to attach at provisioning. Replaces the VM.")
 	an.Describe(&a.StartupScriptID, "Startup script run on first boot. Replaces the VM.")
 	an.Describe(&a.DisableSSHBlocking, "Allow outbound SSH (port 22). Replaces the VM.")
@@ -108,9 +108,9 @@ func (VM) Create(ctx context.Context, req infer.CreateRequest[VMArgs]) (infer.Cr
 		return infer.CreateResponse[VMState]{Output: VMState{VMArgs: in}}, nil
 	}
 
-	api, cfg := getClient(ctx)
+	api, teamID := getClient(ctx)
 	vm, err := api.CreateVM(ctx, client.VMInput{
-		TeamID:             cfg.teamID,
+		TeamID:             teamID,
 		Name:               in.Name,
 		PaymentCycle:       getOrDefault(in.PaymentCycle, ""),
 		InstanceType:       getOrDefault(in.InstanceType, ""),
@@ -141,8 +141,8 @@ func (VM) Create(ctx context.Context, req infer.CreateRequest[VMArgs]) (infer.Cr
 
 // Read refreshes the VM, or adopts one by ID for `pulumi import`.
 func (VM) Read(ctx context.Context, req infer.ReadRequest[VMArgs, VMState]) (infer.ReadResponse[VMArgs, VMState], error) {
-	api, cfg := getClient(ctx)
-	vm, err := api.ReadVM(ctx, req.ID, cfg.teamID)
+	api, teamID := getClient(ctx)
+	vm, err := api.ReadVM(ctx, req.ID, teamID)
 	if client.IsNotFound(err) {
 		return infer.ReadResponse[VMArgs, VMState]{}, nil
 	}
@@ -227,9 +227,9 @@ func (VM) Update(ctx context.Context, req infer.UpdateRequest[VMArgs, VMState]) 
 		return infer.UpdateResponse[VMState]{Output: state}, nil
 	}
 
-	api, cfg := getClient(ctx)
-	patches := planVMPatches(old, next, cfg.teamID)
-	vm, err := api.ReadVM(ctx, req.ID, cfg.teamID)
+	api, teamID := getClient(ctx)
+	patches := planVMPatches(old, next, teamID)
+	vm, err := api.ReadVM(ctx, req.ID, teamID)
 	for _, patch := range patches {
 		if err != nil {
 			break
@@ -244,8 +244,8 @@ func (VM) Update(ctx context.Context, req infer.UpdateRequest[VMArgs, VMState]) 
 
 // Delete destroys the VM and waits until it is gone.
 func (VM) Delete(ctx context.Context, req infer.DeleteRequest[VMState]) (infer.DeleteResponse, error) {
-	api, cfg := getClient(ctx)
-	return infer.DeleteResponse{}, api.RemoveVM(ctx, req.ID, cfg.teamID)
+	api, teamID := getClient(ctx)
+	return infer.DeleteResponse{}, api.RemoveVM(ctx, req.ID, teamID)
 }
 
 // planVMPatches turns an input change into the PATCH actions that apply it.
@@ -258,9 +258,9 @@ func planVMPatches(old, next VMArgs, teamID string) []client.VMPatch {
 		patches = append(patches, client.VMPatch{TeamID: teamID, EnableIPv6: next.IPv6})
 	}
 	oldFirewall, nextFirewall := getOrDefault(old.FirewallGroupID, ""), getOrDefault(next.FirewallGroupID, "")
-	switch {
-	case nextFirewall == oldFirewall:
-	case nextFirewall == "":
+	switch nextFirewall {
+	case oldFirewall:
+	case "":
 		detach := true
 		patches = append(patches, client.VMPatch{TeamID: teamID, DisableFirewall: &detach})
 	default:

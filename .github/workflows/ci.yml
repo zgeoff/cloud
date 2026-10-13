@@ -3,7 +3,8 @@ name: CI
 # One job for the secret scan, the Bun checks and the provider's Go checks, so a run bills one
 # runner minute where three jobs billed three. The job runs on every pull request and every push
 # to main; scripts/needs-provider-check.sh decides whether the change touches an input of the Go
-# checks, and the job runs them only then. A failed decision or a failed check fails the job.
+# checks or the generated SDK, and the job runs them and the SDK check only then. A failed
+# decision or a failed check fails the job.
 on:
   push:
     branches: [main]
@@ -67,6 +68,9 @@ jobs:
         continue-on-error: true
         run: bash .claude/skills/docs-writing/scripts/check-length.sh
 
+      - name: Pulumi pins
+        run: bun run check:pulumi-pins
+
       - name: Typecheck
         run: bun run typecheck
 
@@ -103,8 +107,29 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: provider/go.mod
-          cache-dependency-path: provider/go.sum
+          # tools.sum holds the linters check.sh runs with go tool
+          cache-dependency-path: |
+            provider/go.sum
+            provider/tools.sum
 
       - name: Provider checks
         if: steps.decide.outputs.provider == 'true'
         run: bun run provider:check
+
+      # the Pulumi CLI at infra's @pulumi/pulumi pin, so the SDK check has no pin of its own;
+      # the tarball is checked against the release's checksum file
+      - name: Setup Pulumi CLI
+        if: steps.decide.outputs.provider == 'true'
+        run: |
+          version="$(jq -r '.dependencies["@pulumi/pulumi"]' infra/package.json)"
+          base="https://get.pulumi.com/releases/sdk"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "$base/pulumi-v$version-linux-x64.tar.gz"
+          curl -fsSL "$base/pulumi-$version-checksums.txt" |
+            grep " pulumi-v$version-linux-x64.tar.gz\$" | sha256sum -c -
+          tar -xzf "pulumi-v$version-linux-x64.tar.gz"
+          echo "$RUNNER_TEMP/pulumi" >> "$GITHUB_PATH"
+
+      - name: SDK check
+        if: steps.decide.outputs.provider == 'true'
+        run: bun run check:sdk

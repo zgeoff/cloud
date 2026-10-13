@@ -20,16 +20,6 @@ export type Provider = import("./provider").Provider;
 export const Provider: typeof import("./provider").Provider = null as any;
 utilities.lazyLoad(exports, ["Provider"], () => require("./provider"));
 
-export { RdnsArgs } from "./rdns";
-export type Rdns = import("./rdns").Rdns;
-export const Rdns: typeof import("./rdns").Rdns = null as any;
-utilities.lazyLoad(exports, ["Rdns"], () => require("./rdns"));
-
-export { SshKeyArgs } from "./sshKey";
-export type SshKey = import("./sshKey").SshKey;
-export const SshKey: typeof import("./sshKey").SshKey = null as any;
-utilities.lazyLoad(exports, ["SshKey"], () => require("./sshKey"));
-
 export { VmArgs } from "./vm";
 export type Vm = import("./vm").Vm;
 export const Vm: typeof import("./vm").Vm = null as any;
@@ -51,10 +41,6 @@ const _module = {
                 return new FirewallGroup(name, <any>undefined, { urn })
             case "onidel:index:FirewallRule":
                 return new FirewallRule(name, <any>undefined, { urn })
-            case "onidel:index:Rdns":
-                return new Rdns(name, <any>undefined, { urn })
-            case "onidel:index:SshKey":
-                return new SshKey(name, <any>undefined, { urn })
             case "onidel:index:Vm":
                 return new Vm(name, <any>undefined, { urn })
             default:

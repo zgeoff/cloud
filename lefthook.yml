@@ -44,7 +44,12 @@ pre-push:
     - name: lint
       files: bun run --silent files:branch
       glob: '*.{js,mjs,cjs,ts,mts,cts}'
+      # oxlint ignores the generated SDK, and exits 1 when every file it gets is ignored
+      exclude:
+        - 'sdk/**'
       run: bun run lint:files {files}
+    - name: pulumi pins
+      run: bun run check:pulumi-pins
     - name: typecheck
       run: bun run typecheck
     - name: test
@@ -57,3 +62,11 @@ pre-push:
       files: bun run --silent files:branch --include-deleted
       glob: 'provider/**'
       run: bun run provider:check
+    - name: sdk
+      # sdk:gen builds the provider and needs the Pulumi CLI, so it runs only for a branch that
+      # changes the provider or the SDK; deletions count, as for the provider job
+      files: bun run --silent files:branch --include-deleted
+      glob:
+        - 'provider/**'
+        - 'sdk/**'
+      run: bun run check:sdk

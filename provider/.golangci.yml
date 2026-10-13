@@ -1,0 +1,11 @@
+# golangci-lint for the provider, run by check.sh. Only staticcheck and unused: go vet and
+# gofmt already run there, and deadcode covers what unused cannot see across packages.
+version: "2"
+run:
+  # the checks run on small hosts; two workers bound the memory
+  concurrency: 2
+linters:
+  default: none
+  enable:
+    - staticcheck
+    - unused

@@ -142,10 +142,10 @@ func TestStartStubOnidelAPIPassesAtCleanupOnceTheTestDrainsItsProblems(t *testin
 func TestStubOnidelAPIReportsABodyThatIsNotAJSONObject(t *testing.T) {
 	ctx := setupTest(t)
 
-	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/ssh_keys", `not json`)
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls", `not json`)
 
 	assert.Equal(t, http.StatusBadRequest, status)
-	assert.Equal(t, []string{"body is not a JSON object: POST /ssh_keys"}, ctx.api.DrainProblems())
+	assert.Equal(t, []string{"body is not a JSON object: POST /network/firewalls"}, ctx.api.DrainProblems())
 }
 
 func TestStubOnidelAPIRecordsEachRequestWithItsQueryAndBody(t *testing.T) {
@@ -198,15 +198,6 @@ func TestStubOnidelAPIReplacesAVMInItsListPositionWhenATestSetsItsIDAgain(t *tes
 	assert.JSONEq(t, `[{"id":"a","name":"first-2","status":"building"},{"id":"b","name":"second","status":"active"}]`, body)
 }
 
-func TestStubOnidelAPIReplacesAnSSHKeyWhenATestSetsItsIDAgain(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetSSHKey(map[string]any{"id": "k1", "name": "me", "ssh_key": "k"})
-
-	ctx.api.SetSSHKey(map[string]any{"id": "k1", "name": "me-2", "ssh_key": "k2"})
-
-	assert.Equal(t, map[string]map[string]any{"k1": {"id": "k1", "name": "me-2", "ssh_key": "k2"}}, ctx.api.GetSSHKeys())
-}
-
 func TestStubOnidelAPIServesAFirewallRuleATestSets(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 1})
@@ -231,82 +222,6 @@ func TestStubOnidelAPIReplacesAFirewallRuleWhenATestSetsItsIDAgain(t *testing.T)
 	assert.Equal(t, map[string]map[string]any{"r1": {"id": "r1", "group": "g1", "desc": "web"}}, ctx.api.GetFirewallRules())
 }
 
-func TestStubOnidelAPIReplacesAVMsPTRRecordsWhenATestSetsThemAgain(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "v4.example.com", "2001:db8::1": "v6.example.com"})
-	ctx.api.SetRDNS("w", map[string]string{"198.51.100.1": "w.example.com"})
-
-	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "host.example.com"})
-
-	assert.Equal(t, map[string]map[string]string{
-		"v": {"203.0.113.18": "host.example.com"},
-		"w": {"198.51.100.1": "w.example.com"},
-	}, ctx.api.GetRDNS())
-}
-
-func TestStubOnidelAPICreatesAnSSHKeyInAnEnvelope(t *testing.T) {
-	ctx := setupTest(t)
-
-	status, body := onideltest.SendRequest(t, ctx.api.URL, "POST", "/ssh_keys", `{"team_id":"t","name":"me","ssh_key":"ssh-ed25519 AAAA me@host"}`)
-
-	assert.Equal(t, http.StatusCreated, status)
-	assert.JSONEq(t, `{"ssh_key":{"id":"00000000-0000-4000-8000-000000000001","created":"2026-10-02T05:35:28Z",`+
-		`"name":"me","ssh_key":"ssh-ed25519 AAAA me@host"}}`, body)
-}
-
-func TestStubOnidelAPIRejectsAnSSHKeyWriteMissingARequiredField(t *testing.T) {
-	rows := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-	}{
-		{"it rejects a create without team_id", "POST", "/ssh_keys", `{"name":"me","ssh_key":"k"}`},
-		{"it rejects a create without name", "POST", "/ssh_keys", `{"team_id":"t","ssh_key":"k"}`},
-		{"it rejects a create without ssh_key", "POST", "/ssh_keys", `{"team_id":"t","name":"me"}`},
-		{"it rejects an update without team_id", "PATCH", "/ssh_keys/00000000-0000-4000-8000-000000000001", `{"name":"me","ssh_key":"k"}`},
-	}
-	for _, row := range rows {
-		t.Run(row.name, func(t *testing.T) {
-			ctx := setupTest(t)
-			ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
-
-			status, body := onideltest.SendRequest(t, ctx.api.URL, row.method, row.path, row.body)
-
-			assert.Equal(t, []any{http.StatusBadRequest, ""}, []any{status, body})
-			assert.Equal(t, map[string]map[string]any{
-				"00000000-0000-4000-8000-000000000001": {
-					"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k",
-				},
-			}, ctx.api.GetSSHKeys())
-		})
-	}
-}
-
-func TestStubOnidelAPIUpdatesAnSSHKeyNameAndPublicKey(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k1"})
-
-	status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/ssh_keys/00000000-0000-4000-8000-000000000001", `{"team_id":"t","name":"me-2","ssh_key":"k2"}`)
-
-	assert.Equal(t, http.StatusNoContent, status)
-	assert.Equal(t, map[string]map[string]any{
-		"00000000-0000-4000-8000-000000000001": {
-			"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me-2", "ssh_key": "k2",
-		},
-	}, ctx.api.GetSSHKeys())
-}
-
-func TestStubOnidelAPIRemovesAnSSHKey(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k1"})
-
-	status, _ := onideltest.SendRequest(t, ctx.api.URL, "DELETE", "/ssh_keys/00000000-0000-4000-8000-000000000001?team_id=t", "")
-
-	assert.Equal(t, http.StatusNoContent, status)
-	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetSSHKeys())
-}
-
 func TestStubOnidelAPIAnswersAMissingResourceWithABare404(t *testing.T) {
 	rows := []struct {
 		name   string
@@ -314,9 +229,6 @@ func TestStubOnidelAPIAnswersAMissingResourceWithABare404(t *testing.T) {
 		path   string
 		body   string
 	}{
-		{"it answers a read of an unknown SSH key", "GET", "/ssh_keys/x", ""},
-		{"it answers an update of an unknown SSH key", "PATCH", "/ssh_keys/x", `{"team_id":"t","name":"me","ssh_key":"k"}`},
-		{"it answers a removal of an unknown SSH key", "DELETE", "/ssh_keys/x", ""},
 		{"it answers a read of an unknown VM", "GET", "/vm/x", ""},
 		{"it answers an update of an unknown VM", "PATCH", "/vm/x", `{"name":"web"}`},
 		{"it answers a removal of an unknown VM", "DELETE", "/vm/x", ""},
@@ -805,98 +717,6 @@ func TestStubOnidelAPIRejectsARuleUpdateWithoutAValidDescription(t *testing.T) {
 			}}, ctx.api.GetFirewallRules())
 		})
 	}
-}
-
-func TestStubOnidelAPIListsAVMsPTRRecordsSortedByIP(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8::1"})
-	ctx.api.SetRDNS("v", map[string]string{"2001:db8::1": "v6.example.com", "203.0.113.18": "v4.example.com"})
-
-	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm/v/rdns", "")
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.JSONEq(t, `{"rdns":[{"ip":"2001:db8::1","domain":"v6.example.com"},{"ip":"203.0.113.18","domain":"v4.example.com"}]}`, body)
-}
-
-func TestStubOnidelAPIListsNoPTRRecordsForAVMWithoutAny(t *testing.T) {
-	ctx := setupTest(t)
-
-	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/vm/unknown/rdns", "")
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.JSONEq(t, `{"rdns":[]}`, body)
-}
-
-func TestStubOnidelAPIAcceptsAPTRRecordForAnotherSpellingOfTheVMsIPv6Address(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": "2001:db8::1"})
-
-	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns",
-		`{"ip_addr":"2001:0db8:0000:0000:0000:0000:0000:0001","domain":"v6.example.com"}`)
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.Equal(t, map[string]map[string]string{"v": {"2001:0db8:0000:0000:0000:0000:0000:0001": "v6.example.com"}}, ctx.api.GetRDNS())
-}
-
-func TestStubOnidelAPIRejectsAnInvalidPTRWrite(t *testing.T) {
-	rows := []struct {
-		name   string
-		method string
-		path   string
-		body   string
-		status int
-	}{
-		{"it rejects a record without an IP", "POST", "/vm/v/rdns", `{"domain":"example.com"}`, http.StatusBadRequest},
-		{"it rejects a record with an invalid IP", "POST", "/vm/v/rdns", `{"ip_addr":"nope","domain":"example.com"}`, http.StatusBadRequest},
-		{"it rejects a record without a domain", "POST", "/vm/v/rdns", `{"ip_addr":"203.0.113.18"}`, http.StatusBadRequest},
-		{"it refuses a record for an IP the VM does not own", "POST", "/vm/v/rdns", `{"ip_addr":"198.51.100.1","domain":"example.com"}`, http.StatusUnauthorized},
-		{"it refuses a record on an unknown VM", "POST", "/vm/other/rdns", `{"ip_addr":"203.0.113.18","domain":"example.com"}`, http.StatusUnauthorized},
-		{"it rejects a removal for an invalid IP", "DELETE", "/vm/v/rdns/nope", "", http.StatusBadRequest},
-		{"it refuses a removal for an IP the VM does not own", "DELETE", "/vm/v/rdns/198.51.100.1", "", http.StatusUnauthorized},
-	}
-	for _, row := range rows {
-		t.Run(row.name, func(t *testing.T) {
-			ctx := setupTest(t)
-			ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18", "main_ipv6": ""})
-
-			status, _ := onideltest.SendRequest(t, ctx.api.URL, row.method, row.path, row.body)
-
-			assert.Equal(t, row.status, status)
-			assert.Equal(t, map[string]map[string]string{}, ctx.api.GetRDNS())
-		})
-	}
-}
-
-func TestStubOnidelAPIOverwritesAPTRRecord(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
-	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "a.example.com"})
-
-	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/rdns", `{"team_id":"t","ip_addr":"203.0.113.18","domain":"b.example.com"}`)
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.Equal(t, map[string]map[string]string{"v": {"203.0.113.18": "b.example.com"}}, ctx.api.GetRDNS())
-}
-
-func TestStubOnidelAPIRemovesAPTRRecord(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetVM(map[string]any{"id": "v", "main_ipv4": "203.0.113.18"})
-	ctx.api.SetRDNS("v", map[string]string{"203.0.113.18": "a.example.com"})
-
-	status, _ := onideltest.SendRequest(t, ctx.api.URL, "DELETE", "/vm/v/rdns/203.0.113.18?team_id=t", "")
-
-	assert.Equal(t, http.StatusNoContent, status)
-	assert.Equal(t, map[string]map[string]string{"v": {}}, ctx.api.GetRDNS())
-}
-
-func TestStubOnidelAPIReadsAnSSHKeyInAnEnvelope(t *testing.T) {
-	ctx := setupTest(t)
-	ctx.api.SetSSHKey(map[string]any{"id": "00000000-0000-4000-8000-000000000001", "created": "2026-10-02T05:35:28Z", "name": "me", "ssh_key": "k"})
-
-	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/ssh_keys/00000000-0000-4000-8000-000000000001?team_id=t", "")
-
-	assert.Equal(t, http.StatusOK, status)
-	assert.JSONEq(t, `{"ssh_key":{"id":"00000000-0000-4000-8000-000000000001","created":"2026-10-02T05:35:28Z","name":"me","ssh_key":"k"}}`, body)
 }
 
 func TestStubOnidelAPIReadsAFirewallGroupInAnEnvelope(t *testing.T) {

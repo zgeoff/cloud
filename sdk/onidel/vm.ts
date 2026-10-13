@@ -91,7 +91,7 @@ export class Vm extends pulumi.CustomResource {
      */
     declare public readonly snapshotId: pulumi.Output<string | undefined>;
     /**
-     * SshKey IDs installed at provisioning. Replaces the VM.
+     * Onidel SSH key IDs installed at provisioning. Replaces the VM.
      */
     declare public readonly sshKeys: pulumi.Output<string[] | undefined>;
     /**
@@ -241,7 +241,7 @@ export interface VmArgs {
      */
     snapshotId?: pulumi.Input<string | undefined>;
     /**
-     * SshKey IDs installed at provisioning. Replaces the VM.
+     * Onidel SSH key IDs installed at provisioning. Replaces the VM.
      */
     sshKeys?: pulumi.Input<pulumi.Input<string>[] | undefined>;
     /**

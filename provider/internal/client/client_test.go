@@ -296,17 +296,15 @@ func TestClientNeverRetriesAPOST(t *testing.T) {
 
 func TestClientNeverRetriesAPATCH(t *testing.T) {
 	ctx := setupTest(t)
-	ctx.api.RegisterResponse("PATCH /ssh_keys/{id}", http.StatusServiceUnavailable, "", 1)
+	ctx.api.RegisterResponse("PATCH /network/firewalls/{id}/rules/{rule}", http.StatusServiceUnavailable, "", 1)
 
-	err := ctx.client.UpdateSSHKey(t.Context(), "k", clienttest.BuildMockSSHKeyInput(func(in *client.SSHKeyInput) {
-		in.TeamID, in.Name, in.PublicKey = "t", "n", "p"
-	}))
+	err := ctx.client.UpdateFirewallRuleDescription(t.Context(), "g", "r", "t", "d")
 
 	var apiErr *client.APIError
 	require.ErrorAs(t, err, &apiErr)
-	assert.Equal(t, &client.APIError{Method: "PATCH", Path: "/ssh_keys/k", Status: 503}, apiErr)
+	assert.Equal(t, &client.APIError{Method: "PATCH", Path: "/network/firewalls/g/rules/r", Status: 503}, apiErr)
 	assert.Equal(t, []onideltest.Request{
-		{Method: "PATCH", Path: "/ssh_keys/k", Body: map[string]any{"team_id": "t", "name": "n", "ssh_key": "p"}},
+		{Method: "PATCH", Path: "/network/firewalls/g/rules/r", Body: map[string]any{"team_id": "t", "desc": "d"}},
 	}, ctx.api.GetRequests())
 	assert.Equal(t, []time.Duration(nil), ctx.sleep.GetDurations())
 }

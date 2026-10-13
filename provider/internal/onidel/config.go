@@ -32,9 +32,10 @@ type Config struct {
 	// this struct, so the unexported field survives.
 	sleep func(ctx context.Context, d time.Duration) error
 
-	teamOnce sync.Once
-	teamID   string
-	teamErr  error
+	// teamMu guards teamID, the team a lookup found. A failed lookup is not cached,
+	// so the next call looks the team up again.
+	teamMu sync.Mutex
+	teamID string
 }
 
 // Annotate documents the config for the schema.
@@ -77,33 +78,38 @@ func (c *Config) Configure(context.Context) error {
 	return nil
 }
 
-// getClient returns the configured API client and the config, with the team
-// resolved. Onidel rejects writes without a team_id (401 on create, 404 on
-// delete), so every call carries one. A failed lookup leaves the team empty, and
-// the call then fails with the API's own error.
-func getClient(ctx context.Context) (*client.Client, *Config) {
+// getClient returns the configured API client and the team to act in. Onidel
+// rejects writes without a team_id (401 on create, 404 on delete), so every call
+// carries one. A failed lookup logs a warning and leaves the team empty, and the
+// call then fails with the API's own error.
+func getClient(ctx context.Context) (*client.Client, string) {
 	cfg := infer.GetConfig[*Config](ctx)
-	_, _ = cfg.resolveTeamID(ctx)
-	return cfg.client, cfg
+	teamID, err := cfg.resolveTeamID(ctx)
+	if err != nil {
+		p.GetLogger(ctx).Warningf("onidel: find the team: %s", err)
+	}
+	return cfg.client, teamID
 }
 
 // resolveTeamID returns the team for endpoints that require one: the configured
-// teamId, or the caller's only team.
+// teamId, or the caller's only team. It caches a found team, and looks the team up
+// again after a failed lookup.
 func (c *Config) resolveTeamID(ctx context.Context) (string, error) {
-	c.teamOnce.Do(func() {
-		if c.TeamID != "" {
-			c.teamID = c.TeamID
-			return
-		}
-		teams, err := c.client.ReadTeams(ctx)
-		switch {
-		case err != nil:
-			c.teamErr = err
-		case len(teams) == 1:
-			c.teamID = teams[0].ID
-		default:
-			c.teamErr = fmt.Errorf("onidel: the API key can see %d teams; set the teamId config", len(teams))
-		}
-	})
-	return c.teamID, c.teamErr
+	if c.TeamID != "" {
+		return c.TeamID, nil
+	}
+	c.teamMu.Lock()
+	defer c.teamMu.Unlock()
+	if c.teamID != "" {
+		return c.teamID, nil
+	}
+	teams, err := c.client.ReadTeams(ctx)
+	if err != nil {
+		return "", err
+	}
+	if len(teams) != 1 {
+		return "", fmt.Errorf("onidel: the API key can see %d teams; set the teamId config", len(teams))
+	}
+	c.teamID = teams[0].ID
+	return c.teamID, nil
 }
