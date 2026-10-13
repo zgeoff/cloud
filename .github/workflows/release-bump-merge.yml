@@ -1,0 +1,62 @@
+name: release bump merge
+
+# Merges a release check pull request (release-check/<dependency>, opened by the release check
+# workflow) once it may merge on its own: scripts/merge-release-bump.sh holds the rules. It runs
+# each time a workflow that checks such a pull request finishes, so the last check to finish
+# merges it. A run for any other branch or event is skipped, which bills nothing.
+#
+# It reads the pull request with GITHUB_TOKEN and merges with the release check app's token, so
+# the push to main starts its workflows. The app and its secrets are the release check workflow's.
+on:
+  workflow_run:
+    workflows: [CI, NixOS checks, agent image, atc-gateway images, nixie backup]
+    types: [completed]
+
+permissions:
+  contents: read
+  pull-requests: read
+  checks: read
+  statuses: read
+
+jobs:
+  merge:
+    if: >-
+      github.event.workflow_run.event == 'pull_request' &&
+      startsWith(github.event.workflow_run.head_branch, 'release-check/') &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    # one decision per branch at a time, so two finishing checks never merge twice
+    concurrency:
+      group: release-bump-merge-${{ github.event.workflow_run.head_branch }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Mint the release check app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_CHECK_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_CHECK_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Merge the pull request if it may merge on its own
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MERGE_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_LOGIN: app/${{ steps.app-token.outputs.app-slug }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+        # bash's pipefail, so a failed script fails the step through tee
+        shell: bash
+        run: bun run --silent ci:merge-release-bump "$BRANCH" | tee -a "$GITHUB_STEP_SUMMARY"

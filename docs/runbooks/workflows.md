@@ -167,7 +167,9 @@ imp is pinned in two places, and both move together:
 | imp's NixOS module   | the `imp` input in `nixos/flake.nix`, and `nixos/flake.lock`                          |
 | the `imp-host` image | `services.imp.image` in `nixos/hosts/geoffcloud/configuration.nix`, by tag and digest |
 
-1. Update both pins in a PR. Read imp's release notes for migrations and new host settings.
+1. Update both pins in a PR. Read imp's release notes for migrations and new host settings. The
+   [release check](./release-check.md) opens this PR for each new imp release, with the imp-base pin
+   of the agent image.
 2. Copy impd's database. Never tar the live files:
 
    ```sh
