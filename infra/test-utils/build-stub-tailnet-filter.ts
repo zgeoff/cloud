@@ -115,7 +115,7 @@ function getProtoNumber(proto: string): number {
 function isInPortRange(entry: string, ports: string, port: number): boolean {
   const [first, last = first] = ports.split('-').map(Number);
 
-  if (first === undefined || Number.isNaN(first) || Number.isNaN(last)) {
+  if (first === undefined || last === undefined || Number.isNaN(first) || Number.isNaN(last)) {
     throw new Error(`the stand-in does not model the ip entry ${entry}`);
   }
 
