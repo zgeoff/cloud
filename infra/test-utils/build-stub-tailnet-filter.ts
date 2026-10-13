@@ -10,14 +10,14 @@ export interface TailnetPolicy {
 }
 
 // A user's device carries its owner's roles and no tags; a tagged node carries tags and no roles
-export interface TailnetNode {
+interface TailnetNode {
   readonly ip: string;
   readonly roles: readonly ('admin' | 'member')[];
   readonly tags: readonly string[];
 }
 
 // The protocols ip '*' covers, which are the only ones a test asks about
-export interface TailnetConnection {
+interface TailnetConnection {
   readonly proto: 'tcp' | 'udp' | 'icmp' | 'ipv6-icmp';
   readonly port: number;
 }
