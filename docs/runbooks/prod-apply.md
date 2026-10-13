@@ -87,9 +87,9 @@ did a run whose apply job printed
 `deployed/prod at <commit> already holds every Pulumi input of <revision>, so nothing applied.`
 after it waited behind a newer commit's apply.
 
-A run whose apply job ended cancelled before its first step waited in the queue until a newer
-commit's apply took its place. It still posts `The prod apply failed` to Discord. Check that the
-newer run applied, because its apply covers every change of the cancelled one.
+A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
+most 100 waiting applies and cancels any more. It still posts `The prod apply failed` to Discord.
+Check that a newer run applied, because its apply covers every change of the cancelled one.
 
 ## Answer a held run
 
@@ -113,8 +113,8 @@ A held run fails at the step `Hold for a manual dispatch`, and Discord shows
 
    The dispatched run previews again and applies whatever it plans, with no guard. If `main` moved
    on, answer the newest held run instead: its plan holds every change since the tag. A push to
-   `main` that changes a Pulumi input while your dispatch still waits in the queue replaces it, and
-   that push's run holds again and alerts: dispatch again once it ends.
+   `main` while your dispatch waits joins the same queue without replacing it, and its run decides
+   and guards on its own commit once its turn comes.
 
 3. To drop the change, revert it in a PR. The revert's own run then finds nothing to hold.
 
