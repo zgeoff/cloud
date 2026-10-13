@@ -121,7 +121,9 @@ Any other change to that branch fails the diff check, and the pull request then 
 The check stops mistakes, not a hostile writer: the ruleset needs no approval, so any token that can
 push here can already merge.
 
-If the release job's step fails, pin the release by hand from a clean checkout of `main`:
+The [release check](./release-check.md) also pins each new atc release here, on its own branch and
+together with the host's daemon and the gateway images. If the release job's step fails, pin the
+release by hand from a clean checkout of `main`:
 
 ```sh
 gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -D /tmp/atc-sums

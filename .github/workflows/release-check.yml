@@ -1,0 +1,117 @@
+name: release check
+
+# Finds new atc, imp and nixie releases and opens one bump pull request per dependency, so the
+# release repositories know nothing about cloud. The check job runs on the 1-core runner, reads the
+# newest releases and the pins (scripts/find-release-bumps.sh), and ends: a run that finds nothing
+# bills 1 minute. The bump job runs only when a pin is older than its newest release; it opens the
+# pull requests with the release check app's token, so CI runs on them, which it would not for a
+# GITHUB_TOKEN pull request. The release bump merge workflow merges the ones labelled auto-merge.
+#
+# The app needs the repository permissions Contents (write) and Pull requests (write), and the
+# secrets RELEASE_CHECK_APP_CLIENT_ID and RELEASE_CHECK_APP_PRIVATE_KEY.
+on:
+  schedule:
+    # every 6 hours, off the hour: GitHub's docs say scheduled runs queue at the start of each hour
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# one run at a time, so two runs never push the same branch; a queued run waits, never cancels
+concurrency:
+  group: release-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      bumps: ${{ steps.find.outputs.bumps }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Find the pins older than their newest release
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+        run: |
+          bumps="$(bun run --silent ci:find-release-bumps)"
+          if [ -z "$bumps" ]; then
+            echo "Every pin holds its newest release." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          printf 'bumps<<EOF\n%s\nEOF\n' "$bumps" >> "$GITHUB_OUTPUT"
+          {
+            echo 'Pins older than their newest release (dependency, newest, pinned):'
+            echo
+            sed 's/^/- /' <<< "$bumps"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+  bump:
+    needs: check
+    if: needs.check.outputs.bumps != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Mint the release check app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_CHECK_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_CHECK_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # the full history of main, so the scripts can compare a branch with its merge base
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # commits as the app's bot user, whose noreply address carries the bot's user id
+      - name: Set the git identity
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          id="$(gh api "users/$SLUG%5Bbot%5D" --jq .id)"
+          git config user.name "$SLUG[bot]"
+          git config user.email "$id+$SLUG[bot]@users.noreply.github.com"
+
+      # every line runs, so one dependency's failure leaves the others' pull requests current;
+      # any failure fails the job once all have run
+      - name: Open or update the bump pull requests
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+          BUMPS: ${{ needs.check.outputs.bumps }}
+        run: |
+          failed=0
+          while read -r -a bump; do
+            echo "::group::${bump[0]} ${bump[1]}"
+            # a failed pin can leave tracked files changed; each bump starts from a clean tree
+            git reset -q --hard
+            git clean -fdq
+            bun run --silent ci:bump-release "${bump[@]}" || { echo "::error::the ${bump[0]} bump failed"; failed=1; }
+            echo "::endgroup::"
+          done <<< "$BUMPS"
+          exit "$failed"
