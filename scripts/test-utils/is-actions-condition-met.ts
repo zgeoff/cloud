@@ -3,7 +3,7 @@ import { findJSONField } from '../find-json-field.ts';
 // Evaluates a job's `if` as GitHub's expression docs describe it: literals, `github` and `needs`
 // paths, `!`, `==`, `!=`, `&&`, `||`, parentheses, and the status check functions. Anything else,
 // such as another function or context, throws.
-export interface ActionsNeed {
+interface ActionsNeed {
   readonly result: string;
   readonly outputs: Readonly<Record<string, string>>;
 }

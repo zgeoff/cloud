@@ -15,14 +15,14 @@ export interface StubGitHubContext {
 
 type DoneStatus = 'success' | 'failure' | 'skipped' | 'cancelled';
 
-export type StubJobStatus = 'waiting' | 'pending' | 'in_progress' | DoneStatus;
+type StubJobStatus = 'waiting' | 'pending' | 'in_progress' | DoneStatus;
 
-export interface StubRun {
+interface StubRun {
   readonly status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   readonly jobs: Readonly<Record<string, StubJobStatus>>;
 }
 
-export interface StubJobResult {
+interface StubJobResult {
   readonly status: 'success' | 'failure';
   readonly outputs?: Readonly<Record<string, string>>;
 }
