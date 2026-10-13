@@ -111,6 +111,11 @@ applies or reverts the held change, every later push to `main` runs the job and 
 the tag still sits behind the change. A failed apply or a failed second drift check leaves the tag
 where it was, so the next run's first drift check fails and holds until a person repairs the stack.
 
+The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
+itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
+Pulumi's update plans would close that gap, but they are experimental, and a plan they reject stops
+the apply partway, which leaves the stack half changed.
+
 One run applies at a time, and GitHub never cancels a run in progress, because a cancelled apply
 leaves the stack half changed. The job prints only each held step's op and resource name, never a
 resource's state, and its Pulumi runs suppress the stack outputs, because the repo and its logs are

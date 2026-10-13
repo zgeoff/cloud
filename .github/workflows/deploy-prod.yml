@@ -40,6 +40,7 @@ jobs:
     outputs:
       apply: ${{ steps.decide.outputs.apply }}
       revision: ${{ steps.decide.outputs.revision }}
+      deployed: ${{ steps.decide.outputs.deployed }}
     env:
       LEFTHOOK: 0
       EVENT: ${{ github.event_name }}
@@ -78,13 +79,18 @@ jobs:
             echo "$revision is not on main" >&2
             exit 1
           }
-          apply="$(bun run --silent ci:needs-prod-apply deployed/prod "$revision")"
+          # resolved once, so a tag moved during the run never reaches the apply job
+          deployed="$(git rev-parse --verify 'deployed/prod^{commit}')"
+          apply="$(bun run --silent ci:needs-prod-apply "$deployed" "$revision")"
           case "$apply" in
             true | false) ;;
             *) echo "unexpected decision: $apply" >&2; exit 1 ;;
           esac
-          echo "apply=$apply" >> "$GITHUB_OUTPUT"
-          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+          {
+            echo "apply=$apply"
+            echo "revision=$revision"
+            echo "deployed=$deployed"
+          } >> "$GITHUB_OUTPUT"
           if [ "$apply" = false ]; then
             echo "No Pulumi input changed since deployed/prod, so nothing applied." | tee -a "$GITHUB_STEP_SUMMARY"
           fi
@@ -105,6 +111,7 @@ jobs:
     env:
       LEFTHOOK: 0
       REVISION: ${{ needs.decide.outputs.revision }}
+      DEPLOYED: ${{ needs.decide.outputs.deployed }}
       PULUMI_SKIP_UPDATE_CHECK: true
     steps:
       - name: Checkout
@@ -165,7 +172,7 @@ jobs:
 
       - name: Check out the deployed revision
         run: |
-          git worktree add --detach "$RUNNER_TEMP/deployed" deployed/prod
+          git worktree add --detach "$RUNNER_TEMP/deployed" "$DEPLOYED"
           bash scripts/write-deploy-env.sh "$RUNNER_TEMP/deployed/.env"
           cd "$RUNNER_TEMP/deployed" && bun install --frozen-lockfile
 

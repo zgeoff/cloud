@@ -181,7 +181,7 @@ test.each([
   ['no arguments', []],
   ['a drift outcome it does not know', ['plan.json', 'skipped']],
   ['an extra argument', ['plan.json', 'success', 'extra']],
-])('it rejects %s with its usage', async (_label: string, args: string[]) => {
+])('it rejects %s with its usage', async (_label: string, args: readonly string[]) => {
   const ctx = await setupTest();
 
   const exitCode = await checkProdPlan({

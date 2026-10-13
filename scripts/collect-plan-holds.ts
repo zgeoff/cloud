@@ -64,6 +64,9 @@ function collectSummaryHolds(summary: unknown): string[] {
   }
 
   return Object.entries(summary)
-    .filter(([op, count]) => !unattendedOps.has(op) && count !== 0)
-    .map(([op, count]) => `the plan's summary counts ${String(count)} ${op}`);
+    .filter((entry: Readonly<[string, unknown]>) => !unattendedOps.has(entry[0]) && entry[1] !== 0)
+    .map(
+      (entry: Readonly<[string, unknown]>) =>
+        `the plan's summary counts ${String(entry[1])} ${entry[0]}`,
+    );
 }

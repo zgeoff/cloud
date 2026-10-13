@@ -104,12 +104,15 @@ A held run fails at the step `Hold for a manual dispatch`, and Discord shows
    ```
 
    The dispatched run previews again and applies whatever it plans, with no guard. If `main` moved
-   on, answer the newest held run instead: its plan holds every change since the tag.
+   on, answer the newest held run instead: its plan holds every change since the tag. A push to
+   `main` while your dispatch still waits in the queue replaces it, and that push's run holds again
+   and alerts: dispatch again once it ends.
 
 3. To drop the change, revert it in a PR. The revert's own run then finds nothing to hold.
 
-A held plan that replaces imp's `tag:imp` key needs the `cloud` vault, which the job's account
-cannot write. Apply that one by hand.
+Never dispatch a held plan that replaces imp's `tag:imp` key. The apply writes the new key into the
+`cloud` vault, which the job's account cannot write, so the dispatched apply fails partway and the
+vault keeps the old key. [Apply it by hand](./workflows.md#apply-by-hand).
 
 ## Rotate the job's credentials
 
