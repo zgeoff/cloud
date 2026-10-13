@@ -113,8 +113,8 @@ A held run fails at the step `Hold for a manual dispatch`, and Discord shows
 
    The dispatched run previews again and applies whatever it plans, with no guard. If `main` moved
    on, answer the newest held run instead: its plan holds every change since the tag. A push to
-   `main` while your dispatch waits joins the queue behind it, and its run decides and guards again
-   once your dispatch has applied.
+   `main` while your dispatch waits joins the same queue without replacing it, and its run decides
+   and guards on its own commit once its turn comes.
 
 3. To drop the change, revert it in a PR. The revert's own run then finds nothing to hold.
 
