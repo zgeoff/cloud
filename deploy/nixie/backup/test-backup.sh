@@ -6,11 +6,12 @@
 # (infra/build-nixie-backup-pod-spec.ts, deploy/nixie/restore-job.yaml): nixie's uid and gid
 # 10001, the script mounted read-only and run by /bin/sh in place of the image's entrypoint, the
 # state volume at /state and a local restic repository at /repo. What this proves: a backup takes
-# nixie.db and keys.db alone, with the rows still in a live writer's WAL; it stops before restic
-# on a missing database or a copy that fails the integrity check; retention prunes nixie's
-# snapshots and leaves another tool's alone; a restore checks both databases before it replaces
-# them and their WAL files; and ls, SNAPSHOT and the usage. What it does not prove: R2, k3s, and
-# nixie starting on a restored volume, which the restore test in docs/runbooks/nixie.md covers.
+# nixie.db and keys.db alone, with the rows still in a live writer's WAL, and copies again when
+# nixie removes a record key between the copies; it stops before restic on a missing database or a
+# copy that fails the integrity check; retention prunes nixie's snapshots and leaves another tool's
+# alone; a restore checks both databases before it replaces them and their WAL files; and ls,
+# SNAPSHOT and the usage. What it does not prove: R2, k3s, and nixie starting on a restored volume,
+# which the restore test in docs/runbooks/nixie-backup.md covers.
 #
 # `bun run test:nixie-backup-fixture` runs it; one case alone:
 #
@@ -32,7 +33,7 @@ it_backs_up_nixie_db_and_keys_db_alone() {
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 sqlite3 /state/nixie.db "CREATE TABLE records (v); INSERT INTO records VALUES ('a record');"
-sqlite3 /state/keys.db "CREATE TABLE record_keys (v); INSERT INTO record_keys VALUES ('a key');"
+sqlite3 /state/keys.db "CREATE TABLE record_keys (key_id TEXT PRIMARY KEY, wrapped BLOB); INSERT INTO record_keys VALUES ('a key', x'00');"
 sqlite3 /state/nixie-schema-6.db 'CREATE TABLE old (v);'
 mkdir /state/run && echo socket > /state/run/control.sock
 EOF
@@ -71,7 +72,7 @@ EOF
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/snapshot" << 'EOF'
 restic ls --tag nixie --host nixie latest | tail -n +2
 restic dump latest /nixie.db > /tmp/nixie.db && sqlite3 /tmp/nixie.db 'SELECT v FROM records'
-restic dump latest /keys.db > /tmp/keys.db && sqlite3 /tmp/keys.db 'SELECT v FROM record_keys'
+restic dump latest /keys.db > /tmp/keys.db && sqlite3 /tmp/keys.db 'SELECT key_id FROM record_keys'
 EOF
   diff - "$tree/snapshot" << 'EOF'
 /keys.db
@@ -93,7 +94,7 @@ it_backs_up_the_rows_in_a_live_writers_wal() {
 
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
     -v "$script:/opt/nixie-backup/backup.sh:ro" > "$tree/out" << 'EOF'
-sqlite3 /state/keys.db 'CREATE TABLE record_keys (v);'
+sqlite3 /state/keys.db 'CREATE TABLE record_keys (key_id TEXT PRIMARY KEY, wrapped BLOB);'
 sqlite3 /state/nixie.db 'PRAGMA journal_mode=WAL; CREATE TABLE records (v);' > /dev/null
 {
   echo "INSERT INTO records VALUES ('in the wal');"
@@ -114,6 +115,94 @@ EOF
   diff - "$tree/out" << 'EOF'
 wal before: present
 in the wal
+EOF
+}
+
+# A sqlite3 wrapper first on PATH runs nixie's forget of the next item in /tmp/forgets right after
+# each copy of the live nixie.db: it commits the item's forgetting state, then removes its key, in
+# nixie's order. The first pair then holds k1 active without its key, so the backup copies again,
+# and the second pair holds k1 forgetting without its key and k2 with its key.
+it_copies_again_when_nixie_removes_a_record_key_between_the_copies() {
+  local image="$1" script="$2"
+  name="nixie-backup-$3-$BASHPID"
+  tree="$(mktemp -d)"
+  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" "$name" "$image"
+
+  run_backup_shell "$name" "$image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
+    -v "$script:/opt/nixie-backup/backup.sh:ro" --tmpfs /wrap:exec,mode=1777 > "$tree/out" << 'EOF'
+sqlite3 /state/nixie.db "CREATE TABLE items (id, state); INSERT INTO items VALUES ('k1', 'active'), ('k2', 'active');"
+sqlite3 /state/keys.db "CREATE TABLE record_keys (key_id TEXT PRIMARY KEY, wrapped BLOB); INSERT INTO record_keys VALUES ('k1', x'01'), ('k2', x'02');"
+echo k1 > /tmp/forgets
+mkdir /wrap/bin
+cat > /wrap/bin/sqlite3 << WRAPPER
+#!/bin/sh
+$(command -v sqlite3) "\$@" || exit
+case "\$1 \$2" in
+  "/state/nixie.db .backup "*)
+    item=\$(head -n 1 /tmp/forgets)
+    [ -z "\$item" ] && exit 0
+    sed -i 1d /tmp/forgets
+    $(command -v sqlite3) /state/nixie.db "UPDATE items SET state = 'forgetting' WHERE id = '\$item'"
+    $(command -v sqlite3) /state/keys.db "DELETE FROM record_keys WHERE key_id = '\$item'"
+    ;;
+esac
+WRAPPER
+chmod +x /wrap/bin/sqlite3
+PATH="/wrap/bin:$PATH" /bin/sh /opt/nixie-backup/backup.sh backup > /tmp/backup.out
+grep '^nixie removed' /tmp/backup.out
+restic dump latest /nixie.db > /tmp/nixie.db
+sqlite3 /tmp/nixie.db "SELECT id || ' ' || state FROM items ORDER BY id"
+restic dump latest /keys.db > /tmp/keys.db
+sqlite3 /tmp/keys.db 'SELECT key_id FROM record_keys ORDER BY key_id'
+EOF
+
+  diff - "$tree/out" << 'EOF'
+nixie removed 1 record keys during the copy; copying again
+k1 forgetting
+k2 active
+k2
+EOF
+}
+
+it_fails_a_backup_when_nixie_removes_record_keys_during_every_copy() {
+  local image="$1" script="$2"
+  name="nixie-backup-$3-$BASHPID"
+  tree="$(mktemp -d)"
+  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" "$name" "$image"
+
+  run_backup_shell "$name" "$image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
+    -v "$script:/opt/nixie-backup/backup.sh:ro" --tmpfs /wrap:exec,mode=1777 > "$tree/out" << 'EOF'
+sqlite3 /state/nixie.db "CREATE TABLE items (id, state); INSERT INTO items VALUES ('k1', 'active'), ('k2', 'active'), ('k3', 'active'), ('k4', 'active'), ('k5', 'active'), ('k6', 'active');"
+sqlite3 /state/keys.db "CREATE TABLE record_keys (key_id TEXT PRIMARY KEY, wrapped BLOB); INSERT INTO record_keys VALUES ('k1', x'01'), ('k2', x'02'), ('k3', x'03'), ('k4', x'04'), ('k5', x'05'), ('k6', x'06');"
+printf 'k1\nk2\nk3\nk4\nk5\n' > /tmp/forgets
+mkdir /wrap/bin
+cat > /wrap/bin/sqlite3 << WRAPPER
+#!/bin/sh
+$(command -v sqlite3) "\$@" || exit
+case "\$1 \$2" in
+  "/state/nixie.db .backup "*)
+    item=\$(head -n 1 /tmp/forgets)
+    [ -z "\$item" ] && exit 0
+    sed -i 1d /tmp/forgets
+    $(command -v sqlite3) /state/nixie.db "UPDATE items SET state = 'forgetting' WHERE id = '\$item'"
+    $(command -v sqlite3) /state/keys.db "DELETE FROM record_keys WHERE key_id = '\$item'"
+    ;;
+esac
+WRAPPER
+chmod +x /wrap/bin/sqlite3
+PATH="/wrap/bin:$PATH" /bin/sh /opt/nixie-backup/backup.sh backup 2>&1 | grep -v 'restic\|repository\|password\|irrecoverably\|^$' || true
+restic snapshots --json
+EOF
+
+  diff - "$tree/out" << 'EOF'
+nixie removed 1 record keys during the copy; copying again
+nixie removed 1 record keys during the copy; copying again
+nixie removed 1 record keys during the copy; copying again
+nixie removed 1 record keys during the copy; copying again
+nixie removed record keys during each of 5 copies
+[]
 EOF
 }
 
@@ -202,7 +291,7 @@ done
 mkdir -p /tmp/other && echo other > /tmp/other/f
 (cd /tmp/other && restic backup -q --tag other --host other --time "2020-01-06 09:00:00" .)
 sqlite3 /state/nixie.db 'CREATE TABLE records (v);'
-sqlite3 /state/keys.db 'CREATE TABLE record_keys (v);'
+sqlite3 /state/keys.db 'CREATE TABLE record_keys (key_id TEXT PRIMARY KEY, wrapped BLOB);'
 EOF
 
   run_backup "$name" "$image" --user 10001:10001 --entrypoint /bin/sh \

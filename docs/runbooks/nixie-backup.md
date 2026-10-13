@@ -3,7 +3,9 @@
 The `nixie-backup` CronJob backs up `nixie.db` and `keys.db` every night with restic, encrypted on
 the cluster, to the repository `s3:<endpoint>/geoff-cloud-nixie/nixie` in R2. It copies each
 database with `sqlite3 .backup` while nixie runs, checks each copy with `PRAGMA integrity_check`,
-and uploads nothing else from the volume. The vault items `nixie-restic` and `r2-nixie-backup` hold
+and uploads nothing else from the volume. It copies `nixie.db` before `keys.db`, and copies both
+again when nixie removed a record key in between, so a snapshot never holds an item without its key
+unless it also holds the item's forget. The vault items `nixie-restic` and `r2-nixie-backup` hold
 the repository's password and R2 key. [nixie](./nixie.md#restore-from-a-backup) gives a real
 restore.
 
