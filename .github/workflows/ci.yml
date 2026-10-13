@@ -43,12 +43,7 @@ jobs:
           BASE:
             ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
             github.event.before }}
-        run: |
-          needed="$(bun run --silent ci:needs-provider-check "$BASE" "$GITHUB_SHA")"
-          case "$needed" in
-            true | false) echo "provider=$needed" >> "$GITHUB_OUTPUT" ;;
-            *) echo "unexpected decision: $needed" >&2; exit 1 ;;
-          esac
+        run: bun run --silent ci:decide-provider-checks "$BASE" "$GITHUB_SHA"
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -59,14 +54,29 @@ jobs:
       - name: Lint
         run: bun run lint:full
 
+      # the four linters run tools from nixos/flake.lock's nixpkgs in the pinned Nix image; the
+      # first one fills the job's Nix store volume for the others
+      - name: Lint shell
+        run: bun run lint:sh
+
+      - name: Lint Nix
+        run: bun run lint:nix
+
+      - name: Lint Python
+        run: bun run lint:py
+
+      # actionlint, then the check that every run step is setup or one bun run call
+      - name: Lint Actions
+        run: bun run lint:actions
+
       - name: Doc links
-        run: bash .claude/skills/docs-writing/scripts/check-links.sh
+        run: bun run check:doc-links
 
       # Some READMEs and docs/ pages fail the shared length or prose rules, so this step reports
       # its findings without failing the run.
       - name: Doc length and prose
         continue-on-error: true
-        run: bash .claude/skills/docs-writing/scripts/check-length.sh
+        run: bun run check:doc-length
 
       - name: Pulumi pins
         run: bun run check:pulumi-pins
@@ -98,12 +108,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_VERSION: 8.30.1
 
-      - name: Report the skipped provider checks
-        if: steps.decide.outputs.provider == 'false'
-        run:
-          echo "No input of the provider checks changed, so the Go checks did not run." | tee -a
-          "$GITHUB_STEP_SUMMARY"
-
       # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
       - name: Setup Go
         if: steps.decide.outputs.provider == 'true' && hashFiles('provider/go.mod') != ''
@@ -123,15 +127,7 @@ jobs:
       # the tarball is checked against the release's checksum file
       - name: Setup Pulumi CLI
         if: steps.decide.outputs.provider == 'true'
-        run: |
-          version="$(jq -r '.dependencies["@pulumi/pulumi"]' infra/package.json)"
-          base="https://get.pulumi.com/releases/sdk"
-          cd "$RUNNER_TEMP"
-          curl -fsSLO "$base/pulumi-v$version-linux-x64.tar.gz"
-          curl -fsSL "$base/pulumi-$version-checksums.txt" |
-            grep " pulumi-v$version-linux-x64.tar.gz\$" | sha256sum -c -
-          tar -xzf "pulumi-v$version-linux-x64.tar.gz"
-          echo "$RUNNER_TEMP/pulumi" >> "$GITHUB_PATH"
+        run: bun run ci:install-pulumi-cli
 
       - name: SDK check
         if: steps.decide.outputs.provider == 'true'

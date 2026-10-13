@@ -57,6 +57,4 @@ jobs:
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'
-        # bash's pipefail, so a failed script fails the step through tee
-        shell: bash
-        run: bun run --silent ci:merge-release-bump "$BRANCH" | tee -a "$GITHUB_STEP_SUMMARY"
+        run: bun run --silent ci:merge-release-bump-with-summary "$BRANCH"

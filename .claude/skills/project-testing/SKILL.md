@@ -27,7 +27,12 @@ is decided in the shared skill, not here.
 | nixie's backup script in its pinned image (Docker) | `bun run test:nixie-backup-fixture` | `nixie backup` → `fixture`         |
 | NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`            |
 
-- A new suite gets a root `package.json` script, and CI calls that script, never the file directly.
+- CI calls a root `package.json` script, never a suite file directly.
+- A new shell suite needs no list entry: `scripts/run-shell-suites.sh` runs every `test-*.sh` that
+  git lists. A suite that needs Docker names its group in a `# shell-suite: <group>` line of its
+  header comment, so only its fixture's run picks it up: `atc-gateway-fixture` runs inside
+  `with-fixture-images.sh`, `fixture-images` tests that wrapper from outside it, and
+  `nixie-backup-fixture` runs nixie's backup suite.
 - The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main,
   and on an app's pull request that changes `nixos/`. A person's pull request never runs it, so
   run `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can

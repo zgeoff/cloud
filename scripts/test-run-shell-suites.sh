@@ -153,6 +153,8 @@ it_passes_case_through_to_each_suite() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  # the suite expands CASE when it runs, so the text stays unexpanded here
+  # shellcheck disable=SC2016
   printf '#!/usr/bin/env bash\necho "a: ${CASE-unset}"\n' > "$tree/repo/scripts/test-a.sh"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 CASE='some title' bash scripts/run-shell-suites.sh) > "$tree/out" 2> "$tree/err" || status=$?

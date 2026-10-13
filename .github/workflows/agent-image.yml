@@ -80,6 +80,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run:
-          gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --auto --squash --match-head-commit
-          "$HEAD_SHA"
+        run: bun run --silent ci:enable-atc-pin-auto-merge "$PR" "$HEAD_SHA"

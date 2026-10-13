@@ -48,6 +48,30 @@ pre-push:
       exclude:
         - 'sdk/**'
       run: bun run lint:files {files}
+    # the four linters run their pinned tools in the Nix image, so they need Docker; each lints the
+    # whole tree, and runs only for a branch that changes a file of its kind
+    - name: lint:sh
+      files: bun run --silent files:branch
+      glob:
+        - '*.sh'
+        - 'images/agent/sbin/*'
+        - '.editorconfig'
+      run: bun run lint:sh
+    - name: lint:nix
+      files: bun run --silent files:branch
+      glob: '*.nix'
+      run: bun run lint:nix
+    - name: lint:py
+      files: bun run --silent files:branch
+      glob: '*.py'
+      run: bun run lint:py
+    - name: lint:actions
+      # package.json too: the step check reads its script names
+      files: bun run --silent files:branch
+      glob:
+        - '.github/workflows/*'
+        - 'package.json'
+      run: bun run lint:actions
     - name: pulumi pins
       run: bun run check:pulumi-pins
     - name: typecheck
@@ -56,6 +80,14 @@ pre-push:
       files: bun run --silent files:branch
       glob: '*.ts'
       run: bun run test:related {files}
+    - name: test:scripts
+      # every shell suite, for a branch that changes a shell file; deletions count, so a branch
+      # that deletes a script still runs the suites that may source it
+      files: bun run --silent files:branch --include-deleted
+      glob:
+        - '*.sh'
+        - 'images/agent/sbin/*'
+      run: bun run test:scripts
     - name: provider
       # Deletions count: a branch that only deletes provider/ files must still
       # run the check, so this listing keeps them.

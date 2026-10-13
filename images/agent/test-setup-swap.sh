@@ -12,6 +12,7 @@
 set -euo pipefail
 umask 022
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/test-lib/run-cases.sh
 source "$here/../../scripts/test-lib/run-cases.sh"
 
 script="$here/sbin/setup-swap"
