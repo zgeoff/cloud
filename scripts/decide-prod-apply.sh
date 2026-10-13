@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 # The Deploy prod workflow's decision, from the repo alone and with no secret: which commit to
-# apply, and whether it needs an apply at all. It writes apply (true or false), revision and
-# deployed to $GITHUB_OUTPUT, for the apply job.
+# apply, and whether it needs an apply at all. It writes apply (true or false) and revision to
+# $GITHUB_OUTPUT, for the apply job.
 #
 # A dispatch (EVENT=workflow_dispatch) applies main's tip only: DISPATCH_REF must be
 # refs/heads/main and DISPATCH_REVISION, the commit the person named, must equal DISPATCH_SHA.
 # Because a dispatch skips the trigger that waits for CI, it also needs a green CI run of a push
 # to main on that commit (find-ci-run.sh), and prints the run's URL. Any other event applies
-# RUN_HEAD, the commit the CI run checked. Either way the commit must be on origin/main. The
-# deployed/prod tag is resolved once, so a tag moved during the run never reaches the apply job,
-# and needs-prod-apply.sh decides whether a Pulumi input changed since it; when none did, it says
-# so on stdout and in $GITHUB_STEP_SUMMARY.
+# RUN_HEAD, the commit the CI run checked. Either way the commit must be on origin/main.
+# needs-prod-apply.sh decides whether a Pulumi input changed since the deployed/prod tag; when none
+# did, it says so on stdout and in $GITHUB_STEP_SUMMARY. This job runs outside the deploy-prod
+# queue, so another apply can move the tag after it reads it: the apply job decides again once it
+# holds the queue (decide-queued-prod-apply.sh). A "false" here stays true then, because the tag
+# only moves forward along main.
 #
 # A refused dispatch, a missing green run, a commit off main, a tag git cannot resolve, and a
 # failure of either helper fail the run with exit 1 (git's own status for the tag, the helper's
@@ -55,7 +57,6 @@ git merge-base --is-ancestor "$revision" origin/main || {
   echo "$revision is not on main" >&2
   exit 1
 }
-# resolved once, so a tag moved during the run never reaches the apply job
 deployed="$(git rev-parse --verify 'deployed/prod^{commit}')"
 apply="$(bash "$here/needs-prod-apply.sh" "$deployed" "$revision")"
 case "$apply" in
@@ -68,7 +69,6 @@ esac
 {
   echo "apply=$apply"
   echo "revision=$revision"
-  echo "deployed=$deployed"
 } >> "$GITHUB_OUTPUT"
 if [ "$apply" = false ]; then
   echo "No Pulumi input changed since deployed/prod, so nothing applied." | tee -a "$GITHUB_STEP_SUMMARY"

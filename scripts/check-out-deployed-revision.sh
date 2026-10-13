@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks out the deployed revision beside the prod apply job's checkout, for the drift check from
-# it: a detached git worktree of DEPLOYED (the commit the deployed/prod tag held when the decide
-# job ran) at $RUNNER_TEMP/deployed, its .env pointed at the deploy vault with this checkout's
+# it: a detached git worktree of DEPLOYED (the commit the deployed/prod tag held when the apply
+# job, holding the deploy-prod group, decided again) at $RUNNER_TEMP/deployed, its .env pointed
+# at the deploy vault with this checkout's
 # write-deploy-env.sh, and its dependencies installed with `bun install --frozen-lockfile` there.
 #
 # A failed worktree add, env rewrite or install fails the run with that command's status, so the

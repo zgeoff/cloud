@@ -29,11 +29,10 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
   GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_EMAIL=test@example.invalid
 
 it_decides_an_apply_of_the_ci_run_s_commit_when_it_changes_a_pulumi_input() {
-  local deployed head status=0
+  local head status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  deployed="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" tag deployed/prod
   mkdir "$tree/repo/infra"
   echo 'export {};' > "$tree/repo/infra/index.ts"
@@ -53,7 +52,6 @@ it_decides_an_apply_of_the_ci_run_s_commit_when_it_changes_a_pulumi_input() {
   diff - "$tree/output" << EOF
 apply=true
 revision=$head
-deployed=$deployed
 EOF
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
@@ -64,11 +62,10 @@ EOF
 }
 
 it_decides_no_apply_and_says_so_when_no_pulumi_input_changed() {
-  local deployed head status=0
+  local head status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  deployed="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" tag deployed/prod
   mkdir "$tree/repo/docs"
   echo 'notes' > "$tree/repo/docs/notes.md"
@@ -88,7 +85,6 @@ it_decides_no_apply_and_says_so_when_no_pulumi_input_changed() {
   diff - "$tree/output" << EOF
 apply=false
 revision=$head
-deployed=$deployed
 EOF
   diff - "$tree/summary" <<< 'No Pulumi input changed since deployed/prod, so nothing applied.'
   diff /dev/null "$tree/calls"
@@ -99,11 +95,10 @@ EOF
 }
 
 it_applies_main_s_tip_on_a_dispatch_after_a_green_ci_run_on_it() {
-  local deployed head status=0
+  local head status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  deployed="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" tag deployed/prod
   mkdir "$tree/repo/deploy"
   echo 'kind: Job' > "$tree/repo/deploy/job.yaml"
@@ -124,7 +119,6 @@ it_applies_main_s_tip_on_a_dispatch_after_a_green_ci_run_on_it() {
   diff - "$tree/output" << EOF
 apply=true
 revision=$head
-deployed=$deployed
 EOF
   diff /dev/null "$tree/summary"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$head\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$head\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"

@@ -21,12 +21,8 @@ on:
 permissions:
   contents: read
 
-# one apply at a time, and never cancel one in progress: a cancelled apply leaves the stack half
-# changed. GitHub keeps only the newest pending run, which applies everything an older one would.
-concurrency:
-  group: deploy-prod
-  cancel-in-progress: false
-
+# The concurrency group sits on the apply job, not here, so a run that decide filters out never
+# joins it and never takes the place of an apply that waits.
 jobs:
   # Decides from the repo alone, with no secret, whether the commit needs an apply. A CI run of a
   # pull request, a fork or a failed check starts nothing.
@@ -44,7 +40,6 @@ jobs:
     outputs:
       apply: ${{ steps.decide.outputs.apply }}
       revision: ${{ steps.decide.outputs.revision }}
-      deployed: ${{ steps.decide.outputs.deployed }}
     env:
       LEFTHOOK: 0
       EVENT: ${{ github.event_name }}
@@ -69,7 +64,7 @@ jobs:
 
       # a dispatch applies main's tip, only when the person named it and only after CI passed on
       # it, since a dispatch skips the trigger that waits for CI; a CI run applies the commit it
-      # checked, which must be on main
+      # checked, which must be on main. The apply job decides again against the tag it finds.
       - name: Decide whether the commit needs an apply
         id: decide
         run: bun run --silent ci:decide-prod-apply
@@ -80,6 +75,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     environment: prod
+    # One apply at a time, and never cancel one in progress: a cancelled apply leaves the stack half
+    # changed. GitHub keeps only the newest pending job, which applies everything an older one
+    # would. The group sits after decide's filter, so a failed CI run, a pull request's run or a
+    # commit with nothing to apply never joins it and never takes the place of a waiting apply.
+    # The job decides again once it holds the group, so one that waited behind a newer commit's
+    # apply finds nothing left to do.
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
     outputs:
       verdict: ${{ steps.guard.outputs.verdict }}
     # contents: write moves the deployed/prod tag; id-token: write joins the tailnet through the
@@ -90,9 +94,12 @@ jobs:
     env:
       LEFTHOOK: 0
       REVISION: ${{ needs.decide.outputs.revision }}
-      DEPLOYED: ${{ needs.decide.outputs.deployed }}
       PULUMI_SKIP_UPDATE_CHECK: true
+    # Every step after the queued decision runs only when it finds the revision still needs the
+    # apply.
     steps:
+      # fetched after the job took the group, so the deployed/prod tag is the one the last apply
+      # left
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -105,12 +112,18 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Decide again against the deployed revision
+        id: queued
+        run: bun run --silent ci:decide-queued-prod-apply
+
       # the job's service account reads only the cloud-deploy vault
       - name: Point .env at the deploy vault
+        if: steps.queued.outputs.apply == 'true'
         run: bun run ci:write-deploy-env .env
 
       # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
       - name: Setup Go
+        if: steps.queued.outputs.apply == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: provider/go.mod
@@ -118,17 +131,20 @@ jobs:
 
       # the CLI release that matches the program's @pulumi/pulumi
       - name: Setup Pulumi
+        if: steps.queued.outputs.apply == 'true'
         uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
         with:
           pulumi-version: 3.264.0
 
       - name: Setup 1Password CLI
+        if: steps.queued.outputs.apply == 'true'
         uses: 1password/install-cli-action@1a3160d5e9de1ae0803eaa08a88746f5ae3daa50 # v4.1.0
         with:
           version: 2.40.0
 
       # an ephemeral node, tagged tag:cloud-deploy, that reaches only k3s's API on geoffcloud
       - name: Join the tailnet
+        if: steps.queued.outputs.apply == 'true'
         uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
         with:
           oauth-client-id: ${{ vars.TS_DEPLOY_CLIENT_ID }}
@@ -138,17 +154,23 @@ jobs:
       # a new node reaches its peers only once the tailnet has spread its key; any HTTP answer,
       # a 401 included, shows the route is open
       - name: Wait for the k3s API
+        if: steps.queued.outputs.apply == 'true'
         run: bun run ci:wait-for-k3s-api
 
       - name: Install
+        if: steps.queued.outputs.apply == 'true'
         run: bun install --frozen-lockfile
 
       - name: Check out the deployed revision
+        if: steps.queued.outputs.apply == 'true'
+        env:
+          DEPLOYED: ${{ steps.queued.outputs.deployed }}
         run: bun run ci:check-out-deployed-revision
 
       # a failure here holds the apply rather than failing the run, so the plan still shows
       - name: Check drift from the deployed revision
         id: drift
+        if: steps.queued.outputs.apply == 'true'
         continue-on-error: true
         working-directory: ${{ runner.temp }}/deployed
         env:
@@ -159,28 +181,35 @@ jobs:
       # resource's state
       - name: Preview and guard
         id: guard
+        if: steps.queued.outputs.apply == 'true'
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           DRIFT: ${{ steps.drift.outcome }}
         run: bun run --silent ci:preview-and-guard-prod
 
       - name: Hold for a manual dispatch
-        if: steps.guard.outputs.verdict == 'hold' && github.event_name != 'workflow_dispatch'
+        if: >-
+          steps.queued.outputs.apply == 'true' && steps.guard.outputs.verdict == 'hold' &&
+          github.event_name != 'workflow_dispatch'
         run: bun run ci:hold-prod-apply "$REVISION"
 
       - name: Apply
-        if: steps.guard.outputs.verdict == 'apply' || github.event_name == 'workflow_dispatch'
+        if: >-
+          steps.queued.outputs.apply == 'true' && (steps.guard.outputs.verdict == 'apply' ||
+          github.event_name == 'workflow_dispatch')
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: bun run up -- --yes --refresh --skip-preview --suppress-outputs
 
       - name: Check drift after the apply
+        if: steps.queued.outputs.apply == 'true'
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: bun run drift -- --suppress-outputs
 
       # force=false refuses a move that is not forward along main
       - name: Move deployed/prod
+        if: steps.queued.outputs.apply == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: bun run ci:move-deployed-prod "$REVISION"
