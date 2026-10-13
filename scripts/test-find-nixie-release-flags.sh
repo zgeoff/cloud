@@ -289,4 +289,30 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_flags_migrations_when_the_section_is_blank() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  cat > "$tree/pinned.md" << 'EOF'
+## Migrations
+
+This release adds no migration since v0.6.2.
+EOF
+  cat > "$tree/target.md" << 'EOF'
+## Migrations
+
+
+
+## Images
+EOF
+
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash "$script" "$tree/pinned.md" "$tree/target.md" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'migrations'
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 run_cases
