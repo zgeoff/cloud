@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that the committed Onidel SDK is what the provider generates: it runs sdk:gen, then fails
-# when sdk/onidel/ differs from the index or holds a file git does not track. CI installs the Pulumi
+# when sdk/onidel/ differs from HEAD or holds a file git does not track. CI installs the Pulumi
 # CLI at infra's @pulumi/pulumi pin; a local CLI at another version gets a warning, because its
 # codegen can differ from CI's.
 #
@@ -15,7 +15,7 @@ if [ "$have" != "$want" ]; then
 fi
 
 bun run sdk:gen
-if ! git diff --exit-code -- sdk/onidel; then
+if ! git diff --exit-code HEAD -- sdk/onidel; then
   echo "sdk/onidel is stale: commit the regenerated SDK" >&2
   exit 1
 fi
