@@ -212,7 +212,7 @@ again, and prints a fresh enrolment code.
 
 **CAUTION:** A reset cannot be undone. It deletes every record and key in nixie and signs out every
 device, and the reset itself keeps no copy. Run a backup first, as
-[Back up and restore](#back-up-and-restore) describes, if any of the data matters.
+[nixie's backup](./nixie-backup.md#back-up-now) describes, if any of the data matters.
 
 1. List what the reset deletes. The dry run reads the volume and changes nothing:
 
@@ -239,7 +239,7 @@ step is safe to repeat.
 ## Keep nixie's data out of copies
 
 A forget in nixie removes an item everywhere nixie holds it, but a copy taken outside nixie keeps
-it. Two kinds of copy exist on the host, and each has its rule.
+it. Three kinds of copy exist, and each has its rule.
 
 ### Disk snapshots
 
@@ -277,25 +277,17 @@ host_restic forget <short_id> <short_id>
 host_restic prune
 ```
 
-## Back up and restore
+### nixie's backup
 
-The `nixie-backup` CronJob backs up `nixie.db` and `keys.db` every night with restic, encrypted on
-the cluster, to the repository `s3:<endpoint>/geoff-cloud-nixie/nixie` in R2. It copies each
-database with `sqlite3 .backup` while nixie runs, checks each copy with `PRAGMA integrity_check`,
-and uploads nothing else from the volume. A restore also needs the deployment key from the secrets
-file, which wraps the record keys in `keys.db`. [Test a nixie restore](./nixie-restore-test.md)
-proves a snapshot restores and nixie starts on it, without stopping the live nixie.
+Each snapshot of nixie's backup holds both databases whole, so a forgotten item stays in R2 until
+retention drops the last snapshot taken before the forget.
+[Purge a forgotten item](./nixie-backup.md#purge-a-forgotten-item) removes it sooner.
 
-### Back up now
+## Restore from a backup
 
-```bash
-ssh root@geoffcloud k3s kubectl -n nixie create job --from=cronjob/nixie-backup nixie-backup-manual-$(date +%s)
-ssh root@geoffcloud k3s kubectl -n nixie logs -f job/<job-name>
-```
-
-Expect the log to end with restic's retention table and `snapshot <id> saved` above it.
-
-### Restore
+The `nixie-backup` CronJob backs up `nixie.db` and `keys.db` every night to R2, as
+[nixie's backup](./nixie-backup.md) describes. A restore also needs the deployment key from the
+secrets file, which wraps the record keys in `keys.db`.
 
 **CAUTION:** A restore replaces nixie's records and keys with the snapshot's. Every record and
 device enrolled after the snapshot is lost. Back up first if the current data still matters.

@@ -48,8 +48,8 @@ call, the path of a change, the topology and the data.
 - [1Password Connect](./runbooks/onepassword-connect.md): set up, rotate or debug Connect for imps.
 - [nixie](./runbooks/nixie.md): add nixie's images and secrets to impd, change a secret, deploy,
   enrol a device, back up and restore, renew the certificate.
-- [Test a nixie restore](./runbooks/nixie-restore-test.md): restore nixie's latest backup into a
-  scratch claim and start nixie on it.
+- [nixie's backup](./runbooks/nixie-backup.md): back up nixie now, read the repository, purge a
+  forgotten item, test a restore.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): the tailnet client for imp's end-to-end suites.
 
 Planned work and open choices live in Linear, not in this tree.
