@@ -210,7 +210,7 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:54f9dbabc6b590cb9532bbc2117dd3445fb3ef3f619ccc391fbcdbeee33666ca";
+    image = "ghcr.io/zgeoff/imp-host:1.0.2@sha256:c4ad2d173291d6d8fef0bf92556379e41eabe4138f3b84f4f73a53e75ec56b8f";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
