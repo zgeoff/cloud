@@ -1,11 +1,11 @@
 import { expect, mock, test } from 'bun:test';
 import { http, passthrough } from 'msw';
-import { buildStubR2Bucket } from '../../infra/test-utils/build-stub-r2-bucket.ts';
-import { alertWebhookURL } from '../mocks/alert-webhook-url.ts';
-import { server } from '../mocks/node.ts';
-import { sentAlerts } from '../mocks/sent-alerts.ts';
-import { targetStatuses } from '../mocks/target-statuses.ts';
 import { makeScheduledHandler } from './make-scheduled-handler.ts';
+import { alertWebhookURL } from './mocks/alert-webhook-url.ts';
+import { server } from './mocks/node.ts';
+import { sentAlerts } from './mocks/sent-alerts.ts';
+import { targetStatuses } from './mocks/target-statuses.ts';
+import { buildStubR2Bucket } from './test-utils/build-stub-r2-bucket.ts';
 
 function setupTest() {
   const log = mock<(message: string) => void>();

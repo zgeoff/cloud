@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import { buildStubR2Bucket } from '../../infra/test-utils/build-stub-r2-bucket.ts';
-import { targetStatuses } from '../mocks/target-statuses.ts';
 import handler from './index.ts';
+import { targetStatuses } from './mocks/target-statuses.ts';
+import { buildStubR2Bucket } from './test-utils/build-stub-r2-bucket.ts';
 
 // The module Workers loads: its default export's scheduled runs the check. The log line goes to
 // the real console, which this test leaves alone; make-scheduled-handler.test.ts asserts it.

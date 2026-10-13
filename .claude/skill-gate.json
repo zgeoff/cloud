@@ -8,7 +8,7 @@
     { "match": "scripts/test-lib/**", "skills": ["testing", "project-testing"] },
     { "match": "**/test-utils/**", "skills": ["testing", "project-testing"] },
     { "match": "nixos/checks/**", "skills": ["testing", "project-testing"] },
-    { "match": "workers/mocks/**", "skills": ["testing", "project-testing"] },
+    { "match": "**/mocks/**", "skills": ["testing", "project-testing"] },
     { "match": "e2e/**", "skills": ["testing", "project-testing"] }
   ]
 }

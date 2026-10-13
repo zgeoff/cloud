@@ -5,9 +5,12 @@
       "project": ["**/*.ts"],
       "ignoreDependencies": ["@pulumi/pulumi"]
     },
+    "workers/health-check": {
+      "entry": ["index.ts"],
+      "project": ["**/*.ts"]
+    },
     ".": {
-      "entry": ["workers/*/index.ts"],
-      "project": ["workers/**/*.ts"]
+      "project": ["scripts/**/*.ts"]
     }
   },
   "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],
