@@ -18,9 +18,12 @@
 # command reports. It pushes nothing when the branch already changes the same files to the same
 # contents as a fresh pin of main; it then opens the pull request if none is open, or brings the
 # open one's labels up to date, so a run that failed after its push is repaired by running it
-# again. A person holds a bump by labelling it needs-review, which this script keeps, or by
-# closing it: a closed pull request for the branch's head stays closed until the branch is
-# deleted. Pull requests from forks never count. Unlike open-atc-pin-pr.sh it keeps no newer pin on the branch: the release check runs one
+# again. A person holds a bump by labelling it needs-review, or rejects it by closing it. Both
+# last while the bump targets the same release, which the branch's commit title names, even when
+# main changes another pin in a file the bump changes: the script rebuilds the open pull request's
+# branch and keeps its needs-review, with no auto-merge beside it, and leaves a closed pull
+# request for the branch's head closed, with no push, until a later release or until the branch
+# is deleted. Pull requests from forks never count. Unlike open-atc-pin-pr.sh it keeps no newer pin on the branch: the release check runs one
 # job at a time and always pins the newest release, so a newer branch means a withdrawn release.
 set -euo pipefail
 # comm needs the C collation that sort uses here
@@ -83,12 +86,18 @@ esac
 
 # the branch needs no push when it changes the same files as this commit, to the same contents
 same=false
+# the branch already bumps to this release when its commit has this title, even when main has
+# since changed another pin in a file the bump changes; a person's hold and rejection follow it
+same_release=false
 if [ -n "$lease" ]; then
   mapfile -t files < <(git diff --name-only origin/main HEAD)
   branch_files="$(git diff --name-only "$(git merge-base origin/main "$lease")" "$lease")"
   if [ "$(printf '%s\n' "${files[@]}")" = "$branch_files" ] &&
     git diff --quiet "$lease" HEAD -- "${files[@]}"; then
     same=true
+    same_release=true
+  elif [ "$(git log -1 --format=%s "$lease")" = "$title" ]; then
+    same_release=true
   fi
 fi
 
@@ -131,18 +140,21 @@ sync_labels() {
 }
 
 ensure_labels
-if [ "$same" = true ]; then
-  if [ -n "$number" ]; then
-    sync_labels keep-hold > /dev/null
-    echo "$(jq -r '.[0].url' <<< "$prs") already bumps $dependency to $version"
-    exit 0
-  fi
-  # a person who closed the pull request for this exact head rejected the bump: keep it closed
+# a person who closed the pull request for the branch's head rejected its release: keep it closed
+# while the bump targets that release, with no push, so the branch keeps that head
+if [ -z "$number" ] && [ "$same_release" = true ]; then
   closed="$(gh pr list --repo "$repo" --head "$branch" --state closed \
     --json number,headRefOid,isCrossRepository \
     --jq "[.[] | select((.isCrossRepository | not) and .headRefOid == \"$lease\")][0].number // empty")"
   if [ -n "$closed" ]; then
     echo "#$closed was closed with this bump; delete $branch to open it again"
+    exit 0
+  fi
+fi
+if [ "$same" = true ]; then
+  if [ -n "$number" ]; then
+    sync_labels keep-hold > /dev/null
+    echo "$(jq -r '.[0].url' <<< "$prs") already bumps $dependency to $version"
     exit 0
   fi
   gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body" \
@@ -165,7 +177,11 @@ fi
 git push -q --force-with-lease="refs/heads/$branch:$lease" origin "HEAD:refs/heads/$branch"
 
 if [ -n "$number" ]; then
-  sync_labels > /dev/null
+  if [ "$same_release" = true ]; then
+    sync_labels keep-hold > /dev/null
+  else
+    sync_labels > /dev/null
+  fi
   gh pr edit "$number" --repo "$repo" --title "$title" --body-file "$body"
 else
   gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body" \

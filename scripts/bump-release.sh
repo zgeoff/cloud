@@ -37,7 +37,7 @@ case "$dependency" in
     url="https://github.com/zgeoff/atc/releases/tag/%40zgeoff/atc%40$version"
     gh release download "@zgeoff/atc@$version" -R zgeoff/atc -p SHA256SUMS -D "$work"
     pin=(bash "$here/pin-atc.sh" "$version" "$work/SHA256SUMS")
-    rollout="Rebuild the agent image (\`docs/runbooks/agent-image.md\`), switch the host (\`docs/runbooks/workflows.md\`), and publish the atc-gateway images, whose digests a later pull request pins."
+    rollout="Rebuild the agent image (\`docs/runbooks/agent-image.md\`), switch the host (\`docs/runbooks/workflows.md\`), and publish the atc-gateway images. The \`Deploy prod\` workflow applies the pull request that pins their digests once it merges (\`docs/runbooks/prod-apply.md\`)."
     ;;
   imp)
     names=("imp's NixOS module and the imp-host image (\`nixos/\`)" "the imp-base image (\`images/agent/Dockerfile\`)")
@@ -76,7 +76,7 @@ case "$dependency" in
     bash "$here/find-nixie-release-flags.sh" "$work/pinned.md" "$work/target.md" "${between[@]}" > "$work/flags"
     mapfile -t flags < "$work/flags"
     pin=(bash "$here/pin-nixie.sh" "$version" "$work/target.md")
-    rollout="Preview and apply the stack config, as \`docs/runbooks/workflows.md\` (Change infrastructure) describes, then check the deploy (\`docs/runbooks/nixie.md\`)."
+    rollout="The \`Deploy prod\` workflow applies the stack config once CI passes on main, unless its guard holds the plan (\`docs/runbooks/prod-apply.md\`). Check the deploy (\`docs/runbooks/nixie.md\`)."
     ;;
   *)
     echo "not a release check dependency: '$dependency'" >&2
@@ -114,7 +114,7 @@ bash "$here/label-release-bump.sh" "$version" "${pinned[@]}" -- "${flags[@]}" > 
         update:major) echo "- it is a major release." ;;
         update:minor) if [[ "$version" == 0.* ]]; then echo "- it is a minor release of a 0.x dependency, which may break."; fi ;;
         migrations) echo "- a release in the bump adds database migrations, which a revert does not undo." ;;
-        sandbox-images-changed) echo "- the release changes nixie's sandbox images, which a person adds to impd before the rollout (\`docs/runbooks/nixie.md\`)." ;;
+        sandbox-images-changed) echo "- the release changes nixie's sandbox images, which a person adds to impd before the merge, because the \`Deploy prod\` workflow applies the merged pin (\`docs/runbooks/nixie.md\`)." ;;
       esac
     done < "$work/labels"
   fi

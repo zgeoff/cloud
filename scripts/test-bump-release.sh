@@ -97,7 +97,7 @@ It waits for a review, because:
 
 - it is a major release.
 
-After the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`), switch the host (`docs/runbooks/workflows.md`), and publish the atc-gateway images, whose digests a later pull request pins.
+After the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`), switch the host (`docs/runbooks/workflows.md`), and publish the atc-gateway images. The `Deploy prod` workflow applies the pull request that pins their digests once it merges (`docs/runbooks/prod-apply.md`).
 EOF
   sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g" "$tree/calls" > "$tree/calls.masked"
   diff - "$tree/calls.masked" << 'EOF'
@@ -243,7 +243,7 @@ It waits for a review, because:
 
 - a release in the bump adds database migrations, which a revert does not undo.
 
-After the merge: Preview and apply the stack config, as `docs/runbooks/workflows.md` (Change infrastructure) describes, then check the deploy (`docs/runbooks/nixie.md`).
+After the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).
 EOF
   sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g" "$tree/calls" > "$tree/calls.masked"
   diff - "$tree/calls.masked" << 'EOF'
