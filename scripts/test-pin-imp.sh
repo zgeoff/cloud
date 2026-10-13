@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test for pin-imp.sh: in a case tree that holds nixos/flake.nix, nixos/flake.lock, the host's
 # configuration.nix and the agent image's Dockerfile, it moves the imp input to the release
-# commit's first 8 hex digits, locks it with `nix flake lock` in the pinned nixos/nix image, and
+# commit's first 8 hex digits, locks it with `nix flake lock` in the Nix image that scripts/nix-image.sh pins, and
 # pins imp-host and imp-base to the release's tag and digests, and nothing else. It keeps an image
 # that already holds the release or a newer one, and runs no lock when imp-host stays. It refuses a
 # lock that names another commit, a failed lock, an image pinned at the release with another

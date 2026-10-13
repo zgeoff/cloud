@@ -59,14 +59,14 @@ it_writes_the_test_lock_into_the_mounted_directory() {
   echo '{"old":true}' > "$tree/nixos/flake.lock"
   echo '{"new":true}' > "$tree/flake.lock"
 
-  "${case_env[@]}" docker run --rm -v "$tree/nixos:/src" -w /src nixos/nix:2.35.2 sh -c \
+  "${case_env[@]}" docker run --rm -v "$tree/nixos:/src" -w /src example.invalid/nix:1 sh -c \
     "nix --extra-experimental-features 'nix-command flakes' flake lock && chown 0:0 flake.lock" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/nixos/flake.lock" <<< '{"new":true}'
   diff - <(sed "s|$tree|TREE|g" "$tree/calls") << 'EOF'
-["docker","run","--rm","-v","TREE/nixos:/src","-w","/src","nixos/nix:2.35.2","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown 0:0 flake.lock"]
+["docker","run","--rm","-v","TREE/nixos:/src","-w","/src","example.invalid/nix:1","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown 0:0 flake.lock"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -80,7 +80,7 @@ it_fails_the_lock_with_the_tests_error_and_leaves_the_lock_unchanged() {
   echo '{"old":true}' > "$tree/nixos/flake.lock"
   echo '{"new":true}' > "$tree/flake.lock"
 
-  "${case_env[@]}" STUB_LOCK_ERROR='error: no commit found' docker run --rm -v "$tree/nixos:/src" -w /src nixos/nix:2.35.2 sh -c \
+  "${case_env[@]}" STUB_LOCK_ERROR='error: no commit found' docker run --rm -v "$tree/nixos:/src" -w /src example.invalid/nix:1 sh -c \
     "nix --extra-experimental-features 'nix-command flakes' flake lock" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"

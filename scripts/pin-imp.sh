@@ -8,7 +8,7 @@
 #   bash scripts/pin-imp.sh <version> <commit> <imp-host digest> <imp-base digest>
 #
 # The flake input takes the commit's first 8 hex digits, as it does by hand, and `nix flake lock`
-# then locks it, in the nixos/nix image that scripts/nix-image.sh pins; the lock must name the
+# then locks it, in the Nix image that scripts/nix-image.sh pins; the lock must name the
 # commit. The rules follow pin-agent-atc.sh's for each image on its own: an image that already
 # holds <version> and its digest, or a newer version, stays as it is, and one that holds <version>
 # with another digest fails, because a release's images never change. It checks both images
