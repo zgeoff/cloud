@@ -36,8 +36,10 @@ node rather than by a tag, so a later node with the same tag gains nothing.
 nixie's pod calls impd's API over the same route, so `tag:cloud` holds a second grant to impd's node
 for HTTPS, named in the policy as nixie's route to impd
 ([nixie](../workloads/nixie.md#reaching-impd)). It matches the probe's grant exactly and gives the
-cluster nothing beyond it. The route stays open if the probe's grant changes or goes, and removing
-nixie's grant cuts nixie off from impd.
+cluster nothing beyond it. Tailscale takes the union of the grants that match a connection, so the
+route stays open while either grant stands: a change to the probe's grant leaves nixie's route open,
+and removing nixie's grant cuts nixie off from impd once the probe's grant no longer covers the
+route.
 
 Members hold a second grant, to the host's HTTPS port for nixie, beside the grant that lets them
 reach every device. The policy lists nixie's route in its own grant, so the route stays open if the

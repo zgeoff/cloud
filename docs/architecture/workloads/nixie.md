@@ -77,10 +77,10 @@ blocks outbound port 22.
 
 nixie calls impd's API at `imps.geoff.cloud` over HTTPS. A pod has no tailnet identity of its own,
 so the call leaves through the host's node as `tag:cloud`, on the tailnet grant to impd's node for
-HTTPS that the policy names as nixie's route to impd. Removing that grant cuts nixie off from impd,
-and [the tailnet](../network/tailnet.md#identities) explains why it stands apart from the health
-probe's grant. impd delivers each tool call from an imp back over nixie's own connection, so the pod
-opens no inbound port for its tools.
+HTTPS that the policy names as nixie's route to impd. That grant keeps the route open when the
+health probe's grant changes, and [the tailnet](../network/tailnet.md#identities) explains how the
+two grants combine. impd delivers each tool call from an imp back over nixie's own connection, so
+the pod opens no inbound port for its tools.
 
 nixie's impd token can manage only imps whose names carry nixie's prefix, and grant only nixie's
 model secret to them. impd refuses an image add and a secret add to such a token, because both are
