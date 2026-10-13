@@ -11,7 +11,7 @@ set -euo pipefail
 port="$(jq -er .k3s.apiPort "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json")"
 
 for _ in $(seq 1 30); do
-  if curl -sk -o /dev/null --max-time 5 https://geoffcloud:$port/livez; then exit 0; fi
+  if curl -sk -o /dev/null --max-time 5 "https://geoffcloud:$port/livez"; then exit 0; fi
   sleep 2
 done
 echo "k3s's API on geoffcloud:$port did not answer" >&2
