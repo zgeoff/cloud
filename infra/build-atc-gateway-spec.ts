@@ -1,8 +1,9 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { topology } from '@zgeoff/cloud-topology';
 import type { ATCGatewayConfig } from './inputs/types.ts';
 
-export const atcGatewayPort = 8414;
+export const atcGatewayPort = topology.atc.gatewayPort;
 export const atcGatewayLabels = { app: 'atc-gateway' };
 const nonrootID = 65_532;
 

@@ -1,0 +1,13 @@
+{
+  "name": "@zgeoff/cloud-topology",
+  "private": true,
+  "description": "The constants that geoff.cloud's host, infra, scripts and images share",
+  "type": "module",
+  "exports": {
+    ".": "./index.ts",
+    "./constants.json": "./constants.json"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

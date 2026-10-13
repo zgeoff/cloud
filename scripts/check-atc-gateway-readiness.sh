@@ -6,6 +6,8 @@ set -uo pipefail
 
 host="${1:-geoffcloud}"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
+# the gateway's port, from the shared constants
+gateway_port="$(jq -r .atc.gatewayPort "$repo/packages/topology/constants.json")"
 failures=0
 
 print_check() {
@@ -85,7 +87,7 @@ if run_kubectl -n atc get deploy atc-gateway > /dev/null; then
   code=$(run_kubectl -n atc run readiness-probe --rm -i --restart=Never --quiet \
     --image=curlimages/curl:8.16.0 -- curl -s -o /dev/null -w '%{http_code}' \
     -H 'Host: atc.geoff.cloud' \
-    http://atc-gateway.atc.svc.cluster.local:8414/.well-known/oauth-protected-resource/mcp)
+    "http://atc-gateway.atc.svc.cluster.local:$gateway_port/.well-known/oauth-protected-resource/mcp")
   print_check "$([ "$code" = 200 ] && echo ok || echo FAIL)" "gateway in-cluster metadata: $code"
 fi
 

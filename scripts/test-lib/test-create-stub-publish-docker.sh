@@ -64,6 +64,45 @@ EOF
   }
 }
 
+it_records_a_build_with_two_build_args() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/context"
+  touch "$tree/context/Dockerfile"
+
+  "${case_env[@]}" docker build --build-arg BASE_IMAGE=example.invalid/base:1 --build-arg GATEWAY_PORT=8414 -t ghcr.io/zgeoff/atc-gateway:2.27.0 "$tree/context" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/contexts/ghcr.io_zgeoff_atc-gateway_2.27.0" <<< 'Dockerfile'
+  [ -f "$tree/built/ghcr.io_zgeoff_atc-gateway_2.27.0" ]
+  diff - "$tree/calls" <<< "[\"docker\",\"build\",\"--build-arg\",\"BASE_IMAGE=example.invalid/base:1\",\"--build-arg\",\"GATEWAY_PORT=8414\",\"-t\",\"ghcr.io/zgeoff/atc-gateway:2.27.0\",\"$tree/context\"]"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_fails_closed_on_a_build_with_no_tag() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/context"
+
+  "${case_env[@]}" docker build --build-arg BASE_IMAGE=example.invalid/base:1 --build-arg GATEWAY_PORT=8414 "$tree/context" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "unexpected: build --build-arg BASE_IMAGE=example.invalid/base:1 --build-arg GATEWAY_PORT=8414 $tree/context"
+  [ ! -e "$tree/built/ghcr.io_zgeoff_atc-gateway_2.27.0" ]
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
+}
+
 it_prints_the_manifest_of_a_published_ref() {
   local status=0
   tree="$(mktemp -d)"

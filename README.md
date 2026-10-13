@@ -37,6 +37,7 @@ tools in Docker. The NixOS checks run nightly and gate the host switch.
 - `infra/`: the Pulumi program
 - `provider/`, `sdk/onidel/`: the Onidel Pulumi provider and its generated SDK
 - `nixos/`: the host flake
+- `packages/topology/`: the constants that the host, infra, scripts and images share
 - `images/agent/`: the image agent sessions run on
 - `deploy/atc-gateway/`: the atc gateway's images
 - `workers/health-check/`: the external health-check Worker, its own package

@@ -31,7 +31,7 @@ it_stores_a_new_kubeconfig_with_the_tailnet_server_and_adds_its_reference_to_env
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< 'stored op://cloud/k3s-kubeconfig/kubeconfig.yaml; run: bun run up -- --yes'
@@ -70,7 +70,7 @@ it_replaces_the_stored_kubeconfig_and_leaves_an_env_that_has_its_reference() {
   printf '%s\n' 'K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< 'stored op://cloud/k3s-kubeconfig/kubeconfig.yaml; run: bun run up -- --yes'
@@ -100,7 +100,7 @@ it_reads_the_named_host_and_points_the_server_at_it() {
   printf '%s\n' 'K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud-2 bash connect-k3s.sh geoffcloud-2) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud-2 bash scripts/connect-k3s.sh geoffcloud-2) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< 'stored op://cloud/k3s-kubeconfig/kubeconfig.yaml; run: bun run up -- --yes'
@@ -125,7 +125,7 @@ it_writes_env_with_its_reference_when_none_is_there() {
   printf '%s\n' '    server: https://127.0.0.1:6443' > "$tree/host/k3s.yaml"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< 'grep: .env: No such file or directory'
   diff - "$tree/out" <<< 'stored op://cloud/k3s-kubeconfig/kubeconfig.yaml; run: bun run up -- --yes'
@@ -155,7 +155,7 @@ it_fails_with_ssh_exit_255_and_stores_nothing_when_the_host_does_not_answer() {
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud STUB_SSH_UNREACHABLE=1 bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud STUB_SSH_UNREACHABLE=1 bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host geoffcloud port 22: Connection timed out\r'
@@ -178,7 +178,7 @@ it_fails_with_exit_1_and_stores_nothing_when_the_host_has_no_k3s_kubeconfig() {
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'cat: /etc/rancher/k3s/k3s.yaml: No such file or directory'
@@ -202,7 +202,7 @@ it_fails_with_op_exit_1_and_leaves_env_when_the_new_document_is_refused() {
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud STUB_OP_FAIL_AT=document-create bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud STUB_OP_FAIL_AT=document-create bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
@@ -231,7 +231,7 @@ it_fails_with_op_exit_1_and_keeps_the_stored_kubeconfig_when_the_edit_is_refused
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud STUB_OP_FAIL_AT=document-edit bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud STUB_OP_FAIL_AT=document-edit bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
@@ -259,10 +259,10 @@ it_fails_with_exit_1_after_storing_when_it_may_not_append_to_env() {
   chmod 0444 "$tree/.env"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'connect-k3s.sh: line 20: .env: Permission denied'
+  diff - "$tree/err" <<< 'scripts/connect-k3s.sh: line 23: .env: Permission denied'
   diff - "$tree/calls" << 'CALLS'
 ["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]
 ["op","item","get","k3s-kubeconfig","--vault","cloud"]
@@ -286,12 +286,12 @@ it_completes_env_on_a_second_run_after_a_failed_env_write() {
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
   chmod 0444 "$tree/.env"
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > /dev/null 2> "$tree/first-err" || first_status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > /dev/null 2> "$tree/first-err" || first_status=$?
   chmod 0644 "$tree/.env"
   : > "$tree/calls"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
-    STUB_HOST=root@geoffcloud bash connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< 'stored op://cloud/k3s-kubeconfig/kubeconfig.yaml; run: bun run up -- --yes'
@@ -307,7 +307,7 @@ ONIDEL_API_KEY=op://cloud/onidel/credential
 # k3s API over the tailnet (#6)
 K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/kubeconfig.yaml
 ENV
-  diff - "$tree/first-err" <<< 'connect-k3s.sh: line 20: .env: Permission denied'
+  diff - "$tree/first-err" <<< 'scripts/connect-k3s.sh: line 23: .env: Permission denied'
   [ "$first_status" = 1 ] || {
     echo "first exit $first_status, want 1" >&2
     exit 1
@@ -318,15 +318,18 @@ ENV
   }
 }
 
-# Runtime every case needs: the script in <tree>, the ssh and op stand-ins with fail-closed
+# Runtime every case needs: the script in <tree>/scripts, beside the shared constants in
+# <tree>/packages/topology, the ssh and op stand-ins with fail-closed
 # stand-ins for the other remote tools in <tree>/bin, checked so no call can reach a real
 # remote tool, the empty call log, the host's directory, and the HOME and TMPDIR the script
 # runs with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/host"
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/host" "$tree/scripts" "$tree/packages/topology"
   : > "$tree/calls"
-  cp "$(dirname "${BASH_SOURCE[0]}")/connect-k3s.sh" "$tree/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/connect-k3s.sh" "$tree/scripts/"
+  # the script reads k3s's API port from the shared constants beside it
+  cp "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json" "$tree/packages/topology/"
   create_stub_k3s_ssh "$tree/bin"
   create_stub_kubeconfig_op "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale

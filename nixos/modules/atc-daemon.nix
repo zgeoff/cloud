@@ -10,6 +10,7 @@
 }:
 let
   cfg = config.services.atc-daemon;
+  topology = import ../topology.nix;
   json = pkgs.formats.json { };
   home = "/var/lib/atc-daemon";
 
@@ -56,10 +57,10 @@ in
 
     listen = lib.mkOption {
       type = lib.types.str;
-      example = "100.69.47.33:8415";
+      example = "${topology.tailnet.nodes.geoffcloud.address}:${toString topology.atc.daemonPort}";
       description = ''
         The host:port the daemon listens on for gateways: the host's tailnet address and
-        port 8415. Passed as --listen, always together with --token-file.
+        atc's daemon port. Passed as --listen, always together with --token-file.
       '';
     };
 
@@ -93,7 +94,7 @@ in
         {
           geoffcloud = {
             provider = "imp";
-            url = "http://127.0.0.1:7070";
+            url = "http://127.0.0.1:${toString topology.imp.apiPort}";
             tokenFile = "/run/credentials/atc-daemon.service/imp-token";
             impPrefix = "harness-";
           };

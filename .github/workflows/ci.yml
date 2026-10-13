@@ -81,6 +81,10 @@ jobs:
       - name: Pulumi pins
         run: bun run check:pulumi-pins
 
+      # the copies of shared constants that stay outside packages/topology agree with it
+      - name: Topology
+        run: bun run check:topology
+
       - name: Typecheck
         run: bun run typecheck
 

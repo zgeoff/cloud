@@ -1,4 +1,5 @@
 import type { Output } from '@pulumi/pulumi';
+import { topology } from '@zgeoff/cloud-topology';
 
 interface EdgeRulesInputs {
   // set once the NixOS host answers tailnet SSH: public SSH leaves the edge then
@@ -60,7 +61,7 @@ function buildRules(hostOnTailnet: boolean): readonly EdgeRule[] {
     {
       name: 'tailscale',
       protocol: 'udp',
-      port: '41641',
+      port: String(topology.tailnet.directPort),
       description: 'Tailscale direct connections',
     },
     { name: 'icmp', protocol: 'icmp', description: 'ICMP' },

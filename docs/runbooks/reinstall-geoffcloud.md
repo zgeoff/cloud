@@ -69,7 +69,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    ```sh
    nix run github:nix-community/nixos-anywhere -- \
-     --flake ./nixos#geoffcloud \
+     --flake '.?dir=nixos#geoffcloud' \
      --extra-files /tmp/geoffcloud-extra \
      root@104.250.100.18
    ```

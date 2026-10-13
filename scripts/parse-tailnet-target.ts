@@ -1,11 +1,15 @@
 import { BlockList, isIP } from 'node:net';
+import { topology } from '@zgeoff/cloud-topology';
 import type { ProbeTarget } from './build-tcp-probe.ts';
+
+// the host's own tailnet address and HTTPS port, as the example target in each message
+const exampleTarget = `${topology.tailnet.nodes.geoffcloud.address}:443`;
 
 export type TailnetTargetResult =
   | { readonly ok: true; readonly target: ProbeTarget }
   | { readonly ok: false; readonly error: string };
 
-// Parses the check's arguments: exactly one tailnet address and port, such as 100.69.47.33:443, or
+// Parses the check's arguments: exactly one tailnet address and port, such as the host's on 443, or
 // [fd7a:115c:a1e0::5]:443 for IPv6. It has no default, so the caller always names a listener that
 // is not on port 53.
 export function parseTailnetTarget(args: readonly string[]): TailnetTargetResult {
@@ -14,14 +18,14 @@ export function parseTailnetTarget(args: readonly string[]): TailnetTargetResult
   if (arg === undefined) {
     return {
       ok: false,
-      error: 'give a tailnet address and port to probe, such as 100.69.47.33:443',
+      error: `give a tailnet address and port to probe, such as ${exampleTarget}`,
     };
   }
 
   const target = args.length === 1 ? findAddress(arg) : undefined;
 
   if (target === undefined) {
-    return { ok: false, error: 'give one tailnet address and port, such as 100.69.47.33:443' };
+    return { ok: false, error: `give one tailnet address and port, such as ${exampleTarget}` };
   }
 
   const refusal = findRefusal(arg, target);
@@ -45,11 +49,11 @@ const dnsPort = 53;
 // why the check must not probe a well-formed target; undefined when it may
 function findRefusal(arg: string, target: ProbeTarget): string | undefined {
   if (!isTailnetAddress(target.host)) {
-    return `cannot probe ${arg}: the address is outside the tailnet's 100.64.0.0/10 and fd7a:115c:a1e0::/48, so the host and the sandbox can each reach a different listener on it and the probe would prove nothing`;
+    return `cannot probe ${arg}: the address is outside the tailnet's ${topology.tailnet.cidr} and fd7a:115c:a1e0::/48, so the host and the sandbox can each reach a different listener on it and the probe would prove nothing`;
   }
 
   if (target.port === dnsPort) {
-    return `cannot probe ${arg}: imp redirects a public sandbox's DNS connections to its own DNS proxy, so a probe of port 53 can connect even when the sandbox is isolated; pick a tailnet port that is not 53, such as 100.69.47.33:443`;
+    return `cannot probe ${arg}: imp redirects a public sandbox's DNS connections to its own DNS proxy, so a probe of port 53 can connect even when the sandbox is isolated; pick a tailnet port that is not 53, such as ${exampleTarget}`;
   }
 
   return undefined;
@@ -59,7 +63,9 @@ function findRefusal(arg: string, target: ProbeTarget): string | undefined {
 // than in the sandbox
 const tailnetRanges = new BlockList();
 
-tailnetRanges.addSubnet('100.64.0.0', 10, 'ipv4');
+const [tailnetNetwork = '', tailnetPrefix] = topology.tailnet.cidr.split('/');
+
+tailnetRanges.addSubnet(tailnetNetwork, Number(tailnetPrefix), 'ipv4');
 tailnetRanges.addSubnet('fd7a:115c:a1e0::', 48, 'ipv6');
 
 function isTailnetAddress(host: string): boolean {

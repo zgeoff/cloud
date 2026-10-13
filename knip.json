@@ -4,6 +4,10 @@
     "infra": {
       "project": ["**/*.ts"]
     },
+    "packages/topology": {
+      "entry": ["index.ts"],
+      "project": ["**/*.ts"]
+    },
     "workers/health-check": {
       "entry": ["index.ts"],
       "project": ["**/*.ts"]

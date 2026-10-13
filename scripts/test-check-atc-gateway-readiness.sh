@@ -687,15 +687,17 @@ CALLS
   }
 }
 
-# Runtime every case needs: the script in <tree>/scripts, where it finds <tree>/infra as
-# its repo's; the ssh, curl and getent stand-ins with fail-closed stand-ins for the other
-# remote tools in <tree>/bin, checked so no call can reach a real remote tool; the
-# empty call log; and the HOME and TMPDIR the script runs with.
+# Runtime every case needs: the script in <tree>/scripts, where it finds <tree>/infra and
+# the shared constants in <tree>/packages/topology as its repo's; the ssh, curl and getent
+# stand-ins with fail-closed stand-ins for the other remote tools in <tree>/bin, checked so
+# no call can reach a real remote tool; the empty call log; and the HOME and TMPDIR the
+# script runs with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/scripts" "$tree/infra"
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/scripts" "$tree/infra" "$tree/packages/topology"
   : > "$tree/calls"
   cp "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-readiness.sh" "$tree/scripts/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json" "$tree/packages/topology/"
   create_stub_readiness_ssh "$tree/bin"
   create_stub_readiness_curl "$tree/bin"
   create_stub_getent "$tree/bin"

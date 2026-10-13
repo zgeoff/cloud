@@ -56,7 +56,7 @@ EOF
   diff - "$tree/calls.masked" << 'EOF'
 ["docker","login","ghcr.io","-u","octocat","--password-stdin"]
 ["gh","release","download","@zgeoff/atc@2.27.0","-R","zgeoff/atc","-p","atc-gateway-linux-x64","-p","SHA256SUMS","-D","<work>"]
-["docker","build","--build-arg","BASE_IMAGE=example.invalid/base:1","-t","ghcr.io/zgeoff/atc-gateway:2.27.0","context"]
+["docker","build","--build-arg","BASE_IMAGE=example.invalid/base:1","--build-arg","GATEWAY_PORT=8414","-t","ghcr.io/zgeoff/atc-gateway:2.27.0","context"]
 ["docker","build","--build-arg","RESTIC_IMAGE=example.invalid/restic:1","-t","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2","deploy/atc-gateway/backup"]
 ["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway:2.27.0"]
 ["docker","push","ghcr.io/zgeoff/atc-gateway:2.27.0"]
@@ -115,7 +115,7 @@ EOF
   diff - "$tree/calls.masked" << 'EOF'
 ["docker","login","ghcr.io","-u","octocat","--password-stdin"]
 ["gh","release","download","@zgeoff/atc@2.27.0","-R","zgeoff/atc","-p","atc-gateway-linux-x64","-p","SHA256SUMS","-D","<work>"]
-["docker","build","--build-arg","BASE_IMAGE=example.invalid/base:1","-t","ghcr.io/zgeoff/atc-gateway:2.27.0","context"]
+["docker","build","--build-arg","BASE_IMAGE=example.invalid/base:1","--build-arg","GATEWAY_PORT=8414","-t","ghcr.io/zgeoff/atc-gateway:2.27.0","context"]
 ["docker","build","--build-arg","RESTIC_IMAGE=example.invalid/restic:1","-t","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2","deploy/atc-gateway/backup"]
 ["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway:2.27.0"]
 ["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2"]
@@ -304,8 +304,11 @@ it_requires_the_step_summary() {
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/registry" "$tree/digests" \
-    "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" "$tree/repo/scripts" "$tree/repo/deploy/atc-gateway"
+    "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" "$tree/repo/scripts" "$tree/repo/deploy/atc-gateway" \
+    "$tree/repo/packages/topology"
   cp "$scripts/publish-atc-gateway-images.sh" "$scripts/fetch-atc-release.sh" "$tree/repo/scripts/"
+  # the gateway image's build reads its port from the shared constants
+  cp "$scripts/../packages/topology/constants.json" "$tree/repo/packages/topology/"
   cp "$scripts/../deploy/atc-gateway/Dockerfile" "$tree/repo/deploy/atc-gateway/"
   cp -r "$scripts/../deploy/atc-gateway/backup" "$tree/repo/deploy/atc-gateway/"
   create_stub_publish_docker "$tree/bin"

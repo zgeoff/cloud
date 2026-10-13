@@ -7,27 +7,28 @@
   ...
 }:
 let
+  topology = import ../../topology.nix;
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
-  atcDaemonAddress = "100.69.47.33";
-  atcDaemonPort = 8415;
+  atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
+  atcDaemonPort = topology.atc.daemonPort;
   # k3s's default cluster and service CIDRs (no --cluster-cidr or --service-cidr override
   # below); services.imp.forwardDeny names both
-  k3sPodCIDR = "10.42.0.0/16";
-  k3sServiceCIDR = "10.43.0.0/16";
+  k3sPodCIDR = topology.k3s.podCIDR;
+  k3sServiceCIDR = topology.k3s.serviceCIDR;
   # impd's API on the host's loopback, for the atc daemon's imp target and the health probe
-  impdLoopbackURL = "http://127.0.0.1:7070";
+  impdLoopbackURL = "http://127.0.0.1:${toString topology.imp.apiPort}";
   # 1Password Connect for imps (GEO-120). The imp broker in imp-host forwards granted requests
   # for op-connect.imp.internal to the relay below, on docker0's host address. imp-forward
   # drops imp-host's traffic to the k3s ranges, so the container cannot reach the Service
   # itself: the host dials its ClusterIP instead. The Service pins that ClusterIP
   # (infra/onepassword-connect.ts).
-  connectRelayAddress = "172.17.0.1";
+  connectRelayAddress = topology.docker.bridgeAddress;
   connectRelayPort = 18081;
-  connectServiceAddress = "10.43.82.198:8000";
+  connectServiceAddress = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
   # docker0's subnet. imp's module does not fix imp-host's address on it, so the rule below
   # admits the whole subnet: every container on docker0, imp's docker proxy and image builds
   # included, can reach the relay. Connect's read-only token still gates every request.
-  dockerSubnet = "172.17.0.0/16";
+  dockerSubnet = topology.docker.subnet;
   atc = pkgs.callPackage ../../packages/atc.nix { };
 in
 {
@@ -63,13 +64,13 @@ in
     interfaces.eth0 = {
       ipv4.addresses = [
         {
-          address = "104.250.100.18";
+          address = topology.vm.publicIPv4;
           prefixLength = 24;
         }
       ];
       ipv6.addresses = [
         {
-          address = "2401:a4a0:4:17f::1";
+          address = topology.vm.publicIPv6;
           prefixLength = 64;
         }
       ];
@@ -99,7 +100,7 @@ in
   networking.firewall = {
     enable = true;
     # public: nothing but Tailscale. Everything else is reached over the tailnet.
-    allowedUDPPorts = [ 41641 ];
+    allowedUDPPorts = [ topology.tailnet.directPort ];
     # trusted as a source, in input and forward: the tailnet and k3s pods (pods
     # reach the API server and kubelet on the host)
     trustedInterfaces = [
@@ -119,13 +120,13 @@ in
   };
 
   # atc's daemon port, k3s pods only. tailscale0 is trusted above, so nixos-fw alone would
-  # accept 8415 from every tailnet device the policy lets reach geoffcloud (today every
+  # accept the port from every tailnet device the policy lets reach geoffcloud (today every
   # member, through autogroup:member -> *). This table narrows it to the gateway's path: the
   # pod dials the host's tailnet address, so the packet enters on cni0 from a pod address,
   # and local delivery skips flannel's masquerade in postrouting. Every other source, the
   # tailnet and the host's own loopback included, is dropped. A drop in any input chain is
   # final, and the accept here only passes the packet on to nixos-fw, which trusts cni0.
-  # Any pod on the host can still reach 8415; the daemon's bearer token gates the rest.
+  # Any pod on the host can still reach the port; the daemon's bearer token gates the rest.
   networking.nftables.tables.cloud_host = {
     family = "inet";
     content = ''
@@ -141,8 +142,8 @@ in
 
   # The Connect relay's port, from docker0 only: nixos-fw does not trust docker0, and imp-host
   # reaches the host there. The cloud_host rules above admit only docker0's subnet to it and
-  # drop the rest; as with 8415, a drop in any input chain is final and the accept only passes
-  # the packet on to nixos-fw, which opens the port on docker0 alone.
+  # drop the rest; as with the daemon's port, a drop in any input chain is final and the accept
+  # only passes the packet on to nixos-fw, which opens the port on docker0 alone.
   networking.firewall.interfaces.docker0.allowedTCPPorts = [ connectRelayPort ];
 
   # The relay: systemd holds the socket and starts the proxy on the first connection, so the
@@ -194,7 +195,7 @@ in
     enable = true;
     authKeyFile = "/var/lib/tailscale/authkey";
     extraUpFlags = [
-      "--advertise-tags=tag:cloud"
+      "--advertise-tags=${topology.tailnet.tags.cloud}"
       "--ssh"
     ];
     useRoutingFeatures = "client";
@@ -217,14 +218,14 @@ in
     # could move
     image = "ghcr.io/zgeoff/imp-host:1.0.2@sha256:c4ad2d173291d6d8fef0bf92556379e41eabe4138f3b84f4f73a53e75ec56b8f";
     # the module's default ("imp") is taken in the tailnet
-    settings.IMP_TAILSCALE_HOSTNAME = "imp-geoffcloud";
+    settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
     # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
     # for both names at the tailnet IP of imp's own node. imp.geoff.cloud stays free for imp's
     # public MCP route. The token lives in dnsApiTokenFile (root-only, re-read on change, so
     # a rotation needs no restart) and the ACME email in environmentFile, both installed by
     # scripts/install-imp-dns-token.sh. environmentFile must not also set IMP_DNS_API_TOKEN.
-    settings.IMP_DOMAIN = "imps.geoff.cloud";
+    settings.IMP_DOMAIN = topology.imp.domain;
     dnsApiTokenFile = "/var/lib/imp-host/secrets/dns-api-token";
     settings.IMP_DNS_PROVIDER = "cloudflare";
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
@@ -266,9 +267,9 @@ in
       "--disable=servicelb"
       "--write-kubeconfig-mode=0600"
       "--tls-san=geoffcloud"
-      # NodePorts (Grafana on 30300) bind to the tailnet address only. kube-proxy
-      # DNATs them through FORWARD, which the input firewall does not cover.
-      "--kube-proxy-arg=nodeport-addresses=100.64.0.0/10"
+      # NodePorts (Grafana's, topology.k3s.grafanaNodePort) bind to the tailnet range only.
+      # kube-proxy DNATs them through FORWARD, which the input firewall does not cover.
+      "--kube-proxy-arg=nodeport-addresses=${topology.tailnet.cidr}"
       # the host resolves through MagicDNS (100.100.100.100), which pods cannot reach
       "--resolv-conf=/etc/k3s-resolv.conf"
     ];

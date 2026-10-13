@@ -22,7 +22,8 @@ bash scripts/fetch-atc-release.sh context
 cp deploy/atc-gateway/Dockerfile context/
 gateway="ghcr.io/zgeoff/atc-gateway:$GATEWAY_IMAGE_TAG"
 backup="ghcr.io/zgeoff/atc-gateway-backup:$BACKUP_IMAGE_TAG"
-docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$gateway" context
+gateway_port="$(jq -er .atc.gatewayPort packages/topology/constants.json)"
+docker build --build-arg "BASE_IMAGE=$BASE_IMAGE" --build-arg "GATEWAY_PORT=$gateway_port" -t "$gateway" context
 docker build --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$backup" deploy/atc-gateway/backup
 # a published tag is immutable: skip it, and push only when the registry confirms the tag is
 # missing; any other lookup error stops the run
