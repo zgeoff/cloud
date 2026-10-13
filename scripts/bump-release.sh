@@ -11,6 +11,7 @@
 # | atc        | the release's SHA256SUMS                                   | pin-atc.sh     |
 # | imp        | the tag's commit; the imp-host and imp-base image digests  | pin-imp.sh     |
 # | nixie      | the notes of the pinned release, the target and each between | pin-nixie.sh |
+# | auto-mode  | the npm tarball and its dist.integrity                     | pin-auto-mode.sh |
 #
 # The pinned versions come in find-release-bumps.sh's order, and set the update type. A nixie bump
 # also takes find-nixie-release-flags.sh's flags. label-release-bump.sh decides the labels, and
@@ -77,6 +78,22 @@ case "$dependency" in
     mapfile -t flags < "$work/flags"
     pin=(bash "$here/pin-nixie.sh" "$version" "$work/target.md")
     rollout="The \`Deploy prod\` workflow applies the stack config once CI passes on main, unless its guard holds the plan (\`docs/runbooks/prod-apply.md\`). Check the deploy (\`docs/runbooks/nixie.md\`)."
+    ;;
+  auto-mode)
+    names=("the agent image (\`images/agent/Dockerfile\`)")
+    url="https://github.com/zgeoff/auto-mode/releases/tag/auto-mode-v$version"
+    # the GitHub release comes first and npm publishes in the same run, so a release that npm
+    # lacks yet fails this run, and the next one pins it
+    curl -fsSL "https://registry.npmjs.org/auto-mode/$version" > "$work/package.json"
+    tarball="$(jq -r .dist.tarball "$work/package.json")"
+    integrity="$(jq -r .dist.integrity "$work/package.json")"
+    if [ "$tarball" != "https://registry.npmjs.org/auto-mode/-/auto-mode-$version.tgz" ]; then
+      echo "npm lists auto-mode $version's tarball at $tarball, not where the agent image fetches it" >&2
+      exit 1
+    fi
+    curl -fsSL -o "$work/auto-mode.tgz" "$tarball"
+    pin=(bash "$here/pin-auto-mode.sh" "$version" "$work/auto-mode.tgz" "$integrity")
+    rollout="Rebuild the agent image (\`docs/runbooks/agent-image.md\`). Gateway sessions load the new mod from \`/opt/auto-mode/mods/auto-mode\` once they start on the new image."
     ;;
   *)
     echo "not a release check dependency: '$dependency'" >&2

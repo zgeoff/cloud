@@ -47,7 +47,9 @@ release bot. CI turns on auto-merge for that pull request only when the image ch
 diff changes nothing but the two lines of the atc pin, and only for the head commit it checked;
 every other pull request, author or diff waits for a person. A later release replaces the branch and
 turns the old auto-merge off first, so a newer pin always waits for its own checks, and a pin never
-moves backwards. Every other pin change is an ordinary reviewed PR.
+moves backwards. The [release check](../../runbooks/release-check.md) opens the bump pull requests
+for the imp base image and for auto-mode, the CLI and mod that gateway sessions load. Every other
+pin change is an ordinary reviewed PR.
 
 ## How a daemon uses the image
 

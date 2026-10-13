@@ -53,6 +53,53 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_merges_a_green_auto_mode_bump_that_changes_only_the_agent_image() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '[{"isCrossRepository":false,"number":8}]' > "$tree/open-prs"
+  cat > "$tree/pr-view" << 'EOF'
+{"commits":[{"oid":"2222222222222222222222222222222222222222","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"agent image"},{"__typename":"CheckRun","name":"auto-merge","status":"COMPLETED","conclusion":"SKIPPED","workflowName":"agent image"}]}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    GH_TOKEN=read-token APP_LOGIN=app/cloud-release-check MERGE_TOKEN=merge-token \
+    bash "$script" release-check/auto-mode > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'merged #8 at 2222222222222222222222222222222222222222'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/auto-mode","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","8","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
+["gh","pr","merge","8","--repo","zgeoff/cloud","--squash","--match-head-commit","2222222222222222222222222222222222222222"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_holds_an_auto_mode_bump_that_changes_a_file_outside_the_agent_image() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '[{"isCrossRepository":false,"number":8}]' > "$tree/open-prs"
+  cat > "$tree/pr-view" << 'EOF'
+{"commits":[{"oid":"2222222222222222222222222222222222222222","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"},{"path":"nixos/packages/atc.nix"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    GH_TOKEN=read-token APP_LOGIN=app/cloud-release-check MERGE_TOKEN=merge-token \
+    bash "$script" release-check/auto-mode > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '#8 stays open: it changes nixos/packages/atc.nix, which no pin of its dependency writes'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/auto-mode","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","8","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 it_holds_a_pull_request_while_a_check_is_pending() {
   local status=0
   tree="$(mktemp -d)"

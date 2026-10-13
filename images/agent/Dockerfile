@@ -170,10 +170,11 @@ RUN curl -fsSL -o /tmp/op.zip \
 
 # The auto-mode CLI and its Claude Code mod, from the npm tarball. The package
 # has no dependencies. The mod sits at the fixed path /opt/auto-mode/mods/auto-mode,
-# for --plugin-dir. The sum is the tarball's; npm's dist.integrity is its sha512:
+# for --plugin-dir. The sum is the tarball's. scripts/pin-auto-mode.sh checks the
+# tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=0.17.0
-ARG AUTO_MODE_SHA256=0a9fa7045739d19f9bc7a18602a6b1b986732dffcb12e853de6f2be715c70d79
+ARG AUTO_MODE_VERSION=0.19.3
+ARG AUTO_MODE_SHA256=de2116ce480885d0a25c277ef897b3e78032065507e3625ef45a5b3248f716d8
 RUN curl -fsSL -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \

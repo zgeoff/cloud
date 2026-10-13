@@ -8,8 +8,8 @@
 #   than <version> to <version>. A pin at <version> or newer moves nothing, so it does not count.
 # - each <flag>, such as `migrations` or `sandbox-images-changed` from find-nixie-release-flags.sh.
 # - `needs-review` for a major update, for a minor update to a 0.x release (where a minor release
-#   is the breaking one), and for any flag; `auto-merge` otherwise. One rule serves atc, imp and
-#   nixie: from 1.0 on, patch and minor updates merge on their own.
+#   is the breaking one), and for any flag; `auto-merge` otherwise. One rule serves every
+#   dependency: from 1.0 on, patch and minor updates merge on their own.
 #
 # It fails when no pinned version is older than <version>, since such a bump changes nothing.
 set -euo pipefail

@@ -55,6 +55,9 @@ nixos/hosts/geoffcloud/configuration.nix'
   release-check/nixie)
     allowed='infra/Pulumi.prod.yaml'
     ;;
+  release-check/auto-mode)
+    allowed='images/agent/Dockerfile'
+    ;;
   *)
     echo "$branch is not a release check branch"
     exit 0

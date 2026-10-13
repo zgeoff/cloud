@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Test for find-release-bumps.sh: from a checkout's pins and the releases of zgeoff/atc, zgeoff/imp
-# and zgeoff/nixie, it prints one line for each dependency with a pin older than its newest
+# Test for find-release-bumps.sh: from a checkout's pins and the releases of zgeoff/atc, zgeoff/imp,
+# zgeoff/nixie and zgeoff/auto-mode, it prints one line for each dependency with a pin older than its newest
 # release, and nothing when every pin is current. It takes the highest X.Y.Z among the tags of the
 # dependency's own form, and fails on a missing or doubled pin and on a repository with no
 # release. gh is the create-stub-release-gh.sh stand-in.
@@ -23,7 +23,7 @@ setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/seed/images/agent" "$tree/seed/nixos/packages" \
     "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/deploy/atc-gateway" "$tree/seed/infra" \
-    "$tree/releases/atc" "$tree/releases/imp" "$tree/releases/nixie"
+    "$tree/releases/atc" "$tree/releases/imp" "$tree/releases/nixie" "$tree/releases/auto-mode"
   create_stub_release_gh "$tree/bin"
   case_env=(env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree")
 }
@@ -36,6 +36,7 @@ it_prints_nothing_when_every_pin_holds_its_newest_release() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.3.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
@@ -47,6 +48,7 @@ EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
   echo 'v1.0.1' > "$tree/releases/imp/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
+  echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
   (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -56,6 +58,7 @@ EOF
 ["gh","release","list","-R","zgeoff/atc","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 ["gh","release","list","-R","zgeoff/imp","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 ["gh","release","list","-R","zgeoff/nixie","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
+["gh","release","list","-R","zgeoff/auto-mode","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -68,6 +71,7 @@ it_prints_the_atc_line_with_every_pinned_version_when_one_pin_is_older() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.3.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "2.26.2";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
@@ -79,6 +83,7 @@ EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
   echo 'v1.0.1' > "$tree/releases/imp/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
+  echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
   (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -95,6 +100,7 @@ it_prints_the_imp_and_nixie_lines_when_their_pins_are_older() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.3.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
@@ -106,6 +112,7 @@ EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
   echo 'v1.0.1' > "$tree/releases/imp/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
+  echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
   (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -113,6 +120,35 @@ EOF
 imp 1.0.1 1.0.0 0.33.0
 nixie 0.7.0 0.6.2 0.6.2
 EOF
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_prints_the_auto_mode_line_when_the_agent_images_pin_is_older() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
+FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
+ARG ATC_VERSION=4.3.0
+ARG AUTO_MODE_VERSION=0.17.0
+EOF
+  echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
+  cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
+    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
+    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
+EOF
+  echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
+  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v0.7.0' > "$tree/releases/nixie/tags"
+  printf '%s\n' 'v9.0.0' 'auto-mode-v0.19.3' 'auto-mode-v0.19.2' 'auto-mode-v0.17.0' > "$tree/releases/auto-mode/tags"
+
+  (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'auto-mode 0.19.3 0.17.0'
   diff /dev/null "$tree/err"
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -125,6 +161,7 @@ it_takes_the_highest_version_among_the_tags_of_the_dependencys_own_form() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.2.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.2.0";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.2.0' > "$tree/seed/deploy/atc-gateway/versions.env"
@@ -136,6 +173,7 @@ EOF
   printf '%s\n' '@zgeoff/atc-client@9.0.0' '@zgeoff/atc@4.9.0' '@zgeoff/atc@4.10.0' '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
   printf '%s\n' 'v1.2.3-rc.1' 'v1.0.1' > "$tree/releases/imp/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
+  echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
   (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -152,6 +190,7 @@ it_prints_nothing_for_a_pin_newer_than_the_newest_release() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.4.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
@@ -163,6 +202,7 @@ EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
   echo 'v1.0.1' > "$tree/releases/imp/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
+  echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
   (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -201,6 +241,7 @@ it_fails_on_a_doubled_pin() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.3.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
@@ -227,6 +268,7 @@ it_fails_when_a_repository_has_no_release_of_its_form() {
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222
 ARG ATC_VERSION=4.3.0
+ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
   echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"

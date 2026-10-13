@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Test for bump-release.sh: for each dependency it reads what the release publishes through gh and
-# docker, pins it with the real pin script on the release-check/<dependency> branch of a real bare
-# repository in the case tree, and opens the pull request with the labels and body its rules
-# give. gh is the create-stub-release-gh.sh stand-in and docker the
-# create-stub-release-docker.sh one; git is real, under `env -i` with git's global and system
-# config off. The script's work folder lives under the case's TMPDIR, and the cases mask its
-# random name as <work>.
+# Test for bump-release.sh: for each dependency it reads what the release publishes through gh,
+# docker and the npm registry, pins it with the real pin script on the release-check/<dependency>
+# branch of a real bare repository in the case tree, and opens the pull request with the labels
+# and body its rules give. gh is the create-stub-release-gh.sh stand-in, docker the
+# create-stub-release-docker.sh one and curl the create-stub-release-curl.sh one; git is real,
+# under `env -i` with git's global and system config off. The script's work folder lives under the
+# case's TMPDIR, and the cases mask its random name as <work>.
 #
 #   bash scripts/test-bump-release.sh
 # shellcheck source-path=SCRIPTDIR
@@ -16,18 +16,21 @@ scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$scripts/test-lib/run-cases.sh"
 source "$scripts/test-lib/create-stub-release-gh.sh"
 source "$scripts/test-lib/create-stub-release-docker.sh"
+source "$scripts/test-lib/create-stub-release-curl.sh"
 
 script="$scripts/bump-release.sh"
 source "$scripts/nix-image.sh"
 
 # setup_test <tree>: a bare repository at <tree>/origin.git, a working repository at <tree>/seed
-# whose origin it is, the gh and docker stand-ins in <tree>/bin, and the home and temp folders the
-# cases run with. It sets case_env, the environment every git and script call in a case runs with.
+# whose origin it is, the gh, docker and curl stand-ins in <tree>/bin, and the home and temp
+# folders the cases run with. It sets case_env, the environment every git and script call in a
+# case runs with.
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/seed"
   create_stub_release_gh "$tree/bin"
   create_stub_release_docker "$tree/bin"
+  create_stub_release_curl "$tree/bin"
   case_env=(env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp"
     STUB_TREE="$tree" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
     GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.invalid
@@ -258,6 +261,91 @@ EOF
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/nixie","--title","chore(nixie): bump nixie to 0.7.2","--body-file","<work>/body","--label","update:patch,migrations,needs-review"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_opens_an_auto_mode_patch_bump_that_merges_on_its_own() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/seed/images/agent"
+  cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
+ARG AUTO_MODE_VERSION=0.19.3
+ARG AUTO_MODE_SHA256=de2116ce480885d0a25c277ef897b3e78032065507e3625ef45a5b3248f716d8
+EOF
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  mkdir -p "$tree/pack/package" "$tree/npm/auto-mode"
+  echo '{"name":"auto-mode","version":"0.19.4"}' > "$tree/pack/package/package.json"
+  tar -czf "$tree/npm/auto-mode/auto-mode-0.19.4.tgz" -C "$tree/pack" package
+  integrity="sha512-$(openssl dgst -sha512 -binary "$tree/npm/auto-mode/auto-mode-0.19.4.tgz" | base64 -w0)"
+  sum="$(sha256sum "$tree/npm/auto-mode/auto-mode-0.19.4.tgz" | cut -d' ' -f1)"
+  printf '{"name":"auto-mode","version":"0.19.4","dist":{"tarball":"https://registry.npmjs.org/auto-mode/-/auto-mode-0.19.4.tgz","integrity":"%s"}}\n' "$integrity" > "$tree/npm/auto-mode/0.19.4.json"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" auto-mode 0.19.4 0.19.3) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << EOF
+pinned auto-mode 0.19.4: $sum
+https://github.com/zgeoff/cloud/pull/200
+EOF
+  diff /dev/null "$tree/err"
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" show release-check/auto-mode:images/agent/Dockerfile) << EOF
+ARG AUTO_MODE_VERSION=0.19.4
+ARG AUTO_MODE_SHA256=$sum
+EOF
+  diff - "$tree/body" << 'EOF'
+Bumps auto-mode to [0.19.4](https://github.com/zgeoff/auto-mode/releases/tag/auto-mode-v0.19.4). The release check opened this pull request.
+
+| Pin | From | To |
+| --- | --- | --- |
+| the agent image (`images/agent/Dockerfile`) | 0.19.3 | 0.19.4 |
+
+It merges on its own once every check on its head passes, including the NixOS checks when it changes `nixos/`.
+
+After the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`). Gateway sessions load the new mod from `/opt/auto-mode/mods/auto-mode` once they start on the new image.
+EOF
+  sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g" "$tree/calls" > "$tree/calls.masked"
+  diff - "$tree/calls.masked" << 'EOF'
+["curl","-fsSL","https://registry.npmjs.org/auto-mode/0.19.4"]
+["curl","-fsSL","-o","<work>/auto-mode.tgz","https://registry.npmjs.org/auto-mode/-/auto-mode-0.19.4.tgz"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/auto-mode","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/auto-mode","--title","chore(auto-mode): bump auto-mode to 0.19.4","--body-file","<work>/body","--label","update:patch,auto-merge"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_fails_without_a_pull_request_when_npm_lacks_the_auto_mode_release() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  (cd "$tree/seed" && "${case_env[@]}" bash "$script" auto-mode 0.19.4 0.19.3) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'curl: (22) The requested URL returned error: 404'
+  diff - "$tree/calls" <<< '["curl","-fsSL","https://registry.npmjs.org/auto-mode/0.19.4"]'
+  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+}
+
+it_refuses_an_auto_mode_tarball_away_from_where_the_image_fetches_it() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/npm/auto-mode"
+  echo '{"name":"auto-mode","version":"0.19.4","dist":{"tarball":"https://registry.example.invalid/auto-mode-0.19.4.tgz","integrity":"sha512-x"}}' > "$tree/npm/auto-mode/0.19.4.json"
+
+  (cd "$tree/seed" && "${case_env[@]}" bash "$script" auto-mode 0.19.4 0.19.3) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "npm lists auto-mode 0.19.4's tarball at https://registry.example.invalid/auto-mode-0.19.4.tgz, not where the agent image fetches it"
+  diff - "$tree/calls" <<< '["curl","-fsSL","https://registry.npmjs.org/auto-mode/0.19.4"]'
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 it_fails_without_a_pull_request_when_the_release_lacks_its_sums() {

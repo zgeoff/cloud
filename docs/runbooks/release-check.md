@@ -1,25 +1,27 @@
 # Release check
 
-The `release check` workflow finds new atc, imp and nixie releases and opens one bump pull request
-per dependency, so the release repositories know nothing about cloud. It runs on a schedule and on
-dispatch. Its check job compares each dependency's newest release with the pins on `main`, and its
-bump job runs only when a pin is older. The `release bump merge` workflow then merges a bump that
-may merge on its own once its checks pass. A merged nixie bump changes the stack config, so the
-`Deploy prod` workflow applies it to prod with no person involved, unless its guard holds the plan
-([the prod apply job](./prod-apply.md)). The same holds for the later pull request that pins the
-atc-gateway images an atc bump publishes. A host switch and an agent image rebuild stay with a
-person, and each pull request's body lists the steps its merge leaves.
+The `release check` workflow finds new atc, imp, nixie and auto-mode releases and opens one bump
+pull request per dependency, so the release repositories know nothing about cloud. It runs on a
+schedule and on dispatch. Its check job compares each dependency's newest release with the pins on
+`main`, and its bump job runs only when a pin is older. The `release bump merge` workflow then
+merges a bump that may merge on its own once its checks pass. A merged nixie bump changes the stack
+config, so the `Deploy prod` workflow applies it to prod with no person involved, unless its guard
+holds the plan ([the prod apply job](./prod-apply.md)). The same holds for the later pull request
+that pins the atc-gateway images an atc bump publishes. A host switch and an agent image rebuild
+stay with a person, and each pull request's body lists the steps its merge leaves.
 
-| Dependency | Branch                | Pins                                                                        |
-| ---------- | --------------------- | --------------------------------------------------------------------------- |
-| atc        | `release-check/atc`   | the agent image, the host's atc daemon, the atc-gateway images' release     |
-| imp        | `release-check/imp`   | imp's NixOS module and its lock with the imp-host image, the imp-base image |
-| nixie      | `release-check/nixie` | the nixie and nixie-web images in the stack config                          |
+| Dependency | Branch                    | Pins                                                                        |
+| ---------- | ------------------------- | --------------------------------------------------------------------------- |
+| atc        | `release-check/atc`       | the agent image, the host's atc daemon, the atc-gateway images' release     |
+| imp        | `release-check/imp`       | imp's NixOS module and its lock with the imp-host image, the imp-base image |
+| nixie      | `release-check/nixie`     | the nixie and nixie-web images in the stack config                          |
+| auto-mode  | `release-check/auto-mode` | the auto-mode tarball in the agent image                                    |
 
 Each pin script checks what it writes against the release itself: the atc pins take their sums from
 the release's SHA256SUMS, the nixie pins take their digests from the release notes' `## Images`
-list, and the imp pins take the tag's commit and the images' digests from GitHub and GHCR. A pin
-script never moves a pin back to an older release.
+list, the imp pins take the tag's commit and the images' digests from GitHub and GHCR, and the
+auto-mode pin takes its sum from the npm tarball, which it checks against npm's integrity hash and
+the release's version. A pin script never moves a pin back to an older release.
 
 ## When a bump merges on its own
 
