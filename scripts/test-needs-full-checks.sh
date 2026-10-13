@@ -2,9 +2,9 @@
 # Test for needs-full-checks.sh: against a real git repository in the case tree, it prints false
 # for a change to Markdown files only, true for a change to any other file (a script, or a file
 # under docs/ that is not Markdown), compares from the merge base, counts both paths of a rename,
-# treats an all-zero base, a base that is not an ancestor and an empty change as needing the
-# checks, and fails with git's error on a base git cannot resolve. Each case runs the script under
-# `env -i` with git's global and system config off.
+# treats an all-zero base, a base that is not an ancestor (one with no history in common among
+# them) and an empty change as needing the checks, and fails with git's error on a base git cannot
+# resolve. Each case runs the script under `env -i` with git's global and system config off.
 #
 #   bash scripts/test-needs-full-checks.sh
 # shellcheck source-path=SCRIPTDIR
@@ -209,6 +209,31 @@ it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
   }
 }
 
+it_prints_true_for_a_base_with_no_history_in_common_with_the_head() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  # as for a push that replaced main with an unrelated history: the old tip changed only Markdown
+  echo '# cloud' > "$tree/repo/README.md"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the readme'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/old-tip"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" switch -q --orphan rewritten
+  echo '# notes' > "$tree/repo/notes.md"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'start a new history'
+
+  (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/old-tip")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< true
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
 it_prints_true_for_a_change_with_no_file() {
   local status=0
   tree="$(mktemp -d)"
@@ -277,7 +302,7 @@ it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'ERR'
-fatal: Invalid symmetric difference expression 1111111111111111111111111111111111111111...HEAD
+fatal: Not a valid commit name 1111111111111111111111111111111111111111
 ERR
   [ "$status" = 128 ] || {
     echo "exit $status, want 128" >&2
@@ -295,9 +320,7 @@ it_fails_with_gits_error_for_a_base_git_cannot_resolve() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'ERR'
-fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in the working tree.
-Use '--' to separate paths from revisions, like this:
-'git <command> [<revision>...] -- [<file>...]'
+fatal: Not a valid object name no-such-ref
 ERR
   [ "$status" = 128 ] || {
     echo "exit $status, want 128" >&2

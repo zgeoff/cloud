@@ -78,9 +78,7 @@ it_fails_with_gits_error_and_writes_no_output_for_a_base_git_cannot_resolve() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'ERR'
-fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in the working tree.
-Use '--' to separate paths from revisions, like this:
-'git <command> [<revision>...] -- [<file>...]'
+fatal: Not a valid object name no-such-ref
 ERR
   [ ! -e "$tree/outputs" ]
   [ ! -e "$tree/summary" ]

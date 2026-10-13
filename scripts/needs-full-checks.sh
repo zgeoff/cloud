@@ -8,9 +8,9 @@
 #
 # A base of all zeros, as a push that creates a branch reports, has nothing to compare with, so
 # it prints "true", and so does a base that is not an ancestor of <head>, such as main before a
-# push that rewrote it, and a change with no file at all. An empty argument is a usage error, and
-# a base or head git cannot resolve fails the run with git's error, so the job fails rather than
-# skipping the checks. Paths are read NUL-separated, so a name git would quote still matches.
+# push that rewrote it, even with no history in common, and a change with no file at all. An empty
+# argument is a usage error, and a base or head git cannot resolve fails the run with git's error,
+# so the job fails rather than skipping the checks. Paths are read NUL-separated, so a name git would quote still matches.
 #
 #   bash scripts/needs-full-checks.sh <base> <head>
 set -euo pipefail
@@ -27,14 +27,22 @@ if [[ "$base" =~ ^0+$ ]]; then
   exit 0
 fi
 
+# exit 1 means not an ancestor, which includes a base with no history in common with <head>, where
+# the three-dot diff below would fail; any other failure is git's error on a commit it cannot read
+ancestor=0
+git merge-base --is-ancestor "$base" "$head" || ancestor=$?
+case "$ancestor" in
+  0) ;;
+  1)
+    echo true
+    exit 0
+    ;;
+  *) exit "$ancestor" ;;
+esac
+
 changed="$(mktemp)"
 trap 'rm -f "$changed"' EXIT
 git diff -z --no-renames --name-only "$base...$head" > "$changed"
-
-if ! git merge-base --is-ancestor "$base" "$head"; then
-  echo true
-  exit 0
-fi
 
 if [ ! -s "$changed" ]; then
   echo true
