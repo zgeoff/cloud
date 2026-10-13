@@ -44,6 +44,9 @@ pre-push:
     - name: lint
       files: bun run --silent files:branch
       glob: '*.{js,mjs,cjs,ts,mts,cts}'
+      # oxlint ignores the generated SDK, and exits 1 when every file it gets is ignored
+      exclude:
+        - 'sdk/**'
       run: bun run lint:files {files}
     - name: pulumi pins
       run: bun run check:pulumi-pins
