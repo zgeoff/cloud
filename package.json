@@ -57,6 +57,7 @@
     "check:doc-links": "bash .claude/skills/docs-writing/scripts/check-links.sh",
     "check:doc-length": "bash .claude/skills/docs-writing/scripts/check-length.sh",
     "ci:decide-prod-apply": "bash scripts/decide-prod-apply.sh",
+    "ci:decide-queued-prod-apply": "bash scripts/decide-queued-prod-apply.sh",
     "ci:check-out-deployed-revision": "bash scripts/check-out-deployed-revision.sh",
     "ci:preview-and-guard-prod": "bash scripts/preview-and-guard-prod.sh",
     "ci:wait-for-k3s-api": "bash scripts/wait-for-k3s-api.sh",

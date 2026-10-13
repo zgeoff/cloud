@@ -2,7 +2,8 @@
 # Test for needs-prod-apply.sh: against a real git repository in the case tree, it prints true for
 # a change under each input of the Pulumi program since the deployed revision, false for a
 # docs-only change, for other repo files and for a head that is already deployed, counts both
-# paths of a rename, fails when the tag has left the head's history, and fails with git's error
+# paths of a rename and a commit that a later one reverts, fails when the tag has left the head's
+# history, and fails with git's error
 # on a tag that was never set. Each case runs the script under `env -i` with git's global and
 # system config off.
 #
@@ -182,6 +183,31 @@ it_prints_true_when_a_rename_moves_a_file_out_of_infra() {
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" mv infra/notes.ts docs/notes.ts
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'move the module out of infra'
+
+  (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" deployed/prod HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< true
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_true_when_a_later_commit_reverts_a_change_under_infra() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/repo/infra"
+  echo 'nixie: 0.7.0' > "$tree/repo/infra/Pulumi.prod.yaml"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the stack config'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
+  echo 'nixie: 0.7.1' > "$tree/repo/infra/Pulumi.prod.yaml"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'bump nixie'
+  echo 'nixie: 0.7.0' > "$tree/repo/infra/Pulumi.prod.yaml"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'revert the nixie bump'
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" deployed/prod HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 

@@ -118,10 +118,22 @@ itself. A change made outside Pulumi in the minutes between the two reaches the 
 Pulumi's update plans would close that gap, but they are experimental, and a plan they reject stops
 the apply partway, which leaves the stack half changed.
 
-One run applies at a time, and GitHub never cancels a run in progress, because a cancelled apply
-leaves the stack half changed. The job prints only each held step's op and resource name, never a
-resource's state, and its Pulumi runs suppress the stack outputs, because the repo and its logs are
-public.
+One apply runs at a time, and GitHub never cancels one in progress, because a cancelled apply leaves
+the stack half changed. The queue holds only the apply step, which a run reaches after its decision,
+so a failed CI run, a pull request's run and a commit with nothing to apply never join it. GitHub
+keeps only the newest apply that waits, and the one it drops loses nothing, because the newer apply
+covers every change since the tag. The decisions run one at a time in a queue of their own, so the
+applies join their queue in the order the runs started, and a slow decision for an older commit
+never takes the place of a newer commit's apply. A waiting apply reads the tag again once its turn
+comes, so an apply that a newer commit's apply overtook finds nothing left and skips.
+
+The decision counts every commit since the tag that touches a Pulumi input, not the difference
+between the two trees. A commit that reverts an input change while that change applies therefore
+still gets its own apply, and a decision of nothing to apply stays right after the tag moves
+forward.
+
+The job prints only each held step's op and resource name, never a resource's state, and its Pulumi
+runs suppress the stack outputs, because the repo and its logs are public.
 
 The job reads its secrets from its own 1Password vault, `cloud-deploy`, through a service account
 whose token is the `prod` environment's one secret. The vault holds a copy of each item `.env`
