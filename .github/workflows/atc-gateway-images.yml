@@ -8,6 +8,7 @@ on:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
+      - scripts/publish-atc-gateway-images.sh
       - scripts/run-shell-suites.sh
       - e2e/test-atc-gateway-restore.sh
       - infra/build-atc-gateway-spec.ts
@@ -19,6 +20,7 @@ on:
     paths:
       - deploy/atc-gateway/**
       - scripts/fetch-atc-release.sh
+      - scripts/publish-atc-gateway-images.sh
       - scripts/run-shell-suites.sh
       - e2e/test-atc-gateway-restore.sh
       - infra/build-atc-gateway-spec.ts

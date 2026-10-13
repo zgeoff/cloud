@@ -10,12 +10,14 @@ on:
       - images/agent/**
       - scripts/check-agent-image.sh
       - scripts/agent-image-gitleaks.toml
+      - scripts/enable-atc-pin-auto-merge.sh
       - .github/workflows/agent-image.yml
   pull_request:
     paths:
       - images/agent/**
       - scripts/check-agent-image.sh
       - scripts/agent-image-gitleaks.toml
+      - scripts/enable-atc-pin-auto-merge.sh
       - .github/workflows/agent-image.yml
 
 permissions:

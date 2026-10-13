@@ -5,7 +5,8 @@
 # still covers a later commit. The inputs are the flake (nixos/), the test helpers and scripts the
 # checks read (scripts/test-lib/, restore-impd-db.sh and copy-impd-db-host.sh), the scripts that
 # run them and pin their image (run-nixos-checks.sh and nix-image.sh), the scripts that decide when they
-# run (this script and find-nixos-check-run.sh), .bun-version and the workflow itself. A rename
+# run (this script, find-nixos-check-run.sh and decide-nixos-checks.sh), the script that opens
+# KVM to them (open-kvm.sh), .bun-version and the workflow itself. A rename
 # counts both its old and new path. The root package.json is no input, although its test:nixos
 # script runs the checks: it changes with every dependency bump, and a bump would otherwise
 # re-run the VM rehearsals. An edit to test:nixos runs at the next change to an input, or on a
@@ -45,7 +46,8 @@ while IFS= read -r -d '' path; do
   case "$path" in
     nixos/* | scripts/test-lib/* | scripts/restore-impd-db.sh | scripts/copy-impd-db-host.sh | \
       scripts/run-nixos-checks.sh | scripts/nix-image.sh | scripts/needs-nixos-checks.sh | \
-      scripts/find-nixos-check-run.sh | .bun-version | .github/workflows/nixos-checks.yml)
+      scripts/find-nixos-check-run.sh | scripts/decide-nixos-checks.sh | scripts/open-kvm.sh | \
+      .bun-version | .github/workflows/nixos-checks.yml)
       echo true
       exit 0
       ;;
