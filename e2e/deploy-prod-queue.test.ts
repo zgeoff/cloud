@@ -50,7 +50,7 @@ test('it applies a successful revision that waited behind a running apply when a
   });
 });
 
-test('it applies the newer revision, and alerts on the older, when two successful revisions wait behind a running apply', async () => {
+test('it applies two successful revisions that wait behind a running apply in the order they joined, and cancels neither', async () => {
   const ctx = await setupTest();
 
   const running = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
@@ -78,12 +78,74 @@ test('it applies the newer revision, and alerts on the older, when two successfu
 
   expect(ctx.scheduler.getRun(older)).toStrictEqual({
     status: 'in_progress',
-    jobs: { decide: 'success', apply: 'cancelled', alert: 'in_progress' },
+    jobs: { decide: 'success', apply: 'in_progress', alert: 'waiting' },
   });
 
   expect(ctx.scheduler.getRun(newer)).toStrictEqual({
     status: 'in_progress',
+    jobs: { decide: 'success', apply: 'pending', alert: 'waiting' },
+  });
+});
+
+// The newer apply can finish only once it started, so it ran first. The older apply's own steps
+// then find its commit behind the tag and skip; the tests of decide-queued-prod-apply.sh cover
+// that decision.
+test('it starts an older revision s apply after the newer one s, rather than in its place, when the newer revision s CI finishes first', async () => {
+  const ctx = await setupTest();
+
+  const running = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
+
+  ctx.scheduler.finishJob(running, 'decide', {
+    status: 'success',
+    outputs: { apply: 'true', revision: 'a'.repeat(40) },
+  });
+
+  const newer = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'c'.repeat(40) }));
+
+  ctx.scheduler.finishJob(newer, 'decide', {
+    status: 'success',
+    outputs: { apply: 'true', revision: 'c'.repeat(40) },
+  });
+
+  const older = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'b'.repeat(40) }));
+
+  ctx.scheduler.finishJob(older, 'decide', {
+    status: 'success',
+    outputs: { apply: 'true', revision: 'b'.repeat(40) },
+  });
+
+  ctx.scheduler.finishJob(running, 'apply', { status: 'success', outputs: { verdict: 'apply' } });
+  ctx.scheduler.finishJob(newer, 'apply', { status: 'success', outputs: { verdict: 'apply' } });
+
+  expect(ctx.scheduler.getRun(older)).toStrictEqual({
+    status: 'in_progress',
     jobs: { decide: 'success', apply: 'in_progress', alert: 'waiting' },
+  });
+});
+
+test('it keeps every waiting decision when later runs join the decision queue', async () => {
+  const ctx = await setupTest();
+
+  const deciding = ctx.scheduler.startRun(
+    buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }),
+  );
+
+  const second = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'c'.repeat(40) }));
+  const third = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'b'.repeat(40) }));
+
+  ctx.scheduler.finishJob(deciding, 'decide', {
+    status: 'success',
+    outputs: { apply: 'false', revision: 'a'.repeat(40) },
+  });
+
+  expect(ctx.scheduler.getRun(second)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { decide: 'in_progress', apply: 'waiting', alert: 'waiting' },
+  });
+
+  expect(ctx.scheduler.getRun(third)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { decide: 'pending', apply: 'waiting', alert: 'waiting' },
   });
 });
 

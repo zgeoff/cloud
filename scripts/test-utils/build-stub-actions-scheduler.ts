@@ -1,11 +1,13 @@
 // the scheduler's runs and concurrency groups are mutable state by design
 /* oxlint-disable typescript/prefer-readonly-parameter-types */
+import { buildStubConcurrencyGroup } from './build-stub-concurrency-group.ts';
+import type { StubConcurrencyGroup } from './build-stub-concurrency-group.ts';
 import { isActionsConditionMet } from './is-actions-condition-met.ts';
 import { parseActionsWorkflow } from './parse-actions-workflow.ts';
 import type { ActionsConcurrency, ActionsJob, ActionsWorkflow } from './parse-actions-workflow.ts';
 
 // Stands in for GitHub Actions' scheduler for one workflow, per GitHub's docs on 2026-10-13
-// ("Workflow syntax", "Evaluate expressions"): runs, job needs and `if`, concurrency groups. The
+// ("Workflow syntax", "Evaluate expressions", "Control the concurrency of workflows and jobs"). The
 // test plays the runner and ends each started job; no step runs.
 export interface StubGitHubContext {
   readonly event_name: string;
@@ -74,15 +76,11 @@ interface Holder {
   readonly job?: string;
 }
 
-interface Group {
-  running: Holder | undefined;
-  pending: Holder | undefined;
-}
-
+// each group takes the queue mode of the concurrency that first names it
 interface SchedulerState {
   readonly workflow: ActionsWorkflow;
   readonly runs: RunState[];
-  readonly groups: Map<string, Group>;
+  readonly groups: Map<string, StubConcurrencyGroup<Holder>>;
 }
 
 function createRun(state: SchedulerState, github: StubGitHubContext): number {
@@ -139,32 +137,26 @@ function getRunState(state: SchedulerState, runID: number): RunState {
   return run;
 }
 
-// One holder runs at a time; a newcomer waits as pending and cancels the holder already pending,
-// as the default `queue: single` does. The docs leave a job its `if` skips unsettled: here it
-// never registers, so it neither waits nor cancels.
+// A job its `if` skips, which the docs leave unsettled, never registers, so it neither waits nor
+// cancels.
 function registerHolder(state: SchedulerState, concurrency: ActionsConcurrency, holder: Holder) {
-  const group = state.groups.get(concurrency.group) ?? { running: undefined, pending: undefined };
+  const group =
+    state.groups.get(concurrency.group) ?? buildStubConcurrencyGroup<Holder>(concurrency.queue);
 
   state.groups.set(concurrency.group, group);
 
-  if (group.running === undefined) {
-    startHolder(state, group, holder);
+  const joined = group.join(holder);
 
-    return;
+  if (joined.started) {
+    startHolder(state, holder);
   }
 
-  const replaced = group.pending;
-
-  group.pending = holder;
-
-  if (replaced !== undefined) {
-    updateToCancelled(state, replaced);
-  }
+  joined.cancelled.forEach((each) => {
+    updateToCancelled(state, each);
+  });
 }
 
-function startHolder(state: SchedulerState, group: Group, holder: Holder): void {
-  group.running = holder;
-
+function startHolder(state: SchedulerState, holder: Holder): void {
   const run = getRunState(state, holder.runID);
 
   if (holder.job === undefined) {
@@ -209,13 +201,10 @@ function removeRunningHolder(state: SchedulerState, concurrency: ActionsConcurre
     throw new Error(`no group ${concurrency.group}`);
   }
 
-  const next = group.pending;
-
-  group.running = undefined;
-  group.pending = undefined;
+  const next = group.finish();
 
   if (next !== undefined) {
-    startHolder(state, group, next);
+    startHolder(state, next);
   }
 }
 

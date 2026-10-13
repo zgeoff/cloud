@@ -235,17 +235,94 @@ jobs:
   });
 });
 
-test('it rejects a workflow whose concurrency it does not model', () => {
-  expect(() =>
-    buildStubActionsScheduler(`
+test('it keeps every pending job of a queue: max group, and starts them in the order they joined', () => {
+  const scheduler = buildStubActionsScheduler(`
+jobs:
+  ship:
+    concurrency:
+      group: deploy
+      queue: max
+    runs-on: ubuntu-latest
+`);
+
+  const first = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+  const second = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+  const third = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+
+  scheduler.finishJob(first, 'ship', { status: 'success' });
+
+  expect(scheduler.getRun(second)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { ship: 'in_progress' },
+  });
+
+  expect(scheduler.getRun(third)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { ship: 'pending' },
+  });
+});
+
+test('it keeps every pending run of a workflow-level queue: max group', () => {
+  const scheduler = buildStubActionsScheduler(`
 concurrency:
   group: deploy
   queue: max
 jobs:
   ship:
     runs-on: ubuntu-latest
+`);
+
+  scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+
+  const second = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+
+  scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+
+  expect(scheduler.getRun(second)).toStrictEqual({ status: 'pending', jobs: { ship: 'waiting' } });
+});
+
+test('it cancels a job that joins a queue: max group with 100 jobs already pending', () => {
+  const scheduler = buildStubActionsScheduler(`
+jobs:
+  ship:
+    concurrency:
+      group: deploy
+      queue: max
+    runs-on: ubuntu-latest
+`);
+
+  Array.from({ length: 101 }, () =>
+    scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} }),
+  );
+
+  const overflow = scheduler.startRun({
+    event_name: 'push',
+    repository: 'zgeoff/cloud',
+    event: {},
+  });
+
+  expect(scheduler.getRun(overflow)).toStrictEqual({
+    status: 'completed',
+    jobs: { ship: 'cancelled' },
+  });
+
+  expect(scheduler.getRun(101)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { ship: 'pending' },
+  });
+});
+
+test('it rejects a workflow whose concurrency it does not model', () => {
+  expect(() =>
+    buildStubActionsScheduler(`
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+jobs:
+  ship:
+    runs-on: ubuntu-latest
 `),
-  ).toThrowWithMessage(Error, 'unsupported concurrency queue: "max"');
+  ).toThrowWithMessage(Error, 'unsupported concurrency: cancel-in-progress');
 });
 
 test('it refuses to finish a job that is not in progress', () => {

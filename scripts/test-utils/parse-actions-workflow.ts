@@ -4,6 +4,9 @@
 export interface ActionsConcurrency {
   // lowercased, since GitHub compares group names case-insensitively
   readonly group: string;
+
+  // how many jobs or runs may wait: one for single, the default, or up to GitHub's cap for max
+  readonly queue: 'single' | 'max';
 }
 
 export interface ActionsJob {
@@ -50,7 +53,7 @@ function parseConcurrency(value: unknown): ActionsConcurrency | undefined {
 
   requireModelledConcurrency(definition, definition['group']);
 
-  return { group: definition['group'].toLowerCase() };
+  return { group: definition['group'].toLowerCase(), queue: parseQueue(definition['queue']) };
 }
 
 function requireModelledConcurrency(
@@ -64,10 +67,16 @@ function requireModelledConcurrency(
   if ((definition['cancel-in-progress'] ?? false) !== false) {
     throw new Error('unsupported concurrency: cancel-in-progress');
   }
+}
 
-  if ((definition['queue'] ?? 'single') !== 'single') {
-    throw new Error(`unsupported concurrency queue: ${JSON.stringify(definition['queue'])}`);
+function parseQueue(value: unknown): ActionsConcurrency['queue'] {
+  const queue = value ?? 'single';
+
+  if (queue !== 'single' && queue !== 'max') {
+    throw new Error(`unsupported concurrency queue: ${JSON.stringify(value)}`);
   }
+
+  return queue;
 }
 
 function parseJob(name: string, definition: unknown): ActionsJob {

@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
   test:
     needs: build
+    concurrency:
+      group: Test
+      queue: single
     runs-on: ubuntu-latest
   ship:
     needs: [build, test]
@@ -17,19 +20,24 @@ jobs:
     concurrency:
       group: Ship
       cancel-in-progress: false
-      queue: single
+      queue: max
     runs-on: ubuntu-latest
 `),
   ).toStrictEqual({
-    concurrency: { group: 'deploy' },
+    concurrency: { group: 'deploy', queue: 'single' },
     jobs: [
       { name: 'build', needs: [], condition: undefined, concurrency: undefined },
-      { name: 'test', needs: ['build'], condition: undefined, concurrency: undefined },
+      {
+        name: 'test',
+        needs: ['build'],
+        condition: undefined,
+        concurrency: { group: 'test', queue: 'single' },
+      },
       {
         name: 'ship',
         needs: ['build', 'test'],
         condition: "github.event_name == 'push'",
-        concurrency: { group: 'ship' },
+        concurrency: { group: 'ship', queue: 'max' },
       },
     ],
   });
@@ -47,9 +55,9 @@ test.each([
     'unsupported concurrency: cancel-in-progress',
   ],
   [
-    'queue: max',
-    'concurrency:\n  group: deploy\n  queue: max',
-    'unsupported concurrency queue: "max"',
+    'a queue other than single or max',
+    'concurrency:\n  group: deploy\n  queue: 25',
+    'unsupported concurrency queue: 25',
   ],
   [
     'a concurrency with no group',
