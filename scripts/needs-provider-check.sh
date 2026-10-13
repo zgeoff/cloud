@@ -48,3 +48,4 @@ while IFS= read -r -d '' path; do
   esac
 done < "$changed"
 echo false
+# test line for a script-change CI run
