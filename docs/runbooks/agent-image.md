@@ -130,7 +130,73 @@ gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -D /tmp/a
 bash scripts/open-atc-pin-pr.sh "$VERSION" /tmp/atc-sums/SHA256SUMS
 ```
 
-After the pin merges, build and check the image, then switch the `cloud` target, as above.
+After the pin merges, roll the release out in the order that
+[Roll out an atc release](#roll-out-an-atc-release) gives.
+
+## Roll out an atc release
+
+A daemon whose atc differs from the atc in its `cloud` target's image copies its own binary into
+each imp it wakes, before the imp's first session starts. A restore of a busy fleet after the
+daemon's restart then waits on one upload per imp. So the image that ships a release reaches the
+`cloud` target before the daemon runs that release. The daemon reads its targets at startup only, so
+one restart brings the new release and the new image together.
+
+Run these steps on the machine that runs the daemon, after the pin pull request merges. `$VERSION`
+is the release, such as `4.5.0`.
+
+1. Build and check the image from `main`'s head:
+
+   ```bash
+   bash scripts/build-agent-image.sh
+   ```
+
+   Expect its last line to read `agent-<short sha> <digest> check passed`. Record that line on the
+   pin pull request.
+
+2. Check that the image's commit pins the release:
+
+   ```bash
+   git fetch origin main
+   git show <short sha>:images/agent/Dockerfile | grep '^ARG ATC_VERSION='
+   ```
+
+   Expect `ARG ATC_VERSION=$VERSION`. The image check proves that the image's atc answers with the
+   version its Dockerfile pins, so this line proves the image ships the release.
+
+3. Switch the `cloud` target, and leave the daemon running:
+
+   ```bash
+   bash scripts/switch-agent-image.sh agent-<short sha>
+   ```
+
+   The script prints `atc daemon restart`. Wait for step 4 to run it.
+
+4. Install the release binary over the one the daemon's systemd unit starts, then restart the
+   daemon:
+
+   ```bash
+   bin="$(command -v atc)"
+   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p atc-linux-x64 -p SHA256SUMS -D "/tmp/atc-$VERSION"
+   (cd "/tmp/atc-$VERSION" && grep ' atc-linux-x64$' SHA256SUMS | sha256sum -c -)
+   install -m 0755 "/tmp/atc-$VERSION/atc-linux-x64" "$bin.new" && mv "$bin.new" "$bin"
+   atc daemon restart --dry-run
+   atc daemon restart
+   ```
+
+   The `mv` replaces the binary in one rename, so the running daemon keeps its open file. Run the
+   restart when the dry run lists no session that needs the daemon. atc's install script installs
+   the newest release, which may not be the one the image pins, so this step downloads `$VERSION` by
+   name.
+
+5. Wake an imp on `cloud`, such as by a spawn, and read the daemon's journal:
+
+   ```bash
+   journalctl --user -u atc-daemon --since -10min | grep 'runs hooks through'
+   ```
+
+   Expect `runs hooks through the image's atc $VERSION at /usr/local/bin/atc` for each wake. A line
+   that reads `runs hooks through the daemon's atc $VERSION, copied to /tmp/atc/bin/atc` means the
+   target's image ships another atc: go back to step 2.
 
 ## A new auto-mode release
 
