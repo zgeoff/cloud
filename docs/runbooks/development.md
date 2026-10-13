@@ -4,16 +4,16 @@ This page sets up a machine to work on geoff.cloud, and ends with a preview of t
 
 ## Prerequisites
 
-| Tool                      | Version or source                        | Used for                                                                |
-| ------------------------- | ---------------------------------------- | ----------------------------------------------------------------------- |
-| Bun                       | `.bun-version`                           | every root script, and the Pulumi program's runtime                     |
-| Go                        | `provider/go.mod`                        | building the Onidel provider, which every preview builds                |
-| Pulumi CLI                | `@pulumi/pulumi` in `infra/package.json` | `preview`, `up`, `drift`, stack config, `sdk:gen`                       |
-| 1Password CLI (`op`)      | with a token for the `cloud` vault       | resolving `.env`                                                        |
-| Tailscale                 | a tailnet admin's device                 | the k3s API and Grafana (any member), SSH to `root@geoffcloud` (admins) |
-| Docker                    | current                                  | NixOS builds and switches (`nixos/nix` image), fixture test             |
-| gitleaks                  | on `PATH`                                | the pre-commit hook                                                     |
-| `jq`, `gh`, `ssh`, `curl` | current                                  | the scripts in `scripts/`                                               |
+| Tool                      | Version or source                        | Used for                                                                           |
+| ------------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------- |
+| Bun                       | `.bun-version`                           | every root script, and the Pulumi program's runtime                                |
+| Go                        | `provider/go.mod`                        | building the Onidel provider, which every preview builds                           |
+| Pulumi CLI                | `@pulumi/pulumi` in `infra/package.json` | `preview`, `up`, `drift`, stack config, `sdk:gen`                                  |
+| 1Password CLI (`op`)      | with a token for the `cloud` vault       | resolving `.env`                                                                   |
+| Tailscale                 | the PC (`home-pc`)                       | the k3s API (the PC only), Grafana (any member), SSH to `root@geoffcloud` (admins) |
+| Docker                    | current                                  | NixOS builds and switches (`nixos/nix` image), fixture test                        |
+| gitleaks                  | on `PATH`                                | the pre-commit hook                                                                |
+| `jq`, `gh`, `ssh`, `curl` | current                                  | the scripts in `scripts/`                                                          |
 
 You need no local Nix: every Nix command here runs in the `nixos/nix` image.
 
@@ -75,7 +75,9 @@ The Pulumi program lives in `infra/`, with one stack, `prod`. Its state lives in
    It refreshes from the live APIs and exits non-zero on any change. On a clean `main` that is fully
    applied, expect 0 changes; a merged change that nobody has applied yet also fails it.
 
-Both need the tailnet: the program reaches the k3s API at `https://geoffcloud:6443`.
+Both need the tailnet: the program reaches the k3s API at `https://geoffcloud:6443`. The tailnet
+policy opens that port to the PC (`home-pc`) and the prod apply job's runner only, so run both from
+the PC.
 
 ## Check the host
 
