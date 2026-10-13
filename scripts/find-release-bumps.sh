@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
-# Print one line for each of atc, imp and nixie whose newest release is newer than a pin in the
-# checkout: `<dependency> <newest version> <pinned version>...`, with every pinned version in a
-# fixed order, and nothing when every pin is current. Run it from the root of a zgeoff/cloud
-# checkout with gh signed in; the release check workflow's check job runs it, and its bump job
-# passes each line to scripts/bump-release.sh.
+# Print one line for each of atc, imp, nixie and auto-mode whose newest release is newer than a
+# pin in the checkout: `<dependency> <newest version> <pinned version>...`, with every pinned
+# version in a fixed order, and nothing when every pin is current. Run it from the root of a
+# zgeoff/cloud checkout with gh signed in; the release check workflow's check job runs it, and its
+# bump job passes each line to scripts/bump-release.sh.
 #
 #   bash scripts/find-release-bumps.sh
 #
-# | Dependency | Newest release              | Pins, in order                                                    |
-# | ---------- | --------------------------- | ----------------------------------------------------------------- |
-# | atc        | zgeoff/atc `@zgeoff/atc@X`  | agent image, host daemon (nixos/packages/atc.nix), versions.env   |
-# | imp        | zgeoff/imp `vX`             | imp-host (configuration.nix), imp-base (images/agent/Dockerfile)  |
-# | nixie      | zgeoff/nixie `vX`           | nixie, nixie-web (infra/Pulumi.prod.yaml)                         |
+# | Dependency | Newest release                    | Pins, in order                                                   |
+# | ---------- | --------------------------------- | ---------------------------------------------------------------- |
+# | atc        | zgeoff/atc `@zgeoff/atc@X`        | agent image, host daemon (nixos/packages/atc.nix), versions.env  |
+# | imp        | zgeoff/imp `vX`                   | imp-host (configuration.nix), imp-base (images/agent/Dockerfile) |
+# | nixie      | zgeoff/nixie `vX`                 | nixie, nixie-web (infra/Pulumi.prod.yaml)                        |
+# | auto-mode  | zgeoff/auto-mode `auto-mode-vX`   | agent image (images/agent/Dockerfile)                            |
 #
 # The newest release is the highest version among the latest 30 releases that are neither drafts
 # nor prereleases. imp's flake input is not read: it moves with imp-host. A pin that is missing, or
@@ -65,11 +66,14 @@ imp_host="$(read_pin nixos/hosts/geoffcloud/configuration.nix \
 imp_base="$(read_pin images/agent/Dockerfile "^FROM ghcr\\.io/zgeoff/imp-base:$version@sha256:[0-9a-f]{64}\$")"
 nixie="$(read_pin infra/Pulumi.prod.yaml "^ +image: ghcr\\.io/zgeoff/nixie:$version@sha256:[0-9a-f]{64}\$")"
 nixie_web="$(read_pin infra/Pulumi.prod.yaml "^ +webImage: ghcr\\.io/zgeoff/nixie-web:$version@sha256:[0-9a-f]{64}\$")"
+auto_mode="$(read_pin images/agent/Dockerfile "^ARG AUTO_MODE_VERSION=$version\$")"
 
 atc="$(read_newest atc @zgeoff/atc@)"
 imp="$(read_newest imp v)"
 nixie_newest="$(read_newest nixie v)"
+auto_mode_newest="$(read_newest auto-mode auto-mode-v)"
 
 print_bump atc "$atc" "$atc_agent" "$atc_daemon" "$atc_gateway"
 print_bump imp "$imp" "$imp_host" "$imp_base"
 print_bump nixie "$nixie_newest" "$nixie" "$nixie_web"
+print_bump auto-mode "$auto_mode_newest" "$auto_mode"

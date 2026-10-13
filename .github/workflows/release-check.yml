@@ -1,6 +1,6 @@
 name: release check
 
-# Finds new atc, imp and nixie releases and opens one bump pull request per dependency, so the
+# Finds new atc, imp, nixie and auto-mode releases and opens one bump pull request per dependency, so the
 # release repositories know nothing about cloud. The check job runs on the 1-core runner, reads the
 # newest releases and the pins (scripts/find-release-bumps.sh), and ends: a run that finds nothing
 # bills 1 minute. The bump job runs only when a pin is older than its newest release; it opens the

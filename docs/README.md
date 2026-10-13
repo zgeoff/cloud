@@ -51,8 +51,8 @@ call, the path of a change, the topology and the data.
   enrol a device, back up and restore, renew the certificate.
 - [nixie's backup](./runbooks/nixie-backup.md): back up nixie now, read the repository, purge a
   forgotten item, test a restore.
-- [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp and nixie
-  releases, when they merge on their own, and the app they run as.
+- [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie and
+  auto-mode releases, when they merge on their own, and the app they run as.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): the tailnet client for imp's end-to-end suites.
 
 Planned work and open choices live in Linear, not in this tree.

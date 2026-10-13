@@ -132,6 +132,23 @@ bash scripts/open-atc-pin-pr.sh "$VERSION" /tmp/atc-sums/SHA256SUMS
 
 After the pin merges, build and check the image, then switch the `cloud` target, as above.
 
+## A new auto-mode release
+
+The [release check](./release-check.md) opens the `release-check/auto-mode` pull request for each
+new auto-mode release. `scripts/pin-auto-mode.sh` writes the pin from the npm tarball, after it
+checks the tarball against npm's integrity hash and the version in its `package.json`. To pin a
+release by hand, run it from a clean checkout of `main`:
+
+```sh
+curl -fsSL -o /tmp/auto-mode.tgz "https://registry.npmjs.org/auto-mode/-/auto-mode-$VERSION.tgz"
+bash scripts/pin-auto-mode.sh "$VERSION" /tmp/auto-mode.tgz "$(npm view "auto-mode@$VERSION" dist.integrity)"
+```
+
+The image's gitleaks allowlist (`scripts/agent-image-gitleaks.toml`) names the file in the auto-mode
+tarball that holds its secret-scanner rules. The image check on the bump pull request fails when a
+release moves those rules or ships another finding, and the bump then waits for a person to review
+the allowlist entry.
+
 ## Update
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
