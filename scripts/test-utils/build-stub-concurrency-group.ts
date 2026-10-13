@@ -15,14 +15,11 @@ export interface JoinResult<Holder> {
   readonly cancelled: readonly Holder[];
 }
 
-// GitHub's cap on the holders that wait in a `queue: max` group
-const maxPending = 100;
-
 export function buildStubConcurrencyGroup<Holder>(
   queue: ActionsConcurrency['queue'],
 ): StubConcurrencyGroup<Holder> {
   let running = false;
-  const pending: Holder[] = [];
+  let pending: readonly Holder[] = [];
 
   return {
     join: (holder) => {
@@ -32,11 +29,16 @@ export function buildStubConcurrencyGroup<Holder>(
         return { started: true, cancelled: [] };
       }
 
-      return { started: false, cancelled: updatePending(pending, queue, holder) };
+      const planned = planJoin(pending, queue, holder);
+
+      pending = planned.pending;
+
+      return { started: false, cancelled: planned.cancelled };
     },
     finish: () => {
-      const next = pending.shift();
+      const next = pending.at(0);
 
+      pending = pending.slice(1);
       running = next !== undefined;
 
       return next;
@@ -44,20 +46,27 @@ export function buildStubConcurrencyGroup<Holder>(
   };
 }
 
+interface PlannedJoin<Holder> {
+  readonly pending: readonly Holder[];
+  readonly cancelled: readonly Holder[];
+}
+
+// GitHub's cap on the holders that wait in a `queue: max` group
+const maxPending = 100;
+
 // `queue: single` drops the holder already waiting for the newcomer; `queue: max` keeps it, and
 // drops the newcomer instead once the queue is full
-function updatePending<Holder>(
-  pending: Holder[],
+function planJoin<Holder>(
+  pending: readonly Holder[],
   queue: ActionsConcurrency['queue'],
   holder: Holder,
-): Holder[] {
-  const cancelled = queue === 'single' ? pending.splice(0) : [];
+): PlannedJoin<Holder> {
+  const kept = queue === 'single' ? [] : pending;
+  const cancelled = queue === 'single' ? pending : [];
 
-  if (pending.length < maxPending) {
-    pending.push(holder);
-  } else {
-    cancelled.push(holder);
+  if (kept.length >= maxPending) {
+    return { pending: kept, cancelled: [...cancelled, holder] };
   }
 
-  return cancelled;
+  return { pending: [...kept, holder], cancelled };
 }
