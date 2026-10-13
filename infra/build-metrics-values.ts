@@ -1,11 +1,12 @@
 import type { Output } from '@pulumi/pulumi';
+import { topology } from '@zgeoff/cloud-topology';
 
 // the chart's own args plus the textfile collector, which reads metrics that host timers
 // write (impd local health, #29); node-exporter sees the host root at /host/root
 const nodeExporterArgs = [
   '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)',
   '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$',
-  '--collector.textfile.directory=/host/root/var/lib/node-exporter/textfile',
+  `--collector.textfile.directory=/host/root${topology.nodeExporter.textfileDir}`,
 ];
 
 // Grafana idles near 240Mi, and each query and each plugin backend it installs at start adds

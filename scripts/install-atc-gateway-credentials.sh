@@ -23,7 +23,8 @@ host="${ATC_CREDENTIALS_HOST:-root@geoffcloud}"
 vault="${ATC_CREDENTIALS_VAULT:-cloud}"
 item="${ATC_DAEMON_TOKEN_ITEM:-atc-daemon-token}"
 dir="${ATC_CREDENTIALS_DIR:-/var/lib/atc-daemon-secrets}"
-impd_port="${ATC_IMPD_PORT:-7070}"
+# impd's API port, from the shared constants beside this script unless ATC_IMPD_PORT overrides it
+impd_port="${ATC_IMPD_PORT:-$(jq -er .imp.apiPort "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json")}"
 op_settings="${CLOUD_OP_SETTINGS:-$HOME/projects/cloud/.claude/settings.local.json}"
 
 if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then

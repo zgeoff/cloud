@@ -245,6 +245,52 @@ it_prints_true_for_a_change_to_open_kvm_sh() {
   }
 }
 
+it_prints_true_for_a_change_to_the_shared_constants() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/repo/packages/topology"
+  echo '{}' > "$tree/repo/packages/topology/constants.json"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the constants'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
+  echo '{"atc":{}}' > "$tree/repo/packages/topology/constants.json"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change the constants'
+
+  (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< true
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_false_for_a_change_to_another_package() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/repo/packages/topology-docs"
+  echo '# topology' > "$tree/repo/packages/topology-docs/README.md"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add another package'
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
+  echo changed >> "$tree/repo/packages/topology-docs/README.md"
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change another package'
+
+  (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< false
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
 it_prints_false_for_a_change_to_a_script_the_checks_never_read() {
   local status=0
   tree="$(mktemp -d)"

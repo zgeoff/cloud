@@ -30,7 +30,9 @@ with_fixture_images() (
   if ! {
     GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
       cp "$repo/deploy/atc-gateway/Dockerfile" "$work/context/" &&
-      docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" -t "$FIXTURE_GATEWAY_IMAGE" "$work/context" &&
+      gateway_port="$(jq -er .atc.gatewayPort "$repo/packages/topology/constants.json")" &&
+      docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" --build-arg "GATEWAY_PORT=$gateway_port" \
+        -t "$FIXTURE_GATEWAY_IMAGE" "$work/context" &&
       docker build -q --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$FIXTURE_BACKUP_IMAGE" \
         "$repo/deploy/atc-gateway/backup"
   } > "$work/build.log" 2>&1; then

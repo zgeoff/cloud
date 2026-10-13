@@ -26,7 +26,7 @@ it_requests_a_snapshot_then_lists_the_account_snapshots() {
   echo '[{"id":"5b0c2a8e-1f3d-4c6a-9e7b-2d4f6a8c0e1f","created_at":"2026-09-01T10:00:00.000000Z","name":"pre-imp-0.26","desc":"2026-09-01T09:59Z","size":20,"status":"available"}]' \
     > "$tree/onidel/snapshots.json"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree/scripts" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_NOW=2026-10-08T12:34:56Z STUB_ONIDEL_KEY=onidel-test-key STUB_ONIDEL_VM=0f289413-258f-4115-ac81-252000998fe0 \
     STUB_ONIDEL_NOW=2026-10-08T12:34:57.000000Z STUB_ONIDEL_SNAPSHOT_ID=c1d45377-b2a9-4407-ab8d-6909c34dfaac \
     ONIDEL_API_KEY=onidel-test-key bash snapshot-geoffcloud.sh pre-imp-0.30) > "$tree/out" 2> "$tree/err" || status=$?
@@ -55,7 +55,7 @@ it_stops_with_exit_1_and_its_usage_when_no_name_is_given() {
   setup_test "$tree"
   echo '[]' > "$tree/onidel/snapshots.json"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree/scripts" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_NOW=2026-10-08T12:34:56Z STUB_ONIDEL_KEY=onidel-test-key STUB_ONIDEL_VM=0f289413-258f-4115-ac81-252000998fe0 \
     STUB_ONIDEL_NOW=2026-10-08T12:34:57.000000Z STUB_ONIDEL_SNAPSHOT_ID=c1d45377-b2a9-4407-ab8d-6909c34dfaac \
     ONIDEL_API_KEY=onidel-test-key bash snapshot-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -77,7 +77,7 @@ it_stops_with_exit_1_before_any_request_when_the_API_key_is_not_set() {
   setup_test "$tree"
   echo '[]' > "$tree/onidel/snapshots.json"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree/scripts" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_NOW=2026-10-08T12:34:56Z STUB_ONIDEL_KEY=onidel-test-key STUB_ONIDEL_VM=0f289413-258f-4115-ac81-252000998fe0 \
     STUB_ONIDEL_NOW=2026-10-08T12:34:57.000000Z STUB_ONIDEL_SNAPSHOT_ID=c1d45377-b2a9-4407-ab8d-6909c34dfaac \
     bash snapshot-geoffcloud.sh pre-imp-0.30) > "$tree/out" 2> "$tree/err" || status=$?
@@ -99,7 +99,7 @@ it_stops_with_curl_exit_22_and_lists_nothing_when_Onidel_refuses_the_snapshot() 
   setup_test "$tree"
   echo '[]' > "$tree/onidel/snapshots.json"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree/scripts" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_NOW=2026-10-08T12:34:56Z STUB_ONIDEL_KEY=onidel-test-key STUB_ONIDEL_VM=0f289413-258f-4115-ac81-252000998fe0 \
     STUB_ONIDEL_NOW=2026-10-08T12:34:57.000000Z STUB_ONIDEL_SNAPSHOT_ID=c1d45377-b2a9-4407-ab8d-6909c34dfaac \
     STUB_ONIDEL_LIMIT_REACHED=1 ONIDEL_API_KEY=onidel-test-key bash snapshot-geoffcloud.sh pre-imp-0.30) \
@@ -125,7 +125,7 @@ it_stops_with_curl_exit_22_and_never_prints_the_key_when_Onidel_refuses_it() {
   setup_test "$tree"
   echo '[]' > "$tree/onidel/snapshots.json"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree/scripts" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_NOW=2026-10-08T12:34:56Z STUB_ONIDEL_KEY=onidel-test-key STUB_ONIDEL_VM=0f289413-258f-4115-ac81-252000998fe0 \
     STUB_ONIDEL_NOW=2026-10-08T12:34:57.000000Z STUB_ONIDEL_SNAPSHOT_ID=c1d45377-b2a9-4407-ab8d-6909c34dfaac \
     ONIDEL_API_KEY=revoked-test-key bash snapshot-geoffcloud.sh pre-imp-0.30) > "$tree/out" 2> "$tree/err" || status=$?
@@ -150,7 +150,7 @@ it_exits_22_after_the_request_when_the_snapshot_list_fails() {
   setup_test "$tree"
   echo '[]' > "$tree/onidel/snapshots.json"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree/scripts" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_NOW=2026-10-08T12:34:56Z STUB_ONIDEL_KEY=onidel-test-key STUB_ONIDEL_VM=0f289413-258f-4115-ac81-252000998fe0 \
     STUB_ONIDEL_NOW=2026-10-08T12:34:57.000000Z STUB_ONIDEL_SNAPSHOT_ID=c1d45377-b2a9-4407-ab8d-6909c34dfaac \
     STUB_ONIDEL_LIST_STATUS=500 ONIDEL_API_KEY=onidel-test-key bash snapshot-geoffcloud.sh pre-imp-0.30) \
@@ -177,9 +177,11 @@ CALLS
 # TMPDIR the script runs with.
 setup_test() {
   local tree="$1"
-  mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/onidel"
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/onidel" "$tree/scripts" "$tree/packages/topology"
   : > "$tree/calls"
-  cp "$(dirname "${BASH_SOURCE[0]}")/snapshot-geoffcloud.sh" "$tree/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/snapshot-geoffcloud.sh" "$tree/scripts/"
+  # the script reads the VM's ID from the shared constants beside it
+  cp "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json" "$tree/packages/topology/"
   create_stub_onidel_curl "$tree/bin"
   create_stub_date "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" ssh scp sftp rsync tailscale

@@ -52,7 +52,7 @@ it_skips_every_step_when_all_three_credentials_exist_and_match() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -121,7 +121,7 @@ it_stops_when_the_1Password_vault_is_missing() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_VAULT=missing \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -151,7 +151,7 @@ it_stops_when_atc_key_is_not_installed() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -189,7 +189,7 @@ it_reads_the_1Password_token_from_the_default_settings_file_when_the_environment
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -265,7 +265,7 @@ it_reads_the_1Password_token_from_the_settings_file_the_environment_names() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    CLOUD_OP_SETTINGS="$tree/settings.json" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    CLOUD_OP_SETTINGS="$tree/settings.json" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -333,7 +333,7 @@ it_stops_before_1Password_when_the_settings_file_is_missing_and_the_environment_
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -362,7 +362,7 @@ it_stops_with_ssh_exit_255_when_the_host_is_unreachable() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_SSH_PASS=1 \
     ATC_CREDENTIALS_HOST=ssh://root@127.0.0.1:1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
@@ -392,7 +392,7 @@ it_stops_when_impd_lacks_grantable_tokens() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -426,7 +426,7 @@ it_stops_when_impd_turns_grantable_tokens_off() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -460,7 +460,7 @@ it_stops_before_1Password_when_the_settings_file_holds_no_token() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" CLOUD_OP_SETTINGS="$tree/settings.json" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -487,7 +487,7 @@ it_stops_with_dockers_message_when_imp_info_fails() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_IMPD_FAIL_AT=info \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -522,7 +522,7 @@ it_stops_when_imp_secret_ls_fails() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_IMPD_FAIL_AT=secret-ls \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -560,7 +560,7 @@ it_stops_when_imp_token_ls_fails() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_IMPD_FAIL_AT=token-ls \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -601,7 +601,7 @@ it_stops_when_op_item_list_fails() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_OP_FAIL_AT=item-list \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -647,7 +647,7 @@ it_stops_when_the_host_cannot_create_the_secrets_directory() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   printf '\n== preflight\n' > "$tree/want-out"
@@ -685,7 +685,7 @@ it_stops_when_glm_exists_with_other_rules() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -738,7 +738,7 @@ it_adds_glm_from_the_z_ai_key_on_stdin_when_glm_is_missing() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_ZAI_KEY="$zai_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -812,7 +812,7 @@ it_stops_when_atc_key_prints_no_z_ai_key() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" STUB_ZAI_KEY= ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" STUB_ZAI_KEY= ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -864,7 +864,7 @@ it_stops_with_imps_exit_code_when_impd_rejects_the_glm_secret() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_ZAI_KEY="$zai_token" \
     STUB_SECRET_ADD_ERROR='imp: BAD_REQUEST: rule host api.z.ai is not allowed' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -919,7 +919,7 @@ it_stops_when_the_1Password_item_and_the_host_file_differ() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -973,7 +973,7 @@ it_stops_when_only_the_1Password_item_holds_the_bearer() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1026,7 +1026,7 @@ it_stops_when_only_the_host_file_holds_the_bearer() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1081,7 +1081,7 @@ it_mints_one_bearer_into_1Password_and_a_root_only_host_file_when_neither_exists
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -1167,7 +1167,7 @@ it_stops_when_the_minted_bearer_reads_back_differently_from_1Password() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_OP_READ_VALUE=a-different-value \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1225,7 +1225,7 @@ it_stops_when_the_minted_bearer_reads_back_differently_from_the_host() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_ALTER_BEARER_BEFORE_SUM=1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1282,7 +1282,7 @@ it_writes_no_host_file_when_creating_the_1Password_item_fails() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_OP_FAIL_AT=item-create \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1341,7 +1341,7 @@ it_stops_with_the_item_created_when_the_host_cannot_write_the_bearer() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_READONLY_AT_BEARER_WRITE=1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1403,7 +1403,7 @@ it_removes_the_temporary_bearer_file_when_the_host_cannot_move_it_into_place() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_READONLY_TARGET_AT_BEARER_WRITE=1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   # mktemp's six random characters are masked
@@ -1470,7 +1470,7 @@ it_accepts_a_saved_token_without_a_trailing_newline() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -1545,7 +1545,7 @@ it_rejects_an_empty_saved_token_without_asking_impd() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1613,7 +1613,7 @@ it_rejects_a_saved_token_followed_by_a_second_line_without_asking_impd() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1681,7 +1681,7 @@ it_rejects_a_saved_token_followed_by_a_blank_line_without_asking_impd() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1749,7 +1749,7 @@ it_rejects_a_saved_token_ending_in_a_carriage_return_without_asking_impd() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1817,7 +1817,7 @@ it_rejects_a_saved_token_holding_a_space_without_asking_impd() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1887,7 +1887,7 @@ it_rejects_a_saved_token_holding_a_NUL_byte_without_asking_impd() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1957,7 +1957,7 @@ it_rejects_a_stale_saved_token_that_impd_answers_with_401() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2025,7 +2025,7 @@ it_rejects_a_saved_token_that_impd_names_as_another_token() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=200 \
     STUB_WHOAMI_BODY='{"json":{"kind":"token","name":"atc-other","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2093,7 +2093,7 @@ it_rejects_a_saved_credential_that_impd_names_as_a_caller_other_than_a_token() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=200 \
     STUB_WHOAMI_BODY='{"json":{"kind":"dashboard","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2161,7 +2161,7 @@ it_accepts_an_identity_that_impd_answers_with_a_2xx_other_than_200() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=201 \
     STUB_WHOAMI_BODY='{"json":{"kind":"token","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -2236,7 +2236,7 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_204_without_a_body() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=204 \
-    STUB_WHOAMI_BODY= ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_WHOAMI_BODY= ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2301,7 +2301,7 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_200_with_a_body_that_is_no
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=200 \
-    STUB_WHOAMI_BODY='<html>bad gateway</html>' ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_WHOAMI_BODY='<html>bad gateway</html>' ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2367,7 +2367,7 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_500() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=500 \
     STUB_WHOAMI_BODY='{"json":{"defined":false,"code":"INTERNAL_SERVER_ERROR","status":500,"message":"Internal server error"}}' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2433,7 +2433,7 @@ it_leaves_the_saved_token_unchecked_when_impd_answers_403() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_WHOAMI_STATUS=403 \
     STUB_WHOAMI_BODY='{"json":{"defined":true,"code":"FORBIDDEN","status":403,"message":"forbidden"}}' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2502,7 +2502,7 @@ it_leaves_the_saved_token_unchecked_when_impd_refuses_the_connection() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin-real-curl" STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT=1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   sed -E '1s/ after [0-9]+ ms: / after N ms: /' "$tree/err" > "$tree/err-masked"
@@ -2572,7 +2572,7 @@ it_leaves_the_saved_token_unchecked_when_curl_rejects_the_impd_port() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin-real-curl" STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT=7070x \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   # curl 8.5.0 (CI's ubuntu-24.04 runner image) and 8.22.0 print the same line for a
@@ -2646,7 +2646,7 @@ it_leaves_the_saved_token_unchecked_when_impd_resets_the_connection() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin-real-curl" STUB_GOOD_TOKEN="$good_token" \
     ATC_IMPD_PORT="$listener_port" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2714,7 +2714,7 @@ it_leaves_the_saved_token_unchecked_when_ssh_drops_during_the_check() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_SSH_DROP_AT_WHOAMI=1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   head -n 1 "$tree/err" > "$tree/err-first"
@@ -2785,7 +2785,7 @@ it_leaves_the_saved_token_unchecked_when_it_disappears_before_the_check() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" STUB_REMOVE_TOKEN_AT_WHOAMI=1 \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2850,7 +2850,7 @@ it_leaves_the_saved_token_unchecked_when_a_directory_stands_in_its_place() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2915,7 +2915,7 @@ it_leaves_the_saved_token_unchecked_when_the_file_cannot_be_read() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -2981,7 +2981,7 @@ it_stops_when_atc_cloud_exists_with_another_scope() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3042,7 +3042,7 @@ it_stops_when_only_the_atc_cloud_token_exists() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
-    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_HOST_BIN="$tree/host-bin" ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3103,7 +3103,7 @@ it_stops_when_only_the_saved_token_file_exists() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3166,7 +3166,7 @@ it_mints_atc_cloud_into_a_root_only_host_file_when_neither_exists() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_MINTED="$minted_token" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3244,7 +3244,7 @@ it_saves_no_token_when_the_mint_prints_more_than_one_line() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_MINTED="$minted_token"$'\nimp: a notice on stdout' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3306,7 +3306,7 @@ it_saves_no_token_when_imp_token_new_fails() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_TOKEN_NEW_ERROR='imp: CONFLICT: token atc-cloud exists' \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3370,7 +3370,7 @@ it_fails_the_final_check_when_a_saved_file_is_gone() {
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_HOST_BIN="$tree/host-bin" STUB_GOOD_TOKEN="$good_token" \
-    STUB_REMOVE_BEARER_BEFORE_STAT=1 ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    STUB_REMOVE_BEARER_BEFORE_STAT=1 ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3473,7 +3473,7 @@ EOF
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -3580,7 +3580,7 @@ EOF
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_GOOD_TOKEN="$good_token" ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -3664,7 +3664,7 @@ it_keeps_the_saved_token_out_of_the_output_under_a_curlrc_in_HOME_alone() {
     OP_SERVICE_ACCOUNT_TOKEN=ops_fixture_env STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
     STUB_GOOD_TOKEN="$good_token" http_proxy="http://127.0.0.1:$proxy_port" \
     ATC_IMPD_PORT="$impd_port" STUB_HOST_BIN="$tree/host-bin-real-curl" \
-    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/install-atc-gateway-credentials.sh" \
+    ATC_CREDENTIALS_DIR="$tree/host/secrets" bash "$tree/scripts/install-atc-gateway-credentials.sh" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -3733,7 +3733,8 @@ EOF
   }
 }
 
-# Boot data every case needs: the script, the roots of the 1Password stand-in's vaults
+# Boot data every case needs: the script in scripts/, beside the shared constants it reads
+# (packages/topology), the roots of the 1Password stand-in's vaults
 # (vault/) and of "the host" (host/) with root's HOME on it (host/root/, which the ssh
 # stand-in runs each remote command with, made here so a case that makes host/ read-only
 # still has it), impd's state directory (impd/), and the stand-ins
@@ -3749,10 +3750,12 @@ EOF
 setup_test() {
   local tree="$1" part
   mkdir -p "$tree/bin" "$tree/host-bin" "$tree/host-bin-real-curl" "$tree/home" "$tree/tmp" \
-    "$tree/vault" "$tree/impd" "$tree/host/root"
+    "$tree/vault" "$tree/impd" "$tree/host/root" "$tree/scripts" "$tree/packages/topology"
   : > "$tree/calls"
   : > "$tree/host-output"
-  cp "$(dirname "${BASH_SOURCE[0]}")/install-atc-gateway-credentials.sh" "$tree/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/install-atc-gateway-credentials.sh" "$tree/scripts/"
+  # the script reads impd's port from the shared constants beside it
+  cp "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json" "$tree/packages/topology/"
   create_stub_op "$tree/bin"
   create_stub_host_ssh "$tree/bin"
   create_stub_imp_host_docker "$tree/host-bin"

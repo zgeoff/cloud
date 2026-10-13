@@ -1,3 +1,4 @@
+import { topology } from '@zgeoff/cloud-topology';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import type { ATCDaemonEndpoint } from './inputs/types.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
@@ -71,7 +72,7 @@ const impHealthRule: AlertRule = {
   for: '5m',
   labels: { severity: 'critical' },
   annotations: {
-    summary: 'https://imps.geoff.cloud/health fails from the cluster over the tailnet.',
+    summary: `https://${topology.imp.domain}/health fails from the cluster over the tailnet.`,
   },
 };
 

@@ -10,7 +10,10 @@ host="${1:-geoffcloud}"
 item="k3s-kubeconfig"
 ref="op://cloud/$item/kubeconfig.yaml"
 
-kubeconfig="$(ssh "root@$host" cat /etc/rancher/k3s/k3s.yaml | sed "s#https://127.0.0.1:6443#https://$host:6443#")"
+# k3s's API port, from the shared constants
+port="$(jq -er .k3s.apiPort "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json")"
+
+kubeconfig="$(ssh "root@$host" cat /etc/rancher/k3s/k3s.yaml | sed "s#https://127.0.0.1:$port#https://$host:$port#")"
 if op item get "$item" --vault cloud > /dev/null 2>&1; then
   printf '%s\n' "$kubeconfig" | op document edit "$item" --vault cloud --file-name kubeconfig.yaml - > /dev/null
 else

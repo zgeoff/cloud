@@ -9,6 +9,7 @@
 }:
 let
   cfg = config.services.impd-local-health;
+  topology = import ../topology.nix;
 
   probe = pkgs.writeShellApplication {
     name = "impd-local-health";
@@ -26,13 +27,13 @@ in
 
     url = lib.mkOption {
       type = lib.types.str;
-      default = "http://127.0.0.1:7070/health";
+      default = "http://127.0.0.1:${toString topology.imp.apiPort}/health";
       description = "impd's health endpoint on host loopback.";
     };
 
     textfileDir = lib.mkOption {
       type = lib.types.str;
-      default = "/var/lib/node-exporter/textfile";
+      default = topology.nodeExporter.textfileDir;
       description = "The directory node-exporter's textfile collector reads.";
     };
 

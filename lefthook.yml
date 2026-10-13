@@ -74,6 +74,8 @@ pre-push:
       run: bun run lint:actions
     - name: pulumi pins
       run: bun run check:pulumi-pins
+    - name: topology
+      run: bun run check:topology
     - name: typecheck
       run: bun run typecheck
     - name: test

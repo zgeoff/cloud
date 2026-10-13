@@ -1,3 +1,4 @@
+import { topology } from '@zgeoff/cloud-topology';
 import { z } from 'zod';
 import { pinnedImagePattern } from './pinned-image-pattern.ts';
 
@@ -15,7 +16,7 @@ const daemonNamePattern = /^[a-z](?:[\da-z-]{0,29}[\da-z])?$/u;
 
 // `<host>:<port>`, with an IPv6 host in brackets; atc's registry parser takes ports 1–65535
 const addressPattern = /^(?:\[[^\]]+\]|[^:[\]]+):(?<port>\d{1,5})$/u;
-const addressMessage = "must be the daemon's tailnet host:port, such as 100.69.47.33:8415";
+const addressMessage = `must be the daemon's tailnet host:port, such as ${topology.tailnet.nodes.geoffcloud.address}:${topology.atc.daemonPort}`;
 
 // a daemonID as a daemon mints it: a lowercase UUID
 const daemonIDPattern = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/u;

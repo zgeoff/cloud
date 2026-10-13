@@ -10,6 +10,7 @@ import {
 import { Command } from '@pulumi/command/local';
 import { Config, secret } from '@pulumi/pulumi';
 import { Acl, TailnetKey } from '@pulumi/tailscale';
+import { topology } from '@zgeoff/cloud-topology';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { buildEdgeRules } from './build-edge-rules.ts';
 import { createClusterWorkloads } from './cluster-workloads.ts';
@@ -51,7 +52,7 @@ const hostKey = new TailnetKey(
   'geoffcloud-host',
   {
     description: 'geoffcloud host join',
-    tags: ['tag:cloud'],
+    tags: [topology.tailnet.tags.cloud],
     reusable: false,
     ephemeral: false,
     preauthorized: true,
@@ -74,7 +75,7 @@ const impKey = new TailnetKey(
   'imp',
   {
     description: 'impd nodes',
-    tags: ['tag:imp'],
+    tags: [topology.tailnet.tags.imp],
     reusable: true,
     ephemeral: true,
     preauthorized: true,
@@ -99,10 +100,10 @@ export const impKeySyncID = impKeySync.id;
 // removes an offline ephemeral node, and a long reboot would lose imp-geoffcloud.
 // Single-use, for the reinstall only; tank/imp keeps the node state after that.
 const impHostKey = new TailnetKey(
-  'imp-geoffcloud',
+  topology.tailnet.nodes.imp.hostname,
   {
     description: 'imp node on geoffcloud',
-    tags: ['tag:imp'],
+    tags: [topology.tailnet.tags.imp],
     reusable: false,
     ephemeral: false,
     preauthorized: true,
@@ -141,7 +142,7 @@ const geoffcloud = new Vm(
     ...(hostOnTailnet ? { firewallGroupId: edge.id } : {}),
   },
   {
-    import: '0f289413-258f-4115-ac81-252000998fe0',
+    import: topology.vm.id,
     protect: true,
     retainOnDelete: true,
   },

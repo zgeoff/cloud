@@ -5,7 +5,7 @@ import { buildATCDaemonProbeValues } from './build-atc-daemon-probe-values.ts';
 import type { ATCDaemonEndpoint } from './inputs/types.ts';
 
 // Blackbox TCP probe of each atc daemon every 30s from a pod, down the gateway's own path (host cloud_host admits
-// cni0 10.42.0.0/16 to geoffcloud's daemon; otherwise the tailnet). The chart's ServiceMonitor carries the probe for
+// cni0 from the pod CIDR to geoffcloud's daemon; otherwise the tailnet). The chart's ServiceMonitor carries the probe for
 // Prometheus (observability.ts); opts brings the cluster plus the stack dep owning the CRDs, and ATCDaemonUnreachable alerts on it.
 export function createATCDaemonProbe(
   ns: Namespace,

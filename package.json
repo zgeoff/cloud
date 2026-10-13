@@ -9,6 +9,7 @@
   },
   "workspaces": [
     "infra",
+    "packages/*",
     "sdk/*",
     "workers/*"
   ],
@@ -39,6 +40,7 @@
     "provider:check": "bash provider/check.sh",
     "sdk:gen": "bash scripts/gen-sdk.sh",
     "check:pulumi-pins": "bash scripts/check-pulumi-pins.sh",
+    "check:topology": "bun scripts/check-topology.ts",
     "check:sdk": "bash scripts/check-sdk.sh",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
     "preview": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi preview --stack prod",
@@ -79,6 +81,7 @@
     "@tsconfig/strictest": "2.0.8",
     "@types/bun": "1.3.14",
     "@zgeoff/bun-test-extended": "0.1.0",
+    "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/format-codemod": "0.1.0",
     "@zgeoff/oxlint-config": "0.2.0",
     "knip": "6.24.0",
@@ -88,7 +91,8 @@
     "oxlint": "1.73.0",
     "oxlint-tsgolint": "0.24.0",
     "tslib": "2.8.1",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "zod": "4.6.5"
   },
   "packageManager": "bun@1.4.2"
 }

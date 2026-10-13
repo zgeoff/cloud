@@ -1,6 +1,7 @@
+import { topology } from '@zgeoff/cloud-topology';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 
-const impHealthURL = 'https://imps.geoff.cloud/health';
+const impHealthURL = `https://${topology.imp.domain}/health`;
 
 // TLS must verify (the default; fail_if_not_ssl refuses plain HTTP), and the body must
 // say impd is ready, so a 200 from anything else fails. The chart's own image and

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 name="${1:?usage: snapshot-geoffcloud.sh <name>, such as pre-imp-0.26}"
-vm="0f289413-258f-4115-ac81-252000998fe0"
+vm="$(jq -er .vm.id "$(dirname "${BASH_SOURCE[0]}")/../packages/topology/constants.json")"
 api="https://api.cloud.onidel.com"
 auth="Authorization: Bearer ${ONIDEL_API_KEY:?run through op run --env-file=.env}"
 

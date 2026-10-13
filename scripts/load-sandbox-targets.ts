@@ -1,4 +1,5 @@
 import { isIP } from 'node:net';
+import { topology } from '@zgeoff/cloud-topology';
 import type { ProbeTarget } from './build-tcp-probe.ts';
 
 export interface RemoteResult {
@@ -16,8 +17,8 @@ export type TargetsResult =
   | { readonly ok: true; readonly targets: readonly SandboxTarget[] }
   | { readonly ok: false; readonly error: string };
 
-// impd's API, which nixie's config names as https://imps.geoff.cloud
-const impdHost = 'imps.geoff.cloud';
+// impd's API, which nixie's config names by this host
+const impdHost = topology.imp.domain;
 
 // Reads, from geoffcloud, each address a fetch sandbox must not reach: impd's addresses on its
 // HTTPS port, each node's addresses on the kubelet's port, which listens on every address, and

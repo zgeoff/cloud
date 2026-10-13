@@ -7,9 +7,9 @@
 #
 # - `login <registry> -u <user> --password-stdin` writes stdin to STUB_TREE/password, so a test
 #   reads the token the caller sent without it ever reaching argv, and prints "Login Succeeded".
-# - `build --build-arg <arg> -t <ref> <context>` records the ref as built and writes the sorted
-#   names in <context> to STUB_TREE/contexts/<ref>. It prints none of BuildKit's progress, which
-#   the caller does not read.
+# - `build --build-arg <arg> [--build-arg <arg>…] -t <ref> <context>` records the ref as built
+#   and writes the sorted names in <context> to STUB_TREE/contexts/<ref>. It prints none of
+#   BuildKit's progress, which the caller does not read.
 # - `manifest inspect <ref>` prints the ref's registry file. A ref the registry lacks answers
 #   "manifest unknown" on stderr and exit 1; with STUB_TREE/registry-error present, every lookup
 #   prints that file's text on stderr and exits 1 instead, as for a registry that cannot answer.
@@ -32,13 +32,21 @@ key() {
   local ref="${1//\//_}"
   echo "${ref//:/_}"
 }
+# is_build <args>: whether the args after `build` are one or more `--build-arg <arg>` pairs, then
+# `-t <ref> <context>`
+is_build() {
+  while [ "$#" -gt 3 ] && [ "$1" = --build-arg ]; do
+    shift 2
+  done
+  [ "$#" = 3 ] && [ "$1" = -t ]
+}
 mkdir -p "$STUB_TREE/registry" "$STUB_TREE/built" "$STUB_TREE/contexts"
 if [ "$#" = 5 ] && [ "$1" = login ] && [ "$3" = -u ] && [ "$5" = --password-stdin ]; then
   cat > "$STUB_TREE/password"
   echo "Login Succeeded"
-elif [ "$#" = 6 ] && [ "$1" = build ] && [ "$2" = --build-arg ] && [ "$4" = -t ]; then
-  touch "$STUB_TREE/built/$(key "$5")"
-  ls -A "$6" | LC_ALL=C sort > "$STUB_TREE/contexts/$(key "$5")"
+elif [ "$1" = build ] && [ "$2" = --build-arg ] && is_build "${@:2}"; then
+  touch "$STUB_TREE/built/$(key "${@: -2:1}")"
+  ls -A "${@: -1}" | LC_ALL=C sort > "$STUB_TREE/contexts/$(key "${@: -2:1}")"
 elif [ "$#" = 3 ] && [ "$1" = manifest ] && [ "$2" = inspect ]; then
   if [ -f "$STUB_TREE/registry-error" ]; then
     cat "$STUB_TREE/registry-error" >&2

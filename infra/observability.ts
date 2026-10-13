@@ -1,8 +1,11 @@
+// the observability stack wires its charts, monitors and dashboards here, one import each
+/* oxlint-disable import/max-dependencies */
 import type { Provider } from '@pulumi/kubernetes';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
+import { topology } from '@zgeoff/cloud-topology';
 import { alloyValues } from './alloy-values.ts';
 import { createDashboards } from './create-dashboards.ts';
 import { createMetrics } from './create-metrics.ts';
@@ -10,8 +13,8 @@ import { createMonitors } from './create-monitors.ts';
 import type { ATCDaemonEndpoint } from './inputs/types.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
-// and opens no public port, so http://geoffcloud:30300 works from the tailnet alone.
-const grafanaNodePort = 30_300;
+// and opens no public port, so http://geoffcloud:<grafanaNodePort> works from the tailnet alone.
+const grafanaNodePort = topology.k3s.grafanaNodePort;
 
 export interface ObservabilityOutputs {
   readonly logShipper: Chart;

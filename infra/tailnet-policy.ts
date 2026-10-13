@@ -1,66 +1,73 @@
+import { topology } from '@zgeoff/cloud-topology';
 import { geoffcloudNode } from './geoffcloud-node.ts';
+
+const tags = topology.tailnet.tags;
+const impHostname = topology.tailnet.nodes.imp.hostname;
 
 // The whole tailnet policy file: Pulumi's tailscale.Acl replaces the live file with this,
 // so every relied-on rule must be here.
 // home-pc is the WSL node (home-wsl), where atc's daemon listens on its tailnet address.
 const homePC = {
-  ip: '100.67.122.120',
-  daemonPort: 8415,
+  ip: topology.tailnet.nodes.homePC.address,
+  daemonPort: topology.atc.daemonPort,
 };
 
 // imp's own tailnet node on geoffcloud (imp-geoffcloud, tag:imp), where impd serves
 // https://imps.geoff.cloud. A long-lived node, so its address is stable; a host alias
 // names this one node, where tag:imp would also take in any later impd node.
 const impNode = {
-  ip: '100.75.9.119',
+  ip: topology.tailnet.nodes.imp.address,
   httpsPort: 443,
 };
 
 // k3s's API server on geoffcloud, which the prod apply job reaches from its runner
-const k3sAPIPort = 6443;
+const k3sAPIPort = topology.k3s.apiPort;
+
+// impd's API, between impd nodes
+const impAPIPort = `tcp:${topology.imp.apiPort}`;
 
 // Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; members reach tag:imp nodes on any port,
-// while those reach each other on tcp:7070 and nothing else (imp's isolation goal). tag:imp-e2e reaches only its
+// while those reach each other on impd's API port and nothing else (imp's isolation goal). tag:imp-e2e reaches only its
 // own API, never a live impd, keyed by its own OAuth client (1Password imp-e2e vault, docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
-    'imp-geoffcloud': impNode.ip,
+    [impHostname]: impNode.ip,
     geoffcloud: geoffcloudNode.ip,
   },
 
   // Each tag also owns itself: Pulumi's OAuth client carries tag:cloud and tag:imp,
   // and a client may mint keys only for tags its own tags own.
   tagOwners: {
-    'tag:cloud': ['autogroup:admin', 'tag:cloud'],
-    'tag:imp': ['autogroup:admin', 'tag:imp'],
+    [tags.cloud]: ['autogroup:admin', tags.cloud],
+    [tags.imp]: ['autogroup:admin', tags.imp],
 
     // owns itself, so the e2e OAuth client (tag:imp-e2e) may mint keys for it; no
     // other tag owns it, and it owns no other tag
-    'tag:imp-e2e': ['autogroup:admin', 'tag:imp-e2e'],
+    [tags.impE2E]: ['autogroup:admin', tags.impE2E],
 
     // the prod apply job's runner, an ephemeral node that joins through the deploy workflow's
     // federated identity (tag:cloud-deploy); owns itself, so that identity may mint keys for it
-    'tag:cloud-deploy': ['autogroup:admin', 'tag:cloud-deploy'],
+    [tags.cloudDeploy]: ['autogroup:admin', tags.cloudDeploy],
   },
   grants: [
     // members reach every device; tagged nodes get only what a grant gives them
     { src: ['autogroup:member'], dst: ['*'], ip: ['*'] },
 
     // impd nodes reach each other's API: moves between hosts and imp's two-node e2e
-    { src: ['tag:imp'], dst: ['tag:imp'], ip: ['tcp:7070'] },
+    { src: [tags.imp], dst: [tags.imp], ip: [impAPIPort] },
 
     // the atc gateway on a cloud host → atc's daemon on the PC; last, so adding it
     // shifts no other grant
-    { src: ['tag:cloud'], dst: ['home-pc'], ip: [`tcp:${homePC.daemonPort}`] },
+    { src: [tags.cloud], dst: ['home-pc'], ip: [`tcp:${homePC.daemonPort}`] },
 
     // the cluster's probe of imp's /health (#29) → imp's node, 443 only; last, so
     // adding it shifts no other grant
-    { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: [`tcp:${impNode.httpsPort}`] },
+    { src: [tags.cloud], dst: [impHostname], ip: [`tcp:${impNode.httpsPort}`] },
 
     // imp's e2e nodes reach each other's API only, for the two-node moves suite; no
     // grant takes them to tag:imp. Last, so adding it shifts no other grant
-    { src: ['tag:imp-e2e'], dst: ['tag:imp-e2e'], ip: ['tcp:7070'] },
+    { src: [tags.impE2E], dst: [tags.impE2E], ip: [impAPIPort] },
 
     // members → nixie's web client and API on the host's 443. The first grant already covers it;
     // this one names the route, so it stays open if that grant narrows. Last, so adding it shifts
@@ -70,12 +77,12 @@ export const tailnetPolicy = {
     // nixie's route to impd: nixie's pod, as tag:cloud → imp's node, 443 only. It repeats the probe's
     // grant and gives nothing beyond it; grants union, so removing it breaks nixie once the probe's
     // grant no longer covers this route. Last, so adding it shifts no other grant
-    { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: [`tcp:${impNode.httpsPort}`] },
+    { src: [tags.cloud], dst: [impHostname], ip: [`tcp:${impNode.httpsPort}`] },
 
     // the prod apply job → k3s's API on the host, and nothing else: Pulumi drives the cluster
     // through it, and every other provider the job uses is a public API. Last, so adding it shifts
     // no other grant
-    { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
+    { src: [tags.cloudDeploy], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
   ],
   ssh: [
     {
@@ -90,7 +97,7 @@ export const tailnetPolicy = {
     {
       action: 'accept',
       src: ['autogroup:admin'],
-      dst: ['tag:cloud'],
+      dst: [tags.cloud],
       users: ['autogroup:nonroot', 'root'],
     },
   ],

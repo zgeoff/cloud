@@ -68,7 +68,9 @@ cover it too.
 Bun workspace. `infra/` is the Pulumi program (TypeScript, Bun runtime). `provider/` is the partial
 Onidel Pulumi provider, a Go module built with `pulumi-go-provider`'s `infer` package. `sdk/onidel/`
 is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` is the host flake.
-`docs/` holds the architecture and runbooks. `scripts/` holds repo tooling.
+`packages/topology/` holds the constants that the host, infra, the scripts and the images share,
+such as ports, CIDRs, tailnet addresses and tags; change one there, never at a reader. `docs/` holds
+the architecture and runbooks. `scripts/` holds repo tooling.
 
 ## Rules
 

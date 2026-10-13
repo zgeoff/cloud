@@ -2,7 +2,8 @@
 # Decides whether a change needs the NixOS checks, which boot VMs and take minutes. It prints
 # "true" when any file changed between <base> and <head> is an input of those checks, and "false"
 # otherwise; scripts/find-nixos-check-run.sh uses it to decide whether a green run of the checks
-# still covers a later commit. The inputs are the flake (nixos/), the test helpers and scripts the
+# still covers a later commit. The inputs are the flake (nixos/), the shared constants it reads
+# (packages/topology/), the test helpers and scripts the
 # checks read (scripts/test-lib/, restore-impd-db.sh and copy-impd-db-host.sh), the scripts that
 # run them and pin their image (run-nixos-checks.sh and nix-image.sh), the scripts that decide when they
 # run (this script, find-nixos-check-run.sh and decide-nixos-checks.sh), the script that opens
@@ -44,7 +45,7 @@ fi
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    nixos/* | scripts/test-lib/* | scripts/restore-impd-db.sh | scripts/copy-impd-db-host.sh | \
+    nixos/* | packages/topology/* | scripts/test-lib/* | scripts/restore-impd-db.sh | scripts/copy-impd-db-host.sh | \
       scripts/run-nixos-checks.sh | scripts/nix-image.sh | scripts/needs-nixos-checks.sh | \
       scripts/find-nixos-check-run.sh | scripts/decide-nixos-checks.sh | scripts/open-kvm.sh | \
       .bun-version | .github/workflows/nixos-checks.yml)
