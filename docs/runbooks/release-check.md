@@ -8,7 +8,10 @@ merges a bump that may merge on its own once its checks pass. A merged nixie bum
 config, so the `Deploy prod` workflow applies it to prod with no person involved, unless its guard
 holds the plan ([the prod apply job](./prod-apply.md)). The same holds for the later pull request
 that pins the atc-gateway images an atc bump publishes. A host switch and an agent image rebuild
-stay with a person, and each pull request's body lists the steps its merge leaves.
+stay with a person, and each pull request's body lists the steps its merge leaves. An atc release
+reaches a daemon's `cloud` target only in the order that
+[the agent image runbook](./agent-image.md#roll-out-an-atc-release) gives: the image first, then the
+daemon.
 
 | Dependency | Branch                    | Pins                                                                        |
 | ---------- | ------------------------- | --------------------------------------------------------------------------- |
