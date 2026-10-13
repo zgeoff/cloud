@@ -57,7 +57,7 @@ function collectRunSteps(file: string, text: string): RunStep[] {
     return [];
   }
 
-  return Object.entries(jobs).flatMap((entry: [string, unknown]) =>
+  return Object.entries(jobs).flatMap((entry: readonly [string, unknown]) =>
     collectJobRunSteps(file, entry[0], entry[1]),
   );
 }
@@ -81,17 +81,17 @@ function formatStepName(name: unknown, index: number): string {
   return typeof name === 'string' ? `"${name}"` : `#${index + 1}`;
 }
 
-async function loadScriptNames(path: string): Promise<ReadonlySet<string>> {
+async function loadScriptNames(path: string): Promise<readonly string[]> {
   const text = await readFile(path, 'utf8');
 
   const manifest: unknown = JSON.parse(text);
   const scripts = findJSONField(manifest, 'scripts');
   const names = typeof scripts === 'object' && scripts !== null ? Object.keys(scripts) : [];
 
-  return new Set(names);
+  return names;
 }
 
-function collectViolations(steps: readonly RunStep[], scripts: ReadonlySet<string>): string[] {
+function collectViolations(steps: readonly RunStep[], scripts: readonly string[]): string[] {
   return steps.flatMap((step) => {
     const reason = findViolation(step.run, scripts);
 
@@ -101,7 +101,7 @@ function collectViolations(steps: readonly RunStep[], scripts: ReadonlySet<strin
   });
 }
 
-function findViolation(run: unknown, scripts: ReadonlySet<string>): string | undefined {
+function findViolation(run: unknown, scripts: readonly string[]): string | undefined {
   if (typeof run !== 'string') {
     return 'run is not a string';
   }
@@ -123,7 +123,7 @@ function findViolation(run: unknown, scripts: ReadonlySet<string>): string | und
 
 const scriptCall = /^bun run (?:--silent )?(?<script>[a-z][a-z0-9:-]*)(?<args>(?: \S+)*)$/u;
 
-function findCallViolation(command: string, scripts: ReadonlySet<string>): string | undefined {
+function findCallViolation(command: string, scripts: readonly string[]): string | undefined {
   const call = scriptCall.exec(command);
   const script = call?.groups?.['script'];
 
@@ -131,7 +131,7 @@ function findCallViolation(command: string, scripts: ReadonlySet<string>): strin
     return `runs \`${command}\`, not one bun run call`;
   }
 
-  if (!scripts.has(script)) {
+  if (!scripts.includes(script)) {
     return `calls ${script}, which the root package.json does not define`;
   }
 
