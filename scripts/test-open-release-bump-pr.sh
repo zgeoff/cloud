@@ -383,4 +383,32 @@ EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_refuses_a_working_tree_that_another_pin_left_changed() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  printf 'nixie 0.7.0\nimp 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  printf 'nixie 0.7.0\nimp 1.0.1\n' > "$tree/clone/pins"
+  echo 'Bumps nixie to 0.7.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" nixie 0.7.1 "$tree/pr-body" "$tree/labels" \
+    sed -i 's/^nixie .*/nixie 0.7.1/' pins) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'the working tree has uncommitted changes; commit or discard them first'
+  diff - "$tree/clone/pins" << 'EOF'
+nixie 0.7.0
+imp 1.0.1
+EOF
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" for-each-ref --format='%(refname)') <<< 'refs/heads/main'
+  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+}
+
 run_cases

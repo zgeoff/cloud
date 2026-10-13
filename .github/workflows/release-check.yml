@@ -108,6 +108,9 @@ jobs:
           failed=0
           while read -r -a bump; do
             echo "::group::${bump[0]} ${bump[1]}"
+            # a failed pin can leave tracked files changed; each bump starts from a clean tree
+            git reset -q --hard
+            git clean -fdq
             bun run --silent ci:bump-release "${bump[@]}" || { echo "::error::the ${bump[0]} bump failed"; failed=1; }
             echo "::endgroup::"
           done <<< "$BUMPS"

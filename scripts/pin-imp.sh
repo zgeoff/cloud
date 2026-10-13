@@ -13,7 +13,8 @@
 # holds <version> and its digest, or a newer version, stays as it is, and one that holds <version>
 # with another digest fails, because a release's images never change. It checks both images
 # before it writes, so a failed image check changes nothing. A failed lock leaves flake.nix
-# rewritten and the other files as they were; open-release-bump-pr.sh then pushes nothing.
+# rewritten, and a lock of another commit leaves flake.lock rewritten too; open-release-bump-pr.sh
+# then pushes nothing, and the release check resets the tree before its next bump.
 set -euo pipefail
 
 if [ "$#" -ne 4 ]; then

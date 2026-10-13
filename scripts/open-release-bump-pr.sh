@@ -55,6 +55,11 @@ for label in "${labels[@]}"; do
   fi
 done
 
+# a change another pin left in the tree would ride along in this commit, under this title
+if ! git diff --quiet || ! git diff --cached --quiet; then
+  echo "the working tree has uncommitted changes; commit or discard them first" >&2
+  exit 1
+fi
 git fetch -q origin main
 git checkout -q -B "$branch" origin/main
 "$@"
