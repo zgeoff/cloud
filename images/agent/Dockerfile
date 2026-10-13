@@ -196,6 +196,29 @@ RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
  && install -m 0755 /tmp/gitleaks /usr/local/bin/gitleaks \
  && rm /tmp/gitleaks.tar.gz /tmp/gitleaks
 
+# shellcheck and shfmt, which the atc and imp pre-push lint:shell hooks run, at
+# the versions those repos' CI pins. Neither release publishes a checksums file,
+# so each sum is the asset digest GitHub lists on the release:
+#   gh api repos/koalaman/shellcheck/releases/tags/v$VERSION \
+#     --jq '.assets[] | select(.name=="shellcheck-v'"$VERSION"'.linux.x86_64.tar.xz") | .digest'
+#   gh api repos/mvdan/sh/releases/tags/v$VERSION \
+#     --jq '.assets[] | select(.name=="shfmt_v'"$VERSION"'_linux_amd64") | .digest'
+ARG SHELLCHECK_VERSION=0.11.0
+ARG SHELLCHECK_SHA256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+RUN curl -fsSL -o /tmp/shellcheck.tar.xz \
+      "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
+ && echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c - \
+ && tar -xJf /tmp/shellcheck.tar.xz -C /tmp "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" \
+ && install -m 0755 "/tmp/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck \
+ && rm -rf /tmp/shellcheck.tar.xz "/tmp/shellcheck-v${SHELLCHECK_VERSION}"
+
+ARG SHFMT_VERSION=3.13.1
+ARG SHFMT_SHA256=fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
+RUN curl -fsSL -o /usr/local/bin/shfmt \
+      "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
+ && echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - \
+ && chmod 0755 /usr/local/bin/shfmt
+
 # A boot service that sets vm.overcommit_memory=1 in the guest once at each
 # boot. oxlint's allocator reserves more address space than a 2 GiB imp holds
 # and aborts under the kernel's default heuristic; with overcommit it runs in
