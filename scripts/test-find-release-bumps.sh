@@ -60,7 +60,10 @@ EOF
 ["gh","release","list","-R","zgeoff/nixie","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 ["gh","release","list","-R","zgeoff/auto-mode","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_atc_line_with_every_pinned_version_when_one_pin_is_older() {
@@ -89,7 +92,10 @@ EOF
 
   diff - "$tree/out" <<< 'atc 4.3.0 4.3.0 2.26.2 4.3.0'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_imp_and_nixie_lines_when_their_pins_are_older() {
@@ -121,7 +127,10 @@ imp 1.0.1 1.0.0 0.33.0
 nixie 0.7.0 0.6.2 0.6.2
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_auto_mode_line_when_the_agent_images_pin_is_older() {
@@ -150,7 +159,10 @@ EOF
 
   diff - "$tree/out" <<< 'auto-mode 0.19.3 0.17.0'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_takes_the_highest_version_among_the_tags_of_the_dependencys_own_form() {
@@ -179,7 +191,10 @@ EOF
 
   diff - "$tree/out" <<< 'atc 4.10.0 4.2.0 4.2.0 4.2.0'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_nothing_for_a_pin_newer_than_the_newest_release() {
@@ -208,7 +223,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_on_a_missing_pin_before_it_reads_a_release() {
@@ -229,8 +247,14 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "images/agent/Dockerfile has 0 lines that match '^ARG ATC_VERSION=([0-9]+\\.[0-9]+\\.[0-9]+)\$', want 1"
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_on_a_doubled_pin() {
@@ -256,8 +280,14 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "infra/Pulumi.prod.yaml has 2 lines that match '^ +image: ghcr\\.io/zgeoff/nixie:([0-9]+\\.[0-9]+\\.[0-9]+)@sha256:[0-9a-f]{64}\$', want 1"
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_a_repository_has_no_release_of_its_form() {
@@ -284,7 +314,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'zgeoff/imp has no release tagged vX.Y.Z'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

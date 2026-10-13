@@ -44,7 +44,10 @@ EOF
 GET /readyz 200 Tms
 GET /readyz 200 Tms
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # The container publishes 8414 but nothing listens there, so /readyz never answers before
@@ -72,7 +75,10 @@ a log line on stderr
 a log line on stdout
 EOF
   diff - "$tree/pauses" <<< 0.05
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The container has exited before the helper starts, so the helper reports it at its
@@ -100,7 +106,10 @@ a log line on stderr
 a log line on stdout
 EOF
   assert_missing "$tree/pauses" "wait_for_ready paused before it reported the stop"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a

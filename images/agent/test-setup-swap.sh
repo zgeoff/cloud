@@ -25,7 +25,10 @@ it_picks_2048_mib_for_the_free_space_of_a_32_gib_imp() {
 
   diff - "$tree/out" <<< 2048
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_picks_a_quarter_of_the_free_space_when_that_is_under_2048_mib() {
@@ -38,7 +41,10 @@ it_picks_a_quarter_of_the_free_space_when_that_is_under_2048_mib() {
 
   diff - "$tree/out" <<< 1536
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_2048_mib_free_when_that_is_the_tightest_bound() {
@@ -51,7 +57,10 @@ it_leaves_2048_mib_free_when_that_is_the_tightest_bound() {
 
   diff - "$tree/out" <<< 512
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_picks_256_mib_at_the_floor() {
@@ -64,7 +73,10 @@ it_picks_256_mib_at_the_floor() {
 
   diff - "$tree/out" <<< 256
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_picks_no_swapfile_under_the_floor() {
@@ -77,7 +89,10 @@ it_picks_no_swapfile_under_the_floor() {
 
   diff - "$tree/out" <<< 0
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_picks_no_swapfile_when_less_than_2048_mib_is_free() {
@@ -90,7 +105,10 @@ it_picks_no_swapfile_when_less_than_2048_mib_is_free() {
 
   diff - "$tree/out" <<< 0
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_2048_mib_free_for_every_free_space_up_to_64_gib() {
@@ -108,7 +126,10 @@ it_keeps_2048_mib_free_for_every_free_space_up_to_64_gib() {
   # it does not
   awk '!(($2 == 0 && $1 < 2304) || ($2 >= 256 && $2 <= 2048 && $2 <= int($1 / 4) && $1 - $2 >= 2048))' "$tree/sizes" > "$tree/violations"
   diff /dev/null "$tree/violations"
-  [ "$(wc -l < "$tree/sizes")" = 4131 ] || { echo "$(wc -l < "$tree/sizes") sizes, want 4131" >&2; exit 1; }
+  [ "$(wc -l < "$tree/sizes")" = 4131 ] || {
+    echo "$(wc -l < "$tree/sizes") sizes, want 4131" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_free_space_that_is_not_a_whole_number() {
@@ -120,7 +141,10 @@ it_refuses_a_free_space_that_is_not_a_whole_number() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'setup-swap: --size-for takes the free space in KiB, a whole number'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_unknown_argument() {
@@ -132,7 +156,10 @@ it_refuses_an_unknown_argument() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: setup-swap [--size-for <free KiB>]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

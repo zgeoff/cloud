@@ -42,7 +42,11 @@ it_restores_a_stored_client_after_a_backup_a_wipe_and_a_restore() {
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
     --redirect-uri https://client.fixture.invalid/callback > "$tree/added"
   client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' "$tree/added")"
-  [ -n "$client_id" ] || { cat "$tree/added"; echo "no client ID in the add output" >&2; exit 1; }
+  [ -n "$client_id" ] || {
+    cat "$tree/added"
+    echo "no client ID in the add output" >&2
+    exit 1
+  }
 
   run_backup "$name" "$backup_image" backup > "$tree/backup.out" 2> "$tree/backup.err"
 

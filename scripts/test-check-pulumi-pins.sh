@@ -24,7 +24,10 @@ it_passes_silently_when_the_pins_match() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_both_versions_when_the_pins_differ() {
@@ -42,7 +45,10 @@ it_fails_with_both_versions_when_the_pins_differ() {
 @pulumi/pulumi pins differ: infra/package.json has '3.264.0', sdk/onidel/package.json has '3.251.0'
 change infra's pin, then run: bun run sdk:gen
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_sdk_has_no_pin() {
@@ -60,7 +66,10 @@ it_fails_when_the_sdk_has_no_pin() {
 @pulumi/pulumi pins differ: infra/package.json has '3.264.0', sdk/onidel/package.json has ''
 change infra's pin, then run: bun run sdk:gen
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_neither_file_has_a_pin() {
@@ -78,7 +87,10 @@ it_fails_when_neither_file_has_a_pin() {
 @pulumi/pulumi pins differ: infra/package.json has '', sdk/onidel/package.json has ''
 change infra's pin, then run: bun run sdk:gen
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 setup_test() {

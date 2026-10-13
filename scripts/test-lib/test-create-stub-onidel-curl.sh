@@ -36,7 +36,10 @@ it_takes_a_pending_snapshot_and_prints_its_id() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer k1","-H","content-type: application/json","--data","{\"name\":\"pre-x\",\"desc\":\"before x\"}","https://api.cloud.onidel.com/vm/vm-1/snapshot"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lists_the_account_snapshots() {
@@ -54,7 +57,10 @@ it_lists_the_account_snapshots() {
     <<< '[{"id":"snap-1","created_at":"2026-10-08T12:00:00.000000Z","name":"pre-x","desc":"before x","size":20,"status":"available"}]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["curl","-fsS","-H","Authorization: Bearer k1","https://api.cloud.onidel.com/snapshots"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_snapshot_with_another_bearer_as_curl_reports_a_401() {
@@ -76,7 +82,10 @@ it_refuses_a_snapshot_with_another_bearer_as_curl_reports_a_401() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer k2","-H","content-type: application/json","--data","{\"name\":\"pre-x\",\"desc\":\"before x\"}","https://api.cloud.onidel.com/vm/vm-1/snapshot"]
 CALLS
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_snapshot_of_another_VM_as_curl_reports_a_404() {
@@ -98,7 +107,10 @@ it_refuses_a_snapshot_of_another_VM_as_curl_reports_a_404() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer k1","-H","content-type: application/json","--data","{\"name\":\"pre-x\",\"desc\":\"before x\"}","https://api.cloud.onidel.com/vm/vm-2/snapshot"]
 CALLS
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_snapshot_over_the_limit_as_curl_reports_a_403() {
@@ -120,7 +132,10 @@ it_refuses_a_snapshot_over_the_limit_as_curl_reports_a_403() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer k1","-H","content-type: application/json","--data","{\"name\":\"pre-x\",\"desc\":\"before x\"}","https://api.cloud.onidel.com/vm/vm-1/snapshot"]
 CALLS
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_refuses_the_list_with_another_bearer_as_curl_reports_a_401() {
@@ -136,7 +151,10 @@ it_refuses_the_list_with_another_bearer_as_curl_reports_a_401() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'curl: (22) The requested URL returned error: 401'
   diff - "$tree/calls" <<< '["curl","-fsS","-H","Authorization: Bearer k2","https://api.cloud.onidel.com/snapshots"]'
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_fails_the_list_with_the_named_HTTP_status() {
@@ -153,7 +171,10 @@ it_fails_the_list_with_the_named_HTTP_status() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'curl: (22) The requested URL returned error: 500'
   diff - "$tree/calls" <<< '["curl","-fsS","-H","Authorization: Bearer k1","https://api.cloud.onidel.com/snapshots"]'
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
@@ -169,7 +190,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -fsS -H Authorization: Bearer k1 https://api.cloud.onidel.com/vm/vm-1'
   diff - "$tree/calls" <<< '["curl","-fsS","-H","Authorization: Bearer k1","https://api.cloud.onidel.com/vm/vm-1"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Pins the stand-in's HTTP error report to the real curl's: the impd stand-in on loopback
@@ -192,7 +216,10 @@ it_reports_an_HTTP_error_as_the_real_curl_does() {
   diff "$tree/real-out" "$tree/out"
   diff "$tree/real-err" "$tree/err"
   diff - "$tree/calls" <<< '["curl","-fsS","-H","Authorization: Bearer k2","https://api.cloud.onidel.com/snapshots"]'
-  [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
+  [ "$status" = "$real_status" ] || {
+    echo "exit $status, want $real_status" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for every

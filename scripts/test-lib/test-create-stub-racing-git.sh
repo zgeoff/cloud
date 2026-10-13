@@ -43,7 +43,10 @@ moved
 marker
 LOG
   diff - "$tree/calls" <<< '["git-moved-head"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_a_failed_rev_parse_origin_main_through_and_lands_nothing() {
@@ -71,7 +74,10 @@ ERR
   diff - "$tree/head-after" <<< "$head"
   diff - "$tree/clone/nixos/marker" <<< committed
   assert_missing "$tree/calls" "the stand-in logged a move"
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_hands_every_other_call_to_the_real_git_unchanged() {
@@ -93,7 +99,10 @@ it_hands_every_other_call_to_the_real_git_unchanged() {
   diff /dev/null "$tree/err"
   diff - "$tree/clone/nixos/marker" <<< committed
   assert_missing "$tree/calls" "the stand-in logged a move"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_the_real_gits_exit_code_through_on_other_calls() {
@@ -112,7 +121,10 @@ it_passes_the_real_gits_exit_code_through_on_other_calls() {
   diff - "$tree/head-after" <<< "$head"
   assert_missing "$tree/clone/nixos/marker" "the stand-in landed a commit"
   assert_missing "$tree/calls" "the stand-in logged a move"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: a clone of a bare origin whose main holds one empty commit,

@@ -85,7 +85,10 @@ pinned imp-host 1.0.1: sha256:33333333333333333333333333333333333333333333333333
 pinned imp-base 1.0.1: sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_newer_imp_base_and_pins_the_host() {
@@ -115,7 +118,10 @@ pinned imp 1.0.1 in nixos/flake.nix and nixos/flake.lock: c5bea94080fdde9e21e972
 pinned imp-host 1.0.1: sha256:3333333333333333333333333333333333333333333333333333333333333333
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_runs_no_lock_when_imp_host_already_holds_the_release() {
@@ -136,13 +142,19 @@ it_runs_no_lock_when_imp_host_already_holds_the_release() {
 
   diff -r "$tree/before" "$tree/repo/nixos"
   diff - "$tree/repo/images/agent/Dockerfile" <<< 'FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444'
-  [ ! -e "$tree/calls" ] || { echo "docker ran: $(cat "$tree/calls")" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "docker ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
   diff - "$tree/out" << 'EOF'
 imp-host 1.0.1 is already pinned
 pinned imp-base 1.0.1: sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_lock_that_names_another_commit() {
@@ -165,7 +177,10 @@ it_refuses_a_lock_that_names_another_commit() {
   cmp "$tree/before" "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'nixos/flake.lock locks imp at 9999999999999999999999999999999999999999, want c5bea94080fdde9e21e9720295c1ca727302662e'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_lock_fails() {
@@ -190,7 +205,10 @@ it_fails_when_the_lock_fails() {
   cmp "$tree/before-config" "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: unable to download 'https://api.github.com/repos/zgeoff/imp/commits/c5bea940'"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_the_release_pinned_with_another_digest_without_writing() {
@@ -210,10 +228,16 @@ it_refuses_the_release_pinned_with_another_digest_without_writing() {
     sha256:4444444444444444444444444444444444444444444444444444444444444444) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff -r "$tree/before" "$tree/repo"
-  [ ! -e "$tree/calls" ] || { echo "docker ran: $(cat "$tree/calls")" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "docker ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp-base 1.0.1 is pinned with sha256:2222222222222222222222222222222222222222222222222222222222222222, but the registry lists sha256:4444444444444444444444444444444444444444444444444444444444444444'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_commit_that_is_not_a_full_hash() {
@@ -229,7 +253,10 @@ it_refuses_a_commit_that_is_not_a_full_hash() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a commit: 'c5bea940'"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_digest_without_its_algorithm() {
@@ -245,7 +272,10 @@ it_refuses_a_digest_without_its_algorithm() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not an image digest: '4444444444444444444444444444444444444444444444444444444444444444'"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_the_digests() {
@@ -259,7 +289,10 @@ it_prints_its_usage_without_the_digests() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: pin-imp.sh <version> <commit> <imp-host digest> <imp-base digest>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

@@ -32,7 +32,10 @@ it_prints_true_for_a_change_under_infra() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_under_deploy() {
@@ -50,7 +53,10 @@ it_prints_true_for_a_change_under_deploy() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_under_provider() {
@@ -68,7 +74,10 @@ it_prints_true_for_a_change_under_provider() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_for_a_change_under_sdk() {
@@ -86,7 +95,10 @@ it_prints_true_for_a_change_under_sdk() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_docs_only_change() {
@@ -107,7 +119,10 @@ it_prints_false_for_a_docs_only_change() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_change_to_scripts_workflows_and_nixos() {
@@ -128,7 +143,10 @@ it_prints_false_for_a_change_to_scripts_workflows_and_nixos() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_true_when_a_rename_moves_a_file_out_of_infra() {
@@ -148,7 +166,10 @@ it_prints_true_when_a_rename_moves_a_file_out_of_infra() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_the_deployed_revision_itself() {
@@ -166,7 +187,10 @@ it_prints_false_for_the_deployed_revision_itself() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_false_for_a_head_older_than_the_deployed_revision() {
@@ -188,7 +212,10 @@ it_prints_false_for_a_head_older_than_the_deployed_revision() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_deployed_revision_is_not_in_the_head_history() {
@@ -213,7 +240,10 @@ it_fails_when_the_deployed_revision_is_not_in_the_head_history() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'needs-prod-apply: deployed/prod is not an ancestor of HEAD; set the tag by hand at the live revision'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_git_error_when_the_tag_was_never_set() {
@@ -226,7 +256,10 @@ it_fails_with_git_error_when_the_tag_was_never_set() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'fatal: Needed a single revision'
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_rejects_an_empty_argument_with_its_usage() {
@@ -239,7 +272,10 @@ it_rejects_an_empty_argument_with_its_usage() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-prod-apply.sh <deployed> <head>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 setup_test() {

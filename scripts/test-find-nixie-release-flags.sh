@@ -61,7 +61,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_flags_migrations_that_the_target_adds() {
@@ -99,7 +102,10 @@ EOF
 
   diff - "$tree/out" <<< 'migrations'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_flags_migrations_that_only_a_release_between_adds() {
@@ -144,7 +150,10 @@ EOF
 
   diff - "$tree/out" <<< 'migrations'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_flags_migrations_when_a_release_lacks_the_section() {
@@ -174,7 +183,10 @@ EOF
 
   diff - "$tree/out" <<< 'migrations'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_flags_a_changed_sandbox_image() {
@@ -210,7 +222,10 @@ EOF
 
   diff - "$tree/out" <<< 'sandbox-images-changed'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_both_flags_for_a_release_with_both() {
@@ -248,7 +263,10 @@ migrations
 sandbox-images-changed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_target_notes() {
@@ -263,7 +281,10 @@ it_prints_its_usage_without_target_notes() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: find-nixie-release-flags.sh <pinned notes> <target notes> [<notes between>...]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_flags_migrations_in_a_section_longer_than_a_pipe_buffer() {
@@ -286,7 +307,10 @@ EOF
 
   diff - "$tree/out" <<< 'migrations'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_flags_migrations_when_the_section_is_blank() {
@@ -312,7 +336,10 @@ EOF
 
   diff - "$tree/out" <<< 'migrations'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 run_cases

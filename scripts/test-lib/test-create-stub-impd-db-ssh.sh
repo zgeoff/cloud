@@ -41,7 +41,10 @@ OUT
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- pre-x"]'
   diff - "$tree/stdin" <<< "touch $tree/ran"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_a_failed_integrity_check_with_its_findings_on_one_line_and_exit_1() {
@@ -65,7 +68,10 @@ copy: /root/imp-db-backups/pre-x-20261008T120000 (73728 bytes, mode 600)
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- pre-x"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_answers_a_stopped_imp_host_with_dockers_error_and_exit_1() {
@@ -81,7 +87,10 @@ it_answers_a_stopped_imp_host_with_dockers_error_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error response from daemon: No such container: imp-host'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- pre-x"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
@@ -96,7 +105,10 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@geoffcloud bash -s -- pre-x'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","bash -s -- pre-x"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_host() {
@@ -111,7 +123,10 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@other bash -s -- pre-x'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@other","bash -s -- pre-x"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_command() {
@@ -126,7 +141,10 @@ it_fails_closed_with_exit_97_on_another_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@geoffcloud systemctl stop imp-host'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","stop","imp-host"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_label_with_another_character() {
@@ -141,7 +159,10 @@ it_fails_closed_with_exit_97_on_a_label_with_another_character() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@geoffcloud bash -s -- ../x'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- ../x"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255() {
@@ -156,7 +177,10 @@ it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -s -- x"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # 127.0.0.2 is loopback too, so a broken guard would only reach a dead local port, never a
@@ -173,7 +197,10 @@ it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.2:1 bash -s -- x'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.2:1","bash -s -- x"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # OpenSSH reads an option even after the destination, so the stand-in refuses one there
@@ -191,7 +218,10 @@ it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.1:1 -oProxyCommand=false bash -s -- x'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","-oProxyCommand=false","bash -s -- x"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
@@ -212,7 +242,10 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -s -- x"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the

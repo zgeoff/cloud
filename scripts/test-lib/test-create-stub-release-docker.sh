@@ -34,7 +34,10 @@ it_prints_the_manifest_descriptor_the_test_wrote() {
   diff - "$tree/out" <<< '{"digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"}'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-host:1.0.1","--format","{{json .Manifest}}"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_a_missing_image_as_buildx_does() {
@@ -47,7 +50,10 @@ it_answers_a_missing_image_as_buildx_does() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'ERROR: ghcr.io/zgeoff/imp-host:9.9.9: not found'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_writes_the_test_lock_into_the_mounted_directory() {
@@ -68,7 +74,10 @@ it_writes_the_test_lock_into_the_mounted_directory() {
   diff - <(sed "s|$tree|TREE|g" "$tree/calls") << 'EOF'
 ["docker","run","--rm","-v","TREE/nixos:/src","-w","/src","example.invalid/nix:1","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown 0:0 flake.lock"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_lock_with_the_tests_error_and_leaves_the_lock_unchanged() {
@@ -86,7 +95,10 @@ it_fails_the_lock_with_the_tests_error_and_leaves_the_lock_unchanged() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'error: no commit found'
   diff - "$tree/nixos/flake.lock" <<< '{"old":true}'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_on_an_unexpected_call() {
@@ -100,7 +112,10 @@ it_fails_closed_on_an_unexpected_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: run --rm alpine true'
   diff - "$tree/calls" <<< '["docker","run","--rm","alpine","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 run_cases

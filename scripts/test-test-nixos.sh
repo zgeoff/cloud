@@ -59,7 +59,10 @@ EOF
   diff - "$tree/build-saw/nixos/flake.nix" <<< 'tracked'
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_caps_every_nix_container_at_the_cpus_and_memory_the_environment_names() {
@@ -85,7 +88,10 @@ it_caps_every_nix_container_at_the_cpus_and_memory_the_environment_names() {
 ["docker","run","--rm","--network","host","--cpuset-cpus","0-1","--memory","7g","--memory-swap","7g","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
 ["docker","run","--rm","--network","host","--cpuset-cpus","0-1","--memory","7g","--memory-swap","7g","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.impd-restore"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_only_the_checks_named_without_listing_the_flake() {
@@ -107,7 +113,10 @@ it_builds_only_the_checks_named_without_listing_the_flake() {
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon","path:/src?dir=nixos#checks.x86_64-linux.test-utils"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is_missing() {
@@ -129,7 +138,10 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is_not_readable_and_writable() {
@@ -154,7 +166,10 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_builds_the_other_checks_then_fails_naming_every_restore_check_when_the_kvm_device_is_missing() {
@@ -176,7 +191,10 @@ it_builds_the_other_checks_then_fails_naming_every_restore_check_when_the_kvm_de
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_checks_without_kvm() {
@@ -201,7 +219,10 @@ it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_ch
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_naming_impd_restore_and_builds_nothing_when_it_is_the_only_check_and_kvm_is_missing() {
@@ -221,7 +242,10 @@ it_fails_naming_impd_restore_and_builds_nothing_when_it_is_the_only_check_and_kv
 ["git","rev-parse","--show-toplevel"]
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_without_building_when_the_flake_fails_to_evaluate() {
@@ -245,7 +269,10 @@ it_stops_without_building_when_the_flake_fails_to_evaluate() {
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_flake_declares_no_checks() {
@@ -267,7 +294,10 @@ it_fails_when_the_flake_declares_no_checks() {
 ["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_the_build_when_a_check_fails() {
@@ -292,7 +322,10 @@ it_fails_with_the_build_when_a_check_fails() {
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 setup_test() {

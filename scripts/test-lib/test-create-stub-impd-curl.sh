@@ -29,7 +29,10 @@ it_answers_the_good_bearer_with_atc_clouds_identity_and_200() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\"json\":{}}","-w","\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_answers_another_bearer_with_impds_401() {
@@ -48,7 +51,10 @@ it_answers_another_bearer_with_impds_401() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\"json\":{}}","-w","\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_gives_the_named_fixed_answer_for_any_bearer() {
@@ -68,7 +74,10 @@ it_gives_the_named_fixed_answer_for_any_bearer() {
   diff - "$tree/calls" << 'CALLS'
 ["curl","-q","--noproxy","*","-sS","--max-time","10","-H","@-","-H","content-type: application/json","--data","{\"json\":{}}","-w","\\n%{http_code}","http://127.0.0.1:7070/rpc/tokens/whoami"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_other_arguments() {
@@ -84,7 +93,10 @@ it_fails_closed_with_exit_97_on_other_arguments() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -sS -H @- http://127.0.0.1:7070/rpc/tokens/whoami'
   diff - "$tree/calls" <<< '["curl","-sS","-H","@-","http://127.0.0.1:7070/rpc/tokens/whoami"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each curl

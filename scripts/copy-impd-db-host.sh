@@ -16,7 +16,11 @@ mkdir -p -m 0700 /root/imp-db-backups
 dir=/root/imp-db-backups/$1-$(date -u +%Y%m%dT%H%M%S)
 mkdir -m 0700 "$dir"
 work=$(docker exec imp-host sh -c "umask 077; mktemp -d /tmp/impd-db-copy.XXXXXX")
-case $work in /tmp/impd-db-copy.??????) ;; *) echo "unexpected work dir: $work" >&2; exit 1 ;; esac
+case $work in /tmp/impd-db-copy.??????) ;; *)
+  echo "unexpected work dir: $work" >&2
+  exit 1
+  ;;
+esac
 trap "docker exec imp-host rm -rf -- \"$work\"" EXIT
 docker cp "$static" "imp-host:$work/sqlite3"
 docker exec imp-host sh -c "umask 077; \"\$1/sqlite3\" /var/lib/imp/db/imp.sqlite \"VACUUM INTO '\$1/imp.sqlite'\"" _ "$work"

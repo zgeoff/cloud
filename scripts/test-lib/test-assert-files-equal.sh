@@ -20,7 +20,10 @@ it_passes_silently_for_equal_files() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_for_different_files_printing_the_unified_diff() {
@@ -43,7 +46,10 @@ it_fails_for_different_files_printing_the_unified_diff() {
 -x
 +y
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

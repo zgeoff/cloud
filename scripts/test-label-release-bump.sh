@@ -33,7 +33,10 @@ update:patch
 auto-merge
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_lets_a_minor_update_from_1_0_on_merge_on_its_own() {
@@ -50,7 +53,10 @@ update:minor
 auto-merge
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_minor_update_to_a_0_x_release_for_review() {
@@ -67,7 +73,10 @@ update:minor
 needs-review
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_major_update_for_review() {
@@ -84,7 +93,10 @@ update:major
 needs-review
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_counts_0_9_to_1_0_as_a_major_update() {
@@ -101,7 +113,10 @@ update:major
 needs-review
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_a_flag_and_holds_its_patch_update_for_review() {
@@ -119,7 +134,10 @@ sandbox-images-changed
 needs-review
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_labels_the_largest_step_across_the_pins() {
@@ -136,7 +154,10 @@ update:major
 needs-review
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_ignores_pins_at_the_version_or_newer() {
@@ -153,7 +174,10 @@ update:patch
 auto-merge
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_when_no_pin_is_older_than_the_version() {
@@ -167,7 +191,10 @@ it_fails_when_no_pin_is_older_than_the_version() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'no pinned version is older than 1.0.1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_pin_that_is_not_a_release_version() {
@@ -181,7 +208,10 @@ it_rejects_a_pin_that_is_not_a_release_version() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a release version: 'v1.0.0'"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_pinned_version() {
@@ -195,7 +225,10 @@ it_prints_its_usage_without_a_pinned_version() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: label-release-bump.sh <version> <pinned version>... [-- <flag>...]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

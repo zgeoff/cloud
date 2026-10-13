@@ -46,7 +46,10 @@ it_keeps_the_time_still_between_reads() {
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/sleep" 0.05
 
-  { env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/clock"; env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/clock"; } > "$tree/out"
+  {
+    env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/clock"
+    env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/clock"
+  } > "$tree/out"
 
   diff - "$tree/out" << 'READS'
 1

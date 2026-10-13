@@ -34,7 +34,10 @@ it_answers_the_switch_with_nothing() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # switch-to-configuration-ng sorts the failed units by their lower-case names, so
@@ -61,7 +64,10 @@ OUT
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 it_prints_no_status_text_for_failed_units_when_none_is_given() {
@@ -81,7 +87,10 @@ it_prints_no_status_text_for_failed_units_when_none_is_given() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 it_prints_the_named_gateway_images_without_a_newline_for_the_kubectl_query() {
@@ -101,7 +110,10 @@ it_prints_the_named_gateway_images_without_a_newline_for_the_kubectl_query() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_nothing_for_the_kubectl_query_when_no_gateway_pod_is_named() {
@@ -120,7 +132,10 @@ it_prints_nothing_for_the_kubectl_query_when_no_gateway_pod_is_named() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
@@ -146,7 +161,10 @@ it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_the_named_current_system_for_readlink() {
@@ -162,7 +180,10 @@ it_prints_the_named_current_system_for_readlink() {
   diff - "$tree/out" <<< /nix/store/current
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_drops_the_connection_at_readlink_with_exit_255() {
@@ -178,7 +199,10 @@ it_drops_the_connection_at_readlink_with_exit_255() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'Connection to geoffcloud closed by remote host.\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_prints_the_named_failed_units() {
@@ -195,7 +219,10 @@ it_prints_the_named_failed_units() {
   diff - "$tree/out" <<< 'alloy.service loaded failed failed Alloy'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_the_failed_unit_listing_with_the_named_exit_code() {
@@ -211,7 +238,10 @@ it_fails_the_failed_unit_listing_with_the_named_exit_code() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Failed to list units: Connection timed out'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
@@ -226,7 +256,10 @@ it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@geoffcloud reboot'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","reboot"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
@@ -241,7 +274,10 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@geoffcloud readlink /run/current-system'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","readlink","/run/current-system"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255() {
@@ -257,7 +293,10 @@ it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # 127.0.0.2 is loopback too, so a broken guard would only reach a dead local port, never a
@@ -275,7 +314,10 @@ it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.2:1 true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.2:1","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # OpenSSH reads an option even after the destination, so the stand-in refuses one there
@@ -293,7 +335,10 @@ it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.1:1 -oProxyCommand=false true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","-oProxyCommand=false","true"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
@@ -314,7 +359,10 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the other

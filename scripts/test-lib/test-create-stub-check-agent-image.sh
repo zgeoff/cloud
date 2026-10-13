@@ -31,7 +31,10 @@ it_passes_and_logs_its_arguments() {
   diff - "$tree/out" <<< '== 0 failed'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["check-agent-image.sh","--imp","agent-check-abc1234"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_the_count_a_test_sets() {
@@ -46,7 +49,10 @@ it_fails_with_the_count_a_test_sets() {
   diff - "$tree/out" <<< '== 2 failed'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["check-agent-image.sh","--imp","agent-check-abc1234"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

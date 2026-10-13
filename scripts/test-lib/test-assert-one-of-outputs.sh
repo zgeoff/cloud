@@ -25,7 +25,10 @@ it_passes_silently_for_the_first_candidate() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/assert-err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_silently_for_a_later_candidate() {
@@ -42,7 +45,10 @@ it_passes_silently_for_a_later_candidate() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/assert-err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_for_text_no_candidate_prints() {
@@ -67,7 +73,10 @@ other wording
 not v1: differs in stderr, exit 125
 not v2: differs in stderr
 ERR
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_one_candidates_text_with_another_candidates_status() {
@@ -92,7 +101,10 @@ old wording
 not v1: differs in exit 125
 not v2: differs in stderr
 ERR
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_one_candidates_stdout_with_another_candidates_stderr() {
@@ -121,7 +133,10 @@ new wording
 not v1: differs in stderr
 not v2: differs in stdout
 ERR
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_output_on_a_stream_a_candidate_expects_empty() {
@@ -145,7 +160,10 @@ old wording
 --- exit 125
 not v1: differs in stdout
 ERR
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_an_actual_output_file_that_does_not_exist() {
@@ -166,7 +184,10 @@ cat: $tree/missing: No such file or directory
 --- exit 0
 not v1: differs in stderr
 ERR
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_call_without_a_whole_candidate() {
@@ -180,7 +201,10 @@ it_refuses_a_call_without_a_whole_candidate() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/assert-err" <<< 'assert_one_of_outputs: want <label> <stdout> <stderr> <status>, then <name> <stdout> <stderr> <status> for each supported output'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_call_without_any_candidate() {
@@ -193,7 +217,10 @@ it_refuses_a_call_without_any_candidate() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/assert-err" <<< 'assert_one_of_outputs: want <label> <stdout> <stderr> <status>, then <name> <stdout> <stderr> <status> for each supported output'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

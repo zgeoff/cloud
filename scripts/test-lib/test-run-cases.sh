@@ -33,7 +33,10 @@ ok it passes first
 ok it passes second
 2 cases, 0 failed
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_a_failing_case_with_its_indented_output_keeps_going_and_exits_1() {
@@ -57,7 +60,10 @@ FAIL it fails (exit 3)
 ok it passes after
 2 cases, 1 failed
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_ends_a_case_at_its_first_failing_command() {
@@ -77,7 +83,10 @@ EOF
 FAIL it stops early (exit 1)
 1 cases, 1 failed
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_ends_a_case_that_reads_an_unset_variable() {
@@ -98,7 +107,10 @@ FAIL it reads unset (exit 1)
     $tree/suite.sh: line 2: never_set: unbound variable
 1 cases, 1 failed
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_ends_a_case_whose_pipeline_fails_before_its_last_command() {
@@ -118,7 +130,10 @@ EOF
 FAIL it pipes (exit 1)
 1 cases, 1 failed
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_runs_only_the_cases_whose_title_holds_CASE() {
@@ -139,7 +154,10 @@ EOF
 ok it reads a file
 1 cases, 0 failed
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_exits_1_when_CASE_matches_no_case() {
@@ -156,7 +174,10 @@ EOF
   env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" CASE='no such title' bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
   diff - "$tree/out" <<< '0 cases, 0 failed'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_passes_its_arguments_to_every_case() {
@@ -178,7 +199,10 @@ ok it counts them
 ok it sees both
 2 cases, 0 failed
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_runs_a_case_exit_trap_when_the_case_fails() {
@@ -194,12 +218,18 @@ EOF
 
   env -i PATH="$tree/bin" HOME="$tree/home" TMPDIR="$tree/tmp" bash "$tree/suite.sh" > "$tree/out" 2>&1 || status=$?
 
-  [ -e "$tree/cleaned" ] || { echo "the case's EXIT trap did not run" >&2; exit 1; }
+  [ -e "$tree/cleaned" ] || {
+    echo "the case's EXIT trap did not run" >&2
+    exit 1
+  }
   diff - "$tree/out" << 'EOF'
 FAIL it cleans up (exit 1)
 1 cases, 1 failed
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_keeps_one_case_state_out_of_the_next() {
@@ -223,7 +253,10 @@ ok it b sees no variable
 ok it c starts in the suites directory
 3 cases, 0 failed
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_runs_its_cases_in_a_bash_without_programmable_completion() {
@@ -245,7 +278,10 @@ EOF
 ok it passes
 1 cases, 0 failed
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_runs_an_exported_case() {
@@ -266,7 +302,10 @@ EOF
 ok it is exported
 1 cases, 0 failed
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the PATH, HOME and TMPDIR the suite under test runs with,

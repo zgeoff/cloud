@@ -17,7 +17,7 @@ if [ "$code" = "200" ] && grep -q '"ready":true' "$body"; then
 fi
 
 tmp=$(mktemp -p "$TEXTFILE_DIR" .impd_local_health.XXXXXX)
-cat > "$tmp" <<EOF
+cat > "$tmp" << EOF
 # HELP impd_local_health_up impd answered /health on host loopback with 200 and ready true. Local only, not end-to-end HTTPS.
 # TYPE impd_local_health_up gauge
 impd_local_health_up $up

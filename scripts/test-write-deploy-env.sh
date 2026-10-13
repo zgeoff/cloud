@@ -40,7 +40,10 @@ EOF
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff <(echo .env) <(ls -A "$tree/work")
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_reference_to_another_vault_and_leaves_the_file_unchanged() {
@@ -60,7 +63,10 @@ EOF
   diff "$tree/before" "$tree/work/.env"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'write-deploy-env: a reference outside the cloud vault: E2E_CLIENT_SECRET QUOTED_TOKEN'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_missing_argument_with_its_usage() {
@@ -73,7 +79,10 @@ it_rejects_a_missing_argument_with_its_usage() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: write-deploy-env.sh <env file>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 setup_test() {

@@ -26,7 +26,10 @@ it_prints_a_host_it_holds_as_getent_prints_it() {
   diff - "$tree/out" <<< '104.21.32.1     atc.geoff.cloud'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["getent","hosts","atc.geoff.cloud"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_exits_2_with_nothing_for_a_name_it_does_not_hold() {
@@ -42,7 +45,10 @@ it_exits_2_with_nothing_for_a_name_it_does_not_hold() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["getent","hosts","atc.geoff.cloud"]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_exits_2_with_nothing_when_it_holds_no_records() {
@@ -57,7 +63,10 @@ it_exits_2_with_nothing_when_it_holds_no_records() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["getent","hosts","atc.geoff.cloud"]'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_another_database() {
@@ -72,7 +81,10 @@ it_fails_closed_with_exit_97_on_another_database() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: passwd root'
   diff - "$tree/calls" <<< '["getent","passwd","root"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Pins the stand-in's not-found answer to the real getent's: a hosts lookup of a name that
@@ -91,7 +103,10 @@ it_answers_a_name_it_does_not_hold_as_the_real_getent_does() {
   diff "$tree/real-out" "$tree/out"
   diff "$tree/real-err" "$tree/err"
   diff - "$tree/calls" <<< '["getent","hosts","stub-getent-test.invalid"]'
-  [ "$status" = "$real_status" ] || { echo "exit $status, want $real_status" >&2; exit 1; }
+  [ "$status" = "$real_status" ] || {
+    echo "exit $status, want $real_status" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for every

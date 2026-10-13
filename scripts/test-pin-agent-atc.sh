@@ -51,7 +51,10 @@ ARG CODEX_VERSION=0.160.1
 EOF
   diff - "$tree/out" <<< 'pinned atc 3.11.0: 4444444444444444444444444444444444444444444444444444444444444444'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_pin_that_already_matches_alone() {
@@ -71,7 +74,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff - "$tree/out" <<< 'atc 3.10.2 is already pinned'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_a_newer_pin_alone() {
@@ -91,7 +97,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff - "$tree/out" <<< 'atc 3.10.10 is pinned, which is newer than 3.10.9'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_another_sum_for_the_pinned_version() {
@@ -111,7 +120,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'atc 3.10.2 is pinned with sum 4444444444444444444444444444444444444444444444444444444444444444, but SHA256SUMS lists 5555555555555555555555555555555555555555555555555555555555555555'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_sha256sums_without_an_atc_linux_x64_line() {
@@ -131,7 +143,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'SHA256SUMS has 0 atc-linux-x64 lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_sha256sums_with_two_atc_linux_x64_lines() {
@@ -154,7 +169,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'SHA256SUMS has 2 atc-linux-x64 lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_atc_linux_x64_line_that_holds_no_sha256() {
@@ -174,7 +192,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "SHA256SUMS's atc-linux-x64 line holds no sha256 sum"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_dockerfile_without_an_atc_version_pin() {
@@ -191,7 +212,10 @@ it_refuses_a_dockerfile_without_an_atc_version_pin() {
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'images/agent/Dockerfile has 0 ARG ATC_VERSION= lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_dockerfile_with_two_atc_sha256_pins() {
@@ -212,7 +236,10 @@ EOF
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'images/agent/Dockerfile has 2 ARG ATC_SHA256= lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_folder_without_the_agent_dockerfile() {
@@ -226,7 +253,10 @@ it_refuses_a_folder_without_the_agent_dockerfile() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'images/agent/Dockerfile is missing: run this from the root of a zgeoff/cloud checkout'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_version_that_is_not_a_release_version() {
@@ -241,7 +271,10 @@ it_refuses_a_version_that_is_not_a_release_version() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a release version: '3.11.0/x'"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_sha256sums_file() {
@@ -254,7 +287,10 @@ it_prints_its_usage_without_a_sha256sums_file() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: pin-agent-atc.sh <version> <SHA256SUMS file>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

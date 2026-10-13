@@ -31,7 +31,10 @@ it_lists_no_image_on_an_empty_host() {
   diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["imp","image","ls","--json"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_an_image_from_a_folder_it_copies_aside() {
@@ -50,7 +53,10 @@ it_builds_an_image_from_a_folder_it_copies_aside() {
   diff - "$tree/build-saw/Dockerfile" <<< 'FROM scratch'
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[{"name":"agent-abc1234","digest":"imp-build-stub-agent-abc1234"}],"imps":[]}'
   diff - <(env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" imp image ls --json) <<< '[{"name":"agent-abc1234","ref":"imp/agent-abc1234:latest","digest":"imp-build-stub-agent-abc1234"}]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_build_on_request_and_adds_no_image() {
@@ -68,7 +74,10 @@ it_fails_a_build_on_request_and_adds_no_image() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: BUILD_FAILED: the build exited 1'
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[],"imps":[]}'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_removes_an_image_no_imp_uses() {
@@ -84,7 +93,10 @@ it_removes_an_image_no_imp_uses() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[{"name":"agent-def5678","digest":"imp-build-2"}],"imps":[]}'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_to_remove_a_missing_image() {
@@ -98,7 +110,10 @@ it_refuses_to_remove_a_missing_image() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: NOT_FOUND: image agent-abc1234 not found'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_to_remove_an_image_an_imp_uses() {
@@ -114,7 +129,10 @@ it_refuses_to_remove_an_image_an_imp_uses() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: CONFLICT: image agent-abc1234 is in use'
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[{"name":"agent-abc1234","digest":"imp-build-1"}],"imps":[{"name":"home-1","image":"agent-abc1234"}]}'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_creates_an_imp_on_an_image() {
@@ -130,7 +148,10 @@ it_creates_an_imp_on_an_image() {
   diff - "$tree/out" <<< 'agent-check-abc1234'
   diff /dev/null "$tree/err"
   diff - <(env -i PATH="$tree/bin:/usr/bin:/bin" STUB_TREE="$tree" imp ls --json) <<< '[{"name":"agent-check-abc1234","image":"agent-abc1234"}]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_imp_on_a_missing_image() {
@@ -145,7 +166,10 @@ it_refuses_an_imp_on_a_missing_image() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: NOT_FOUND: image agent-abc1234 not found'
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[],"imps":[]}'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_imp_under_a_taken_name() {
@@ -160,7 +184,10 @@ it_refuses_an_imp_under_a_taken_name() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: CONFLICT: imp agent-check-abc1234 already exists'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_removes_an_imp() {
@@ -176,7 +203,10 @@ it_removes_an_imp() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[{"name":"agent-abc1234","digest":"imp-build-1"}],"imps":[]}'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_to_remove_a_missing_imp() {
@@ -190,7 +220,10 @@ it_refuses_to_remove_a_missing_imp() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp: NOT_FOUND: imp agent-check-abc1234 not found'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
@@ -205,7 +238,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: token ls'
   diff - "$tree/calls" <<< '["imp","token","ls"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 run_cases

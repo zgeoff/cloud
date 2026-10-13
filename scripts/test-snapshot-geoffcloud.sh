@@ -42,7 +42,10 @@ OUT
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer onidel-test-key","-H","content-type: application/json","--data","{\n  \"name\": \"pre-imp-0.30\",\n  \"desc\": \"2026-10-08T12:34Z\"\n}","https://api.cloud.onidel.com/vm/0f289413-258f-4115-ac81-252000998fe0/snapshot"]
 ["curl","-fsS","-H","Authorization: Bearer onidel-test-key","https://api.cloud.onidel.com/snapshots"]
 CALLS
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_with_exit_1_and_its_usage_when_no_name_is_given() {
@@ -61,7 +64,10 @@ it_stops_with_exit_1_and_its_usage_when_no_name_is_given() {
   diff - "$tree/err" <<< 'snapshot-geoffcloud.sh: line 9: 1: usage: snapshot-geoffcloud.sh <name>, such as pre-imp-0.26'
   diff /dev/null "$tree/calls"
   diff - "$tree/onidel/snapshots.json" <<< '[]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_with_exit_1_before_any_request_when_the_API_key_is_not_set() {
@@ -80,7 +86,10 @@ it_stops_with_exit_1_before_any_request_when_the_API_key_is_not_set() {
   diff - "$tree/err" <<< 'snapshot-geoffcloud.sh: line 12: ONIDEL_API_KEY: run through op run --env-file=.env'
   diff /dev/null "$tree/calls"
   diff - "$tree/onidel/snapshots.json" <<< '[]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_with_curl_exit_22_and_lists_nothing_when_Onidel_refuses_the_snapshot() {
@@ -103,7 +112,10 @@ it_stops_with_curl_exit_22_and_lists_nothing_when_Onidel_refuses_the_snapshot() 
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer onidel-test-key","-H","content-type: application/json","--data","{\n  \"name\": \"pre-imp-0.30\",\n  \"desc\": \"2026-10-08T12:34Z\"\n}","https://api.cloud.onidel.com/vm/0f289413-258f-4115-ac81-252000998fe0/snapshot"]
 CALLS
   diff - "$tree/onidel/snapshots.json" <<< '[]'
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_stops_with_curl_exit_22_and_never_prints_the_key_when_Onidel_refuses_it() {
@@ -125,7 +137,10 @@ it_stops_with_curl_exit_22_and_never_prints_the_key_when_Onidel_refuses_it() {
 ["curl","-fsS","-X","POST","-H","Authorization: Bearer revoked-test-key","-H","content-type: application/json","--data","{\n  \"name\": \"pre-imp-0.30\",\n  \"desc\": \"2026-10-08T12:34Z\"\n}","https://api.cloud.onidel.com/vm/0f289413-258f-4115-ac81-252000998fe0/snapshot"]
 CALLS
   diff - "$tree/onidel/snapshots.json" <<< '[]'
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 it_exits_22_after_the_request_when_the_snapshot_list_fails() {
@@ -150,7 +165,10 @@ it_exits_22_after_the_request_when_the_snapshot_list_fails() {
 CALLS
   diff - "$tree/onidel/snapshots.json" \
     <<< '[{"id":"c1d45377-b2a9-4407-ab8d-6909c34dfaac","created_at":"2026-10-08T12:34:57.000000Z","name":"pre-imp-0.30","desc":"2026-10-08T12:34Z","size":0,"status":"pending"}]'
-  [ "$status" = 22 ] || { echo "exit $status, want 22" >&2; exit 1; }
+  [ "$status" = 22 ] || {
+    echo "exit $status, want 22" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the script in <tree>, the curl and date stand-ins with

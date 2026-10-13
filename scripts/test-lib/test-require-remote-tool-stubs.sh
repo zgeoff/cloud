@@ -26,7 +26,10 @@ it_passes_when_every_remote_tool_resolves_to_a_stand_in_on_the_default_system_pa
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_passes_when_the_system_path_also_holds_every_remote_tool() {
@@ -43,7 +46,10 @@ it_passes_when_the_system_path_also_holds_every_remote_tool() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
@@ -62,7 +68,10 @@ it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to nothing, not a stand-in in $tree/bin"
   assert_missing "$tree/script-ran" "the step after the guard ran"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_a_stand_in_is_not_executable() {
@@ -76,7 +85,10 @@ it_fails_when_a_stand_in_is_not_executable() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "tailscale stand-in in $tree/bin is not executable"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_ssh_is_missing_and_the_system_path_holds_one() {
@@ -92,7 +104,10 @@ it_fails_when_ssh_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to $tree/system/ssh, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_ssh_is_missing_everywhere() {
@@ -106,7 +121,10 @@ it_fails_when_ssh_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_scp_is_missing_and_the_system_path_holds_one() {
@@ -122,7 +140,10 @@ it_fails_when_scp_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "scp resolves to $tree/system/scp, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_scp_is_missing_everywhere() {
@@ -136,7 +157,10 @@ it_fails_when_scp_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "scp resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_sftp_is_missing_and_the_system_path_holds_one() {
@@ -152,7 +176,10 @@ it_fails_when_sftp_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "sftp resolves to $tree/system/sftp, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_sftp_is_missing_everywhere() {
@@ -166,7 +193,10 @@ it_fails_when_sftp_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "sftp resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_rsync_is_missing_and_the_system_path_holds_one() {
@@ -182,7 +212,10 @@ it_fails_when_rsync_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "rsync resolves to $tree/system/rsync, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_rsync_is_missing_everywhere() {
@@ -196,7 +229,10 @@ it_fails_when_rsync_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "rsync resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_tailscale_is_missing_and_the_system_path_holds_one() {
@@ -212,7 +248,10 @@ it_fails_when_tailscale_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "tailscale resolves to $tree/system/tailscale, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_tailscale_is_missing_everywhere() {
@@ -226,7 +265,10 @@ it_fails_when_tailscale_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "tailscale resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: <tree>/bin with an executable placeholder for each remote

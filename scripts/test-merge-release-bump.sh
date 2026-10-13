@@ -50,7 +50,10 @@ read-token
 read-token
 merge-token
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_merges_a_green_auto_mode_bump_that_changes_only_the_agent_image() {
@@ -74,7 +77,10 @@ EOF
 ["gh","pr","view","8","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","8","--repo","zgeoff/cloud","--squash","--match-head-commit","2222222222222222222222222222222222222222"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_an_auto_mode_bump_that_changes_a_file_outside_the_agent_image() {
@@ -97,7 +103,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/auto-mode","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","8","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_while_a_check_is_pending() {
@@ -120,7 +129,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_whose_check_failed_and_names_it() {
@@ -143,7 +155,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_labelled_needs_review() {
@@ -166,7 +181,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_that_another_author_opened() {
@@ -189,7 +207,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_from_another_repository() {
@@ -212,7 +233,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_that_changes_a_file_outside_its_pins() {
@@ -235,7 +259,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_waits_for_the_nixos_checks_when_the_pull_request_changes_nixos() {
@@ -258,7 +285,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","9","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_merges_an_imp_pull_request_once_the_nixos_checks_passed() {
@@ -282,7 +312,10 @@ EOF
 ["gh","pr","view","9","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","9","--repo","zgeoff/cloud","--squash","--match-head-commit","2222222222222222222222222222222222222222"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_merges_while_a_review_bot_status_is_pending() {
@@ -306,7 +339,10 @@ EOF
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","7","--repo","zgeoff/cloud","--squash","--match-head-commit","1111111111111111111111111111111111111111"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_waits_for_ci_before_it_is_listed() {
@@ -329,7 +365,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_skips_a_branch_that_is_not_a_release_check_branch() {
@@ -344,8 +383,14 @@ it_skips_a_branch_that_is_not_a_release_check_branch() {
 
   diff - "$tree/out" <<< 'release-check/renovate is not a release check branch'
   diff /dev/null "$tree/err"
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_skips_a_branch_without_an_open_pull_request() {
@@ -361,7 +406,10 @@ it_skips_a_branch_without_an_open_pull_request() {
   diff - "$tree/out" <<< 'release-check/atc has no open pull request'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_without_the_app_login() {
@@ -376,8 +424,14 @@ it_fails_without_the_app_login() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'APP_LOGIN must name the release check app, as app/<slug>'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_fails_without_the_merge_token() {
@@ -392,8 +446,14 @@ it_fails_without_the_merge_token() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "MERGE_TOKEN must hold the release check app's token"
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_branch() {
@@ -408,8 +468,14 @@ it_prints_its_usage_without_a_branch() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: merge-release-bump.sh <branch>'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_holds_a_pull_request_with_a_commit_that_another_author_pushed() {
@@ -432,7 +498,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_reads_its_own_pull_request_past_a_forks_with_the_same_branch_name() {
@@ -456,7 +525,10 @@ EOF
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","7","--repo","zgeoff/cloud","--squash","--match-head-commit","1111111111111111111111111111111111111111"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_waits_for_a_gateway_fixture_that_has_not_registered_its_check() {
@@ -479,7 +551,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_waits_for_the_nixie_backup_fixture_past_another_workflows_fixture() {
@@ -502,7 +577,10 @@ EOF
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
 ["gh","pr","view","8","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 run_cases

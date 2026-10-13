@@ -84,7 +84,10 @@ pinned atc 4.3.0 in nixos/packages/atc.nix: 444444444444444444444444444444444444
 pinned atc 4.3.0 in deploy/atc-gateway/versions.env: 2222222222222222222222222222222222222222222222222222222222222222
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_newer_pin_and_pins_the_other_files() {
@@ -131,7 +134,10 @@ pinned atc 4.3.0 in nixos/packages/atc.nix: 444444444444444444444444444444444444
 pinned atc 4.3.0 in deploy/atc-gateway/versions.env: 2222222222222222222222222222222222222222222222222222222222222222
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_reports_a_release_that_every_file_already_pins() {
@@ -168,7 +174,10 @@ deploy/atc-gateway/versions.env already pins atc 4.3.0
 atc 4.3.0 is already pinned
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_the_release_pinned_with_another_sum_without_writing_any_file() {
@@ -201,7 +210,10 @@ EOF
   diff -r "$tree/before" "$tree/repo"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'nixos/packages/atc.nix pins atc 4.3.0 with sum 5555555555555555555555555555555555555555555555555555555555555555, but SHA256SUMS lists 4444444444444444444444444444444444444444444444444444444444444444'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_sums_without_the_gateway_asset_without_writing_any_file() {
@@ -231,7 +243,10 @@ EOF
   diff -r "$tree/before" "$tree/repo"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'SHA256SUMS has 0 atc-gateway-linux-x64 lines, want 1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_file_with_two_version_lines_without_writing_any_file() {
@@ -265,7 +280,10 @@ EOF
   diff -r "$tree/before" "$tree/repo"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "nixos/packages/atc.nix has 2 lines that match '^  version = \"(.*)\";\$', want 1"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_sha256sums_file() {
@@ -278,7 +296,10 @@ it_prints_its_usage_without_a_sha256sums_file() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: pin-atc.sh <version> <SHA256SUMS file>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_version_that_is_not_a_release() {
@@ -292,7 +313,10 @@ it_refuses_a_version_that_is_not_a_release() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a release version: '4.3'"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

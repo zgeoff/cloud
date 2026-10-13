@@ -48,7 +48,10 @@ EOF
 
   diff - "$tree/out" <<< 'the diff changes only the atc pins in images/agent/Dockerfile'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_compares_from_the_merge_base_when_main_moved_on() {
@@ -77,7 +80,10 @@ EOF
 
   diff - "$tree/out" <<< 'the diff changes only the atc pins in images/agent/Dockerfile'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_change_to_another_file() {
@@ -104,7 +110,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the diff changes scripts/check-agent-image.sh, not only images/agent/Dockerfile'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_change_to_another_dockerfile_line() {
@@ -131,7 +140,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the diff changes a Dockerfile line other than the atc pins: -ARG CODEX_VERSION=0.160.1'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_change_to_the_version_pin_alone() {
@@ -154,7 +166,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the diff must replace each atc pin once; it removes 1 and adds 1 ATC_VERSION lines, and removes 0 and adds 0 ATC_SHA256 lines'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_change_to_the_dockerfile_mode() {
@@ -180,7 +195,10 @@ EOF
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the diff changes a file mode, or creates or removes a file: mode change 100644 => 100755 images/agent/Dockerfile'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_empty_change() {
@@ -198,7 +216,10 @@ it_refuses_an_empty_change() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the diff changes nothing'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_gits_error_on_a_base_git_cannot_resolve() {
@@ -218,7 +239,10 @@ fatal: ambiguous argument 'nosuch...main': unknown revision or path not in the w
 Use '--' to separate paths from revisions, like this:
 'git <command> [<revision>...] -- [<file>...]'
 EOF
-  [ "$status" = 128 ] || { echo "exit $status, want 128" >&2; exit 1; }
+  [ "$status" = 128 ] || {
+    echo "exit $status, want 128" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_two_commits() {
@@ -231,7 +255,10 @@ it_prints_its_usage_without_two_commits() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: check-atc-pin-diff.sh <base> <head>'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

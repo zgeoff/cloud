@@ -25,7 +25,10 @@ it_prints_the_check_names_without_a_trailing_newline_for_an_eval() {
   printf 'atc-daemon\nimpd-restore\n' | cmp - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"eval\",\"--raw\",\"path:/src?dir=nixos#checks.x86_64-linux\",\"--apply\",\"builtins.attrNames\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_an_eval_with_the_set_error_and_exit_1() {
@@ -42,7 +45,10 @@ it_fails_an_eval_with_the_set_error_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: undefined variable 'x'"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"eval\",\"--raw\",\"path:/src?dir=nixos#checks.x86_64-linux\",\"--apply\",\"builtins.attrNames\"]"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_copies_the_directory_mounted_at_src_for_a_build() {
@@ -61,7 +67,10 @@ it_copies_the_directory_mounted_at_src_for_a_build() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_copies_the_source_then_fails_a_build_with_the_set_error_and_exit_1() {
@@ -81,7 +90,10 @@ it_copies_the_source_then_fails_a_build_with_the_set_error_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: Cannot build 'x.drv'."
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
@@ -96,7 +108,10 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: volume rm cloud-nixos-checks-store"
   diff - "$tree/calls" <<< '["docker","volume","rm","cloud-nixos-checks-store"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each call

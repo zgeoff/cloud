@@ -27,7 +27,10 @@ it_prints_the_field_with_no_newline() {
   printf '%s' token-value | diff - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud/dns/credential"]'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_a_missing_item_with_ops_error_and_exit_1() {
@@ -45,7 +48,10 @@ it_fails_a_missing_item_with_ops_error_and_exit_1() {
 [ERROR] 2026/10/07 12:00:00 could not read secret op://cloud/dns/credential: could not get item cloud/dns: "dns" isn't an item in the "cloud" vault.
 ERR
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud/dns/credential"]'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_field_the_item_does_not_hold() {
@@ -61,7 +67,10 @@ it_fails_closed_with_exit_97_on_a_field_the_item_does_not_hold() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: read --no-newline op://cloud/dns/credential'
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud/dns/credential"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_a_read_without_no_newline() {
@@ -78,7 +87,10 @@ it_fails_closed_with_exit_97_on_a_read_without_no_newline() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: read op://cloud/dns/credential'
   diff - "$tree/calls" <<< '["op","read","op://cloud/dns/credential"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 it_fails_closed_with_exit_97_on_any_other_command() {
@@ -93,7 +105,10 @@ it_fails_closed_with_exit_97_on_any_other_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: item list --vault cloud'
   diff - "$tree/calls" <<< '["op","item","list","--vault","cloud"]'
-  [ "$status" = 97 ] || { echo "exit $status, want 97" >&2; exit 1; }
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for every

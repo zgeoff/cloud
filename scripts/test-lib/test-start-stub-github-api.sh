@@ -29,7 +29,10 @@ it_answers_a_release_lookup_by_tag_with_githubs_404() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/v3/repos/zgeoff/atc/releases/tags/v1.0.0")"
 
   printf '%s' '{"message":"Not Found","documentation_url":"https://docs.github.com/rest/releases/releases#get-a-release-by-tag-name","status":"404"}' | diff - "$tree/body"
-  [ "$code" = 404 ] || { echo "HTTP $code, want 404" >&2; exit 1; }
+  [ "$code" = 404 ] || {
+    echo "HTTP $code, want 404" >&2
+    exit 1
+  }
   diff - "$tree/github/requests" <<< 'GET /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0'
   assert_missing "$tree/github/unexpected" "the lookup was recorded as unexpected"
 }
@@ -47,7 +50,10 @@ it_answers_the_release_by_tag_query_with_a_null_release() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/graphql")"
 
   printf '%s' '{"data":{"repository":{"release":null}}}' | diff - "$tree/body"
-  [ "$code" = 200 ] || { echo "HTTP $code, want 200" >&2; exit 1; }
+  [ "$code" = 200 ] || {
+    echo "HTTP $code, want 200" >&2
+    exit 1
+  }
   diff - "$tree/github/requests" <<< 'POST /api/graphql RepositoryReleaseByTag tagName=v1.0.0'
   assert_missing "$tree/github/unexpected" "the query was recorded as unexpected"
 }
@@ -63,7 +69,10 @@ it_fails_closed_on_another_path() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/v3/repos/zgeoff/atc/releases/latest")"
 
   printf '%s' '{"message":"stub-github-api: unexpected GET /api/v3/repos/zgeoff/atc/releases/latest"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
   diff - "$tree/github/unexpected" <<< 'GET /api/v3/repos/zgeoff/atc/releases/latest'
   assert_missing "$tree/github/requests" "the request was recorded as answered"
 }
@@ -80,7 +89,10 @@ it_fails_closed_on_another_graphql_query() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/graphql")"
 
   printf '%s' '{"message":"stub-github-api: unexpected POST /api/graphql"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
   diff - "$tree/github/unexpected" <<< 'POST /api/graphql'
   assert_missing "$tree/github/requests" "the query was recorded as answered"
 }
@@ -96,7 +108,10 @@ it_fails_closed_on_another_method() {
     -X DELETE "https://127.0.0.1:$(cat "$tree/github/port")/api/v3/repos/zgeoff/atc/releases/tags/v1.0.0")"
 
   printf '%s' '{"message":"stub-github-api: unexpected DELETE /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
   diff - "$tree/github/unexpected" <<< 'DELETE /api/v3/repos/zgeoff/atc/releases/tags/v1.0.0'
   assert_missing "$tree/github/requests" "the request was recorded as answered"
 }
@@ -114,7 +129,10 @@ it_fails_closed_on_the_release_by_tag_query_without_a_tag_variable() {
     "https://127.0.0.1:$(cat "$tree/github/port")/api/graphql")"
 
   printf '%s' '{"message":"stub-github-api: unexpected POST /api/graphql"}' | diff - "$tree/body"
-  [ "$code" = 500 ] || { echo "HTTP $code, want 500" >&2; exit 1; }
+  [ "$code" = 500 ] || {
+    echo "HTTP $code, want 500" >&2
+    exit 1
+  }
   diff - "$tree/github/unexpected" <<< 'POST /api/graphql'
   assert_missing "$tree/github/requests" "the query was recorded as answered"
 }
@@ -143,7 +161,10 @@ REQUESTS
   assert_missing "$tree/github/unexpected" "gh sent an unexpected request"
   ls -A "$tree/download" > "$tree/downloaded"
   diff /dev/null "$tree/downloaded"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the stand-in, started in <tree>/github, and the HOME and TMPDIR

@@ -61,7 +61,10 @@ ENV
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_installs_here_in_local_mode_from_the_named_references() {
@@ -97,7 +100,10 @@ ENV
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_replaces_a_token_file_it_installed_before() {
@@ -131,7 +137,10 @@ CALLS
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_writes_an_env_file_with_only_the_email_line_when_none_is_there() {
@@ -161,7 +170,10 @@ CALLS
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_with_exit_1_and_changes_nothing_when_the_token_does_not_look_like_a_Cloudflare_token() {
@@ -185,7 +197,10 @@ it_stops_with_exit_1_and_changes_nothing_when_the_token_does_not_look_like_a_Clo
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_with_exit_1_and_changes_nothing_when_the_email_does_not_look_like_an_email() {
@@ -212,7 +227,10 @@ CALLS
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_with_op_exit_1_and_changes_nothing_when_the_token_item_is_missing() {
@@ -236,7 +254,10 @@ ERR
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_exit_1_and_leaves_both_files_when_the_host_may_not_write_the_secrets_directory() {
@@ -268,7 +289,10 @@ CALLS
 dns-api-token
 imp-host.env
 FILES
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connection() {
@@ -297,7 +321,10 @@ CALLS
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the script in <tree>, the op and ssh stand-ins with fail-closed

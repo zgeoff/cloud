@@ -34,7 +34,10 @@ it_returns_once_the_command_succeeds_on_a_later_poll() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_returns_without_polling_again_when_the_command_succeeds_at_once() {
@@ -51,7 +54,10 @@ it_returns_without_polling_again_when_the_command_succeeds_at_once() {
   diff /dev/null "$tree/out"
   diff - "$tree/polls" <<< poll
   assert_missing "$tree/pauses" "wait_for paused after a poll that succeeded"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # The deadline is 3 seconds after the clock's 0. Each failed poll before it pauses, and the
@@ -76,7 +82,10 @@ it_fails_with_a_named_message_once_the_deadline_passes() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_passes_the_command_arguments_through_unchanged() {
@@ -90,7 +99,10 @@ it_passes_the_command_arguments_through_unchanged() {
     wait_for 5 "the file" test -f "$tree/a file with spaces" > "$tree/out" 2>&1 || status=$?
 
   diff /dev/null "$tree/out"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # With no WAIT_FOR_CLOCK, wait_for reads bash's SECONDS. The poll runs in wait_for's own
@@ -117,7 +129,10 @@ it_times_out_on_bashs_SECONDS_when_no_clock_is_set() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # With no WAIT_FOR_SLEEP, wait_for pauses with the sleep command it finds on PATH; here
@@ -141,7 +156,10 @@ it_pauses_with_the_sleep_command_on_PATH_when_no_pause_is_set() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 unset WAIT_FOR_CLOCK WAIT_FOR_SLEEP

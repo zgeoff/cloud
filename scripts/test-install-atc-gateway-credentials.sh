@@ -105,7 +105,10 @@ EOF
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   diff - "$tree/op-token-seen" <<< ops_fixture_env
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_when_the_1Password_vault_is_missing() {
@@ -133,7 +136,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_atc_key_is_not_installed() {
@@ -158,7 +164,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_reads_the_1Password_token_from_the_default_settings_file_when_the_environment_has_none() {
@@ -233,7 +242,10 @@ EOF
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   diff - "$tree/op-token-seen" <<< ops_fixture_settings
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_reads_the_1Password_token_from_the_settings_file_the_environment_names() {
@@ -306,7 +318,10 @@ EOF
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   diff - "$tree/op-token-seen" <<< ops_fixture_named
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_before_1Password_when_the_settings_file_is_missing_and_the_environment_has_no_token() {
@@ -328,7 +343,10 @@ EOF
   diff /dev/null "$tree/calls"
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 # The real ssh, behind the logging stand-in, refused by a loopback port where nothing
@@ -358,7 +376,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 255 ] || { echo "exit $status, want 255" >&2; exit 1; }
+  [ "$status" = 255 ] || {
+    echo "exit $status, want 255" >&2
+    exit 1
+  }
 }
 
 it_stops_when_impd_lacks_grantable_tokens() {
@@ -389,7 +410,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_impd_turns_grantable_tokens_off() {
@@ -420,7 +444,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_before_1Password_when_the_settings_file_holds_no_token() {
@@ -441,7 +468,10 @@ $tree/settings.json holds no env.OP_SERVICE_ACCOUNT_TOKEN; nothing changed
 EOF
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # A failing `imp info` stops the script with docker's own message and exit code, never
@@ -475,7 +505,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_imp_secret_ls_fails() {
@@ -509,7 +542,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_imp_token_ls_fails() {
@@ -546,7 +582,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_op_item_list_fails() {
@@ -585,7 +624,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The real install on "the host" (test-lib/create-stub-host-install.sh drops only the
@@ -672,7 +714,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_adds_glm_from_the_z_ai_key_on_stdin_when_glm_is_missing() {
@@ -749,7 +794,10 @@ EOF
   grep -F -e "$good_token" -e "$zai_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   diff - "$tree/impd/secret-glm" <<< "$zai_token"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_when_atc_key_prints_no_z_ai_key() {
@@ -795,7 +843,10 @@ EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
   assert_missing "$tree/impd/secret-glm" "impd secret glm"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_with_imps_exit_code_when_impd_rejects_the_glm_secret() {
@@ -848,7 +899,10 @@ EOF
   grep -F -e "$zai_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   assert_missing "$tree/impd/secret-glm" "impd secret glm"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_stops_when_the_1Password_item_and_the_host_file_differ() {
@@ -900,7 +954,10 @@ EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
   diff - "$tree/host/secrets/gateway-token" <<< other-bearer
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_only_the_1Password_item_holds_the_bearer() {
@@ -950,7 +1007,10 @@ EOF
   diff /dev/null "$tree/mints"
   ls -A "$tree/host/secrets" > "$tree/host-files"
   diff /dev/null "$tree/host-files"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_only_the_host_file_holds_the_bearer() {
@@ -1000,7 +1060,10 @@ EOF
   diff /dev/null "$tree/mints"
   ls -A "$tree/vault/cloud" > "$tree/vault-items"
   diff /dev/null "$tree/vault-items"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_mints_one_bearer_into_1Password_and_a_root_only_host_file_when_neither_exists() {
@@ -1074,7 +1137,10 @@ EOF
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   bearer="$(cat "$tree/vault/cloud/atc-daemon-token")"
-  [[ "$bearer" =~ ^[A-Za-z0-9_-]{64}$ ]] || { echo "the vault holds no 48-byte base64url bearer" >&2; exit 1; }
+  [[ "$bearer" =~ ^[A-Za-z0-9_-]{64}$ ]] || {
+    echo "the vault holds no 48-byte base64url bearer" >&2
+    exit 1
+  }
   diff - "$tree/host/secrets/gateway-token" <<< "$bearer"
   stat -c %a "$tree/host/secrets/gateway-token" > "$tree/mode"
   diff - "$tree/mode" <<< 400
@@ -1082,7 +1148,10 @@ EOF
   diff /dev/null "$tree/leftover"
   grep -F -e "$bearer" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/bearer-leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/bearer-leaks"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_when_the_minted_bearer_reads_back_differently_from_1Password() {
@@ -1135,7 +1204,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The host file changes between its write and its checksum; nothing but an interception
@@ -1191,7 +1263,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_writes_no_host_file_when_creating_the_1Password_item_fails() {
@@ -1244,7 +1319,10 @@ EOF
   diff /dev/null "$tree/host-secrets-files"
   ls -A "$tree/vault/cloud" > "$tree/vault-items-files"
   diff /dev/null "$tree/vault-items-files"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The secrets directory turns read-only after preflight; nothing but an interception
@@ -1303,7 +1381,10 @@ EOF
   diff /dev/null "$tree/host-files"
   ls -A "$tree/vault/cloud" > "$tree/vault-items"
   diff - "$tree/vault-items" <<< atc-daemon-token
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # gateway-token turns into a read-only directory after preflight, so the write's mktemp
@@ -1366,7 +1447,10 @@ EOF
   diff /dev/null "$tree/target-files"
   ls -A "$tree/vault/cloud" > "$tree/vault-items"
   diff - "$tree/vault-items" <<< atc-daemon-token
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_accepts_a_saved_token_without_a_trailing_newline() {
@@ -1438,7 +1522,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_rejects_an_empty_saved_token_without_asking_impd() {
@@ -1503,7 +1590,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_saved_token_followed_by_a_second_line_without_asking_impd() {
@@ -1568,7 +1658,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_saved_token_followed_by_a_blank_line_without_asking_impd() {
@@ -1633,7 +1726,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_saved_token_ending_in_a_carriage_return_without_asking_impd() {
@@ -1698,7 +1794,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_saved_token_holding_a_space_without_asking_impd() {
@@ -1763,7 +1862,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # the host's bash drops a NUL from the value it reads (and warns), so the token's length
@@ -1831,7 +1933,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_stale_saved_token_that_impd_answers_with_401() {
@@ -1896,7 +2001,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" -e "$stale_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_saved_token_that_impd_names_as_another_token() {
@@ -1961,7 +2069,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_saved_credential_that_impd_names_as_a_caller_other_than_a_token() {
@@ -2026,7 +2137,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_accepts_an_identity_that_impd_answers_with_a_2xx_other_than_200() {
@@ -2099,7 +2213,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_leaves_the_saved_token_unchecked_when_impd_answers_204_without_a_body() {
@@ -2161,7 +2278,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_leaves_the_saved_token_unchecked_when_impd_answers_200_with_a_body_that_is_not_JSON() {
@@ -2223,7 +2343,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_leaves_the_saved_token_unchecked_when_impd_answers_500() {
@@ -2286,7 +2409,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_leaves_the_saved_token_unchecked_when_impd_answers_403() {
@@ -2349,7 +2475,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The real curl on "the host", refused by a loopback port where nothing listens. curl
@@ -2489,7 +2618,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # A listener that resets the connection after reading the request drives the real curl
@@ -2557,7 +2689,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The ssh connection drops on the whoami check alone; nothing but an interception drops
@@ -2624,7 +2759,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The saved token disappears after preflight listed it and before the check reads it;
@@ -2691,7 +2829,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_leaves_the_saved_token_unchecked_when_a_directory_stands_in_its_place() {
@@ -2750,7 +2891,10 @@ EOF
   diff /dev/null "$tree/mints"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_leaves_the_saved_token_unchecked_when_the_file_cannot_be_read() {
@@ -2814,7 +2958,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_atc_cloud_exists_with_another_scope() {
@@ -2875,7 +3022,10 @@ EOF
   diff /dev/null "$tree/leaks"
   jq -r 'select(.[0] == "curl")' "$tree/calls" > "$tree/curl-calls"
   diff /dev/null "$tree/curl-calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_only_the_atc_cloud_token_exists() {
@@ -2930,7 +3080,10 @@ EOF
 EOF
   jq -r 'select(join(" ") | test("token (new|rm)"))' "$tree/calls" > "$tree/mints"
   diff /dev/null "$tree/mints"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_stops_when_only_the_saved_token_file_exists() {
@@ -2991,7 +3144,10 @@ EOF
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
   diff - "$tree/host/secrets/imp-token" <<< "$good_token"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_mints_atc_cloud_into_a_root_only_host_file_when_neither_exists() {
@@ -3066,7 +3222,10 @@ EOF
   diff - "$tree/mode" <<< 400
   find "$tree/host/secrets" -name '.imp-token.*' > "$tree/leftover"
   diff /dev/null "$tree/leftover"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_saves_no_token_when_the_mint_prints_more_than_one_line() {
@@ -3126,7 +3285,10 @@ EOF
   diff /dev/null "$tree/leaks"
   ls -A "$tree/host/secrets" > "$tree/host-files"
   diff - "$tree/host-files" <<< gateway-token
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_saves_no_token_when_imp_token_new_fails() {
@@ -3183,7 +3345,10 @@ EOF
 EOF
   ls -A "$tree/host/secrets" > "$tree/host-files"
   diff - "$tree/host-files" <<< gateway-token
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # The bearer file disappears after step 2 checked it; nothing but an interception removes
@@ -3259,7 +3424,10 @@ EOF
   diff /dev/null "$tree/mints"
   grep -F -e "$good_token" "$tree/calls" "$tree/host-output" "$tree/out" "$tree/err" > "$tree/leaks" || [ "$?" = 1 ]
   diff /dev/null "$tree/leaks"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # Real curl against the impd and proxy stand-ins (test-lib/start-stub-impd.sh and
@@ -3368,7 +3536,10 @@ pid
 port
 EOF
   assert_missing "$tree/trace.txt" "curl trace"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_stale_saved_token_without_leaking_it_under_the_hostile_curl_config() {
@@ -3464,7 +3635,10 @@ pid
 port
 EOF
   assert_missing "$tree/trace.txt" "curl trace"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 # HOME's .curlrc alone traces to stdout, which the host command returns here
@@ -3553,7 +3727,10 @@ pid
 port
 EOF
   assert_missing "$tree/trace.txt" "curl trace"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Boot data every case needs: the script, the roots of the 1Password stand-in's vaults

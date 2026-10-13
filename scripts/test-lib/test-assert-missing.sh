@@ -18,7 +18,10 @@ it_passes_silently_when_nothing_is_at_the_path() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_for_a_file_naming_its_path_quoted() {
@@ -31,7 +34,10 @@ it_fails_for_a_file_naming_its_path_quoted() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the label: expected no $tree/a\\ file"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_a_directory() {
@@ -44,7 +50,10 @@ it_fails_for_a_directory() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the label: expected no $tree/dir"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_for_a_dangling_symlink() {
@@ -57,7 +66,10 @@ it_fails_for_a_dangling_symlink() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the label: expected no $tree/link"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 run_cases

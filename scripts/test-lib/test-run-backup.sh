@@ -61,7 +61,10 @@ EOF
   diff - "$tree/obs/state-write" <<< 'exit 0'
   diff - "$tree/obs/repo-write" <<< 'exit 0'
   printf '<one>\n<two words>\nexit 0\n' | diff - "$tree/obs/args"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # ls is the one mode that lists the repository's gateway snapshots, so a dropped or
@@ -89,7 +92,10 @@ ID  2020-01-06 10:00:00  atc-gateway  atc-gateway  /tmp/a  SIZE
 ---------------------------------------------------------------------
 1 snapshots
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # restic exits 10 when the repository does not exist, a status no other path gives
@@ -108,7 +114,10 @@ Fatal: repository does not exist: unable to open config file: stat /repo/config:
 Is there a repository at the following location?
 /repo
 EOF
-  [ "$status" = 10 ] || { echo "exit $status, want 10" >&2; exit 1; }
+  [ "$status" = 10 ] || {
+    echo "exit $status, want 10" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_docker_run_option_without_a_value() {
@@ -122,7 +131,10 @@ it_refuses_a_docker_run_option_without_a_value() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'run_backup: the docker run option --version has no value'
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 # A trap removes the containers by name, so a run that is interrupted leaves none behind.
@@ -158,7 +170,10 @@ it_shares_the_state_volume_between_run_backup_shell_and_run_backup() {
 
   diff - "$tree/out" <<< 'in state'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_shares_the_repository_volume_between_run_backup_shell_and_run_backup() {
@@ -173,7 +188,10 @@ it_shares_the_repository_volume_between_run_backup_shell_and_run_backup() {
 
   diff - "$tree/out" <<< 'in repo'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 # Boot data every case needs: a seed directory that run_backup_shell mounts at /seed,

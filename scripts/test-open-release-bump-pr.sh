@@ -60,7 +60,10 @@ it_opens_a_labelled_pull_request_when_none_is_open() {
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/nixie","--title","chore(nixie): bump nixie to 0.7.1","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_updates_the_open_pull_request_and_its_labels_after_it_turns_auto_merge_off() {
@@ -97,7 +100,10 @@ it_updates_the_open_pull_request_and_its_labels_after_it_turns_auto_merge_off() 
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--add-label","needs-review,update:major","--remove-label","update:patch"]
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--title","chore(atc): bump atc to 5.0.0","--body-file","$tree/pr-body"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_opens_the_missing_pull_request_when_the_branch_already_holds_the_change() {
@@ -131,7 +137,10 @@ it_opens_the_missing_pull_request_when_the_branch_already_holds_the_change() {
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","closed","--json","number,headRefOid,isCrossRepository","--jq","[.[] | select((.isCrossRepository | not) and .headRefOid == \\"$(cat "$tree/before")\\")][0].number // empty"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/imp","--title","chore(imp): bump imp to 1.0.1","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_pushes_nothing_when_main_moved_only_in_other_files() {
@@ -169,7 +178,10 @@ it_pushes_nothing_when_main_moved_only_in_other_files() {
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_rebuilds_the_branch_when_main_changed_a_pinned_file() {
@@ -212,7 +224,10 @@ EOF
 ["gh","pr","edit","14","--repo","zgeoff/cloud","--add-label","auto-merge"]
 ["gh","pr","edit","14","--repo","zgeoff/cloud","--title","chore(imp): bump imp to 1.0.1","--body-file","$tree/pr-body"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_stops_when_main_already_pins_the_release() {
@@ -234,8 +249,14 @@ it_stops_when_main_already_pins_the_release() {
   diff - "$tree/out" <<< 'nixie 0.7.1 is already pinned'
   diff /dev/null "$tree/err"
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" for-each-ref --format='%(refname)') <<< 'refs/heads/main'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_without_a_push_when_the_pin_fails() {
@@ -257,8 +278,14 @@ it_fails_without_a_push_when_the_pin_fails() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the notes list 0 nixie digests'
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" for-each-ref --format='%(refname)') <<< 'refs/heads/main'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_label_it_does_not_manage() {
@@ -273,8 +300,14 @@ it_refuses_a_label_it_does_not_manage() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "not a release bump label: 'ship-it'"
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_without_a_pin_command() {
@@ -287,8 +320,14 @@ it_prints_its_usage_without_a_pin_command() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: open-release-bump-pr.sh <dependency> <version> <body file> <labels file> <pin command>...'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_persons_needs_review_hold_on_an_unchanged_branch() {
@@ -319,7 +358,10 @@ it_keeps_a_persons_needs_review_hold_on_an_unchanged_branch() {
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_bump_closed_that_a_person_closed_at_the_same_head() {
@@ -352,7 +394,10 @@ it_keeps_a_bump_closed_that_a_person_closed_at_the_same_head() {
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","closed","--json","number,headRefOid,isCrossRepository","--jq","[.[] | select((.isCrossRepository | not) and .headRefOid == \\"$head\\")][0].number // empty"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_opens_its_own_pull_request_past_a_forks_with_the_same_branch_name() {
@@ -380,7 +425,10 @@ it_opens_its_own_pull_request_past_a_forks_with_the_same_branch_name() {
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/nixie","--title","chore(nixie): bump nixie to 0.7.1","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_working_tree_that_another_pin_left_changed() {
@@ -407,8 +455,14 @@ nixie 0.7.0
 imp 1.0.1
 EOF
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" for-each-ref --format='%(refname)') <<< 'refs/heads/main'
-  [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "gh ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_persons_needs_review_hold_when_main_changed_another_pin_in_the_same_file() {
@@ -449,7 +503,10 @@ EOF
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","edit","14","--repo","zgeoff/cloud","--title","chore(atc): bump atc to 4.2.1","--body-file","$tree/pr-body"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_drops_a_persons_needs_review_hold_when_a_later_release_replaces_the_bump() {
@@ -483,7 +540,10 @@ it_drops_a_persons_needs_review_hold_when_a_later_release_replaces_the_bump() {
 ["gh","pr","edit","14","--repo","zgeoff/cloud","--add-label","auto-merge","--remove-label","needs-review"]
 ["gh","pr","edit","14","--repo","zgeoff/cloud","--title","chore(atc): bump atc to 4.2.2","--body-file","$tree/pr-body"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_rejected_release_closed_when_main_changed_another_pin_in_the_same_file() {
@@ -521,7 +581,10 @@ it_keeps_a_rejected_release_closed_when_main_changed_another_pin_in_the_same_fil
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","closed","--json","number,headRefOid,isCrossRepository","--jq","[.[] | select((.isCrossRepository | not) and .headRefOid == \\"$head\\")][0].number // empty"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_opens_a_later_release_after_a_person_rejected_the_one_before() {
@@ -555,7 +618,10 @@ it_opens_a_later_release_after_a_person_rejected_the_one_before() {
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/atc","--title","chore(atc): bump atc to 4.2.2","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 run_cases

@@ -39,7 +39,10 @@ https://github.com/zgeoff/cloud/actions/runs/8' \
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/actions/runs/9'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$commit\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$commit\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_prints_nothing_when_no_run_on_the_commit_is_green() {
@@ -57,7 +60,10 @@ it_prints_nothing_when_no_run_on_the_commit_is_green() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$commit\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$commit\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_fails_with_gh_error_and_exit_when_gh_fails() {
@@ -76,7 +82,10 @@ it_fails_with_gh_error_and_exit_when_gh_fails() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$commit\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$commit\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 4 ] || { echo "exit $status, want 4" >&2; exit 1; }
+  [ "$status" = 4 ] || {
+    echo "exit $status, want 4" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_commit_git_cannot_resolve() {
@@ -92,7 +101,10 @@ it_refuses_a_commit_git_cannot_resolve() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'find-ci-run: 0123456789abcdef0123456789abcdef01234567 is not a commit'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_rejects_a_missing_argument_with_its_usage() {
@@ -108,7 +120,10 @@ it_rejects_a_missing_argument_with_its_usage() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: find-ci-run.sh <commit>'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 # Runtime every case needs: the gh stand-in, and a git repository with an empty root commit.

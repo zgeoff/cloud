@@ -116,7 +116,10 @@ prs="$(gh pr list --repo "$repo" --head "$branch" --state open \
   --json number,url,autoMergeRequest,labels,isCrossRepository |
   jq -c '[.[] | select(.isCrossRepository | not)]')"
 number="$(jq -r '.[0].number // empty' <<< "$prs")"
-joined="$(IFS=,; echo "${labels[*]}")"
+joined="$(
+  IFS=,
+  echo "${labels[*]}"
+)"
 
 # sync_labels [keep-hold]: adds the missing labels to the open pull request and removes the
 # managed labels it no longer carries. With keep-hold, a needs-review label stays, and auto-merge
@@ -126,7 +129,10 @@ sync_labels() {
   current="$(jq -r '.[0].labels[].name' <<< "$prs")"
   wanted="$(printf '%s\n' "${labels[@]}")"
   if [ "${1:-}" = keep-hold ] && grep -qx needs-review <<< "$current"; then
-    wanted="$(grep -vx auto-merge <<< "$wanted"; echo needs-review)"
+    wanted="$(
+      grep -vx auto-merge <<< "$wanted"
+      echo needs-review
+    )"
   fi
   add="$(comm -13 <(sort <<< "$current") <(sort -u <<< "$wanted") | paste -sd,)"
   remove="$(comm -23 <(sort <<< "$current") <(sort -u <<< "$wanted") |

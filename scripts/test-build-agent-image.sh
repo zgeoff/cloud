@@ -71,7 +71,10 @@ EOF
 ["check-agent-image.sh","--imp","agent-check-$short"]
 ["imp","rm","agent-check-$short"]
 EOF
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_builds_an_older_commit_on_main() {
@@ -96,7 +99,10 @@ it_builds_an_older_commit_on_main() {
 
   diff - "$tree/out" <<< "agent-$short imp-build-stub-agent-$short check passed"
   diff - "$tree/build-saw/Dockerfile" <<< 'FROM ghcr.io/zgeoff/imp-base:0.33.0'
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_removes_the_image_when_its_check_fails() {
@@ -135,7 +141,10 @@ EOF
 ["imp","rm","agent-check-$short"]
 ["imp","image","rm","agent-$short"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_keeps_the_image_when_its_check_fails_with_keep() {
@@ -157,7 +166,10 @@ it_keeps_the_image_when_its_check_fails_with_keep() {
 
   diff - "$tree/out" <<< "agent-$short imp-build-stub-agent-$short check failed; kept the image"
   diff - <(jq -c . "$tree/imp-state.json") <<< "{\"images\":[{\"name\":\"agent-$short\",\"digest\":\"imp-build-stub-agent-$short\"}],\"imps\":[]}"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_without_an_imp_when_the_build_fails() {
@@ -185,7 +197,10 @@ imp: BUILD_FAILED: the build exited 1
 imp image build failed for agent-$short
 EOF
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[],"imps":[]}'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_fails_when_the_build_outlives_its_timeout() {
@@ -213,7 +228,10 @@ building agent-$short from $sha; imp image build shows no progress off a termina
 imp image build did not finish within 1s; impd may still finish agent-$short, so read imp image ls before a retry
 EOF
   diff - <(jq -c . "$tree/imp-state.json") <<< '{"images":[],"imps":[]}'
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_commit_that_is_not_on_main() {
@@ -238,8 +256,14 @@ it_refuses_a_commit_that_is_not_on_main() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$sha is not on origin/main: build only a commit that main holds"
-  [ ! -e "$tree/calls" ] || { echo "imp ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "imp ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_an_image_name_that_is_taken() {
@@ -263,7 +287,10 @@ it_refuses_an_image_name_that_is_taken() {
   diff - "$tree/err" <<< "image agent-$short already exists: remove it with imp image rm, or build another commit"
   diff - "$tree/calls" <<< '["imp","image","ls","--json"]'
   diff - <(jq -c . "$tree/imp-state.json") <<< "{\"images\":[{\"name\":\"agent-$short\",\"digest\":\"imp-build-1\"}],\"imps\":[]}"
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_refuses_a_check_imp_name_that_is_taken() {
@@ -289,7 +316,10 @@ it_refuses_a_check_imp_name_that_is_taken() {
 ["imp","image","ls","--json"]
 ["imp","ls","--json"]
 EOF
-  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
 }
 
 it_prints_its_usage_for_an_unknown_option() {
@@ -302,8 +332,14 @@ it_prints_its_usage_for_an_unknown_option() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: build-agent-image.sh [--keep] [<commit on main>]'
-  [ ! -e "$tree/calls" ] || { echo "imp ran: $(cat "$tree/calls")" >&2; exit 1; }
-  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  [ ! -e "$tree/calls" ] || {
+    echo "imp ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  [ "$status" = 2 ] || {
+    echo "exit $status, want 2" >&2
+    exit 1
+  }
 }
 
 run_cases

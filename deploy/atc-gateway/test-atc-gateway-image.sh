@@ -57,7 +57,10 @@ it_answers_the_protected_resource_metadata_on_its_public_Host() {
   ]
 }
 EOF
-  [ "$code" = 200 ] || { echo "HTTP $code, want 200" >&2; exit 1; }
+  [ "$code" = 200 ] || {
+    echo "HTTP $code, want 200" >&2
+    exit 1
+  }
 }
 
 it_answers_healthz_on_its_public_Host() {
@@ -73,9 +76,15 @@ it_answers_healthz_on_its_public_Host() {
   code="$(curl -q --noproxy '*' -sS -o "$tree/body" -w '%{http_code}' -H 'Host: atc.fixture.invalid' \
     "http://127.0.0.1:$port/healthz")"
 
-  [ -f "$tree/body" ] || { echo "curl wrote no body file" >&2; exit 1; }
+  [ -f "$tree/body" ] || {
+    echo "curl wrote no body file" >&2
+    exit 1
+  }
   diff /dev/null "$tree/body"
-  [ "$code" = 200 ] || { echo "HTTP $code, want 200" >&2; exit 1; }
+  [ "$code" = 200 ] || {
+    echo "HTTP $code, want 200" >&2
+    exit 1
+  }
 }
 
 it_answers_readyz_on_its_public_Host() {
@@ -91,9 +100,15 @@ it_answers_readyz_on_its_public_Host() {
   code="$(curl -q --noproxy '*' -sS -o "$tree/body" -w '%{http_code}' -H 'Host: atc.fixture.invalid' \
     "http://127.0.0.1:$port/readyz")"
 
-  [ -f "$tree/body" ] || { echo "curl wrote no body file" >&2; exit 1; }
+  [ -f "$tree/body" ] || {
+    echo "curl wrote no body file" >&2
+    exit 1
+  }
   diff /dev/null "$tree/body"
-  [ "$code" = 200 ] || { echo "HTTP $code, want 200" >&2; exit 1; }
+  [ "$code" = 200 ] || {
+    echo "HTTP $code, want 200" >&2
+    exit 1
+  }
 }
 
 # the kubelet's probe reaches the pod by its IP, so the probe must set Host
@@ -110,9 +125,15 @@ it_refuses_healthz_for_a_foreign_Host() {
   code="$(curl -q --noproxy '*' -sS -o "$tree/body" -w '%{http_code}' -H 'Host: 10.42.0.9:8414' \
     "http://127.0.0.1:$port/healthz")"
 
-  [ -f "$tree/body" ] || { echo "curl wrote no body file" >&2; exit 1; }
+  [ -f "$tree/body" ] || {
+    echo "curl wrote no body file" >&2
+    exit 1
+  }
   diff /dev/null "$tree/body"
-  [ "$code" = 403 ] || { echo "HTTP $code, want 403" >&2; exit 1; }
+  [ "$code" = 403 ] || {
+    echo "HTTP $code, want 403" >&2
+    exit 1
+  }
 }
 
 it_refuses_the_metadata_for_a_foreign_Host() {
@@ -128,9 +149,15 @@ it_refuses_the_metadata_for_a_foreign_Host() {
   code="$(curl -q --noproxy '*' -sS -o "$tree/body" -w '%{http_code}' -H 'Host: 10.42.0.9:8414' \
     "http://127.0.0.1:$port/.well-known/oauth-protected-resource/mcp")"
 
-  [ -f "$tree/body" ] || { echo "curl wrote no body file" >&2; exit 1; }
+  [ -f "$tree/body" ] || {
+    echo "curl wrote no body file" >&2
+    exit 1
+  }
   diff /dev/null "$tree/body"
-  [ "$code" = 403 ] || { echo "HTTP $code, want 403" >&2; exit 1; }
+  [ "$code" = 403 ] || {
+    echo "HTTP $code, want 403" >&2
+    exit 1
+  }
 }
 
 it_runs_the_gateway_process_as_the_nonroot_uid() {
@@ -164,10 +191,17 @@ it_prints_the_new_clients_ID_when_it_adds_a_client() {
     --redirect-uri https://client.fixture.invalid/callback > "$tree/added" 2> "$tree/err" || status=$?
 
   client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' "$tree/added")"
-  [ -n "$client_id" ] || { cat "$tree/added"; echo "no client ID in the add output" >&2; exit 1; }
+  [ -n "$client_id" ] || {
+    cat "$tree/added"
+    echo "no client ID in the add output" >&2
+    exit 1
+  }
   diff - "$tree/added" <<< "Added fixture-client. Its client ID is $client_id"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
 }
 
 it_keeps_a_stored_client_across_a_restart() {
@@ -180,7 +214,11 @@ it_keeps_a_stored_client_across_a_restart() {
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \
     --redirect-uri https://client.fixture.invalid/callback > "$tree/added"
   client_id="$(sed -n 's/^Added fixture-client\. Its client ID is \([A-Za-z0-9]*\)$/\1/p' "$tree/added")"
-  [ -n "$client_id" ] || { cat "$tree/added"; echo "no client ID in the add output" >&2; exit 1; }
+  [ -n "$client_id" ] || {
+    cat "$tree/added"
+    echo "no client ID in the add output" >&2
+    exit 1
+  }
 
   docker restart "$name" > /dev/null
   wait_for_ready "$name" 30
