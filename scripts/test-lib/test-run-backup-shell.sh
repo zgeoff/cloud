@@ -81,6 +81,38 @@ it_stops_the_backup_shell_at_the_first_failing_command() {
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
+it_replaces_a_default_with_a_trailing_docker_run_option() {
+  local backup_image="$2" run="$3" status=0
+  name="atc-gw-shell-$run-$BASHPID"
+  tree="$(mktemp -d)"
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" "$name" "$backup_image"
+
+  run_backup_shell "$name" "$backup_image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
+    <<< 'echo "$(id -u):$(id -g) $STATE_DIR"' > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  diff - "$tree/out" <<< '10001:10001 /state'
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_refuses_a_trailing_docker_run_option_without_a_value() {
+  local backup_image="$2" run="$3" status=0
+  name="atc-gw-shell-$run-$BASHPID"
+  tree="$(mktemp -d)"
+  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree" "$name" "$backup_image"
+
+  run_backup_shell "$name" "$backup_image" "$tree" --user <<< 'touch /state/ran' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" <<< 'run_backup_shell: the docker run option --user has no value'
+  diff /dev/null "$tree/out"
+  [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+  run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state"
+  diff /dev/null "$tree/state"
+}
+
 # client is global, as name and tree are: the EXIT trap runs after the case function has
 # returned, when a local would be gone and the client would never be killed.
 it_names_the_backup_shell_container_after_the_case_while_it_runs() {

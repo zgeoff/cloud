@@ -1,0 +1,13 @@
+# The restore test's scratch claim (docs/runbooks/nixie.md). Its class deletes the volume when
+# the claim goes, unlike nixie's own local-path-retain claim.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nixie-restore-check
+  namespace: nixie
+spec:
+  accessModes: ['ReadWriteOnce']
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

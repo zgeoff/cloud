@@ -18,6 +18,8 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 | vault `cloud`, item `nixie-deployment-key`         | the deployment key, 32 random bytes in base64                   |
 | vault `cloud`, item `nixie-model-credential`       | the Claude setup token behind the model profile `opus`          |
 | vault `cloud`, item `nixie-definitions-deploy-key` | git-sync's read-only deploy key for `zgeoff/nixie-definitions`  |
+| vault `cloud`, item `nixie-restic`                 | the restic password of nixie's backup repository                |
+| vault `cloud`, item `r2-nixie-backup`              | the R2 key, endpoint and bucket of nixie's backup repository    |
 | `deploy/nixie/secrets.sops.yaml`                   | the deployment key, the model credential and nixie's impd token |
 | impd                                               | the token `nixie`, the model secret and nixie's sandbox images  |
 
@@ -209,8 +211,8 @@ deletes `nixie.db` and `keys.db` with their WAL and SHM files from the data volu
 again, and prints a fresh enrolment code.
 
 **CAUTION:** A reset cannot be undone. It deletes every record and key in nixie and signs out every
-device, and no copy is kept. Take an Onidel snapshot first if any of the data matters, and delete it
-once the reset is checked ([disk snapshots](#disk-snapshots)).
+device, and the reset itself keeps no copy. Run a backup first, as
+[nixie's backup](./nixie-backup.md#back-up-now) describes, if any of the data matters.
 
 1. List what the reset deletes. The dry run reads the volume and changes nothing:
 
@@ -237,7 +239,7 @@ step is safe to repeat.
 ## Keep nixie's data out of copies
 
 A forget in nixie removes an item everywhere nixie holds it, but a copy taken outside nixie keeps
-it. Two kinds of copy exist on the host, and each has its rule.
+it. Three kinds of copy exist, and each has its rule.
 
 ### Disk snapshots
 
@@ -274,6 +276,48 @@ forget only snapshots older than the newest one that holds no nixie sandbox. Run
 host_restic forget <short_id> <short_id>
 host_restic prune
 ```
+
+### nixie's backup
+
+Each snapshot of nixie's backup holds both databases whole, so a forgotten item stays in R2 until
+retention drops the last snapshot taken before the forget.
+[Purge a forgotten item](./nixie-backup.md#purge-a-forgotten-item) removes it sooner.
+
+## Restore from a backup
+
+The `nixie-backup` CronJob backs up `nixie.db` and `keys.db` every night to R2, as
+[nixie's backup](./nixie-backup.md) describes. A restore also needs the deployment key from the
+secrets file, which wraps the record keys in `keys.db`.
+
+**CAUTION:** A restore replaces nixie's records and keys with the snapshot's. Every record and
+device enrolled after the snapshot is lost. Back up first if the current data still matters.
+
+1. Stop nixie, so nothing writes during the restore:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n nixie scale statefulset/nixie --replicas=0
+   ssh root@geoffcloud k3s kubectl -n nixie wait --for=delete pod/nixie-0 --timeout=120s
+   ```
+
+   Expect `pod/nixie-0 condition met`. nixie writes until its pod stops.
+
+2. Restore with `deploy/nixie/restore-job.yaml`, which checks both databases before it replaces
+   either. Set `args: ["ls"]` to list the snapshots first, and `SNAPSHOT` to pick one:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl create -f - < deploy/nixie/restore-job.yaml
+   ssh root@geoffcloud k3s kubectl -n nixie logs -f job/<job-name>
+   ```
+
+   Expect `restored nixie.db: integrity_check ok` and `restored keys.db: integrity_check ok`.
+
+3. Start nixie and check it, as step 4 of [Deploy or upgrade](#deploy-or-upgrade) describes:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n nixie scale statefulset/nixie --replicas=1
+   ```
+
+4. Record the restore, with the snapshot ID, the time and the reason, in a cloud issue.
 
 ## Renew the certificate
 

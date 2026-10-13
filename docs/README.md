@@ -26,8 +26,8 @@ call, the path of a change, the topology and the data.
     and its backup.
   - [1Password Connect](./architecture/workloads/onepassword-connect.md): how a granted imp reads
     the vault through a host relay.
-  - [nixie](./architecture/workloads/nixie.md): the assistant, its secrets, its definitions, and its
-    route on the tailnet.
+  - [nixie](./architecture/workloads/nixie.md): the assistant, its secrets, its definitions, its
+    route on the tailnet, and its backup.
   - [The agent image](./architecture/workloads/agent-image.md): what sessions run on, and how it is
     built and pinned.
   - [Observability](./architecture/workloads/observability.md): metrics, logs, probes, alerts and
@@ -47,7 +47,9 @@ call, the path of a change, the topology and the data.
 - [Agent image](./runbooks/agent-image.md): build, check, switch or roll back the agent image.
 - [1Password Connect](./runbooks/onepassword-connect.md): set up, rotate or debug Connect for imps.
 - [nixie](./runbooks/nixie.md): add nixie's images and secrets to impd, change a secret, deploy,
-  enrol a device, renew the certificate.
+  enrol a device, back up and restore, renew the certificate.
+- [nixie's backup](./runbooks/nixie-backup.md): back up nixie now, read the repository, purge a
+  forgotten item, test a restore.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): the tailnet client for imp's end-to-end suites.
 
 Planned work and open choices live in Linear, not in this tree.
