@@ -158,6 +158,10 @@ check_tool op "$OP_VERSION" op --version
 check_package docker-compose-plugin "$DOCKER_COMPOSE_VERSION"
 check_tool auto-mode "$AUTO_MODE_VERSION" jq -r .version /opt/auto-mode/package.json
 check_tool gitleaks "$GITLEAKS_VERSION" gitleaks version
+# shellcheck's first line is its name, so the check reads its version line
+check_tool shellcheck "version: $SHELLCHECK_VERSION" \
+  bash -o pipefail -c "shellcheck --version | sed -n '/^version: /p'"
+check_tool shfmt "v$SHFMT_VERSION" shfmt --version
 if auto-mode --help > /dev/null 2>&1; then
   pass auto-mode "auto-mode --help exits 0"
 else
