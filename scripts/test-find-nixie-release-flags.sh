@@ -266,4 +266,27 @@ it_prints_its_usage_without_target_notes() {
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
 }
 
+it_flags_migrations_in_a_section_longer_than_a_pipe_buffer() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  cat > "$tree/pinned.md" << 'EOF'
+## Migrations
+
+This release adds no migration since v0.6.2.
+EOF
+  {
+    printf '## Migrations\n\n| Version | Migration |\n| ------- | --------- |\n'
+    for i in $(seq 1000); do echo "| $i | create the projection of table $i and backfill it from the event log |"; done
+  } > "$tree/target.md"
+
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash "$script" "$tree/pinned.md" "$tree/target.md" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'migrations'
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 run_cases

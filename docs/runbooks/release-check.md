@@ -33,10 +33,11 @@ it `needs-review` when any of these holds:
   [the nixie runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd) describes.
 
 The merge workflow runs each time a check workflow finishes on a `release-check/` branch. It merges
-a pull request labelled `auto-merge` only when the release check app opened it, it changes no file
-outside its dependency's pins, and every GitHub Actions check on its head has passed. A bump that
-changes `nixos/` also needs the NixOS checks, which run on an app's pull request. The merge uses the
-app's token, so the push to `main` starts its workflows.
+a pull request labelled `auto-merge` only when the release check app opened it and wrote every
+commit on it, it changes no file outside its dependency's pins, and every GitHub Actions check on
+its head has passed. A commit anyone else pushes to the branch therefore holds the pull request for
+a person. A bump that changes `nixos/` also needs the NixOS checks, which run on an app's pull
+request. The merge uses the app's token, so the push to `main` starts its workflows.
 
 ## Review a bump
 
@@ -46,8 +47,12 @@ app's token, so the push to `main` starts its workflows.
 3. Merge it once its checks pass.
 
 A later release replaces the branch, the title, the body and the labels of the open pull request,
-and turns its auto-merge off. A pull request that waits for review therefore always holds the newest
-release.
+and takes its `auto-merge` label and auto-merge off before the push. A pull request that waits for
+review therefore always holds the newest release.
+
+To hold a bump that would merge on its own, label it `needs-review`; the release check keeps that
+label until a later release replaces the bump. To reject a release, close its pull request; the
+release check keeps it closed until the next release, or until you delete its branch.
 
 ## Set up the app
 

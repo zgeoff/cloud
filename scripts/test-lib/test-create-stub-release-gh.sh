@@ -176,6 +176,21 @@ it_lists_the_open_pull_requests_the_test_wrote() {
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
+it_lists_the_closed_pull_requests_the_test_wrote_apart_from_the_open_ones() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '[{"number":12}]' > "$tree/open-prs"
+  echo '[{"number":15}]' > "$tree/closed-prs"
+
+  "${case_env[@]}" gh pr list --repo zgeoff/cloud --head release-check/atc --state closed --json number > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '[{"number":15}]'
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 it_filters_the_open_pull_requests_through_the_calls_jq() {
   local status=0
   tree="$(mktemp -d)"

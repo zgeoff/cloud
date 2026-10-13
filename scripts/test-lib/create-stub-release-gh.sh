@@ -13,8 +13,9 @@
 # - `release download <tag> -R zgeoff/<repo> -p <asset> -D <dir>` copies the tag's <asset> into
 #   <dir>, creating it.
 # - `api repos/zgeoff/<repo>/commits/<tag> --jq .sha` prints the tag's commit file.
-# - `pr list …` prints STUB_TREE/open-prs, the JSON array a test writes there, or `[]` when the
-#   file is missing, filtered through `jq -r` with the call's --jq expression when it has one.
+# - `pr list … --state open …` prints STUB_TREE/open-prs, and `pr list … --state closed …`
+#   STUB_TREE/closed-prs: the JSON array a test writes there, or `[]` when the file is missing,
+#   filtered through `jq -r` with the call's --jq expression when it has one.
 # - `pr view <n> …` prints STUB_TREE/pr-view, the JSON object a test writes there.
 # - `pr merge … --disable-auto`, `pr merge … --squash …` and `label create …` print nothing.
 # - `pr create …` prints https://github.com/zgeoff/cloud/pull/200, the URL of the new pull request.
@@ -78,7 +79,8 @@ case "$*" in
     cat "$dir/commit"
     ;;
   "pr list "*)
-    if [ -f "$STUB_TREE/open-prs" ]; then prs="$(cat "$STUB_TREE/open-prs")"; else prs='[]'; fi
+    file="$STUB_TREE/$(read_flag --state "$@")-prs"
+    if [ -f "$file" ]; then prs="$(cat "$file")"; else prs='[]'; fi
     filter="$(read_flag --jq "$@")"
     if [ -n "$filter" ]; then jq -r "$filter" <<< "$prs"; else echo "$prs"; fi
     ;;

@@ -18,7 +18,9 @@
 # command reports. It pushes nothing when the branch already changes the same files to the same
 # contents as a fresh pin of main; it then opens the pull request if none is open, or brings the
 # open one's labels up to date, so a run that failed after its push is repaired by running it
-# again. Unlike open-atc-pin-pr.sh it keeps no newer pin on the branch: the release check runs one
+# again. A person holds a bump by labelling it needs-review, which this script keeps, or by
+# closing it: a closed pull request for the branch's head stays closed until the branch is
+# deleted. Pull requests from forks never count. Unlike open-atc-pin-pr.sh it keeps no newer pin on the branch: the release check runs one
 # job at a time and always pins the newest release, so a newer branch means a withdrawn release.
 set -euo pipefail
 # comm needs the C collation that sort uses here
@@ -95,17 +97,25 @@ ensure_labels() {
   done
 }
 
-prs="$(gh pr list --repo "$repo" --head "$branch" --state open --json number,url,autoMergeRequest,labels)"
+# this repository's own pull requests only: a fork's pull request can have the same branch name
+prs="$(gh pr list --repo "$repo" --head "$branch" --state open \
+  --json number,url,autoMergeRequest,labels,isCrossRepository |
+  jq -c '[.[] | select(.isCrossRepository | not)]')"
 number="$(jq -r '.[0].number // empty' <<< "$prs")"
 joined="$(IFS=,; echo "${labels[*]}")"
 
-# sync_labels: adds the missing labels to the open pull request and removes the managed labels
-# it no longer carries
+# sync_labels [keep-hold]: adds the missing labels to the open pull request and removes the
+# managed labels it no longer carries. With keep-hold, a needs-review label stays, and auto-merge
+# is not added beside it, so a person's hold on the pull request lasts.
 sync_labels() {
-  local current add remove
+  local current wanted add remove
   current="$(jq -r '.[0].labels[].name' <<< "$prs")"
-  add="$(comm -13 <(sort <<< "$current") <(printf '%s\n' "${labels[@]}" | sort) | paste -sd,)"
-  remove="$(comm -23 <(sort <<< "$current") <(printf '%s\n' "${labels[@]}" | sort) |
+  wanted="$(printf '%s\n' "${labels[@]}")"
+  if [ "${1:-}" = keep-hold ] && grep -qx needs-review <<< "$current"; then
+    wanted="$(grep -vx auto-merge <<< "$wanted"; echo needs-review)"
+  fi
+  add="$(comm -13 <(sort <<< "$current") <(sort -u <<< "$wanted") | paste -sd,)"
+  remove="$(comm -23 <(sort <<< "$current") <(sort -u <<< "$wanted") |
     grep -xF -f <(cut -d' ' -f1 <<< "$managed") | paste -sd, || true)"
   local args=()
   if [ -n "$add" ]; then args+=(--add-label "$add"); fi
@@ -118,17 +128,33 @@ sync_labels() {
 ensure_labels
 if [ "$same" = true ]; then
   if [ -n "$number" ]; then
-    sync_labels > /dev/null
+    sync_labels keep-hold > /dev/null
     echo "$(jq -r '.[0].url' <<< "$prs") already bumps $dependency to $version"
-  else
-    gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body" \
-      --label "$joined"
+    exit 0
   fi
+  # a person who closed the pull request for this exact head rejected the bump: keep it closed
+  closed="$(gh pr list --repo "$repo" --head "$branch" --state closed \
+    --json number,headRefOid,isCrossRepository \
+    --jq "[.[] | select((.isCrossRepository | not) and .headRefOid == \"$lease\")][0].number // empty")"
+  if [ -n "$closed" ]; then
+    echo "#$closed was closed with this bump; delete $branch to open it again"
+    exit 0
+  fi
+  gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body" \
+    --label "$joined"
   exit 0
 fi
 
-if [ -n "$number" ] && [ "$(jq -r '.[0].autoMergeRequest != null' <<< "$prs")" = true ]; then
-  gh pr merge "$number" --repo "$repo" --disable-auto >&2
+# the open pull request loses auto-merge before the push, so a new head never merges under the
+# labels of the release it replaces, even when a later step fails
+if [ -n "$number" ]; then
+  if [ "$(jq -r '.[0].autoMergeRequest != null' <<< "$prs")" = true ]; then
+    gh pr merge "$number" --repo "$repo" --disable-auto >&2
+  fi
+  if jq -e '.[0].labels | any(.name == "auto-merge")' <<< "$prs" > /dev/null; then
+    gh pr edit "$number" --repo "$repo" --remove-label auto-merge > /dev/null
+    prs="$(jq -c '.[0].labels |= map(select(.name != "auto-merge"))' <<< "$prs")"
+  fi
 fi
 
 git push -q --force-with-lease="refs/heads/$branch:$lease" origin "HEAD:refs/heads/$branch"

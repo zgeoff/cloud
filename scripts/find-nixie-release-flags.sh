@@ -37,8 +37,11 @@ for notes in "${@:2}"; do
     echo migrations
     break
   fi
-  if read_section '## Migrations' "$notes" | grep -v '^[[:space:]]*$' |
-    grep -qvE '^This release adds no migration since v[0-9]+\.[0-9]+\.[0-9]+\.$'; then
+  # the section's other text, read whole rather than through grep -q: under pipefail, grep -q's
+  # early exit fails the pipe's writer on a long section, and the pipeline would read as empty
+  other="$(read_section '## Migrations' "$notes" | grep -v '^[[:space:]]*$' |
+    grep -vE '^This release adds no migration since v[0-9]+\.[0-9]+\.[0-9]+\.$' || true)"
+  if [ -n "$other" ]; then
     echo migrations
     break
   fi

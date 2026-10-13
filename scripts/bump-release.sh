@@ -57,6 +57,13 @@ case "$dependency" in
     from="$(printf '%s\n' "${pinned[@]}" | sort -V | head -1)"
     gh release view "v$from" -R zgeoff/nixie --json body --jq .body > "$work/pinned.md"
     gh release view "v$version" -R zgeoff/nixie --json body --jq .body > "$work/target.md"
+    # every release after the pinned one must be in the list, or its migrations go unread
+    tags="$(gh release list -R zgeoff/nixie --exclude-drafts --exclude-pre-releases --limit 30 \
+      --json tagName --jq '.[].tagName')"
+    if ! grep -qx "v$from" <<< "$tags"; then
+      echo "the latest 30 nixie releases do not reach the pinned v$from, so the releases between go unread" >&2
+      exit 1
+    fi
     between=()
     while read -r tag; do
       each="${tag#v}"
@@ -65,8 +72,7 @@ case "$dependency" in
         gh release view "$tag" -R zgeoff/nixie --json body --jq .body > "$work/$tag.md"
         between+=("$work/$tag.md")
       fi
-    done < <(gh release list -R zgeoff/nixie --exclude-drafts --exclude-pre-releases --limit 30 \
-      --json tagName --jq '.[].tagName')
+    done <<< "$tags"
     bash "$here/find-nixie-release-flags.sh" "$work/pinned.md" "$work/target.md" "${between[@]}" > "$work/flags"
     mapfile -t flags < "$work/flags"
     pin=(bash "$here/pin-nixie.sh" "$version" "$work/target.md")

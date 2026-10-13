@@ -29,9 +29,9 @@ it_merges_a_green_auto_merge_pull_request_with_the_merge_token() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:minor"},{"name":"auto-merge"}],"files":[{"path":"deploy/atc-gateway/versions.env"},{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"agent image"},{"__typename":"CheckRun","name":"auto-merge","status":"COMPLETED","conclusion":"SKIPPED","workflowName":"agent image"},{"__typename":"StatusContext","context":"CodeRabbit","state":"SUCCESS"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:minor"},{"name":"auto-merge"}],"files":[{"path":"deploy/atc-gateway/versions.env"},{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"agent image"},{"__typename":"CheckRun","name":"auto-merge","status":"COMPLETED","conclusion":"SKIPPED","workflowName":"agent image"},{"__typename":"StatusContext","context":"CodeRabbit","state":"SUCCESS"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -41,8 +41,8 @@ EOF
   diff - "$tree/out" <<< 'merged #7 at 1111111111111111111111111111111111111111'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","7","--repo","zgeoff/cloud","--squash","--match-head-commit","1111111111111111111111111111111111111111"]
 EOF
   diff - "$tree/tokens" << 'EOF'
@@ -58,9 +58,9 @@ it_holds_a_pull_request_while_a_check_is_pending() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"IN_PROGRESS","conclusion":null,"workflowName":"agent image"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"IN_PROGRESS","conclusion":null,"workflowName":"agent image"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -70,8 +70,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: waiting for check'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -81,9 +81,9 @@ it_holds_a_pull_request_whose_check_failed_and_names_it() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"FAILURE","workflowName":"agent image"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"FAILURE","workflowName":"agent image"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -93,8 +93,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: check (FAILURE) did not pass'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -104,9 +104,9 @@ it_holds_a_pull_request_labelled_needs_review() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:major"},{"name":"needs-review"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:major"},{"name":"needs-review"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -116,8 +116,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: it is not labelled auto-merge without needs-review'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -127,9 +127,9 @@ it_holds_a_pull_request_that_another_author_opened() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":false,"login":"someone"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":false,"login":"someone"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -139,8 +139,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: app/cloud-release-check did not open it from zgeoff/cloud'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -150,9 +150,9 @@ it_holds_a_pull_request_from_another_repository() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":true,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":true,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -162,8 +162,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: app/cloud-release-check did not open it from zgeoff/cloud'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -173,9 +173,9 @@ it_holds_a_pull_request_that_changes_a_file_outside_its_pins() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"infra/Pulumi.prod.yaml"},{"path":"scripts/pin-nixie.sh"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"infra/Pulumi.prod.yaml"},{"path":"scripts/pin-nixie.sh"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -185,8 +185,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: it changes scripts/pin-nixie.sh, which no pin of its dependency writes'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -196,9 +196,9 @@ it_waits_for_the_nixos_checks_when_the_pull_request_changes_nixos() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":9}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":9}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"nixos/flake.lock"},{"path":"nixos/flake.nix"},{"path":"nixos/hosts/geoffcloud/configuration.nix"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"nixos/flake.lock"},{"path":"nixos/flake.nix"},{"path":"nixos/hosts/geoffcloud/configuration.nix"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -208,8 +208,8 @@ EOF
   diff - "$tree/out" <<< '#9 stays open: waiting for nixos'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","9","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","9","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -219,9 +219,9 @@ it_merges_an_imp_pull_request_once_the_nixos_checks_passed() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":9}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":9}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"},{"path":"nixos/flake.lock"},{"path":"nixos/flake.nix"},{"path":"nixos/hosts/geoffcloud/configuration.nix"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"nixos","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"NixOS checks"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"agent image"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"},{"path":"nixos/flake.lock"},{"path":"nixos/flake.nix"},{"path":"nixos/hosts/geoffcloud/configuration.nix"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"CheckRun","name":"nixos","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"NixOS checks"},{"__typename":"CheckRun","name":"check","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"agent image"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -231,8 +231,8 @@ EOF
   diff - "$tree/out" <<< 'merged #9 at 2222222222222222222222222222222222222222'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","9","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","9","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","9","--repo","zgeoff/cloud","--squash","--match-head-commit","2222222222222222222222222222222222222222"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -243,9 +243,9 @@ it_merges_while_a_review_bot_status_is_pending() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"infra/Pulumi.prod.yaml"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"StatusContext","context":"CodeRabbit","state":"PENDING"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"infra/Pulumi.prod.yaml"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"},{"__typename":"StatusContext","context":"CodeRabbit","state":"PENDING"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -255,8 +255,8 @@ EOF
   diff - "$tree/out" <<< 'merged #7 at 1111111111111111111111111111111111111111'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 ["gh","pr","merge","7","--repo","zgeoff/cloud","--squash","--match-head-commit","1111111111111111111111111111111111111111"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -267,9 +267,9 @@ it_waits_for_ci_before_it_is_listed() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '[{"number":7}]' > "$tree/open-prs"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
   cat > "$tree/pr-view" << 'EOF'
-{"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"infra/Pulumi.prod.yaml"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"fixture","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"nixie backup"}]}
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"infra/Pulumi.prod.yaml"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"fixture","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"nixie backup"}]}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -279,8 +279,8 @@ EOF
   diff - "$tree/out" <<< '#7 stays open: waiting for ci'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number","--jq",".[0].number // empty"]
-["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,statusCheckRollup"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
@@ -313,7 +313,7 @@ it_skips_a_branch_without_an_open_pull_request() {
 
   diff - "$tree/out" <<< 'release-check/atc has no open pull request'
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number","--jq",".[0].number // empty"]'
+  diff - "$tree/calls" <<< '["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]'
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
@@ -363,6 +363,53 @@ it_prints_its_usage_without_a_branch() {
   diff - "$tree/err" <<< 'usage: merge-release-bump.sh <branch>'
   [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+}
+
+it_holds_a_pull_request_with_a_commit_that_another_author_pushed() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '[{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
+  cat > "$tree/pr-view" << 'EOF'
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]},{"oid":"2222222222222222222222222222222222222222","authors":[{"login":"someone"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"2222222222222222222222222222222222222222","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    GH_TOKEN=read-token APP_LOGIN=app/cloud-release-check MERGE_TOKEN=merge-token \
+    bash "$script" release-check/atc > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '#7 stays open: commits 2222222 are not all by cloud-release-check[bot]'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_reads_its_own_pull_request_past_a_forks_with_the_same_branch_name() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '[{"isCrossRepository":true,"number":9},{"isCrossRepository":false,"number":7}]' > "$tree/open-prs"
+  cat > "$tree/pr-view" << 'EOF'
+{"commits":[{"oid":"1111111111111111111111111111111111111111","authors":[{"login":"cloud-release-check[bot]"}]}],"author":{"is_bot":true,"login":"app/cloud-release-check"},"isCrossRepository":false,"headRefOid":"1111111111111111111111111111111111111111","labels":[{"name":"update:patch"},{"name":"auto-merge"}],"files":[{"path":"images/agent/Dockerfile"}],"statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS","workflowName":"CI"}]}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    GH_TOKEN=read-token APP_LOGIN=app/cloud-release-check MERGE_TOKEN=merge-token \
+    bash "$script" release-check/atc > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'merged #7 at 1111111111111111111111111111111111111111'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,isCrossRepository","--jq","[.[] | select(.isCrossRepository | not)][0].number // empty"]
+["gh","pr","view","7","--repo","zgeoff/cloud","--json","author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup"]
+["gh","pr","merge","7","--repo","zgeoff/cloud","--squash","--match-head-commit","1111111111111111111111111111111111111111"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 run_cases

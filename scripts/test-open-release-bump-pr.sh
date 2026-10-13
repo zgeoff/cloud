@@ -55,7 +55,7 @@ it_opens_a_labelled_pull_request_when_none_is_open() {
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" show release-check/nixie:pins) <<< 'nixie 0.7.1'
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..release-check/nixie) <<< 'chore(nixie): bump nixie to 0.7.1'
   diff - "$tree/calls" << EOF
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/nixie","--title","chore(nixie): bump nixie to 0.7.1","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
@@ -89,11 +89,12 @@ it_updates_the_open_pull_request_and_its_labels_after_it_turns_auto_merge_off() 
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" show release-check/atc:pins) <<< 'atc 5.0.0'
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..release-check/atc) <<< 'chore(atc): bump atc to 5.0.0'
   diff - "$tree/calls" << EOF
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:major","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","a major release"]
 ["gh","label","create","needs-review","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","waits for a review before it merges"]
 ["gh","pr","merge","12","--repo","zgeoff/cloud","--disable-auto"]
-["gh","pr","edit","12","--repo","zgeoff/cloud","--add-label","needs-review,update:major","--remove-label","auto-merge,update:patch"]
+["gh","pr","edit","12","--repo","zgeoff/cloud","--remove-label","auto-merge"]
+["gh","pr","edit","12","--repo","zgeoff/cloud","--add-label","needs-review,update:major","--remove-label","update:patch"]
 ["gh","pr","edit","12","--repo","zgeoff/cloud","--title","chore(atc): bump atc to 5.0.0","--body-file","$tree/pr-body"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -124,9 +125,10 @@ it_opens_the_missing_pull_request_when_the_branch_already_holds_the_change() {
   diff /dev/null "$tree/err"
   diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/imp)
   diff - "$tree/calls" << EOF
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","closed","--json","number,headRefOid,isCrossRepository","--jq","[.[] | select((.isCrossRepository | not) and .headRefOid == \\"$(cat "$tree/before")\\")][0].number // empty"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/imp","--title","chore(imp): bump imp to 1.0.1","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -163,7 +165,7 @@ it_pushes_nothing_when_main_moved_only_in_other_files() {
   diff /dev/null "$tree/err"
   diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/imp)
   diff - "$tree/calls" << 'EOF'
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 EOF
@@ -203,9 +205,11 @@ imp 1.0.1
 EOF
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..release-check/imp) <<< 'chore(imp): bump imp to 1.0.1'
   diff - "$tree/calls" << EOF
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","edit","14","--repo","zgeoff/cloud","--remove-label","auto-merge"]
+["gh","pr","edit","14","--repo","zgeoff/cloud","--add-label","auto-merge"]
 ["gh","pr","edit","14","--repo","zgeoff/cloud","--title","chore(imp): bump imp to 1.0.1","--body-file","$tree/pr-body"]
 EOF
   [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
@@ -285,6 +289,98 @@ it_prints_its_usage_without_a_pin_command() {
   diff - "$tree/err" <<< 'usage: open-release-bump-pr.sh <dependency> <version> <body file> <labels file> <pin command>...'
   [ ! -e "$tree/calls" ] || { echo "gh ran: $(cat "$tree/calls")" >&2; exit 1; }
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+}
+
+it_keeps_a_persons_needs_review_hold_on_an_unchanged_branch() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo 'imp 1.0.0' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/imp
+  echo 'imp 1.0.1' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(imp): bump imp to 1.0.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/imp
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  echo '[{"autoMergeRequest":null,"isCrossRepository":false,"labels":[{"name":"needs-review"},{"name":"update:patch"}],"number":14,"url":"https://github.com/zgeoff/cloud/pull/14"}]' > "$tree/open-prs"
+  echo 'Bumps imp to 1.0.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" imp 1.0.1 "$tree/pr-body" "$tree/labels" \
+    sh -c 'echo "imp 1.0.1" > pins') > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/14 already bumps imp to 1.0.1'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_keeps_a_bump_closed_that_a_person_closed_at_the_same_head() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo 'imp 1.0.0' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/imp
+  echo 'imp 1.0.1' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(imp): bump imp to 1.0.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/imp
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  head="$("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/imp)"
+  echo "[{\"headRefOid\":\"$head\",\"isCrossRepository\":false,\"number\":15}]" > "$tree/closed-prs"
+  echo 'Bumps imp to 1.0.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" imp 1.0.1 "$tree/pr-body" "$tree/labels" \
+    sh -c 'echo "imp 1.0.1" > pins') > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '#15 was closed with this bump; delete release-check/imp to open it again'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << EOF
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","closed","--json","number,headRefOid,isCrossRepository","--jq","[.[] | select((.isCrossRepository | not) and .headRefOid == \\"$head\\")][0].number // empty"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_opens_its_own_pull_request_past_a_forks_with_the_same_branch_name() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo 'nixie 0.7.0' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  echo '[{"autoMergeRequest":null,"isCrossRepository":true,"labels":[],"number":31,"url":"https://github.com/zgeoff/cloud/pull/31"}]' > "$tree/open-prs"
+  echo 'Bumps nixie to 0.7.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" nixie 0.7.1 "$tree/pr-body" "$tree/labels" \
+    sh -c 'echo "nixie 0.7.1" > pins') > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/200'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << EOF
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/nixie","--title","chore(nixie): bump nixie to 0.7.1","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
 }
 
 run_cases

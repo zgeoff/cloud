@@ -8,7 +8,8 @@
 # check app's token, so the push to main starts its workflows, which a GITHUB_TOKEN merge would
 # not. It squash-merges the branch's open pull request, pinned to the head it checked, only when:
 #
-# - APP_LOGIN, the release check app, opened it from this repository;
+# - APP_LOGIN, the release check app, opened it from this repository, and the app's bot user
+#   authored every commit on it, so a commit someone else pushed waits for a person;
 # - it carries `auto-merge` and not `needs-review` (label-release-bump.sh's decision);
 # - it changes only the files that its dependency's pin script writes;
 # - every GitHub Actions check run on its head has passed or was skipped, `ci` among them, and
@@ -59,13 +60,15 @@ nixos/hosts/geoffcloud/configuration.nix'
     ;;
 esac
 
-number="$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')"
+# this repository's own pull request: a fork's pull request can have the same branch name
+number="$(gh pr list --repo "$repo" --head "$branch" --state open --json number,isCrossRepository \
+  --jq '[.[] | select(.isCrossRepository | not)][0].number // empty')"
 if [ -z "$number" ]; then
   echo "$branch has no open pull request"
   exit 0
 fi
 pr="$(gh pr view "$number" --repo "$repo" \
-  --json author,isCrossRepository,headRefOid,labels,files,statusCheckRollup)"
+  --json author,isCrossRepository,headRefOid,labels,files,commits,statusCheckRollup)"
 
 # hold <reason>: leaves the pull request open, saying why
 hold() {
@@ -76,6 +79,12 @@ hold() {
 author="$(jq -r .author.login <<< "$pr")"
 if [ "$author" != "$APP_LOGIN" ] || [ "$(jq -r .isCrossRepository <<< "$pr")" != false ]; then
   hold "$APP_LOGIN did not open it from $repo"
+fi
+# a commit anyone else pushed to the branch is not a pin, whatever files it touches
+bot="${APP_LOGIN#app/}[bot]"
+others="$(jq -r --arg bot "$bot" '[.commits[] | select(any(.authors[]; .login != $bot)) | .oid[0:7]] | join(", ")' <<< "$pr")"
+if [ -n "$others" ] || [ "$(jq '.commits | length' <<< "$pr")" = 0 ]; then
+  hold "commits ${others:-none} are not all by $bot"
 fi
 labels="$(jq -r '.labels[].name' <<< "$pr")"
 if ! grep -qx auto-merge <<< "$labels" || grep -qx needs-review <<< "$labels"; then

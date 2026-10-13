@@ -102,7 +102,7 @@ EOF
   sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g" "$tree/calls" > "$tree/calls.masked"
   diff - "$tree/calls.masked" << 'EOF'
 ["gh","release","download","@zgeoff/atc@5.0.0","-R","zgeoff/atc","-p","SHA256SUMS","-D","<work>"]
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:major","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","a major release"]
 ["gh","label","create","needs-review","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","waits for a review before it merges"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/atc","--title","chore(atc): bump atc to 5.0.0","--body-file","<work>/body","--label","update:major,needs-review"]
@@ -166,7 +166,7 @@ EOF
 ["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-host:1.0.1","--format","{{json .Manifest}}"]
 ["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-base:1.0.1","--format","{{json .Manifest}}"]
 ["docker","run","--rm","-v","<clone>/nixos:/src","-w","/src","$NIX_IMAGE","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"]
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
 ["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/imp","--title","chore(imp): bump imp to 1.0.1","--body-file","<work>/body","--label","update:patch,auto-merge"]
@@ -251,7 +251,7 @@ EOF
 ["gh","release","view","v0.7.2","-R","zgeoff/nixie","--json","body","--jq",".body"]
 ["gh","release","list","-R","zgeoff/nixie","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 ["gh","release","view","v0.7.1","-R","zgeoff/nixie","--json","body","--jq",".body"]
-["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,url,autoMergeRequest,labels"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/nixie","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","migrations","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","the release adds database migrations"]
 ["gh","label","create","needs-review","--repo","zgeoff/cloud","--force","--color","d73a4a","--description","waits for a review before it merges"]
@@ -316,6 +316,28 @@ it_prints_its_usage_without_a_pinned_version() {
   diff - "$tree/err" <<< 'usage: bump-release.sh <dependency> <version> <pinned version>...'
   [ ! -e "$tree/calls" ] || { echo "a stand-in ran: $(cat "$tree/calls")" >&2; exit 1; }
   [ "$status" = 2 ] || { echo "exit $status, want 2" >&2; exit 1; }
+}
+
+it_fails_without_a_pull_request_when_the_release_list_misses_the_pinned_release() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/releases/nixie/v0.5.0" "$tree/releases/nixie/v0.7.2"
+  printf 'v0.7.2\nv0.7.1\n' > "$tree/releases/nixie/tags"
+  printf '## Migrations\n\nThis release adds no migration since v0.4.0.\n' > "$tree/releases/nixie/v0.5.0/notes.md"
+  printf '## Migrations\n\nThis release adds no migration since v0.7.1.\n' > "$tree/releases/nixie/v0.7.2/notes.md"
+
+  (cd "$tree/seed" && "${case_env[@]}" bash "$script" nixie 0.7.2 0.5.0 0.5.0) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'the latest 30 nixie releases do not reach the pinned v0.5.0, so the releases between go unread'
+  diff - "$tree/calls" << 'EOF'
+["gh","release","view","v0.5.0","-R","zgeoff/nixie","--json","body","--jq",".body"]
+["gh","release","view","v0.7.2","-R","zgeoff/nixie","--json","body","--jq",".body"]
+["gh","release","list","-R","zgeoff/nixie","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
+EOF
+  [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
 run_cases
