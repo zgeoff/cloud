@@ -12,10 +12,11 @@
 #   authored every commit on it, so a commit someone else pushed waits for a person;
 # - it carries `auto-merge` and not `needs-review` (label-release-bump.sh's decision);
 # - it changes only the files that its dependency's pin script writes;
-# - every GitHub Actions check run on its head has passed or was skipped, `ci` among them, and
-#   `nixos` among them when it changes `nixos/`, since a person's pull request skips the NixOS
-#   checks and the ruleset requires only `ci`. Commit statuses from other apps, such as a review
-#   bot's, do not count.
+# - every GitHub Actions check run on its head has passed or was skipped, and each check its
+#   changed files start has passed: `ci` always, and the NixOS checks, the agent image check, the
+#   atc-gateway fixture or the nixie backup fixture when it changes their paths. The ruleset
+#   requires only `ci`, and a person's pull request skips the NixOS checks. Commit statuses from
+#   other apps, such as a review bot's, do not count.
 #
 # Any other pull request, or one still waiting for a check, stays open: it prints why and exits 0.
 # A branch that is not a release check branch, or that has no open pull request, prints why and
@@ -104,13 +105,24 @@ failed="$(jq -r '[.[] | select(.conclusion | IN("SUCCESS", "SKIPPED", "NEUTRAL")
 if [ -n "$failed" ]; then
   hold "$failed did not pass"
 fi
-required=(ci)
-if jq -e 'any(.files[].path; startswith("nixos/"))' <<< "$pr" > /dev/null; then
-  required+=(nixos)
-fi
-for name in "${required[@]}"; do
-  if ! jq -e --arg name "$name" 'any(.[]; .name == $name and .conclusion == "SUCCESS")' <<< "$runs" > /dev/null; then
-    hold "waiting for $name"
+# the checks the changed files must start, as "<workflow>/<job>": a path-triggered workflow can
+# register its check after another workflow finishes, and an unregistered check is never pending.
+# Two workflows name their job fixture, so the workflow is part of the name.
+required=("CI/ci")
+# requires_on <path prefix> <check>: adds the check when a changed file starts with the prefix
+requires_on() {
+  if jq -e --arg prefix "$1" 'any(.files[].path; startswith($prefix))' <<< "$pr" > /dev/null; then
+    required+=("$2")
+  fi
+}
+requires_on nixos/ "NixOS checks/nixos"
+requires_on images/agent/ "agent image/check"
+requires_on deploy/atc-gateway/ "atc-gateway images/fixture"
+requires_on infra/Pulumi.prod.yaml "nixie backup/fixture"
+for check in "${required[@]}"; do
+  if ! jq -e --arg workflow "${check%%/*}" --arg name "${check#*/}" \
+    'any(.[]; .workflowName == $workflow and .name == $name and .conclusion == "SUCCESS")' <<< "$runs" > /dev/null; then
+    hold "waiting for ${check#*/} (${check%%/*})"
   fi
 done
 
