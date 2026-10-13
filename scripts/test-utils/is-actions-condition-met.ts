@@ -7,7 +7,7 @@ export interface ActionsNeed {
 }
 
 export interface ActionsConditionContext {
-  readonly github: Readonly<Record<string, unknown>>;
+  readonly github: object;
   readonly needs: Readonly<Record<string, ActionsNeed>>;
 }
 
