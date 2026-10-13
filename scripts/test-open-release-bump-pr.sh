@@ -411,4 +411,151 @@ EOF
   [ "$status" = 1 ] || { echo "exit $status, want 1" >&2; exit 1; }
 }
 
+it_keeps_a_persons_needs_review_hold_when_main_changed_another_pin_in_the_same_file() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  printf 'atc 4.2.0\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/atc
+  printf 'atc 4.2.1\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(atc): bump atc to 4.2.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/atc
+  "${case_env[@]}" git -C "$tree/seed" switch -q main
+  printf 'atc 4.2.0\nimp-base 1.0.1\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(imp): bump imp to 1.0.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  echo '[{"autoMergeRequest":null,"isCrossRepository":false,"labels":[{"name":"needs-review"},{"name":"update:patch"}],"number":14,"url":"https://github.com/zgeoff/cloud/pull/14"}]' > "$tree/open-prs"
+  echo 'Bumps atc to 4.2.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" atc 4.2.1 "$tree/pr-body" "$tree/labels" \
+    sed -i 's/^atc .*/atc 4.2.1/' pins) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/14'
+  diff /dev/null "$tree/err"
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" show release-check/atc:pins) << 'EOF'
+atc 4.2.1
+imp-base 1.0.1
+EOF
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..release-check/atc) <<< 'chore(atc): bump atc to 4.2.1'
+  diff - "$tree/calls" << EOF
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","edit","14","--repo","zgeoff/cloud","--title","chore(atc): bump atc to 4.2.1","--body-file","$tree/pr-body"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_drops_a_persons_needs_review_hold_when_a_later_release_replaces_the_bump() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  printf 'atc 4.2.0\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/atc
+  printf 'atc 4.2.1\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(atc): bump atc to 4.2.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/atc
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  echo '[{"autoMergeRequest":null,"isCrossRepository":false,"labels":[{"name":"needs-review"},{"name":"update:patch"}],"number":14,"url":"https://github.com/zgeoff/cloud/pull/14"}]' > "$tree/open-prs"
+  echo 'Bumps atc to 4.2.2.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" atc 4.2.2 "$tree/pr-body" "$tree/labels" \
+    sed -i 's/^atc .*/atc 4.2.2/' pins) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/14'
+  diff /dev/null "$tree/err"
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..release-check/atc) <<< 'chore(atc): bump atc to 4.2.2'
+  diff - "$tree/calls" << EOF
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","edit","14","--repo","zgeoff/cloud","--add-label","auto-merge","--remove-label","needs-review"]
+["gh","pr","edit","14","--repo","zgeoff/cloud","--title","chore(atc): bump atc to 4.2.2","--body-file","$tree/pr-body"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_keeps_a_rejected_release_closed_when_main_changed_another_pin_in_the_same_file() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  printf 'atc 4.2.0\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/atc
+  printf 'atc 4.2.1\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(atc): bump atc to 4.2.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/atc
+  "${case_env[@]}" git -C "$tree/seed" switch -q main
+  printf 'atc 4.2.0\nimp-base 1.0.1\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(imp): bump imp to 1.0.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  head="$("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/atc)"
+  echo "[{\"headRefOid\":\"$head\",\"isCrossRepository\":false,\"number\":15}]" > "$tree/closed-prs"
+  echo 'Bumps atc to 4.2.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" atc 4.2.1 "$tree/pr-body" "$tree/labels" \
+    sed -i 's/^atc .*/atc 4.2.1/' pins) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '#15 was closed with this bump; delete release-check/atc to open it again'
+  diff /dev/null "$tree/err"
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/atc) <<< "$head"
+  diff - "$tree/calls" << EOF
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","closed","--json","number,headRefOid,isCrossRepository","--jq","[.[] | select((.isCrossRepository | not) and .headRefOid == \\"$head\\")][0].number // empty"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
+it_opens_a_later_release_after_a_person_rejected_the_one_before() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  printf 'atc 4.2.0\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/atc
+  printf 'atc 4.2.1\nimp-base 1.0.0\n' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(atc): bump atc to 4.2.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/atc
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  head="$("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/atc)"
+  echo "[{\"headRefOid\":\"$head\",\"isCrossRepository\":false,\"number\":15}]" > "$tree/closed-prs"
+  echo 'Bumps atc to 4.2.2.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" atc 4.2.2 "$tree/pr-body" "$tree/labels" \
+    sed -i 's/^atc .*/atc 4.2.2/' pins) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/200'
+  diff /dev/null "$tree/err"
+  diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" log --format=%s main..release-check/atc) <<< 'chore(atc): bump atc to 4.2.2'
+  diff - "$tree/calls" << EOF
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/atc","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","create","--repo","zgeoff/cloud","--base","main","--head","release-check/atc","--title","chore(atc): bump atc to 4.2.2","--body-file","$tree/pr-body","--label","update:patch,auto-merge"]
+EOF
+  [ "$status" = 0 ] || { echo "exit $status, want 0" >&2; exit 1; }
+}
+
 run_cases

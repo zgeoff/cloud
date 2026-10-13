@@ -4,8 +4,11 @@ The `release check` workflow finds new atc, imp and nixie releases and opens one
 per dependency, so the release repositories know nothing about cloud. It runs on a schedule and on
 dispatch. Its check job compares each dependency's newest release with the pins on `main`, and its
 bump job runs only when a pin is older. The `release bump merge` workflow then merges a bump that
-may merge on its own once its checks pass. A merge rolls nothing out: the rollout steps stay with a
-person, and each pull request's body lists them.
+may merge on its own once its checks pass. A merged nixie bump changes the stack config, so the
+`Deploy prod` workflow applies it to prod with no person involved, unless its guard holds the plan
+([the prod apply job](./prod-apply.md)). The same holds for the later pull request that pins the
+atc-gateway images an atc bump publishes. A host switch and an agent image rebuild stay with a
+person, and each pull request's body lists the steps its merge leaves.
 
 | Dependency | Branch                | Pins                                                                        |
 | ---------- | --------------------- | --------------------------------------------------------------------------- |
@@ -29,7 +32,7 @@ it `needs-review` when any of these holds:
 - A nixie release in the bump adds migrations (label `migrations`). nixie's migrations run forward
   only, so a revert does not undo them.
 - The bump changes nixie's sandbox images (label `sandbox-images-changed`), which a person adds to
-  impd before the rollout, as
+  impd before the merge, because the `Deploy prod` workflow applies the merged pin, as
   [the nixie runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd) describes.
 
 The merge workflow runs each time a check workflow finishes on a `release-check/` branch. It merges
@@ -45,16 +48,20 @@ uses the app's token, so the push to `main` starts its workflows.
 
 1. Read the release notes the pull request links, and every release between the pin and the bump.
 2. For a nixie bump with `sandbox-images-changed`, add the new sandbox images to impd before you
-   apply the merged pin.
-3. Merge it once its checks pass.
+   merge it, because the `Deploy prod` workflow applies the merged pin.
+3. Merge it once its checks pass. For a nixie bump, read the `Deploy prod` run it starts, and answer
+   it if its guard holds the plan, as [the prod apply job](./prod-apply.md) describes.
 
 A later release replaces the branch, the title, the body and the labels of the open pull request,
 and takes its `auto-merge` label and auto-merge off before the push. A pull request that waits for
 review therefore always holds the newest release.
 
-To hold a bump that would merge on its own, label it `needs-review`; the release check keeps that
-label until a later release replaces the bump. To reject a release, close its pull request; the
-release check keeps it closed until the next release, or until you delete its branch.
+To hold a bump that would merge on its own, label it `needs-review`. To reject a release, close its
+pull request. The release check keys both on the release in the title of the branch's commit, not on
+the files. When `main` changes another pin in a file the bump changes, the release check rebuilds
+the branch and keeps the `needs-review` label, with no `auto-merge` beside it, and it leaves a
+closed pull request closed. A later release drops the hold and opens a rejected bump again, as does
+deleting its branch.
 
 ## Set up the app
 
