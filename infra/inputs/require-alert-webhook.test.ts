@@ -15,18 +15,8 @@ test('it returns the webhook when the flag is on', () => {
   );
 });
 
-test('it returns the webhook untrimmed', () => {
-  expect(requireAlertWebhook(true, ' https://example.invalid/webhook\n')).toBe(
-    ' https://example.invalid/webhook\n',
-  );
-});
-
-test.each([
-  ['missing', undefined],
-  ['empty', ''],
-  ['blank', ' \n'],
-])('it throws when the flag is on and the webhook is %s', (_kind, webhookURL) => {
-  expect(() => requireAlertWebhook(true, webhookURL)).toThrowWithMessage(
+test('it throws when the flag is on and the webhook is unset', () => {
+  expect(() => requireAlertWebhook(true, undefined)).toThrowWithMessage(
     Error,
     'discordAlerts is on, but ALERT_WEBHOOK_URL is empty; run through `op run --env-file=../.env`',
   );

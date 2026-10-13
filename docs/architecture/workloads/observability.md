@@ -71,3 +71,6 @@ unreachable, and any other answer counts as up. The Worker keeps each target's l
 acts only on a change, the recovery included, so it logs the change and posts it to the same webhook
 Alertmanager uses, and a long outage sends one alert, not one per run. Pulumi bundles the Worker
 with Bun at deploy time and uploads it with its bindings, so the Worker has no deploy of its own.
+The Worker is its own workspace package, and its contract export names the bindings, the shape of
+the targets and the entry module. Pulumi builds the bindings from that contract, so a renamed
+binding fails the type check instead of the deployed Worker.

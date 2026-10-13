@@ -21,6 +21,26 @@ test('it parses the JSON text from getObject', () => {
   });
 });
 
+test.each([
+  ['true', true],
+  ['false', false],
+])('it reads %p as %p from getBoolean', (raw, value) => {
+  expect(buildStubConfig({ hostOnTailnet: raw }).getBoolean('hostOnTailnet')).toBe(value);
+});
+
+test('it reads an unset key as undefined from getBoolean', () => {
+  expect(buildStubConfig({}).getBoolean('hostOnTailnet')).toBeUndefined();
+});
+
+test("it throws Config's error, naming the full key, from getBoolean on a value that is not a boolean", () => {
+  const config = buildStubConfig({ hostOnTailnet: 'True' });
+
+  expect(() => config.getBoolean('hostOnTailnet')).toThrowWithMessage(
+    RunError,
+    "Configuration 'geoff-cloud:hostOnTailnet' value 'True' is not a valid boolean",
+  );
+});
+
 test('it reads an unset key as undefined from get', () => {
   expect(buildStubConfig({}).get('cluster')).toBeUndefined();
 });

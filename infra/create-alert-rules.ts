@@ -1,8 +1,8 @@
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import type { CustomResourceOptions } from '@pulumi/pulumi';
-import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { buildAlertRules } from './build-alert-rules.ts';
+import type { ATCDaemonEndpoint } from './inputs/types.ts';
 
 // buildAlertRules' groups as a PrometheusRule (#29), picked up via ruleSelectorNilUsesHelmValues.
 // The chart brings the CRD, so opts waits for it; atcDaemons adds ATCDaemonUnreachable per daemon.

@@ -109,6 +109,59 @@ test('it exits with the failing code when the related test fails', async () => {
   expect(run.exitCode).toBe(1);
 });
 
+test('it runs a test inside a package with its own bunfig.toml from that package, under its preload', async () => {
+  const ctx = await setupTest();
+
+  writeFileSync(join(ctx.dir, 'package.json'), JSON.stringify({ scripts: { test: 'exit 3' } }));
+  mkdirSync(join(ctx.dir, 'src/pkg'));
+  writeFileSync(join(ctx.dir, 'src/pkg/bunfig.toml'), '[test]\npreload = ["./preload.ts"]\n');
+  writeFileSync(join(ctx.dir, 'src/pkg/preload.ts'), "process.env['PKG_PRELOAD'] = 'loaded';\n");
+
+  writeFileSync(
+    join(ctx.dir, 'src/pkg/a.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it sees the preload', () => {\n  expect(process.env['PKG_PRELOAD']).toBe('loaded');\n});\n",
+  );
+
+  const run = Bun.spawnSync(
+    [process.execPath, join(import.meta.dir, 'run-related-tests.ts'), 'src/pkg/a.test.ts'],
+    { cwd: ctx.dir },
+  );
+
+  expect(run.exitCode).toBe(0);
+  expect(run.stderr.toString()).toInclude('1 pass');
+});
+
+test('it stops at the first failing run and exits with its failing code', async () => {
+  const ctx = await setupTest();
+
+  writeFileSync(join(ctx.dir, 'package.json'), JSON.stringify({ scripts: { test: 'bun test' } }));
+  mkdirSync(join(ctx.dir, 'src/pkg'));
+  writeFileSync(join(ctx.dir, 'src/pkg/bunfig.toml'), '');
+
+  writeFileSync(
+    join(ctx.dir, 'src/a.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it adds', () => {\n  expect(1 + 1).toBe(3);\n});\n",
+  );
+
+  writeFileSync(
+    join(ctx.dir, 'src/pkg/a.test.ts'),
+    "import { expect, test } from 'bun:test';\n\ntest('it adds', () => {\n  expect(1 + 1).toBe(2);\n});\n",
+  );
+
+  const run = Bun.spawnSync(
+    [
+      process.execPath,
+      join(import.meta.dir, 'run-related-tests.ts'),
+      'src/a.test.ts',
+      'src/pkg/a.test.ts',
+    ],
+    { cwd: ctx.dir },
+  );
+
+  expect(run.exitCode).toBe(1);
+  expect(run.stderr.toString()).not.toInclude('1 pass');
+});
+
 // A temp directory standing in for a repo root.
 async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'run-related-tests-'));

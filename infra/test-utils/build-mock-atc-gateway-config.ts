@@ -1,24 +1,21 @@
 import { faker } from '@faker-js/faker';
-import type { ATCGatewayConfig } from '../atc-gateway.ts';
-import { buildMockATCGatewayDaemonConfig } from './build-mock-atc-gateway-daemon-config.ts';
-import type { ATCGatewayDaemonConfigOverrides } from './build-mock-atc-gateway-daemon-config.ts';
+import type { ATCGatewayConfig, ATCGatewayDaemon } from '../inputs/types.ts';
+import { buildMockATCGatewayDaemon } from './build-mock-atc-gateway-daemon.ts';
 
-// An absent optional field is behaviour, so undefined leaves it out (exactOptionalPropertyTypes
-// forbids plain overrides). `daemons` names the daemons held; each merges into fresh defaults.
-type ATCGatewayConfigOverrides = Partial<
-  Omit<ATCGatewayConfig, 'daemons' | 'defaultDaemon' | 'stateDir'>
-> & {
-  readonly daemons?: Readonly<Record<string, ATCGatewayDaemonConfigOverrides>> | undefined;
-  readonly defaultDaemon?: string | undefined;
+// stateDir's absence is behaviour (the gateway takes $HOME's state dir), so undefined leaves it
+// out (exactOptionalPropertyTypes forbids plain overrides). `daemons` names the daemons held;
+// each merges into fresh defaults.
+type ATCGatewayConfigOverrides = Partial<Omit<ATCGatewayConfig, 'daemons' | 'stateDir'>> & {
+  readonly daemons?: Readonly<Record<string, Partial<ATCGatewayDaemon>>>;
   readonly stateDir?: string | undefined;
 };
 
-// A complete config, valid by requireATCGatewayInputs: one daemon under a name atc takes,
-// and that daemon as the default
+// A complete config as the schema checks it: one daemon under a name atc takes, and that daemon
+// as the default. A checked config is also a valid raw one, so a test can write it as JSON.
 export function buildMockATCGatewayConfig(
   overrides: ATCGatewayConfigOverrides = {},
 ): ATCGatewayConfig {
-  const { daemons, defaultDaemon, stateDir, ...fields } = {
+  const { daemons, stateDir, ...fields } = {
     daemons: { geoffcloud: {} },
     defaultDaemon: 'geoffcloud',
     stateDir: faker.system.directoryPath(),
@@ -30,19 +27,9 @@ export function buildMockATCGatewayConfig(
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:${faker.system.semver()}@sha256:${faker.string.hexadecimal({ length: 64, casing: 'lower', prefix: '' })}`,
     publicURL: `https://${faker.internet.domainName()}`,
     ...fields,
-    ...(daemons === undefined ? {} : { daemons: buildDaemons(daemons) }),
-    ...(defaultDaemon === undefined ? {} : { defaultDaemon }),
+    daemons: Object.fromEntries(
+      Object.entries(daemons).map(([name, daemon]) => [name, buildMockATCGatewayDaemon(daemon)]),
+    ),
     ...(stateDir === undefined ? {} : { stateDir }),
   };
-}
-
-function buildDaemons(
-  overrides: Readonly<Record<string, ATCGatewayDaemonConfigOverrides>>,
-): NonNullable<ATCGatewayConfig['daemons']> {
-  return Object.fromEntries(
-    Object.entries(overrides).map(([name, daemon]) => [
-      name,
-      buildMockATCGatewayDaemonConfig(daemon),
-    ]),
-  );
 }

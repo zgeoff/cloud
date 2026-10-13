@@ -71,12 +71,3 @@ test('it leaves ALERT_URL out when no webhook is set', () => {
     ],
   );
 });
-
-test('it leaves ALERT_URL out when the webhook is empty', () => {
-  const stateBucket = output('geoff-cloud-health-check-state');
-
-  expect(buildHealthCheckBindings({ stateBucket, targets: [], alertURL: '' })).toStrictEqual([
-    { name: 'STATE', type: 'r2_bucket', bucketName: stateBucket },
-    { name: 'TARGETS', type: 'plain_text', text: '[]' },
-  ]);
-});

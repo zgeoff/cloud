@@ -237,9 +237,9 @@ that only lived in the cluster. **What survives:** imps (ZFS on `vdb`, outside k
 and images reachable.
 
 **CAUTION:** With stack config `cluster: managed`, an empty `K3S_KUBECONFIG` stops the program
-before it registers any resource (`infra/require-kubeconfig.ts`), so a run without the kubeconfig
-fails instead of planning to delete the cluster. Never switch `cluster` to `none` to get past it:
-that does plan to delete every cluster resource. Check the preview before any apply.
+before it registers any resource (`infra/inputs/require-kubeconfig.ts`), so a run without the
+kubeconfig fails instead of planning to delete the cluster. Never switch `cluster` to `none` to get
+past it: that does plan to delete every cluster resource. Check the preview before any apply.
 
 1. Put the new kubeconfig in `op://cloud/k3s-kubeconfig`. With the old one, every run fails with
    `x509: certificate signed by unknown authority` and changes nothing.

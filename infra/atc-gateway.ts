@@ -1,3 +1,5 @@
+// the gateway's resources each take their builder, beside its inputs type
+/* oxlint-disable import/max-dependencies */
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import type { CronJob } from '@pulumi/kubernetes/batch/v1';
@@ -19,68 +21,11 @@ import {
 } from './build-atc-gateway-spec.ts';
 import { buildATCGatewayTokenData } from './build-atc-gateway-token-data.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
+import type { ATCGatewayInputs } from './inputs/types.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
 // daemons (docs/architecture/workloads/atc-gateway.md). Off until the stack config sets
 // atcGateway; setting it is an operator step that needs Geoff's approval.
-
-// one daemon the gateway dials: its tailnet host:port and the daemonID `atc daemon id`
-// prints there. Both are required; the deploy refuses without them.
-interface ATCGatewayDaemonConfig {
-  readonly address?: string;
-  readonly daemonID?: string;
-
-  // ATCDaemonUnreachable's severity for this daemon; critical when unset. A host that
-  // sleeps, such as Geoff's PC, takes warning.
-  readonly alertSeverity?: string;
-}
-
-export interface ATCGatewayConfig {
-  // a digest-pinned image built from deploy/atc-gateway
-  readonly image: string;
-  readonly backupImage: string;
-
-  // the origin clients reach, and the OAuth issuer
-  readonly publicURL: string;
-
-  // the daemons the gateway dials, by name, and the one a call without a daemon goes
-  // to. Each name's bearer token comes from ATC_GATEWAY_TOKEN_<NAME>.
-  readonly daemons?: Readonly<Record<string, ATCGatewayDaemonConfig>>;
-  readonly defaultDaemon?: string;
-
-  // where the state volume mounts and --state-dir points: gateway.db and
-  // mcp-auth.db. atc's packaging fixes the path; the default is $HOME's state dir.
-  readonly stateDir?: string;
-}
-
-export interface ATCGatewayBackupSecrets {
-  readonly repository: Output<string>;
-  readonly password: Output<string>;
-  readonly accessKeyID: Output<string>;
-  readonly secretAccessKey: Output<string>;
-}
-
-interface ATCGatewaySecrets {
-  // the bearer token the gateway presents to each daemon, by daemon name
-  readonly tokens: Readonly<Record<string, Output<string>>>;
-
-  // restic to R2; without it there is no backup CronJob
-  readonly backup?: ATCGatewayBackupSecrets;
-}
-
-// the daemon as the registry pins it, checked
-interface ATCGatewayDaemon {
-  readonly address: string;
-  readonly daemonID: string;
-  readonly alertSeverity: 'critical' | 'warning';
-}
-
-export interface ATCGatewayInputs {
-  readonly config: ATCGatewayConfig;
-  readonly daemons: Readonly<Record<string, ATCGatewayDaemon>>;
-  readonly defaultDaemon: string;
-  readonly secrets: ATCGatewaySecrets;
-}
 
 export interface ATCGatewayOutputs {
   readonly deployment: Deployment;
@@ -190,7 +135,7 @@ function createConfigObjects(
       metadata: { namespace },
       data: {
         [atcGatewayRegistryFile]: JSON.stringify(
-          buildATCGatewayRegistry(inputs.daemons, inputs.defaultDaemon),
+          buildATCGatewayRegistry(inputs.config.daemons, inputs.config.defaultDaemon),
           null,
           2,
         ),

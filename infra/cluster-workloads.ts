@@ -1,24 +1,27 @@
 import { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
-import { Config } from '@pulumi/pulumi';
-import type { ATCGatewayInputs } from './atc-gateway.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import { buildATCDaemonEndpoints } from './build-atc-daemon-endpoints.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
 import type { CloudflaredOutputs } from './create-cloudflared.ts';
 import { createCloudflared } from './create-cloudflared.ts';
+import type { ATCGatewayInputs } from './inputs/types.ts';
 import type { NixieInputs } from './nixie.ts';
 import { createNixie } from './nixie.ts';
 import type { ObservabilityOutputs } from './observability.ts';
 import { createObservability } from './observability.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
-import { requireAlertWebhook } from './require-alert-webhook.ts';
 
 interface ClusterInputs {
   readonly kubeconfig: string;
   readonly tunnelToken: Output<string>;
+
+  // In-cluster alerts reach Discord only after `pulumi config set discordAlerts true` (#29);
+  // until then no Secret holds the webhook and Alertmanager sends nothing. The inputs group
+  // reads ALERT_WEBHOOK_URL once for this and the external health check.
+  readonly alertWebhookURL: string | undefined;
 
   // set only after the owner approves the deploy
   readonly atcGateway?: ATCGatewayInputs;
@@ -47,17 +50,8 @@ export function createClusterWorkloads(inputs: ClusterInputs): ClusterOutputs {
   const cluster = new Provider('geoffcloud', { kubeconfig: inputs.kubeconfig });
 
   const ingress = createCloudflared(cluster, inputs.tunnelToken);
-
-  // In-cluster alerts reach Discord only after `pulumi config set discordAlerts true`
-  // (#29); until then no Secret holds the webhook and Alertmanager sends nothing. The
-  // external health check (health-check.ts) reads the same webhook on its own.
-  const alertWebhookURL = requireAlertWebhook(
-    new Config().getBoolean('discordAlerts') ?? false,
-    process.env['ALERT_WEBHOOK_URL'],
-  );
-
-  const atcDaemons = buildATCDaemonEndpoints(inputs.atcGateway);
-  const observability = createObservability(cluster, alertWebhookURL, atcDaemons);
+  const atcDaemons = buildATCDaemonEndpoints(inputs.atcGateway?.config);
+  const observability = createObservability(cluster, inputs.alertWebhookURL, atcDaemons);
 
   const gateway =
     inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);

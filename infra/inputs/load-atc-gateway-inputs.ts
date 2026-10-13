@@ -1,47 +1,37 @@
 import { secret } from '@pulumi/pulumi';
-import type { Config } from '@pulumi/pulumi';
-import type { ATCGatewayBackupSecrets, ATCGatewayConfig, ATCGatewayInputs } from './atc-gateway.ts';
 import { findResticBackup } from './find-restic-backup.ts';
 import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
-
-// the stack config methods this reads: Pulumi's Config, or a stand-in in a test
-type ATCGatewayStackConfig = Pick<Config, 'getObject'>;
-
-type Environment = Readonly<Record<string, string | undefined>>;
+import type {
+  ATCGatewayBackupSecrets,
+  ATCGatewayInputs,
+  Environment,
+  StackConfig,
+} from './types.ts';
 
 // The gateway's inputs, or nothing while atcGateway is unset (setting it approves the deploy).
 // Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_<NAME> per daemon plus the
 // backup's ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
 export function loadATCGatewayInputs(
-  stackConfig: ATCGatewayStackConfig,
+  stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
 ): { readonly atcGateway?: ATCGatewayInputs } {
-  const config = stackConfig.getObject<ATCGatewayConfig>('atcGateway');
+  // unknown until the schema checks it
+  const raw = stackConfig.getObject<unknown>('atcGateway');
 
-  if (config === undefined) {
+  if (raw === undefined) {
     return {};
   }
 
-  const checked = requireATCGatewayInputs(config, env);
-  const daemons = Object.entries(checked.daemons);
+  const checked = requireATCGatewayInputs(raw, env);
   const backup = findBackupSecrets(env);
 
   return {
     atcGateway: {
-      config,
-      daemons: Object.fromEntries(
-        daemons.map(([name, daemon]) => [
-          name,
-          {
-            address: daemon.address,
-            daemonID: daemon.daemonID,
-            alertSeverity: daemon.alertSeverity,
-          },
-        ]),
-      ),
-      defaultDaemon: checked.defaultDaemon,
+      config: checked.config,
       secrets: {
-        tokens: Object.fromEntries(daemons.map(([name, daemon]) => [name, secret(daemon.token)])),
+        tokens: Object.fromEntries(
+          Object.entries(checked.tokens).map(([name, token]) => [name, secret(token)]),
+        ),
         ...(backup === undefined ? {} : { backup }),
       },
     },

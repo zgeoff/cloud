@@ -1,0 +1,3 @@
+[test]
+# registers jest-extended matchers and runs the worker's MSW server; infra's preload never loads here
+preload = ["@zgeoff/bun-test-extended", "./mocks/register-mock-server.ts"]

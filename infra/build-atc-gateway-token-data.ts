@@ -1,5 +1,5 @@
 import type { Output } from '@pulumi/pulumi';
-import { toATCGatewayTokenVariable } from './to-atc-gateway-token-variable.ts';
+import { toATCGatewayTokenVariable } from './inputs/to-atc-gateway-token-variable.ts';
 
 // The daemon-token Secret's data: each daemon's bearer token under the
 // ATC_GATEWAY_TOKEN_<NAME> variable the gateway reads it from, through envFrom

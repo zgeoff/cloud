@@ -23,10 +23,11 @@ wrap `op run`. Check that `.env` has `K3S_KUBECONFIG=op://cloud/k3s-kubeconfig/k
 **CAUTION:** Never set `cluster` to `none` to get past this error. With `none`, the program plans to
 delete every cluster resource.
 
-### `CLOUDFLARE_ACCOUNT_ID is unset`
+### `CLOUDFLARE_ACCOUNT_ID is unset` or `is blank`
 
-The run did not go through `op run`. Use `bun run preview` or `bun run up`, or prefix the command
-with `op run --env-file=../.env --` from `infra/`.
+The run did not go through `op run`, or the reference resolved to an empty value. Use
+`bun run preview` or `bun run up`, or prefix the command with `op run --env-file=../.env --` from
+`infra/`.
 
 ### `discordAlerts is on, but ALERT_WEBHOOK_URL is empty`
 
@@ -42,8 +43,9 @@ cluster rebuild, follow
 
 ### `atcGateway.daemons.<name>.daemonID is unset`, or another `atcGateway` error
 
-These come from `infra/require-atc-gateway-inputs.ts` when `atcGateway` is set. Each message names
-its fix.
+These come from the inputs group in `infra/inputs/` when `atcGateway` is set: the stack config's
+schema, then each daemon's token. Each message starts with the failing field's path and names its
+fix, one line per field.
 
 ### The preview shows changes on a clean `main`
 

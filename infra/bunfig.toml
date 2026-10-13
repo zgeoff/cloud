@@ -1,0 +1,3 @@
+[test]
+# registers jest-extended matchers and seeds faker once for the run
+preload = ["@zgeoff/bun-test-extended", "./test-utils/seed-faker.ts"]

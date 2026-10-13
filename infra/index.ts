@@ -15,15 +15,13 @@ import { buildEdgeRules } from './build-edge-rules.ts';
 import { createClusterWorkloads } from './cluster-workloads.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 import { createHealthCheck } from './health-check.ts';
-import { loadClusterInputs } from './load-cluster-inputs.ts';
-import { requireCloudflareAccountID } from './require-cloudflare-account-id.ts';
+import { loadInputs } from './inputs/load-inputs.ts';
 import { tailnetPolicy } from './tailnet-policy.ts';
 
-// K3S_KUBECONFIG and ONEPASSWORD_CONNECT_CREDENTIALS come from op:// refs. "cluster" says if
-// managed, so a missing value fails before any resource registers instead of planning to
-// delete the cluster's resources.
-const clusterInputs = loadClusterInputs(new Config(), process.env);
-const accountID = requireCloudflareAccountID(process.env['CLOUDFLARE_ACCOUNT_ID']);
+// The one place the program reads its stack config and env (.env's op:// refs, through `op
+// run`); every value is checked before any resource registers.
+const inputs = loadInputs(new Config(), process.env);
+const accountID = inputs.accountID;
 
 export const domain = 'geoff.cloud';
 const zone = getZoneOutput({ filter: { name: domain } });
@@ -121,7 +119,7 @@ export const impHostAuthKey = impHostKey.key;
 // The Onidel VM, hand-made on 2026-10-02 and adopted here (#4): every input but name replaces
 // it, so protect/retainOnDelete guard typos, and vdb (200 GB, imp's pool, no API) is manual.
 // Once NixOS answers tailnet SSH, `pulumi config set hostOnTailnet true` attaches edge, drops public SSH.
-const hostOnTailnet = new Config().getBoolean('hostOnTailnet') ?? false;
+const hostOnTailnet = inputs.hostOnTailnet;
 
 // Onidel's cloud firewall, outside the VM. Attaching it closes every port it does
 // not list.
@@ -180,12 +178,15 @@ export const tunnelToken = secret(
 );
 
 // k3s workloads (#6), with their inputs checked at the top of the program
+const clusterInputs = inputs.cluster;
+
 const workloads =
   clusterInputs === undefined
     ? undefined
     : createClusterWorkloads({
         kubeconfig: clusterInputs.kubeconfig,
         tunnelToken,
+        alertWebhookURL: clusterInputs.alertWebhookURL,
         ...(clusterInputs.atcGateway === undefined ? {} : { atcGateway: clusterInputs.atcGateway }),
         onePasswordConnect: {
           credentials: clusterInputs.onePasswordConnectCredentials,
@@ -218,7 +219,7 @@ const healthCheck = await createHealthCheck({
     workloads?.atcGatewayRoute === undefined
       ? []
       : [{ name: 'atc', url: workloads.atcGatewayRoute.healthURL }],
-  alertURL: process.env['ALERT_WEBHOOK_URL'],
+  alertURL: inputs.alertURL,
 });
 
 export const healthCheckCron = healthCheck.schedules;

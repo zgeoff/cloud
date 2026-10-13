@@ -4,12 +4,14 @@ import {
   WorkersScript,
   WorkersScriptSubdomain,
 } from '@pulumi/cloudflare';
+import { entryPath } from '@zgeoff/cloud-health-check/contract';
+import type { Target } from '@zgeoff/cloud-health-check/contract';
 import { buildHealthCheckBindings } from './build-health-check-bindings.ts';
 import { buildWorkerBundle } from './build-worker-bundle.ts';
 
 interface HealthCheckInputs {
   readonly accountID: string;
-  readonly targets: readonly { readonly name: string; readonly url: string }[];
+  readonly targets: readonly Target[];
   readonly alertURL: string | undefined;
 }
 
@@ -25,11 +27,9 @@ const observability = {
 };
 
 // The external health check (#8): a Worker on a 5-minute cron, bundled from
-// workers/health-check by Bun at deploy time. Its state lives in an R2 bucket.
+// @zgeoff/cloud-health-check by Bun at deploy time. Its state lives in an R2 bucket.
 export async function createHealthCheck(inputs: HealthCheckInputs): Promise<WorkersCronTrigger> {
-  const content = await buildWorkerBundle(
-    new URL('../workers/health-check/index.ts', import.meta.url).pathname,
-  );
+  const content = await buildWorkerBundle(entryPath);
 
   // R2, not KV: the API token has R2 rights and no KV rights
   const state = new R2Bucket('health-check-state', {

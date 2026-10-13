@@ -1,3 +1,5 @@
+import type { Environment } from './types.ts';
+
 // A restic backup to R2 that one workload owns: its own password, its own R2 key and its own
 // bucket. The workload's .env variables share one prefix, such as ATC_GATEWAY or NIXIE.
 export interface ResticBackupTarget {
@@ -17,8 +19,6 @@ interface ResticBackupValues {
   readonly accessKeyID: string;
   readonly secretAccessKey: string;
 }
-
-type Environment = Readonly<Record<string, string | undefined>>;
 
 // A backup's inputs from .env, or undefined when none is set (no CronJob). Throws on a partial set
 // or a whitespace-only value, so a missing reference fails the preview.

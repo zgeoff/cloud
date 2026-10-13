@@ -2,7 +2,7 @@
 // and a source file runs its sibling test file. Prints a line and exits 0
 // when none of the files has a test.
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 
 // Test files related to the given paths, ordered and deduplicated: a .test.ts selects itself;
 // another .ts (not .d.ts) selects its sibling .test.ts. Paths resolve against cwd.
@@ -26,19 +26,56 @@ export function collectRelatedTests(paths: readonly string[], cwd: string): stri
   return [...selected];
 }
 
-// Runs the repo's test script over the tests related to the given paths and
-// returns its exit code, or 0 after printing a note when there are none.
-export function runRelatedTests(paths: readonly string[], cwd: string): Promise<number> {
+// Runs the related tests, or prints a note and returns 0 when there are none. A test in a package
+// with its own bunfig.toml runs from that package under its preload; the rest run through the
+// repo's test script. Returns the first failing exit code, or 0.
+export async function runRelatedTests(paths: readonly string[], cwd: string): Promise<number> {
   const tests = collectRelatedTests(paths, cwd);
 
   if (tests.length === 0) {
     process.stdout.write('run-related-tests: no related tests\n');
 
-    return Promise.resolve(0);
+    return 0;
   }
 
-  const run = Bun.spawn(['bun', 'run', 'test', ...tests], {
-    cwd,
+  for (const [packageDir, packageTests] of Map.groupBy(tests, (test) =>
+    findPackageDir(test, cwd),
+  )) {
+    // one run at a time: the runs share the tree and its ports
+    // oxlint-disable-next-line no-await-in-loop
+    const exitCode = await runTests(cwd, packageDir, packageTests);
+
+    if (exitCode !== 0) {
+      return exitCode;
+    }
+  }
+
+  return 0;
+}
+
+// the nearest directory below cwd, relative to it, that holds the test and its own bunfig.toml
+function findPackageDir(test: string, cwd: string): string | undefined {
+  for (let dir = dirname(test); dir !== '.' && dir !== '/'; dir = dirname(dir)) {
+    if (existsSync(join(cwd, dir, 'bunfig.toml'))) {
+      return dir;
+    }
+  }
+
+  return undefined;
+}
+
+function runTests(
+  cwd: string,
+  packageDir: string | undefined,
+  tests: readonly string[],
+): Promise<number> {
+  const command =
+    packageDir === undefined
+      ? ['bun', 'run', 'test', ...tests]
+      : ['bun', 'test', ...tests.map((test) => relative(packageDir, test))];
+
+  const run = Bun.spawn(command, {
+    cwd: join(cwd, packageDir ?? ''),
     stdin: 'inherit',
     stdout: 'inherit',
     stderr: 'inherit',

@@ -2,8 +2,8 @@
 /* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { onTestFinished } from 'bun:test';
 import { HttpResponse, http } from 'msw';
-import { server } from '../../workers/mocks/node.ts';
 import { findJSONField } from '../find-json-field.ts';
+import { server } from '../mocks/node.ts';
 import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
 import type { StubStream } from './start-stub-nixie-stream.ts';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';

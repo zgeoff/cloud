@@ -1,4 +1,5 @@
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
+import type { ATCDaemonEndpoint } from './inputs/types.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
 interface AlertRule {
@@ -12,15 +13,6 @@ interface AlertRule {
 interface AlertRuleGroup {
   readonly name: string;
   readonly rules: readonly AlertRule[];
-}
-
-// one of atc's daemons the gateway dials: its name in the registry and its host:port
-export type ATCDaemonAlertSeverity = 'critical' | 'warning';
-
-export interface ATCDaemonEndpoint {
-  readonly name: string;
-  readonly address: string;
-  readonly alertSeverity: ATCDaemonAlertSeverity;
 }
 
 interface AlertRuleInputs {

@@ -19,7 +19,8 @@ is decided in the shared skill, not here.
 
 | Suite                                              | Command                            | Runs in CI                          |
 | -------------------------------------------------- | ---------------------------------- | ----------------------------------- |
-| TypeScript unit tests in `infra/` and `workers/`   | `bun run test`                     | `CI` → `ci`                         |
+| TypeScript unit tests in `infra/` and `scripts/`   | `bun run test`                     | `CI` → `ci`                         |
+| The health-check Worker's tests                    | `bun run test:health-check`        | `CI` → `ci`                         |
 | Go tests in `provider/`                            | `bun run provider:check`           | `CI` → `ci`, if `provider/` changed |
 | Shell suites and `scripts/test-lib/` tests         | `bun run test:scripts`             | `CI` → `ci`                         |
 | Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture` | `atc-gateway images` → `fixture`    |
@@ -67,30 +68,34 @@ live host.
 `infra/` is in the pure regime: every unit under test is a builder or a validator that returns a
 value. Resource-creating modules stay thin, and their logic lives in an exported `build*`,
 `require*`, `find*` or `to*` function in its own file, which the test calls directly. The
-health-check worker in `workers/` is HTTP-mocked.
+health-check worker in `workers/health-check/` is HTTP-mocked.
 
-- The `bunfig.toml` preload registers `@zgeoff/bun-test-extended`, runs
-  `infra/test-utils/seed-faker.ts`, which seeds faker once per run, and runs
-  `workers/mocks/register-mock-server.ts`, which starts the MSW server.
+- Each package's `bunfig.toml` holds its preload, and Bun reads only the one in the directory it
+  runs from. `infra/`'s registers `@zgeoff/bun-test-extended` and runs
+  `infra/test-utils/seed-faker.ts`, which seeds faker once per run. The root one, for `bun run
+  test`, adds `scripts/mocks/register-mock-server.ts`, the scripts' MSW server, and ignores
+  `workers/**`. `workers/health-check/`'s runs the worker's MSW server and never loads infra's
+  preload.
 - Beside the preload, `infra/test-utils/` holds the shared test utils, each with its own test file:
   - `buildMock<Type>` factories fill every field: faker values for arbitrary fields, a fixed value
     for constrained ones. A test passes `undefined` for a field whose absence it tests, and passes
     as an override every field its assertions depend on.
-  - `buildStubConfig` stands in for Pulumi's `Config`: `get` returns the raw string and `getObject`
-    parses it, throwing the `RunError` the real `Config` throws for non-JSON. Modules take their
-    stack config and `env` as arguments from `index.ts`, so a test never touches `process.env` or
-    the Pulumi runtime.
+  - `buildStubConfig` stands in for Pulumi's `Config`: `get` returns the raw string, `getBoolean`
+    reads `true` and `false`, and `getObject` parses it, throwing the `RunError` the real `Config`
+    throws for any other value. Only `index.ts` builds `Config` and reads the env, and a lint rule
+    bans both elsewhere; the inputs group (`infra/inputs/`) takes them as arguments, so a test never
+    touches `process.env` or the Pulumi runtime.
   - `resolveOutput` reads an `Output`'s value. Assert secrecy with `isSecret`, separately from the
     value.
-  - `buildStubR2Bucket` is an in-memory R2 bucket.
 - The health-check worker's logic is tested through `makeScheduledHandler(destination)` in
   `workers/health-check/make-scheduled-handler.ts`: each test injects a recording destination and
   asserts every logged change of state through it, never by replacing the global console.
   `index.test.ts` checks the module Workers loads: its default export's `scheduled`, wired to
-  `console`. `buildStubR2Bucket` implements `Pick<R2Bucket, 'get' | 'put'>` from
+  `console`. `buildStubR2Bucket`, in the worker's own `test-utils/`, is an in-memory R2 bucket. It
+  implements `Pick<R2Bucket, 'get' | 'put'>` from
   `@cloudflare/workers-types` with R2's full object shapes, and rejects options and non-string
   values instead of modelling them. Its HTTP boundary is
-  MSW handlers in `workers/mocks/` over two in-memory stores: the probe targets' statuses and the
+  MSW handlers in `workers/health-check/mocks/` over two in-memory stores: the probe targets' statuses and the
   alerts sent. The server runs with `onUnhandledRequest: 'error'`, and the preload also fails the
   test on any `request:unhandled` event, because the worker turns a failed probe into a status
   instead of throwing. A dead target is a per-test `passthrough()` to `127.0.0.1:1`, so the

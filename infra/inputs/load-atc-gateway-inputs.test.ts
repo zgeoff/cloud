@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
+import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
+import { buildStubConfig } from '../test-utils/build-stub-config.ts';
+import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
-import { buildMockATCGatewayConfig } from './test-utils/build-mock-atc-gateway-config.ts';
-import { buildStubConfig } from './test-utils/build-stub-config.ts';
-import { resolveOutput } from './test-utils/resolve-output.ts';
 
 test('it returns no gateway while the stack config leaves atcGateway unset', () => {
   expect(
@@ -13,20 +13,9 @@ test('it returns no gateway while the stack config leaves atcGateway unset', () 
   ).toStrictEqual({});
 });
 
-test('it carries each daemon, the default daemon and a token per daemon, and leaves the backup out when its variables are unset', () => {
+test('it carries the checked config and a token per daemon, and leaves the backup out when its variables are unset', () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {
-        address: '100.69.47.33:8415',
-        daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
-        alertSeverity: undefined,
-      },
-      'home-pc': {
-        address: '100.67.122.120:8415',
-        daemonID: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
-        alertSeverity: 'warning',
-      },
-    },
+    daemons: { geoffcloud: {}, 'home-pc': { alertSeverity: 'warning' } },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -40,19 +29,6 @@ test('it carries each daemon, the default daemon and a token per daemon, and lea
   ).toStrictEqual({
     atcGateway: {
       config,
-      daemons: {
-        geoffcloud: {
-          address: '100.69.47.33:8415',
-          daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
-          alertSeverity: 'critical',
-        },
-        'home-pc': {
-          address: '100.67.122.120:8415',
-          daemonID: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
-          alertSeverity: 'warning',
-        },
-      },
-      defaultDaemon: 'geoffcloud',
       secrets: {
         tokens: {
           geoffcloud: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
@@ -63,12 +39,53 @@ test('it carries each daemon, the default daemon and a token per daemon, and lea
   });
 });
 
+test('it gives a daemon the stack config leaves without alertSeverity the severity critical', () => {
+  const stackConfig = buildStubConfig({
+    atcGateway: JSON.stringify({
+      image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
+      backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+      publicURL: 'https://atc.geoff.cloud',
+      daemons: {
+        geoffcloud: {
+          address: '100.69.47.33:8415',
+          daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+        },
+      },
+      defaultDaemon: 'geoffcloud',
+    }),
+  });
+
+  expect(
+    loadATCGatewayInputs(stackConfig, { ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32) }).atcGateway
+      ?.config.daemons,
+  ).toStrictEqual({
+    geoffcloud: {
+      address: '100.69.47.33:8415',
+      daemonID: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
+      alertSeverity: 'critical',
+    },
+  });
+});
+
+test('it throws naming the field when the stack config fails the schema', () => {
+  const stackConfig = buildStubConfig({
+    atcGateway: JSON.stringify({
+      ...buildMockATCGatewayConfig(),
+      publicURL: 'atc.geoff.cloud',
+    }),
+  });
+
+  expect(() =>
+    loadATCGatewayInputs(stackConfig, { ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32) }),
+  ).toThrowWithMessage(
+    Error,
+    'atcGateway.publicURL must be the https:// origin clients reach, such as https://atc.geoff.cloud',
+  );
+});
+
 test('it marks every daemon token secret', () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {},
-      'home-pc': {},
-    },
+    daemons: { geoffcloud: {}, 'home-pc': {} },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -96,10 +113,7 @@ test('it marks every daemon token secret', () => {
 
 test('it gives each daemon the token from its own ATC_GATEWAY_TOKEN_<NAME> variable', () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {},
-      'home-pc': {},
-    },
+    daemons: { geoffcloud: {}, 'home-pc': {} },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -126,9 +140,7 @@ test('it gives each daemon the token from its own ATC_GATEWAY_TOKEN_<NAME> varia
 
 test('it marks every backup value secret when the backup variables are set', () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {},
-    },
+    daemons: { geoffcloud: {} },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -155,9 +167,7 @@ test('it marks every backup value secret when the backup variables are set', () 
 
 test('it carries the backup values, with the restic repository built from the R2 endpoint and bucket', () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {},
-    },
+    daemons: { geoffcloud: {} },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -187,9 +197,7 @@ test('it carries the backup values, with the restic repository built from the R2
 
 test("it throws when a daemon's token is missing from the environment it is given", () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {},
-    },
+    daemons: { geoffcloud: {} },
     defaultDaemon: 'geoffcloud',
   });
 
@@ -197,15 +205,13 @@ test("it throws when a daemon's token is missing from the environment it is give
     loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {}),
   ).toThrowWithMessage(
     Error,
-    "ATC_GATEWAY_TOKEN_GEOFFCLOUD is empty: .env must reference the daemon's token",
+    "ATC_GATEWAY_TOKEN_GEOFFCLOUD is unset; .env must reference the daemon's token",
   );
 });
 
 test('it throws when only some backup variables are set in the environment it is given', () => {
   const config = buildMockATCGatewayConfig({
-    daemons: {
-      geoffcloud: {},
-    },
+    daemons: { geoffcloud: {} },
     defaultDaemon: 'geoffcloud',
   });
 

@@ -1,14 +1,19 @@
 import { RunError } from '@pulumi/pulumi';
 import type { Config } from '@pulumi/pulumi';
 
-// Stand-in for Pulumi's Config over raw stack values: get returns the string, getObject
-// JSON-parses it unchecked, and a missing key reads undefined. Non-JSON throws Config's
-// RunError naming project, key, and value (ConfigTypeError itself is unexported).
+// Stand-in for Pulumi's Config over raw stack values: get returns the string, getBoolean reads
+// "true" and "false", getObject JSON-parses unchecked, a missing key reads undefined. Any other
+// value throws Config's RunError naming project, key and value (ConfigTypeError is unexported).
 export function buildStubConfig(
   values: Readonly<Record<string, string>>,
-): Pick<Config, 'get' | 'getObject'> {
+): Pick<Config, 'get' | 'getBoolean' | 'getObject'> {
   return {
     get: (key) => findValue(values, key),
+    getBoolean: (key) => {
+      const raw = values[key];
+
+      return raw === undefined ? undefined : parseBoolean(key, raw);
+    },
     getObject: (key) => {
       const raw = values[key];
 
@@ -29,6 +34,14 @@ function findValue<K extends string>(
 
 // Pulumi.yaml's name, which a bare `new Config()` takes as its namespace
 const projectName = 'geoff-cloud';
+
+function parseBoolean(key: string, raw: string): boolean {
+  if (raw === 'true' || raw === 'false') {
+    return raw === 'true';
+  }
+
+  throw new RunError(`Configuration '${projectName}:${key}' value '${raw}' is not a valid boolean`);
+}
 
 function parseJSON<T>(key: string, raw: string): T {
   try {

@@ -1,13 +1,13 @@
 import { faker } from '@faker-js/faker';
-import type { ATCDaemonEndpoint } from '../build-alert-rules.ts';
+import type { ATCDaemonEndpoint } from '../inputs/types.ts';
+import { buildMockATCGatewayDaemon } from './build-mock-atc-gateway-daemon.ts';
 
+// a daemon's endpoint: a name, and the address and severity of buildMockATCGatewayDaemon's daemon
 export function buildMockATCDaemonEndpoint(
   overrides: Partial<ATCDaemonEndpoint> = {},
 ): ATCDaemonEndpoint {
-  return {
-    name: faker.internet.domainWord(),
-    address: `${faker.internet.ipv4()}:${faker.number.int({ min: 1, max: 65_535 })}`,
-    alertSeverity: 'critical',
-    ...overrides,
-  };
+  const { name = faker.internet.domainWord(), ...daemonOverrides } = overrides;
+  const daemon = buildMockATCGatewayDaemon(daemonOverrides);
+
+  return { name, address: daemon.address, alertSeverity: daemon.alertSeverity };
 }

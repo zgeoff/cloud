@@ -1,4 +1,4 @@
-import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
+import type { ATCDaemonEndpoint } from './inputs/types.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
 // The chart's own image (its appVersion) and securityContext: non-root, read-only

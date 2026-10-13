@@ -1,0 +1,18 @@
+{
+  "name": "@zgeoff/cloud-health-check",
+  "private": true,
+  "description": "The external health check for geoff.cloud, a Cloudflare Worker",
+  "type": "module",
+  "exports": {
+    "./contract": "./contract.ts"
+  },
+  "dependencies": {
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20261001.1",
+    "@types/bun": "1.3.14",
+    "@zgeoff/bun-test-extended": "0.1.0",
+    "msw": "2.15.0"
+  }
+}

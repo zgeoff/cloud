@@ -2,14 +2,17 @@
 // tunnel hostnames from the edge — 530/1033 reads tunnel down, 502/504 gateway down, else up. Each
 // target's last state lives in R2; a change posts to ALERT_URL when set and always logs to destination.
 import type { R2Bucket } from '@cloudflare/workers-types';
+import { bindingNames } from './binding-names.ts';
+import { targetsSchema } from './targets-schema.ts';
+import type { Target } from './targets-schema.ts';
 
 // the R2 methods the check calls, typed by Cloudflare's runtime types
 type StateBucket = Pick<R2Bucket, 'get' | 'put'>;
 
 interface Env {
-  readonly STATE: StateBucket;
-  readonly TARGETS: string;
-  readonly ALERT_URL?: string;
+  readonly [bindingNames.state]: StateBucket;
+  readonly [bindingNames.targets]: string;
+  readonly [bindingNames.alertURL]?: string;
 }
 
 // where a change of state is logged; the console in production
@@ -21,36 +24,20 @@ type ScheduledHandler = (controller: unknown, env: Env) => Promise<void>;
 
 export function makeScheduledHandler(destination: LogDestination): ScheduledHandler {
   return async (_controller, env) => {
-    const targets = parseTargets(env.TARGETS);
+    const targets = parseTargets(env[bindingNames.targets]);
 
     await Promise.all(targets.map((target) => checkTarget(target, env, destination)));
   };
 }
 
-interface Target {
-  readonly name: string;
-  readonly url: string;
-}
-
 function parseTargets(raw: string): Target[] {
-  const parsed: unknown = JSON.parse(raw);
+  const result = targetsSchema.safeParse(JSON.parse(raw));
 
-  if (!Array.isArray(parsed) || !parsed.every((item) => isTarget(item))) {
-    throw new Error('TARGETS must be a JSON array of { name, url }');
+  if (!result.success) {
+    throw new Error(`${bindingNames.targets} must be a JSON array of { name, url }`);
   }
 
-  return parsed;
-}
-
-function isTarget(value: unknown): value is Target {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'name' in value &&
-    typeof value.name === 'string' &&
-    'url' in value &&
-    typeof value.url === 'string'
-  );
+  return result.data;
 }
 
 async function checkTarget(target: Target, env: Env, destination: LogDestination): Promise<void> {
@@ -58,21 +45,19 @@ async function checkTarget(target: Target, env: Env, destination: LogDestination
 
   const key = `state:${target.name}`;
 
-  const previous = await readStoredHealth(env.STATE, key);
+  const previous = await readStoredHealth(env[bindingNames.state], key);
 
   if (previous === health) {
     return;
   }
 
-  await env.STATE.put(key, health);
+  await env[bindingNames.state].put(key, health);
 
   const message = `geoff.cloud: ${target.name} is ${health} (was ${previous ?? 'unknown'})`;
 
   destination.log(message);
 
-  if (env.ALERT_URL !== undefined && env.ALERT_URL !== '') {
-    await sendAlert(env.ALERT_URL, message);
-  }
+  await sendAlert(env[bindingNames.alertURL], message);
 }
 
 async function readStoredHealth(bucket: StateBucket, key: string): Promise<string | null> {
@@ -111,8 +96,12 @@ function pickHealth(status: number): Health {
 }
 
 // The body carries `content` (Discord), `text` (Slack) and `message`, so most
-// webhook receivers show it without a per-service format.
-async function sendAlert(url: string, message: string): Promise<void> {
+// webhook receivers show it without a per-service format. No URL, no alert.
+async function sendAlert(url: string | undefined, message: string): Promise<void> {
+  if (url === undefined || url === '') {
+    return;
+  }
+
   await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },

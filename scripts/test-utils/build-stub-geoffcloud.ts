@@ -22,7 +22,7 @@ export interface StubGeoffcloudScenario {
   readonly createExitCode: number;
 }
 
-export interface RemoteResult {
+interface RemoteResult {
   readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;

@@ -13,6 +13,49 @@
       "rules": {
         "typescript/prefer-readonly-parameter-types": "off"
       }
+    },
+    {
+      "files": ["infra/**/*.ts", "workers/**/*.ts"],
+      "rules": {
+        "no-restricted-properties": [
+          "error",
+          {
+            "object": "process",
+            "property": "env",
+            "message": "only infra/index.ts reads the env, once; take each value from loadInputs (infra/inputs/)"
+          },
+          {
+            "object": "Bun",
+            "property": "env",
+            "message": "only infra/index.ts reads the env, once; take each value from loadInputs (infra/inputs/)"
+          },
+          {
+            "object": "pulumi",
+            "property": "Config",
+            "message": "only infra/index.ts builds Config, once; take each value from loadInputs (infra/inputs/)"
+          }
+        ],
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@pulumi/pulumi",
+                "importNames": ["Config"],
+                "allowTypeImports": true,
+                "message": "only infra/index.ts builds Config, once; take each value from loadInputs (infra/inputs/)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["infra/index.ts"],
+      "rules": {
+        "no-restricted-properties": "off",
+        "no-restricted-imports": "off"
+      }
     }
   ]
 }
