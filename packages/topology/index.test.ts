@@ -7,5 +7,5 @@ test('it exports the constants file as written', async () => {
 
   const written: unknown = JSON.parse(text);
 
-  expect<unknown>(topology).toStrictEqual(written);
+  expect(written).toStrictEqual(topology);
 });

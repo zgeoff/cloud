@@ -1,8 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Topology } from '@zgeoff/cloud-topology';
 import { topology } from '@zgeoff/cloud-topology';
-import { z } from 'zod';
+import { findJSONField } from './find-json-field.ts';
 
 // Compares each copy of a shared constant that stays outside packages/topology with the constant,
 // and prints each mismatch with its file and field: 0 when every copy agrees, 1 on a mismatch or
@@ -26,16 +25,18 @@ export async function checkTopology(options: Readonly<CheckTopologyOptions>): Pr
 
   const loaded = await Promise.all(sources.map((source) => loadCopies(root, source)));
 
-  const failures = loaded.flatMap((result) => ('error' in result ? [result.error] : []));
+  const unreadable = sources.filter((_, index) => loaded[index] === undefined);
 
-  if (failures.length > 0) {
-    options.printErr(failures.map((failure) => `check-topology: ${failure}\n`).join(''));
+  if (unreadable.length > 0) {
+    options.printErr(
+      unreadable.map((source) => `check-topology: cannot read ${source.file}\n`).join(''),
+    );
 
     return 1;
   }
 
   return printReport(
-    loaded.flatMap((result) => ('copies' in result ? result.copies : [])),
+    loaded.flatMap((copies) => copies ?? []),
     options,
   );
 }
@@ -48,170 +49,77 @@ interface Copy {
   readonly expected: unknown;
 }
 
-type LoadResult = { readonly copies: readonly Copy[] } | { readonly error: string };
-
-// a file that holds copies, with its parse and its copies' reader bound together, so files of
-// different shapes share one list
-interface CopySource {
+// a file that holds copies, and the copies its parsed YAML holds
+interface Source {
   readonly file: string;
-  readonly collectCopies: (parsed: unknown) => LoadResult;
+  readonly collectCopies: (parsed: unknown) => readonly Omit<Copy, 'file'>[];
 }
 
-interface Source<T> {
-  readonly file: string;
-  readonly schema: z.ZodType<T>;
-  readonly collectCopies: (parsed: T, constants: Topology) => readonly Omit<Copy, 'file'>[];
-}
+const daemonPort = topology.atc.daemonPort;
+const gatewayDaemons = ['config', 'geoff-cloud:atcGateway', 'daemons'];
 
-// The stack config's daemon addresses, which the gateway's registry reads as config
-const stackDaemonSchema = z.looseObject({ address: z.string() });
-
-const stackDaemonsSchema = z.looseObject({
-  geoffcloud: stackDaemonSchema,
-  'home-pc': stackDaemonSchema,
-});
-
-const stackGatewaySchema = z.looseObject({ daemons: stackDaemonsSchema });
-
-const stackSchema = z.looseObject({
-  config: z.looseObject({ 'geoff-cloud:atcGateway': stackGatewaySchema }),
-});
-
-// nixie's config file, which infra mounts byte for byte
-const nixieImpSchema = z.looseObject({
-  url: z.string(),
-  host_addresses: z.array(z.string()),
-  egress_deny: z.array(z.string()),
-});
-
-const nixieConfigSchema = z.looseObject({ imp: nixieImpSchema });
-
-// the deploy workflow, whose tailnet tag an action input takes as a literal
-const workflowStepWithSchema = z.looseObject({ tags: z.string().optional() });
-
-const workflowStepSchema = z.looseObject({
-  uses: z.string().optional(),
-  with: workflowStepWithSchema.optional(),
-});
-
-const workflowJobSchema = z.looseObject({ steps: z.array(workflowStepSchema).optional() });
-const workflowSchema = z.looseObject({ jobs: z.record(z.string(), workflowJobSchema) });
-
-type Workflow = z.infer<typeof workflowSchema>;
-
-const sources: readonly CopySource[] = [
-  defineSource({
+const sources: readonly Source[] = [
+  // the stack config's daemon addresses, which the gateway's registry reads as config
+  {
     file: 'infra/Pulumi.prod.yaml',
-    schema: stackSchema,
-    collectCopies: (stack, constants) => {
-      const daemons = stack.config['geoff-cloud:atcGateway'].daemons;
-      const port = constants.atc.daemonPort;
+    collectCopies: (stack) => [
+      {
+        field: 'geoff-cloud:atcGateway.daemons.geoffcloud.address',
+        actual: findPath(stack, [...gatewayDaemons, 'geoffcloud', 'address']),
+        expected: `${topology.tailnet.nodes.geoffcloud.address}:${daemonPort}`,
+      },
+      {
+        field: 'geoff-cloud:atcGateway.daemons.home-pc.address',
+        actual: findPath(stack, [...gatewayDaemons, 'home-pc', 'address']),
+        expected: `${topology.tailnet.nodes.homePC.address}:${daemonPort}`,
+      },
+    ],
+  },
 
-      return [
-        {
-          field: 'geoff-cloud:atcGateway.daemons.geoffcloud.address',
-          actual: daemons.geoffcloud.address,
-          expected: `${constants.tailnet.nodes.geoffcloud.address}:${port}`,
-        },
-        {
-          field: 'geoff-cloud:atcGateway.daemons.home-pc.address',
-          actual: daemons['home-pc'].address,
-          expected: `${constants.tailnet.nodes.homePC.address}:${port}`,
-        },
-      ];
-    },
-  }),
-  defineSource({
+  // nixie's config file, which infra mounts byte for byte
+  {
     file: 'deploy/nixie/config.yaml',
-    schema: nixieConfigSchema,
-    collectCopies: (config, constants) => {
-      // impd's IMP_HOST_ADDRESSES, each with its interface's prefix length, which the host config
-      // holds; the constants hold the addresses
-      const addresses = config.imp.host_addresses.map((entry) => entry.split('/')[0]);
+    collectCopies: (config) => [
+      {
+        field: 'imp.url',
+        actual: findPath(config, ['imp', 'url']),
+        expected: `https://${topology.imp.domain}`,
+      },
+      ...collectHostAddressCopies(findPath(config, ['imp', 'host_addresses'])),
+      {
+        field: 'imp.egress_deny',
+        actual: findPath(config, ['imp', 'egress_deny']),
+        expected: [topology.k3s.podCIDR, topology.k3s.serviceCIDR],
+      },
+    ],
+  },
 
-      const expectedAddresses = [
-        constants.vm.publicIPv4,
-        constants.vm.publicIPv6,
-        constants.docker.bridgeAddress,
-        constants.tailnet.nodes.geoffcloud.address,
-      ];
-
-      return [
-        { field: 'imp.url', actual: config.imp.url, expected: `https://${constants.imp.domain}` },
-        ...expectedAddresses.map((expected, index) => ({
-          field: `imp.host_addresses[${index}]`,
-          actual: addresses[index],
-          expected,
-        })),
-        {
-          field: 'imp.egress_deny',
-          actual: config.imp.egress_deny,
-          expected: [constants.k3s.podCIDR, constants.k3s.serviceCIDR],
-        },
-      ];
-    },
-  }),
-  defineSource({
+  // the deploy workflow, whose tailnet tag an action input takes as a literal
+  {
     file: '.github/workflows/deploy-prod.yml',
-    schema: workflowSchema,
-    collectCopies: (workflow, constants) =>
-      collectTailscaleSteps(workflow).map((step) => ({
+    collectCopies: (workflow) =>
+      collectTailscaleSteps(findJSONField(workflow, 'jobs')).map((step) => ({
         field: `jobs.${step.job}: tailscale/github-action's tags`,
         actual: step.tags,
-        expected: constants.tailnet.tags.cloudDeploy,
+        expected: topology.tailnet.tags.cloudDeploy,
       })),
-  }),
+  },
 ];
 
-function defineSource<T>(source: Source<T>): CopySource {
-  return {
-    file: source.file,
-    collectCopies: (value) => {
-      const parsed = source.schema.safeParse(value);
-
-      if (!parsed.success) {
-        const paths = parsed.error.issues.map((issue) => issue.path.join('.'));
-
-        return { error: `${source.file} lacks the fields it checks: ${paths.join(', ')}` };
-      }
-
-      const copies = source.collectCopies(parsed.data, topology);
-
-      return {
-        copies: copies.map((copy) => ({
-          file: source.file,
-          field: copy.field,
-          actual: copy.actual,
-          expected: copy.expected,
-        })),
-      };
-    },
-  };
-}
-
-// each tailscale/github-action step, by its job, with the tags it joins as
-function collectTailscaleSteps(
-  workflow: Workflow,
-): readonly { readonly job: string; readonly tags: string | undefined }[] {
-  return Object.entries(workflow.jobs).flatMap(([job, definition]) => {
-    const steps = definition.steps ?? [];
-
-    const tailscaleSteps = steps.filter(
-      (step) => step.uses?.startsWith('tailscale/github-action@') === true,
-    );
-
-    return tailscaleSteps.map((step) => ({ job, tags: step.with?.tags }));
-  });
-}
-
-async function loadCopies(root: string, source: CopySource): Promise<LoadResult> {
+// undefined for a file it cannot read, so the check stops before it compares anything
+async function loadCopies(root: string, source: Source): Promise<readonly Copy[] | undefined> {
   const text = await readFile(join(root, source.file), 'utf8').catch(() => null);
 
   if (text === null) {
-    return { error: `cannot read ${source.file}` };
+    return undefined;
   }
 
-  return source.collectCopies(parseYAML(text));
+  return source.collectCopies(parseYAML(text)).map((copy) => ({
+    file: source.file,
+    field: copy.field,
+    actual: copy.actual,
+    expected: copy.expected,
+  }));
 }
 
 function parseYAML(text: string): unknown {
@@ -222,6 +130,60 @@ function parseYAML(text: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function findPath(value: unknown, keys: readonly string[]): unknown {
+  return keys.reduce((field: unknown, key) => findJSONField(field, key), value);
+}
+
+// impd's IMP_HOST_ADDRESSES, each with its interface's prefix length, which the host config holds;
+// the constants hold the addresses
+function collectHostAddressCopies(entries: unknown): readonly Omit<Copy, 'file'>[] {
+  const expected = [
+    topology.vm.publicIPv4,
+    topology.vm.publicIPv6,
+    topology.docker.bridgeAddress,
+    topology.tailnet.nodes.geoffcloud.address,
+  ];
+
+  return expected.map((address, index) => {
+    const entry: unknown = Array.isArray(entries) ? entries[index] : undefined;
+
+    return {
+      field: `imp.host_addresses[${index}]`,
+      actual: typeof entry === 'string' ? entry.split('/')[0] : entry,
+      expected: address,
+    };
+  });
+}
+
+interface TailscaleStep {
+  readonly job: string;
+  readonly tags: unknown;
+}
+
+// each tailscale/github-action step, by its job, with the tags it joins as
+function collectTailscaleSteps(jobs: unknown): readonly TailscaleStep[] {
+  if (typeof jobs !== 'object' || jobs === null) {
+    return [];
+  }
+
+  return Object.entries(jobs).flatMap((entry: readonly [string, unknown]) => {
+    const steps = findJSONField(entry[1], 'steps');
+    const list: readonly unknown[] = Array.isArray(steps) ? steps : [];
+    const tailscaleSteps = list.filter((step: unknown) => isTailscaleStep(step));
+
+    return tailscaleSteps.map((step: unknown) => ({
+      job: entry[0],
+      tags: findPath(step, ['with', 'tags']),
+    }));
+  });
+}
+
+function isTailscaleStep(step: unknown): boolean {
+  const uses = findJSONField(step, 'uses');
+
+  return typeof uses === 'string' && uses.startsWith('tailscale/github-action@');
 }
 
 function printReport(copies: readonly Copy[], options: Readonly<CheckTopologyOptions>): number {

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Decides whether a commit on main needs the prod apply. It prints "true" when any file changed
 # between <deployed> (the deployed/prod tag, the last applied revision) and <head> is an input of
-# the Pulumi program: infra/, deploy/, provider/ or sdk/. It prints "false" for a change to
-# nothing else, such as docs, and for a head that is already deployed: <head> equal to
-# <deployed>, or its ancestor, as for a run that waited behind a newer one. A rename counts both
-# its old and new path.
+# the Pulumi program: infra/, deploy/, provider/, sdk/ or the shared constants in
+# packages/topology/. It prints "false" for a change to nothing else, such as docs, and for a head
+# that is already deployed: <head> equal to <deployed>, or its ancestor, as for a run that waited
+# behind a newer one. A rename counts both its old and new path.
 #
 # A head that neither descends from <deployed> nor is its ancestor fails with exit 1, because
 # the tag has left main and only a person can say which revision is live. An empty argument is a
@@ -38,7 +38,7 @@ git diff -z --no-renames --name-only "$deployed" "$head" > "$changed"
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    infra/* | deploy/* | provider/* | sdk/*)
+    infra/* | deploy/* | provider/* | sdk/* | packages/topology/*)
       echo true
       exit 0
       ;;
