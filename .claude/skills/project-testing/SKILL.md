@@ -248,7 +248,7 @@ because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` contai
   `test-utils`, which also checks `build-stub-curl` against that real curl, and one probe case
   in `impd-local-health`, the only real-transport proof that a hung impd reads as status 0.
 - A rehearsal's first subtests assert that no unit failed at boot and that `systemd-detect-virt`
-  prints `kvm`, so a run that fell back to emulation fails. `test-nixos.sh` needs a readable and
+  prints `kvm`, so a run that fell back to emulation fails. `run-nixos-checks.sh` needs a readable and
   writable KVM device for any `impd-restore*` check.
 - nixpkgs passes a VM test script as one environment variable, capped at 131,072 bytes. A rehearsal
   that would pass the cap becomes a new `impd-restore-<area>` check, never a shorter rewrite of

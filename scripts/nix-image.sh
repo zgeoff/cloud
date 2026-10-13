@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# The nixos/nix image that scripts/test-nixos.sh and scripts/switch-geoffcloud.sh run Nix in.
+# The nixos/nix image that scripts/run-nixos-checks.sh and scripts/switch-geoffcloud.sh run Nix in.
 # The tag names the Nix release and the digest pins the exact image, so CI's NixOS checks and a
 # host switch build with the same Nix, and a run never pulls a moving tag. Refresh the digest from
 # the registry when the tag moves, never from memory:

@@ -38,17 +38,17 @@ it_prints_true_for_a_change_under_nixos() {
   }
 }
 
-it_prints_true_for_a_change_to_test_nixos_sh() {
+it_prints_true_for_a_change_to_run_nixos_checks_sh() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
-  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/test-nixos.sh"
+  echo '#!/usr/bin/env bash' > "$tree/repo/scripts/run-nixos-checks.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add a script'
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
-  echo changed >> "$tree/repo/scripts/test-nixos.sh"
+  echo changed >> "$tree/repo/scripts/run-nixos-checks.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'change a script'
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" "$(cat "$tree/base")" HEAD) > "$tree/out" 2> "$tree/err" || status=$?

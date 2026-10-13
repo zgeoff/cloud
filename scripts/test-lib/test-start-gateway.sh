@@ -8,6 +8,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-start-gateway.sh
 #   CASE='readyz' bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-start-gateway.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask

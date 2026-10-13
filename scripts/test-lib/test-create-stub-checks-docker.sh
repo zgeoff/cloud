@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for create-stub-checks-docker.sh: the docker stand-in answers the nix eval and build that
-# test-nixos.sh runs, copies what the build mounts at /src, logs every call, and fails closed on
+# run-nixos-checks.sh runs, copies what the build mounts at /src, logs every call, and fails closed on
 # any other call. No nix runs here; the stand-in's exit 1 for a failed eval or build is the
 # one its header records from a one-off check against nix 2.35.2.
 #

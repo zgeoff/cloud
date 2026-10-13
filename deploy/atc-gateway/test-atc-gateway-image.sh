@@ -18,6 +18,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
 #   CASE='foreign Host' bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask

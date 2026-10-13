@@ -24,7 +24,7 @@ it_pins_the_nix_image_by_tag_and_digest() {
 
 it_is_the_one_source_both_nix_scripts_read() {
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-  for script in test-nixos.sh switch-geoffcloud.sh; do
+  for script in run-nixos-checks.sh switch-geoffcloud.sh; do
     grep -q 'source .*/nix-image\.sh' "$root/scripts/$script" ||
       {
         echo "scripts/$script does not source nix-image.sh" >&2

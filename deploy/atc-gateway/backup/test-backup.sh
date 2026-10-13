@@ -19,6 +19,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/backup/test-backup.sh
 #   CASE='ls mode' bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/backup/test-backup.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask

@@ -17,6 +17,7 @@
 # `bun run test:nixie-backup-fixture` runs it; one case alone:
 #
 #   CASE='ls mode' bash deploy/nixie/backup/test-backup.sh
+# shell-suite: nixie-backup-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask

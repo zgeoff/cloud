@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-checks-git.sh: the git stand-in answers the two calls test-nixos.sh makes,
+# Test for create-stub-checks-git.sh: the git stand-in answers the two calls run-nixos-checks.sh makes,
 # prints the toplevel as git does and the file list byte for byte, logs every call, and fails
 # closed on any other call.
 #

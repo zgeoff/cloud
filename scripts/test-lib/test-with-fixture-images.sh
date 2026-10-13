@@ -5,6 +5,9 @@
 # images once, in the case that runs a command.
 #
 #   bash scripts/test-lib/test-with-fixture-images.sh
+#
+# It tests the wrapper itself, so it runs outside it, in its own group:
+# shell-suite: fixture-images
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask

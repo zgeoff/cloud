@@ -9,6 +9,7 @@
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-wait-for-ready.sh
 #   CASE='after a restart' bash scripts/test-lib/with-fixture-images.sh bash scripts/test-lib/test-wait-for-ready.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask

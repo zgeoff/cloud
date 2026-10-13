@@ -17,6 +17,7 @@
 # `bun run test:atc-gateway-fixture` runs it after the fixture tests; alone:
 #
 #   bash scripts/test-lib/with-fixture-images.sh bash e2e/test-atc-gateway-restore.sh
+# shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
