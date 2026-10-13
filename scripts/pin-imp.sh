@@ -108,7 +108,7 @@ if needs_pin imp-base "$base_digest" "$base_pin"; then pin_base=true; fi
 
 if [ "$pin_host" = true ]; then
   write "$flake" "s|^(      url = \"github:zgeoff/imp/)[0-9a-f]+(\";)\$|\\1${commit:0:8}\\2|"
-  # shellcheck source=nix-image.sh
+  # shellcheck source-path=SCRIPTDIR source=nix-image.sh
   source "$here/nix-image.sh"
   docker run --rm -v "$PWD/nixos:/src" -w /src "$NIX_IMAGE" sh -c \
     "nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"

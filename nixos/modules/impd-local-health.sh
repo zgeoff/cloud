@@ -1,8 +1,8 @@
-# Probe impd's /health on loopback and write node-exporter textfile metrics atomically.
-# Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR, and IMPD_HEALTH_TIMEOUT_SECONDS (curl's --max-time,
-# default 5). CURL names the curl it runs (default: the one on PATH, the package's own), so
-# nixos/checks/impd-local-health.nix can put a stand-in in its place. Writes
-# $TEXTFILE_DIR/impd_local_health.prom.
+# shellcheck shell=bash
+# Probe impd's /health on loopback and write node-exporter textfile metrics atomically to
+# $TEXTFILE_DIR/impd_local_health.prom. Inputs: IMPD_HEALTH_URL, TEXTFILE_DIR, and
+# IMPD_HEALTH_TIMEOUT_SECONDS (curl's --max-time, default 5). CURL names the curl it runs (default:
+# the one on PATH, the package's own), so nixos/checks/impd-local-health.nix can swap in a stand-in.
 curl="${CURL:-curl}"
 
 body=$(mktemp)

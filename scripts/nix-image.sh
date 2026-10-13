@@ -5,4 +5,5 @@
 # the registry when the tag moves, never from memory:
 #
 #   docker buildx imagetools inspect "nixos/nix:<tag>"
+# shellcheck disable=SC2034 # the scripts that source this file read it
 NIX_IMAGE='nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c'

@@ -61,9 +61,9 @@ case "$rank" in
     echo "no pinned version is older than $version" >&2
     exit 1
     ;;
-  1) update=patch ;;
-  2) update=minor ;;
-  3) update=major ;;
+  1) update='patch' ;;
+  2) update='minor' ;;
+  3) update='major' ;;
 esac
 
 echo "update:$update"

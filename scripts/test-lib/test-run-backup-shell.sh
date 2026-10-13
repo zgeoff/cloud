@@ -94,6 +94,8 @@ it_replaces_a_default_with_a_trailing_docker_run_option() {
   trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
   setup_test "$tree" "$name" "$backup_image"
 
+  # the shell in the container expands the command, so it stays unexpanded here
+  # shellcheck disable=SC2016
   run_backup_shell "$name" "$backup_image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
     <<< 'echo "$(id -u):$(id -g) $STATE_DIR"' > "$tree/out" 2> "$tree/err" || status=$?
 

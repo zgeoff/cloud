@@ -16,6 +16,7 @@
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it
 # is not the switch's geoffcloud-nix-store, so a test build never shares the deploy cache.
 set -euo pipefail
+# shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"

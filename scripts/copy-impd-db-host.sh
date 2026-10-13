@@ -12,6 +12,8 @@ nix() { command nix --extra-experimental-features "nix-command flakes" "$@"; }
 static=$(nix build --no-link --print-out-paths nixpkgs#pkgsStatic.sqlite.bin)/bin/sqlite3
 # SQLITE3 is for the restore VM, which checks a failed integrity_check; ssh never sends it
 sqlite=${SQLITE3:-$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3}
+# /root exists, so -m sets the mode of the one directory this creates
+# shellcheck disable=SC2174
 mkdir -p -m 0700 /root/imp-db-backups
 dir=/root/imp-db-backups/$1-$(date -u +%Y%m%dT%H%M%S)
 mkdir -m 0700 "$dir"
@@ -21,6 +23,8 @@ case $work in /tmp/impd-db-copy.??????) ;; *)
   exit 1
   ;;
 esac
+# $work is checked above, so the trap holds its value now
+# shellcheck disable=SC2064
 trap "docker exec imp-host rm -rf -- \"$work\"" EXIT
 docker cp "$static" "imp-host:$work/sqlite3"
 docker exec imp-host sh -c "umask 077; \"\$1/sqlite3\" /var/lib/imp/db/imp.sqlite \"VACUUM INTO '\$1/imp.sqlite'\"" _ "$work"
