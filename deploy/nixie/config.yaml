@@ -16,8 +16,24 @@ models:
       effort: medium
       # compact a long conversation at 400k tokens instead of near the full window
       context_tokens: 400000
+    # the memory writer extracts and files memories from each batch of messages
+    haiku:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-haiku-5-5
+      effort: low
+    # high is Sonnet 5.5's default effort, and the schema needs a value
+    sonnet:
+      base_url: https://api.anthropic.com
+      credential: deployment:anthropic
+      auth_header: bearer
+      model: claude-sonnet-5-5
+      effort: high
   roles:
     conversation: opus
+    memory-writer: haiku
+    checker: sonnet
 imp:
   # impd's API on its own tailnet node; the pod reaches it through the host's node (tag:cloud)
   url: https://imps.geoff.cloud
