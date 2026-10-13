@@ -6,7 +6,7 @@
 call, the path of a change, the topology and the data.
 
 - [Infrastructure as code](./architecture/infrastructure-as-code.md): the Pulumi program, its
-  providers, drift and the guards.
+  providers, drift, the apply job and the guards.
 - [Secrets](./architecture/secrets.md): how each secret reaches its user, and what 1Password cannot
   restore.
 - Host:
@@ -38,6 +38,7 @@ call, the path of a change, the topology and the data.
 - [Development](./runbooks/development.md): set up a machine and run a first preview.
 - [Workflows](./runbooks/workflows.md): change infrastructure, switch the host, upgrade imp,
   observe, rotate a credential.
+- [The prod apply job](./runbooks/prod-apply.md): set up the job, read a run, answer a held one.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host

@@ -14,6 +14,7 @@ test('it holds every host, tag owner, grant, SSH rule and node attribute the tai
       'tag:cloud': ['autogroup:admin', 'tag:cloud'],
       'tag:imp': ['autogroup:admin', 'tag:imp'],
       'tag:imp-e2e': ['autogroup:admin', 'tag:imp-e2e'],
+      'tag:cloud-deploy': ['autogroup:admin', 'tag:cloud-deploy'],
     },
     grants: [
       { src: ['autogroup:member'], dst: ['*'], ip: ['*'] },
@@ -23,6 +24,7 @@ test('it holds every host, tag owner, grant, SSH rule and node attribute the tai
       { src: ['tag:imp-e2e'], dst: ['tag:imp-e2e'], ip: ['tcp:7070'] },
       { src: ['autogroup:member'], dst: ['geoffcloud'], ip: ['tcp:443'] },
       { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: ['tcp:443'] },
+      { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: ['tcp:6443'] },
     ],
     ssh: [
       {
@@ -49,4 +51,17 @@ test('it lets tag:imp-e2e reach only other tag:imp-e2e nodes, on the API port on
 
   expect(fromE2E).toStrictEqual([{ src: ['tag:imp-e2e'], dst: ['tag:imp-e2e'], ip: ['tcp:7070'] }]);
   expect(tailnetPolicy.tagOwners['tag:imp-e2e']).toStrictEqual(['autogroup:admin', 'tag:imp-e2e']);
+});
+
+// the prod apply job's runner holds full-account cloud credentials, so its node reaches the k3s
+// API and nothing else on the tailnet, and no SSH rule names it
+test('it lets tag:cloud-deploy reach only the k3s API on geoffcloud', () => {
+  const fromDeploy = tailnetPolicy.grants.filter((grant) => grant.src.includes('tag:cloud-deploy'));
+  const sshToDeploy = tailnetPolicy.ssh.filter((rule) => rule.dst.includes('tag:cloud-deploy'));
+
+  expect(fromDeploy).toStrictEqual([
+    { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: ['tcp:6443'] },
+  ]);
+
+  expect(sshToDeploy).toStrictEqual([]);
 });

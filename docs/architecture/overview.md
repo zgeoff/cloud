@@ -39,8 +39,7 @@ builds ([the agent image](./workloads/agent-image.md)).
 
 ## The path of a change
 
-A change reaches the live estate along one of two paths, and both start from a merged PR on a clean
-checkout of `main`.
+A change reaches the live estate along one of two paths, and both start from a merged PR on `main`.
 
 ```mermaid
 flowchart LR
@@ -57,8 +56,9 @@ applies, and a drift check, a refreshed preview that fails on any difference, pr
 after an apply that the live state matches the code
 ([infrastructure as code](./infrastructure-as-code.md)). The host is outside Pulumi: a script builds
 the flake from the commit, copies that exact system to the host and activates it, so a failed build
-never touches the host ([the host](./host/host.md)). Nothing applies on its own; the owner or an
-agent the owner approved runs each step.
+never touches the host ([the host](./host/host.md)). The apply job runs the Pulumi path on its own
+once CI passes, unless its guard holds the plan for a person. The owner or an agent the owner
+approved runs each host switch.
 
 ## Topology
 

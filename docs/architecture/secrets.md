@@ -21,8 +21,10 @@ flowchart LR
 ```
 
 - **Into a Pulumi run.** The committed `.env` holds only `op://` references, and every Pulumi
-  command runs inside `op run`, which resolves them into the run's environment. The program marks
-  each value secret, so Pulumi encrypts it in the state and redacts it in output.
+  command runs inside `op run`, which resolves them into the run's environment. The apply job reads
+  the same items from copies in its own vault, `cloud-deploy`, which holds nothing else
+  ([infrastructure as code](./infrastructure-as-code.md#the-apply-job)). The program marks each
+  value secret, so Pulumi encrypts it in the state and redacts it in output.
 - **Into a pod.** A workload's secret becomes a Kubernetes Secret that the program declares from the
   run's value, and the pod reads it as a file or an environment variable. A gateway token Secret has
   no fixed name, so a change replaces it and rolls the gateway, which reads its tokens only at

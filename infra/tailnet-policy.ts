@@ -16,6 +16,9 @@ const impNode = {
   httpsPort: 443,
 };
 
+// k3s's API server on geoffcloud, which the prod apply job reaches from its runner
+const k3sAPIPort = 6443;
+
 // Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; members reach tag:imp nodes on any port,
 // while those reach each other on tcp:7070 and nothing else (imp's isolation goal). tag:imp-e2e reaches only its
 // own API, never a live impd, keyed by its own OAuth client (1Password imp-e2e vault, docs/runbooks/imp-e2e-tailnet.md).
@@ -35,6 +38,10 @@ export const tailnetPolicy = {
     // owns itself, so the e2e OAuth client (tag:imp-e2e) may mint keys for it; no
     // other tag owns it, and it owns no other tag
     'tag:imp-e2e': ['autogroup:admin', 'tag:imp-e2e'],
+
+    // the prod apply job's runner, an ephemeral node that joins through the deploy workflow's
+    // federated identity (tag:cloud-deploy); owns itself, so that identity may mint keys for it
+    'tag:cloud-deploy': ['autogroup:admin', 'tag:cloud-deploy'],
   },
   grants: [
     // members reach every device; tagged nodes get only what a grant gives them
@@ -64,6 +71,11 @@ export const tailnetPolicy = {
     // grant and gives nothing beyond it; grants union, so removing it breaks nixie once the probe's
     // grant no longer covers this route. Last, so adding it shifts no other grant
     { src: ['tag:cloud'], dst: ['imp-geoffcloud'], ip: [`tcp:${impNode.httpsPort}`] },
+
+    // the prod apply job → k3s's API on the host, and nothing else: Pulumi drives the cluster
+    // through it, and every other provider the job uses is a public API. Last, so adding it shifts
+    // no other grant
+    { src: ['tag:cloud-deploy'], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
   ],
   ssh: [
     {
