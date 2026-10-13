@@ -4,10 +4,10 @@ import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 import { alloyValues } from './alloy-values.ts';
-import type { ATCDaemonEndpoint } from './build-alert-rules.ts';
 import { createDashboards } from './create-dashboards.ts';
 import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
+import type { ATCDaemonEndpoint } from './inputs/types.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
 // and opens no public port, so http://geoffcloud:30300 works from the tailnet alone.

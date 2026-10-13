@@ -38,7 +38,7 @@ gate the host switch.
 - `nixos/`: the host flake
 - `images/agent/`: the image agent sessions run on
 - `deploy/atc-gateway/`: the atc gateway's images
-- `workers/`: the external health-check Worker
+- `workers/health-check/`: the external health-check Worker, its own package
 - `scripts/`: repo and host tooling
 
 ## Documentation

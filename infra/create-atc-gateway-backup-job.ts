@@ -2,8 +2,8 @@ import type { Provider } from '@pulumi/kubernetes';
 import { CronJob } from '@pulumi/kubernetes/batch/v1';
 import { Secret } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
-import type { ATCGatewayBackupSecrets } from './atc-gateway.ts';
 import { buildATCGatewayBackupPodSpec } from './build-atc-gateway-backup-pod-spec.ts';
+import type { ATCGatewayBackupSecrets } from './inputs/types.ts';
 
 interface BackupJobInputs {
   readonly namespace: Output<string>;

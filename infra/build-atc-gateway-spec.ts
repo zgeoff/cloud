@@ -1,6 +1,6 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
-import type { ATCGatewayConfig } from './atc-gateway.ts';
+import type { ATCGatewayConfig } from './inputs/types.ts';
 
 export const atcGatewayPort = 8414;
 export const atcGatewayLabels = { app: 'atc-gateway' };

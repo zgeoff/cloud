@@ -1,14 +1,11 @@
 import { secret } from '@pulumi/pulumi';
-import type { Config, Output } from '@pulumi/pulumi';
-import type { ATCGatewayInputs } from './atc-gateway.ts';
+import type { Output } from '@pulumi/pulumi';
+import type { NixieInputs } from '../nixie.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
 import { loadNixieInputs } from './load-nixie-inputs.ts';
-import type { NixieInputs } from './nixie.ts';
 import { requireKubeconfig } from './require-kubeconfig.ts';
 import { requireOnePasswordConnectCredentials } from './require-onepassword-connect-credentials.ts';
-
-// the stack config methods this reads: Pulumi's Config, or a stand-in in a test
-type ClusterStackConfig = Pick<Config, 'get' | 'getObject'>;
+import type { ATCGatewayInputs, Environment, StackConfig } from './types.ts';
 
 interface ClusterConfigInputs {
   readonly kubeconfig: string;
@@ -23,10 +20,10 @@ interface ClusterConfigInputs {
 // the program, so a missing value fails before any resource registers instead of planning to
 // delete the cluster's resources.
 export function loadClusterInputs(
-  stackConfig: ClusterStackConfig,
-  env: NodeJS.ProcessEnv,
+  stackConfig: Pick<StackConfig, 'get' | 'getObject'>,
+  env: Environment,
 ): ClusterConfigInputs | undefined {
-  const kubeconfig = requireKubeconfig(stackConfig.get('cluster'), env['K3S_KUBECONFIG']);
+  const kubeconfig = requireKubeconfig(stackConfig.get('cluster'), env);
 
   if (kubeconfig === undefined) {
     return undefined;
@@ -34,9 +31,7 @@ export function loadClusterInputs(
 
   return {
     kubeconfig,
-    onePasswordConnectCredentials: secret(
-      requireOnePasswordConnectCredentials(env['ONEPASSWORD_CONNECT_CREDENTIALS']),
-    ),
+    onePasswordConnectCredentials: secret(requireOnePasswordConnectCredentials(env)),
     ...loadATCGatewayInputs(stackConfig, env),
     ...loadNixieInputs(stackConfig, env),
   };

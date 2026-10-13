@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
+import { buildStubConfig } from '../test-utils/build-stub-config.ts';
+import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { loadNixieInputs } from './load-nixie-inputs.ts';
-import { buildStubConfig } from './test-utils/build-stub-config.ts';
-import { resolveOutput } from './test-utils/resolve-output.ts';
 
 test('it returns nothing while the stack config leaves nixie out', () => {
   expect(
@@ -108,6 +108,30 @@ test.each([
       env,
     ),
   ).toThrowWithMessage(Error, `${name} is unset; nixie needs it while stack config "nixie" is set`);
+});
+
+test('it throws when a nixie secret holds only whitespace', () => {
+  expect(() =>
+    loadNixieInputs(
+      buildStubConfig({
+        nixie: JSON.stringify({
+          image:
+            'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+          webImage:
+            'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+          hostname: 'nixie.geoff.cloud',
+        }),
+      }),
+      {
+        NIXIE_AGE_HOST_KEY: ' \n',
+        NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+        CLOUDFLARE_API_TOKEN: 'cf-token',
+      },
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'NIXIE_AGE_HOST_KEY is blank; nixie needs it while stack config "nixie" is set',
+  );
 });
 
 test.each([

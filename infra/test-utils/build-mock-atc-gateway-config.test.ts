@@ -56,14 +56,8 @@ test('it applies overrides on top of the defaults', () => {
   });
 });
 
-test('it leaves out a field passed as undefined', () => {
-  expect(
-    buildMockATCGatewayConfig({
-      daemons: undefined,
-      defaultDaemon: undefined,
-      stateDir: undefined,
-    }),
-  ).toStrictEqual({
+test('it leaves out a stateDir passed as undefined', () => {
+  expect(buildMockATCGatewayConfig({ stateDir: undefined })).toStrictEqual({
     image: expect.toSatisfy((value: string) =>
       /^ghcr\.io\/zgeoff\/atc-gateway:\d+\.\d+\.\d+@sha256:[\da-f]{64}$/u.test(value),
     ),
@@ -71,5 +65,17 @@ test('it leaves out a field passed as undefined', () => {
       /^ghcr\.io\/zgeoff\/atc-gateway-backup:\d+\.\d+\.\d+@sha256:[\da-f]{64}$/u.test(value),
     ),
     publicURL: expect.toSatisfy((value: string) => /^https:\/\/[\w.-]+$/u.test(value)),
+    daemons: {
+      geoffcloud: {
+        address: expect.toSatisfy((address: string) =>
+          /^\d{1,3}(?:\.\d{1,3}){3}:\d{1,5}$/u.test(address),
+        ),
+        daemonID: expect.toSatisfy((daemonID: string) =>
+          /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/u.test(daemonID),
+        ),
+        alertSeverity: 'critical',
+      },
+    },
+    defaultDaemon: 'geoffcloud',
   });
 });
