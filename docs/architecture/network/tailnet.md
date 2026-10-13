@@ -20,12 +20,13 @@ visible change to the test as well.
 A tagged node holds only what a grant gives it, while a member's device reaches every device on any
 port.
 
-| Identity          | Holder                                         | Reaches                                               |
-| ----------------- | ---------------------------------------------- | ----------------------------------------------------- |
-| a member's device | the owner's devices, the PC among them         | every device, on any port; the host's HTTPS for nixie |
-| `tag:cloud`       | the host's node, and through it every pod      | the PC's atc daemon; impd's node for HTTPS            |
-| `tag:imp`         | impd's node on the host, and imp's dev nodes   | other `tag:imp` nodes' API                            |
-| `tag:imp-e2e`     | the throwaway nodes of imp's end-to-end suites | other `tag:imp-e2e` nodes' API only                   |
+| Identity           | Holder                                         | Reaches                                               |
+| ------------------ | ---------------------------------------------- | ----------------------------------------------------- |
+| a member's device  | the owner's devices, the PC among them         | every device, on any port; the host's HTTPS for nixie |
+| `tag:cloud`        | the host's node, and through it every pod      | the PC's atc daemon; impd's node for HTTPS            |
+| `tag:imp`          | impd's node on the host, and imp's dev nodes   | other `tag:imp` nodes' API                            |
+| `tag:imp-e2e`      | the throwaway nodes of imp's end-to-end suites | other `tag:imp-e2e` nodes' API only                   |
+| `tag:cloud-deploy` | the prod apply job's ephemeral runner node     | the host's k3s API only                               |
 
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the cluster
 as a whole is `tag:cloud`, and every pod gains whatever the host is granted. The grants for
@@ -49,6 +50,12 @@ impd's nodes reach each other's API only, which is what lets impd move an imp be
 nothing more. The end-to-end nodes reach each other and never a `tag:imp` node, so a test run can
 never touch a live impd. They join with keys from an OAuth client of their own, which can mint keys
 for that tag alone ([the imp e2e runbook](../../runbooks/imp-e2e-tailnet.md)).
+
+The prod apply job's runner joins for one run as `tag:cloud-deploy`, through a federated identity
+that GitHub's token for the job proves, so no key for it is stored anywhere. The runner holds
+full-account cloud credentials for the run, so its one grant is the k3s API port on the host, which
+Pulumi drives the cluster through, and no SSH rule lists it as a destination
+([infrastructure as code](../infrastructure-as-code.md#the-apply-job)).
 
 Each tag owns itself as well as being owned by the tailnet's admins, because Tailscale lets an OAuth
 client mint keys only for tags its own tags own. Pulumi's client carries `tag:cloud` and `tag:imp`,

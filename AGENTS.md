@@ -106,13 +106,14 @@ is its generated TypeScript SDK: never edit it by hand, regenerate it. `nixos/` 
   live `imp.sqlite*` files: impd runs in WAL mode, so such a copy can tear. A restore is one-way
   (migrations run forward only), needs approval, and follows the restore runbook (#9). The host's
   `/var/lib/imp` is empty: `tank/imp` has a legacy mountpoint inside imp-host.
-- Drift checks are manual. `bun run drift` is a refresh preview that exits non-zero on any change.
-  Before an apply, run it from a clean checkout of the last deployed revision; a clean `main` serves
-  only when it is fully applied, because it can hold other unapplied changes. Record that revision
-  and the result. Then `bun run preview -- --refresh` from a clean current `main` must show only the
-  intended changes, reviewed on their PRs; apply them with `bun run up`, then run `bun run drift`
-  again. Record both drift results. A scheduled CI check is parked until scoped credentials exist
-  (#19): Onidel offers only full-account keys.
+- The `Deploy prod` workflow applies each merged change to a Pulumi input once CI passes on `main`,
+  bracketed by drift checks, and its guard holds a delete, a replace, a change to the tailnet
+  policy, the VM or the cloud firewall, or a failed drift check for a manual dispatch
+  (`docs/runbooks/prod-apply.md`). Never run `bun run up` while a run of it is in progress. An apply
+  by hand follows the same bracket: `bun run drift` from a clean checkout of the `deployed/prod`
+  tag, `bun run preview -- --refresh` from a clean `main` showing only the reviewed changes,
+  `bun run up`, `bun run drift` again, then move the tag. Record both drift results. A scheduled
+  drift check is parked until scoped credentials exist (#19): Onidel offers only full-account keys.
 - Tailscale SSH logs each session's full remote command line in `tailscaled.service`'s journal, and
   Alloy ships the host journal to Loki. So never put a secret in the command line of
   `ssh root@geoffcloud …`, including the `kubectl` arguments and inline scripts it runs: send it on

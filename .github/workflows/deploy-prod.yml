@@ -1,0 +1,289 @@
+name: Deploy prod
+
+# Applies main to the prod stack with no person involved, unless the guard holds it. It starts
+# when the CI run of a push to main passes, and does nothing unless a Pulumi input changed since
+# the deployed/prod tag. It checks drift from that tag, previews the push's commit, and applies
+# only when the guard passes the plan; then it checks drift again and moves the tag. A held plan
+# waits for a manual dispatch of this workflow on main, which applies whatever the guard found.
+# docs/runbooks/workflows.md covers a held run and the tag's first setting.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: The full commit of the held run to apply; it must be main's tip
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# one apply at a time, and never cancel one in progress: a cancelled apply leaves the stack half
+# changed. GitHub keeps only the newest pending run, which applies everything an older one would.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  # Decides from the repo alone, with no secret, whether the commit needs an apply. A CI run of a
+  # pull request, a fork or a failed check starts nothing.
+  decide:
+    if: >-
+      github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # actions: read lists CI's runs for a dispatch
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      apply: ${{ steps.decide.outputs.apply }}
+      revision: ${{ steps.decide.outputs.revision }}
+      deployed: ${{ steps.decide.outputs.deployed }}
+    env:
+      LEFTHOOK: 0
+      EVENT: ${{ github.event_name }}
+      RUN_HEAD: ${{ github.event.workflow_run.head_sha }}
+      DISPATCH_REF: ${{ github.ref }}
+      DISPATCH_SHA: ${{ github.sha }}
+      DISPATCH_REVISION: ${{ inputs.revision }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      # the full history and tags, for the deployed/prod tag and the comparison with it
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # a dispatch applies main's tip, only when the person named it and only after CI passed on
+      # it, since a dispatch skips the trigger that waits for CI; a CI run applies the commit it
+      # checked, which must be on main
+      - name: Decide whether the commit needs an apply
+        id: decide
+        run: |
+          if [ "$EVENT" = workflow_dispatch ]; then
+            if [ "$DISPATCH_REF" != refs/heads/main ] || [ "$DISPATCH_REVISION" != "$DISPATCH_SHA" ]; then
+              echo "a dispatch applies main's tip only: dispatch on main with revision $DISPATCH_SHA" >&2
+              exit 1
+            fi
+            ci_run="$(bun run --silent ci:find-ci-run "$DISPATCH_SHA")"
+            if [ -z "$ci_run" ]; then
+              echo "no green CI run of a push to main on $DISPATCH_SHA: wait for CI to pass" >&2
+              exit 1
+            fi
+            echo "CI passed on $DISPATCH_SHA: $ci_run"
+            revision="$DISPATCH_SHA"
+          else
+            revision="$RUN_HEAD"
+          fi
+          git merge-base --is-ancestor "$revision" origin/main || {
+            echo "$revision is not on main" >&2
+            exit 1
+          }
+          # resolved once, so a tag moved during the run never reaches the apply job
+          deployed="$(git rev-parse --verify 'deployed/prod^{commit}')"
+          apply="$(bun run --silent ci:needs-prod-apply "$deployed" "$revision")"
+          case "$apply" in
+            true | false) ;;
+            *) echo "unexpected decision: $apply" >&2; exit 1 ;;
+          esac
+          {
+            echo "apply=$apply"
+            echo "revision=$revision"
+            echo "deployed=$deployed"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$apply" = false ]; then
+            echo "No Pulumi input changed since deployed/prod, so nothing applied." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+  apply:
+    needs: decide
+    if: needs.decide.outputs.apply == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: prod
+    outputs:
+      verdict: ${{ steps.guard.outputs.verdict }}
+    # contents: write moves the deployed/prod tag; id-token: write joins the tailnet through the
+    # federated identity
+    permissions:
+      contents: write
+      id-token: write
+    env:
+      LEFTHOOK: 0
+      REVISION: ${{ needs.decide.outputs.revision }}
+      DEPLOYED: ${{ needs.decide.outputs.deployed }}
+      PULUMI_SKIP_UPDATE_CHECK: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.decide.outputs.revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # the job's service account reads only the cloud-deploy vault
+      - name: Point .env at the deploy vault
+        run: bash scripts/write-deploy-env.sh .env
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: provider/go.sum
+
+      # the CLI release that matches the program's @pulumi/pulumi
+      - name: Setup Pulumi
+        uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
+        with:
+          pulumi-version: 3.264.0
+
+      - name: Setup 1Password CLI
+        uses: 1password/install-cli-action@1a3160d5e9de1ae0803eaa08a88746f5ae3daa50 # v4.1.0
+        with:
+          version: 2.40.0
+
+      # an ephemeral node, tagged tag:cloud-deploy, that reaches only k3s's API on geoffcloud
+      - name: Join the tailnet
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ vars.TS_DEPLOY_CLIENT_ID }}
+          audience: ${{ vars.TS_DEPLOY_AUDIENCE }}
+          tags: tag:cloud-deploy
+
+      # a new node reaches its peers only once the tailnet has spread its key; any HTTP answer,
+      # a 401 included, shows the route is open
+      - name: Wait for the k3s API
+        run: |
+          for _ in $(seq 1 30); do
+            if curl -sk -o /dev/null --max-time 5 https://geoffcloud:6443/livez; then exit 0; fi
+            sleep 2
+          done
+          echo "k3s's API on geoffcloud:6443 did not answer" >&2
+          exit 1
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Check out the deployed revision
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/deployed" "$DEPLOYED"
+          bash scripts/write-deploy-env.sh "$RUNNER_TEMP/deployed/.env"
+          cd "$RUNNER_TEMP/deployed" && bun install --frozen-lockfile
+
+      # a failure here holds the apply rather than failing the run, so the plan still shows
+      - name: Check drift from the deployed revision
+        id: drift
+        continue-on-error: true
+        working-directory: ${{ runner.temp }}/deployed
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: bun run drift -- --suppress-outputs
+
+      # the digest stays on the runner: the guard prints each held step's op and URN, never a
+      # resource's state
+      - name: Preview and guard
+        id: guard
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          DRIFT: ${{ steps.drift.outcome }}
+        run: |
+          bun run sdk:build
+          preview=0
+          bun run --silent preview -- --refresh --json > "$RUNNER_TEMP/plan.json" || preview=$?
+          guard=0
+          bun run --silent ci:check-prod-plan "$RUNNER_TEMP/plan.json" "$DRIFT" > "$RUNNER_TEMP/guard.txt" || guard=$?
+          tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/guard.txt"
+          if [ "$preview" != 0 ]; then
+            echo "the preview failed (exit $preview)" >&2
+            exit 1
+          fi
+          case "$guard" in
+            0) echo "verdict=apply" >> "$GITHUB_OUTPUT" ;;
+            3) echo "verdict=hold" >> "$GITHUB_OUTPUT" ;;
+            *) exit 1 ;;
+          esac
+
+      - name: Hold for a manual dispatch
+        if: steps.guard.outputs.verdict == 'hold' && github.event_name != 'workflow_dispatch'
+        run: |
+          echo "::error::The guard held the apply. To apply this plan, dispatch Deploy prod on main with revision $REVISION."
+          exit 1
+
+      - name: Apply
+        if: steps.guard.outputs.verdict == 'apply' || github.event_name == 'workflow_dispatch'
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: bun run up -- --yes --refresh --skip-preview --suppress-outputs
+
+      - name: Check drift after the apply
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: bun run drift -- --suppress-outputs
+
+      # force=false refuses a move that is not forward along main
+      - name: Move deployed/prod
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/deployed/prod" \
+            -f sha="$REVISION" -F force=false > /dev/null
+          echo "deployed/prod moved to $REVISION." | tee -a "$GITHUB_STEP_SUMMARY"
+
+  alert:
+    needs: [decide, apply]
+    if: >-
+      always() && (needs.decide.result == 'failure' || needs.apply.result == 'failure' ||
+      needs.apply.result == 'cancelled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: prod
+    env:
+      VERDICT: ${{ needs.apply.outputs.verdict }}
+      EVENT: ${{ github.event_name }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Point .env at the deploy vault
+        run: bash scripts/write-deploy-env.sh .env
+
+      - name: Setup 1Password CLI
+        uses: 1password/install-cli-action@1a3160d5e9de1ae0803eaa08a88746f5ae3daa50 # v4.1.0
+        with:
+          version: 2.40.0
+
+      - name: Alert on Discord
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          if [ "$VERDICT" = hold ] && [ "$EVENT" != workflow_dispatch ]; then
+            what="is held for a manual dispatch"
+          else
+            what="failed"
+          fi
+          url="$(op read "$(sed -n 's/^ALERT_WEBHOOK_URL=//p' .env)")"
+          echo "::add-mask::$url"
+          jq -n --arg content "The prod apply $what: $RUN_URL" '{content: $content}' |
+            curl -fsS -H 'Content-Type: application/json' --data @- "$url" > /dev/null

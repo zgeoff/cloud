@@ -3,9 +3,10 @@
 One Pulumi program, in `infra/`, declares every cloud resource and every workload in the k3s
 cluster, and one stack, `prod`, holds the live state. Pulumi runs on Bun, and every run reads its
 inputs from 1Password through `op run`, so the program sees each secret only for the length of a
-run. A run changes nothing until someone applies it, and the guards at the top of the program stop a
-run whose inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which
-Pulumi does not drive.
+run. A preview changes nothing. The apply job applies each merged change on its own, unless its plan
+guard holds the change for a person, and the guards at the top of the program stop a run whose
+inputs would plan a mass delete. [The host](./host/host.md) covers the NixOS host, which Pulumi does
+not drive.
 
 ## What the program owns
 
@@ -54,14 +55,85 @@ refreshes from the live APIs first and fails on any change, so it passes only ag
 that was last applied. A clean `main` passes only when every merged change is applied, because a
 merged change nobody has applied yet reads as drift too. An apply is therefore bracketed: a drift
 check from the last applied revision proves the baseline, a refreshed preview from the new `main`
-shows only the reviewed changes, and a second drift check proves the apply landed. The check runs by
-hand, because Onidel offers only full-account API keys and a scheduled CI job would hold one.
+shows only the reviewed changes, and a second drift check proves the apply landed. The apply job
+runs that bracket on every apply. No scheduled check runs between applies, because Onidel offers
+only full-account API keys and a scheduled job would hold one around the clock.
 
 Some resources are declared to avoid drift on their own. The host's auth keys are single-use, so
 after the host joins they read as used, and the program never mints them again until a reinstall
 replaces them on purpose. A Service that the host dials by its cluster address pins that address and
 ignores later changes to it, so a refresh never reads it as drift
 ([1Password Connect](./workloads/onepassword-connect.md)).
+
+## The apply job
+
+A merged change to a Pulumi input reaches production through a GitHub Actions workflow, because the
+state lives in R2 and Pulumi's own hosted deployments apply only stacks in Pulumi Cloud. The job
+runs on a GitHub-hosted runner, so it reaches the cluster over the tailnet as its own ephemeral
+node.
+
+```mermaid
+flowchart LR
+  CI["CI passes on<br>a push to main"] --> F{"Pulumi input changed<br>since deployed/prod?"}
+  F -->|no| SK["skip"]
+  F -->|yes| D1["drift check<br>at deployed/prod"]
+  D1 --> P["refreshed preview<br>of the commit"]
+  P --> G{"guard"}
+  G -->|hold| H["wait for a<br>manual dispatch"]
+  H --> U
+  G -->|pass| U["apply"]
+  U --> D2["drift check<br>at the commit"]
+  D2 --> T["move deployed/prod"]
+```
+
+The tag `deployed/prod` marks the last revision the job applied, and it moves only after an apply
+and its second drift check pass. It is therefore the baseline for both the path filter and the first
+drift check. The job compares the tag with the commit, not the commit with its parent, so a run that
+GitHub dropped from the queue loses nothing: the next run applies every change since the tag. A
+commit that is already at or behind the tag skips, and a tag outside the commit's history fails the
+run, because only a person can say which revision is live. A person sets the tag once, at the last
+revision applied by hand.
+
+GitHub environments here offer branch policies and secrets but no required reviewers, so a guard on
+the plan takes the reviewer's place. It reads the refreshed preview and holds the apply on any of
+these:
+
+- a delete or a replace, or any step that is not a create, an update, a refresh or a read, so an op
+  Pulumi adds later holds too;
+- any change to the tailnet policy, the VM or the cloud firewall, because each can cut the host off
+  or open it, and the owner reviews a policy diff before it applies;
+- a failed drift check from the deployed revision, because the plan then holds changes nobody
+  reviewed.
+
+A held run fails and alerts on Discord. A manual dispatch of the workflow on `main` applies whatever
+its own preview plans, so the person who dispatches it has read the held plan first. The dispatch
+applies only once CI has passed on main's tip, because a dispatch skips the trigger that waits for
+CI. Until someone applies or reverts the held change, every later push to `main` runs the job and
+holds again, because the tag still sits behind the change. A failed apply or a failed second drift
+check leaves the tag where it was, so the next run's first drift check fails and holds until a
+person repairs the stack.
+
+The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
+itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
+Pulumi's update plans would close that gap, but they are experimental, and a plan they reject stops
+the apply partway, which leaves the stack half changed.
+
+One run applies at a time, and GitHub never cancels a run in progress, because a cancelled apply
+leaves the stack half changed. The job prints only each held step's op and resource name, never a
+resource's state, and its Pulumi runs suppress the stack outputs, because the repo and its logs are
+public.
+
+The job reads its secrets from its own 1Password vault, `cloud-deploy`, through a service account
+whose token is the `prod` environment's one secret. The vault holds a copy of each item `.env`
+references and nothing else, so a leaked token reaches no item the program does not already read.
+The job points `.env` at that vault before it resolves anything. Its tailnet node joins through a
+federated identity, with no stored key, as `tag:cloud-deploy`, whose one grant reaches the k3s API
+on the host ([the tailnet](./network/tailnet.md)).
+
+Two writes outside Pulumi stay with a person. The program copies each new `tag:imp` key into the
+`cloud` vault, which the job's account cannot write, but a new key replaces the old one and the
+guard holds every replace. A NixOS switch and an agent-image rollout run by hand
+([workflows](../runbooks/workflows.md)).
 
 ## Guards
 

@@ -19,17 +19,32 @@ cannot be undone needs the owner's approval of its exact effect.
    Read every replace and delete. If the preview changes the tailnet policy, the owner reviews the
    diff first: Pulumi replaces the whole policy file.
 
-3. Check the baseline from a clean checkout of the last deployed revision:
+3. Merge it. Once CI passes on `main`, the `Deploy prod` workflow checks drift from the deployed
+   revision, previews, applies and checks drift again, unless its guard holds the plan.
+   [The prod apply job](./prod-apply.md) covers reading its run and answering a held one.
+4. Link the run on the PR or issue. Its log holds both drift results.
+
+Pass Pulumi flags after `--`, such as `bun run preview -- --diff`.
+
+### Apply by hand
+
+Apply by hand only for what the job cannot do, such as a first apply before the job is set up.
+
+**CAUTION:** Check that no `Deploy prod` run is in progress first
+(`gh run list --workflow deploy-prod.yml --status in_progress`). Two applies at once race on the
+stack.
+
+1. Check the baseline from a clean checkout of the revision at the tag `deployed/prod`, or of the
+   last revision applied by hand:
 
    ```sh
    bun run drift
    ```
 
-   It exits non-zero on any change, so it expects 0 changes only against the deployed code. A clean
-   `main` serves as the baseline only when it is fully applied: it can hold other merged changes
-   that nobody has applied. Record the revision and the result. Resolve drift before you go on.
+   It exits non-zero on any change, so it expects 0 changes only against the deployed code. Record
+   the revision and the result. Resolve drift before you go on.
 
-4. After the merge, from a clean current `main`, preview against the live state:
+2. From a clean current `main`, preview against the live state:
 
    ```sh
    bun run preview -- --refresh
@@ -37,15 +52,20 @@ cannot be undone needs the owner's approval of its exact effect.
 
    Expect exactly the intended changes, reviewed on their PRs, and nothing else.
 
-5. Apply:
+3. Apply:
 
    ```sh
    bun run up
    ```
 
-6. Run `bun run drift` again, and expect 0 changes. Record both drift results on the PR or issue.
+4. Run `bun run drift` again, and expect 0 changes. Record both drift results on the PR or issue.
+5. Once `deployed/prod` exists, move it to the revision you applied, so the job's next run starts
+   from it:
 
-Pass Pulumi flags after `--`, such as `bun run preview -- --diff`.
+   ```sh
+   git tag -f deployed/prod <revision>
+   git push --force origin refs/tags/deployed/prod
+   ```
 
 ### Change stack config
 
@@ -57,8 +77,8 @@ cd infra
 op run --env-file=../.env -- pulumi config set --stack prod <key> <value>
 ```
 
-Land the YAML change through a PR, then preview and apply as above. `infra/Pulumi.prod.yaml` holds
-the keys, and the program's input loaders describe each one.
+Land the YAML change through a PR, which the apply job applies after the merge.
+`infra/Pulumi.prod.yaml` holds the keys, and the program's input loaders describe each one.
 
 ## Switch the host
 
@@ -235,15 +255,16 @@ approval first.
 
 2. `bun run preview` shows the new Secret `observability/alertmanager-discord`. The run fails if
    `ALERT_WEBHOOK_URL` is empty.
-3. `bun run up` applies it. Alertmanager then sends every alert to Discord, except the chart's
-   always-firing `Watchdog` and its `InfoInhibitor` helper.
+3. The merge applies it through the apply job. Alertmanager then sends every alert to Discord,
+   except the chart's always-firing `Watchdog` and its `InfoInhibitor` helper.
 
 To turn it off again, run `op run --env-file=../.env -- pulumi config rm --stack prod discordAlerts`
 in `infra/`, and land it the same way. The external health check uses the same webhook either way.
 
 ## Rotate a credential
 
-Store the new value in its 1Password item first, then deliver it.
+Store the new value in its 1Password item first, then deliver it. An item `.env` references has a
+copy in the vault `cloud-deploy` for the apply job: update both.
 
 | Credential                                                     | Deliver it with                                                                                       |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
