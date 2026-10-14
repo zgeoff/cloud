@@ -47,24 +47,22 @@ async function readManifestDigest(
       ? await sendManifestHeadWithToken(url, first.headers.get('www-authenticate'), githubToken)
       : first;
 
-  return toRegistryAnswer(response);
+  return toRegistryAnswer(response.status, response.headers.get('docker-content-digest'));
 }
 
-function toRegistryAnswer(response: Readonly<Response>): RegistryAnswer {
-  if (response.status === 404) {
+function toRegistryAnswer(status: number, digest: string | null): RegistryAnswer {
+  if (status === 404) {
     return { missing: true };
   }
 
   // ghcr.io answers 401 or 403 when the token cannot read a private package
-  if (response.status === 401 || response.status === 403) {
-    return { error: `the registry answered ${response.status}: the credential cannot read it` };
+  if (status === 401 || status === 403) {
+    return { error: `the registry answered ${status}: the credential cannot read it` };
   }
 
-  if (response.status !== 200) {
-    return { error: `the registry answered ${response.status}` };
+  if (status !== 200) {
+    return { error: `the registry answered ${status}` };
   }
-
-  const digest = response.headers.get('docker-content-digest');
 
   return digest === null ? { error: 'the registry named no digest' } : { digest };
 }
