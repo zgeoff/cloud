@@ -112,6 +112,60 @@ test('it fails an upward import from inputs into the cluster group', async () =>
   `);
 });
 
+test.each([
+  [
+    'a variable annotation',
+    "export const items: Array<import('../cluster/index.ts').Thing> = [];\n",
+  ],
+  ['a type alias', "export type Things = Array<import('../cluster/index.ts').Thing>;\n"],
+  ['an as expression', "export const items = [] as Array<import('../cluster/index.ts').Thing>;\n"],
+  ['a typeof type query', "export const cluster: typeof import('../cluster/index.ts') = null!;\n"],
+])('it fails an upward import type from inputs nested in %s', async (_, source) => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.root, 'infra', 'inputs'), { recursive: true });
+  await mkdir(join(ctx.root, 'infra', 'cluster'), { recursive: true });
+  await writeFile(join(ctx.root, 'infra', 'cluster', 'index.ts'), 'export type Thing = number;\n');
+  await writeFile(join(ctx.root, 'infra', 'inputs', 'index.ts'), source);
+
+  const status = await checkBoundaries({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(status).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    '\n  error infra-inputs-imports-no-group: infra/inputs/index.ts → infra/cluster/index.ts\n\nx 1 dependency violations (1 errors, 0 warnings). 2 modules, 1 dependencies cruised.\n\n',
+  );
+});
+
+test('it passes an import type nested in a variable annotation that points down a layer', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.root, 'infra', 'inputs'), { recursive: true });
+  await mkdir(join(ctx.root, 'infra', 'cluster'), { recursive: true });
+  await writeFile(join(ctx.root, 'infra', 'inputs', 'index.ts'), 'export type Port = number;\n');
+
+  await writeFile(
+    join(ctx.root, 'infra', 'cluster', 'index.ts'),
+    "export const ports: Array<import('../inputs/index.ts').Port> = [];\n",
+  );
+
+  const status = await checkBoundaries({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(status).toBe(0);
+
+  expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
+    '\n✔ no dependency violations found (2 modules, 1 dependencies cruised)\n\n',
+  );
+});
+
 test('it fails a relative import into another workspace package', async () => {
   const ctx = await setupTest();
 

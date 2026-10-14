@@ -44,6 +44,11 @@ The rules a task needs are not repeated here. Load the skill for the work before
 
 - Pin exact versions — no `^`/`~` ranges. (`bun add` saves exact automatically via `exact = true` in
   bunfig.toml — the rule applies to hand-written edits.)
+- `patches/` holds Bun patches, which `patchedDependencies` in the root `package.json` applies on
+  install. The dependency-cruiser patch makes its SWC extractor collect an import type nested in
+  another type, such as `Array<import('./a.ts').T>`, because without it the boundary check misses
+  that dependency. A bump of dependency-cruiser carries the patch to the new version with
+  `bun patch`, and `scripts/check-boundaries.test.ts` fails when the patch is lost.
 
 ## Review bots
 
