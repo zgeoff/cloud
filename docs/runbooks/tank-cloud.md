@@ -79,11 +79,14 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 2. Check the mounts and the services:
 
    ```bash
-   findmnt -R /var/lib/tank-cloud
+   for path in /var/lib/tank-cloud/{host-secrets,imp-db-backups,rancher}; do
+     findmnt -n -o SOURCE,FSTYPE --mountpoint "$path"
+   done
    systemctl is-active tank-cloud-key k3s imp-host atc-daemon
    ```
 
-   Expect the three datasets mounted, and `active` four times.
+   Expect `tank/cloud/host-secrets zfs`, `tank/cloud/imp-db-backups zfs` and a `/dev/zd<n> ext4`
+   line, then `active` four times.
 
 3. Make the two filesystems root-only, because they hold secrets:
 

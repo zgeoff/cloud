@@ -51,13 +51,25 @@ in
         stopped when the key fails to load.
       '';
     };
+
+    fileSystems = lib.mkOption {
+      type = lib.types.attrs;
+      internal = true;
+      readOnly = true;
+      description = ''
+        The datasets' entries for fileSystems. A NixOS test VM replaces fileSystems with
+        virtualisation.fileSystems, so the module's check gives them to the VM from here.
+      '';
+    };
   };
 
   config = lib.mkIf cfg.enable {
     # tank-cloud-key loads tank/cloud's key; the import only imports the pool
     boot.zfs.requestEncryptionCredentials = false;
 
-    fileSystems = {
+    fileSystems = cfg.fileSystems;
+
+    services.tank-cloud.fileSystems = {
       ${mountPoint "host-secrets"} = {
         device = "${root}/host-secrets";
         fsType = "zfs";

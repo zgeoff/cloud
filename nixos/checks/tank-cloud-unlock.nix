@@ -38,6 +38,8 @@ pkgs.testers.runNixOSTest {
         enable = true;
         inherit requiredBy;
       };
+      # the VM mounts virtualisation.fileSystems in place of fileSystems
+      virtualisation.fileSystems = config.services.tank-cloud.fileSystems;
 
       systemd.services = {
         # the pool, made once on the empty disk before its first import; zpool create leaves a
