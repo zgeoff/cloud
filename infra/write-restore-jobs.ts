@@ -13,10 +13,17 @@ export interface WriteRestoreJobsOptions {
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
+
+  // the oxfmt that lays each file out; the repo's own by default
+  readonly formatter?: string;
 }
 
 const usage = 'usage: write-restore-jobs.ts [--check] [repo root]\n';
 const stackFile = join('infra', 'Pulumi.prod.yaml');
+
+// the repo root, where oxfmt and its config live
+const repoDir = join(import.meta.dir, '..');
+const repoFormatter = join(repoDir, 'node_modules', '.bin', 'oxfmt');
 
 export function writeRestoreJobs(options: Readonly<WriteRestoreJobsOptions>): Promise<number> {
   const parsed = parseArgs(options.args);
@@ -50,7 +57,12 @@ async function applyRestoreJobs(
 
   const outcomes = await Promise.all(
     buildRestoreJobFiles(backupImage).map((job) =>
-      applyRestoreJob({ root: parsed.root, check: parsed.check, job }),
+      applyRestoreJob({
+        root: parsed.root,
+        check: parsed.check,
+        job,
+        formatter: options.formatter ?? repoFormatter,
+      }),
     ),
   );
 
@@ -166,6 +178,7 @@ interface RestoreJobChange {
   readonly root: string;
   readonly check: boolean;
   readonly job: RestoreJobFile;
+  readonly formatter: string;
 }
 
 // a file's status, and the line that reports it, if any
@@ -176,10 +189,13 @@ interface RestoreJobOutcome {
 
 // writes the file that differs from its Job, or fails the check without writing it
 async function applyRestoreJob(change: RestoreJobChange): Promise<RestoreJobOutcome> {
-  const path = join(change.root, change.job.path);
+  const written = await tryRenderRestoreJob(change.job, change.formatter);
 
-  const written = await renderRestoreJob(change.job);
-  const current = await readFile(path, 'utf8').catch(() => null);
+  if (typeof written !== 'string') {
+    return { status: 1, line: `write-restore-jobs: ${written.error}\n` };
+  }
+
+  const current = await readFile(join(change.root, change.job.path), 'utf8').catch(() => null);
 
   if (current === written) {
     return { status: 0 };
@@ -192,7 +208,7 @@ async function applyRestoreJob(change: RestoreJobChange): Promise<RestoreJobOutc
     };
   }
 
-  await writeFile(path, written);
+  await writeFile(join(change.root, change.job.path), written);
 
   return { status: 0, line: `write-restore-jobs: wrote ${change.job.path}\n` };
 }
@@ -209,16 +225,29 @@ function printOutcomes(
   }
 }
 
-// the repo root, where oxfmt and its config live
-const repoDir = join(import.meta.dir, '..');
+// the rendered file, or why oxfmt gave none, such as a checkout without its dependencies
+async function tryRenderRestoreJob(
+  job: RestoreJobFile,
+  formatter: string,
+): Promise<string | { readonly error: string }> {
+  try {
+    return await renderRestoreJob(job, formatter);
+  } catch (error) {
+    return {
+      error: `cannot format ${job.path}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
 
 // The header and the Job as YAML, laid out by the repo's own oxfmt, so format:check leaves the
 // written file as it is
-async function renderRestoreJob(job: RestoreJobFile): Promise<string> {
-  const formatter = Bun.spawn(
-    [join(repoDir, 'node_modules', '.bin', 'oxfmt'), `--stdin-filepath=${job.path}`],
-    { cwd: repoDir, stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
-  );
+async function renderRestoreJob(job: RestoreJobFile, formatterPath: string): Promise<string> {
+  const formatter = Bun.spawn([formatterPath, `--stdin-filepath=${job.path}`], {
+    cwd: repoDir,
+    stdin: 'pipe',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
 
   await formatter.stdin.write(`${job.header}${Bun.YAML.stringify(job.job, null, 2)}\n`);
   await formatter.stdin.end();
@@ -230,7 +259,7 @@ async function renderRestoreJob(job: RestoreJobFile): Promise<string> {
   ]);
 
   if (status !== 0) {
-    throw new Error(`oxfmt exited ${status} on ${job.path}: ${error}`);
+    throw new Error(`oxfmt exited ${status}: ${error.trim()}`);
   }
 
   return text;

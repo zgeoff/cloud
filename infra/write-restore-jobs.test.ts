@@ -443,6 +443,43 @@ test('it fails when the stack config sets no atcGateway', async () => {
   ]);
 });
 
+test('it reports each file it cannot format and exits 1 when oxfmt is missing', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'infra', 'Pulumi.prod.yaml'),
+    `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/atc-gateway:9.1.0@sha256:${'a'.repeat(64)}
+    backupImage: ghcr.io/zgeoff/atc-gateway-backup:9.0.0-r3@sha256:${'b'.repeat(64)}
+    publicURL: https://gateway.example.org
+    daemons:
+      lighthouse:
+        address: 100.64.0.7:8415
+        daemonID: 3f2b1c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d
+    defaultDaemon: lighthouse
+`,
+  );
+
+  const status = await writeRestoreJobs({
+    args: ['--check', ctx.root],
+    formatter: join(ctx.root, 'oxfmt'),
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(status).toBe(1);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    [
+      `write-restore-jobs: cannot format images/atc-gateway/restore-job.yaml: ENOENT: no such file or directory, posix_spawn '${join(ctx.root, 'oxfmt')}'\n`,
+    ],
+    [
+      `write-restore-jobs: cannot format deploy/nixie/restore-job.yaml: ENOENT: no such file or directory, posix_spawn '${join(ctx.root, 'oxfmt')}'\n`,
+    ],
+  ]);
+});
+
 test('it fails when the stack config is unreadable', async () => {
   const ctx = await setupTest();
 
