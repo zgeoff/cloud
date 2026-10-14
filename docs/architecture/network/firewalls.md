@@ -85,11 +85,12 @@ so a port or a hostname cannot go public without an entry that records why. The 
 The `exposure` check reads NixOS's evaluated firewall and fails on any difference in either
 direction. A port open on every interface needs a public entry, and a tailnet entry's port open
 there, such as OpenSSH's default, fails the check. A port open on one interface, or narrowed by the
-narrowing table, needs a host-scope entry for that interface. Each port that imp's module publishes
-for public imps passes NixOS's input chain through Docker's forwarding, so it needs a public entry
-as well. A port range or a hand-written input rule cannot be matched with an entry, so the check
-fails on either. The tailnet capability and the Worker URL entries record a decision that no code
-reads yet.
+narrowing table, needs a host-scope entry for that interface. An interface with a default route or a
+static address faces outside the host, so a port open there needs a public entry, and no host-scope
+entry may name it. Each port that imp's module publishes for public imps passes NixOS's input chain
+through Docker's forwarding, so it needs a public entry as well. A port range or a hand-written
+input rule cannot be matched with an entry, so the check fails on either. The tailnet capability and
+the Worker URL entries record a decision that no code reads yet.
 
 ## NodePorts
 
