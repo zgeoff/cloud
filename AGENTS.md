@@ -19,6 +19,10 @@ The rules a task needs are not repeated here. Load the skill for the work before
 
 - Perform all work on a branch in a git worktree under `.worktrees/` (e.g.
   `git worktree add .worktrees/<branch> -b <branch>`) — never commit directly on `main`.
+- Run `bun install` in the main checkout before you run `bun run deadcode` in a worktree. knip's
+  config loader looks for a `tsconfig.json` from the directory above the worktree, so it reads the
+  main checkout's, and without that checkout's `node_modules` knip exits 1 with
+  `File '@tsconfig/strictest/tsconfig.json' not found.`
 - Use [Conventional Commits](https://www.conventionalcommits.org/) for all commit messages.
 - A squash merge makes the PR title the commit subject, so a PR title is a Conventional Commit too.
   `feat(#412): add the retry budget` is a title; `add the retry budget` is not.
