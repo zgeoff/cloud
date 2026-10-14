@@ -3,7 +3,7 @@
 const token = process.env['GH_TOKEN'];
 const actor = process.env['GITHUB_ACTOR'];
 
-if (!token || !actor) {
+if (token === undefined || token === '' || actor === undefined || actor === '') {
   console.error('login-ghcr: GH_TOKEN and GITHUB_ACTOR must both be set');
   process.exit(1);
 }
