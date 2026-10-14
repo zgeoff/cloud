@@ -10,6 +10,8 @@
 # - A port that networking.firewall.interfaces.<name> opens, or that an inet cloud_host admission
 #   narrows, needs a host-scope entry for that interface, and each host-scope entry needs one of
 #   them. An entry that marks an admission needs the admission.
+# - sshd answers on the trusted tailnet interface whatever the firewall opens, so each of its
+#   ports needs a tailnet-scope or public tcp entry while it runs.
 # - Each of imp's publicPorts publishes a host port past nixos-fw, so it needs a public entry.
 # - A port range or extraInputRules cannot be matched with an entry, so either is a mismatch.
 { lib }:
@@ -18,6 +20,7 @@ let
   firewall = config.networking.firewall;
   admissions = config.networking.cloudHost.admissions or [ ];
   impPublicPorts = config.services.imp.publicPorts or [ ];
+  sshPorts = lib.optionals config.services.openssh.enable config.services.openssh.ports;
 
   hostPorts = lib.filter (entry: entry.kind == "host-port") entries;
   publicEntries = lib.filter (entry: entry.scope == "public") hostPorts;
@@ -170,6 +173,18 @@ let
       ]
   ) (map parsePublishSpec impPublicPorts);
 
+  sshMismatches = lib.concatMap (
+    port:
+    if
+      lib.any (entry: entry.scope == "tailnet" || entry.scope == "public") (
+        lib.filter (isPort "tcp" port) hostPorts
+      )
+    then
+      [ ]
+    else
+      [ "sshd listens on tcp ${toString port} with no tailnet-scope or public registry entry" ]
+  ) sshPorts;
+
   extraRuleMismatches =
     lib.optional (firewall.extraInputRules != "")
       "networking.firewall.extraInputRules is set, and the exposure check cannot read it: open the port through allowedTCPPorts or allowedUDPPorts instead";
@@ -181,5 +196,6 @@ publicPortMismatches
 ++ interfacePortMismatches
 ++ admissionMismatches
 ++ staleHostEntries
+++ sshMismatches
 ++ impMismatches
 ++ extraRuleMismatches

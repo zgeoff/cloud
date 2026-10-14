@@ -154,6 +154,47 @@ let
         '';
     }
     {
+      title = "it reports an sshd port without a tailnet-scope entry";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            services.openssh = {
+              enable = true;
+              openFirewall = false;
+              ports = [
+                22
+                2222
+              ];
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "sshd listens on tcp 2222 with no tailnet-scope or public registry entry"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "ssh";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 22;
+                scope = "tailnet";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
       title = "it reports public entries that the firewall does not open";
       script =
         let
