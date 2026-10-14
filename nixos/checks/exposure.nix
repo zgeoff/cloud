@@ -379,6 +379,41 @@ let
         '';
     }
     {
+      title = "it reports a bare imp publicPorts container port even when a public entry has the same number";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "443" ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "imp's publicPorts publishes 443, whose host port the exposure check cannot read"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "imp-https";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
       title = "it reports port ranges and extraInputRules, which no entry can match";
       script =
         let

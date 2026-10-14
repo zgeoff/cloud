@@ -127,22 +127,19 @@ function renderRow(entry: ExposureEntry): readonly string[] {
 }
 
 function formatExposes(entry: ExposureEntry): string {
-  switch (entry.kind) {
-    case 'host-port': {
-      const port = entry.port === undefined ? entry.protocol : `${entry.protocol} ${entry.port}`;
+  if (entry.kind === 'host-port') {
+    const port = entry.port === undefined ? entry.protocol : `${entry.protocol} ${entry.port}`;
 
-      return entry.interface === undefined ? port : `${port} on \`${entry.interface}\``;
-    }
-    case 'tunnel-hostname': {
-      return `\`${entry.hostname}\``;
-    }
-    case 'tailnet-capability': {
-      return `node attribute \`${entry.attr}\``;
-    }
-    default: {
-      return `\`${entry.script}\` on workers.dev`;
-    }
+    return entry.interface === undefined ? port : `${port} on \`${entry.interface}\``;
   }
+
+  if (entry.kind === 'tunnel-hostname') {
+    return `\`${entry.hostname}\``;
+  }
+
+  return entry.kind === 'tailnet-capability'
+    ? `node attribute \`${entry.attr}\``
+    : `\`${entry.script}\` on workers.dev`;
 }
 
 if (import.meta.main) {

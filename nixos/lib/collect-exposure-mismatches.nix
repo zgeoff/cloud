@@ -146,14 +146,14 @@ let
         "the registry's ${entry.name} entry marks an admission, but inet cloud_host admits no ${formatEntryPort entry} on ${entry.interface}"
   ) hostEntries;
 
-  # a docker -p spec: [IP:]HOST:CONTAINER or CONTAINER, with an optional /udp or /tcp suffix
+  # a docker -p spec: [IP:]HOST:CONTAINER, or a bare CONTAINER, with an optional /udp or /tcp suffix
   parsePublishSpec =
     spec:
     let
       halves = lib.splitString "/" spec;
       fields = lib.splitString ":" (lib.head halves);
-      hostPort =
-        if lib.length fields >= 2 then lib.elemAt fields (lib.length fields - 2) else lib.head fields;
+      # a bare CONTAINER spec publishes on a host port Docker picks, so it has none to read
+      hostPort = if lib.length fields >= 2 then lib.elemAt fields (lib.length fields - 2) else "";
     in
     {
       inherit spec;
