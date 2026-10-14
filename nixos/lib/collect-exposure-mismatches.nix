@@ -12,6 +12,8 @@
 #   them. An entry that marks an admission needs the admission.
 # - sshd answers on the trusted tailnet interface whatever the firewall opens, so each of its
 #   ports needs a tailnet-scope or public tcp entry while it runs.
+# - An interface that carries a default route or a static address is public, so a port opened
+#   there needs a public entry, and a host-scope entry never names it.
 # - Each of imp's publicPorts publishes a host port past nixos-fw, so it needs a public entry.
 # - A port range or extraInputRules cannot be matched with an entry, so either is a mismatch.
 { lib }:
@@ -21,6 +23,20 @@ let
   admissions = config.networking.cloudHost.admissions or [ ];
   impPublicPorts = config.services.imp.publicPorts or [ ];
   sshPorts = lib.optionals config.services.openssh.enable config.services.openssh.ports;
+
+  # the interfaces that reach beyond the host: those with a default route or a static address
+  publicInterfaces = lib.unique (
+    lib.filter (name: name != null) [
+      (config.networking.defaultGateway.interface or null)
+      (config.networking.defaultGateway6.interface or null)
+    ]
+    ++ lib.attrNames (
+      lib.filterAttrs (
+        _: interface: interface.ipv4.addresses != [ ] || interface.ipv6.addresses != [ ]
+      ) config.networking.interfaces
+    )
+  );
+  isPublicInterface = name: lib.elem name publicInterfaces;
 
   hostPorts = lib.filter (entry: entry.kind == "host-port") entries;
   publicEntries = lib.filter (entry: entry.scope == "public") hostPorts;
@@ -68,7 +84,10 @@ let
 
   stalePublicEntries = lib.concatMap (
     entry:
-    if entry.protocol == "icmp" || lib.any (isPort entry.protocol entry.port) publicPorts then
+    if
+      entry.protocol == "icmp"
+      || lib.any (isPort entry.protocol entry.port) (publicPorts ++ publicInterfacePorts)
+    then
       [ ]
     else
       [
@@ -104,13 +123,26 @@ let
       name: lists: map (open: open // { interface = name; }) (toOpenPorts lists)
     ) firewall.interfaces
   );
+  publicInterfacePorts = lib.filter (open: isPublicInterface open.interface) interfacePorts;
   findHostEntry =
     interface: protocol: port:
     lib.findFirst (entry: entry.interface == interface && isPort protocol port entry) null hostEntries;
 
+  publicInterfacePortMismatches = lib.concatMap (
+    open:
+    if lib.any (isPort open.protocol open.port) publicEntries then
+      [ ]
+    else
+      [
+        "${formatPort open.protocol open.port} is open on ${open.interface}, a public interface, with no public registry entry"
+      ]
+  ) publicInterfacePorts;
+
   interfacePortMismatches = lib.concatMap (
     open:
-    if findHostEntry open.interface open.protocol open.port == null then
+    if isPublicInterface open.interface then
+      [ ]
+    else if findHostEntry open.interface open.protocol open.port == null then
       [
         "${formatPort open.protocol open.port} is open on ${open.interface} with no host-scope registry entry for ${open.interface}"
       ]
@@ -130,6 +162,11 @@ let
     else
       [ ]
   ) admissions;
+
+  publicHostEntries = lib.concatMap (
+    entry:
+    lib.optional (isPublicInterface entry.interface) "the registry's ${entry.name} entry is host scope on ${entry.interface}, but ${entry.interface} is a public interface"
+  ) hostEntries;
 
   staleHostEntries = lib.concatMap (
     entry:
@@ -193,7 +230,9 @@ publicPortMismatches
 ++ stalePublicEntries
 ++ pingMismatches
 ++ rangeMismatches
+++ publicInterfacePortMismatches
 ++ interfacePortMismatches
+++ publicHostEntries
 ++ admissionMismatches
 ++ staleHostEntries
 ++ sshMismatches

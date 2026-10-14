@@ -242,6 +242,80 @@ let
         '';
     }
     {
+      title = "it reports a port on an addressed interface against a host-scope entry for it";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.interfaces.eth0.ipv4.addresses = [
+              {
+                address = "203.0.113.10";
+                prefixLength = 24;
+              }
+            ];
+            networking.firewall.interfaces.eth0.allowedTCPPorts = [ 8080 ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "tcp 8080 is open on eth0, a public interface, with no public registry entry"
+                "the registry's web entry is host scope on eth0, but eth0 is a public interface"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "web";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 8080;
+                scope = "host";
+                interface = "eth0";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it accepts a port on the default route interface with a public entry";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.defaultGateway = {
+              address = "203.0.113.1";
+              interface = "eth0";
+            };
+            networking.firewall.interfaces.eth0.allowedTCPPorts = [ 443 ];
+          };
+        in
+        ''
+          assert_equals '[]' ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "https";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
       title = "it reports a port on an interface and an admission without their entries";
       script =
         let
