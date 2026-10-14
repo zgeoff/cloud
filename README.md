@@ -41,7 +41,7 @@ switch.
 - `nixos/`: the host flake
 - `packages/topology/`: the constants that the host, infra, scripts and images share
 - `images/agent/`: the image agent sessions run on
-- `deploy/atc-gateway/`: the atc gateway's images
+- `images/atc-gateway/`: the atc gateway's images
 - `workers/health-check/`: the external health-check Worker, its own package
 - `scripts/`: repo and host tooling
 

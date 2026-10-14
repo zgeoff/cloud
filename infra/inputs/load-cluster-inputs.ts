@@ -29,10 +29,14 @@ export function loadClusterInputs(
     return undefined;
   }
 
+  // the Connect credentials first, so a missing file fails before the gateway's config
+  const onePasswordConnectCredentials = secret(requireOnePasswordConnectCredentials(env));
+  const atcGateway = loadATCGatewayInputs(stackConfig, env);
+
   return {
     kubeconfig,
-    onePasswordConnectCredentials: secret(requireOnePasswordConnectCredentials(env)),
-    ...loadATCGatewayInputs(stackConfig, env),
-    ...loadNixieInputs(stackConfig, env),
+    onePasswordConnectCredentials,
+    ...atcGateway,
+    ...loadNixieInputs(stackConfig, env, atcGateway.atcGateway?.config.backupImage),
   };
 }

@@ -6,7 +6,7 @@ on:
   push:
     branches: [main]
     paths:
-      - deploy/atc-gateway/**
+      - images/atc-gateway/**
       - scripts/fetch-atc-release.sh
       - scripts/publish-atc-gateway-images.sh
       - scripts/run-shell-suites.sh
@@ -18,7 +18,7 @@ on:
       - .github/workflows/atc-gateway-images.yml
   pull_request:
     paths:
-      - deploy/atc-gateway/**
+      - images/atc-gateway/**
       - scripts/fetch-atc-release.sh
       - scripts/publish-atc-gateway-images.sh
       - scripts/run-shell-suites.sh

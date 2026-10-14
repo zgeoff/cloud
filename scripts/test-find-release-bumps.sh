@@ -22,7 +22,7 @@ script="$scripts/find-release-bumps.sh"
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/seed/images/agent" "$tree/seed/nixos/packages" \
-    "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/deploy/atc-gateway" "$tree/seed/infra" \
+    "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/images/atc-gateway" "$tree/seed/infra" \
     "$tree/releases/atc" "$tree/releases/imp" "$tree/releases/nixie" "$tree/releases/auto-mode"
   create_stub_release_gh "$tree/bin"
   case_env=(env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree")
@@ -39,7 +39,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -77,7 +77,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "2.26.2";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -109,7 +109,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.6.2@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -144,7 +144,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.17.0
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -176,7 +176,7 @@ ARG ATC_VERSION=4.2.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.2.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.2.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.2.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -208,7 +208,7 @@ ARG ATC_VERSION=4.4.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -236,7 +236,7 @@ it_fails_on_a_missing_pin_before_it_reads_a_release() {
   setup_test "$tree"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/seed/images/agent/Dockerfile"
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -268,7 +268,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -301,7 +301,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333

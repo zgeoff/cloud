@@ -42,8 +42,8 @@ repo=zgeoff/cloud
 
 case "$branch" in
   release-check/atc)
-    allowed='deploy/atc-gateway/versions.env
-images/agent/Dockerfile
+    allowed='images/agent/Dockerfile
+images/atc-gateway/versions.env
 nixos/packages/atc.nix'
     ;;
   release-check/imp)
@@ -120,7 +120,7 @@ requires_on() {
 }
 requires_on nixos/ "NixOS checks/nixos"
 requires_on images/agent/ "agent image/check"
-requires_on deploy/atc-gateway/ "atc-gateway images/fixture"
+requires_on images/atc-gateway/ "atc-gateway images/fixture"
 requires_on infra/Pulumi.prod.yaml "nixie backup/fixture"
 for check in "${required[@]}"; do
   if ! jq -e --arg workflow "${check%%/*}" --arg name "${check#*/}" \

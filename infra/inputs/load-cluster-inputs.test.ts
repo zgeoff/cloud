@@ -103,3 +103,43 @@ test('it checks the Connect credentials before the gateway, so a missing file fa
     'cluster is managed, but ONEPASSWORD_CONNECT_CREDENTIALS is empty; run through `op run --env-file=../.env`',
   );
 });
+
+test("it runs nixie's backup in the gateway's backup image", () => {
+  const config = buildMockATCGatewayConfig({
+    backupImage:
+      'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+    daemons: { geoffcloud: {} },
+    defaultDaemon: 'geoffcloud',
+  });
+
+  const inputs = loadClusterInputs(
+    buildStubConfig({
+      cluster: 'managed',
+      atcGateway: JSON.stringify(config),
+      nixie: JSON.stringify({
+        image:
+          'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',
+        webImage:
+          'ghcr.io/zgeoff/nixie-web:0.1.0@sha256:318c0b6c6ff89e0b0bbd252df2d04b0120ef28c7266d698ffa9757ff4d2f5754',
+        hostname: 'nixie.geoff.cloud',
+      }),
+    }),
+    {
+      K3S_KUBECONFIG: 'apiVersion: v1',
+      ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
+      NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
+      CLOUDFLARE_API_TOKEN: 'cf-token',
+      NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
+      NIXIE_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      NIXIE_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      NIXIE_R2_BUCKET: 'nixie-backups',
+    },
+  );
+
+  expect(inputs?.nixie?.backup?.image).toBe(
+    'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+  );
+});

@@ -70,6 +70,11 @@ checks each database, and replaces each database file along with its WAL files, 
 replays over the restored state
 ([the backup and restore runbook](../../runbooks/atc-gateway-backup-restore.md)).
 
+The restore Job's YAML is generated from the same pod builder as the backup CronJob, with explicit
+restore overrides, and from the stack config's one pin of the backup image. A CI check fails when
+the committed YAML differs from the generated one, so a restore always runs as the backup's user,
+with its claim and Secret and in its image.
+
 ## The cloud daemon
 
 The cloud daemon is a NixOS service on the host, running an unpatched atc release that the flake

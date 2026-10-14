@@ -1,20 +1,20 @@
 import type { input } from '@pulumi/kubernetes/types';
-import type { Output } from '@pulumi/pulumi';
+import type { Input } from '@pulumi/pulumi';
 import { buildATCPodSecurity } from './build-atc-gateway-spec.ts';
 
 interface BackupPodInputs {
   readonly image: string;
 
   // the gateway's state claim, mounted at STATE_DIR
-  readonly claim: Output<string>;
+  readonly claim: Input<string>;
 
   // the Secret with restic's and R2's environment
-  readonly envSecret: Output<string>;
+  readonly envSecret: Input<string>;
 }
 
 // The backup Job's pod: the backup image's `backup` with the gateway's claim at
-// /state, as the gateway's own non-root user
-export function buildATCGatewayBackupPodSpec(inputs: BackupPodInputs): input.core.v1.PodSpec {
+// /state, as the gateway's own non-root user. buildRestoreJob turns it into the restore Job's pod.
+export function buildATCGatewayBackupPodSpec(inputs: BackupPodInputs) {
   return {
     restartPolicy: 'OnFailure',
     securityContext: buildATCPodSecurity(),
@@ -41,5 +41,5 @@ export function buildATCGatewayBackupPodSpec(inputs: BackupPodInputs): input.cor
       { name: 'state', persistentVolumeClaim: { claimName: inputs.claim } },
       { name: 'tmp', emptyDir: {} },
     ],
-  };
+  } satisfies input.core.v1.PodSpec;
 }

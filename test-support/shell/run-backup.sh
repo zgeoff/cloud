@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # run_backup <name> <image> [<docker run option> <value>]... [<arg>...]: runs the backup
 # image as the backup CronJob and the restore Job run it
-# (infra/build-atc-gateway-backup-pod-spec.ts, deploy/atc-gateway/restore-job.yaml): uid
+# (infra/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml): uid
 # and gid 65532, no privilege escalation, every capability dropped, HOME=/tmp on a writable
 # /tmp (an emptyDir there), the volume <name>-state at /state and <name>-repo at /repo.
 # Neither pod sets readOnlyRootFilesystem, so neither does this. Leading arguments that

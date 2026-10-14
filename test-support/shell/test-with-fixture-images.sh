@@ -64,7 +64,7 @@ it_reports_a_failed_build_with_its_log_and_runs_nothing() {
   trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
   mkdir "$tree/github" "$tree/gh" "$tree/home" "$tree/tmp" "$tree/no-certs"
   start_stub_github_api "$tree/github"
-  sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../deploy/atc-gateway/versions.env" > "$tree/release"
+  sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../images/atc-gateway/versions.env" > "$tree/release"
   release="$(< "$tree/release")"
 
   # shellcheck disable=SC2016 # expanded by the inner shell
@@ -102,7 +102,7 @@ it_runs_the_release_fetch_with_ghs_telemetry_and_update_check_off() {
   trap 'rm -rf "$tree" || true' EXIT
   mkdir "$tree/bin" "$tree/home" "$tree/tmp"
   create_stub_gh "$tree/bin"
-  sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../deploy/atc-gateway/versions.env" > "$tree/release"
+  sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../images/atc-gateway/versions.env" > "$tree/release"
   release="$(< "$tree/release")"
 
   # shellcheck disable=SC2016 # expanded by the inner shell

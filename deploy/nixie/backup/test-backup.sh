@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Fixture test for nixie's backup script (backup.sh), run locally with Docker in the backup image
-# that the stack config pins as nixie.backupImage. It touches no cluster and no cloud account.
+# that the stack config pins as atcGateway.backupImage. It touches no cluster and no cloud account.
 #
 # It runs the script as the backup CronJob and the restore Job run it
 # (infra/build-nixie-backup-pod-spec.ts, deploy/nixie/restore-job.yaml): nixie's uid and gid
@@ -690,10 +690,11 @@ setup_test() {
     -v "$name-state:/s" -v "$name-repo:/r" "$image" -c 'chown 10001:10001 /s /r'
 }
 
-# Boot data every case needs: the backup image the stack config pins for nixie, pulled once, and
-# the script under test, by absolute path for the bind mount.
+# Boot data every case needs: the backup image the stack config pins for nixie and the gateway
+# (atcGateway.backupImage), pulled once, and the script under test, by absolute path for the bind
+# mount.
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-image="$(cd "$repo" && bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:nixie"].backupImage)')"
+image="$(cd "$repo" && bun -e 'console.log(Bun.YAML.parse(await Bun.file("infra/Pulumi.prod.yaml").text()).config["geoff-cloud:atcGateway"].backupImage)')"
 docker pull -q "$image" > /dev/null
 run="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
 run_cases "$image" "$repo/deploy/nixie/backup/backup.sh" "$run"

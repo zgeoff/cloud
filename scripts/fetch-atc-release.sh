@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Fetch the pinned atc release asset into a build context and check it twice: against
-# the release's SHA256SUMS and against the pin in deploy/atc-gateway/versions.env.
+# the release's SHA256SUMS and against the pin in images/atc-gateway/versions.env.
 # Usage: scripts/fetch-atc-release.sh <context-dir>
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 # shellcheck source=/dev/null
-source "$repo/deploy/atc-gateway/versions.env"
+source "$repo/images/atc-gateway/versions.env"
 out="${1:?usage: fetch-atc-release.sh <context-dir>}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

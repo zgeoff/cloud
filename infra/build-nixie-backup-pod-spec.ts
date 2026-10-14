@@ -17,7 +17,7 @@ interface NixieBackupPodInputs {
 // The backup Job's pod: deploy/nixie/backup/backup.sh's `backup`, run in the backup image with
 // nixie's claim at /state, as nixie's own user, so a restore leaves files nixie can open. The
 // command replaces the image's own entrypoint, which backs up the atc gateway.
-export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs): input.core.v1.PodSpec {
+export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs) {
   return {
     restartPolicy: 'OnFailure',
     securityContext: {
@@ -53,5 +53,5 @@ export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs): input.cor
       { name: 'script', configMap: { name: inputs.scriptConfigMap } },
       { name: 'tmp', emptyDir: {} },
     ],
-  };
+  } satisfies input.core.v1.PodSpec;
 }

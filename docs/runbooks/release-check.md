@@ -26,7 +26,12 @@ Each pin script checks what it writes against the release itself: the atc pins t
 the release's SHA256SUMS, the nixie pins take their digests from the release notes' `## Images`
 list, the imp pins take the tag's commit and the images' digests from GitHub and GHCR, and the
 auto-mode pin takes its sum from the npm tarball, which it checks against npm's integrity hash and
-the release's version. A pin script never moves a pin back to an older release.
+the release's version. A pin script never moves a pin back to an older release. CI's image pin check
+(`bun run check:image-pins`) covers the pins a person edits too. A release tag of an image this repo
+publishes is never replaced, so the check fails a pull request whose release tag names another
+digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves when its publisher
+rebuilds the image, so for an upstream pin the check asks only that the registry still serves the
+pinned digest.
 
 ## When a bump merges on its own
 

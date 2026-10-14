@@ -60,7 +60,7 @@ print_bump() {
 version='([0-9]+\.[0-9]+\.[0-9]+)'
 atc_agent="$(read_pin images/agent/Dockerfile "^ARG ATC_VERSION=$version\$")"
 atc_daemon="$(read_pin nixos/packages/atc.nix "^  version = \"$version\";\$")"
-atc_gateway="$(read_pin deploy/atc-gateway/versions.env "^ATC_RELEASE=@zgeoff/atc@$version\$")"
+atc_gateway="$(read_pin images/atc-gateway/versions.env "^ATC_RELEASE=@zgeoff/atc@$version\$")"
 imp_host="$(read_pin nixos/hosts/geoffcloud/configuration.nix \
   "^    image = \"ghcr\\.io/zgeoff/imp-host:$version@sha256:[0-9a-f]{64}\";\$")"
 imp_base="$(read_pin images/agent/Dockerfile "^FROM ghcr\\.io/zgeoff/imp-base:$version@sha256:[0-9a-f]{64}\$")"

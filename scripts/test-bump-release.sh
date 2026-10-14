@@ -45,7 +45,7 @@ it_opens_an_atc_bump_that_waits_for_review_on_a_major_release() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  mkdir -p "$tree/seed/images/agent" "$tree/seed/nixos/packages" "$tree/seed/deploy/atc-gateway"
+  mkdir -p "$tree/seed/images/agent" "$tree/seed/nixos/packages" "$tree/seed/images/atc-gateway"
   cat > "$tree/seed/images/agent/Dockerfile" << 'EOF'
 ARG ATC_VERSION=4.2.0
 ARG ATC_SHA256=1111111111111111111111111111111111111111111111111111111111111111
@@ -56,7 +56,7 @@ let
   sha256 = "2222222222222222222222222222222222222222222222222222222222222222";
 in
 EOF
-  cat > "$tree/seed/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/seed/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=3333333333333333333333333333333333333333333333333333333333333333
@@ -77,13 +77,13 @@ EOF
   diff - "$tree/out" << 'EOF'
 pinned atc 5.0.0: 4444444444444444444444444444444444444444444444444444444444444444
 pinned atc 5.0.0 in nixos/packages/atc.nix: 4444444444444444444444444444444444444444444444444444444444444444
-pinned atc 5.0.0 in deploy/atc-gateway/versions.env: 5555555555555555555555555555555555555555555555555555555555555555
+pinned atc 5.0.0 in images/atc-gateway/versions.env: 5555555555555555555555555555555555555555555555555555555555555555
 https://github.com/zgeoff/cloud/pull/200
 EOF
   diff /dev/null "$tree/err"
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" diff --stat=200 main release-check/atc) << 'EOF'
- deploy/atc-gateway/versions.env | 6 +++---
  images/agent/Dockerfile         | 4 ++--
+ images/atc-gateway/versions.env | 6 +++---
  nixos/packages/atc.nix          | 4 ++--
  3 files changed, 7 insertions(+), 7 deletions(-)
 EOF
@@ -94,7 +94,7 @@ Bumps atc to [5.0.0](https://github.com/zgeoff/atc/releases/tag/%40zgeoff/atc%40
 | --- | --- | --- |
 | the agent image (`images/agent/Dockerfile`) | 4.2.0 | 5.0.0 |
 | the host's atc daemon (`nixos/packages/atc.nix`) | 2.26.2 | 5.0.0 |
-| the atc-gateway images (`deploy/atc-gateway/versions.env`) | 2.27.0 | 5.0.0 |
+| the atc-gateway images (`images/atc-gateway/versions.env`) | 2.27.0 | 5.0.0 |
 
 It waits for a review, because:
 

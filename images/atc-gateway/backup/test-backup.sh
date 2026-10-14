@@ -3,7 +3,7 @@
 # Docker. It touches no cluster and no cloud account.
 #
 # It runs the backup image as the backup CronJob and the restore Job run it
-# (infra/build-atc-gateway-backup-pod-spec.ts, deploy/atc-gateway/restore-job.yaml).
+# (infra/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml).
 # What this proves: a backup's retention groups the gateway's snapshots across source paths and
 # leaves other snapshots alone; and each declared path of the script (usage, a missing
 # STATE_DIR, no databases, an integrity failure on backup and on restore, a snapshot
@@ -17,8 +17,8 @@
 # containers on its own volumes, all named from that id, and removes them when it exits.
 # `bun run test:atc-gateway-fixture` runs it after the helper tests; alone:
 #
-#   bash test-support/shell/with-fixture-images.sh bash deploy/atc-gateway/backup/test-backup.sh
-#   CASE='ls mode' bash test-support/shell/with-fixture-images.sh bash deploy/atc-gateway/backup/test-backup.sh
+#   bash test-support/shell/with-fixture-images.sh bash images/atc-gateway/backup/test-backup.sh
+#   CASE='ls mode' bash test-support/shell/with-fixture-images.sh bash images/atc-gateway/backup/test-backup.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
@@ -572,7 +572,7 @@ setup_test() {
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 # sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
-source "$repo/deploy/atc-gateway/versions.env"
+source "$repo/images/atc-gateway/versions.env"
 : "${FIXTURE_RUN:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 : "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 : "${FIXTURE_BACKUP_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"

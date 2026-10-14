@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Pin an atc release everywhere cloud runs atc: the agent image, through pin-agent-atc.sh; the
 # host's atc daemon, in nixos/packages/atc.nix; and the atc-gateway images, in
-# deploy/atc-gateway/versions.env. Each pin takes its asset's sum from the release's SHA256SUMS:
+# images/atc-gateway/versions.env. Each pin takes its asset's sum from the release's SHA256SUMS:
 # atc-linux-x64 for the agent image and the daemon, and versions.env's ATC_ASSET for the gateway.
 # Run it from the root of a zgeoff/cloud checkout. The release check runs it with the SHA256SUMS
 # it downloaded (scripts/bump-release.sh):
@@ -27,7 +27,7 @@ if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
 fi
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 nix=nixos/packages/atc.nix
-env=deploy/atc-gateway/versions.env
+env=images/atc-gateway/versions.env
 for file in "$nix" "$env"; do
   if [ ! -f "$file" ]; then
     echo "$file is missing: run this from the root of a zgeoff/cloud checkout" >&2
