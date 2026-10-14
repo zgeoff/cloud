@@ -2,7 +2,7 @@
 
 The gateway's durable state is two SQLite files on its volume. This runbook covers what is backed
 up, where, and how to restore it. The procedure is tested by `e2e/test-atc-gateway-restore.sh` and
-`deploy/atc-gateway/backup/test-backup.sh` against a local restic repository, and a restore of a
+`images/atc-gateway/backup/test-backup.sh` against a local restic repository, and a restore of a
 real backup from R2 into a scratch claim matched the live `mcp-auth.db` row for row.
 
 ## Data boundary
@@ -53,13 +53,13 @@ lost: those clients sign in again. Take a fresh backup first if the current stat
    ssh root@geoffcloud k3s kubectl -n atc scale deploy/atc-gateway --replicas=0
    ```
 
-2. Restore with `deploy/atc-gateway/restore-job.yaml`. Set its image digest. To list snapshots
+2. Restore with `images/atc-gateway/restore-job.yaml`. Set its image digest. To list snapshots
    first, set `args: ["ls"]`; to pick one, set `SNAPSHOT`. The script restores into a scratch
    directory, checks each database's integrity, and only then replaces the files, including any
    `-wal` and `-shm`:
 
    ```sh
-   ssh root@geoffcloud k3s kubectl create -f - < deploy/atc-gateway/restore-job.yaml
+   ssh root@geoffcloud k3s kubectl create -f - < images/atc-gateway/restore-job.yaml
    ssh root@geoffcloud k3s kubectl -n atc logs -f job/<job-name>
    ```
 

@@ -1,7 +1,7 @@
 # One-off restore (or snapshot list) for the atc gateway's state. Stop the gateway
 # first (docs/runbooks/atc-gateway-backup-restore.md), set the image digest, the
 # command and SNAPSHOT, then:
-#   ssh root@geoffcloud k3s kubectl create -f - < deploy/atc-gateway/restore-job.yaml
+#   ssh root@geoffcloud k3s kubectl create -f - < images/atc-gateway/restore-job.yaml
 apiVersion: batch/v1
 kind: Job
 metadata:

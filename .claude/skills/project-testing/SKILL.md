@@ -185,7 +185,7 @@ Each shared rule takes its Go form:
 ## Shell suites
 
 `scripts/test-<script>.sh` tests `scripts/<script>.sh`. A test of a deploy artifact sits beside it
-(`deploy/atc-gateway/test-atc-gateway-image.sh`), and a journey sits in `e2e/`, one file per
+(`images/atc-gateway/test-atc-gateway-image.sh`), and a journey sits in `e2e/`, one file per
 journey. Each shared rule takes its shell form:
 
 | Shared rule                  | Shell form                                                                                                                                                                                                         |

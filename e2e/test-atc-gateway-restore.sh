@@ -5,7 +5,7 @@
 #
 # The gateway runs as the Deployment runs it (infra/build-atc-gateway-spec.ts), and the
 # backup image as the backup CronJob and the restore Job run it
-# (infra/build-atc-gateway-backup-pod-spec.ts, deploy/atc-gateway/restore-job.yaml).
+# (infra/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml).
 # The journey adds a client, backs the live databases up, wipes them, restores them and
 # starts a new gateway, which still knows the client. Each step needs the state the step
 # before it left, so the journey checks each step as it goes.
@@ -126,7 +126,7 @@ setup_test() {
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
-source "$repo/deploy/atc-gateway/versions.env"
+source "$repo/images/atc-gateway/versions.env"
 : "${FIXTURE_RUN:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 : "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 : "${FIXTURE_BACKUP_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"

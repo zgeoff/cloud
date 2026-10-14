@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for pin-atc.sh: in a case tree that holds the agent image's Dockerfile, the host daemon's
-# nixos/packages/atc.nix and the gateway's deploy/atc-gateway/versions.env, it pins a release in
+# nixos/packages/atc.nix and the gateway's images/atc-gateway/versions.env, it pins a release in
 # all three from that release's SHA256SUMS: atc-linux-x64's sum for the Dockerfile and atc.nix,
 # versions.env's ATC_ASSET sum for the gateway, with GATEWAY_IMAGE_TAG moving with the release. It
 # keeps a pin that already holds the release or a newer one, and refuses, with no file changed, a
@@ -20,7 +20,7 @@ script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pin-atc.sh"
 # files and none of the files, and the home and temp folders the script runs with
 setup_test() {
   local tree="$1"
-  mkdir -p "$tree/repo/images/agent" "$tree/repo/nixos/packages" "$tree/repo/deploy/atc-gateway" \
+  mkdir -p "$tree/repo/images/agent" "$tree/repo/nixos/packages" "$tree/repo/images/atc-gateway" \
     "$tree/home" "$tree/tmp"
 }
 
@@ -42,7 +42,7 @@ let
 in
 { inherit version sha256; }
 EOF
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=b6f3e54077e05bce6db35e12807eecebf4ac3ee988a7ca4abadb48d8fd602e6d
@@ -71,7 +71,7 @@ let
 in
 { inherit version sha256; }
 EOF
-  diff - "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  diff - "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@4.3.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=2222222222222222222222222222222222222222222222222222222222222222
@@ -81,7 +81,7 @@ EOF
   diff - "$tree/out" << 'EOF'
 pinned atc 4.3.0: 4444444444444444444444444444444444444444444444444444444444444444
 pinned atc 4.3.0 in nixos/packages/atc.nix: 4444444444444444444444444444444444444444444444444444444444444444
-pinned atc 4.3.0 in deploy/atc-gateway/versions.env: 2222222222222222222222222222222222222222222222222222222222222222
+pinned atc 4.3.0 in images/atc-gateway/versions.env: 2222222222222222222222222222222222222222222222222222222222222222
 EOF
   diff /dev/null "$tree/err"
   [ "$status" = 0 ] || {
@@ -104,7 +104,7 @@ EOF
   version = "2.26.2";
   sha256 = "4d92b125a68edbd067ea0eaac493790402baa9102229df2843dea962250602e7";
 EOF
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=b6f3e54077e05bce6db35e12807eecebf4ac3ee988a7ca4abadb48d8fd602e6d
@@ -122,7 +122,7 @@ EOF
   version = "4.3.0";
   sha256 = "4444444444444444444444444444444444444444444444444444444444444444";
 EOF
-  diff - "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  diff - "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@4.3.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=2222222222222222222222222222222222222222222222222222222222222222
@@ -131,7 +131,7 @@ EOF
   diff - "$tree/out" << 'EOF'
 atc 4.4.0 is pinned, which is newer than 4.3.0
 pinned atc 4.3.0 in nixos/packages/atc.nix: 4444444444444444444444444444444444444444444444444444444444444444
-pinned atc 4.3.0 in deploy/atc-gateway/versions.env: 2222222222222222222222222222222222222222222222222222222222222222
+pinned atc 4.3.0 in images/atc-gateway/versions.env: 2222222222222222222222222222222222222222222222222222222222222222
 EOF
   diff /dev/null "$tree/err"
   [ "$status" = 0 ] || {
@@ -153,7 +153,7 @@ EOF
   version = "4.3.0";
   sha256 = "4444444444444444444444444444444444444444444444444444444444444444";
 EOF
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@4.3.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=2222222222222222222222222222222222222222222222222222222222222222
@@ -170,7 +170,7 @@ EOF
   diff -r "$tree/before" "$tree/repo"
   diff - "$tree/out" << 'EOF'
 nixos/packages/atc.nix already pins atc 4.3.0
-deploy/atc-gateway/versions.env already pins atc 4.3.0
+images/atc-gateway/versions.env already pins atc 4.3.0
 atc 4.3.0 is already pinned
 EOF
   diff /dev/null "$tree/err"
@@ -193,7 +193,7 @@ EOF
   version = "4.3.0";
   sha256 = "5555555555555555555555555555555555555555555555555555555555555555";
 EOF
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=b6f3e54077e05bce6db35e12807eecebf4ac3ee988a7ca4abadb48d8fd602e6d
@@ -229,7 +229,7 @@ EOF
   version = "2.26.2";
   sha256 = "4d92b125a68edbd067ea0eaac493790402baa9102229df2843dea962250602e7";
 EOF
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=b6f3e54077e05bce6db35e12807eecebf4ac3ee988a7ca4abadb48d8fd602e6d
@@ -263,7 +263,7 @@ EOF
   version = "2.26.1";
   sha256 = "4d92b125a68edbd067ea0eaac493790402baa9102229df2843dea962250602e7";
 EOF
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=b6f3e54077e05bce6db35e12807eecebf4ac3ee988a7ca4abadb48d8fd602e6d

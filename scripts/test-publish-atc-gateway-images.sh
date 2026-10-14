@@ -28,7 +28,7 @@ it_pushes_both_images_when_the_registry_lacks_both_tags() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << EOF
+  cat > "$tree/repo/images/atc-gateway/versions.env" << EOF
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=$sum
@@ -57,7 +57,7 @@ EOF
 ["docker","login","ghcr.io","-u","octocat","--password-stdin"]
 ["gh","release","download","@zgeoff/atc@2.27.0","-R","zgeoff/atc","-p","atc-gateway-linux-x64","-p","SHA256SUMS","-D","<work>"]
 ["docker","build","--build-arg","BASE_IMAGE=example.invalid/base:1","--build-arg","GATEWAY_PORT=8414","-t","ghcr.io/zgeoff/atc-gateway:2.27.0","context"]
-["docker","build","--build-arg","RESTIC_IMAGE=example.invalid/restic:1","-t","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2","deploy/atc-gateway/backup"]
+["docker","build","--build-arg","RESTIC_IMAGE=example.invalid/restic:1","-t","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2","images/atc-gateway/backup"]
 ["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway:2.27.0"]
 ["docker","push","ghcr.io/zgeoff/atc-gateway:2.27.0"]
 ["docker","inspect","--format","{{index .RepoDigests 0}}","ghcr.io/zgeoff/atc-gateway:2.27.0"]
@@ -69,7 +69,7 @@ EOF
 Dockerfile
 atc-gateway
 EOF
-  cmp "$scripts/../deploy/atc-gateway/Dockerfile" "$tree/repo/context/Dockerfile"
+  cmp "$scripts/../images/atc-gateway/Dockerfile" "$tree/repo/context/Dockerfile"
   cmp "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" "$tree/repo/context/atc-gateway"
   diff - "$tree/summary" << 'EOF'
 ghcr.io/zgeoff/atc-gateway:2.27.0: ghcr.io/zgeoff/atc-gateway@sha256:1111111111111111111111111111111111111111111111111111111111111111
@@ -89,7 +89,7 @@ it_skips_a_published_tag_and_pushes_the_other() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << EOF
+  cat > "$tree/repo/images/atc-gateway/versions.env" << EOF
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=$sum
@@ -116,7 +116,7 @@ EOF
 ["docker","login","ghcr.io","-u","octocat","--password-stdin"]
 ["gh","release","download","@zgeoff/atc@2.27.0","-R","zgeoff/atc","-p","atc-gateway-linux-x64","-p","SHA256SUMS","-D","<work>"]
 ["docker","build","--build-arg","BASE_IMAGE=example.invalid/base:1","--build-arg","GATEWAY_PORT=8414","-t","ghcr.io/zgeoff/atc-gateway:2.27.0","context"]
-["docker","build","--build-arg","RESTIC_IMAGE=example.invalid/restic:1","-t","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2","deploy/atc-gateway/backup"]
+["docker","build","--build-arg","RESTIC_IMAGE=example.invalid/restic:1","-t","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2","images/atc-gateway/backup"]
 ["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway:2.27.0"]
 ["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2"]
 ["docker","push","ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2"]
@@ -141,7 +141,7 @@ it_stops_without_a_push_on_a_lookup_it_cannot_read() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << EOF
+  cat > "$tree/repo/images/atc-gateway/versions.env" << EOF
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=$sum
@@ -181,7 +181,7 @@ it_stops_before_any_build_when_the_release_is_missing() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@9.9.9
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=1111111111111111111111111111111111111111111111111111111111111111
@@ -215,7 +215,7 @@ it_stops_before_any_build_when_the_asset_fails_the_pin() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
-  cat > "$tree/repo/deploy/atc-gateway/versions.env" << 'EOF'
+  cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
 ATC_ASSET_SHA256=1111111111111111111111111111111111111111111111111111111111111111
@@ -304,13 +304,13 @@ it_requires_the_step_summary() {
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/registry" "$tree/digests" \
-    "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" "$tree/repo/scripts" "$tree/repo/deploy/atc-gateway" \
+    "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" "$tree/repo/scripts" "$tree/repo/images/atc-gateway" \
     "$tree/repo/packages/topology"
   cp "$scripts/publish-atc-gateway-images.sh" "$scripts/fetch-atc-release.sh" "$tree/repo/scripts/"
   # the gateway image's build reads its port from the shared constants
   cp "$scripts/../packages/topology/constants.json" "$tree/repo/packages/topology/"
-  cp "$scripts/../deploy/atc-gateway/Dockerfile" "$tree/repo/deploy/atc-gateway/"
-  cp -r "$scripts/../deploy/atc-gateway/backup" "$tree/repo/deploy/atc-gateway/"
+  cp "$scripts/../images/atc-gateway/Dockerfile" "$tree/repo/images/atc-gateway/"
+  cp -r "$scripts/../images/atc-gateway/backup" "$tree/repo/images/atc-gateway/"
   create_stub_publish_docker "$tree/bin"
   create_stub_release_download_gh "$tree/bin"
 }

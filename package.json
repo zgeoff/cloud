@@ -26,7 +26,7 @@
     "test:health-check": "cd workers/health-check && bun test",
     "test:related": "bun scripts/run-related-tests.ts",
     "test:scripts": "bash scripts/run-shell-suites.sh",
-    "test:atc-gateway-fixture": "bash deploy/atc-gateway/run-fixture-tests.sh",
+    "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-shell-suites.sh nixie-backup-fixture",
     "test:nixos": "bash scripts/run-nixos-checks.sh",
     "ci:check-atc-pin-diff": "bash scripts/check-atc-pin-diff.sh",

@@ -34,7 +34,7 @@ flags=()
 case "$dependency" in
   atc)
     names=("the agent image (\`images/agent/Dockerfile\`)" "the host's atc daemon (\`nixos/packages/atc.nix\`)"
-      "the atc-gateway images (\`deploy/atc-gateway/versions.env\`)")
+      "the atc-gateway images (\`images/atc-gateway/versions.env\`)")
     url="https://github.com/zgeoff/atc/releases/tag/%40zgeoff/atc%40$version"
     gh release download "@zgeoff/atc@$version" -R zgeoff/atc -p SHA256SUMS -D "$work"
     pin=(bash "$here/pin-atc.sh" "$version" "$work/SHA256SUMS")

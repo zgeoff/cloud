@@ -19,7 +19,7 @@ with_fixture_images() (
   repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   # sets BASE_IMAGE and RESTIC_IMAGE, among the pins
   # shellcheck source=/dev/null
-  source "$repo/deploy/atc-gateway/versions.env"
+  source "$repo/images/atc-gateway/versions.env"
   FIXTURE_RUN="$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
   FIXTURE_GATEWAY_IMAGE="atc-gateway:fixture-$FIXTURE_RUN"
   FIXTURE_BACKUP_IMAGE="atc-gateway-backup:fixture-$FIXTURE_RUN"
@@ -29,12 +29,12 @@ with_fixture_images() (
   # shellcheck disable=SC2153 # BASE_IMAGE and RESTIC_IMAGE come from versions.env
   if ! {
     GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 "$repo/scripts/fetch-atc-release.sh" "$work/context" &&
-      cp "$repo/deploy/atc-gateway/Dockerfile" "$work/context/" &&
+      cp "$repo/images/atc-gateway/Dockerfile" "$work/context/" &&
       gateway_port="$(jq -er .atc.gatewayPort "$repo/packages/topology/constants.json")" &&
       docker build -q --build-arg "BASE_IMAGE=$BASE_IMAGE" --build-arg "GATEWAY_PORT=$gateway_port" \
         -t "$FIXTURE_GATEWAY_IMAGE" "$work/context" &&
       docker build -q --build-arg "RESTIC_IMAGE=$RESTIC_IMAGE" -t "$FIXTURE_BACKUP_IMAGE" \
-        "$repo/deploy/atc-gateway/backup"
+        "$repo/images/atc-gateway/backup"
   } > "$work/build.log" 2>&1; then
     echo "FAIL the images did not build from the pinned, checked binary and pinned bases"
     sed 's/^/    /' "$work/build.log"

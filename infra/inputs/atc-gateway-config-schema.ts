@@ -63,7 +63,7 @@ const defaultDaemonUnsetMessage =
 export const atcGatewayConfigSchema = z
   .object(
     {
-      // a digest-pinned image built from deploy/atc-gateway, and its backup image
+      // a digest-pinned image built from images/atc-gateway, and its backup image
       image: pinnedImageSchema.refine(
         (image) => !image.includes(standInDigest),
         "is the fixture stand-in, not the gateway; wait for atc's release",

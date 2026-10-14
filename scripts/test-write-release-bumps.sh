@@ -28,7 +28,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.2.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -79,7 +79,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -115,7 +115,7 @@ ARG ATC_VERSION=4.3.0
 ARG AUTO_MODE_VERSION=0.19.3
 EOF
   echo '  version = "4.3.0";' > "$tree/seed/nixos/packages/atc.nix"
-  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/deploy/atc-gateway/versions.env"
+  echo 'ATC_RELEASE=@zgeoff/atc@4.3.0' > "$tree/seed/images/atc-gateway/versions.env"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   cat > "$tree/seed/infra/Pulumi.prod.yaml" << 'EOF'
     image: ghcr.io/zgeoff/nixie:0.7.0@sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -161,7 +161,7 @@ it_fails_without_a_step_summary_file() {
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/seed/images/agent" "$tree/seed/nixos/packages" \
-    "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/deploy/atc-gateway" "$tree/seed/infra" \
+    "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/images/atc-gateway" "$tree/seed/infra" \
     "$tree/releases/atc" "$tree/releases/imp" "$tree/releases/nixie" "$tree/releases/auto-mode"
   : > "$tree/calls"
   # boot data: the runner creates both files before a step runs

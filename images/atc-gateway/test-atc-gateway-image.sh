@@ -16,8 +16,8 @@
 # removes them when it exits. `bun run test:atc-gateway-fixture` runs it after the helper
 # tests; alone:
 #
-#   bash test-support/shell/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
-#   CASE='foreign Host' bash test-support/shell/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
+#   bash test-support/shell/with-fixture-images.sh bash images/atc-gateway/test-atc-gateway-image.sh
+#   CASE='foreign Host' bash test-support/shell/with-fixture-images.sh bash images/atc-gateway/test-atc-gateway-image.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
@@ -247,7 +247,7 @@ setup_test() {
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
-source "$repo/deploy/atc-gateway/versions.env"
+source "$repo/images/atc-gateway/versions.env"
 : "${FIXTURE_RUN:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 : "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 : "${FIXTURE_BACKUP_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"

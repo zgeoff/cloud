@@ -44,7 +44,7 @@ if [ "${#images[@]}" = 0 ]; then
 fi
 gateways=()
 for image in "${images[@]}"; do
-  # GATEWAY_IMAGE_TAG is the gateway's atc release (deploy/atc-gateway/versions.env)
+  # GATEWAY_IMAGE_TAG is the gateway's atc release (images/atc-gateway/versions.env)
   if [[ ! "$image" =~ ^ghcr\.io/zgeoff/atc-gateway:($version)(@sha256:[0-9a-f]{64})?$ ]]; then
     echo "an atc gateway pod runs '$image', which is no atc-gateway release image" >&2
     exit 1

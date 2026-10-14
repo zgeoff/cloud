@@ -5,7 +5,7 @@
 # `# shell-suite: <group>` line in their headers. The atc-gateway images workflow runs it on a
 # change to any file it reads.
 #
-#   bash deploy/atc-gateway/run-fixture-tests.sh
+#   bash images/atc-gateway/run-fixture-tests.sh
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 bash scripts/run-shell-suites.sh fixture-images
