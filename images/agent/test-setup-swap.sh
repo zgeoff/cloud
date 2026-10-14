@@ -5,7 +5,7 @@
 # free space up to 64 GiB. It refuses
 # a free space that is not a whole number and an unknown argument. Each case runs the script with
 # `sh` under `env -i`, so CI runs it with dash, the guest's /bin/sh. The boot mode writes /swapfile
-# and runs swapon as root, so check-agent-image.sh checks it in a fresh imp instead.
+# and runs swapon as root, so check-agent-image.ts checks it in a fresh imp instead.
 #
 #   bash images/agent/test-setup-swap.sh
 # shellcheck source-path=SCRIPTDIR/../..

@@ -24,7 +24,7 @@ tool, because a tool can write state when it runs (`codex --version` creates `~/
 | Path                                  | Holds                                                   |
 | ------------------------------------- | ------------------------------------------------------- |
 | `images/agent/Dockerfile`             | the pins, each with the command that checks its sum     |
-| `scripts/check-agent-image.sh`        | the version sweep, login-state check and secret scan    |
+| `scripts/agent-image-check-guest.sh`  | the version sweep, login-state check and secret scan    |
 | `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files |
 | `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`      |
 | `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use  |

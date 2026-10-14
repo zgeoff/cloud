@@ -1,4 +1,4 @@
-# gitleaks config for scripts/check-agent-image.sh: the default rules, less the upstream
+# gitleaks config for scripts/check-agent-image.ts: the default rules, less the upstream
 # files in the agent image that match a rule but hold no credential. Each entry names
 # the files and why; keep it narrow, so a real leak anywhere else still fails the check.
 

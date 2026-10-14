@@ -8,15 +8,13 @@ on:
     branches: [main]
     paths:
       - images/agent/**
-      - scripts/check-agent-image.sh
-      - scripts/agent-image-gitleaks.toml
+      - scripts/*agent-image*
       - scripts/enable-atc-pin-auto-merge.sh
       - .github/workflows/agent-image.yml
   pull_request:
     paths:
       - images/agent/**
-      - scripts/check-agent-image.sh
-      - scripts/agent-image-gitleaks.toml
+      - scripts/*agent-image*
       - scripts/enable-atc-pin-auto-merge.sh
       - .github/workflows/agent-image.yml
 

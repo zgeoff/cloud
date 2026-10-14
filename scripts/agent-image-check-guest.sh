@@ -1,50 +1,11 @@
-#!/usr/bin/env bash
-# Check the agent image (images/agent) from inside a running copy of it: each pinned tool
-# answers with the version the Dockerfile pins, no login state or credential file exists,
-# and gitleaks finds no secret on the filesystem. Run it from this machine:
-#
-#   bash scripts/check-agent-image.sh --imp <name>        # a fresh imp from the image
-#   bash scripts/check-agent-image.sh --docker <image>    # a local docker build, as CI does
-#
-# It prints one line per check and exits non-zero when any check fails. It prints names
-# only, never a value: gitleaks runs with --redact, and the environment check lists
-# variable names. The script changes nothing in the image beyond the gitleaks binary it
-# copies to /run/agent-image-check, which is a tmpfs in an imp and a read-only mount in docker.
-set -euo pipefail
-
-repo="$(cd "$(dirname "$0")/.." && pwd)"
-dockerfile="$repo/images/agent/Dockerfile"
-
-mode="${1:-}"
-target="${2:-}"
-if [[ ! "$mode" =~ ^--(imp|docker)$ || -z "$target" ]]; then
-  echo "usage: check-agent-image.sh --imp <name> | --docker <image>" >&2
-  exit 2
-fi
-
-# gitleaks, the release CI's gitleaks job pins, checked against its checksums file
-gitleaks_version=8.30.1
-gitleaks_sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
-
-work="$(mktemp -d)"
-teardown() {
-  rm -rf "$work"
-}
-trap teardown EXIT
-
-mkdir "$work/agent-image-check"
-curl -fsSL -o "$work/gitleaks.tar.gz" \
-  "https://github.com/gitleaks/gitleaks/releases/download/v${gitleaks_version}/gitleaks_${gitleaks_version}_linux_x64.tar.gz"
-echo "$gitleaks_sha256  $work/gitleaks.tar.gz" | sha256sum -c --quiet -
-tar -xzf "$work/gitleaks.tar.gz" -C "$work/agent-image-check" gitleaks
-cp "$repo/scripts/agent-image-gitleaks.toml" "$work/agent-image-check/gitleaks.toml"
-
-# the guest script, led by the pins and the check's mode: every `ARG NAME=value` line of the
-# Dockerfile but the snapshot stamp and the sums, as shell assignments, then check_mode, imp or docker
-{
-  grep -E '^ARG [A-Z0-9_]+_VERSION=' "$dockerfile" | sed -E "s/^ARG ([A-Z0-9_]+)=(.*)$/\1='\2'/"
-  echo "check_mode='${mode#--}'"
-  cat << 'GUEST'
+# shellcheck shell=bash
+# The guest half of check-agent-image.ts, which runs it as `bash -s` inside a running copy of the
+# agent image: in an imp through `imp exec`, or in `docker run`. check-agent-image.ts sends it
+# after a prelude that assigns every `ARG <NAME>_VERSION=` pin of images/agent/Dockerfile and
+# check_mode (imp or docker), and copies the gitleaks binary and its config to
+# /run/agent-image-check first. It prints one line per check, names only and never a value, and
+# exits 1 when any check fails.
+# shellcheck disable=SC2154 # the prelude assigns the pins
 set -uo pipefail
 failures=0
 
@@ -233,16 +194,3 @@ fi
 
 echo "== $failures failed"
 exit $((failures > 0))
-GUEST
-} > "$work/guest.sh"
-
-case "$mode" in
-  --imp)
-    imp cp "$work/agent-image-check" "$target:/run/agent-image-check" > /dev/null
-    imp exec "$target" -- bash -s < "$work/guest.sh"
-    ;;
-  --docker)
-    docker run --rm -i -v "$work/agent-image-check:/run/agent-image-check:ro" "$target" \
-      bash -s < "$work/guest.sh"
-    ;;
-esac

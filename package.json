@@ -32,7 +32,7 @@
     "ci:check-atc-pin-diff": "bash scripts/check-atc-pin-diff.sh",
     "ci:write-deploy-env": "bash scripts/write-deploy-env.sh",
     "ci:check-prod-plan": "bun scripts/check-prod-plan.ts",
-    "test:agent-image": "docker build -t cloud/agent-image images/agent && bash scripts/check-agent-image.sh --docker cloud/agent-image",
+    "test:agent-image": "docker build -t cloud/agent-image images/agent && bun scripts/check-agent-image.ts --docker cloud/agent-image",
     "typecheck": "bun run sdk:build && tsc -p tsconfig.json --noEmit && tsc -p workers/health-check/tsconfig.json --noEmit",
     "format": "oxfmt . && format-codemod --quiet .",
     "format:check": "oxfmt --check . && format-codemod --check --quiet .",
