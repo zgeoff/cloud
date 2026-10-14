@@ -54,7 +54,7 @@ async function setupTest() {
 test.each([
   ['SIGINT', 130],
   ['SIGTERM', 143],
-])(
+] as const)(
   'it removes the check imp, the image and the work tree on %s during the check, and exits %d',
   async (signal, code) => {
     const ctx = await setupTest();
