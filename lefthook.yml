@@ -76,6 +76,8 @@ pre-push:
       run: bun run check:pulumi-pins
     - name: topology
       run: bun run check:topology
+    - name: boundaries
+      run: bun run check:boundaries
     - name: typecheck
       run: bun run typecheck
     - name: test
