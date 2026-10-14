@@ -20,8 +20,20 @@ const impNode = {
   httpsPort: 443,
 };
 
-// k3s's API server on geoffcloud, which the prod apply job reaches from its runner
+// k3s's API server on geoffcloud, which the prod apply job reaches from its runner and the
+// operator's Pulumi runs reach from home-pc
 const k3sAPIPort = topology.k3s.apiPort;
+
+// What ip '*' covers (TCP and UDP on every port, ICMP and ICMPv6), less TCP on k3s's API port: a
+// grant only adds access, so the members' grant leaves the port out, and the grants that name it
+// add it back for each source that needs it. 58 is ICMPv6, which the policy names by number only.
+const allButK3sAPI = [
+  `tcp:1-${k3sAPIPort - 1}`,
+  `tcp:${k3sAPIPort + 1}-65535`,
+  'udp:*',
+  'icmp:*',
+  '58:*',
+];
 
 // impd's API, between impd nodes
 const impAPIPort = `tcp:${topology.imp.apiPort}`;
@@ -51,8 +63,9 @@ export const tailnetPolicy = {
     [tags.cloudDeploy]: ['autogroup:admin', tags.cloudDeploy],
   },
   grants: [
-    // members reach every device; tagged nodes get only what a grant gives them
-    { src: ['autogroup:member'], dst: ['*'], ip: ['*'] },
+    // members reach every device on every port but k3s's API port; tagged nodes get only what a
+    // grant gives them
+    { src: ['autogroup:member'], dst: ['*'], ip: allButK3sAPI },
 
     // impd nodes reach each other's API: moves between hosts and imp's two-node e2e
     { src: [tags.imp], dst: [tags.imp], ip: [impAPIPort] },
@@ -83,6 +96,20 @@ export const tailnetPolicy = {
     // through it, and every other provider the job uses is a public API. Last, so adding it shifts
     // no other grant
     { src: [tags.cloudDeploy], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
+
+    // members keep k3s's API port on every device but the host, which is the only tag:cloud node,
+    // so a k3s credential copied off the host works from no member device. Last, so adding it
+    // shifts no other grant
+    {
+      src: ['autogroup:member'],
+      dst: ['autogroup:member', tags.imp, tags.impE2E, tags.cloudDeploy],
+      ip: [`tcp:${k3sAPIPort}`],
+    },
+
+    // the operator's Pulumi runs (preview, up, drift) on home-pc → k3s's API on the host. kubectl
+    // by hand runs on the host over Tailscale SSH and needs no grant here. Last, so adding it
+    // shifts no other grant
+    { src: ['home-pc'], dst: ['geoffcloud'], ip: [`tcp:${k3sAPIPort}`] },
   ],
   ssh: [
     {
