@@ -2,8 +2,10 @@ import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';
 import { Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
+import { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
+import { buildOnePasswordConnectNetworkPolicySpec } from './build-onepassword-connect-network-policy-spec.ts';
 import {
   buildOnePasswordConnectServiceSpec,
   onePasswordConnectServicePort,
@@ -16,7 +18,7 @@ import { buildServiceURL } from './build-service-url.ts';
 
 // 1Password Connect for imps (GEO-120), following charts/connect in 1Password/connect-helm-charts: the broker swaps a
 // placeholder bearer for the real token on op-connect.imp.internal requests, relayed from the host to this ClusterIP
-// Service (no public route). Read-only token (vault `imp`), so Connect refuses writes; cluster pods need the bearer too.
+// Service (no public route). Read-only token (vault `imp`), so Connect refuses writes; a NetworkPolicy refuses pods.
 
 export interface OnePasswordConnectInputs {
   // the Connect server's credentials file (JSON)
@@ -46,6 +48,8 @@ export function createOnePasswordConnect(
   );
 
   const service = createService(cluster, namespace);
+
+  createNetworkPolicy(cluster, namespace);
 
   return {
     serviceURL: buildServiceURL(
@@ -81,6 +85,17 @@ function createService(cluster: Provider, namespace: Output<string>): Service {
       // the Service. The state already holds the live value; a new Service takes the pin.
       ignoreChanges: ['spec.clusterIP'],
     },
+  );
+}
+
+function createNetworkPolicy(cluster: Provider, namespace: Output<string>): NetworkPolicy {
+  return new NetworkPolicy(
+    'onepassword-connect',
+    {
+      metadata: { name: 'onepassword-connect', namespace },
+      spec: buildOnePasswordConnectNetworkPolicySpec(),
+    },
+    { provider: cluster },
   );
 }
 
