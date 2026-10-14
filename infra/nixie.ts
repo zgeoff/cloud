@@ -33,9 +33,6 @@ export interface NixieConfig {
 
   // the one public DNS name, which points at the host's tailnet address
   readonly hostname: string;
-
-  // the image the backup CronJob runs its script in, by tag and digest; needed only with the backup
-  readonly backupImage?: string;
 }
 
 // a nightly restic backup of nixie.db and keys.db to nixie's own R2 bucket

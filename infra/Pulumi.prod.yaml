@@ -20,4 +20,3 @@ config:
     image: ghcr.io/zgeoff/nixie:0.17.0@sha256:b771397f5d9f0943afb2137d6c8a53295bc7b72f0cd9faa02ab232b074501f84
     webImage: ghcr.io/zgeoff/nixie-web:0.17.0@sha256:c59fba2f3ca0b4a89cc81b70a7d3e3140064c9e3d97561a9184d137ac34777b9
     hostname: nixie.geoff.cloud
-    backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377

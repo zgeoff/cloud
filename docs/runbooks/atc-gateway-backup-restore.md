@@ -53,7 +53,8 @@ lost: those clients sign in again. Take a fresh backup first if the current stat
    ssh root@geoffcloud k3s kubectl -n atc scale deploy/atc-gateway --replicas=0
    ```
 
-2. Restore with `images/atc-gateway/restore-job.yaml`. Set its image digest. To list snapshots
+2. Restore with `images/atc-gateway/restore-job.yaml`, which `bun run write:restore-job` generates
+   from the backup CronJob's pod and the stack config's `atcGateway.backupImage`. To list snapshots
    first, set `args: ["ls"]`; to pick one, set `SNAPSHOT`. The script restores into a scratch
    directory, checks each database's integrity, and only then replaces the files, including any
    `-wal` and `-shm`:

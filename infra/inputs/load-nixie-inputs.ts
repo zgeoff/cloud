@@ -10,10 +10,11 @@ const nixieNeed = 'nixie needs it while stack config "nixie" is set';
 
 // nixie's inputs, or nothing while nixie is unset (setting it approves the deploy). Secrets come
 // from .env's op:// references, plus Pulumi's CLOUDFLARE_API_TOKEN for the certificate's DNS-01.
-// NIXIE_RESTIC_* and NIXIE_R2_* add the backup, which then needs nixie.backupImage.
+// NIXIE_RESTIC_* and NIXIE_R2_* add the backup, in the one backup image, atcGateway.backupImage.
 export function loadNixieInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
+  backupImage: string | undefined,
 ): { readonly nixie?: NixieInputs } {
   const config = stackConfig.getObject<NixieConfig>('nixie');
 
@@ -21,11 +22,17 @@ export function loadNixieInputs(
     return {};
   }
 
+  if (Object.hasOwn(config, 'backupImage')) {
+    throw new Error(
+      'stack config "nixie.backupImage" is no longer read: nixie\'s backup runs in "atcGateway.backupImage", so remove it',
+    );
+  }
+
   requirePinnedImage('image', config.image);
   requirePinnedImage('webImage', config.webImage);
   requireHostname(config.hostname);
 
-  const backup = findBackup(config, env);
+  const backup = findBackup(env, backupImage);
 
   return {
     nixie: {
@@ -43,17 +50,24 @@ export function loadNixieInputs(
 }
 
 // all backup variables set, or no backup; findResticBackup throws on a partial set
-function findBackup(config: NixieConfig, env: Environment): NixieBackupInputs | undefined {
+function findBackup(
+  env: Environment,
+  backupImage: string | undefined,
+): NixieBackupInputs | undefined {
   const backup = findResticBackup(env, { prefix: 'NIXIE', label: "nixie's backup", path: 'nixie' });
 
   if (backup === undefined) {
     return undefined;
   }
 
-  requirePinnedImage('backupImage', config.backupImage);
+  if (backupImage === undefined) {
+    throw new Error(
+      'nixie\'s backup runs in stack config "atcGateway.backupImage", which is unset: set atcGateway, or unset the NIXIE backup variables',
+    );
+  }
 
   return {
-    image: config.backupImage,
+    image: backupImage,
     secrets: {
       repository: secret(backup.repository),
       password: secret(backup.password),
