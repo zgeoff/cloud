@@ -10,6 +10,9 @@ interface BackupPodInputs {
 
   // the Secret with restic's and R2's environment
   readonly envSecret: Input<string>;
+
+  // the dockerconfigjson Secret that pulls the private backup image
+  readonly pullSecret: Input<string>;
 }
 
 // The backup Job's pod: the backup image's `backup` with the gateway's claim at
@@ -19,6 +22,7 @@ export function buildATCGatewayBackupPodSpec(inputs: BackupPodInputs) {
     restartPolicy: 'OnFailure',
     securityContext: buildATCPodSecurity(),
     automountServiceAccountToken: false,
+    imagePullSecrets: [{ name: inputs.pullSecret }],
     containers: [
       {
         name: 'backup',

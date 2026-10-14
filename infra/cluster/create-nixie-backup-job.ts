@@ -5,7 +5,9 @@ import { CronJob } from '@pulumi/kubernetes/batch/v1';
 import { ConfigMap, Secret } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { NixieBackupInputs } from '../inputs/index.ts';
+import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
+import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
 interface NixieBackupJobInputs {
   readonly namespace: Output<string>;
@@ -16,11 +18,17 @@ interface NixieBackupJobInputs {
 }
 
 // Nightly restic backup of nixie.db and keys.db to R2, from nixie's claim beside nixie (one node,
-// so ReadWriteOnce allows it). The Secret and the ConfigMap keep fixed names, unlike nixie's own,
-// because deploy/nixie/restore-job.yaml names them.
+// so ReadWriteOnce allows it). The Secrets and the ConfigMap keep fixed names, unlike nixie's own,
+// because deploy/nixie/restore-job.yaml names them; the pull Secret serves only the backup here.
 export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobInputs): CronJob {
   const env = createEnvSecret(cluster, inputs);
   const script = createScriptConfigMap(cluster, inputs.namespace);
+
+  const pull = createGHCRPullSecret(cluster, {
+    resourceName: 'nixie-ghcr-pull',
+    namespace: inputs.namespace,
+    credential: inputs.backup.pullCredential,
+  });
 
   return new CronJob(
     'nixie-backup',
@@ -41,13 +49,14 @@ export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobIn
                 claim: 'data-nixie-0',
                 scriptConfigMap: 'nixie-backup-script',
                 envSecret: 'nixie-backup',
+                pullSecret: ghcrPullSecretName,
               }),
             },
           },
         },
       },
     },
-    { provider: cluster, dependsOn: [env, script, inputs.statefulSet] },
+    { provider: cluster, dependsOn: [env, script, pull, inputs.statefulSet] },
   );
 }
 

@@ -38,6 +38,12 @@ image from the pinned release after checking the release's checksum, and publish
 manual run, without replacing a tag that already exists; the stack config names each image by
 digest, so a deploy runs exactly the image that was checked.
 
+The gateway's image and the backup image are private packages on GHCR, so k3s pulls them with a pull
+Secret in each namespace that runs one: the gateway's own and nixie's, whose backup runs in the same
+backup image. The Secret has a fixed name, because the generated restore Jobs name it. A rotated
+token therefore updates the Secret in place, and the kubelet reads it at the next pull without a
+rollout ([the GHCR pull token](../../runbooks/ghcr-pull-token.md)).
+
 The pod runs as a non-root user on a read-only root, with writable volumes only where atc writes:
 its state, its config, its runtime sockets and its temporary directory. The temporary directory must
 allow execution, because a compiled Bun binary unpacks native code there and maps it. The gateway

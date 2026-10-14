@@ -282,6 +282,7 @@ copy in the vault `cloud-deploy` for the apply job: update both.
 | `PULUMI_CONFIG_PASSPHRASE`                                     | do not replace the item: the stack's secrets are encrypted with it. Changing it needs a migration     |
 | imp's Cloudflare DNS token                                     | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart                            |
 | the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                               |
+| `GHCR_PULL_TOKEN`                                              | the apply bracket in [the GHCR pull token](./ghcr-pull-token.md#rotate-the-token), then a pull check  |
 | imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                    |
 
 A rotation of the atc daemon's gateway or imp token needs `systemctl restart atc-daemon` on the

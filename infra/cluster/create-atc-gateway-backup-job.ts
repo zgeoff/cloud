@@ -9,6 +9,9 @@ interface BackupJobInputs {
   readonly namespace: Output<string>;
   readonly claim: Output<string>;
   readonly image: string;
+
+  // the namespace's dockerconfigjson Secret, which pulls the private image
+  readonly pullSecret: Output<string>;
   readonly secrets: ATCGatewayBackupSecrets;
 }
 
@@ -48,6 +51,7 @@ export function createATCGatewayBackupJob(cluster: Provider, inputs: BackupJobIn
                 image: inputs.image,
                 claim: inputs.claim,
                 envSecret: env.metadata.name,
+                pullSecret: inputs.pullSecret,
               }),
             },
           },

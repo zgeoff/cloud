@@ -5,10 +5,11 @@ import { output } from '@pulumi/pulumi';
 import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
 import { buildATCGatewaySpec, buildATCPodSecurity } from './build-atc-gateway-spec.ts';
 
-test("#buildATCGatewaySpec keeps state in $HOME's state dir when the config sets no stateDir, passing the claim, tokens and registry through", () => {
+test("#buildATCGatewaySpec keeps state in $HOME's state dir when the config sets no stateDir, passing the claim, tokens, registry and pull Secret through", () => {
   const claim = output('atc-gateway-state');
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
+  const pullSecret = output('ghcr-pull');
 
   expect(
     buildATCGatewaySpec({
@@ -22,6 +23,7 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir when the config sets
       claim,
       tokens,
       registry,
+      pullSecret,
     }),
   ).toStrictEqual({
     replicas: 1,
@@ -38,6 +40,7 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir when the config sets
           seccompProfile: { type: 'RuntimeDefault' },
         },
         automountServiceAccountToken: false,
+        imagePullSecrets: [{ name: pullSecret }],
         containers: [
           {
             name: 'atc-gateway',
@@ -107,6 +110,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
   const claim = output('atc-gateway-state');
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
+  const pullSecret = output('ghcr-pull');
 
   expect(
     buildATCGatewaySpec({
@@ -120,6 +124,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
       claim,
       tokens,
       registry,
+      pullSecret,
     }),
   ).toStrictEqual({
     replicas: 1,
@@ -136,6 +141,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
           seccompProfile: { type: 'RuntimeDefault' },
         },
         automountServiceAccountToken: false,
+        imagePullSecrets: [{ name: pullSecret }],
         containers: [
           {
             name: 'atc-gateway',
@@ -205,6 +211,7 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
   const claim = output('atc-gateway-state');
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
+  const pullSecret = output('ghcr-pull');
 
   expect(
     buildATCGatewaySpec({
@@ -218,6 +225,7 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
       claim,
       tokens,
       registry,
+      pullSecret,
     }),
   ).toStrictEqual({
     replicas: 1,
@@ -234,6 +242,7 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
           seccompProfile: { type: 'RuntimeDefault' },
         },
         automountServiceAccountToken: false,
+        imagePullSecrets: [{ name: pullSecret }],
         containers: [
           {
             name: 'atc-gateway',

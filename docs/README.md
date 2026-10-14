@@ -50,6 +50,8 @@ call, the path of a change, the topology and the data.
   or the cluster.
 - [atc gateway backup and restore](./runbooks/atc-gateway-backup-restore.md): back up and restore
   the gateway's state.
+- [The GHCR pull token](./runbooks/ghcr-pull-token.md): rotate the token k3s pulls the private
+  images with, and check a pull.
 - [Agent image](./runbooks/agent-image.md): build, check, switch or roll back the agent image.
 - [1Password Connect](./runbooks/onepassword-connect.md): set up, rotate or debug Connect for imps.
 - [nixie](./runbooks/nixie.md): add nixie's images and secrets to impd, change a secret, deploy,

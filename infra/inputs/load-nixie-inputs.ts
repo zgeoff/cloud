@@ -3,6 +3,7 @@ import { findResticBackup } from './find-restic-backup.ts';
 import { pinnedImagePattern } from './pinned-image-pattern.ts';
 import { requireVariable } from './require-variable.ts';
 import type {
+  BackupImage,
   Environment,
   NixieBackupInputs,
   NixieConfig,
@@ -14,12 +15,12 @@ import type {
 const nixieNeed = 'nixie needs it while stack config "nixie" is set';
 
 // nixie's inputs, or nothing while nixie is unset (setting it approves the deploy). Secrets come
-// from .env's op:// references, plus Pulumi's CLOUDFLARE_API_TOKEN for the certificate's DNS-01.
-// NIXIE_RESTIC_* and NIXIE_R2_* add the backup, in the one backup image, atcGateway.backupImage.
+// from .env, plus Pulumi's CLOUDFLARE_API_TOKEN for DNS-01. NIXIE_RESTIC_* and NIXIE_R2_* add the
+// backup, in the gateway's backup image and with the gateway's pull credential.
 export function loadNixieInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
-  backupImage: string | undefined,
+  backupImage: BackupImage | undefined,
 ): { readonly nixie?: NixieInputs } {
   const config = stackConfig.getObject<NixieConfig>('nixie');
 
@@ -57,7 +58,7 @@ export function loadNixieInputs(
 // all backup variables set, or no backup; findResticBackup throws on a partial set
 function findBackup(
   env: Environment,
-  backupImage: string | undefined,
+  backupImage: BackupImage | undefined,
 ): NixieBackupInputs | undefined {
   const backup = findResticBackup(env, { prefix: 'NIXIE', label: "nixie's backup", path: 'nixie' });
 
@@ -72,7 +73,8 @@ function findBackup(
   }
 
   return {
-    image: backupImage,
+    image: backupImage.reference,
+    pullCredential: backupImage.pullCredential,
     secrets: {
       repository: secret(backup.repository),
       password: secret(backup.password),

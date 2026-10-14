@@ -32,10 +32,19 @@ export function loadClusterInputs(
   const onePasswordConnectCredentials = secret(requireOnePasswordConnectCredentials(env));
   const atcGateway = loadATCGatewayInputs(stackConfig, env);
 
+  // nixie's backup runs in the gateway's backup image, pulled with the gateway's credential
+  const backupImage =
+    atcGateway.atcGateway === undefined
+      ? undefined
+      : {
+          reference: atcGateway.atcGateway.config.backupImage,
+          pullCredential: atcGateway.atcGateway.secrets.pullCredential,
+        };
+
   return {
     kubeconfig,
     onePasswordConnectCredentials,
     ...atcGateway,
-    ...loadNixieInputs(stackConfig, env, atcGateway.atcGateway?.config.backupImage),
+    ...loadNixieInputs(stackConfig, env, backupImage),
   };
 }
