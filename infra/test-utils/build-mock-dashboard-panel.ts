@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import type { DashboardPanel } from '../build-dashboard.ts';
+import type { DashboardPanel } from '../observability/build-dashboard.ts';
 
 // legend's absence is behaviour (the target carries no legendFormat), so an override of
 // undefined leaves it out: with exactOptionalPropertyTypes a plain override cannot

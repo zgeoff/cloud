@@ -2,7 +2,7 @@
 # in k3s. The imp broker in imp-host forwards granted requests for op-connect.imp.internal to the
 # relay. imp-forward drops imp-host's traffic to the k3s ranges, so the container cannot reach the
 # Service itself: the host dials its ClusterIP instead, and the Service pins that ClusterIP
-# (infra/onepassword-connect.ts).
+# (infra/cluster/onepassword-connect.ts).
 #
 # systemd holds the socket and starts the proxy on the first connection, so the socket can wait
 # for docker0 (FreeBind) and the proxy dials the ClusterIP from the host. nixos-fw does not trust

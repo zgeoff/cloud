@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # start_gateway <name> <tree> <image>: runs the gateway image detached as the Deployment
-# runs it (infra/build-atc-gateway-spec.ts): a read-only root, no new privileges, every
+# runs it (infra/cluster/build-atc-gateway-spec.ts): a read-only root, no new privileges, every
 # capability dropped, the same tmpfs mounts, env and args, the volume <name>-state as its
 # state directory, <tree>/registry read-only at /etc/atc-gateway, and port 8414 published
 # on an ephemeral loopback port. The container is named <name>; the caller creates the

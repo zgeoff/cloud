@@ -206,8 +206,8 @@ cd infra
 op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets grafanaAdminPassword
 ```
 
-The dashboards `imp` and `cloudflared` are provisioned from `infra/create-dashboards.ts`. Use
-Explore for ad hoc queries.
+The dashboards `imp` and `cloudflared` are provisioned from
+`infra/observability/create-dashboards.ts`. Use Explore for ad hoc queries.
 
 ### Logs (Loki)
 

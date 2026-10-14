@@ -10,8 +10,11 @@ not drive.
 
 ## What the program owns
 
-The program composes its resources in one root module, and each provider manages its own part of the
-estate:
+The program's root module reads the inputs once and composes the estate from groups, each a folder
+with one entry module: the inputs, the edge (the VM, its cloud firewall, the zone and the backups
+bucket), the tailnet, public ingress, the cluster's workloads, and observability. The root module
+builds the cluster's Kubernetes provider and passes it to each group that runs a workload, so no
+group creates another group's resources. Each provider manages its own part of the estate:
 
 | Provider                | Manages                                                                    |
 | ----------------------- | -------------------------------------------------------------------------- |

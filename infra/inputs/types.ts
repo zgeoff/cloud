@@ -40,3 +40,41 @@ export interface ATCGatewayInputs {
     readonly backup?: ATCGatewayBackupSecrets;
   };
 }
+
+// the stack config's nixie object; setting it approves the deploy
+export interface NixieConfig {
+  // the nixie and nixie-web images of one release, each by tag and digest
+  readonly image: string;
+  readonly webImage: string;
+
+  // the one public DNS name, which points at the host's tailnet address
+  readonly hostname: string;
+}
+
+// a nightly restic backup of nixie.db and keys.db to nixie's own R2 bucket
+export interface NixieBackupInputs {
+  readonly image: string;
+  readonly secrets: {
+    readonly repository: Output<string>;
+    readonly password: Output<string>;
+    readonly accessKeyID: Output<string>;
+    readonly secretAccessKey: Output<string>;
+  };
+}
+
+export interface NixieInputs {
+  readonly config: NixieConfig;
+  readonly secrets: {
+    // the host's age identity, which decrypts deploy/nixie/secrets.sops.yaml
+    readonly ageHostKey: Output<string>;
+
+    // git-sync's read-only deploy key for zgeoff/nixie-definitions
+    readonly definitionsDeployKey: Output<string>;
+
+    // Pulumi's own Cloudflare token, for the certificate's DNS-01 challenge
+    readonly dnsToken: Output<string>;
+  };
+
+  // without it there is no backup CronJob
+  readonly backup?: NixieBackupInputs;
+}

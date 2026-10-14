@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { output } from '@pulumi/pulumi';
-import type { ATCGatewayOutputs } from '../atc-gateway.ts';
+import type { ATCGatewayOutputs } from '../cluster/atc-gateway.ts';
 
 // The plain fields of the gateway's outputs, the ones a builder takes. deployment and
 // backupJob are Pulumi resources, which a factory cannot build without registering them.

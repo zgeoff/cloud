@@ -1,8 +1,8 @@
 # imp's e2e nodes on the tailnet
 
 imp's `tailscale` and `moves-tailnet` e2e suites join throwaway impd nodes to the tailnet as
-`tag:imp-e2e`. The policy (`infra/tailnet-policy.ts`) lets those nodes reach only each other on
-tcp 7070. No grant takes them to `tag:imp`, so a test run cannot reach a live impd such as
+`tag:imp-e2e`. The policy (`infra/tailnet/tailnet-policy.ts`) lets those nodes reach only each other
+on tcp 7070. No grant takes them to `tag:imp`, so a test run cannot reach a live impd such as
 `imp-geoffcloud`. Tracked as GEO-228.
 
 ## What holds what

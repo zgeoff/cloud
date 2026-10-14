@@ -3,9 +3,9 @@
 # docs/runbooks/atc-gateway-backup-restore.md describes, run locally with Docker. It
 # touches no cluster and no cloud account.
 #
-# The gateway runs as the Deployment runs it (infra/build-atc-gateway-spec.ts), and the
+# The gateway runs as the Deployment runs it (infra/cluster/build-atc-gateway-spec.ts), and the
 # backup image as the backup CronJob and the restore Job run it
-# (infra/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml).
+# (infra/cluster/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml).
 # The journey adds a client, backs the live databases up, wipes them, restores them and
 # starts a new gateway, which still knows the client. Each step needs the state the step
 # before it left, so the journey checks each step as it goes.
