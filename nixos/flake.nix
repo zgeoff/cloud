@@ -38,7 +38,8 @@
       };
 
       # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config, and exposure
-      # compares its firewall with the exposure registry (packages/topology/exposure.json). Every other
+      # compares its firewall with the exposure registry (packages/topology/exposure.json), and
+      # imp-pin compares the imp input's release with its imp-host image tag. Every other
       # check reads ../test-support/shell (checks/test-utils/build-shell-lib-source.nix), so they
       # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
@@ -48,6 +49,10 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.exposure = import ./checks/exposure.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.imp-pin = import ./checks/imp-pin.nix {
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
