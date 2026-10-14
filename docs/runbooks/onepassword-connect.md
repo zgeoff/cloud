@@ -49,6 +49,42 @@ OP_CONNECT_HOST=https://op-connect.imp.internal OP_CONNECT_TOKEN=imp-broker-plac
 
 The broker swaps the placeholder for the real token on the way out.
 
+## Check the NetworkPolicy
+
+Run these on the host (`ssh root@geoffcloud`). None of them takes a secret.
+
+1. Check that k3s's policy controller programs the host's rules:
+
+   ```bash
+   nft list ruleset | grep -cE 'chain KUBE-(ROUTER-FORWARD|POD-FW-)'
+   ```
+
+   Expect: a count above 0.
+
+2. Check that the policy exists:
+
+   ```bash
+   k3s kubectl -n onepassword get networkpolicy onepassword-connect
+   ```
+
+3. Call the Service from a pod in another namespace:
+
+   ```bash
+   k3s kubectl -n default run connect-netpol-probe --rm -i --restart=Never \
+     --image=curlimages/curl:8.11.1 -- curl -sS -m 5 http://10.43.82.198:8000/heartbeat
+   ```
+
+   Expect: curl fails with `Failed to connect` or `timed out`, and the pod exits non-zero.
+
+4. Call the Service from the host, the address the relay dials from:
+
+   ```bash
+   curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://10.43.82.198:8000/heartbeat
+   ```
+
+   Expect: `200`. Then read an item from a granted imp, as in
+   [Check from a granted imp](#check-from-a-granted-imp).
+
 ## Failures
 
 | Symptom             | Cause                                                     | Fix                                                                                                                                                            |
