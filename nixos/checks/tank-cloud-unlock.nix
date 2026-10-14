@@ -31,7 +31,8 @@ pkgs.testers.runNixOSTest {
       # as geoffcloud: a virtio disk has no serial, so no /dev/disk/by-id link
       boot.zfs.devNodes = "/dev/disk/by-partuuid";
       virtualisation.emptyDiskImages = [ 2048 ];
-      virtualisation.memorySize = 2048;
+      # half of a restore rehearsal's, so it and a rehearsal fit the runner side by side
+      virtualisation.memorySize = 1024;
       services.openssh.enable = true;
 
       services.tank-cloud = {
@@ -100,6 +101,11 @@ pkgs.testers.runNixOSTest {
         assert virt == "kvm", f"the VM runs under {virt!r}: QEMU fell back from KVM"
 
 
+    # with no datasets yet, the rancher mount's wait for its device is still queued; cancel it, so
+    # the zvol that zfs create makes does not start an fsck under mkfs. On geoffcloud the commands
+    # run before the switch, so no unit waits for the device then.
+    machine.succeed("systemctl cancel")
+
     # the runbook's commands, in its order, with the key file written as op read --no-newline
     # writes it: 64 characters and no newline
     machine.succeed("install -d -m 0700 /var/lib/zfs-keys")
@@ -114,7 +120,7 @@ pkgs.testers.runNixOSTest {
     machine.succeed("zfs create -o mountpoint=legacy tank/cloud/imp-db-backups")
     machine.succeed("zfs create -s -V 64G tank/cloud/rancher")
     machine.succeed("udevadm settle")
-    machine.succeed("mkfs.ext4 -q -L tank-cloud-rancher /dev/zvol/tank/cloud/rancher")
+    machine.succeed("mkfs.ext4 -q -L rancher /dev/zvol/tank/cloud/rancher")
 
 
     with subtest("it unlocks and mounts every tank/cloud dataset at boot, and starts the services that need them"):

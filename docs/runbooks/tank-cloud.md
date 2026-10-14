@@ -59,7 +59,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    ```bash
    udevadm settle
-   mkfs.ext4 -q -L tank-cloud-rancher /dev/zvol/tank/cloud/rancher
+   mkfs.ext4 -q -L rancher /dev/zvol/tank/cloud/rancher
    ```
 
 5. Check the result:
