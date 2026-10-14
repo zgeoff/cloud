@@ -75,6 +75,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const impCalls = stub.calls.filter((call) => call.argv[0] !== 'git' && call.argv[0] !== 'tar');
@@ -154,6 +155,7 @@ test('it builds an older commit on main, and runs that commit’s bash check whe
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const check = stub.calls.find((call) => call.argv[0] === 'bash');
@@ -200,6 +202,7 @@ test('it removes the image and the imp when the check fails', async () => {
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const impCalls = stub.calls.filter((call) => call.argv[0] === 'imp');
@@ -257,6 +260,7 @@ test('it keeps the image when the check fails with --keep', async () => {
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(1);
@@ -301,6 +305,7 @@ test('it fails without an imp when the build fails', async () => {
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(1);
@@ -314,6 +319,58 @@ test('it fails without an imp when the build fails', async () => {
 
   expect(imp.images).toStrictEqual([]);
   expect(imp.imps).toStrictEqual([]);
+});
+
+test('it leaves the image to an interrupt from the build on, newest of the steps', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
+  await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
+  await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM scratch\n');
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
+
+  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+  // each registered step, bound to a runner that records what an interrupt would run
+  const steps: (() => unknown)[] = [];
+  const interrupt = buildStubRunner(() => ({}));
+  const imp = buildStubImp({ images: [] });
+
+  // runs the newest step while the build runs, since the older one removes the build's directory
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    async (call) => {
+      if (call.argv[1] === 'image' && call.argv[2] === 'build') {
+        await steps.at(-1)?.();
+      }
+    },
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: (step) => {
+      steps.push(() => step({ run: interrupt.run, printOut() {}, printErr() {} }));
+
+      return () => {};
+    },
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(interrupt.calls.map((call) => call.argv)).toStrictEqual([
+    ['imp', 'image', 'rm', `agent-${short}`],
+  ]);
 });
 
 test('it fails when the build outlives AGENT_IMAGE_BUILD_TIMEOUT, and gives the build that timeout', async () => {
@@ -346,6 +403,7 @@ test('it fails when the build outlives AGENT_IMAGE_BUILD_TIMEOUT, and gives the 
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const build = stub.calls.find((call) => call.argv[2] === 'build');
@@ -387,6 +445,7 @@ test('it gives the build 45 minutes when AGENT_IMAGE_BUILD_TIMEOUT is unset', as
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const build = stub.calls.find((call) => call.argv[2] === 'build');
@@ -429,6 +488,7 @@ test('it refuses a commit that is not on main, before any imp call', async () =>
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(1);
@@ -467,6 +527,7 @@ test('it refuses an image name that is taken', async () => {
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(1);
@@ -512,6 +573,7 @@ test('it refuses a check imp name that is taken', async () => {
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(1);
@@ -543,6 +605,7 @@ test.each([
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(2);
@@ -562,6 +625,7 @@ test('it refuses an AGENT_IMAGE_BUILD_TIMEOUT that is not a duration, before any
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(2);

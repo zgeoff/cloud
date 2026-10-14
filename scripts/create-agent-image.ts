@@ -1,6 +1,3 @@
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { parseBuildAgentImageArgs } from './parse-build-agent-image-args.ts';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
 import { resolveMainCommit } from './resolve-main-commit.ts';
@@ -8,9 +5,11 @@ import { runAgentImageBuild } from './run-agent-image-build.ts';
 import { runAgentImageCheck } from './run-agent-image-check.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
+import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
 import { withExitCode } from './with-exit-code.ts';
+import { withWorkDir } from './with-work-dir.ts';
 
-export interface CreateAgentImageOptions extends ScriptIO {
+export interface CreateAgentImageOptions extends InterruptibleIO {
   // `[--keep] [<commit on main>]`
   readonly args: readonly string[];
 
@@ -34,13 +33,9 @@ export function createAgentImage(options: Readonly<CreateAgentImageOptions>): Pr
 
     await requireFreeAgentImageNames(options, names);
 
-    const work = await mkdtemp(join(tmpdir(), 'agent-image-build-'));
-
-    try {
-      return await runBuildAndCheck(options, { ...request, ...names, sha: commit.sha, work });
-    } finally {
-      await rm(work, { recursive: true, force: true });
-    }
+    return withWorkDir(options, 'agent-image-build-', (work) =>
+      runBuildAndCheck(options, { ...request, ...names, sha: commit.sha, work }),
+    );
   });
 }
 
@@ -55,13 +50,23 @@ interface AgentImageRun {
 }
 
 async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run: AgentImageRun) {
-  const built = await runAgentImageBuild(options, { ...run, cwd: options.cwd });
+  // An interrupt leaves the image unchecked, so it goes as a failed check's image goes. The step
+  // comes before the build, since the image exists before the build call returns.
+  const dropCleanup = run.keep
+    ? () => {}
+    : options.registerCleanup((io) => removeImage(io, run.image));
 
-  options.printErr(`checking ${run.image} on a fresh imp, ${run.check}\n`);
+  try {
+    const built = await runAgentImageBuild(options, { ...run, cwd: options.cwd });
 
-  const passed = await runAgentImageCheck(options, { ...run, src: built.src });
+    options.printErr(`checking ${run.image} on a fresh imp, ${run.check}\n`);
 
-  return printCheckResult(options, { ...run, digest: built.digest, passed });
+    const passed = await runAgentImageCheck(options, { ...run, src: built.src });
+
+    return await printCheckResult(options, { ...run, digest: built.digest, passed });
+  } finally {
+    dropCleanup();
+  }
 }
 
 interface CheckResult {
@@ -85,9 +90,13 @@ async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
     return 1;
   }
 
-  await runOrExit(io, ['imp', 'image', 'rm', result.image]);
+  await removeImage(io, result.image);
 
   io.printOut(`${result.image} check failed; removed the image\n`);
 
   return 1;
+}
+
+async function removeImage(io: Readonly<ScriptIO>, image: string) {
+  await runOrExit(io, ['imp', 'image', 'rm', image]);
 }

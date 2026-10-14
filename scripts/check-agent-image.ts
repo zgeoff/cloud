@@ -1,19 +1,19 @@
 // Checks the agent image (images/agent) from inside a running copy of it: each pinned tool answers
 // with the version the Dockerfile pins, no login state or credential file exists, and gitleaks finds
 // no secret on the filesystem. scripts/agent-image-check-guest.sh holds the checks.
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buildAgentImageGuestScript } from './build-agent-image-guest-script.ts';
 import { createAgentImageCheckDir } from './create-agent-image-check-dir.ts';
 import { ExitError } from './exit-error.ts';
 import { loadAgentImagePins } from './load-agent-image-pins.ts';
-import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
-import { runProcess } from './run-process.ts';
+import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
+import { subscribeToInterrupts } from './subscribe-to-interrupts.ts';
 import { withExitCode } from './with-exit-code.ts';
+import { withWorkDir } from './with-work-dir.ts';
 
-export interface CheckAgentImageOptions extends ScriptIO {
+export interface CheckAgentImageOptions extends InterruptibleIO {
   // `--imp <name>` for a fresh imp from the image, or `--docker <image>` for a local build
   readonly args: readonly string[];
 
@@ -23,16 +23,10 @@ export interface CheckAgentImageOptions extends ScriptIO {
 
 // Prints one line per check and returns the guest's exit code: 1 when any check fails
 export function checkAgentImage(options: Readonly<CheckAgentImageOptions>): Promise<number> {
-  return withExitCode(options.printErr, async () => {
+  return withExitCode(options.printErr, () => {
     const target = parseTarget(options.args);
 
-    const work = await mkdtemp(join(tmpdir(), 'agent-image-check-'));
-
-    try {
-      return await runCheck(options, target, work);
-    } finally {
-      await rm(work, { recursive: true, force: true });
-    }
+    return withWorkDir(options, 'agent-image-check-', (work) => runCheck(options, target, work));
   });
 }
 
@@ -85,15 +79,13 @@ async function setupGuest(options: Readonly<CheckAgentImageOptions>, target: Tar
 }
 
 if (import.meta.main) {
+  const trap = subscribeToInterrupts();
+
   process.exitCode = await checkAgentImage({
+    ...trap,
     args: process.argv.slice(2),
     repo: join(import.meta.dir, '..'),
-    run: runProcess,
-    printOut: (text) => {
-      process.stdout.write(text);
-    },
-    printErr: (text) => {
-      process.stderr.write(text);
-    },
   });
+
+  trap.unsubscribe();
 }

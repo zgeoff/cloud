@@ -10,6 +10,12 @@ export interface RunOptions {
 
   // the child gets SIGTERM after this long, as `timeout` sends it
   readonly timeoutMs?: number;
+
+  // the child gets SIGTERM when this aborts, which no timeout reports
+  readonly signal?: AbortSignal;
+
+  // the child gets SIGKILL when this aborts, for one that outlives its SIGTERM
+  readonly forceStop?: AbortSignal;
   readonly cwd?: string;
 
   // the child's whole environment; without it, the child inherits this process's
@@ -56,6 +62,8 @@ export async function runProcess(
     spawned.kill('SIGTERM');
   }, timeoutMs);
 
+  void subscribeToForceStop(spawned, options.forceStop);
+
   const [stdout, stderr] = await Promise.all([
     new Response(spawned.stdout).arrayBuffer(),
     new Response(spawned.stderr).arrayBuffer(),
@@ -72,6 +80,22 @@ export async function runProcess(
   };
 }
 
+// sends the child SIGKILL when forceStop aborts, and stops listening once the child exits
+async function subscribeToForceStop(
+  spawned: Readonly<Pick<Bun.Subprocess, 'kill' | 'exited'>>,
+  forceStop: AbortSignal | undefined,
+) {
+  const onForceStop = () => {
+    spawned.kill('SIGKILL');
+  };
+
+  forceStop?.addEventListener('abort', onForceStop, { once: true });
+
+  await spawned.exited;
+
+  forceStop?.removeEventListener('abort', onForceStop);
+}
+
 function trySpawn(argv: readonly string[], options: Readonly<RunOptions>) {
   try {
     return Bun.spawn([...argv], {
@@ -79,6 +103,7 @@ function trySpawn(argv: readonly string[], options: Readonly<RunOptions>) {
       stdout: 'pipe',
       stderr: 'pipe',
       ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.env === undefined ? {} : { env: { ...options.env } }),
     });
   } catch (error) {

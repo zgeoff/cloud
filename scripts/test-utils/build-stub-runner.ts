@@ -11,8 +11,9 @@ export interface StubCall {
   // the stdin the script sent, as text; empty when it sent none
   readonly stdin: string;
 
-  // the call's other options; its stdin is the text above, so a handler sees no Buffer
-  readonly options: Readonly<Omit<RunOptions, 'stdin'>>;
+  // the call's other options; its stdin is the text above, so a handler sees no Buffer, and no
+  // stand-in runs a child that an abort signal could stop
+  readonly options: Readonly<Omit<RunOptions, 'stdin' | 'signal' | 'forceStop'>>;
 }
 
 export interface StubAnswer {
@@ -67,7 +68,9 @@ async function findAnswer(handlers: readonly StubHandler[], call: StubCall) {
   return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
 }
 
-function toCallOptions(options: Readonly<RunOptions>): Readonly<Omit<RunOptions, 'stdin'>> {
+function toCallOptions(
+  options: Readonly<RunOptions>,
+): Readonly<Omit<RunOptions, 'stdin' | 'signal' | 'forceStop'>> {
   return {
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
