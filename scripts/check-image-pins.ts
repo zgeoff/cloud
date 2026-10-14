@@ -73,12 +73,18 @@ async function loadPins(
 }
 
 function collectPins(file: string, text: string): readonly Pin[] {
-  return [...text.matchAll(pinPattern)].map((match) => ({
-    file,
-    name: match.groups?.['name'] ?? '',
-    tag: match.groups?.['tag'] ?? '',
-    digest: match.groups?.['digest'] ?? '',
-  }));
+  const pins: Pin[] = [];
+
+  for (const match of text.matchAll(pinPattern)) {
+    pins.push({
+      file,
+      name: match.groups?.['name'] ?? '',
+      tag: match.groups?.['tag'] ?? '',
+      digest: match.groups?.['digest'] ?? '',
+    });
+  }
+
+  return pins;
 }
 
 // the registry's answer for one name and tag: the digest it names, or why it gave none
@@ -91,8 +97,8 @@ async function readRegistryDigests(
   const distinct = new Map(pins.map((pin) => [`${pin.name}:${pin.tag}`, pin]));
 
   const answers = await Promise.all(
-    [...distinct].map(
-      async ([reference, pin]) => [reference, await tryReadTagDigest(pin.name, pin.tag)] as const,
+    [...distinct.values()].map(
+      async (pin) => [`${pin.name}:${pin.tag}`, await tryReadTagDigest(pin.name, pin.tag)] as const,
     ),
   );
 

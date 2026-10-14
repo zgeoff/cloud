@@ -1,3 +1,5 @@
+// MSW's resolver info carries a Request, which has no readonly form
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

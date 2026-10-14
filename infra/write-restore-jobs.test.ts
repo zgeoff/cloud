@@ -257,7 +257,11 @@ test('it passes the check and writes nothing when both files match their builder
 `,
   );
 
-  await writeRestoreJobs({ args: [ctx.root], printOut: mock(), printErr: mock() });
+  await writeRestoreJobs({
+    args: [ctx.root],
+    printOut: mock<(text: string) => void>(),
+    printErr: mock<(text: string) => void>(),
+  });
 
   const status = await writeRestoreJobs({
     args: ['--check', ctx.root],
@@ -288,7 +292,11 @@ test("it fails the check, naming the file, when one field of the YAML differs fr
 `,
   );
 
-  await writeRestoreJobs({ args: [ctx.root], printOut: mock(), printErr: mock() });
+  await writeRestoreJobs({
+    args: [ctx.root],
+    printOut: mock<(text: string) => void>(),
+    printErr: mock<(text: string) => void>(),
+  });
 
   const path = join(ctx.root, 'images', 'atc-gateway', 'restore-job.yaml');
 
@@ -457,7 +465,11 @@ test.each([
 ])('it prints the usage and exits 2 for %s', async (_label, args) => {
   const printErr = mock<(text: string) => void>();
 
-  const status = await writeRestoreJobs({ args, printOut: mock(), printErr });
+  const status = await writeRestoreJobs({
+    args,
+    printOut: mock<(text: string) => void>(),
+    printErr,
+  });
 
   expect(status).toBe(2);
 
