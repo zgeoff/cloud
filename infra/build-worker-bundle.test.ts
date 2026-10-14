@@ -14,7 +14,7 @@ test('it bundles an entry and its imports into one module that runs on its own',
 
   await writeFile(
     join(ctx.dir, 'index.ts'),
-    "import { greet } from './greet.ts';\nconsole.log(greet('geoff'));\n",
+    "import { greet } from './greet.ts';\nconsole.log(greet('sam'));\n",
   );
 
   await mkdir(join(ctx.dir, 'out'));
@@ -33,7 +33,7 @@ test('it bundles an entry and its imports into one module that runs on its own',
     stderr: run.stderr.toString(),
   }).toStrictEqual({
     exitCode: 0,
-    stdout: 'hi geoff\n',
+    stdout: 'hi sam\n',
     stderr: '',
   });
 });

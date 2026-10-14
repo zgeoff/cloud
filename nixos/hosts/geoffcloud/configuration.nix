@@ -142,7 +142,7 @@ in
       PermitRootLogin = "prohibit-password";
     };
   };
-  users.users.root.openssh.authorizedKeys.keyFiles = [ ../../keys/geoff.pub ];
+  users.users.root.openssh.authorizedKeys.keyFiles = [ ../../keys/owner.pub ];
 
   # Host's own tailnet node: tag:cloud. The auth key is placed at install time
   # by nixos-anywhere --extra-files, minted by Pulumi as a TailnetKey (#5).

@@ -25,7 +25,7 @@ import type { ATCGatewayInputs } from './inputs/types.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
 // daemons (docs/architecture/workloads/atc-gateway.md). Off until the stack config sets
-// atcGateway; setting it is an operator step that needs Geoff's approval.
+// atcGateway; setting it is an operator step that needs the owner's approval.
 
 export interface ATCGatewayOutputs {
   readonly deployment: Deployment;

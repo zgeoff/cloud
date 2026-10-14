@@ -1,6 +1,6 @@
 # Agent Guidelines
 
-Infrastructure as code for `geoff.cloud`, Geoff's general-purpose private cloud on the tailnet:
+Infrastructure as code for `geoff.cloud`, the owner's general-purpose private cloud on the tailnet:
 today one Onidel VM running a single-node k3s cluster, with imp microVMs on the host as the first
 workload. `docs/architecture/overview.md` describes the system, and Linear holds the planned work.
 
@@ -82,7 +82,7 @@ the architecture and runbooks. `scripts/` holds repo tooling.
   hostname or a public DNS record) needs a stated reason in its PR.
 - Never print a secret, and never log a whole Onidel VM object: the API returns the root password.
 - No live change without a preview first. The Tailscale policy file in particular: Pulumi's `Acl`
-  replaces the whole file, so Geoff reviews the diff before an apply that changes it.
+  replaces the whole file, so the owner reviews the diff before an apply that changes it.
 - The host's firewall is NixOS's table `inet nixos-fw`, plus `inet cloud_host` for the atc daemon's
   port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and Docker add their own
   tables; imp's `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and
@@ -128,10 +128,11 @@ the architecture and runbooks. `scripts/` holds repo tooling.
 
 ## Project management
 
-Geoff runs this project through a delegated coordinating agent, which reaches sessions through atc
-(2026-10-03). Its word is Geoff's sign-off; Geoff is the final rubber stamp.
+The owner runs this project through a delegated coordinating agent, which reaches sessions through
+atc (2026-10-03). Its word is the owner's sign-off; the owner is the final rubber stamp.
 
-- Escalate anything you doubt through the coordinating agent; it brings Geoff in directly.
+- Escalate anything you doubt through the coordinating agent; it brings the owner in directly.
 - Before an action that costs money, deletes data or cannot be undone, state its exact effect back
   to it and act only on its approval of that statement, not of a summary.
-- A permission-check block needs Geoff himself. Tell the coordinating agent, so it can bring him in.
+- A permission-check block needs the owner in person. Tell the coordinating agent, so it can bring
+  the owner in.
