@@ -1,5 +1,6 @@
 import type { Output } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
+import { lokiURL } from './loki-url.ts';
 
 // the chart's own args plus the textfile collector, which reads metrics that host timers
 // write (impd local health, #29); node-exporter sees the host root at /host/root
@@ -58,9 +59,7 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
       adminPassword: grafana.password,
       service: { type: 'NodePort', nodePort: grafana.nodePort },
       resources: grafanaResources,
-      additionalDataSources: [
-        { name: 'Loki', type: 'loki', url: 'http://loki.observability.svc:3100', access: 'proxy' },
-      ],
+      additionalDataSources: [{ name: 'Loki', type: 'loki', url: lokiURL, access: 'proxy' }],
 
       // no Alertmanager datasource: Grafana does no alerting here, and alerts show in
       // Prometheus and Alertmanager themselves (#28, #29); deleteDatasources removes the

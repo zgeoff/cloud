@@ -1,3 +1,5 @@
+import { lokiURL } from './loki-url.ts';
+
 // Alloy as a DaemonSet: tail every pod's logs and the host's journal, and push them to Loki
 export const alloyValues = {
   alloy: {
@@ -59,7 +61,7 @@ loki.relabel "journal" {
 
 loki.write "default" {
   endpoint {
-    url = "http://loki.observability.svc:3100/loki/api/v1/push"
+    url = "${lokiURL}/loki/api/v1/push"
   }
 }
 `,
