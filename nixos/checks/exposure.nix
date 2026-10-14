@@ -3,8 +3,9 @@
 # every mismatch, so a port that opens without a registry entry, or an entry the firewall no
 # longer matches, fails here instead of reaching the host. The cases first test the comparison:
 # each evaluates its own config through test-utils/build-module-system.nix, with
-# inet cloud_host's module and imp's module for their options, compares it with its own entries,
-# and runs on its own, in a fresh directory, under test-support/shell/run-cases.sh.
+# inet cloud_host's module and imp's module for their options, or extends geoffcloud's, compares
+# it with its own entries, and runs on its own, in a fresh directory, under
+# test-support/shell/run-cases.sh.
 # Run: bun run test:nixos exposure
 {
   nixpkgs,
@@ -396,6 +397,267 @@ let
                 scope = "host";
                 interface = "docker0";
                 admission = true;
+              }
+              {
+                name = "atc-daemon";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 8415;
+                scope = "host";
+                interface = "cni0";
+                admission = true;
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports the atc daemon's admission once geoffcloud stops trusting cni0";
+      script =
+        let
+          # geoffcloud's own config, less cni0 in trustedInterfaces: inet cloud_host still admits
+          # the gateway's pods to tcp 8415, but nixos-fw now drops them
+          untrusted = geoffcloud.extendModules {
+            modules = [
+              {
+                networking.firewall.trustedInterfaces = lib.mkForce (
+                  lib.remove "cni0" geoffcloud.config.networking.firewall.trustedInterfaces
+                );
+              }
+            ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's atc-daemon entry is host scope on cni0, and inet cloud_host admits tcp 8415 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8415 neither there nor on every interface"
+              ]
+            )
+          } ${
+            lib.escapeShellArg (
+              builtins.toJSON (collectExposureMismatches {
+                inherit (untrusted) config;
+                inherit ((import ../exposure.nix)) entries;
+              })
+            )
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports an admission on an interface that nixos-fw neither trusts nor opens the port on";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.cloudHost.admissions = [
+              {
+                port = 18081;
+                interface = "docker0";
+                sourceCIDR = "172.17.0.0/16";
+                destinationAddress = "172.17.0.1";
+              }
+            ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's relay entry is host scope on docker0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: docker0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "relay";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 18081;
+                scope = "host";
+                interface = "docker0";
+                admission = true;
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it accepts an admission that nixos-fw passes through a trusted interface or a port range";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.firewall.trustedInterfaces = [ "cni0" ];
+            networking.firewall.interfaces.docker0.allowedTCPPortRanges = [
+              {
+                from = 18000;
+                to = 18099;
+              }
+            ];
+            networking.cloudHost.admissions = [
+              {
+                port = 8415;
+                interface = "cni0";
+                sourceCIDR = "10.42.0.0/16";
+                destinationAddress = "100.64.0.1";
+              }
+              {
+                port = 18081;
+                interface = "docker0";
+                sourceCIDR = "172.17.0.0/16";
+                destinationAddress = "172.17.0.1";
+              }
+            ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "tcp 18000-18099 is open on docker0 as a range, which no registry entry can match"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "atc-daemon";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 8415;
+                scope = "host";
+                interface = "cni0";
+                admission = true;
+              }
+              {
+                name = "relay";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 18081;
+                scope = "host";
+                interface = "docker0";
+                admission = true;
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a port that nixos-fw opens on an interface where inet cloud_host drops it";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.firewall.trustedInterfaces = [ "cni0" ];
+            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 8415 ];
+            networking.cloudHost.admissions = [
+              {
+                port = 8415;
+                interface = "cni0";
+                sourceCIDR = "10.42.0.0/16";
+                destinationAddress = "100.64.0.1";
+              }
+            ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's docker-daemon entry is host scope on docker0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admission for tcp 8415 is on cni0"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "atc-daemon";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 8415;
+                scope = "host";
+                interface = "cni0";
+                admission = true;
+              }
+              {
+                name = "docker-daemon";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 8415;
+                scope = "host";
+                interface = "docker0";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it narrows a port open on every interface to its admission";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.firewall.allowedTCPPorts = [ 8415 ];
+            networking.cloudHost.admissions = [
+              {
+                port = 8415;
+                interface = "cni0";
+                sourceCIDR = "10.42.0.0/16";
+                destinationAddress = "100.64.0.1";
+              }
+            ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's atc-public entry is public, but tcp 8415 is not open on every interface"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "atc-public";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 8415;
+                scope = "public";
               }
               {
                 name = "atc-daemon";
