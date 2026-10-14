@@ -21,7 +21,7 @@
     "lint": "oxlint",
     "lint:files": "oxlint",
     "lint:fix": "oxlint --fix",
-    "lint:full": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
+    "lint:full": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error -f unix",
     "test": "bun test",
     "test:health-check": "cd workers/health-check && bun test",
     "test:related": "bun scripts/run-related-tests.ts",
