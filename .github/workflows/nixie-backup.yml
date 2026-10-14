@@ -31,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   fixture:
@@ -46,6 +47,12 @@ jobs:
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
+
+      # the backup image is a private GHCR package, so docker pulls it with the workflow token
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
 
       - name: Fixture test
         run: bun run test:nixie-backup-fixture
