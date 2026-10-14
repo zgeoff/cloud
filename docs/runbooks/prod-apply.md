@@ -125,5 +125,5 @@ vault keeps the old key. [Apply it by hand](./workflows.md#apply-by-hand).
 ## Rotate the job's credentials
 
 A rotation of an item `.env` references updates the item in `cloud` and its copy in `cloud-deploy`,
-or the job reads the old value. The service account's token expires on the date set when it was
-made: make a new account, replace the environment secret, then delete the old account.
+or the job reads the old value. The service account's token has no expiry. To replace the token,
+make a new account, replace the environment secret, then delete the old account.
