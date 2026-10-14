@@ -22,9 +22,15 @@ export function collectPlanHolds(digest: unknown): string[] {
 // a refresh is not a change, and the drift check reports what it finds; read is a data source
 const unattendedOps = new Set(['same', 'create', 'update', 'refresh', 'read']);
 
-// the whole tailnet policy file, the VM and the cloud firewall in front of it
+// the whole tailnet policy file, the VM and the cloud firewall in front of it, and the edge's
+// say over who reaches the public hostnames: the tunnel's routes and the Access login in front of
+// the gateway's sign-in pages
 const guardedTypes = new Set([
   'tailscale:index/acl:Acl',
+  'cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig',
+  'cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication',
+  'cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy',
+  'cloudflare:index/zeroTrustAccessIdentityProvider:ZeroTrustAccessIdentityProvider',
   'onidel:index:Vm',
   'onidel:index:FirewallGroup',
   'onidel:index:FirewallRule',

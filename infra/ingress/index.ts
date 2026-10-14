@@ -7,6 +7,7 @@ import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 import { createCloudflared } from './create-cloudflared.ts';
+import { createGatewayAccess } from './create-gateway-access.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 
 // the names observability's monitor and alert rule select cloudflared by
@@ -23,6 +24,10 @@ interface IngressInputs {
 
   // the atc gateway's route, set only with the gateway
   readonly atcRoute: TunnelRoute | undefined;
+
+  // the one address the Access policy in front of the gateway's sign-in pages lets in, set with
+  // the gateway
+  readonly atcOwnerEmail: Output<string> | undefined;
 }
 
 interface IngressOutputs {
@@ -32,7 +37,8 @@ interface IngressOutputs {
 }
 
 // Public ingress (#7). One tunnel for every public hostname under geoff.cloud;
-// cloudflared runs in k3s with the token below. Each workload brings its own auth.
+// cloudflared runs in k3s with the token below. Each workload brings its own auth, and an
+// owner-only Access application fronts the atc gateway's sign-in pages on top of it.
 export function createIngress(inputs: IngressInputs): IngressOutputs {
   const tunnel = new ZeroTrustTunnelCloudflared('edge', {
     accountId: inputs.accountID,
@@ -51,11 +57,29 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
   }
 
   // the tunnel's one route: atc.geoff.cloud, a workload in k3s
+  const atcRoute = inputs.atcRoute;
+  const atcOwnerEmail = inputs.atcOwnerEmail;
+
+  // the inputs group sets both with the gateway, so one without the other is a wiring fault
+  if (atcRoute !== undefined && atcOwnerEmail === undefined) {
+    throw new Error("the atc gateway's route has no owner address for its Access policy");
+  }
+
   const routes = createTunnelRoutes({
     accountID: inputs.accountID,
     zoneID: inputs.zoneID,
     tunnelID: tunnel.id,
-    atcRoute: inputs.atcRoute,
+    gateway:
+      atcRoute === undefined || atcOwnerEmail === undefined
+        ? undefined
+        : {
+            route: atcRoute,
+            access: createGatewayAccess({
+              accountID: inputs.accountID,
+              hostname: atcRoute.hostname,
+              ownerEmail: atcOwnerEmail,
+            }),
+          },
   });
 
   return {

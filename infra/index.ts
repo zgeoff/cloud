@@ -54,6 +54,7 @@ const ingress = createIngress({
   zoneID: edge.zoneID,
   cluster: k3s?.provider,
   atcRoute: workloads?.atcGatewayRoute,
+  atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
 });
 
 export const tunnelToken = ingress.tunnelToken;

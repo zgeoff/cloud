@@ -85,6 +85,22 @@ test.each([
   ['the VM', 'urn:pulumi:prod::geoff-cloud::onidel:index:Vm::geoffcloud'],
   ['the firewall group', 'urn:pulumi:prod::geoff-cloud::onidel:index:FirewallGroup::edge'],
   ['a firewall rule', 'urn:pulumi:prod::geoff-cloud::onidel:index:FirewallRule::edge-https'],
+  [
+    "the tunnel's routes",
+    'urn:pulumi:prod::geoff-cloud::cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig::edge',
+  ],
+  [
+    'the Access application',
+    'urn:pulumi:prod::geoff-cloud::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::atc-gateway-sign-in',
+  ],
+  [
+    'the Access policy',
+    'urn:pulumi:prod::geoff-cloud::cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy::atc-gateway-owner',
+  ],
+  [
+    'the Access identity provider',
+    'urn:pulumi:prod::geoff-cloud::cloudflare:index/zeroTrustAccessIdentityProvider:ZeroTrustAccessIdentityProvider::one-time-pin',
+  ],
 ])('it holds an update of %s', (_label: string, urn: string) => {
   expect(collectPlanHolds({ steps: [{ op: 'update', urn }] })).toStrictEqual([
     `update of a guarded resource ${urn}`,

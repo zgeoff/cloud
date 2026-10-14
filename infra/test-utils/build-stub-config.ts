@@ -1,12 +1,12 @@
-import { RunError } from '@pulumi/pulumi';
-import type { Config } from '@pulumi/pulumi';
+import { RunError, secret } from '@pulumi/pulumi';
+import type { Config, Output } from '@pulumi/pulumi';
 
 // Stand-in for Pulumi's Config over raw stack values: get returns the string, getBoolean reads
-// "true" and "false", getObject JSON-parses unchecked, a missing key reads undefined. Any other
-// value throws Config's RunError naming project, key and value (ConfigTypeError is unexported).
+// "true" and "false", getObject JSON-parses unchecked, getSecret wraps the string as a secret, a
+// missing key reads undefined. Any other value throws Config's RunError (ConfigTypeError is unexported).
 export function buildStubConfig(
   values: Readonly<Record<string, string>>,
-): Pick<Config, 'get' | 'getBoolean' | 'getObject'> {
+): Pick<Config, 'get' | 'getBoolean' | 'getObject' | 'getSecret'> {
   return {
     get: (key) => findValue(values, key),
     getBoolean: (key) => {
@@ -18,6 +18,11 @@ export function buildStubConfig(
       const raw = values[key];
 
       return raw === undefined ? undefined : parseJSON(key, raw);
+    },
+    getSecret: <K extends string = string>(key: string) => {
+      const raw = findValue<K>(values, key);
+
+      return raw === undefined ? undefined : toSecret(raw);
     },
   };
 }
@@ -51,4 +56,9 @@ function parseJSON<T>(key: string, raw: string): T {
       `Configuration '${projectName}:${key}' value '${raw}' is not a valid JSON object`,
     );
   }
+}
+
+// secret unwraps its value's type, so it reads back as Config's getSecret types it: the caller's K
+function toSecret<K extends string>(raw: K): Output<K> {
+  return secret(raw) as Output<K>;
 }

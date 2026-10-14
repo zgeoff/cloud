@@ -1,15 +1,16 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
-import type { TunnelRoute } from './build-tunnel-ingresses.ts';
+import type { GatewayIngress } from './build-tunnel-ingresses.ts';
 
 interface TunnelRoutesInputs {
   readonly accountID: string;
   readonly zoneID: Output<string>;
   readonly tunnelID: Output<string>;
 
-  // the atc gateway, on its public URL's host. It owns OAuth too.
-  readonly atcRoute?: TunnelRoute | undefined;
+  // the atc gateway, on its public URL's host, with the Access application in front of its
+  // sign-in pages. It owns OAuth too.
+  readonly gateway?: GatewayIngress | undefined;
 }
 
 interface TunnelRoutesOutputs {
@@ -20,17 +21,18 @@ interface TunnelRoutesOutputs {
 // The tunnel's ingress rules and the proxied CNAME for each hostname. The catch-all 404
 // stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const atcRoute = inputs.atcRoute;
+  const gateway = inputs.gateway;
 
   const config = new ZeroTrustTunnelCloudflaredConfig('edge', {
     accountId: inputs.accountID,
     tunnelId: inputs.tunnelID,
     config: {
-      ingresses: buildTunnelIngresses(atcRoute),
+      ingresses: buildTunnelIngresses(gateway),
     },
   });
 
-  const atc = atcRoute === undefined ? undefined : createRecord('atc', inputs, atcRoute.hostname);
+  const atc =
+    gateway === undefined ? undefined : createRecord('atc', inputs, gateway.route.hostname);
 
   return {
     configVersion: config.version,

@@ -73,7 +73,11 @@ test('it loads the gateway from the same stack config and environment when atcGa
     defaultDaemon: 'geoffcloud',
   });
 
-  const stackConfig = buildStubConfig({ cluster: 'managed', atcGateway: JSON.stringify(config) });
+  const stackConfig = buildStubConfig({
+    cluster: 'managed',
+    atcGateway: JSON.stringify(config),
+    atcGatewayOwnerEmail: 'owner@example.test',
+  });
 
   expect(
     loadClusterInputs(stackConfig, {
@@ -94,6 +98,7 @@ test('it loads the gateway from the same stack config and environment when atcGa
           token: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
         },
         tokens: { geoffcloud: expect.toSatisfy((value: unknown) => Output.isInstance(value)) },
+        ownerEmail: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
       },
     },
   });
@@ -122,6 +127,7 @@ test("it runs nixie's backup in the gateway's backup image, pulled with the gate
     buildStubConfig({
       cluster: 'managed',
       atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
       nixie: JSON.stringify({
         image:
           'ghcr.io/zgeoff/nixie:0.1.0@sha256:06d8802f4aac382106d53be0915887e86e36c6960e2404e19af6611a4c01b309',

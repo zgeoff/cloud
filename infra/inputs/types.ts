@@ -6,7 +6,7 @@ import type { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
 export type Environment = Readonly<Record<string, string | undefined>>;
 
 // the stack config methods the inputs group reads: Pulumi's Config, or a stand-in in a test
-export type StackConfig = Pick<Config, 'get' | 'getBoolean' | 'getObject'>;
+export type StackConfig = Pick<Config, 'get' | 'getBoolean' | 'getObject' | 'getSecret'>;
 
 // the atcGateway stack config as written, before the schema fills in each default
 export type ATCGatewayRawConfig = z.input<typeof atcGatewayConfigSchema>;
@@ -53,6 +53,9 @@ export interface ATCGatewayInputs {
 
     // restic to R2; without it there is no backup CronJob
     readonly backup?: ATCGatewayBackupSecrets;
+
+    // the one address the Access policy in front of the gateway's sign-in pages lets in
+    readonly ownerEmail: Output<string>;
   };
 }
 
