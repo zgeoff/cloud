@@ -7,6 +7,7 @@ import { checkATCGatewayReadiness } from './check-atc-gateway-readiness.ts';
 import { server } from './mocks/node.ts';
 import { buildStubGetent } from './test-utils/build-stub-getent.ts';
 import { buildStubReadinessHost } from './test-utils/build-stub-readiness-host.ts';
+import type { StubAnswer, StubCall } from './test-utils/build-stub-runner.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 // recorders for the output; the host, registry and route are each test's own
@@ -26,10 +27,18 @@ function setupTest() {
   };
 }
 
+// gh prints the token it holds, as `gh auth token` does once signed in or with GH_TOKEN set
+function buildGHAuthTokenAnswer(call: StubCall): StubAnswer | undefined {
+  return call.argv.join(' ') === 'gh auth token --hostname github.com'
+    ? { stdout: 'gh-token-1\n' }
+    : undefined;
+}
+
 test('it reports every check ok and exits 0 once the gateway is deployed', async () => {
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -133,6 +142,7 @@ test('it reports every check ok and exits 0 once the gateway is deployed', async
       'root@geoffcloud',
       "'k3s' 'kubectl' 'get' '-n' 'atc' 'deploy' 'atc-gateway'",
     ],
+    ['gh', 'auth', 'token', '--hostname', 'github.com'],
     ['getent', 'hosts', 'atc.geoff.cloud'],
     [
       'ssh',
@@ -177,6 +187,7 @@ test('it reports what the deploy creates as missing, and exits 0, before the dep
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -228,6 +239,7 @@ test('it fails the four host checks and exits 4 when the host does not answer', 
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       isUnreachable: true,
@@ -273,6 +285,7 @@ test('it fails the node check when the node is not Ready, and the memory check b
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   NotReady   control-plane,master   40d   v1.33.4+k3s1',
@@ -309,6 +322,7 @@ test('it passes the memory check at exactly 1024 MiB available', async () => {
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -341,6 +355,7 @@ test('it fails the impd check with impd’s status when impd is not ready', asyn
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -372,6 +387,7 @@ test('it fails the public route when its metadata answers another status', async
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -409,6 +425,7 @@ test('it fails the public route with 000 when its metadata gets no answer', asyn
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -445,6 +462,7 @@ test('it fails the in-cluster check when the gateway answers another status', as
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud',
       nodeLine: 'geoffcloud   Ready    control-plane,master   40d   v1.33.4+k3s1',
@@ -476,6 +494,7 @@ test('it checks the named host', async () => {
   const ctx = setupTest();
 
   const stub = buildStubRunner(
+    buildGHAuthTokenAnswer,
     buildStubReadinessHost({
       destination: 'root@geoffcloud-2',
       nodeLine: 'geoffcloud-2   Ready    control-plane,master   1d   v1.33.4+k3s1',

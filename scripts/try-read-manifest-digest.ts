@@ -6,13 +6,15 @@ export type RegistryAnswer =
   | { readonly error: string };
 
 // Asks an image's registry for the digest of one manifest, by tag or by digest, through the
-// distribution API's manifest HEAD, with an anonymous pull token when the registry asks for one.
+// distribution API's manifest HEAD, with a pull token when the registry asks for one: anonymous,
+// except that ghcr.io's realm alone gets the GitHub token, which private packages need.
 export async function tryReadManifestDigest(
   name: string,
   reference: string,
+  githubToken?: string,
 ): Promise<RegistryAnswer> {
   try {
-    return await readManifestDigest(name, reference);
+    return await readManifestDigest(name, reference, githubToken);
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
@@ -28,27 +30,42 @@ const manifestTypes = [
 ].join(', ');
 
 // The distribution API's manifest HEAD. A registry that wants a token answers 401 with a Bearer
-// challenge, and its realm hands out an anonymous pull token for a public image.
-async function readManifestDigest(name: string, reference: string): Promise<RegistryAnswer> {
+// challenge, and its realm hands out a pull token: anonymous for a public image, and for ghcr.io's
+// private packages one the GitHub token pays for.
+async function readManifestDigest(
+  name: string,
+  reference: string,
+  githubToken: string | undefined,
+): Promise<RegistryAnswer> {
   const location = resolveRegistry(name);
   const url = `https://${location.host}/v2/${location.repository}/manifests/${reference}`;
 
   const first = await sendManifestHead(url, undefined);
 
+  // another registry may name ghcr.io's realm in its challenge, and would get the pull token
+  const realmToken = location.host === 'ghcr.io' ? githubToken : undefined;
+
   const response =
     first.status === 401
-      ? await sendManifestHeadWithToken(url, first.headers.get('www-authenticate'))
+      ? await sendManifestHeadWithToken(url, first.headers.get('www-authenticate'), realmToken)
       : first;
 
-  if (response.status === 404) {
+  return toRegistryAnswer(response.status, response.headers.get('docker-content-digest'));
+}
+
+function toRegistryAnswer(status: number, digest: string | null): RegistryAnswer {
+  if (status === 404) {
     return { missing: true };
   }
 
-  if (response.status !== 200) {
-    return { error: `the registry answered ${response.status}` };
+  // ghcr.io answers 401 or 403 when the token cannot read a private package
+  if (status === 401 || status === 403) {
+    return { error: `the registry answered ${status}: the credential cannot read it` };
   }
 
-  const digest = response.headers.get('docker-content-digest');
+  if (status !== 200) {
+    return { error: `the registry answered ${status}` };
+  }
 
   return digest === null ? { error: 'the registry named no digest' } : { digest };
 }
@@ -75,16 +92,29 @@ function sendManifestHead(url: string, token: string | undefined): Promise<Respo
   });
 }
 
-async function sendManifestHeadWithToken(url: string, challenge: string | null): Promise<Response> {
-  const token = await readPullToken(challenge);
+async function sendManifestHeadWithToken(
+  url: string,
+  challenge: string | null,
+  githubToken: string | undefined,
+): Promise<Response> {
+  const token = await readPullToken(challenge, githubToken);
 
   return sendManifestHead(url, token);
 }
 
-async function readPullToken(challenge: string | null): Promise<string> {
-  const response = await fetch(buildTokenURL(challenge ?? ''), {
-    signal: AbortSignal.timeout(15_000),
-  });
+async function readPullToken(
+  challenge: string | null,
+  githubToken: string | undefined,
+): Promise<string> {
+  const url = buildTokenURL(challenge ?? '');
+
+  // ghcr.io's realm takes a GitHub token as the password of basic auth, with any user name
+  const headers: Readonly<Record<string, string>> =
+    githubToken !== undefined && url.protocol === 'https:' && url.host === 'ghcr.io'
+      ? { authorization: `Basic ${btoa(`x:${githubToken}`)}` }
+      : {};
+
+  const response = await fetch(url, { headers, signal: AbortSignal.timeout(15_000) });
 
   if (response.status !== 200) {
     throw new Error(`the token realm answered ${response.status}`);
