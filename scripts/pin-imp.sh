@@ -114,12 +114,15 @@ if [ "$pin_host" = true ]; then
   # shellcheck source-path=SCRIPTDIR source=nix-image.sh
   source "$here/nix-image.sh"
   # the lock resolves the short commit through api.github.com, whose anonymous quota a shared
-  # runner IP can spend; with NIX_GITHUB_TOKEN, nix sends it as a github.com access token. docker
-  # takes NIX_CONFIG by name, so the token stays out of every argv and log line.
+  # runner IP can spend; with NIX_GITHUB_TOKEN, nix sends it as a github.com access token, added
+  # after the caller's own NIX_CONFIG. docker takes NIX_CONFIG by name, so the token stays out of
+  # every argv and log line; without the token, the container gets no NIX_CONFIG at all.
+  nix_env=()
   if [ -n "${NIX_GITHUB_TOKEN:-}" ]; then
-    export NIX_CONFIG="access-tokens = github.com=$NIX_GITHUB_TOKEN"
+    export NIX_CONFIG="${NIX_CONFIG:+$NIX_CONFIG$'\n'}access-tokens = github.com=$NIX_GITHUB_TOKEN"
+    nix_env=(-e NIX_CONFIG)
   fi
-  docker run --rm -v "$PWD/nixos:/src" -w /src -e NIX_CONFIG "$NIX_IMAGE" sh -c \
+  docker run --rm -v "$PWD/nixos:/src" -w /src "${nix_env[@]}" "$NIX_IMAGE" sh -c \
     "nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"
   locked="$(jq -r '.nodes.imp.locked.rev' "$lock")"
   if [ "$locked" != "$commit" ]; then

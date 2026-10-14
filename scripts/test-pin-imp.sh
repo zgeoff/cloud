@@ -3,8 +3,8 @@
 # configuration.nix and the agent image's Dockerfile, it moves the imp input to the release
 # commit's first 8 hex digits, locks it with `nix flake lock` in the Nix image that scripts/nix-image.sh pins, and
 # pins imp-host and imp-base to the release's tag and digests, and nothing else. The lock gets
-# NIX_GITHUB_TOKEN as a github.com access token through the container's NIX_CONFIG, never in an
-# argv or the output, and no NIX_CONFIG without the token. It keeps an image
+# NIX_GITHUB_TOKEN as a github.com access token after the caller's NIX_CONFIG, never in an argv
+# or the output, and no NIX_CONFIG at all without the token. It keeps an image
 # that already holds the release or a newer one, and runs no lock when imp-host stays. It refuses a
 # lock that names another commit, a failed lock, an image pinned at the release with another
 # digest (with no file changed and no docker call), and bad arguments. docker is the
@@ -79,12 +79,8 @@ EOF
   # the case tree's path and uid vary between runs, so the expected argv takes them as arguments
   jq -cn --arg mount "$tree/repo/nixos:/src" --arg image "$NIX_IMAGE" \
     --arg command "nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock" \
-    '["docker","run","--rm","-v",$mount,"-w","/src","-e","NIX_CONFIG",$image,"sh","-c",$command]' > "$tree/want-calls"
+    '["docker","run","--rm","-v",$mount,"-w","/src",$image,"sh","-c",$command]' > "$tree/want-calls"
   diff "$tree/want-calls" "$tree/calls"
-  [ ! -e "$tree/nix-config" ] || {
-    echo "passed a NIX_CONFIG without NIX_GITHUB_TOKEN: $(cat "$tree/nix-config")" >&2
-    exit 1
-  }
   diff - "$tree/out" << 'EOF'
 pinned imp 1.0.1 in nixos/flake.nix and nixos/flake.lock: c5bea94080fdde9e21e9720295c1ca727302662e
 pinned imp-host 1.0.1: sha256:3333333333333333333333333333333333333333333333333333333333333333
@@ -123,6 +119,64 @@ pinned imp 1.0.1 in nixos/flake.nix and nixos/flake.lock: c5bea94080fdde9e21e972
 pinned imp-host 1.0.1: sha256:3333333333333333333333333333333333333333333333333333333333333333
 pinned imp-base 1.0.1: sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_adds_the_github_token_after_the_callers_nix_config() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '      url = "github:zgeoff/imp/4211437b";' > "$tree/repo/nixos/flake.nix"
+  echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
+  echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
+  echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    NIX_CONFIG='connect-timeout = 5' NIX_GITHUB_TOKEN=ghs_exampletoken bash "$script" 1.0.1 c5bea94080fdde9e21e9720295c1ca727302662e \
+    sha256:3333333333333333333333333333333333333333333333333333333333333333 \
+    sha256:4444444444444444444444444444444444444444444444444444444444444444) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/nix-config" << 'EOF'
+connect-timeout = 5
+access-tokens = github.com=ghs_exampletoken
+EOF
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_hands_the_lock_no_nix_config_without_a_github_token() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '      url = "github:zgeoff/imp/4211437b";' > "$tree/repo/nixos/flake.nix"
+  echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
+  echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
+  echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    NIX_CONFIG='access-tokens = example.invalid=other' bash "$script" 1.0.1 c5bea94080fdde9e21e9720295c1ca727302662e \
+    sha256:3333333333333333333333333333333333333333333333333333333333333333 \
+    sha256:4444444444444444444444444444444444444444444444444444444444444444) > "$tree/out" 2> "$tree/err" || status=$?
+
+  jq -cn --arg mount "$tree/repo/nixos:/src" --arg image "$NIX_IMAGE" \
+    --arg command "nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock" \
+    '["docker","run","--rm","-v",$mount,"-w","/src",$image,"sh","-c",$command]' > "$tree/want-calls"
+  diff "$tree/want-calls" "$tree/calls"
+  [ ! -e "$tree/nix-config" ] || {
+    echo "passed the caller's NIX_CONFIG without NIX_GITHUB_TOKEN: $(cat "$tree/nix-config")" >&2
+    exit 1
+  }
   diff /dev/null "$tree/err"
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
