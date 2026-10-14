@@ -1,14 +1,14 @@
 # Evaluates services.atc-daemon apart from any host's config, with the pinned atc release, and
 # checks the service, the config.json it links and the module's assertions. Each case evaluates
 # its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
-# directory, under scripts/test-lib/run-cases.sh, which reports each case and fails the check
+# directory, under test-support/shell/run-cases.sh, which reports each case and fails the check
 # when any case fails.
 # Run: bun run test:nixos atc-daemon
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = ../../scripts/test-lib;
+  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };

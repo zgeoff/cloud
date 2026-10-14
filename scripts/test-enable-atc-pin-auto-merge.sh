@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for enable-atc-pin-auto-merge.sh: through the gh stand-in
-# (scripts/test-lib/create-stub-release-gh.sh), it turns on squash auto-merge for the pull request
+# (test-support/shell/create-stub-release-gh.sh), it turns on squash auto-merge for the pull request
 # in GITHUB_REPOSITORY, matched to the head it checked; it fails without GITHUB_REPOSITORY before
 # calling gh; and a missing argument is a usage error. Each case runs it under `env -i` and
 # compares its whole stdout, stderr and gh call log.
@@ -11,8 +11,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
-source "$scripts/test-lib/create-stub-release-gh.sh"
+source "$scripts/../test-support/shell/run-cases.sh"
+source "$scripts/../test-support/shell/create-stub-release-gh.sh"
 
 script="$scripts/enable-atc-pin-auto-merge.sh"
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for set-release-bot-identity.sh: in a real git repository in the case tree, with a gh
-# stand-in (scripts/test-lib/create-stub-bot-user-gh.sh) that knows the bot users, it sets
+# stand-in (test-support/shell/create-stub-bot-user-gh.sh) that knows the bot users, it sets
 # user.name to the app's bot login and user.email to the bot's noreply address with its id; a bot
 # user GitHub does not know fails it with gh's error and leaves the identity unset; and a missing
 # slug is a usage error. Each case runs the script under `env -i` with git's global and system
@@ -11,8 +11,8 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-bot-user-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-bot-user-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/set-release-bot-identity.sh"
 

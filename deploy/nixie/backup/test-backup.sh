@@ -22,10 +22,10 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/run-backup.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/run-backup-shell.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/test-lib/normalize-restic-output.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup-shell.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-restic-output.sh"
 
 it_backs_up_nixie_db_and_keys_db_alone() {
   local image="$1" script="$2" status=0

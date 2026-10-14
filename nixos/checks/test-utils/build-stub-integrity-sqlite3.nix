@@ -5,10 +5,10 @@
 # fail the check: VACUUM INTO rebuilds every index from its table. Any other call is the real
 # sqlite3 alone.
 #
-#   SQLITE3=<this> bash -s -- <label> < scripts/copy-impd-db-host.sh
+#   SQLITE3=<this> copy-impd-db-host <label>
 #
-# What it assumes of scripts/copy-impd-db-host.sh, which nixos/checks/test-utils-check.nix
-# pins: it runs integrity_check through SQLITE3 as a database path and that one statement.
+# What it assumes of copy-impd-db-host (nixos/packages/impd-db-tools), which
+# nixos/checks/test-utils-check.nix pins: it runs integrity_check through SQLITE3 as a database path and that one statement.
 { pkgs }:
 let
   damaged = pkgs.runCommand "damaged-imp.sqlite" { nativeBuildInputs = [ pkgs.sqlite ]; } ''

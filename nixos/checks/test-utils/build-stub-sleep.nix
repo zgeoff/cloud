@@ -5,9 +5,9 @@
 # $SLEEP_LOG it exits 2. The script's start loop counts its pauses rather than reading a clock,
 # so the stand-in needs no time source: the pauses it records are the wait.
 #
-#   IMPD_START_SLEEP=<this> SLEEP_LOG=/tmp/sleep.log bash restore-impd-db.sh ...
+#   IMPD_START_SLEEP=<this> SLEEP_LOG=/tmp/sleep.log restore-impd-db ...
 #
-# What it assumes of sleep and of scripts/restore-impd-db.sh, which
+# What it assumes of sleep and of restore-impd-db (nixos/packages/impd-db-tools), which
 # nixos/checks/test-utils-check.nix pins: sleep given one number of seconds prints nothing and
 # exits 0; the script's start loop pauses through $IMPD_START_SLEEP with `1`, once for each of
 # its IMPD_START_WAIT_SECONDS tries. nixos/checks/test-utils-check.nix tests it.

@@ -1,4 +1,4 @@
-# The restore rehearsal's seam subtests for scripts/restore-impd-db.sh, in a NixOS VM: the
+# The restore rehearsal's seam subtests for restore-impd-db, in a NixOS VM: the
 # machine, its reset and its boot subtests are test-utils/build-restore-rehearsal.nix's, the same
 # as impd-restore's. These subtests reach the errors that no real state on the machine can
 # trigger, through the script's SYSTEMCTL and CMP: each puts one stand-in in place of the real
@@ -7,8 +7,8 @@
 # Stand-ins, from test-utils, beside the rehearsal's own: a systemctl that cannot read one
 # unit's state (build-stub-systemctl.nix), and a cmp that finds one comparison different
 # (build-stub-cmp.nix). Each subtest writes its own database, secret, copy and COPY-INFO, so
-# every subtest stands alone. It needs KVM, and it reads scripts/ beside nixos/, so it builds
-# only from the repo root: run `bun run test:nixos impd-restore-seams`.
+# every subtest stands alone. It needs KVM, and it reads test-support/shell beside nixos/, so it
+# builds only from the repo root: run `bun run test:nixos impd-restore-seams`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -41,7 +41,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 SYSTEMCTL=${stubSystemctl} FAIL_SHOW_UNIT=imp-docker-proxy bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("SYSTEMCTL=${stubSystemctl} FAIL_SHOW_UNIT=imp-docker-proxy restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -94,7 +94,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 CMP=${stubCmp} FAIL_CMP_FIRST=/root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite.restore' bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("CMP=${stubCmp} FAIL_CMP_FIRST=/root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite.restore' restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -169,7 +169,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 CMP=${stubCmp} FAIL_CMP_FIRST=/root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite' bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("CMP=${stubCmp} FAIL_CMP_FIRST=/root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite' restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"

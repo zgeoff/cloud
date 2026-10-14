@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test for decide-prod-apply.sh: against a real git repository in the case tree, with origin/main
 # and the deployed/prod tag set by each case, and a gh stand-in for find-ci-run.sh
-# (scripts/test-lib/create-stub-ci-runs-gh.sh), it decides whether a CI run's commit or a
+# (test-support/shell/create-stub-ci-runs-gh.sh), it decides whether a CI run's commit or a
 # dispatched main tip needs the prod apply, writes the decision to the step output file, says in
 # the step summary when nothing applies, and refuses a dispatch off main's tip, a dispatch with
 # no green CI run, a commit off main, a missing tag and a tag that has left main. Each case runs
@@ -17,8 +17,8 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-ci-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-ci-runs-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-prod-apply.sh"
 

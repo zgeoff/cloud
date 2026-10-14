@@ -1,4 +1,4 @@
-# Tests the checks' shared test utilities: the shell helpers in scripts/test-lib that the checks
+# Tests the checks' shared test utilities: the shell helpers in test-support/shell that the checks
 # source (run-cases.sh and the assert_* helpers, by their own suites), and the Nix helpers and
 # stand-ins in nixos/checks/test-utils. The checks that use them build this first, so a broken
 # utility fails every check that relies on it instead of passing silently. The shell suites run
@@ -10,7 +10,7 @@
 { pkgs, imp }:
 let
   lib = pkgs.lib;
-  testLib = ../../scripts/test-lib;
+  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   collectCaseRejections = import ./test-utils/collect-case-rejections.nix { inherit lib; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
@@ -24,6 +24,28 @@ let
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
 
   cases = [
+    {
+      title = "it buildShellLibSource holds the shell helpers the checks read and no other file";
+      script = ''
+        ls -A ${testLib} > listing
+
+        assert_files_equal - listing <<'EOF'
+        assert-between.sh
+        assert-equals.sh
+        assert-files-equal.sh
+        assert-missing.sh
+        assert-not-equals.sh
+        run-cases.sh
+        test-assert-between.sh
+        test-assert-equals.sh
+        test-assert-files-equal.sh
+        test-assert-missing.sh
+        test-assert-not-equals.sh
+        test-run-cases.sh
+        wait-for.sh
+        EOF
+      '';
+    }
     {
       title = "it collectFailedAssertions lists the messages of the failing assertions, in order";
       script = ''
@@ -623,24 +645,24 @@ let
       '';
     }
     {
-      title = "it buildStubIntegritySqlite3 holds to scripts/copy-impd-db-host.sh: it checks the copy through SQLITE3";
+      title = "it buildStubIntegritySqlite3 holds to copy-impd-db-host: it checks the copy through SQLITE3";
       script = ''
-        sqlite=$(grep -cxF 'sqlite=''${SQLITE3:-$(nix build --no-link --print-out-paths nixpkgs#sqlite.bin)/bin/sqlite3}' \
-          ${../../scripts/copy-impd-db-host.sh} || true)
+        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' \
+          ${../packages/impd-db-tools/copy-impd-db-host.sh} || true)
         checked=$(grep -cxF 'integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")' \
-          ${../../scripts/copy-impd-db-host.sh} || true)
+          ${../packages/impd-db-tools/copy-impd-db-host.sh} || true)
 
         assert_equals 1 "$sqlite" "the host script's SQLITE3"
         assert_equals 1 "$checked" "the host script's integrity_check"
       '';
     }
     {
-      title = "it buildStubSqlite3 holds to scripts/restore-impd-db.sh: it checks the staged file through SQLITE3";
+      title = "it buildStubSqlite3 holds to restore-impd-db: it checks the staged file through SQLITE3";
       script = ''
-        staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
+        staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         checked=$(grep -cF '[ "$("$sqlite" "file:$staged?mode=ro&immutable=1" '"'"'PRAGMA integrity_check;'"'"')" = ok ]' \
-          ${../../scripts/restore-impd-db.sh} || true)
-        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../../scripts/restore-impd-db.sh} || true)
+          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
         assert_equals 1 "$staged" "the script's staged file"
         assert_equals 1 "$checked" "the script's checks of the staged file"
@@ -705,12 +727,12 @@ let
       '';
     }
     {
-      title = "it buildStubBlockingSqlite3 holds to scripts/restore-impd-db.sh: it checks the staged file through SQLITE3";
+      title = "it buildStubBlockingSqlite3 holds to restore-impd-db: it checks the staged file through SQLITE3";
       script = ''
-        staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
+        staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         checked=$(grep -cF '[ "$("$sqlite" "file:$staged?mode=ro&immutable=1" '"'"'PRAGMA integrity_check;'"'"')" = ok ]' \
-          ${../../scripts/restore-impd-db.sh} || true)
-        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../../scripts/restore-impd-db.sh} || true)
+          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
         assert_equals 1 "$staged" "the script's staged file"
         assert_equals 1 "$checked" "the script's checks of the staged file"
@@ -816,10 +838,10 @@ let
       title = "it buildStubSystemctl holds: systemctl prints its message, and the script reads each state through SYSTEMCTL";
       script = ''
         message=$(grep -laF 'Failed to get properties: %s' ${pkgs.systemd}/bin/systemctl ${pkgs.systemd}/lib/systemd/libsystemd-shared-*.so | wc -l)
-        systemctl=$(grep -cxF 'systemctl="''${SYSTEMCTL:-systemctl}"' ${../../scripts/restore-impd-db.sh} || true)
+        systemctl=$(grep -cxF 'systemctl="''${SYSTEMCTL:-systemctl}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         reads=$(grep -cxF '  unit_state="$("$systemctl" show -p ActiveState --value "$unit")" || fail "cannot read $unit'"'"'s state"' \
-          ${../../scripts/restore-impd-db.sh} || true)
-        units=$(grep -cxF 'units=(imp-host imp-docker-proxy)' ${../../scripts/restore-impd-db.sh} || true)
+          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        units=$(grep -cxF 'units=(imp-host imp-docker-proxy)' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
         assert_equals 1 "$message" "systemd's files that hold the message"
         assert_equals 1 "$systemctl" "the script's systemctl"
@@ -953,19 +975,19 @@ let
       '';
     }
     {
-      title = "it buildStubCmp holds to scripts/restore-impd-db.sh: it compares through CMP, the copy first in its two checks";
+      title = "it buildStubCmp holds to restore-impd-db: it compares through CMP, the copy first in its two checks";
       script = ''
-        cmp=$(grep -cxF 'cmp="''${CMP:-cmp}"' ${../../scripts/restore-impd-db.sh} || true)
-        mount=$(grep -cxF 'mnt="$(mktemp -d /run/impd-restore.XXXXXX)"' ${../../scripts/restore-impd-db.sh} || true)
-        db=$(grep -cxF 'db="$mnt/db"' ${../../scripts/restore-impd-db.sh} || true)
-        staged_file=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../../scripts/restore-impd-db.sh} || true)
+        cmp=$(grep -cxF 'cmp="''${CMP:-cmp}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        mount=$(grep -cxF 'mnt="$(mktemp -d /run/impd-restore.XXXXXX)"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        db=$(grep -cxF 'db="$mnt/db"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        staged_file=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         staged=$(grep -cxF '"$cmp" -s "$copy/imp.sqlite" "$staged" || fail "the staged file differs from the copy"' \
-          ${../../scripts/restore-impd-db.sh} || true)
+          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         published=$(grep -cxF '"$cmp" -s "$copy/imp.sqlite" "$db/imp.sqlite" || fail "the published database differs from the copy"' \
-          ${../../scripts/restore-impd-db.sh} || true)
+          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         saved=$(grep -cxF '    "$cmp" -s "$db/$file" "$saved/$file" || fail "the saved $file differs from the original"' \
-          ${../../scripts/restore-impd-db.sh} || true)
-        calls=$(grep -cF '"$cmp"' ${../../scripts/restore-impd-db.sh} || true)
+          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        calls=$(grep -cF '"$cmp"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
         assert_equals 1 "$cmp" "the script's cmp"
         assert_equals 1 "$mount" "the script's mount directory"
@@ -1129,14 +1151,14 @@ let
       '';
     }
     {
-      title = "it buildStubSleep holds to scripts/restore-impd-db.sh: its start loop pauses a second each try through the pause it is given";
+      title = "it buildStubSleep holds to restore-impd-db: its start loop pauses a second each try through the pause it is given";
       script = ''
-        sleep_cmd=$(grep -cxF 'start_sleep="''${IMPD_START_SLEEP:-sleep}"' ${../../scripts/restore-impd-db.sh} || true)
-        loop=$(grep -cxF 'for _ in $(seq "$start_wait"); do' ${../../scripts/restore-impd-db.sh} || true)
-        pause=$(grep -cxF '  "$start_sleep" 1' ${../../scripts/restore-impd-db.sh} || true)
-        pauses=$(grep -cF '"$start_sleep"' ${../../scripts/restore-impd-db.sh} || true)
+        sleep_cmd=$(grep -cxF 'start_sleep="''${IMPD_START_SLEEP:-sleep}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        loop=$(grep -cxF 'for _ in $(seq "$start_wait"); do' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        pause=$(grep -cxF '  "$start_sleep" 1' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        pauses=$(grep -cF '"$start_sleep"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         # a pause by name, outside a comment, would pass the stand-in by
-        direct=$(grep -cE '^[^#]*(^|[ ;&|(])sleep ' ${../../scripts/restore-impd-db.sh} || true)
+        direct=$(grep -cE '^[^#]*(^|[ ;&|(])sleep ' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
         assert_equals 1 "$sleep_cmd" "the script's sleep"
         assert_equals 1 "$loop" "the script's start loop"

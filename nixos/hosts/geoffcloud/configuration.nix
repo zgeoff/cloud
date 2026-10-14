@@ -1,7 +1,6 @@
 # geoffcloud: Onidel VM, Melbourne. 8 vCPU (EPYC 7513, nested KVM), 31 GiB RAM.
 # vda: root (disko.nix). vdb: imp's ZFS pool, imported, never formatted here.
 {
-  config,
   modulesPath,
   pkgs,
   ...
@@ -17,18 +16,6 @@ let
   k3sServiceCIDR = topology.k3s.serviceCIDR;
   # impd's API on the host's loopback, for the atc daemon's imp target and the health probe
   impdLoopbackURL = "http://127.0.0.1:${toString topology.imp.apiPort}";
-  # 1Password Connect for imps (GEO-120). The imp broker in imp-host forwards granted requests
-  # for op-connect.imp.internal to the relay below, on docker0's host address. imp-forward
-  # drops imp-host's traffic to the k3s ranges, so the container cannot reach the Service
-  # itself: the host dials its ClusterIP instead. The Service pins that ClusterIP
-  # (infra/onepassword-connect.ts).
-  connectRelayAddress = topology.docker.bridgeAddress;
-  connectRelayPort = 18081;
-  connectServiceAddress = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
-  # docker0's subnet. imp's module does not fix imp-host's address on it, so the rule below
-  # admits the whole subnet: every container on docker0, imp's docker proxy and image builds
-  # included, can reach the relay. Connect's read-only token still gates every request.
-  dockerSubnet = topology.docker.subnet;
   atc = pkgs.callPackage ../../packages/atc.nix { };
 in
 {
@@ -119,63 +106,31 @@ in
     '';
   };
 
-  # atc's daemon port, k3s pods only. tailscale0 is trusted above, so nixos-fw alone would
-  # accept the port from every tailnet device the policy lets reach geoffcloud (today every
-  # member, through autogroup:member -> *). This table narrows it to the gateway's path: the
-  # pod dials the host's tailnet address, so the packet enters on cni0 from a pod address,
-  # and local delivery skips flannel's masquerade in postrouting. Every other source, the
-  # tailnet and the host's own loopback included, is dropped. A drop in any input chain is
-  # final, and the accept here only passes the packet on to nixos-fw, which trusts cni0.
-  # Any pod on the host can still reach the port; the daemon's bearer token gates the rest.
-  networking.nftables.tables.cloud_host = {
-    family = "inet";
-    content = ''
-      chain input {
-        type filter hook input priority filter - 10; policy accept;
-        tcp dport ${toString atcDaemonPort} iifname "cni0" ip saddr ${k3sPodCIDR} ip daddr ${atcDaemonAddress} accept
-        tcp dport ${toString atcDaemonPort} drop
-        tcp dport ${toString connectRelayPort} iifname "docker0" ip saddr ${dockerSubnet} ip daddr ${connectRelayAddress} accept
-        tcp dport ${toString connectRelayPort} drop
-      }
-    '';
-  };
-
-  # The Connect relay's port, from docker0 only: nixos-fw does not trust docker0, and imp-host
-  # reaches the host there. The cloud_host rules above admit only docker0's subnet to it and
-  # drop the rest; as with the daemon's port, a drop in any input chain is final and the accept
-  # only passes the packet on to nixos-fw, which opens the port on docker0 alone.
-  networking.firewall.interfaces.docker0.allowedTCPPorts = [ connectRelayPort ];
-
-  # The relay: systemd holds the socket and starts the proxy on the first connection, so the
-  # socket can wait for docker0 (FreeBind) and the proxy dials the ClusterIP from the host.
-  # imp-host reaches the relay on docker0 only while imp's IPv6 mode is off: that mode moves
-  # imp-host to its own bridge, which neither nixos-fw nor cloud_host opens for the relay
-  assertions = [
+  # atc's daemon port, k3s pods only, in inet cloud_host (modules/cloud-host-firewall.nix).
+  # tailscale0 is trusted above, so nixos-fw alone would accept the port from every tailnet
+  # device the policy lets reach geoffcloud (today every member, through autogroup:member -> *).
+  # The admission narrows it to the gateway's path: the pod dials the host's tailnet address, so
+  # the packet enters on cni0 from a pod address, and local delivery skips flannel's masquerade
+  # in postrouting. Every other source, the tailnet and the host's own loopback included, is
+  # dropped; nixos-fw, which trusts cni0, accepts what the admission passes on. Any pod on the
+  # host can still reach the port; the daemon's bearer token gates the rest.
+  networking.cloudHost.admissions = [
     {
-      assertion = !(config.services.imp.ipv6.enable or false);
-      message = "the Connect relay assumes imp-host on docker0; services.imp.ipv6.enable moves it to br-imphost";
+      port = atcDaemonPort;
+      interface = "cni0";
+      sourceCIDR = k3sPodCIDR;
+      destinationAddress = atcDaemonAddress;
     }
   ];
-  systemd.sockets.onepassword-connect-relay = {
-    wantedBy = [ "sockets.target" ];
-    listenStreams = [ "${connectRelayAddress}:${toString connectRelayPort}" ];
-    socketConfig.FreeBind = true;
-  };
-  systemd.services.onepassword-connect-relay = {
-    serviceConfig = {
-      ExecStart = "${config.systemd.package}/lib/systemd/systemd-socket-proxyd ${connectServiceAddress}";
-      DynamicUser = true;
-      PrivateTmp = true;
-      ProtectSystem = "strict";
-      ProtectHome = true;
-      NoNewPrivileges = true;
-      RestrictAddressFamilies = [
-        "AF_INET"
-        "AF_INET6"
-        "AF_UNIX"
-      ];
-      CapabilityBoundingSet = "";
-    };
+
+  # 1Password Connect for imps, relayed from docker0 to the Service's pinned ClusterIP; the
+  # module admits docker0's subnet to the relay in cloud_host and opens its port on docker0
+  services.onepassword-connect-relay = {
+    enable = true;
+    address = topology.docker.bridgeAddress;
+    port = 18081;
+    allowedSubnet = topology.docker.subnet;
+    target = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
   };
 
   services.openssh = {
@@ -283,6 +238,8 @@ in
   environment.systemPackages = with pkgs; [
     # a patched copy for `atc daemon id`; the service runs the unpatched release
     (callPackage ../../packages/atc-interactive.nix { inherit atc; })
+    # copy-impd-db-host and restore-impd-db, for scripts/copy-impd-db.sh and the restore runbook
+    (callPackage ../../packages/impd-db-tools { })
     git
     htop
     k9s

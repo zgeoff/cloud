@@ -4,7 +4,7 @@
 # what the bump before it left, with no stdin to read the lines still to come; it runs every line
 # after a failed bump, marks that bump with an Actions error and then fails; and it fails without
 # BUMPS. bump-releases.sh runs from a copy in the case tree beside the bump-release.sh stand-in
-# (scripts/test-lib/create-stub-bump-release.sh). Each case runs it under `env -i` with git's
+# (test-support/shell/create-stub-bump-release.sh). Each case runs it under `env -i` with git's
 # global and system config off, and compares its whole stdout, stderr and the stand-in's log.
 #
 #   bash scripts/test-bump-releases.sh
@@ -12,8 +12,8 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-bump-release.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-bump-release.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bump-releases.sh"
 

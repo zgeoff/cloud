@@ -4,14 +4,14 @@
 # curl, with a stand-in curl that records its call (test-utils/build-stub-curl.nix) and answers
 # at once. Each case runs on its own, in a fresh directory, with its own stand-in on an ephemeral
 # port or its own call log, its own textfile directory, and the probe and stand-in under env -i
-# with a HOME and TMPDIR of their own, under scripts/test-lib/run-cases.sh, which reports each
+# with a HOME and TMPDIR of their own, under test-support/shell/run-cases.sh, which reports each
 # case and fails the check when any case fails.
 # Run: bun run test:nixos impd-local-health
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
-  testLib = ../../scripts/test-lib;
+  testLib = import ./test-utils/build-shell-lib-source.nix { inherit lib; };
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };

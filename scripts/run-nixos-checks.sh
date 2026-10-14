@@ -8,9 +8,9 @@
 # impd-restore and every other check named impd-restore-* boot a NixOS VM, so they need KVM:
 # unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the
 # script builds every other check it was asked for and then fails, naming those checks. Each such
-# check itself fails if QEMU still falls back to emulation. The checks read scripts/ beside
-# nixos/ (scripts/test-lib, and the scripts they test), so the build's flake source is the repo
-# root (path:.?dir=nixos), not nixos/ alone. The source is a snapshot of the working tree's
+# check itself fails if QEMU still falls back to emulation. The checks read test-support/shell
+# beside nixos/, so the build's flake source is the repo root (path:.?dir=nixos), not nixos/
+# alone. The source is a snapshot of the working tree's
 # tracked and unignored files, so a local edit is tested before it is committed and nothing
 # ignored, such as node_modules or .worktrees, is copied. The Docker
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it

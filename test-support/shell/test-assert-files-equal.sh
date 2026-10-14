@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Test for assert-files-equal.sh: assert_files_equal passes equal files silently and fails on
+# different ones, printing their diff.
+#
+#   bash test-support/shell/test-assert-files-equal.sh
+# shellcheck source-path=SCRIPTDIR
+set -euo pipefail
+umask 022
+source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-files-equal.sh"
+
+it_passes_silently_for_equal_files() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  printf 'x\n' > "$tree/a"
+  printf 'x\n' > "$tree/b"
+
+  assert_files_equal "$tree/a" "$tree/b" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_fails_for_different_files_printing_the_unified_diff() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  printf 'x\n' > "$tree/a"
+  printf 'y\n' > "$tree/b"
+  # the two header lines carry the files' modification times, pinned here and printed in UTC
+  touch -d '2026-01-02 03:04:05.000000006 UTC' "$tree/a"
+  touch -d '2026-07-08 09:10:11.000000012 UTC' "$tree/b"
+
+  TZ=UTC assert_files_equal "$tree/a" "$tree/b" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << EOF
+--- $tree/a	2026-01-02 03:04:05.000000006 +0000
++++ $tree/b	2026-07-08 09:10:11.000000012 +0000
+@@ -1 +1 @@
+-x
++y
+EOF
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+run_cases

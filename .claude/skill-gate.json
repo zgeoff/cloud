@@ -5,7 +5,7 @@
     { "match": "**/*.test.ts", "skills": ["testing", "project-testing"] },
     { "match": "**/*_test.go", "skills": ["testing", "project-testing"] },
     { "match": "**/test-*.sh", "skills": ["testing", "project-testing"] },
-    { "match": "scripts/test-lib/**", "skills": ["testing", "project-testing"] },
+    { "match": "test-support/shell/**", "skills": ["testing", "project-testing"] },
     { "match": "**/test-utils/**", "skills": ["testing", "project-testing"] },
     { "match": "nixos/checks/**", "skills": ["testing", "project-testing"] },
     { "match": "**/mocks/**", "skills": ["testing", "project-testing"] },

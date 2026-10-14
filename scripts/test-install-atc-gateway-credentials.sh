@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hermetic test for install-atc-gateway-credentials.sh. It touches no host, no 1Password
-# vault and no impd: op, atc-key and ssh are stand-ins from test-lib on this machine, and
+# vault and no impd: op, atc-key and ssh are stand-ins from test-support/shell on this machine, and
 # "the host" is a directory in the case's tree, where the ssh stand-in runs each remote
 # command it knows with stand-ins for docker (impd), install and curl first on PATH.
 # Every stand-in logs its argv as a JSON line. A failure that real state can reach runs
@@ -18,21 +18,21 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-one-of-outputs.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-missing.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/build-token.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-op.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-atc-key.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-host-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-imp-host-docker.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-host-install.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-impd-curl.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-stub-impd.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-stub-proxy.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/start-stub-resetting-listener.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-one-of-outputs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-missing.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/build-token.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-op.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-atc-key.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-host-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-imp-host-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-host-install.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-impd-curl.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/start-stub-impd.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/start-stub-proxy.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/start-stub-resetting-listener.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 it_skips_every_step_when_all_three_credentials_exist_and_match() {
   local seed="$1" good_token status=0
@@ -630,7 +630,7 @@ EOF
   }
 }
 
-# The real install on "the host" (test-lib/create-stub-host-install.sh drops only the
+# The real install on "the host" (test-support/shell/create-stub-host-install.sh drops only the
 # owner, which needs root), under a parent directory it may not write. coreutils 9.4 (CI's
 # ubuntu-24.04 runner image 20261004) and 9.11 word that failure differently, and the script
 # exits 1 after either, so the case accepts either whole output with that status.
@@ -3430,9 +3430,9 @@ EOF
   }
 }
 
-# Real curl against the impd and proxy stand-ins (test-lib/start-stub-impd.sh and
-# test-lib/start-stub-proxy.sh) under the hostile curl config whose controls are
-# test-lib/test-start-stub-proxy.sh's curlrc and noproxy-alone cases, set on "the host",
+# Real curl against the impd and proxy stand-ins (test-support/shell/start-stub-impd.sh
+# and test-support/shell/start-stub-proxy.sh) under the hostile curl config whose controls are
+# test-support/shell/test-start-stub-proxy.sh's curlrc and noproxy-alone cases, set on "the host",
 # where the remote curl runs: root's .curlrc, and CURL_HOME, XDG_CONFIG_HOME and every
 # proxy variable in its login environment. The token must reach impd's stand-in only, with
 # no proxy connection and no trace.
@@ -3738,7 +3738,7 @@ EOF
 # (vault/) and of "the host" (host/) with root's HOME on it (host/root/, which the ssh
 # stand-in runs each remote command with, made here so a case that makes host/ read-only
 # still has it), impd's state directory (impd/), and the stand-ins
-# from test-lib for op, ssh, and the host's docker (impd), install and curl, which log
+# from test-support/shell for op, ssh, and the host's docker (impd), install and curl, which log
 # each call's argv as a JSON line and end with exit 97 on a call they do not know.
 # host-bin-real-curl holds the same host stand-ins without curl, for the cases that run
 # the real one. Each of the three bin directories also gets fail-closed stand-ins for the

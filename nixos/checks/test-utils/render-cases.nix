@@ -1,4 +1,4 @@
-# Renders a check's cases as the it_ functions scripts/test-lib/run-cases.sh runs: each case's
+# Renders a check's cases as the it_ functions test-support/shell/run-cases.sh runs: each case's
 # script, run in a fresh directory of its own. A case is { title, script }; the title is the
 # case's name with spaces for underscores, as run_cases prints it, so it must start with "it "
 # and hold only letters, digits, spaces and , . / : -, and no two cases may share one. It throws

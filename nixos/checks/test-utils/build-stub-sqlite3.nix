@@ -5,9 +5,10 @@
 # runs the real sqlite3 with the same arguments. The holder forks from <dir>, so the mount is
 # busy by the time sqlite3 runs. Any other call is the real sqlite3 alone.
 #
-#   SQLITE3=<this> HOLDER_PID_FILE=/tmp/holder.pid bash restore-impd-db.sh ...
+#   SQLITE3=<this> HOLDER_PID_FILE=/tmp/holder.pid restore-impd-db ...
 #
-# What it assumes of scripts/restore-impd-db.sh, which nixos/checks/test-utils-check.nix pins:
+# What it assumes of restore-impd-db (nixos/packages/impd-db-tools), which
+# nixos/checks/test-utils-check.nix pins:
 # it stages the copy as db/imp.sqlite.restore inside the mount and checks it through $SQLITE3
 # with a file: URI. nixos/checks/test-utils-check.nix tests it.
 { pkgs }:

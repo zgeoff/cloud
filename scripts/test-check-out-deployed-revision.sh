@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for check-out-deployed-revision.sh: against a real git repository in the case tree and a
-# bun stand-in (scripts/test-lib/create-stub-prod-apply-bun.sh), it checks out the deployed
+# bun stand-in (test-support/shell/create-stub-prod-apply-bun.sh), it checks out the deployed
 # commit as a detached worktree in the runner's temp directory, points that checkout's .env at
 # the deploy vault, and installs its dependencies there; it stops with git's error on a commit
 # git cannot resolve, before the install on an env reference outside the cloud vault, with the
@@ -13,8 +13,8 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-prod-apply-bun.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-prod-apply-bun.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-out-deployed-revision.sh"
 

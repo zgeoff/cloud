@@ -4,8 +4,8 @@
 # pod's image, before the build or before the activation, never follows a failed build, and activates the exact store path the build
 # printed, built from the checked commit. Each case that switches commits its own
 # nixos/packages/atc.nix. It touches no host and runs no Nix: gh lists the
-# green runs (with none named, one for HEAD), and docker and ssh are stand-ins from test-lib that log
-# their argv as JSON lines (two cases hand them to the real docker and ssh, to fail on a
+# green runs (with none named, one for HEAD), and docker and ssh are stand-ins from test-support/shell that
+# log their argv as JSON lines (two cases hand them to the real docker and ssh, to fail on a
 # missing daemon socket and a refused loopback port), and each case runs the script in
 # its own temporary clone with its own origin, under `env -i` with only the variables it
 # sets. Each case compares the script's whole stdout, stderr and call log, masking only
@@ -17,14 +17,14 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/assert-one-of-outputs.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-nix-docker.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-nixos-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-racing-git.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-runs-gh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-one-of-outputs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nix-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nixos-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-racing-git.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository,
@@ -248,7 +248,7 @@ EOF
 
 # The script reads HEAD once, while it checks; a commit landing after that check must not
 # reach the build. Nothing but an interception lands it at that moment, so a git stand-in
-# (test-lib/create-stub-racing-git.sh) commits right after the check's last read
+# (test-support/shell/create-stub-racing-git.sh) commits right after the check's last read
 # (rev-parse origin/main) and logs that it did.
 it_builds_the_checked_commit_when_a_commit_lands_after_the_check() {
   local checked status=0
@@ -1266,7 +1266,8 @@ EOF
 # Boot data every case needs: a clone of a bare origin whose main holds one empty commit,
 # the script under test and the pin it reads copied into the clone untracked (they run from
 # there, and the check and the build ignore untracked files), and the docker and ssh stand-ins
-# (test-lib/create-stub-nix-docker.sh, test-lib/create-stub-nixos-ssh.sh), which log each
+# (test-support/shell/create-stub-nix-docker.sh, test-support/shell/create-stub-nixos-ssh.sh),
+# which log each
 # call's argv as a JSON line to STUB_LOG and end with exit 97 on a call they do not know;
 # fail-closed stand-ins for scp, sftp, rsync and tailscale; and a guard that ends the case
 # unless every remote tool resolves to a stand-in, so no call reaches a real host.

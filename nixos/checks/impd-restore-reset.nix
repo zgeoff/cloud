@@ -9,13 +9,13 @@
 # seccomp profile; and no holder, backup, restore error, pause log or restore directory left.
 #
 # Beside the hand-made states, the last subtests reach the reset from what a real run leaves: a
-# restore-impd-db.sh run that fails in its switch, and one killed with SIGKILL while it checks its
+# restore-impd-db run that fails in its switch, and one killed with SIGKILL while it checks its
 # staged copy, so its EXIT trap never unmounts tank/imp. A stand-in sqlite3 from test-utils
 # (build-stub-blocking-sqlite3.nix) blocks in that check and names itself in /tmp/holder.pid,
 # which is the test's signal to kill the script; the reset then ends the stand-in as it ends any
 # holder. The last two take the reset's own steps up to a point where an earlier reset could have
 # stopped: tank/imp destroyed and not yet made again, and every system profile link removed. It
-# needs KVM, and it reads scripts/ beside nixos/, so it builds only from the repo root: run
+# needs KVM, and it reads test-support/shell beside nixos/, so it builds only from the repo root: run
 # `bun run test:nixos impd-restore-reset`.
 { nixpkgs, imp }:
 let
@@ -696,7 +696,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           broken_before = ctx["broken_path"]
 
-          status_before, out_before = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
+          status_before, out_before = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
           err_before = machine.succeed("cat /tmp/restore.err").splitlines()
           saved_before = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
@@ -781,7 +781,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           # the stand-in writes /tmp/holder.pid once the script is inside the check of its staged copy
-          pid = machine.succeed("SQLITE3=${stubBlockingSqlite3} HOLDER_PID_FILE=/tmp/holder.pid bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 > /tmp/restore.err 2>&1 < /dev/null & echo $!").strip()
+          pid = machine.succeed("SQLITE3=${stubBlockingSqlite3} HOLDER_PID_FILE=/tmp/holder.pid restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 > /tmp/restore.err 2>&1 < /dev/null & echo $!").strip()
           machine.wait_until_succeeds("test -s /tmp/holder.pid")
           blocked = machine.succeed("cat /tmp/holder.pid").strip()
           machine.succeed(f"kill -KILL {pid}")

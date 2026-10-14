@@ -7,9 +7,10 @@
 # through rather than failing it. Without both variables it exits 2.
 #
 #   CMP=<this> FAIL_CMP_FIRST=/root/imp-db-backups/<copy>/imp.sqlite \
-#     FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite.restore' bash restore-impd-db.sh ...
+#     FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite.restore' restore-impd-db ...
 #
-# What it assumes of scripts/restore-impd-db.sh, which nixos/checks/test-utils-check.nix pins:
+# What it assumes of restore-impd-db (nixos/packages/impd-db-tools), which
+# nixos/checks/test-utils-check.nix pins:
 # it compares through $CMP with -s, the copy first, then the staged file or the published
 # database in db/ of a /run/impd-restore.XXXXXX mount, and each saved file second to its
 # original. nixos/checks/test-utils-check.nix tests it.

@@ -1,15 +1,16 @@
-# A restore rehearsal for scripts/restore-impd-db.sh in a NixOS VM: the machine, its reset and
-# its boot subtests are test-utils/build-restore-rehearsal.nix's. These subtests run the script
-# through the paths that real state reaches. Three run scripts/copy-impd-db-host.sh as
-# copy-impd-db.sh runs it on geoffcloud, against the real Docker and imp-host container, and one
+# A restore rehearsal for restore-impd-db (nixos/packages/impd-db-tools) in a NixOS VM: the
+# machine, its reset and its boot subtests are test-utils/build-restore-rehearsal.nix's, and the
+# VM has the packaged tools on PATH, as geoffcloud does. These subtests run the tool through the
+# paths that real state reaches. Three run copy-impd-db-host as scripts/copy-impd-db.sh runs it
+# on geoffcloud, against the real Docker and imp-host container, and one
 # restores the copy it takes. The stand-in imp-host has no tank/imp mount, so those subtests
 # write the database to its /var/lib/imp/db with docker cp.
 #
 # Stand-ins, from test-utils, beside the rehearsal's own: a sqlite3 that also holds the
 # restore's mount busy (build-stub-sqlite3.nix), and one whose integrity_check gives the real
 # report on a damaged index (build-stub-integrity-sqlite3.nix). Each subtest writes its own database, secret,
-# copy and COPY-INFO, so every subtest stands alone. It needs KVM, and it reads scripts/ beside
-# nixos/, so it builds only from the repo root: run `bun run test:nixos impd-restore`.
+# copy and COPY-INFO, so every subtest stands alone. It needs KVM, and it reads test-support/shell
+# beside nixos/, so it builds only from the repo root: run `bun run test:nixos impd-restore`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -44,7 +45,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           )
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -90,7 +91,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -137,7 +138,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("docker run -d --rm --name imp-host ${image29.ref} sleep infinity")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -183,7 +184,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/restore.err")
 
@@ -277,7 +278,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/restore.err")
 
@@ -371,7 +372,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/restore.err")
 
@@ -441,7 +442,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("bash -s -- pre-0.30 < ${../../scripts/copy-impd-db-host.sh} 2>/tmp/copy.err")
+          status, out = machine.execute("copy-impd-db-host pre-0.30 2>/tmp/copy.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/copy.err")
 
@@ -484,7 +485,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert work == "", f"imp-host's /tmp holds {work}"
 
 
-      with subtest("it restores a copy that copy-impd-db-host.sh took, from the COPY-INFO it wrote"):
+      with subtest("it restores a copy that copy-impd-db-host took, from the COPY-INFO it wrote"):
           ctx = setup_test()
           machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
           machine.succeed("install -d -m 0700 /mnt/imp/db")
@@ -498,11 +499,11 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           )
           machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
           machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
-          machine.succeed("bash -s -- pre-0.30 < ${../../scripts/copy-impd-db-host.sh}")
+          machine.succeed("copy-impd-db-host pre-0.30")
           copy = machine.succeed("ls -d /root/imp-db-backups/pre-0.30-*").strip()
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
-          status, out = machine.execute(f"SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} {copy} 3 2>/tmp/restore.err")
+          status, out = machine.execute(f"restore-impd-db {copy} 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 0, f"exit {status}: {out}{err}"
@@ -535,7 +536,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           # imp's module runs imp-host with --rm, so a stopped imp-host leaves no container
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
-          status, out = machine.execute("bash -s -- pre-0.30 < ${../../scripts/copy-impd-db-host.sh} 2>/tmp/copy.err")
+          status, out = machine.execute("copy-impd-db-host pre-0.30 2>/tmp/copy.err")
           err = machine.succeed("cat /tmp/copy.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -555,7 +556,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
           machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
 
-          status, out = machine.execute("SQLITE3=${stubIntegritySqlite3} bash -s -- pre-0.30 < ${../../scripts/copy-impd-db-host.sh} 2>/tmp/copy.err")
+          status, out = machine.execute("SQLITE3=${stubIntegritySqlite3} copy-impd-db-host pre-0.30 2>/tmp/copy.err")
           err = machine.succeed("cat /tmp/copy.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -601,7 +602,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/restore.err")
 
@@ -675,7 +676,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/restore.err")
 
@@ -751,13 +752,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh}  2>/tmp/restore.err")
+          tool = machine.succeed("command -v restore-impd-db").strip()
+          status, out = machine.execute("restore-impd-db 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
           assert out == "", out
-          # bash names the script and the line of the failed expansion, the script's first argument
-          assert err == "${../../scripts/restore-impd-db.sh}: line 20: 1: usage: restore-impd-db.sh /root/imp-db-backups/<copy> <generation>\n", err
+          # bash names the tool as PATH found it and the line of the failed expansion, the
+          # script's first argument, in the file writeShellApplication wrote
+          assert err == f"{tool}: line 28: 1: usage: restore-impd-db /root/imp-db-backups/<copy> <generation>\n", err
           units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
           backups = machine.succeed("ls -A /root/imp-db-backups").split()
@@ -795,7 +798,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -839,7 +842,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -882,7 +885,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -928,7 +931,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -974,7 +977,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1020,7 +1023,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1066,7 +1069,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 old 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 old 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1112,7 +1115,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 99 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 99 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1158,7 +1161,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1205,7 +1208,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("mount -t zfs tank/imp /mnt/imp")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1245,7 +1248,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("umount /mnt/imp")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1296,7 +1299,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop docker.socket docker.service")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1358,7 +1361,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1442,7 +1445,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=${stubSqlite3} HOLDER_PID_FILE=/tmp/holder.pid bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("SQLITE3=${stubSqlite3} HOLDER_PID_FILE=/tmp/holder.pid restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1517,7 +1520,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=${stubSqlite3} HOLDER_PID_FILE=/tmp/holder.pid bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("SQLITE3=${stubSqlite3} HOLDER_PID_FILE=/tmp/holder.pid restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -1594,7 +1597,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           # 0.29.0's imp-host
           machine.succeed(f"ln -sfn {ctx['old_path']} /run/current-system")
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"

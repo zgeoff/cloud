@@ -14,9 +14,9 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-checks-git.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-checks-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-checks-git.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-checks-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-nixos-checks.sh"

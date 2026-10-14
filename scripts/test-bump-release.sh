@@ -13,10 +13,10 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
-source "$scripts/test-lib/create-stub-release-gh.sh"
-source "$scripts/test-lib/create-stub-release-docker.sh"
-source "$scripts/test-lib/create-stub-release-curl.sh"
+source "$scripts/../test-support/shell/run-cases.sh"
+source "$scripts/../test-support/shell/create-stub-release-gh.sh"
+source "$scripts/../test-support/shell/create-stub-release-docker.sh"
+source "$scripts/../test-support/shell/create-stub-release-curl.sh"
 
 script="$scripts/bump-release.sh"
 source "$scripts/nix-image.sh"

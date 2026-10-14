@@ -2,7 +2,7 @@
 # Hermetic test for connect-k3s.sh: it reads the host's k3s kubeconfig, points its server
 # at the host's tailnet name, stores it in 1Password as a new document or over the stored
 # one, and adds the K3S_KUBECONFIG reference to .env once. It touches no host and no
-# 1Password vault: ssh and op are stand-ins from test-lib that log their argv as JSON lines,
+# 1Password vault: ssh and op are stand-ins from test-support/shell that log their argv as JSON lines,
 # "the host" is a directory in the case's tree, and the vault is a directory beside it.
 # Each case runs the script under `env -i` from its tree, with only the variables it sets,
 # and compares its whole stdout, stderr and call log, the stored document and .env, and its
@@ -14,11 +14,11 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-k3s-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-kubeconfig-op.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-k3s-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kubeconfig-op.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 it_stores_a_new_kubeconfig_with_the_tailnet_server_and_adds_its_reference_to_env() {
   local status=0

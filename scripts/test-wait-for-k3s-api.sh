@@ -10,9 +10,9 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-livez-curl.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-clock.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-livez-curl.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/wait-for-k3s-api.sh"
 
