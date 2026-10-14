@@ -42,9 +42,12 @@ async function readManifestDigest(
 
   const first = await sendManifestHead(url, undefined);
 
+  // another registry may name ghcr.io's realm in its challenge, and would get the pull token
+  const realmToken = location.host === 'ghcr.io' ? githubToken : undefined;
+
   const response =
     first.status === 401
-      ? await sendManifestHeadWithToken(url, first.headers.get('www-authenticate'), githubToken)
+      ? await sendManifestHeadWithToken(url, first.headers.get('www-authenticate'), realmToken)
       : first;
 
   return toRegistryAnswer(response.status, response.headers.get('docker-content-digest'));
@@ -107,7 +110,7 @@ async function readPullToken(
 
   // ghcr.io's realm takes a GitHub token as the password of basic auth, with any user name
   const headers: Readonly<Record<string, string>> =
-    githubToken !== undefined && url.host === 'ghcr.io'
+    githubToken !== undefined && url.protocol === 'https:' && url.host === 'ghcr.io'
       ? { authorization: `Basic ${btoa(`x:${githubToken}`)}` }
       : {};
 

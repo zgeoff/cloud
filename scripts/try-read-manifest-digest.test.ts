@@ -157,6 +157,62 @@ test("it never sends the GitHub token to another registry's realm", async () => 
   expect(realmAuthorizations).toStrictEqual([null]);
 });
 
+test("it never pays for a pull token with the GitHub token when another registry names ghcr.io's realm", async () => {
+  const realmAuthorizations: (string | null)[] = [];
+
+  server.use(
+    http.head(
+      'https://registry.example/v2/image/manifests/1.0.0',
+      () =>
+        new HttpResponse(null, {
+          status: 401,
+          headers: {
+            'www-authenticate':
+              'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:zgeoff/atc-gateway:pull"',
+          },
+        }),
+    ),
+    http.get('https://ghcr.io/token', (info) => {
+      realmAuthorizations.push(info.request.headers.get('authorization'));
+
+      return new HttpResponse(null, { status: 401 });
+    }),
+  );
+
+  const answer = await tryReadManifestDigest('registry.example/image', '1.0.0', 'gh-token-1');
+
+  expect(answer).toStrictEqual({ error: 'the token realm answered 401' });
+  expect(realmAuthorizations).toStrictEqual([null]);
+});
+
+test('it never sends the GitHub token to a ghcr.io realm over plain HTTP', async () => {
+  const realmAuthorizations: (string | null)[] = [];
+
+  server.use(
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/2.27.0',
+      () =>
+        new HttpResponse(null, {
+          status: 401,
+          headers: {
+            'www-authenticate':
+              'Bearer realm="http://ghcr.io/token",service="ghcr.io",scope="repository:zgeoff/atc-gateway:pull"',
+          },
+        }),
+    ),
+    http.get('http://ghcr.io/token', (info) => {
+      realmAuthorizations.push(info.request.headers.get('authorization'));
+
+      return new HttpResponse(null, { status: 401 });
+    }),
+  );
+
+  const answer = await tryReadManifestDigest('ghcr.io/zgeoff/atc-gateway', '2.27.0', 'gh-token-1');
+
+  expect(answer).toStrictEqual({ error: 'the token realm answered 401' });
+  expect(realmAuthorizations).toStrictEqual([null]);
+});
+
 test('it says the credential cannot read a manifest the registry refuses with its token', async () => {
   server.use(
     http.head(
