@@ -4,7 +4,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HttpResponse, http, passthrough } from 'msw';
+import { HttpResponse, http } from 'msw';
 import { checkImagePins } from './check-image-pins.ts';
 import { server } from './mocks/node.ts';
 
@@ -43,7 +43,7 @@ async function setupTest() {
   return { root, printOut, printErr };
 }
 
-test('it passes when every tag resolves to its pinned digest, asking once for a pin two files hold', async () => {
+test('it passes when a release tag names its pinned digest, asking once for a pin two files hold', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -59,11 +59,11 @@ test('it passes when every tag resolves to its pinned digest, asking once for a 
     `          image: ghcr.io/zgeoff/backup:1.0.0-r2@sha256:${'1'.repeat(64)}\n`,
   );
 
-  const accepts: (string | null)[] = [];
+  let requests = 0;
 
   server.use(
-    http.head('https://ghcr.io/v2/zgeoff/backup/manifests/1.0.0-r2', (info) => {
-      accepts.push(info.request.headers.get('accept'));
+    http.head('https://ghcr.io/v2/zgeoff/backup/manifests/1.0.0-r2', () => {
+      requests += 1;
 
       return new HttpResponse(null, {
         status: 200,
@@ -81,17 +81,14 @@ test('it passes when every tag resolves to its pinned digest, asking once for a 
   expect(exitCode).toBe(0);
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'check-image-pins: 2 pins of 1 tags agree with their registries\n',
+    'check-image-pins: 2 pins hold: 1 release tags name their pinned digests, and 0 upstream digests are still served\n',
   );
 
   expect(ctx.printErr).not.toHaveBeenCalled();
-
-  expect(accepts).toStrictEqual([
-    'application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.oci.image.manifest.v1+json',
-  ]);
+  expect(requests).toBe(1);
 });
 
-test('it fails a pin whose tag names another digest at the registry', async () => {
+test('it fails a release pin whose tag names another digest at the registry', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -125,37 +122,21 @@ test('it fails a pin whose tag names another digest at the registry', async () =
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
-test("it takes an anonymous pull token from the registry's Bearer challenge", async () => {
+test('it fails a release pin whose tag the registry does not have', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.root, 'scripts', 'nix-image.sh'),
-    `NIX_IMAGE='example/builder:2.30.0@sha256:${'4'.repeat(64)}'\n`,
+    join(ctx.root, 'images', 'agent', 'Dockerfile'),
+    `FROM ghcr.io/zgeoff/base:2.0.0@sha256:${'2'.repeat(64)}\n`,
   );
 
   server.use(
-    http.head('https://registry-1.docker.io/v2/example/builder/manifests/2.30.0', (info) =>
-      info.request.headers.get('authorization') === 'Bearer pull-token-7'
-        ? new HttpResponse(null, {
-            status: 200,
-            headers: { 'docker-content-digest': `sha256:${'4'.repeat(64)}` },
-          })
-        : new HttpResponse(null, {
-            status: 401,
-            headers: {
-              'www-authenticate':
-                'Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:example/builder:pull"',
-            },
-          }),
+    http.head('https://ghcr.io/v2/zgeoff/base/manifests/2.0.0', () =>
+      HttpResponse.json(
+        { errors: [{ code: 'MANIFEST_UNKNOWN', message: 'manifest unknown' }] },
+        { status: 404 },
+      ),
     ),
-    http.get('https://auth.docker.io/token', (info) => {
-      const query = new URL(info.request.url).searchParams;
-
-      return query.get('service') === 'registry.docker.io' &&
-        query.get('scope') === 'repository:example/builder:pull'
-        ? HttpResponse.json({ token: 'pull-token-7', access_token: 'pull-token-7' })
-        : HttpResponse.json({ errors: [{ code: 'DENIED' }] }, { status: 403 });
-    }),
   );
 
   const exitCode = await checkImagePins({
@@ -164,30 +145,37 @@ test("it takes an anonymous pull token from the registry's Bearer challenge", as
     printErr: ctx.printErr,
   });
 
-  expect(exitCode).toBe(0);
+  expect(exitCode).toBe(1);
 
-  expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'check-image-pins: 1 pins of 1 tags agree with their registries\n',
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: images/agent/Dockerfile: ghcr.io/zgeoff/base:2.0.0: the registry has no tag 2.0.0\n',
   );
-
-  expect(ctx.printErr).not.toHaveBeenCalled();
 });
 
-test("it asks Docker Hub's library namespace for an official image's tag", async () => {
+test('it passes an upstream pin whose tag moved, while the registry still serves its digest', async () => {
   const ctx = await setupTest();
 
   await writeFile(
     join(ctx.root, 'images', 'atc-gateway', 'versions.env'),
-    `RESTIC_IMAGE=alpine:3.20@sha256:${'5'.repeat(64)}\n`,
+    `BASE_IMAGE=gcr.io/distroless/cc:nonroot@sha256:${'6'.repeat(64)}\n`,
   );
 
+  // the publisher rebuilt nonroot, so the tag names a newer digest than the pin
   server.use(
     http.head(
-      'https://registry-1.docker.io/v2/library/alpine/manifests/3.20',
+      'https://gcr.io/v2/distroless/cc/manifests/nonroot',
       () =>
         new HttpResponse(null, {
           status: 200,
-          headers: { 'docker-content-digest': `sha256:${'5'.repeat(64)}` },
+          headers: { 'docker-content-digest': `sha256:${'8'.repeat(64)}` },
+        }),
+    ),
+    http.head(
+      `https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`,
+      () =>
+        new HttpResponse(null, {
+          status: 200,
+          headers: { 'docker-content-digest': `sha256:${'6'.repeat(64)}` },
         }),
     ),
   );
@@ -201,8 +189,42 @@ test("it asks Docker Hub's library namespace for an official image's tag", async
   expect(exitCode).toBe(0);
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'check-image-pins: 1 pins of 1 tags agree with their registries\n',
+    'check-image-pins: 1 pins hold: 0 release tags name their pinned digests, and 1 upstream digests are still served\n',
   );
+
+  expect(ctx.printErr).not.toHaveBeenCalled();
+});
+
+test('it fails an upstream pin whose digest the registry no longer serves', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'images', 'atc-gateway', 'versions.env'),
+    `BASE_IMAGE=gcr.io/distroless/cc:nonroot@sha256:${'6'.repeat(64)}\n`,
+  );
+
+  server.use(
+    http.head(`https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`, () =>
+      HttpResponse.json(
+        { errors: [{ code: 'MANIFEST_UNKNOWN', message: 'manifest unknown' }] },
+        { status: 404 },
+      ),
+    ),
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    `check-image-pins: images/atc-gateway/versions.env: gcr.io/distroless/cc:nonroot pins sha256:${'6'.repeat(64)}, which the registry no longer serves\n`,
+  );
+
+  expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
 test('it fails a pin whose registry answers with an error', async () => {
@@ -215,7 +237,7 @@ test('it fails a pin whose registry answers with an error', async () => {
 
   server.use(
     http.head(
-      'https://gcr.io/v2/distroless/cc/manifests/nonroot',
+      `https://gcr.io/v2/distroless/cc/manifests/sha256:${'6'.repeat(64)}`,
       () => new HttpResponse(null, { status: 503 }),
     ),
   );
@@ -229,36 +251,7 @@ test('it fails a pin whose registry answers with an error', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    "check-image-pins: nixos/hosts/geoffcloud/configuration.nix: cannot read gcr.io/distroless/cc:nonroot's digest: the registry answered 503\n",
-  );
-
-  expect(ctx.printOut).not.toHaveBeenCalled();
-});
-
-test('it fails a pin whose registry it cannot reach', async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    join(ctx.root, 'deploy', 'nixie', 'restore-job.yaml'),
-    `          image: 127.0.0.1:1/zgeoff/backup:1.0.0@sha256:${'7'.repeat(64)}\n`,
-  );
-
-  server.use(http.head('https://127.0.0.1:1/*', () => passthrough()));
-
-  const exitCode = await checkImagePins({
-    args: [ctx.root],
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
-  });
-
-  expect(exitCode).toBe(1);
-
-  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    expect.toSatisfy((text: string) =>
-      /^check-image-pins: deploy\/nixie\/restore-job\.yaml: cannot read 127\.0\.0\.1:1\/zgeoff\/backup:1\.0\.0's digest: .+\n$/u.test(
-        text,
-      ),
-    ),
+    `check-image-pins: nixos/hosts/geoffcloud/configuration.nix: gcr.io/distroless/cc:nonroot: cannot read gcr.io/distroless/cc@sha256:${'6'.repeat(64)}: the registry answered 503\n`,
   );
 
   expect(ctx.printOut).not.toHaveBeenCalled();
