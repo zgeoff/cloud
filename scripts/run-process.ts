@@ -11,10 +11,10 @@ export interface RunOptions {
   // the child gets SIGTERM after this long, as `timeout` sends it
   readonly timeoutMs?: number;
 
-  // the child gets SIGTERM when this aborts, which no timeout reports
+  // the child and its descendants get SIGTERM when this aborts, which no timeout reports
   readonly signal?: AbortSignal;
 
-  // the child gets SIGKILL when this aborts, for one that outlives its SIGTERM
+  // the child and its descendants get SIGKILL when this aborts, for one that outlives its SIGTERM
   readonly forceStop?: AbortSignal;
   readonly cwd?: string;
 
@@ -33,16 +33,16 @@ export interface RunResult {
 
 export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<RunResult>;
 
-// ten minutes, for a call that names no timeout of its own
-const defaultTimeoutMs = 600_000;
-
 // Runs one program with its argv as given: no shell parses it
 export async function runProcess(
   argv: readonly string[],
   options: Readonly<RunOptions> = {},
 ): Promise<RunResult> {
-  const timeoutMs = options.timeoutMs ?? defaultTimeoutMs;
-  const spawned = trySpawn(argv, options);
+  // A child that the caller can stop leads a process group of its own, so the stop reaches the
+  // descendants that hold its pipes. Any other child stays in this process's group, where a
+  // terminal's Ctrl-C reaches it.
+  const ownGroup = options.signal !== undefined || options.forceStop !== undefined;
+  const spawned = trySpawn(argv, options, ownGroup);
 
   if (spawned instanceof Error) {
     return {
@@ -53,63 +53,142 @@ export async function runProcess(
     };
   }
 
-  // the flag, not the signal, marks a timeout: a child can also die of its own SIGTERM
-  let timedOut = false;
-
-  const timer = setTimeout(() => {
-    timedOut = true;
-
-    spawned.kill('SIGTERM');
-  }, timeoutMs);
-
-  void subscribeToForceStop(spawned, options.forceStop);
+  const stops = subscribeToStops({ spawned, ownGroup }, options);
 
   const [stdout, stderr] = await Promise.all([
-    new Response(spawned.stdout).arrayBuffer(),
-    new Response(spawned.stderr).arrayBuffer(),
+    readPipe(spawned.stdout, stops.release),
+    readPipe(spawned.stderr, stops.release),
     spawned.exited,
   ]);
 
-  clearTimeout(timer);
+  stops.unsubscribe();
 
   return {
     exitCode: getExitCode(spawned),
-    stdout: Buffer.from(stdout),
-    stderr: Buffer.from(stderr),
-    timedOut,
+    stdout,
+    stderr,
+    timedOut: stops.hasTimedOut(),
   };
 }
 
-// sends the child SIGKILL when forceStop aborts, and stops listening once the child exits
-async function subscribeToForceStop(
-  spawned: Readonly<Pick<Bun.Subprocess, 'kill' | 'exited'>>,
-  forceStop: AbortSignal | undefined,
-) {
-  const onForceStop = () => {
-    spawned.kill('SIGKILL');
-  };
-
-  forceStop?.addEventListener('abort', onForceStop, { once: true });
-
-  await spawned.exited;
-
-  forceStop?.removeEventListener('abort', onForceStop);
-}
-
-function trySpawn(argv: readonly string[], options: Readonly<RunOptions>) {
+function trySpawn(argv: readonly string[], options: Readonly<RunOptions>, ownGroup: boolean) {
   try {
     return Bun.spawn([...argv], {
       stdin: options.stdin ?? 'ignore',
       stdout: 'pipe',
       stderr: 'pipe',
+
+      // Bun starts a detached child with setsid, which makes it the leader of a new group
+      detached: ownGroup,
       ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-      ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.env === undefined ? {} : { env: { ...options.env } }),
     });
   } catch (error) {
     // Bun throws when the program is missing, where bash prints "command not found"
     return error instanceof Error ? error : new Error(String(error));
   }
+}
+
+interface Child {
+  readonly spawned: Readonly<Pick<Bun.Subprocess, 'pid' | 'kill' | 'exited'>>;
+  readonly ownGroup: boolean;
+}
+
+// signals the child's whole group when it leads one, and the child alone otherwise
+function sendSignal(child: Readonly<Child>, signal: 'SIGTERM' | 'SIGKILL') {
+  if (!child.ownGroup) {
+    child.spawned.kill(signal);
+
+    return;
+  }
+
+  try {
+    process.kill(-child.spawned.pid, signal);
+  } catch {
+    // ESRCH: every process of the group has exited
+  }
+}
+
+// ten minutes, for a call that names no timeout of its own
+const defaultTimeoutMs = 600_000;
+
+// the group's pipes close as SIGKILL ends its processes; one still open this long after the child
+// exits belongs to a descendant that left the group
+const releaseDelayMs = 100;
+
+// Sends the group SIGTERM on the timeout or when signal aborts, and SIGKILL when forceStop aborts,
+// until the pipes close: a descendant that outlives the child holds them. release aborts after
+// SIGKILL to free the pipes that a descendant outside the group holds.
+function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>) {
+  const release = new AbortController();
+
+  // the flag, not the signal, marks a timeout: a child can also die of its own SIGTERM
+  let timedOut = false;
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+
+    sendSignal(child, 'SIGTERM');
+  }, options.timeoutMs ?? defaultTimeoutMs);
+
+  const onStop = () => {
+    sendSignal(child, 'SIGTERM');
+  };
+
+  const onForceStop = async () => {
+    sendSignal(child, 'SIGKILL');
+
+    await child.spawned.exited;
+
+    await Bun.sleep(releaseDelayMs);
+
+    release.abort();
+  };
+
+  subscribeToAbort(options.signal, onStop);
+  subscribeToAbort(options.forceStop, onForceStop);
+
+  return {
+    release: release.signal,
+    hasTimedOut: () => timedOut,
+    unsubscribe: () => {
+      clearTimeout(timer);
+      options.signal?.removeEventListener('abort', onStop);
+      options.forceStop?.removeEventListener('abort', onForceStop);
+    },
+  };
+}
+
+// runs listener now when signal has already aborted, and on its abort otherwise
+function subscribeToAbort(signal: AbortSignal | undefined, listener: () => unknown) {
+  if (signal?.aborted === true) {
+    listener();
+  } else {
+    signal?.addEventListener('abort', listener, { once: true });
+  }
+}
+
+// reads a pipe to its end, or to the point where release aborts
+async function readPipe(pipe: ReadableStream<Uint8Array>, release: AbortSignal) {
+  const reader = pipe.getReader();
+  const chunks: Uint8Array[] = [];
+
+  const onRelease = () => {
+    void reader.cancel();
+  };
+
+  subscribeToAbort(release, onRelease);
+
+  try {
+    // oxlint-disable-next-line no-await-in-loop -- each read waits for the chunk after the last
+    for (let read = await reader.read(); !read.done; read = await reader.read()) {
+      chunks.push(read.value);
+    }
+  } finally {
+    release.removeEventListener('abort', onRelease);
+  }
+
+  return Buffer.concat(chunks);
 }
 
 const signalNumbers: Readonly<Record<string, number>> = {

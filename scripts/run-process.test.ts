@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from './run-process.ts';
@@ -104,3 +104,75 @@ test('it runs the program in the directory and with only the environment it name
   expect(lines).toIncludeAllMembers(['RUN_PROCESS_TEST=set']);
   expect(lines.filter((line) => line.startsWith('HOME='))).toStrictEqual([]);
 });
+
+test('it sends SIGTERM to the program’s descendants when its signal aborts', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'run-process-'));
+
+  const pidFile = join(dir, 'pid');
+
+  onTestFinished(() => removeDescendant(dir, pidFile));
+
+  const controller = new AbortController();
+
+  // the grandchild holds the pipes, so without its SIGTERM the test times out
+  const running = runProcess(['bash', '-c', 'sleep 30 & echo $! > "$1"; wait', 'bash', pidFile], {
+    signal: controller.signal,
+  });
+
+  await waitForFile(pidFile);
+
+  controller.abort();
+
+  const result = await running;
+
+  expect(result.exitCode).toBe(143);
+});
+
+test('it stops reading the pipes that a descendant outside its group holds once forceStop kills the program', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'run-process-'));
+
+  const pidFile = join(dir, 'pid');
+
+  onTestFinished(() => removeDescendant(dir, pidFile));
+
+  const controller = new AbortController();
+
+  const running = runProcess(
+    ['bash', '-c', 'setsid sleep 30 & echo $! > "$1"; echo started; wait', 'bash', pidFile],
+    { forceStop: controller.signal },
+  );
+
+  await waitForFile(pidFile);
+
+  controller.abort();
+
+  const result = await running;
+
+  expect(result.exitCode).toBe(137);
+});
+
+// kills the descendant whose pid the file holds, should it outlive the test, and removes dir
+async function removeDescendant(dir: string, pidFile: string) {
+  const text = await readFile(pidFile, 'utf8').catch(() => '');
+
+  try {
+    process.kill(Number(text), 'SIGKILL');
+  } catch {
+    // the descendant has exited, or never started
+  }
+
+  await rm(dir, { recursive: true, force: true });
+}
+
+// polls until the program has written the file, which the test reads as its start
+async function waitForFile(path: string) {
+  for (let text = ''; text === ''; ) {
+    // oxlint-disable-next-line no-await-in-loop -- each poll waits for the one before it
+    text = await readFile(path, 'utf8').catch(() => '');
+
+    if (text === '') {
+      // oxlint-disable-next-line no-await-in-loop -- the pause sits between two polls
+      await Bun.sleep(10);
+    }
+  }
+}
