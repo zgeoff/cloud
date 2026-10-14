@@ -13,7 +13,7 @@ export interface StubCall {
 
   // the call's other options; its stdin is the text above, so a handler sees no Buffer, and no
   // stand-in runs a child that an abort signal could stop
-  readonly options: Readonly<Omit<RunOptions, 'stdin' | 'signal'>>;
+  readonly options: Readonly<Omit<RunOptions, 'stdin' | 'signal' | 'forceStop'>>;
 }
 
 export interface StubAnswer {
@@ -70,7 +70,7 @@ async function findAnswer(handlers: readonly StubHandler[], call: StubCall) {
 
 function toCallOptions(
   options: Readonly<RunOptions>,
-): Readonly<Omit<RunOptions, 'stdin' | 'signal'>> {
+): Readonly<Omit<RunOptions, 'stdin' | 'signal' | 'forceStop'>> {
   return {
     ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),

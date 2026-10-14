@@ -33,12 +33,16 @@ interface SignalSource {
 export interface InterruptTrapOptions extends ScriptIO {
   readonly signals: SignalSource;
   readonly exit: (code: number) => void;
+
+  // how long a command that traps SIGTERM gets to exit before it gets SIGKILL
+  readonly graceMs: number;
 }
 
 // the script's own process, which a script's entry point traps
 const processTrapOptions: InterruptTrapOptions = {
   signals: process,
   exit: (code) => process.exit(code),
+  graceMs: 5000,
   run: runProcess,
   printOut: (text) => {
     process.stdout.write(text);
@@ -48,22 +52,26 @@ const processTrapOptions: InterruptTrapOptions = {
   },
 };
 
-// The cleanup that `trap … EXIT` gave the shell scripts: on a signal, it kills the running command,
-// starts no later one, runs the registered steps newest first, and exits 128 plus the signal's
+// The cleanup that `trap … EXIT` gave the shell scripts: on a signal, it stops the running command,
+// waits for it to exit, runs the registered steps newest first, and exits 128 plus the signal's
 // number. A failed step prints why; a second signal changes nothing, so SIGKILL stops the cleanup.
 export function subscribeToInterrupts(
   options: Readonly<InterruptTrapOptions> = processTrapOptions,
 ): InterruptTrap {
-  const controller = new AbortController();
+  const commands: Commands = {
+    stop: new AbortController(),
+    force: new AbortController(),
+    active: new Set(),
+  };
 
   const steps: CleanupStep[] = [];
   const io: ScriptIO = { run: options.run, printOut: options.printOut, printErr: options.printErr };
 
   const listeners = interrupts.map((signal) => {
     const onInterrupt = () => {
-      if (!controller.signal.aborted) {
-        controller.abort();
-        void runCleanup({ ...options, io, steps }, signal);
+      if (!commands.stop.signal.aborted) {
+        commands.stop.abort();
+        void runCleanup({ ...options, io, steps, commands }, signal);
       }
     };
 
@@ -73,7 +81,7 @@ export function subscribeToInterrupts(
   });
 
   return {
-    run: makeParkingRunner(options.run, controller.signal),
+    run: makeParkingRunner(options.run, commands),
     printOut: options.printOut,
     printErr: options.printErr,
     registerCleanup: (step) => {
@@ -95,32 +103,57 @@ export function subscribeToInterrupts(
   };
 }
 
-// The runner for the script's own steps. An interrupt kills the command that runs, and the script
+// the script's own commands: stop sends them SIGTERM, force sends them SIGKILL, and active holds
+// each one until it exits
+interface Commands {
+  readonly stop: AbortController;
+  readonly force: AbortController;
+  readonly active: Set<Promise<RunResult>>;
+}
+
+// The runner for the script's own steps. An interrupt stops the command that runs, and the script
 // parks at it, or at the next command it starts, until the cleanup exits the process.
-function makeParkingRunner(run: Runner, signal: AbortSignal): Runner {
+function makeParkingRunner(run: Runner, commands: Readonly<Commands>): Runner {
   const parked = Promise.withResolvers<RunResult>().promise;
 
   return async (argv, options = {}) => {
-    if (signal.aborted) {
+    if (commands.stop.signal.aborted) {
       return parked;
     }
 
-    const result = await run(argv, { ...options, signal });
+    const running = run(argv, {
+      ...options,
+      signal: commands.stop.signal,
+      forceStop: commands.force.signal,
+    });
 
-    return signal.aborted ? parked : result;
+    commands.active.add(running);
+
+    try {
+      const result = await running;
+
+      return commands.stop.signal.aborted ? parked : result;
+    } finally {
+      commands.active.delete(running);
+    }
   };
 }
 
 interface Cleanup {
   readonly io: Readonly<ScriptIO>;
   readonly steps: CleanupStep[];
+  readonly commands: Readonly<Commands>;
+  readonly graceMs: number;
   readonly exit: (code: number) => void;
 }
 
-// a step that registers while the cleanup runs, such as one whose mkdtemp was in flight, still
-// runs, so the loop takes the newest step until none is left
+// A step that registers while the cleanup runs, such as one whose mkdtemp was in flight, still
+// runs, so the loop takes the newest step until none is left. No step starts while a command of
+// the script runs, since a command that traps SIGTERM can still read what a step removes.
 async function runCleanup(cleanup: Readonly<Cleanup>, signal: Interrupt) {
   cleanup.io.printErr(`stopped by ${signal}; cleaning up\n`);
+
+  await waitForCommands(cleanup);
 
   for (let step = cleanup.steps.pop(); step !== undefined; step = cleanup.steps.pop()) {
     // oxlint-disable-next-line no-await-in-loop -- each step undoes what the steps after it built on
@@ -128,6 +161,27 @@ async function runCleanup(cleanup: Readonly<Cleanup>, signal: Interrupt) {
   }
 
   cleanup.exit(128 + constants.signals[signal]);
+}
+
+// gives the commands graceMs to exit on their SIGTERM, then sends SIGKILL to each one left
+async function waitForCommands(cleanup: Readonly<Cleanup>) {
+  const exited = Promise.allSettled(cleanup.commands.active);
+  const timer = Promise.withResolvers<'timeout'>();
+
+  const timeout = setTimeout(() => {
+    timer.resolve('timeout');
+  }, cleanup.graceMs);
+
+  const first = await Promise.race([exited, timer.promise]);
+
+  clearTimeout(timeout);
+
+  if (first === 'timeout') {
+    cleanup.io.printErr(`a command outlived SIGTERM by ${cleanup.graceMs} ms; killing it\n`);
+    cleanup.commands.force.abort();
+
+    await exited;
+  }
 }
 
 async function tryCleanupStep(io: Readonly<ScriptIO>, step: CleanupStep) {

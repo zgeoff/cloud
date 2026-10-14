@@ -66,6 +66,21 @@ test('it stops a program with SIGTERM when its signal aborts, and reports no tim
   expect(result.timedOut).toBe(false);
 });
 
+test('it stops a program that ignores SIGTERM with SIGKILL when its forceStop aborts', async () => {
+  const controller = new AbortController();
+
+  const running = runProcess(['bash', '-c', 'trap "" TERM; while :; do sleep 0.05; done'], {
+    forceStop: controller.signal,
+  });
+
+  controller.abort();
+
+  const result = await running;
+
+  expect(result.exitCode).toBe(137);
+  expect(result.timedOut).toBe(false);
+});
+
 test('it reports a program that dies of its own SIGTERM as no timeout', async () => {
   const result = await runProcess(['bash', '-c', 'kill -TERM $$'], { timeoutMs: 60_000 });
 

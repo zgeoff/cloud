@@ -2,6 +2,10 @@
 /* oxlint-disable max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
+import { existsSync } from 'node:fs';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { ExitError } from './exit-error.ts';
 import type { RunResult, Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
@@ -10,6 +14,9 @@ import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 interface TestConfig {
   readonly run: Runner;
+
+  // a script's grace when unset
+  readonly graceMs?: number;
 }
 
 // a trap over an emitter that stands in for process, with recorders for stderr and the exit
@@ -28,6 +35,7 @@ function setupTest(config: TestConfig) {
   const trap = subscribeToInterrupts({
     signals,
     exit,
+    graceMs: config.graceMs ?? 5000,
     run: config.run,
     printOut: () => {},
     printErr: (text) => {
@@ -111,11 +119,9 @@ test('it never hands the script the result of a command that ends after an inter
   const ctx = setupTest({ run: stub.run });
   const settled = mock();
 
-  // the cleanup ends only once the command has ended and every callback it queued has run
+  // the cleanup ends only once every callback that the command's end queued has run
   ctx.trap.registerCleanup(async () => {
     const drained = Promise.withResolvers<undefined>();
-
-    answered.resolve(undefined);
 
     setImmediate(drained.resolve);
 
@@ -129,10 +135,111 @@ test('it never hands the script the result of a command that ends after an inter
   })();
 
   ctx.signals.emit('SIGTERM');
+  answered.resolve(undefined);
 
   await ctx.exited;
 
   expect(settled).not.toHaveBeenCalled();
+});
+
+test('it waits for a command that traps SIGTERM to exit before it runs the steps', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
+
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
+  const work = join(dir, 'work');
+  const fifo = join(dir, 'trapped');
+  const copied = join(dir, 'copied');
+
+  await mkdir(work);
+  await writeFile(join(work, 'src'), 'the archived scripts\n');
+  await runProcess(['mkfifo', fifo]);
+
+  const ended = Promise.withResolvers<RunResult>();
+
+  const ctx = setupTest({
+    // RunOptions carries stdin as a Buffer, which has no readonly form
+    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
+    run: async (argv, options) => {
+      const result = await runProcess(argv, options);
+
+      ended.resolve(result);
+
+      return result;
+    },
+  });
+
+  ctx.trap.registerCleanup(() => rm(work, { recursive: true, force: true }));
+
+  // The child reads the work tree 0.3 s after its SIGTERM, as a check that cleans up on its own
+  // signal does, so a cleanup that did not wait would remove the tree first.
+  const trapped =
+    'trap \'sleep 0.3; cat "$1/src" > "$2"; exit 0\' TERM; echo > "$3"; while :; do sleep 0.05; done';
+
+  void ctx.trap.run(['bash', '-c', trapped, 'bash', work, copied, fifo]);
+
+  await readFile(fifo);
+
+  ctx.signals.emit('SIGTERM');
+
+  const exitCode = await ctx.exited;
+  const result = await ended.promise;
+  const text = await readFile(copied, 'utf8');
+
+  expect(exitCode).toBe(143);
+  expect(result.exitCode).toBe(0);
+  expect(text).toBe('the archived scripts\n');
+  expect(existsSync(work)).toBe(false);
+});
+
+test('it sends SIGKILL to a command that outlives its SIGTERM by the grace, then runs the steps', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
+
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
+  const fifo = join(dir, 'trapped');
+
+  await runProcess(['mkfifo', fifo]);
+
+  const ended = Promise.withResolvers<RunResult>();
+
+  const ctx = setupTest({
+    graceMs: 50,
+
+    // RunOptions carries stdin as a Buffer, which has no readonly form
+    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
+    run: async (argv, options) => {
+      const result = await runProcess(argv, options);
+
+      ended.resolve(result);
+
+      return result;
+    },
+  });
+
+  const ran: string[] = [];
+
+  ctx.trap.registerCleanup(() => ran.push('remove the work directory'));
+
+  const ignoring = 'trap "" TERM; echo > "$1"; while :; do sleep 0.05; done';
+
+  void ctx.trap.run(['bash', '-c', ignoring, 'bash', fifo]);
+
+  await readFile(fifo);
+
+  ctx.signals.emit('SIGTERM');
+
+  const exitCode = await ctx.exited;
+  const result = await ended.promise;
+
+  expect(exitCode).toBe(143);
+  expect(result.exitCode).toBe(137);
+  expect(ran).toStrictEqual(['remove the work directory']);
+
+  expect(ctx.err).toStrictEqual([
+    'stopped by SIGTERM; cleaning up\n',
+    'a command outlived SIGTERM by 50 ms; killing it\n',
+  ]);
 });
 
 test('it gives each step a runner that still runs commands after the interrupt', async () => {
