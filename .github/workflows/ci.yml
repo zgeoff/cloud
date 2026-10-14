@@ -99,6 +99,14 @@ jobs:
       - name: Topology
         run: bun run check:topology
 
+      # each image pin's tag still names its pinned digest at the registry
+      - name: Image pins
+        run: bun run check:image-pins
+
+      # each restore Job's YAML is its backup pod builder's output
+      - name: Restore jobs
+        run: bun run check:restore-job
+
       - name: Typecheck
         run: bun run typecheck
 
