@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 
-test("it runs the mounted script's backup on nixie's claim as nixie's own user", () => {
+test("it runs the mounted script's backup on nixie's claim as nixie's own user, pulling the private image with the pull Secret", () => {
   expect(
     buildNixieBackupPodSpec({
       image:
@@ -9,6 +9,7 @@ test("it runs the mounted script's backup on nixie's claim as nixie's own user",
       claim: 'data-nixie-0',
       scriptConfigMap: 'nixie-backup-script',
       envSecret: 'nixie-backup',
+      pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
     restartPolicy: 'OnFailure',
@@ -20,6 +21,7 @@ test("it runs the mounted script's backup on nixie's claim as nixie's own user",
       seccompProfile: { type: 'RuntimeDefault' },
     },
     automountServiceAccountToken: false,
+    imagePullSecrets: [{ name: 'ghcr-pull' }],
     containers: [
       {
         name: 'backup',

@@ -22,6 +22,9 @@ interface GatewaySpecInputs {
   readonly claim: Output<string>;
   readonly tokens: Output<string>;
   readonly registry: Output<string>;
+
+  // the dockerconfigjson Secret that pulls the private image
+  readonly pullSecret: Output<string>;
 }
 
 // The gateway's Deployment spec: `serve` keeps gateway.db/mcp-auth.db in --state-dir and
@@ -39,6 +42,7 @@ export function buildATCGatewaySpec(inputs: GatewaySpecInputs): input.apps.v1.De
       spec: {
         securityContext: buildATCPodSecurity(),
         automountServiceAccountToken: false,
+        imagePullSecrets: [{ name: inputs.pullSecret }],
         containers: [buildGatewayContainer(inputs)],
         volumes: [
           { name: 'state', persistentVolumeClaim: { claimName: inputs.claim } },

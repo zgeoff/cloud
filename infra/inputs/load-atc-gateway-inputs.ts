@@ -1,6 +1,7 @@
 import { secret } from '@pulumi/pulumi';
 import { findResticBackup } from './find-restic-backup.ts';
 import { requireATCGatewayInputs } from './require-atc-gateway-inputs.ts';
+import { requireGHCRPullCredential } from './require-ghcr-pull-credential.ts';
 import type {
   ATCGatewayBackupSecrets,
   ATCGatewayInputs,
@@ -9,8 +10,8 @@ import type {
 } from './types.ts';
 
 // The gateway's inputs, or nothing while atcGateway is unset (setting it approves the deploy).
-// Secrets come from .env's op:// references: ATC_GATEWAY_TOKEN_<NAME> per daemon plus the
-// backup's ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_* values.
+// Secrets come from .env's op:// references: GHCR_PULL_* for the private images,
+// ATC_GATEWAY_TOKEN_<NAME> per daemon, and the backup's ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_*.
 export function loadATCGatewayInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
@@ -23,12 +24,14 @@ export function loadATCGatewayInputs(
   }
 
   const checked = requireATCGatewayInputs(raw, env);
+  const pull = requireGHCRPullCredential(env);
   const backup = findBackupSecrets(env);
 
   return {
     atcGateway: {
       config: checked.config,
       secrets: {
+        pullCredential: { username: pull.username, token: secret(pull.token) },
         tokens: Object.fromEntries(
           Object.entries(checked.tokens).map(([name, token]) => [name, secret(token)]),
         ),

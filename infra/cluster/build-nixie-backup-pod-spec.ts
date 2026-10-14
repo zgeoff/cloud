@@ -12,6 +12,9 @@ interface NixieBackupPodInputs {
 
   // the Secret with restic's and R2's environment
   readonly envSecret: string;
+
+  // the dockerconfigjson Secret that pulls the private backup image
+  readonly pullSecret: string;
 }
 
 // The backup Job's pod: deploy/nixie/backup/backup.sh's `backup`, run in the backup image with
@@ -28,6 +31,7 @@ export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs) {
       seccompProfile: { type: 'RuntimeDefault' },
     },
     automountServiceAccountToken: false,
+    imagePullSecrets: [{ name: inputs.pullSecret }],
     containers: [
       {
         name: 'backup',

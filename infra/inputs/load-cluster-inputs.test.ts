@@ -80,6 +80,8 @@ test('it loads the gateway from the same stack config and environment when atcGa
       K3S_KUBECONFIG: 'apiVersion: v1',
       ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
       ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
     }),
   ).toStrictEqual({
     kubeconfig: 'apiVersion: v1',
@@ -87,6 +89,10 @@ test('it loads the gateway from the same stack config and environment when atcGa
     atcGateway: {
       config,
       secrets: {
+        pullCredential: {
+          username: 'octo-puller',
+          token: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+        },
         tokens: { geoffcloud: expect.toSatisfy((value: unknown) => Output.isInstance(value)) },
       },
     },
@@ -104,7 +110,7 @@ test('it checks the Connect credentials before the gateway, so a missing file fa
   );
 });
 
-test("it runs nixie's backup in the gateway's backup image", () => {
+test("it runs nixie's backup in the gateway's backup image, pulled with the gateway's credential", () => {
   const config = buildMockATCGatewayConfig({
     backupImage:
       'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
@@ -128,6 +134,8 @@ test("it runs nixie's backup in the gateway's backup image", () => {
       K3S_KUBECONFIG: 'apiVersion: v1',
       ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
       ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
       NIXIE_AGE_HOST_KEY: 'AGE-SECRET-KEY-1QQQ',
       NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
       CLOUDFLARE_API_TOKEN: 'cf-token',
@@ -138,6 +146,13 @@ test("it runs nixie's backup in the gateway's backup image", () => {
       NIXIE_R2_BUCKET: 'nixie-backups',
     },
   );
+
+  expect(inputs?.atcGateway?.secrets.pullCredential).toStrictEqual({
+    username: 'octo-puller',
+    token: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
+  });
+
+  expect(inputs?.nixie?.backup?.pullCredential).toBe(inputs?.atcGateway?.secrets.pullCredential);
 
   expect(inputs?.nixie?.backup?.image).toBe(
     'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',

@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { Output, isSecret } from '@pulumi/pulumi';
+import { Output, isSecret, secret } from '@pulumi/pulumi';
 import { buildStubConfig } from '../test-utils/build-stub-config.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { loadNixieInputs } from './load-nixie-inputs.ts';
@@ -13,7 +13,14 @@ test('it returns nothing while the stack config leaves nixie out', () => {
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toStrictEqual({});
 });
@@ -37,7 +44,14 @@ test('it returns the pinned images, the host name and the 3 secrets when nixie i
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toStrictEqual({
     nixie: {
@@ -77,7 +91,14 @@ test.each([
       NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
       CLOUDFLARE_API_TOKEN: 'cf-token',
     },
-    'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    {
+      reference:
+        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      pullCredential: {
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
+      },
+    },
   );
 
   if (inputs.nixie === undefined) {
@@ -137,7 +158,14 @@ test('it throws when a nixie secret holds only whitespace', () => {
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toThrowWithMessage(
     Error,
@@ -171,7 +199,14 @@ test.each([
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toThrowWithMessage(Error, `stack config "nixie.${key}" must name an image by tag and digest`);
 });
@@ -198,12 +233,24 @@ test.each([
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toThrowWithMessage(Error, 'stack config "nixie.hostname" must name a host under geoff.cloud');
 });
 
-test('it returns the backup with its pinned image when every NIXIE backup variable is set', () => {
+test("it returns the backup with its pinned image and the gateway's pull credential when every NIXIE backup variable is set", () => {
+  const pullCredential = {
+    username: 'octo-puller',
+    token: secret('ghp_fake0token0for0tests0only0000000000'),
+  };
+
   const stackConfig = buildStubConfig({
     nixie: JSON.stringify({
       image:
@@ -227,11 +274,16 @@ test('it returns the backup with its pinned image when every NIXIE backup variab
         NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
         NIXIE_R2_BUCKET: 'nixie-backups',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential,
+      },
     ).nixie?.backup,
   ).toStrictEqual({
     image:
       'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    pullCredential,
     secrets: {
       repository: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
       password: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
@@ -267,7 +319,14 @@ test.each([
       NIXIE_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
       NIXIE_R2_BUCKET: 'nixie-backups',
     },
-    'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    {
+      reference:
+        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      pullCredential: {
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
+      },
+    },
   );
 
   if (inputs.nixie?.backup === undefined) {
@@ -297,7 +356,14 @@ test('it returns no backup when no NIXIE backup variable is set, even with a bac
       NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
       CLOUDFLARE_API_TOKEN: 'cf-token',
     },
-    'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+    {
+      reference:
+        'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      pullCredential: {
+        username: 'octo-puller',
+        token: secret('ghp_fake0token0for0tests0only0000000000'),
+      },
+    },
   );
 
   expect(inputs.nixie).not.toContainKey('backup');
@@ -352,7 +418,14 @@ test('it throws when the stack config still sets nixie.backupImage', () => {
         NIXIE_DEFINITIONS_DEPLOY_KEY: 'deploy-key',
         CLOUDFLARE_API_TOKEN: 'cf-token',
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toThrowWithMessage(
     Error,
@@ -378,7 +451,14 @@ test('it throws, naming the gap, when the nixie backup variables are partial', (
         CLOUDFLARE_API_TOKEN: 'cf-token',
         NIXIE_RESTIC_PASSWORD: 'p'.repeat(32),
       },
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toThrowWithMessage(
     Error,

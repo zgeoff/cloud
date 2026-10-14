@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { atcGatewayConfigSchema } from '../inputs/index.ts';
 import { buildATCGatewayBackupPodSpec } from './build-atc-gateway-backup-pod-spec.ts';
+import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 import { buildRestoreJob } from './build-restore-job.ts';
 
@@ -129,8 +130,9 @@ function renderGeneratedNote(builder: string): string {
 `;
 }
 
-// Each restore Job, named as the backup CronJob's claim, Secret and ConfigMap are named in infra
-// (atc-gateway.ts, create-atc-gateway-backup-job.ts and create-nixie-backup-job.ts)
+// Each restore Job, named as the backup CronJob's claim, Secrets and ConfigMap are named in infra
+// (atc-gateway.ts, create-atc-gateway-backup-job.ts, create-nixie-backup-job.ts and
+// build-ghcr-pull-secret-args.ts)
 function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
   return [
     {
@@ -147,6 +149,7 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
           image: backupImage,
           claim: 'atc-gateway-state',
           envSecret: 'atc-gateway-backup',
+          pullSecret: ghcrPullSecretName,
         }),
       }),
     },
@@ -168,6 +171,7 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
           claim: 'data-nixie-0',
           scriptConfigMap: 'nixie-backup-script',
           envSecret: 'nixie-backup',
+          pullSecret: ghcrPullSecretName,
         }),
       }),
     },

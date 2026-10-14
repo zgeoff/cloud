@@ -2,9 +2,10 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildATCGatewayBackupPodSpec } from './build-atc-gateway-backup-pod-spec.ts';
 
-test("it mounts the gateway's claim at STATE_DIR and runs the backup as the gateway's non-root user", () => {
+test("it mounts the gateway's claim at STATE_DIR, runs the backup as the gateway's non-root user, and pulls the private image with the pull Secret", () => {
   const claim = output('atc-gateway-state');
   const envSecret = output('atc-gateway-backup');
+  const pullSecret = output('ghcr-pull');
 
   expect(
     buildATCGatewayBackupPodSpec({
@@ -12,6 +13,7 @@ test("it mounts the gateway's claim at STATE_DIR and runs the backup as the gate
         'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
       claim,
       envSecret,
+      pullSecret,
     }),
   ).toStrictEqual({
     restartPolicy: 'OnFailure',
@@ -23,6 +25,7 @@ test("it mounts the gateway's claim at STATE_DIR and runs the backup as the gate
       seccompProfile: { type: 'RuntimeDefault' },
     },
     automountServiceAccountToken: false,
+    imagePullSecrets: [{ name: pullSecret }],
     containers: [
       {
         name: 'backup',

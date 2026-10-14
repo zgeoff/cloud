@@ -23,6 +23,7 @@ import {
 import { buildATCGatewayTokenData } from './build-atc-gateway-token-data.ts';
 import { buildServiceURL } from './build-service-url.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
+import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
 // daemons (docs/architecture/workloads/atc-gateway.md). Off until the stack config sets
@@ -65,6 +66,7 @@ export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): A
       namespace: ns.metadata.name,
       claim,
       image: inputs.config.backupImage,
+      pullSecret: objects.pullSecret,
       secrets: inputs.secrets.backup,
     });
   }
@@ -124,7 +126,11 @@ function createConfigObjects(
   cluster: Provider,
   namespace: Output<string>,
   inputs: ATCGatewayInputs,
-): { readonly tokens: Output<string>; readonly registry: Output<string> } {
+): {
+  readonly tokens: Output<string>;
+  readonly registry: Output<string>;
+  readonly pullSecret: Output<string>;
+} {
   const tokens = new Secret(
     'atc-gateway-daemon-tokens',
     {
@@ -151,5 +157,15 @@ function createConfigObjects(
     { provider: cluster },
   );
 
-  return { tokens: tokens.metadata.name, registry: registry.metadata.name };
+  const pull = createGHCRPullSecret(cluster, {
+    resourceName: 'atc-ghcr-pull',
+    namespace,
+    credential: inputs.secrets.pullCredential,
+  });
+
+  return {
+    tokens: tokens.metadata.name,
+    registry: registry.metadata.name,
+    pullSecret: pull.metadata.name,
+  };
 }

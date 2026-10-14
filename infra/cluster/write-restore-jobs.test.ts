@@ -81,6 +81,8 @@ test("it writes the gateway's restore Job from its backup pod and the stack's ba
               seccompProfile:
                 type: RuntimeDefault
             automountServiceAccountToken: false
+            imagePullSecrets:
+              - name: ghcr-pull
             containers:
               - name: restore
                 image: ghcr.io/zgeoff/atc-gateway-backup:9.0.0-r3@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -169,6 +171,8 @@ test("it writes nixie's restore Job from its backup pod and the stack's backup i
             seccompProfile:
               type: RuntimeDefault
           automountServiceAccountToken: false
+          imagePullSecrets:
+            - name: ghcr-pull
           containers:
             - name: restore
               image: ghcr.io/zgeoff/atc-gateway-backup:9.0.0-r3@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb

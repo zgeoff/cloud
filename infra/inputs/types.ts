@@ -30,9 +30,24 @@ export interface ATCGatewayBackupSecrets {
   readonly secretAccessKey: Output<string>;
 }
 
+// the GitHub login and classic read:packages token k3s pulls the private GHCR images with
+export interface GHCRPullCredential {
+  readonly username: string;
+  readonly token: Output<string>;
+}
+
+// the one backup image, atcGateway.backupImage, and the credential that pulls it
+export interface BackupImage {
+  readonly reference: string;
+  readonly pullCredential: GHCRPullCredential;
+}
+
 export interface ATCGatewayInputs {
   readonly config: ATCGatewayConfig;
   readonly secrets: {
+    // pulls the gateway's and the backup's images, which are private
+    readonly pullCredential: GHCRPullCredential;
+
     // the bearer token the gateway presents to each daemon, by daemon name
     readonly tokens: Readonly<Record<string, Output<string>>>;
 
@@ -54,6 +69,7 @@ export interface NixieConfig {
 // a nightly restic backup of nixie.db and keys.db to nixie's own R2 bucket
 export interface NixieBackupInputs {
   readonly image: string;
+  readonly pullCredential: GHCRPullCredential;
   readonly secrets: {
     readonly repository: Output<string>;
     readonly password: Output<string>;
