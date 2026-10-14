@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# create_stub_op <bin>: writes <bin>/op, a stand-in for the 1Password CLI that
-# install-atc-gateway-credentials.sh calls. It keeps its state under STUB_TREE: a vault is a
+# create_stub_op <bin>: writes <bin>/op, a stand-in for the 1Password CLI at the item and
+# vault calls the shell suites make. It keeps its state under STUB_TREE: a vault is a
 # directory under STUB_TREE/vault/, an item a file there holding its credential. It logs
 # each call's argv as a JSON line to STUB_TREE/calls and records the service-account token
 # it ran with (or "unset") in STUB_TREE/op-token-seen. Its JSON follows op's item and

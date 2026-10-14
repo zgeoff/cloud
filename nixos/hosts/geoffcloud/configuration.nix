@@ -191,7 +191,7 @@ in
   };
 
   # atc's daemon for the atc gateway (docs/architecture/workloads/atc-gateway.md). The token
-  # files are root-only and staged by scripts/install-atc-gateway-credentials.sh; systemd passes them in as
+  # files are root-only and staged by scripts/install-atc-gateway-credentials.ts; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
   # the targets it may reach; a client not listed here is refused every request.
   services.atc-daemon = {
