@@ -6,7 +6,8 @@
 # "the host" is a directory in the case's tree, and the vault is a directory beside it.
 # Each case runs the script under `env -i` from its tree, with only the variables it sets,
 # and compares its whole stdout, stderr and call log, the stored document and .env, and its
-# exact exit code. A .env the script may not append to is real state: a read-only file.
+# exact exit code. A .env the script may not append to is real state: a read-only file, which
+# binds a run as root too through run_with_file_modes.
 #
 #   bash scripts/test-connect-k3s.sh
 #   CASE='.env' bash scripts/test-connect-k3s.sh   # the cases whose title holds it
@@ -19,6 +20,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-k3s-ssh
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kubeconfig-op.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-with-file-modes.sh"
 
 it_stores_a_new_kubeconfig_with_the_tailnet_server_and_adds_its_reference_to_env() {
   local status=0
@@ -258,7 +260,7 @@ it_fails_with_exit_1_after_storing_when_it_may_not_append_to_env() {
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
   chmod 0444 "$tree/.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && run_with_file_modes env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -285,7 +287,7 @@ it_completes_env_on_a_second_run_after_a_failed_env_write() {
   printf '%s\n' '    server: https://127.0.0.1:6443' > "$tree/host/k3s.yaml"
   printf '%s\n' 'ONIDEL_API_KEY=op://cloud/onidel/credential' > "$tree/.env"
   chmod 0444 "$tree/.env"
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && run_with_file_modes env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud bash scripts/connect-k3s.sh) > /dev/null 2> "$tree/first-err" || first_status=$?
   chmod 0644 "$tree/.env"
   : > "$tree/calls"

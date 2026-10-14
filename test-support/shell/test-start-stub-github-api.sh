@@ -7,7 +7,9 @@
 # for the tag and, since both report it missing, prints "release not found" and exits 1
 # whichever answer lands first. It ran against gh 2.99.0 here; CI's ubuntu-24.04 runner
 # image (20260927.320.1, per its published readme) lists GitHub CLI 2.101.0. gh runs with
-# telemetry and the update check off and trusts only the stand-in's certificate.
+# telemetry and the update check off and trusts only the stand-in's certificate. The runner
+# image installs gh in /usr/bin and the cloud imp's agent image in /usr/local/bin, so the case's
+# PATH holds both.
 #
 #   bash test-support/shell/test-start-stub-github-api.sh
 # shellcheck source-path=SCRIPTDIR
@@ -146,7 +148,7 @@ it_makes_a_real_gh_release_download_report_the_release_not_found() {
   setup_test "$tree"
   mkdir "$tree/gh" "$tree/download" "$tree/no-certs"
 
-  env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
+  env -i PATH=/usr/local/bin:/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GH_CONFIG_DIR="$tree/gh" \
     GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 \
     GH_HOST="127.0.0.1:$(cat "$tree/github/port")" SSL_CERT_FILE="$tree/github/cert.pem" \
     SSL_CERT_DIR="$tree/no-certs" gh release download v1.0.0 -R zgeoff/atc -p atc -D "$tree/download" > "$tree/out" 2> "$tree/err" || status=$?

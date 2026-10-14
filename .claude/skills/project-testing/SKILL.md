@@ -60,6 +60,9 @@ live host.
   a fixed system path, resolved when the stand-in is created.
 - A failure that real state can produce comes from real state on loopback: a dead port
   (`127.0.0.1:1`), a missing socket, a directory without write permission.
+- A case whose act meets a mode that denies a write, a read or a search runs that act through
+  `run_with_file_modes` from `test-support/shell/`. Root passes such a mode, and a cloud imp runs
+  its sessions as root, so without the helper the denial never happens there and the case fails.
 - A DNS lookup (`getent hosts`) and a curl to a URL that is not loopback get stand-ins too. A real
   `getent` in a stand-in's own test reads the hosts file only (`-s files`).
 - The real `gh` runs only with `GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1`, in a case
