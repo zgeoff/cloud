@@ -99,6 +99,11 @@ jobs:
       - name: Topology
         run: bun run check:topology
 
+      # infra's groups import only lower groups, through their entry modules, and no package
+      # reaches into another package's folder by a relative path
+      - name: Boundaries
+        run: bun run check:boundaries
+
       # each release tag still names its pinned digest, and each upstream digest is still served
       - name: Image pins
         run: bun run check:image-pins
