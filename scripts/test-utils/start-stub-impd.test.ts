@@ -53,6 +53,32 @@ test('it answers any other bearer with impd’s 401', async () => {
   expect(result.stdout.toString()).toBe('{"error":"unauthorized"}\n401');
 });
 
+test('it answers /health as ready by default', async () => {
+  const impd = startStubImpd('imp_fixture_good');
+
+  const result = await runProcess(
+    ['curl', '-q', '-sS', '-w', '\n%{http_code}', `http://127.0.0.1:${impd.port}/health`],
+    { env: { PATH: process.env['PATH'] } },
+  );
+
+  expect(result.stdout.toString()).toBe('{"ready":true}\n200');
+
+  expect(impd.requests).toStrictEqual([
+    { method: 'GET', target: '/health', authorization: null, body: '' },
+  ]);
+});
+
+test('it answers /health with the status and body a test gives it', async () => {
+  const impd = startStubImpd('imp_fixture_good', { status: 503, body: '{"ready":false}' });
+
+  const result = await runProcess(
+    ['curl', '-q', '-sS', '-w', '\n%{http_code}', `http://127.0.0.1:${impd.port}/health`],
+    { env: { PATH: process.env['PATH'] } },
+  );
+
+  expect(result.stdout.toString()).toBe('{"ready":false}\n503');
+});
+
 test('it fails closed for any other request, and records a proxy request’s whole URL', async () => {
   const impd = startStubImpd('imp_fixture_good');
 
