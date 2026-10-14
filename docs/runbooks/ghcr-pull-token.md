@@ -69,20 +69,26 @@ The kubelet pulls a pinned image only when the node lacks it, so a running pod p
 the current token. This check starts a pod that pulls the backup image every time, through the
 Secret in `atc`, and runs `restic version` in it.
 
-1. Start the pod, with the backup image's pinned reference from `atcGateway.backupImage` in
-   `infra/Pulumi.prod.yaml`:
+1. Start the pod. Replace `<backup_image_reference>` with the backup image's pinned reference from
+   `atcGateway.backupImage` in `infra/Pulumi.prod.yaml`. The commands travel on SSH's stdin in a
+   quoted heredoc, because SSH joins its arguments into one string that the remote shell parses
+   again, which would strip the JSON's quotes:
 
    ```bash
-   ssh root@geoffcloud k3s kubectl -n atc run ghcr-pull-check --restart=Never \
+   ssh root@geoffcloud bash -s <<'EOF'
+   k3s kubectl -n atc run ghcr-pull-check --restart=Never \
      --image='<backup_image_reference>' --image-pull-policy=Always \
      --overrides='{"apiVersion":"v1","spec":{"imagePullSecrets":[{"name":"ghcr-pull"}]}}' \
      --command -- restic version
+   EOF
    ```
 
 2. Read its phase:
 
    ```bash
-   ssh root@geoffcloud k3s kubectl -n atc get pod ghcr-pull-check -o jsonpath='{.status.phase}'
+   ssh root@geoffcloud bash -s <<'EOF'
+   k3s kubectl -n atc get pod ghcr-pull-check -o jsonpath='{.status.phase}'
+   EOF
    ```
 
    Expect `Succeeded`. A phase of `Pending` with the event `Failed to pull image` and
