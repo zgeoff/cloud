@@ -4,3 +4,9 @@
 
 [extend]
 useDefault = true
+
+# Go module checksums are public content hashes. A module whose name holds a word such as
+# "openapi" makes the hash beside it match generic-api-key.
+[[allowlists]]
+description = "Go module checksums"
+paths = ['''(^|/)(go|tools)\.sum$''']

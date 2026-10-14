@@ -24,6 +24,32 @@ func TestSendRequestSendsTheBodyWithTheStubsBearerToken(t *testing.T) {
 	assert.Equal(t, []onideltest.Request{{Method: "POST", Path: "/network/firewalls", Body: map[string]any{"team_id": "t", "description": "edge"}}}, ctx.api.GetRequests())
 }
 
+func TestSendRequestMarksABodyAsJSON(t *testing.T) {
+	var contentType string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType = r.Header.Get("Content-Type")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+
+	onideltest.SendRequest(t, server.URL, "PUT", "/network/firewalls/g1", `{"description":"edge"}`)
+
+	assert.Equal(t, "application/json", contentType)
+}
+
+func TestSendRequestSendsNoContentTypeWithoutABody(t *testing.T) {
+	contentType := "unset"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType = r.Header.Get("Content-Type")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	t.Cleanup(server.Close)
+
+	onideltest.SendRequest(t, server.URL, "GET", "/teams", "")
+
+	assert.Equal(t, "", contentType)
+}
+
 func TestSendRequestSendsNoBodyForAnEmptyOne(t *testing.T) {
 	ctx := setupTest(t)
 

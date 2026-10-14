@@ -8,18 +8,19 @@ import (
 
 	"github.com/zgeoff/cloud/provider/internal/client"
 	"github.com/zgeoff/cloud/provider/internal/clienttest"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
 func TestCreateFirewallGroupReturnsTheStoredGroup(t *testing.T) {
 	ctx := setupTest(t)
 
-	group, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+	group, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockNewFirewallGroup(func(in *onidelapi.NewFirewallGroup) {
 		in.TeamID, in.Description = "team-a", "edge"
 	}))
 
 	require.NoError(t, err)
-	assert.Equal(t, client.FirewallGroup{
+	assert.Equal(t, onidelapi.FirewallGroup{
 		ID: "00000000-0000-4000-8000-000000000001", Description: "edge",
 		Created: "2026-10-02T00:00:00Z", Updated: "2026-10-02T00:00:00Z",
 	}, group)
@@ -28,7 +29,7 @@ func TestCreateFirewallGroupReturnsTheStoredGroup(t *testing.T) {
 func TestCreateFirewallGroupFailsWithoutATeam(t *testing.T) {
 	ctx := setupTest(t)
 
-	_, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+	_, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockNewFirewallGroup(func(in *onidelapi.NewFirewallGroup) {
 		in.TeamID = ""
 	}))
 
@@ -47,7 +48,7 @@ func TestReadFirewallGroupReadsOneGroup(t *testing.T) {
 	group, err := ctx.client.ReadFirewallGroup(t.Context(), "g1")
 
 	require.NoError(t, err)
-	assert.Equal(t, client.FirewallGroup{
+	assert.Equal(t, onidelapi.FirewallGroup{
 		ID: "g1", Description: "edge", Created: "2026-10-02T00:00:00Z", Updated: "2026-10-03T00:00:00Z", InstanceCount: 1, RuleCount: 4,
 	}, group)
 }
@@ -56,7 +57,7 @@ func TestUpdateFirewallGroupChangesTheDescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge"})
 
-	err := ctx.client.UpdateFirewallGroup(t.Context(), "g1", clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+	err := ctx.client.UpdateFirewallGroup(t.Context(), "g1", clienttest.BuildMockUpdateFirewallGroup(func(in *onidelapi.UpdateFirewallGroup) {
 		in.TeamID, in.Description = "team-a", "edge 2"
 	}))
 
@@ -92,15 +93,15 @@ func TestCreateFirewallRuleDecodesTheSubnetSizeTheCreateSendsAsAString(t *testin
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
-	rule, err := ctx.client.CreateFirewallRule(t.Context(), "g1", clienttest.BuildMockFirewallRuleInput(func(in *client.FirewallRuleInput) {
+	rule, err := ctx.client.CreateFirewallRule(t.Context(), "g1", clienttest.BuildMockNewFirewallRule(func(in *onidelapi.NewFirewallRule) {
 		in.TeamID, in.Protocol, in.Port = "team-a", "tcp", "443"
-		in.Subnet, in.SubnetSize, in.Description = "203.0.113.0", 24, "web"
+		in.Subnet, in.SubnetSize, in.Desc = "203.0.113.0", 24, "web"
 	}))
 
 	require.NoError(t, err)
-	assert.Equal(t, client.FirewallRule{
+	assert.Equal(t, onidelapi.FirewallRule{
 		ID: "00000000-0000-4000-8000-000000000001", Group: "g1", IPType: "v4", Action: "allow", Protocol: "tcp",
-		Port: "443", Subnet: "203.0.113.0", SubnetSize: 24, Description: "web",
+		Port: "443", Subnet: "203.0.113.0", SubnetSize: 24, Desc: "web",
 	}, rule)
 }
 
@@ -108,8 +109,8 @@ func TestCreateFirewallRuleOmitsAnEmptyPortAndDescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
 
-	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", clienttest.BuildMockFirewallRuleInput(func(in *client.FirewallRuleInput) {
-		in.TeamID, in.Protocol, in.Port, in.Subnet, in.SubnetSize, in.Description = "", "icmp", "", "::", 0, ""
+	_, err := ctx.client.CreateFirewallRule(t.Context(), "g1", clienttest.BuildMockNewFirewallRule(func(in *onidelapi.NewFirewallRule) {
+		in.TeamID, in.Protocol, in.Port, in.Subnet, in.SubnetSize, in.Desc = "", "icmp", "", "::", 0, ""
 	}))
 
 	require.NoError(t, err)
@@ -129,7 +130,7 @@ func TestReadFirewallRuleReadsOneRuleInTheTeam(t *testing.T) {
 	rule, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "r1", "team-a")
 
 	require.NoError(t, err)
-	assert.Equal(t, client.FirewallRule{ID: "r1", Group: "g1", IPType: "v6", Action: "allow", Protocol: "ipv6-icmp", Subnet: "::"}, rule)
+	assert.Equal(t, onidelapi.FirewallRule{ID: "r1", Group: "g1", IPType: "v6", Action: "allow", Protocol: "ipv6-icmp", Subnet: "::"}, rule)
 	assert.Equal(t, []onideltest.Request{{Method: "GET", Path: "/network/firewalls/g1/rules/r1", Query: "team_id=team-a"}}, ctx.api.GetRequests())
 }
 
@@ -144,7 +145,7 @@ func TestReadFirewallRuleNamesANonIntegerSubnetSize(t *testing.T) {
 	_, err := ctx.client.ReadFirewallRule(t.Context(), "g1", "r1", "team-a")
 
 	assert.EqualError(t, err, "onidel: decode GET /network/firewalls/g1/rules/r1: "+
-		"json: cannot unmarshal non-integer value into Go struct field FirewallRule.firewall_rule.subnet_size of type client.FlexInt")
+		"json: cannot unmarshal non-integer value into Go struct field FirewallRule.firewall_rule.subnet_size of type onidelapi.FlexInt")
 }
 
 func TestUpdateFirewallRuleDescriptionChangesOnlyTheDescription(t *testing.T) {

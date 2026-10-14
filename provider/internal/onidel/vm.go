@@ -10,6 +10,7 @@ import (
 	"github.com/pulumi/pulumi-go-provider/infer"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 // VM is onidel:index:Vm, a virtual machine.
@@ -109,22 +110,22 @@ func (VM) Create(ctx context.Context, req infer.CreateRequest[VMArgs]) (infer.Cr
 	}
 
 	api, teamID := getClient(ctx)
-	vm, err := api.CreateVM(ctx, client.VMInput{
+	vm, err := api.CreateVM(ctx, onidelapi.NewVM{
 		TeamID:             teamID,
 		Name:               in.Name,
-		PaymentCycle:       getOrDefault(in.PaymentCycle, ""),
+		PaymentCycle:       onidelapi.NewVMPaymentCycle(getOrDefault(in.PaymentCycle, "")),
 		InstanceType:       getOrDefault(in.InstanceType, ""),
 		Location:           in.Location,
-		CPU:                in.CPU,
-		RAM:                in.RAM,
-		Disk:               in.Disk,
-		OS:                 in.OS,
+		CPU:                int64(in.CPU),
+		RAM:                int64(in.RAM),
+		Disk:               int64(in.Disk),
+		Os:                 toInt64Pointer(in.OS),
 		SnapshotID:         getOrDefault(in.SnapshotID, ""),
-		ISOID:              getOrDefault(in.ISOID, ""),
+		IsoID:              getOrDefault(in.ISOID, ""),
 		SSHKeys:            in.SSHKeys,
-		VPCs:               in.VPCs,
+		Vpcs:               in.VPCs,
 		FirewallGroupID:    getOrDefault(in.FirewallGroupID, ""),
-		IPv6:               getOrDefault(in.IPv6, false),
+		Ipv6:               getOrDefault(in.IPv6, false),
 		DisableSSHBlocking: getOrDefault(in.DisableSSHBlocking, false),
 		StartupScriptID:    getOrDefault(in.StartupScriptID, ""),
 	})
@@ -155,16 +156,16 @@ func (VM) Read(ctx context.Context, req infer.ReadRequest[VMArgs, VMState]) (inf
 	isImport := args.Name == "" && args.Location == ""
 	args.Name = vm.Name
 	args.Location = vm.Location
-	args.CPU = vm.VCPU
-	args.RAM = vm.RAM
-	args.Disk = vm.Disk
+	args.CPU = int(vm.Vcpu)
+	args.RAM = int(vm.RAM)
+	args.Disk = int(vm.Disk)
 	firewallGroupID, err := readFirewallGroupID(ctx, api, req.Inputs.FirewallGroupID, string(vm.FirewallGroupID))
 	if err != nil {
 		return infer.ReadResponse[VMArgs, VMState]{}, err
 	}
 	args.FirewallGroupID = firewallGroupID
 	if args.IPv6 != nil || isImport {
-		enabled := vm.MainIPv6 != ""
+		enabled := vm.MainIpv6 != ""
 		args.IPv6 = &enabled
 	}
 	if args.SnapshotID == nil && args.ISOID == nil && vm.Template != "" {
@@ -228,13 +229,16 @@ func (VM) Update(ctx context.Context, req infer.UpdateRequest[VMArgs, VMState]) 
 	}
 
 	api, teamID := getClient(ctx)
-	patches := planVMPatches(old, next, teamID)
+	patches, err := planVMPatches(old, next, teamID)
+	if err != nil {
+		return infer.UpdateResponse[VMState]{}, err
+	}
 	vm, err := api.ReadVM(ctx, req.ID, teamID)
 	for _, patch := range patches {
 		if err != nil {
 			break
 		}
-		vm, err = api.UpdateVM(ctx, req.ID, patch)
+		vm, err = api.UpdateVM(ctx, req.ID, teamID, patch)
 	}
 	if err != nil {
 		return infer.UpdateResponse[VMState]{}, err
@@ -248,37 +252,51 @@ func (VM) Delete(ctx context.Context, req infer.DeleteRequest[VMState]) (infer.D
 	return infer.DeleteResponse{}, api.RemoveVM(ctx, req.ID, teamID)
 }
 
-// planVMPatches turns an input change into the PATCH actions that apply it.
-func planVMPatches(old, next VMArgs, teamID string) []client.VMPatch {
-	var patches []client.VMPatch
+// planVMPatches turns an input change into the PATCH settings that apply it, one per
+// request, in order.
+func planVMPatches(old, next VMArgs, teamID string) ([]onidelapi.VMPatch, error) {
+	var settings []func(*onidelapi.VMPatch) error
 	if next.Name != old.Name {
-		patches = append(patches, client.VMPatch{TeamID: teamID, Name: next.Name})
+		settings = append(settings, func(p *onidelapi.VMPatch) error {
+			return p.FromVMRename(onidelapi.VMRename{TeamID: teamID, Name: next.Name})
+		})
 	}
 	if next.IPv6 != nil && (old.IPv6 == nil || *old.IPv6 != *next.IPv6) {
-		patches = append(patches, client.VMPatch{TeamID: teamID, EnableIPv6: next.IPv6})
+		settings = append(settings, func(p *onidelapi.VMPatch) error {
+			return p.FromVMToggleIPv6(onidelapi.VMToggleIPv6{TeamID: teamID, EnableIpv6: *next.IPv6})
+		})
 	}
 	oldFirewall, nextFirewall := getOrDefault(old.FirewallGroupID, ""), getOrDefault(next.FirewallGroupID, "")
 	switch nextFirewall {
 	case oldFirewall:
 	case "":
-		detach := true
-		patches = append(patches, client.VMPatch{TeamID: teamID, DisableFirewall: &detach})
+		settings = append(settings, func(p *onidelapi.VMPatch) error {
+			return p.FromVMDetachFirewall(onidelapi.VMDetachFirewall{TeamID: teamID, DisableFirewall: true})
+		})
 	default:
-		patches = append(patches, client.VMPatch{TeamID: teamID, FirewallGroupID: nextFirewall})
+		settings = append(settings, func(p *onidelapi.VMPatch) error {
+			return p.FromVMAttachFirewall(onidelapi.VMAttachFirewall{TeamID: teamID, FirewallGroupID: nextFirewall})
+		})
 	}
-	return patches
+	patches := make([]onidelapi.VMPatch, len(settings))
+	for i, set := range settings {
+		if err := set(&patches[i]); err != nil {
+			return nil, err
+		}
+	}
+	return patches, nil
 }
 
 // buildVMState maps an API VM onto state. Only the listed fields are copied; there is
 // no password to copy.
-func buildVMState(args VMArgs, vm client.VM) VMState {
+func buildVMState(args VMArgs, vm onidelapi.VM) VMState {
 	return VMState{
 		VMArgs:     args,
-		Status:     vm.Status,
-		MainIPv4:   vm.MainIPv4,
-		MainIPv6:   vm.MainIPv6,
+		Status:     string(vm.Status),
+		MainIPv4:   vm.MainIpv4,
+		MainIPv6:   vm.MainIpv6,
 		Template:   vm.Template,
-		BGPEnabled: vm.BGPEnabled,
+		BGPEnabled: vm.BgpEnabled,
 		CreatedAt:  vm.CreatedAt,
 	}
 }
@@ -320,11 +338,18 @@ func findOSTemplateID(ctx context.Context, api *client.Client, name string) (*in
 	}
 	for _, t := range templates {
 		if t.Name == name {
-			id := t.ID
+			id := int(t.ID)
 			return &id, nil
 		}
 	}
 	return nil, nil
+}
+
+func toInt64Pointer(v *int) *int64 {
+	if v == nil {
+		return nil
+	}
+	return new(int64(*v))
 }
 
 func countSet(flags ...bool) int {

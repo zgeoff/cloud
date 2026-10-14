@@ -1,0 +1,119 @@
+# The changes the client needs on top of onidel.yaml, the vendor's spec, which stays as
+# published. oapi-codegen applies this overlay before it generates internal/onidelapi, and
+# the stub API validates requests against the result. Each action states its source: the
+# vendor's spec, a live answer on record, or the client's own need.
+overlay: 1.1.0
+info:
+  title: Onidel API changes for the provider's client
+  version: 1.0.0
+actions:
+  # oapi-codegen's include-operation-ids matches the spec's operationId only, so an
+  # operation without one is never generated. The client also sends team_id here, as on
+  # every other call it makes with a team.
+  - target: $.paths['/vm/{vm_id}'].delete
+    update:
+      operationId: deleteVM
+      parameters:
+        - name: team_id
+          in: query
+          description: Team ID. Default team will be used if not provided.
+          required: false
+          schema:
+            type: string
+  # A team_id query stays a pointer, so the client leaves out an empty one: without a
+  # pointer, the generated request sends team_id= for the default team.
+  - target: $.paths.*.*.parameters[?(@.name == 'team_id')]
+    update:
+      x-go-type-skip-optional-pointer: false
+  # The API returns the VM's root password in plain text. No generated type carries it,
+  # so decoding drops it; internal/onidelapi's tests guard that.
+  - target: $.components.schemas.VM.properties.password
+    remove: true
+  # Live VM objects carry these, and the provider reads them.
+  - target: $.components.schemas.VM.properties
+    update:
+      location:
+        type: string
+        example: Sydney
+      bgp_enabled:
+        type: boolean
+      active_action_id:
+        description: >-
+          Non-null while an async action (rename, firewall attach, ...) runs. Its type is
+          undocumented, so it stays opaque.
+        nullable: true
+        x-go-type: json.RawMessage
+  # Live reads report the group ID as a string on some reads and a number on others.
+  - target: $.components.schemas.VM.properties.firewall_group_id
+    update:
+      x-go-type: FlexString
+  # The one list of VM statuses. Past the spec's own: the corrected spelling of
+  # taking_snaphot, and the statuses a destroyed VM may stay listed under.
+  - target: $.components.schemas.VM.properties.status.enum
+    update:
+      - taking_snapshot
+      - terminated
+      - deleted
+      - destroyed
+  # The client always sends these, ipv6 as false too. The spec still lets them be left
+  # out, so this changes the generated type only.
+  - target: $.components.schemas.NewVM.properties['name','location','cpu','ram','disk','ipv6']
+    update:
+      x-omitempty: false
+  # 0 is not an OS template, so os stays a pointer and an unset os is left out.
+  - target: $.components.schemas.NewVM.properties.os
+    update:
+      x-go-type-skip-optional-pointer: false
+  # A create answers subnet_size as a string, a read as a number (checked 2026-10-02).
+  - target: $.components.schemas.FirewallRule.properties.subnet_size
+    update:
+      x-go-type: FlexInt
+  # Each PATCH /vm/{vm_id} setting as a named schema, in the spec's oneOf order, and the
+  # body as a oneOf of references to them. oapi-codegen generates an inline oneOf body as
+  # a defined type that drops the union's MarshalJSON, so it would send {}; a referenced
+  # schema generates an alias that keeps it, and From<Setting> methods by name.
+  - target: $.components.schemas
+    update:
+      VMRename: {}
+      VMReinstall: {}
+      VMToggleIPv6: {}
+      VMAttachFirewall: {}
+      VMDetachFirewall: {}
+      VMBootMode: {}
+      VMSEV: {}
+      VMPatch:
+        oneOf:
+          - $ref: '#/components/schemas/VMRename'
+          - $ref: '#/components/schemas/VMReinstall'
+          - $ref: '#/components/schemas/VMToggleIPv6'
+          - $ref: '#/components/schemas/VMAttachFirewall'
+          - $ref: '#/components/schemas/VMDetachFirewall'
+          - $ref: '#/components/schemas/VMBootMode'
+          - $ref: '#/components/schemas/VMSEV'
+  - target: $.components.schemas.VMRename
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[0]
+  - target: $.components.schemas.VMReinstall
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[1]
+  - target: $.components.schemas.VMToggleIPv6
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[2]
+  - target: $.components.schemas.VMAttachFirewall
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[3]
+  - target: $.components.schemas.VMDetachFirewall
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[4]
+  - target: $.components.schemas.VMBootMode
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[5]
+  - target: $.components.schemas.VMSEV
+    copy: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema.oneOf[6]
+  - target: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json'].schema
+    remove: true
+  - target: $.paths['/vm/{vm_id}'].patch.requestBody.content['application/json']
+    update:
+      schema:
+        $ref: '#/components/schemas/VMPatch'
+  # A named type for the snapshot answer, which the spec writes inline.
+  - target: $.paths['/vm/{vm_id}/snapshot'].post.responses['201'].content['application/json'].schema
+    update:
+      x-go-type-name: SnapshotStarted
+  - target: $.paths['/vm/{vm_id}/snapshot'].post.requestBody.content['application/json'].schema
+    update:
+      x-go-type-name: NewSnapshot

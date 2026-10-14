@@ -3,6 +3,7 @@ package onideltest
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -10,10 +11,18 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/openapi3filter"
+	"github.com/getkin/kin-openapi/routers"
+	"github.com/getkin/kin-openapi/routers/legacy"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 // StubOnidelAPI is an in-memory Onidel API, written against provider/spec/onidel.yaml and
@@ -25,9 +34,12 @@ import (
 // the in-flight state (status building, or an active_action_id), and the next read
 // sees it active with no action. SetAutoSettle(false) holds every VM where it is.
 //
-// The stub records every request. A request no route serves, a VM setting the stub
-// does not model, or a body that is not JSON, is a problem: it gets a 500 or a 400,
-// and the test fails at cleanup unless it drains the problem with DrainProblems.
+// The stub records every request and validates it against the spec the client is
+// generated from: onidel.yaml with the overlay applied, for the operations in use
+// (onidelapi.GetSpec). A request that does not match the spec, a request no route
+// serves, a VM setting the stub does not model, or a body that is not JSON, is a
+// problem: it gets a 400 or a 500, and the test fails at cleanup unless it drains the
+// problem with DrainProblems.
 type StubOnidelAPI struct {
 	// URL is the base URL of the running stub.
 	URL string
@@ -40,6 +52,7 @@ type StubOnidelAPI struct {
 	vmOrder    []string
 	firewalls  map[string]map[string]any
 	rules      map[string]map[string]any
+	snapshots  []map[string]any
 	requests   []Request
 	problems   []string
 	// canned holds, per pattern, the status and body of each response still to send.
@@ -51,6 +64,7 @@ type StubOnidelAPI struct {
 	routes    *http.ServeMux
 	overrides *http.ServeMux
 	cans      *http.ServeMux
+	spec      routers.Router
 }
 
 // StartStubOnidelAPI starts a stub API with no teams and no resources: the spec does
@@ -59,6 +73,12 @@ type StubOnidelAPI struct {
 // stops the server.
 func StartStubOnidelAPI(t testing.TB) *StubOnidelAPI {
 	t.Helper()
+	spec, err := onidelapi.GetSpec()
+	require.NoError(t, err)
+	// The spec names the production server; the stub serves the same paths on loopback.
+	spec.Servers = nil
+	router, err := legacy.NewRouter(spec)
+	require.NoError(t, err)
 	f := &StubOnidelAPI{
 		autoSettle: true,
 		teams:      []map[string]any{},
@@ -72,6 +92,7 @@ func StartStubOnidelAPI(t testing.TB) *StubOnidelAPI {
 		routes:    http.NewServeMux(),
 		overrides: http.NewServeMux(),
 		cans:      http.NewServeMux(),
+		spec:      router,
 	}
 	f.registerRoutes()
 	server := httptest.NewServer(f)
@@ -192,6 +213,17 @@ func (f *StubOnidelAPI) GetFirewallGroups() map[string]map[string]any {
 	return buildStoreCopy(f.firewalls)
 }
 
+// GetSnapshots returns the snapshots taken so far, in order.
+func (f *StubOnidelAPI) GetSnapshots() []map[string]any {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]map[string]any, 0, len(f.snapshots))
+	for _, snapshot := range f.snapshots {
+		out = append(out, maps.Clone(snapshot))
+	}
+	return out
+}
+
 // GetFirewallRules returns the stored firewall rules by ID.
 func (f *StubOnidelAPI) GetFirewallRules() map[string]map[string]any {
 	f.mu.Lock()
@@ -203,7 +235,8 @@ func (f *StubOnidelAPI) GetFirewallRules() map[string]map[string]any {
 const APIKey = "test-key"
 
 // ServeHTTP records the request, then answers it: 400 for a body that is not a JSON
-// object, 401 for a wrong bearer token, else the registered override or the route.
+// object or a request that does not match the spec, 401 for a wrong bearer token, else
+// the registered override or the route.
 func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	raw, _ := io.ReadAll(r.Body)
 	body, ok := decodeBody(raw)
@@ -215,6 +248,13 @@ func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Unlock()
 
 	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+	if err := f.checkRequest(r, raw); err != nil {
+		f.mu.Lock()
+		f.problems = append(f.problems, fmt.Sprintf("request does not match the spec: %s %s: %s", r.Method, r.URL.Path, err))
+		f.mu.Unlock()
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -233,6 +273,32 @@ func (f *StubOnidelAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f.routes.ServeHTTP(w, r)
+}
+
+// checkRequest validates r, whose body is raw, against the operation of the spec it
+// matches, and leaves r's body readable again. A request that matches no operation
+// passes: no route serves it, so the stub reports it as unhandled instead. The error
+// names the failing rule and where it failed, never the value.
+func (f *StubOnidelAPI) checkRequest(r *http.Request, raw []byte) error {
+	defer func() { r.Body = io.NopCloser(bytes.NewReader(raw)) }()
+	route, params, err := f.spec.FindRoute(r)
+	if err != nil {
+		return nil
+	}
+	r.Body = io.NopCloser(bytes.NewReader(raw))
+	err = openapi3filter.ValidateRequest(r.Context(), &openapi3filter.RequestValidationInput{
+		Request: r, PathParams: params, Route: route,
+		Options: &openapi3filter.Options{AuthenticationFunc: openapi3filter.NoopAuthenticationFunc},
+	})
+	var schemaErr *openapi3.SchemaError
+	if errors.As(err, &schemaErr) {
+		return fmt.Errorf("%s at /%s", schemaErr.Reason, strings.Join(schemaErr.JSONPointer(), "/"))
+	}
+	var reqErr *openapi3filter.RequestError
+	if errors.As(err, &reqErr) {
+		return errors.New(reqErr.Reason)
+	}
+	return err
 }
 
 func decodeBody(raw []byte) (map[string]any, bool) {
@@ -278,6 +344,8 @@ func (f *StubOnidelAPI) registerRoutes() {
 	route("GET /vm/{id}", f.sendVM)
 	route("PATCH /vm/{id}", f.updateVM)
 	route("DELETE /vm/{id}", f.removeVM)
+	route("POST /vm/{id}/snapshot", f.createSnapshot)
+	route("GET /snapshots", f.sendSnapshots)
 
 	route("POST /network/firewalls", f.createFirewallGroup)
 	route("GET /network/firewalls/{id}", f.sendFirewallGroup)
@@ -393,12 +461,10 @@ func (f *StubOnidelAPI) sendVM(w http.ResponseWriter, r *http.Request, _ map[str
 	}
 }
 
-// The statuses the client treats as settling into active on their own.
-var settlingStatuses = []string{"building", "restoring", "migrating", "taking_snaphot"}
-
+// isSettling reports whether the VM is in a status the client waits on, or runs an action.
 func isSettling(vm map[string]any) bool {
 	status, _ := vm["status"].(string)
-	return slices.Contains(settlingStatuses, status) || vm["active_action_id"] != nil
+	return onidelapi.VMStatus(status).IsSettling() || vm["active_action_id"] != nil
 }
 
 // updateVM applies one setting per request (202), refuses a VM with an action in
@@ -446,6 +512,29 @@ func (f *StubOnidelAPI) updateVM(w http.ResponseWriter, r *http.Request, body ma
 	w.WriteHeader(http.StatusAccepted)
 }
 
+// createSnapshot starts a snapshot of a stored VM. The snapshot lists as pending, and
+// the VM reads as taking_snaphot, the spec's spelling, until a read settles it.
+func (f *StubOnidelAPI) createSnapshot(w http.ResponseWriter, r *http.Request, body map[string]any) {
+	vm, ok := f.vms[r.PathValue("id")]
+	if !ok {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+	desc, _ := body["desc"].(string)
+	snapshot := map[string]any{
+		"id": f.claimID(), "created_at": "2026-10-02T06:00:00Z", "name": body["name"], "desc": desc,
+		"size": vm["disk"], "status": "pending",
+	}
+	f.snapshots = append(f.snapshots, snapshot)
+	vm["status"] = "taking_snaphot"
+	sendJSON(w, http.StatusCreated, map[string]any{"snapshot_id": snapshot["id"]})
+}
+
+// sendSnapshots lists the snapshots in the order they were taken.
+func (f *StubOnidelAPI) sendSnapshots(w http.ResponseWriter, _ *http.Request, _ map[string]any) {
+	sendJSON(w, http.StatusOK, append([]map[string]any{}, f.snapshots...))
+}
+
 func (f *StubOnidelAPI) removeVM(w http.ResponseWriter, r *http.Request, _ map[string]any) {
 	id := r.PathValue("id")
 	vm, ok := f.vms[id]
@@ -459,15 +548,11 @@ func (f *StubOnidelAPI) removeVM(w http.ResponseWriter, r *http.Request, _ map[s
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// createFirewallGroup needs a description (the spec) and a team_id: the live API
+// createFirewallGroup needs a team_id, past the spec's description: the live API
 // answers 401, not 400, when team_id is missing (checked 2026-10-02).
 func (f *StubOnidelAPI) createFirewallGroup(w http.ResponseWriter, _ *http.Request, body map[string]any) {
 	if !hasStrings(body, "team_id") {
 		sendJSON(w, http.StatusUnauthorized, map[string]any{"err": "UNAUTHORIZED"})
-		return
-	}
-	if _, ok := body["description"].(string); !ok {
-		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	group := map[string]any{
@@ -487,15 +572,8 @@ func (f *StubOnidelAPI) sendFirewallGroup(w http.ResponseWriter, r *http.Request
 	sendJSON(w, http.StatusOK, map[string]any{"firewall_group": group})
 }
 
-// updateFirewallGroup changes the description. UpdateFirewallGroup requires one, but
-// the spec lists no 400 for this call (only 204, 401 and 404) and no live answer is
-// on record, so an update without one is a problem, not a guessed status.
+// updateFirewallGroup changes the description, which the spec requires.
 func (f *StubOnidelAPI) updateFirewallGroup(w http.ResponseWriter, r *http.Request, body map[string]any) {
-	if _, ok := body["description"].(string); !ok {
-		f.problems = append(f.problems, fmt.Sprintf("undocumented response: PUT %s without a description", r.URL.Path))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 	group, ok := f.firewalls[r.PathValue("id")]
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)
@@ -531,10 +609,11 @@ func (f *StubOnidelAPI) createFirewallRule(w http.ResponseWriter, r *http.Reques
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
+	// The spec requires protocol, subnet and subnet_size, and lists the protocols.
 	protocol, _ := body["protocol"].(string)
 	subnet, _ := body["subnet"].(string)
-	subnetSize, hasSize := body["subnet_size"]
-	if !slices.Contains([]string{"tcp", "udp", "icmp", "ipv6-icmp"}, protocol) || subnet == "" || !hasSize {
+	subnetSize := body["subnet_size"]
+	if subnet == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -582,13 +661,9 @@ func (f *StubOnidelAPI) findRule(r *http.Request) (map[string]any, bool) {
 }
 
 // updateFirewallRule changes the description, the only field the spec lets a PATCH
-// change; desc is required and at most 255 characters.
+// change; the spec requires desc and caps it at 255 characters.
 func (f *StubOnidelAPI) updateFirewallRule(w http.ResponseWriter, r *http.Request, body map[string]any) {
-	desc, ok := body["desc"].(string)
-	if !ok || len(desc) > 255 {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	desc, _ := body["desc"].(string)
 	rule, ok := f.findRule(r)
 	if !ok {
 		w.WriteHeader(http.StatusNotFound)

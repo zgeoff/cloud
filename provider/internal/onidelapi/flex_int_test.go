@@ -1,4 +1,4 @@
-package client_test
+package onidelapi_test
 
 import (
 	"encoding/json"
@@ -8,14 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 func TestFlexIntDecodesNumbersAndNumericStrings(t *testing.T) {
 	rows := []struct {
 		name  string
 		input string
-		want  client.FlexInt
+		want  onidelapi.FlexInt
 	}{
 		{"it decodes a number", `24`, 24},
 		{"it decodes a numeric string", `"24"`, 24},
@@ -26,7 +26,7 @@ func TestFlexIntDecodesNumbersAndNumericStrings(t *testing.T) {
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
-			var got client.FlexInt
+			var got onidelapi.FlexInt
 
 			err := json.Unmarshal([]byte(row.input), &got)
 
@@ -37,19 +37,19 @@ func TestFlexIntDecodesNumbersAndNumericStrings(t *testing.T) {
 }
 
 func TestFlexIntRejectsANonNumericString(t *testing.T) {
-	var got client.FlexInt
+	var got onidelapi.FlexInt
 
 	err := json.Unmarshal([]byte(`"x"`), &got)
 
 	var typeErr *json.UnmarshalTypeError
 	require.ErrorAs(t, err, &typeErr)
-	assert.Equal(t, &json.UnmarshalTypeError{Value: "non-integer value", Type: reflect.TypeFor[client.FlexInt]()}, typeErr)
+	assert.Equal(t, &json.UnmarshalTypeError{Value: "non-integer value", Type: reflect.TypeFor[onidelapi.FlexInt]()}, typeErr)
 }
 
 func TestFlexIntReportsANonNumericStringWithoutPanicking(t *testing.T) {
-	var got client.FlexInt
+	var got onidelapi.FlexInt
 
 	err := json.Unmarshal([]byte(`"x"`), &got)
 
-	assert.EqualError(t, err, "json: cannot unmarshal non-integer value into Go value of type client.FlexInt")
+	assert.EqualError(t, err, "json: cannot unmarshal non-integer value into Go value of type onidelapi.FlexInt")
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 func TestReadTeamsListsTheCallersTeams(t *testing.T) {
@@ -19,5 +19,5 @@ func TestReadTeamsListsTheCallersTeams(t *testing.T) {
 	teams, err := ctx.client.ReadTeams(t.Context())
 
 	require.NoError(t, err)
-	assert.Equal(t, []client.Team{{ID: "team-a", Name: "a", Role: "Team Owner"}, {ID: "team-b", Name: "b", Role: "Team Member"}}, teams)
+	assert.Equal(t, []onidelapi.Team{{ID: "team-a", Name: "a", Role: "Team Owner"}, {ID: "team-b", Name: "b", Role: "Team Member"}}, teams)
 }

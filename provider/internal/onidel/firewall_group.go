@@ -6,6 +6,7 @@ import (
 	"github.com/pulumi/pulumi-go-provider/infer"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 // FirewallGroup is onidel:index:FirewallGroup, a cloud firewall group. Attach it to a
@@ -46,7 +47,7 @@ func (FirewallGroup) Create(
 		return infer.CreateResponse[FirewallGroupState]{Output: FirewallGroupState{FirewallGroupArgs: req.Inputs}}, nil
 	}
 	api, teamID := getClient(ctx)
-	group, err := api.CreateFirewallGroup(ctx, client.FirewallGroupInput{
+	group, err := api.CreateFirewallGroup(ctx, onidelapi.NewFirewallGroup{
 		TeamID: teamID, Description: req.Inputs.Description,
 	})
 	if err != nil {
@@ -83,7 +84,7 @@ func (FirewallGroup) Update(
 		return infer.UpdateResponse[FirewallGroupState]{Output: next}, nil
 	}
 	api, teamID := getClient(ctx)
-	err := api.UpdateFirewallGroup(ctx, req.ID, client.FirewallGroupInput{
+	err := api.UpdateFirewallGroup(ctx, req.ID, onidelapi.UpdateFirewallGroup{
 		TeamID: teamID, Description: req.Inputs.Description,
 	})
 	if err != nil {
@@ -108,7 +109,7 @@ func (FirewallGroup) Delete(
 	return infer.DeleteResponse{}, err
 }
 
-func buildFirewallGroupState(group client.FirewallGroup) FirewallGroupState {
+func buildFirewallGroupState(group onidelapi.FirewallGroup) FirewallGroupState {
 	return FirewallGroupState{
 		FirewallGroupArgs: FirewallGroupArgs{Description: group.Description},
 		Created:           group.Created,

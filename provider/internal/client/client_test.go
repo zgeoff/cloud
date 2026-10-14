@@ -19,6 +19,7 @@ import (
 
 	"github.com/zgeoff/cloud/provider/internal/client"
 	"github.com/zgeoff/cloud/provider/internal/clienttest"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 	"github.com/zgeoff/cloud/provider/internal/onideltest"
 )
 
@@ -220,7 +221,7 @@ func TestClientRetriesAGETOnATransientStatus(t *testing.T) {
 			teams, err := ctx.client.ReadTeams(t.Context())
 
 			require.NoError(t, err)
-			assert.Equal(t, []client.Team{{ID: "team-a", Name: "team", Role: "Team Owner"}}, teams)
+			assert.Equal(t, []onidelapi.Team{{ID: "team-a", Name: "team", Role: "Team Owner"}}, teams)
 			assert.Equal(t, []onideltest.Request{
 				{Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"}, {Method: "GET", Path: "/teams"},
 			}, ctx.api.GetRequests())
@@ -234,7 +235,7 @@ func TestClientRetriesAPUT(t *testing.T) {
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g", "description": "c"})
 	ctx.api.RegisterResponse("PUT /network/firewalls/{id}", http.StatusServiceUnavailable, "", 1)
 
-	err := ctx.client.UpdateFirewallGroup(t.Context(), "g", clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+	err := ctx.client.UpdateFirewallGroup(t.Context(), "g", clienttest.BuildMockUpdateFirewallGroup(func(in *onidelapi.UpdateFirewallGroup) {
 		in.TeamID, in.Description = "", "d"
 	}))
 
@@ -281,7 +282,7 @@ func TestClientNeverRetriesAPOST(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.RegisterResponse("POST /network/firewalls", http.StatusServiceUnavailable, "", 1)
 
-	_, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockFirewallGroupInput(func(in *client.FirewallGroupInput) {
+	_, err := ctx.client.CreateFirewallGroup(t.Context(), clienttest.BuildMockNewFirewallGroup(func(in *onidelapi.NewFirewallGroup) {
 		in.TeamID, in.Description = "t", "x"
 	}))
 
@@ -342,7 +343,7 @@ func TestClientReportsABaseURLThatDoesNotParse(t *testing.T) {
 
 	var urlErr *url.Error
 	require.ErrorAs(t, err, &urlErr)
-	assert.Equal(t, &url.Error{Op: "parse", URL: "http://bad host/teams", Err: url.InvalidHostError(" ")}, urlErr)
+	assert.Equal(t, &url.Error{Op: "parse", URL: "http://bad host/", Err: url.InvalidHostError(" ")}, urlErr)
 }
 
 func TestNewDefaultsToTheProductionAPI(t *testing.T) {

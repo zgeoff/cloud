@@ -1,9 +1,10 @@
-// Package client is a small typed HTTP client for the parts of the Onidel cloud API
-// that the provider uses. It is written against provider/spec/onidel.yaml.
+// Package client is the provider's policy on top of the generated Onidel client in
+// internal/onidelapi: retries with an injected sleep, error mapping, and the waits for a
+// VM to settle. Requests and responses use onidelapi's generated types.
 //
-// Security: the API returns a VM's root password in plain text. No type in this
-// package has a field for it, so it is dropped at decode time, and no function here
-// logs or formats a response body.
+// Security: the API returns a VM's root password in plain text. No onidelapi type has a
+// field for it, so it is dropped at decode time, and no function here logs or formats a
+// response body.
 package client
 
 import (
@@ -14,9 +15,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 	"time"
+
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 // DefaultBaseURL is the production Onidel API.
@@ -35,9 +36,8 @@ const DefaultVMWaitTimeout = 30 * time.Minute
 
 // Client talks to the Onidel API with a bearer token.
 type Client struct {
-	baseURL string
-	apiKey  string
-	http    *http.Client
+	api  *onidelapi.Client
+	http *http.Client
 	// PollInterval is how long the wait helpers sleep between reads.
 	PollInterval time.Duration
 	// RetryBase is the first backoff for a retried request; it doubles per retry.
@@ -54,15 +54,23 @@ func New(baseURL, apiKey string) *Client {
 	if baseURL == "" {
 		baseURL = DefaultBaseURL
 	}
-	return &Client{
-		baseURL:       strings.TrimRight(baseURL, "/"),
-		apiKey:        apiKey,
+	c := &Client{
 		http:          &http.Client{Timeout: 60 * time.Second},
 		PollInterval:  DefaultPollInterval,
 		RetryBase:     500 * time.Millisecond,
 		VMWaitTimeout: DefaultVMWaitTimeout,
 		Sleep:         sleepContext,
 	}
+	// NewClient fails only when an option does, and neither of these can.
+	c.api, _ = onidelapi.NewClient(baseURL,
+		onidelapi.WithHTTPClient(retryingDoer{c}),
+		onidelapi.WithRequestEditorFn(func(_ context.Context, req *http.Request) error {
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+			req.Header.Set("Accept", "application/json")
+			return nil
+		}),
+	)
+	return c
 }
 
 // sleepContext waits d, or returns ctx's error as soon as ctx ends.
@@ -100,23 +108,30 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &apiErr) && apiErr.Status == http.StatusNotFound
 }
 
-// sendRequest sends one request. body, when non-nil, is encoded as JSON; out, when
-// non-nil, receives the decoded response. The raw response bytes are returned only
-// for callers in this package that must sniff an undocumented body; they are never
-// logged or put into an error.
+// retryingDoer is the generated client's transport. It sends each request through
+// Client.sendRequest, so every generated call gets the same retries and errors.
+type retryingDoer struct{ c *Client }
+
+func (d retryingDoer) Do(req *http.Request) (*http.Response, error) { return d.c.sendRequest(req) }
+
+// sendRequest sends req and returns a 2xx response with its body read in full, or an
+// error: an *APIError for any other status, or the transport's error wrapped with the
+// method and path. Neither the body nor any part of it but the API's error code ever
+// reaches an error.
 //
 // Onidel answers bursts (a parallel Pulumi refresh) with 503. Idempotent requests
 // (GET, PUT, DELETE) retry on 429, 502, 503 and 504 with exponential backoff; a POST
 // or PATCH never retries, so it cannot run twice.
-func (c *Client) sendRequest(
-	ctx context.Context, method, path string, query url.Values, body, out any,
-) ([]byte, error) {
+func (c *Client) sendRequest(req *http.Request) (*http.Response, error) {
 	for attempt := 0; ; attempt++ {
-		raw, err := c.sendOnce(ctx, method, path, query, body, out)
-		if !shouldRetry(method, err) || attempt >= maxRetries {
-			return raw, err
+		resp, err := c.sendOnce(req)
+		if !shouldRetry(req.Method, err) || attempt >= maxRetries {
+			return resp, err
 		}
-		if err := c.Sleep(ctx, c.RetryBase<<attempt); err != nil {
+		if err := c.Sleep(req.Context(), c.RetryBase<<attempt); err != nil {
+			return nil, err
+		}
+		if req, err = buildRetry(req); err != nil {
 			return nil, err
 		}
 	}
@@ -141,60 +156,43 @@ func shouldRetry(method string, err error) bool {
 	return false
 }
 
-func (c *Client) sendOnce(
-	ctx context.Context, method, path string, query url.Values, body, out any,
-) ([]byte, error) {
-	target := c.baseURL + path
-	if len(query) > 0 {
-		target += "?" + query.Encode()
-	}
-
-	var reader io.Reader
-	if body != nil {
-		encoded, err := json.Marshal(body)
+// buildRetry copies req with a fresh body. The generated client builds every body from
+// bytes, so net/http gives each request a GetBody.
+func buildRetry(req *http.Request) (*http.Request, error) {
+	retry := req.Clone(req.Context())
+	if req.GetBody != nil {
+		body, err := req.GetBody()
 		if err != nil {
-			return nil, fmt.Errorf("onidel: encode %s %s: %w", method, path, err)
+			return nil, err
 		}
-		reader = bytes.NewReader(encoded)
+		retry.Body = body
 	}
+	return retry, nil
+}
 
-	req, err := http.NewRequestWithContext(ctx, method, target, reader)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
-	req.Header.Set("Accept", "application/json")
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
+func (c *Client) sendOnce(req *http.Request) (*http.Response, error) {
+	path := req.URL.EscapedPath()
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("onidel: %s %s: %w", method, path, err)
+		return nil, fmt.Errorf("onidel: %s %s: %w", req.Method, path, err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return nil, fmt.Errorf("onidel: %s %s: read body: %w", method, path, err)
+		return nil, fmt.Errorf("onidel: %s %s: read body: %w", req.Method, path, err)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		return nil, &APIError{
-			Method: method,
+			Method: req.Method,
 			Path:   path,
 			Status: resp.StatusCode,
 			Code:   parseErrorCode(raw),
 		}
 	}
-
-	if out != nil && len(bytes.TrimSpace(raw)) > 0 {
-		if err := json.Unmarshal(raw, out); err != nil {
-			// The decode error names a type and offset, not body content.
-			return nil, fmt.Errorf("onidel: decode %s %s: %w", method, path, err)
-		}
-	}
-	return raw, nil
+	resp.Body = io.NopCloser(bytes.NewReader(raw))
+	return resp, nil
 }
 
 // parseErrorCode pulls the short error code out of an error body. Onidel documents
@@ -220,12 +218,45 @@ func parseErrorCode(raw []byte) string {
 	return ""
 }
 
-// buildTeamQuery returns the team_id query, or nil when teamID is empty.
-func buildTeamQuery(teamID string) url.Values {
+// readBody returns the body of a response that sendRequest already read in full, or
+// err. Only callers in this package that must sniff an undocumented body use the bytes;
+// they are never logged or put into an error.
+func readBody(resp *http.Response, err error) ([]byte, error) {
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	return io.ReadAll(resp.Body)
+}
+
+// decodeResponse decodes a generated call's response into a T. An empty body decodes
+// as T's zero value.
+func decodeResponse[T any](resp *http.Response, err error) (T, error) {
+	var out T
+	raw, err := readBody(resp, err)
+	if err != nil || len(bytes.TrimSpace(raw)) == 0 {
+		return out, err
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		// The decode error names a type and offset, not body content.
+		return out, fmt.Errorf("onidel: decode %s %s: %w", resp.Request.Method, resp.Request.URL.EscapedPath(), err)
+	}
+	return out, nil
+}
+
+// requireSuccess returns err from a generated call whose body the caller does not need.
+func requireSuccess(resp *http.Response, err error) error {
+	_, err = readBody(resp, err)
+	return err
+}
+
+// buildTeamID returns teamID as the generated query parameter, nil when empty so the
+// request leaves it out and the API uses the default team.
+func buildTeamID(teamID string) *string {
 	if teamID == "" {
 		return nil
 	}
-	return url.Values{"team_id": {teamID}}
+	return &teamID
 }
 
 // waitFor polls check until it reports done, returns an error, or ctx ends. check

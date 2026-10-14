@@ -10,13 +10,16 @@ import (
 )
 
 // SendRequest sends one request with the stub's bearer token to baseURL+path and
-// returns the status and the raw body. An empty body sends no content. It fails the
-// test on a transport error.
+// returns the status and the raw body. A body goes out as JSON, as the client sends
+// it; an empty body sends no content. It fails the test on a transport error.
 func SendRequest(t testing.TB, baseURL, method, path, body string) (int, string) {
 	t.Helper()
 	req, err := http.NewRequestWithContext(t.Context(), method, baseURL+path, strings.NewReader(body))
 	require.NoError(t, err)
 	req.Header.Set("Authorization", "Bearer "+APIKey)
+	if body != "" {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = resp.Body.Close() })

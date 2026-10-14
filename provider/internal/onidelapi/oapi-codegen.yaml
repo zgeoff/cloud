@@ -1,0 +1,44 @@
+# oapi-codegen's config for onidelapi.gen.go. go generate runs it from this directory, so
+# the overlay path is relative to it.
+package: onidelapi
+generate:
+  client: true
+  models: true
+  # The stub API validates requests against this spec: the operations below, after the overlay.
+  embedded-spec: true
+compatibility:
+  always-prefix-enum-values: true
+output-options:
+  name-normalizer: ToCamelCaseWithInitialisms
+  prefer-skip-optional-pointer: true
+  # IDs and timestamps stay strings: the client passes them through and never parses one,
+  # so a live value in another format never fails a decode.
+  type-mapping:
+    string:
+      formats:
+        uuid:
+          type: string
+        date-time:
+          type: string
+  overlay:
+    path: ../../spec/onidel.overlay.yaml
+  # The operations the provider and the snapshot command call. The rest of the spec, and
+  # every schema only it uses, is left out.
+  include-operation-ids:
+    - getTeams
+    - getOSTemplate
+    - getVMs
+    - provisionVM
+    - getVM
+    - patchVM
+    - deleteVM
+    - snapshotVM
+    - getSnapshots
+    - createFirewall
+    - getFirewall
+    - updateFirewall
+    - deleteFirewall
+    - createFirewallRule
+    - getFirewallRule
+    - updateFirewallRule
+    - deleteFirewallRule
