@@ -41,13 +41,13 @@ Build and check in one command, from any zgeoff/cloud clone, on a machine whose 
 geoffcloud host. The token needs `manage` scope with no imp patterns.
 
 ```sh
-bash scripts/build-agent-image.sh            # origin/main's head, after a fetch
-bash scripts/build-agent-image.sh <commit>   # or an older commit on main
+bun scripts/build-agent-image.ts            # origin/main's head, after a fetch
+bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 ```
 
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
-runs that commit's `scripts/check-agent-image.sh` there, and removes the imp. Its last line is
+runs that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
 `agent-<short sha> <digest> check passed`; record that line on the PR. A failed check removes the
 image, unless `--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is
 not on `main`, and an image or check imp name that already exists.
@@ -150,7 +150,7 @@ is the release, such as `4.5.0`.
 1. Build and check the image from `main`'s head:
 
    ```bash
-   bash scripts/build-agent-image.sh
+   bun scripts/build-agent-image.ts
    ```
 
    Expect its last line to read `agent-<short sha> <digest> check passed`. Record that line on the
@@ -232,7 +232,7 @@ the allowlist entry.
    above its pin.
 2. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
    its check; run it locally first to find a failure sooner.
-3. After the PR merges, run `bash scripts/build-agent-image.sh`, and record its last line on the PR.
+3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
    `imp image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.

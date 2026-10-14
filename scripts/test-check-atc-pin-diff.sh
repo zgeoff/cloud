@@ -96,20 +96,20 @@ it_refuses_a_change_to_another_file() {
 ARG ATC_VERSION=3.10.2
 ARG ATC_SHA256=8f47233eab37dbfc0b700f2665a6caf69cbc986a73651d2b6f8f26eb908818c4
 EOF
-  echo 'echo check' > "$tree/repo/scripts/check-agent-image.sh"
+  echo 'echo check' > "$tree/repo/scripts/agent-image-check-guest.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qm 'add the image'
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" switch -qc pin
   sed -i -e 's/^ARG ATC_VERSION=.*/ARG ATC_VERSION=3.11.0/' \
     -e 's/^ARG ATC_SHA256=.*/ARG ATC_SHA256=4444444444444444444444444444444444444444444444444444444444444444/' \
     "$tree/repo/images/agent/Dockerfile"
-  echo 'exit 0' > "$tree/repo/scripts/check-agent-image.sh"
+  echo 'exit 0' > "$tree/repo/scripts/agent-image-check-guest.sh"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" commit -qam 'pin atc 3.11.0'
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" main pin) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'the diff changes scripts/check-agent-image.sh, not only images/agent/Dockerfile'
+  diff - "$tree/err" <<< 'the diff changes scripts/agent-image-check-guest.sh, not only images/agent/Dockerfile'
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1
