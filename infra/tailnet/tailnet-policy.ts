@@ -128,5 +128,4 @@ export const tailnetPolicy = {
       users: ['autogroup:nonroot', 'root'],
     },
   ],
-  nodeAttrs: [{ target: ['autogroup:member'], attr: ['funnel'] }],
 };

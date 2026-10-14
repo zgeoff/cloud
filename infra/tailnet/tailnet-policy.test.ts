@@ -4,7 +4,7 @@ import { tailnetPolicy } from './tailnet-policy.ts';
 
 // Acl replaces the whole tailnet file, so the whole policy is the contract: a lost
 // grant, SSH rule or tag owner fails here before it reaches the tailnet
-test('it holds every host, tag owner, grant, SSH rule and node attribute the tailnet relies on', () => {
+test('it holds every host, tag owner, grant and SSH rule the tailnet relies on', () => {
   expect(tailnetPolicy).toStrictEqual({
     hosts: {
       'home-pc': '100.67.122.120',
@@ -51,8 +51,13 @@ test('it holds every host, tag owner, grant, SSH rule and node attribute the tai
         users: ['autogroup:nonroot', 'root'],
       },
     ],
-    nodeAttrs: [{ target: ['autogroup:member'], attr: ['funnel'] }],
   });
+});
+
+// Funnel publishes a device's port to the internet, and the policy grants it only through a node
+// attribute, so a policy with no node attributes lets no device use Funnel
+test('it grants no device a node attribute, so no device can use Funnel', () => {
+  expect(tailnetPolicy).not.toContainKey('nodeAttrs');
 });
 
 // imp's e2e nodes are throwaway: a grant that took them anywhere but each other
