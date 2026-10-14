@@ -11,6 +11,7 @@ import { alloyValues } from './alloy-values.ts';
 import { createDashboards } from './create-dashboards.ts';
 import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
+import { lokiValues } from './loki-values.ts';
 import { observabilityNamespace } from './observability-namespace.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
@@ -21,41 +22,6 @@ interface ClusterObservabilityOutputs {
   readonly grafanaURL: string;
   readonly grafanaAdminPassword: Output<string>;
 }
-
-const lokiValues = {
-  deploymentMode: 'SingleBinary',
-  loki: {
-    auth_enabled: false,
-    commonConfig: { replication_factor: 1 },
-    storage: { type: 'filesystem' },
-    schemaConfig: {
-      configs: [
-        {
-          from: '2026-10-01',
-          store: 'tsdb',
-          object_store: 'filesystem',
-          schema: 'v13',
-          index: { prefix: 'index_', period: '24h' },
-        },
-      ],
-    },
-    limits_config: { retention_period: '720h' },
-    compactor: { retention_enabled: true, delete_request_store: 'filesystem' },
-  },
-  singleBinary: {
-    replicas: 1,
-    persistence: { size: '20Gi' },
-    resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '384Mi' } },
-  },
-  read: { replicas: 0 },
-  write: { replicas: 0 },
-  backend: { replicas: 0 },
-  chunksCache: { enabled: false },
-  resultsCache: { enabled: false },
-  gateway: { enabled: false },
-  lokiCanary: { enabled: false },
-  test: { enabled: false },
-};
 
 // Prometheus, Alertmanager, Grafana, Loki, Alloy on one node (~1 GiB, #8); 30-day retention.
 // Alertmanager reaches Discord only with alertWebhookURL (#29). atcDaemons adds a TCP probe
