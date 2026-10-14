@@ -1,16 +1,24 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
+import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
 import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
-import type { TunnelRoute } from './build-tunnel-ingresses.ts';
+import type { OriginAccess, TunnelRoute } from './build-tunnel-ingresses.ts';
 
 interface TunnelRoutesInputs {
   readonly accountID: string;
   readonly zoneID: Output<string>;
   readonly tunnelID: Output<string>;
 
-  // the atc gateway, on its public URL's host. It owns OAuth too.
-  readonly atcRoute?: TunnelRoute | undefined;
+  // the atc gateway, on its public URL's host, with the Access application in front of its
+  // sign-in pages. It owns OAuth too.
+  readonly gateway?: GatewayIngress | undefined;
+}
+
+// the atc gateway's route and the Access application in front of its sign-in pages
+export interface GatewayIngress {
+  readonly route: TunnelRoute;
+  readonly access: OriginAccess;
 }
 
 interface TunnelRoutesOutputs {
@@ -24,7 +32,7 @@ interface TunnelRoutesOutputs {
 // The tunnel's ingress rules and the proxied CNAME for each hostname. The catch-all 404
 // stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const atcRoute = inputs.atcRoute;
+  const gateway = inputs.gateway;
   const previewWebhookRoute = buildPreviewWebhookRoute();
 
   const config = new ZeroTrustTunnelCloudflaredConfig('edge', {
@@ -32,13 +40,15 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
     tunnelId: inputs.tunnelID,
     config: {
       ingresses: buildTunnelIngresses([
-        ...(atcRoute === undefined ? [] : [atcRoute]),
+        ...(gateway === undefined ? [] : buildATCGatewayRoutes(gateway.route, gateway.access)),
         previewWebhookRoute,
       ]),
     },
   });
 
-  const atc = atcRoute === undefined ? undefined : createRecord('atc', inputs, atcRoute.hostname);
+  const atc =
+    gateway === undefined ? undefined : createRecord('atc', inputs, gateway.route.hostname);
+
   const previewWebhook = createRecord('preview-webhook', inputs, previewWebhookRoute.hostname);
 
   return {

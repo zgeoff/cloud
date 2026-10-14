@@ -21,7 +21,10 @@ test('it carries the checked config, the pull credential and a token per daemon,
     defaultDaemon: 'geoffcloud',
   });
 
-  const stackConfig = buildStubConfig({ atcGateway: JSON.stringify(config) });
+  const stackConfig = buildStubConfig({
+    atcGateway: JSON.stringify(config),
+    atcGatewayOwnerEmail: 'owner@example.test',
+  });
 
   expect(
     loadATCGatewayInputs(stackConfig, {
@@ -42,6 +45,7 @@ test('it carries the checked config, the pull credential and a token per daemon,
           geoffcloud: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
           'home-pc': expect.toSatisfy((value: unknown) => Output.isInstance(value)),
         },
+        ownerEmail: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
       },
     },
   });
@@ -61,6 +65,7 @@ test('it gives a daemon the stack config leaves without alertSeverity the severi
       },
       defaultDaemon: 'geoffcloud',
     }),
+    atcGatewayOwnerEmail: 'owner@example.test',
   });
 
   expect(
@@ -104,12 +109,18 @@ test('it marks every daemon token secret', () => {
     defaultDaemon: 'geoffcloud',
   });
 
-  const result = loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-    ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-    GHCR_PULL_USERNAME: 'octo-puller',
-    GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-    ATC_GATEWAY_TOKEN_HOME_PC: 'h'.repeat(32),
-  });
+  const result = loadATCGatewayInputs(
+    buildStubConfig({
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+    }),
+    {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+      ATC_GATEWAY_TOKEN_HOME_PC: 'h'.repeat(32),
+    },
+  );
 
   if (result.atcGateway === undefined) {
     throw new Error('expected the gateway inputs');
@@ -134,12 +145,18 @@ test('it gives each daemon the token from its own ATC_GATEWAY_TOKEN_<NAME> varia
     defaultDaemon: 'geoffcloud',
   });
 
-  const result = loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-    ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-    GHCR_PULL_USERNAME: 'octo-puller',
-    GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-    ATC_GATEWAY_TOKEN_HOME_PC: 'h'.repeat(32),
-  });
+  const result = loadATCGatewayInputs(
+    buildStubConfig({
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+    }),
+    {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+      ATC_GATEWAY_TOKEN_HOME_PC: 'h'.repeat(32),
+    },
+  );
 
   const tokens = result.atcGateway?.secrets.tokens;
 
@@ -163,16 +180,22 @@ test('it marks every backup value secret when the backup variables are set', () 
     defaultDaemon: 'geoffcloud',
   });
 
-  const result = loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-    ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-    GHCR_PULL_USERNAME: 'octo-puller',
-    GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-    ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
-    ATC_GATEWAY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
-    ATC_GATEWAY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
-    ATC_GATEWAY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
-    ATC_GATEWAY_R2_BUCKET: 'atc-gateway-backups',
-  });
+  const result = loadATCGatewayInputs(
+    buildStubConfig({
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+    }),
+    {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+      ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
+      ATC_GATEWAY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      ATC_GATEWAY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      ATC_GATEWAY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      ATC_GATEWAY_R2_BUCKET: 'atc-gateway-backups',
+    },
+  );
 
   const backup = result.atcGateway?.secrets.backup;
 
@@ -192,16 +215,22 @@ test('it carries the backup values, with the restic repository built from the R2
     defaultDaemon: 'geoffcloud',
   });
 
-  const result = loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-    ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-    GHCR_PULL_USERNAME: 'octo-puller',
-    GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-    ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
-    ATC_GATEWAY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
-    ATC_GATEWAY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
-    ATC_GATEWAY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
-    ATC_GATEWAY_R2_BUCKET: 'atc-gateway-backups',
-  });
+  const result = loadATCGatewayInputs(
+    buildStubConfig({
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+    }),
+    {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+      ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
+      ATC_GATEWAY_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      ATC_GATEWAY_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      ATC_GATEWAY_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      ATC_GATEWAY_R2_BUCKET: 'atc-gateway-backups',
+    },
+  );
 
   const backup = result.atcGateway?.secrets.backup;
 
@@ -225,7 +254,13 @@ test("it throws when a daemon's token is missing from the environment it is give
   });
 
   expect(() =>
-    loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {}),
+    loadATCGatewayInputs(
+      buildStubConfig({
+        atcGateway: JSON.stringify(config),
+        atcGatewayOwnerEmail: 'owner@example.test',
+      }),
+      {},
+    ),
   ).toThrowWithMessage(
     Error,
     "ATC_GATEWAY_TOKEN_GEOFFCLOUD is unset; .env must reference the daemon's token",
@@ -239,12 +274,18 @@ test('it throws when only some backup variables are set in the environment it is
   });
 
   expect(() =>
-    loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-      GHCR_PULL_USERNAME: 'octo-puller',
-      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-      ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
-    }),
+    loadATCGatewayInputs(
+      buildStubConfig({
+        atcGateway: JSON.stringify(config),
+        atcGatewayOwnerEmail: 'owner@example.test',
+      }),
+      {
+        ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+        GHCR_PULL_USERNAME: 'octo-puller',
+        GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+        ATC_GATEWAY_RESTIC_PASSWORD: 'p'.repeat(32),
+      },
+    ),
   ).toThrowWithMessage(
     Error,
     "the atc gateway's backup needs every one of ATC_GATEWAY_RESTIC_PASSWORD, ATC_GATEWAY_R2_ACCESS_KEY_ID, ATC_GATEWAY_R2_SECRET_ACCESS_KEY, ATC_GATEWAY_R2_ENDPOINT, ATC_GATEWAY_R2_BUCKET; unset: ATC_GATEWAY_R2_ACCESS_KEY_ID, ATC_GATEWAY_R2_SECRET_ACCESS_KEY, ATC_GATEWAY_R2_ENDPOINT, ATC_GATEWAY_R2_BUCKET",
@@ -257,11 +298,17 @@ test('it marks the pull token secret and carries it as given', async () => {
     defaultDaemon: 'geoffcloud',
   });
 
-  const result = loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-    ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-    GHCR_PULL_USERNAME: 'octo-puller',
-    GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
-  });
+  const result = loadATCGatewayInputs(
+    buildStubConfig({
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+    }),
+    {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+    },
+  );
 
   const token = result.atcGateway?.secrets.pullCredential.token;
 
@@ -283,12 +330,67 @@ test('it throws when the pull token is missing from the environment it is given'
   });
 
   expect(() =>
-    loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
-      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
-      GHCR_PULL_USERNAME: 'octo-puller',
-    }),
+    loadATCGatewayInputs(
+      buildStubConfig({
+        atcGateway: JSON.stringify(config),
+        atcGatewayOwnerEmail: 'owner@example.test',
+      }),
+      {
+        ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+        GHCR_PULL_USERNAME: 'octo-puller',
+      },
+    ),
   ).toThrowWithMessage(
     Error,
     "GHCR_PULL_TOKEN is unset; the atc gateway's images are private, so .env must reference op://cloud/ghcr-pull",
+  );
+});
+
+test("it carries the owner's address from the secret stack config, still marked secret", async () => {
+  const config = buildMockATCGatewayConfig({
+    daemons: { geoffcloud: {} },
+    defaultDaemon: 'geoffcloud',
+  });
+
+  const result = loadATCGatewayInputs(
+    buildStubConfig({
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+    }),
+    {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+    },
+  );
+
+  const ownerEmail = result.atcGateway?.secrets.ownerEmail;
+
+  if (ownerEmail === undefined) {
+    throw new Error("expected the owner's address");
+  }
+
+  const isMarkedSecret = await isSecret(ownerEmail);
+  const value = await resolveOutput(ownerEmail);
+
+  expect(isMarkedSecret).toBeTrue();
+  expect(value).toBe('owner@example.test');
+});
+
+test("it throws naming the config command when the owner's address is unset", () => {
+  const config = buildMockATCGatewayConfig({
+    daemons: { geoffcloud: {} },
+    defaultDaemon: 'geoffcloud',
+  });
+
+  expect(() =>
+    loadATCGatewayInputs(buildStubConfig({ atcGateway: JSON.stringify(config) }), {
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+    }),
+  ).toThrowWithMessage(
+    Error,
+    "atcGatewayOwnerEmail is unset; the Access policy in front of the gateway's sign-in pages needs it: run `pulumi config set --secret atcGatewayOwnerEmail <owner address>` in infra/",
   );
 });

@@ -2,18 +2,34 @@ import type { Output } from '@pulumi/pulumi';
 import { exposure } from '@zgeoff/cloud-topology';
 
 // a public hostname the tunnel serves, from a workload in k3s or a listener on the host, and the
-// one path it lets through when it lets through only one: a Go regular expression that cloudflared
-// matches anywhere in the request path, so it needs both anchors
+// paths it lets through when it limits them: a Go regular expression that cloudflared matches
+// anywhere in the decoded request path, so it needs both anchors
 export interface TunnelRoute {
   readonly hostname: string;
   readonly service: string | Output<string>;
   readonly path?: string;
+
+  // the Access application whose token cloudflared requires on this route
+  readonly access?: OriginAccess;
+}
+
+// the Access application whose token cloudflared checks on a route
+export interface OriginAccess {
+  readonly teamName: Output<string>;
+  readonly audience: Output<string>;
 }
 
 interface TunnelIngress {
   readonly hostname?: string;
   readonly path?: string;
   readonly service: string | Output<string>;
+  readonly originRequest?: {
+    readonly access: {
+      readonly required: boolean;
+      readonly teamName: Output<string>;
+      readonly audTags: Output<string>[];
+    };
+  };
 }
 
 // The tunnel's ingress rules, then the catch-all 404, last since cloudflared takes the first rule
@@ -29,6 +45,17 @@ export function buildTunnelIngresses(routes: readonly TunnelRoute[]): TunnelIngr
       hostname: route.hostname,
       ...(route.path === undefined ? {} : { path: route.path }),
       service: route.service,
+      ...(route.access === undefined
+        ? {}
+        : {
+            originRequest: {
+              access: {
+                required: true,
+                teamName: route.access.teamName,
+                audTags: [route.access.audience],
+              },
+            },
+          }),
     })),
     { service: 'http_status:404' },
   ];

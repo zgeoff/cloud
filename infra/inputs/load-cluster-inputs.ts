@@ -19,7 +19,7 @@ interface ClusterConfigInputs {
 // the program, so a missing value fails before any resource registers instead of planning to
 // delete the cluster's resources.
 export function loadClusterInputs(
-  stackConfig: Pick<StackConfig, 'get' | 'getObject'>,
+  stackConfig: Pick<StackConfig, 'get' | 'getObject' | 'getSecret'>,
   env: Environment,
 ): ClusterConfigInputs | undefined {
   const kubeconfig = requireKubeconfig(stackConfig.get('cluster'), env);
