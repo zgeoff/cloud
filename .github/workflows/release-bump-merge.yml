@@ -3,7 +3,12 @@ name: release bump merge
 # Merges a release check pull request (release-check/<dependency>, opened by the release check
 # workflow) once it may merge on its own: scripts/merge-release-bump.sh holds the rules. It runs
 # each time a workflow that checks such a pull request finishes, so the last check to finish
-# merges it. A run for any other branch or event is skipped, which bills nothing.
+# merges it, and each time such a pull request gets the auto-merge label, so a label put back after
+# its checks finished still merges it (scripts/decide-release-bump-merge.sh). A run for any other
+# branch, label or event is skipped, which bills nothing.
+#
+# pull_request_target runs this workflow and checks out main, never the pull request's head, so
+# the app's token never meets code from the pull request.
 #
 # It reads the pull request with GITHUB_TOKEN and merges with the release check app's token, so
 # the push to main starts its workflows. The app and its secrets are the release check workflow's.
@@ -11,6 +16,8 @@ on:
   workflow_run:
     workflows: [CI, NixOS checks, agent image, atc-gateway images, nixie backup]
     types: [completed]
+  pull_request_target:
+    types: [labeled]
 
 permissions:
   contents: read
@@ -21,14 +28,19 @@ permissions:
 jobs:
   merge:
     if: >-
-      github.event.workflow_run.event == 'pull_request' &&
+      (github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' &&
       startsWith(github.event.workflow_run.head_branch, 'release-check/') &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      github.event.workflow_run.head_repository.full_name == github.repository) ||
+      (github.event_name == 'pull_request_target' && github.event.label.name == 'auto-merge' &&
+      startsWith(github.event.pull_request.head.ref, 'release-check/') &&
+      github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-slim
     timeout-minutes: 5
     # one decision per branch at a time, so two finishing checks never merge twice
     concurrency:
-      group: release-bump-merge-${{ github.event.workflow_run.head_branch }}
+      group:
+        release-bump-merge-${{ github.event.workflow_run.head_branch ||
+        github.event.pull_request.head.ref }}
       cancel-in-progress: false
     steps:
       - name: Checkout
@@ -53,8 +65,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MERGE_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_LOGIN: app/${{ steps.app-token.outputs.app-slug }}
-          BRANCH: ${{ github.event.workflow_run.head_branch }}
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'
-        run: bun run --silent ci:merge-release-bump-with-summary "$BRANCH"
+        run: bun run --silent ci:decide-release-bump-merge

@@ -184,6 +184,45 @@ EOF
   }
 }
 
+it_puts_back_the_auto_merge_label_with_no_push_after_a_run_that_failed_past_its_push() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo 'imp 1.0.0' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" add -A
+  "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin main
+  "${case_env[@]}" git -C "$tree/seed" switch -qc release-check/imp
+  echo 'imp 1.0.1' > "$tree/seed/pins"
+  "${case_env[@]}" git -C "$tree/seed" commit -qam 'chore(imp): bump imp to 1.0.1'
+  "${case_env[@]}" git -C "$tree/seed" push -q origin release-check/imp
+  "${case_env[@]}" git -C "$tree/seed" switch -q main
+  "${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/imp > "$tree/before"
+  "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
+  # the run before pushed this head, took auto-merge off and failed before it put it back
+  echo '[{"autoMergeRequest":null,"labels":[{"name":"update:patch"}],"number":14,"url":"https://github.com/zgeoff/cloud/pull/14"}]' > "$tree/open-prs"
+  echo 'Bumps imp to 1.0.1.' > "$tree/pr-body"
+  printf 'update:patch\nauto-merge\n' > "$tree/labels"
+
+  (cd "$tree/clone" && "${case_env[@]}" bash "$script" imp 1.0.1 "$tree/pr-body" "$tree/labels" \
+    sh -c 'echo "imp 1.0.1" > pins') > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/pull/14 already bumps imp to 1.0.1'
+  diff /dev/null "$tree/err"
+  diff "$tree/before" <("${case_env[@]}" git --git-dir="$tree/origin.git" rev-parse release-check/imp)
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
+["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
+["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]
+["gh","pr","edit","14","--repo","zgeoff/cloud","--add-label","auto-merge"]
+EOF
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
 it_rebuilds_the_branch_when_main_changed_a_pinned_file() {
   local status=0
   tree="$(mktemp -d)"
