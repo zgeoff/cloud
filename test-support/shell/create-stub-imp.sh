@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # create_stub_imp <bin>: writes <bin>/imp, a stand-in for the imp CLI calls that
-# build-agent-image.sh and switch-agent-image.sh make. It logs each call's argv as a JSON line to
+# build-agent-image.sh makes. It logs each call's argv as a JSON line to
 # STUB_TREE/calls, and keeps the host's images and imps in STUB_TREE/imp-state.json as
 # {"images":[{"name","digest"}],"imps":[{"name","image"}]}, which a test writes first; a missing
 # file is an empty host.

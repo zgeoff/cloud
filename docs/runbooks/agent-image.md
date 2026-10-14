@@ -83,10 +83,10 @@ The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs
 into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB, before each new
 imp's first session starts.
 
-1. Run `bash scripts/switch-agent-image.sh agent-<short sha>` on the machine that runs the daemon.
-   It refuses an image the host lacks, copies the config to
-   `config.json.bak-<UTC stamp>-pre-<image>`, then sets `targets.cloud.image` and
-   `targets.cloud.guestATC` and changes nothing else. A second argument names another config file.
+1. Run `bun scripts/switch-agent-image.ts agent-<short sha>` on the machine that runs the daemon. It
+   refuses an image the host lacks, copies the config to `config.json.bak-<UTC stamp>-pre-<image>`,
+   then sets `targets.cloud.image` and `targets.cloud.guestATC` and changes nothing else. A second
+   argument names another config file.
 2. Restart the daemon when no session needs it, with the command the script prints,
    `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
    `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The
@@ -169,7 +169,7 @@ is the release, such as `4.5.0`.
 3. Switch the `cloud` target, and leave the daemon running:
 
    ```bash
-   bash scripts/switch-agent-image.sh agent-<short sha>
+   bun scripts/switch-agent-image.ts agent-<short sha>
    ```
 
    The script prints `atc daemon restart`. Wait for step 4 to run it.
