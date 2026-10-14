@@ -28,6 +28,7 @@
     "test:scripts": "bash scripts/run-shell-suites.sh",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-shell-suites.sh nixie-backup-fixture",
+    "login:ghcr": "printf '%s' \"$GH_TOKEN\" | docker login ghcr.io -u \"$GITHUB_ACTOR\" --password-stdin",
     "test:nixos": "bash scripts/run-nixos-checks.sh",
     "ci:check-atc-pin-diff": "bash scripts/check-atc-pin-diff.sh",
     "ci:write-deploy-env": "bash scripts/write-deploy-env.sh",
