@@ -71,7 +71,7 @@
     "ci:write-release-bumps": "bash scripts/write-release-bumps.sh",
     "ci:set-release-bot-identity": "bash scripts/set-release-bot-identity.sh",
     "ci:bump-releases": "bash scripts/bump-releases.sh",
-    "ci:merge-release-bump-with-summary": "bash scripts/merge-release-bump-with-summary.sh",
+    "ci:decide-release-bump-merge": "bash scripts/decide-release-bump-merge.sh",
     "ci:enable-atc-pin-auto-merge": "bash scripts/enable-atc-pin-auto-merge.sh",
     "ci:decide-provider-checks": "bash scripts/decide-provider-checks.sh",
     "ci:decide-full-checks": "bash scripts/decide-full-checks.sh",
