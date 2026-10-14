@@ -138,7 +138,13 @@ test('it exits with curl’s code when impd refuses the connection', async () =>
 
   expect(result.exitCode).toBe(7);
   expect(result.stdout.toString()).toBe('\n000');
-  expect(result.stderr.toString()).toStartWith('curl: (7) Failed to connect to 127.0.0.1 port 1');
+
+  // curl 8.5.0 (Ubuntu 24.04) and 8.22.0 word the refusal differently; both exit 7. The connect
+  // time is masked, since it changes between runs.
+  expect(result.stderr.toString().replace(/ after \d+ ms: /u, ' after N ms: ')).toBeOneOf([
+    "curl: (7) Failed to connect to 127.0.0.1 port 1 after N ms: Couldn't connect to server\n",
+    'curl: (7) Failed to connect to 127.0.0.1:1 after N ms: Could not connect to server\n',
+  ]);
 });
 
 test('it keeps the request on loopback under a hostile curl config and proxy variables', async () => {
