@@ -34,7 +34,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    ```sh
    x=/tmp/geoffcloud-extra
-   mkdir -p $x/var/lib/tailscale $x/var/lib/imp-host/secrets
+   mkdir -p $x/var/lib/tailscale $x/var/lib/imp-host/secrets $x/var/lib/zfs-keys
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets hostAuthKey) \
      > $x/var/lib/tailscale/authkey
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impHostAuthKey) \
@@ -55,6 +55,21 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
    warns.
+
+   Stage the key of the encryption root `tank/cloud` too. `--no-newline` keeps the file at exactly
+   the key's 64 hex characters, so the length check catches a wrong item before the install:
+
+   ```sh
+   op read --no-newline op://cloud/zfs-tank-key/password > $x/var/lib/zfs-keys/tank.key
+   test "$(wc -c < $x/var/lib/zfs-keys/tank.key)" -eq 64 && echo ok
+   chmod 700 $x/var/lib/zfs-keys
+   chmod 400 $x/var/lib/zfs-keys/tank.key
+   ```
+
+   Expect `ok`. Without it, check the item and stage the key again before you go on.
+
+   Without the key, the host boots and joins the tailnet, but k3s, imp-host and the atc daemon stay
+   stopped ([tank/cloud](./tank-cloud.md#if-the-key-fails-to-load-at-boot)).
 
 4. Stop imp on the old host, and export its pool, so that NixOS imports `tank` cleanly:
 
@@ -81,7 +96,8 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
 6. Remove the staged key: `rm -rf /tmp/geoffcloud-extra`.
 7. Check the host over the tailnet: `ssh root@geoffcloud`, then `zpool status`,
-   `k3s kubectl get nodes`, `tailscale status` and `imp status`.
+   `zfs get -H -o value keystatus tank/cloud` (expect `available`), `k3s kubectl get nodes`,
+   `tailscale status` and `imp status`.
 
    **NOTE:** The installed host keeps port 22 shut on its public interface, whatever the edge
    allows, so the tailnet is its only SSH path. If the host does not join the tailnet, reach it
