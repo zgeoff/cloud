@@ -3,9 +3,9 @@ import { join } from 'node:path';
 import type { RegistryAnswer } from './try-read-manifest-digest.ts';
 import { tryReadManifestDigest } from './try-read-manifest-digest.ts';
 
-// Asks each pin's registry about it, and prints each pin that fails: 0 when every pin holds, 1 on a
-// failed pin, an unreadable pin file or a registry error. A release pin's tag must still name its
-// digest; an upstream pin's digest must still be served, since upstream tags can move.
+// Asks each pin's registry about it, and prints each pin that fails: 1 on a pin without a complete
+// digest, a failed pin, an unreadable pin file or a registry error. A release pin's tag must still
+// name its digest; an upstream pin's digest must still be served, since upstream tags can move.
 export interface CheckImagePinsOptions {
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
@@ -34,10 +34,9 @@ export async function checkImagePins(options: Readonly<CheckImagePinsOptions>): 
 
   const loaded = await loadPins(options.args[0] ?? '.');
 
-  if ('unreadable' in loaded) {
-    options.printErr(
-      loaded.unreadable.map((file) => `check-image-pins: cannot read ${file}\n`).join(''),
-    );
+  // an unreadable file, or a malformed or missing digest, fails before any registry request
+  if ('failures' in loaded) {
+    options.printErr(loaded.failures.join(''));
 
     return 1;
   }
@@ -55,38 +54,85 @@ interface Pin {
   readonly digest: string;
 }
 
-// <name>:<tag>@sha256:<digest>, where the name may start with a registry host and port
-const pinPattern =
-  /(?<name>(?:[a-z\d][a-z\d.-]*(?::\d+)?\/)?[a-z\d][\w.-]*(?:\/[a-z\d][\w.-]*)*):(?<tag>\w[\w.-]{0,127})@(?<digest>sha256:[\da-f]{64})/gu;
-
-// every pin the files hold, or the files it cannot read
+// every pin the files hold, or a line for each file it cannot read or each image reference that is
+// not a complete pin
 async function loadPins(
   root: string,
-): Promise<{ readonly pins: readonly Pin[] } | { readonly unreadable: readonly string[] }> {
+): Promise<{ readonly pins: readonly Pin[] } | { readonly failures: readonly string[] }> {
   const texts = await Promise.all(
     pinFiles.map((file) => readFile(join(root, file), 'utf8').catch(() => null)),
   );
 
   const unreadable = pinFiles.filter((_, index) => texts[index] === null);
 
-  return unreadable.length > 0
-    ? { unreadable }
-    : { pins: pinFiles.flatMap((file, index) => collectPins(file, texts[index] ?? '')) };
-}
-
-function collectPins(file: string, text: string): readonly Pin[] {
-  const pins: Pin[] = [];
-
-  for (const match of text.matchAll(pinPattern)) {
-    pins.push({
-      file,
-      name: match.groups?.['name'] ?? '',
-      tag: match.groups?.['tag'] ?? '',
-      digest: match.groups?.['digest'] ?? '',
-    });
+  if (unreadable.length > 0) {
+    return { failures: unreadable.map((file) => `check-image-pins: cannot read ${file}\n`) };
   }
 
-  return pins;
+  const parsed = pinFiles.map((file, index) => parsePins(file, texts[index] ?? ''));
+  const malformed = parsed.flatMap((result) => result.malformed);
+
+  return malformed.length > 0
+    ? { failures: malformed }
+    : { pins: parsed.flatMap((result) => result.pins) };
+}
+
+// An image reference's place in a pin file: a Dockerfile's FROM in any case, or the value of a key
+// that ends in image, such as YAML's `backupImage:`, an env file's `BASE_IMAGE=` or Nix's
+// `image = "…"`. A key such as GATEWAY_IMAGE_TAG names a tag alone, so it is not one.
+const referencePattern =
+  /^\s*(?:from\s+(?:--platform=\S+\s+)?|(?:-\s+)?[\w-]*image\s*[:=]\s*)["']?(?<reference>[^\s"']+)/iu;
+
+// a complete pin, <name>:<tag>@sha256:<digest>, where the name may start with a registry host and
+// port; the anchors make a digest with an extra digit fail, where a substring match would hold
+const pinPattern =
+  /^(?<name>(?:[a-z\d][a-z\d.-]*(?::\d+)?\/)?[a-z\d][\w.-]*(?:\/[a-z\d][\w.-]*)*):(?<tag>\w[\w.-]{0,127})@(?<digest>sha256:[\da-f]{64})$/u;
+
+// Each image reference in the file as a pin, or as a finding when it is not a complete pin. A
+// digest on a line that holds no image reference is a finding too, so a pin in another form fails
+// rather than drop out of the check.
+function parsePins(
+  file: string,
+  text: string,
+): { readonly pins: readonly Pin[]; readonly malformed: readonly string[] } {
+  const parsed = text
+    .split('\n')
+    .map((line, index) => parseLine(`check-image-pins: ${file}:${index + 1}:`, file, line));
+
+  return {
+    pins: parsed.filter((result): result is Pin => typeof result === 'object'),
+    malformed: parsed.filter((result): result is string => typeof result === 'string'),
+  };
+}
+
+// the line's pin, a finding when the line holds an incomplete pin, or undefined when it holds none
+function parseLine(prefix: string, file: string, line: string): Pin | string | undefined {
+  if (line.trimStart().startsWith('#')) {
+    return undefined;
+  }
+
+  const reference = referencePattern.exec(line)?.groups?.['reference'];
+
+  if (reference === undefined) {
+    return line.includes('@sha256:')
+      ? `${prefix} a digest outside an image reference: ${line.trim()}\n`
+      : undefined;
+  }
+
+  const match = pinPattern.exec(reference);
+
+  if (match === null) {
+    return reference.includes('@')
+      ? `${prefix} ${reference} is not <name>:<tag>@sha256:<64 hex digits>\n`
+      : `${prefix} ${reference} pins no digest\n`;
+  }
+
+  return {
+    file,
+    name: match.groups?.['name'] ?? '',
+    tag: match.groups?.['tag'] ?? '',
+    digest: match.groups?.['digest'] ?? '',
+  };
 }
 
 // The images this repo's release flows publish. A published release tag is never replaced, so a

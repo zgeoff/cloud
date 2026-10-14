@@ -255,6 +255,131 @@ test('it fails a pin whose registry answers with an error', async () => {
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
+test('it fails a digest with an extra hex digit, without asking the registry', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'images', 'agent', 'Dockerfile'),
+    `# the base image\nFROM ghcr.io/zgeoff/base:2.0.0@sha256:${'2'.repeat(65)}\n`,
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    `check-image-pins: images/agent/Dockerfile:2: ghcr.io/zgeoff/base:2.0.0@sha256:${'2'.repeat(65)} is not <name>:<tag>@sha256:<64 hex digits>\n`,
+  );
+
+  expect(ctx.printOut).not.toHaveBeenCalled();
+});
+
+test('it fails an image reference whose digest was removed', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'infra', 'Pulumi.prod.yaml'),
+    `config:
+  geoff-cloud:atcGateway:
+    image: ghcr.io/zgeoff/gateway:3.1.0
+`,
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: infra/Pulumi.prod.yaml:3: ghcr.io/zgeoff/gateway:3.1.0 pins no digest\n',
+  );
+
+  expect(ctx.printOut).not.toHaveBeenCalled();
+});
+
+test('it fails a lowercase Dockerfile from without a digest', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.root, 'images', 'agent', 'Dockerfile'), 'from example/base:1.0.0\n');
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: images/agent/Dockerfile:1: example/base:1.0.0 pins no digest\n',
+  );
+});
+
+test('it fails a digest on a line that holds no image reference', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'scripts', 'nix-image.sh'),
+    `RUNNER=example/runner:1.0.0@sha256:${'4'.repeat(64)}\n`,
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    `check-image-pins: scripts/nix-image.sh:1: a digest outside an image reference: RUNNER=example/runner:1.0.0@sha256:${'4'.repeat(64)}\n`,
+  );
+});
+
+test('it reads a quoted Nix image and a tag-only key, which is not an image reference', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'nixos', 'hosts', 'geoffcloud', 'configuration.nix'),
+    `    image = "example.org:5000/team/host:1.0.0@sha256:${'5'.repeat(64)}";\n`,
+  );
+
+  await writeFile(
+    join(ctx.root, 'images', 'atc-gateway', 'versions.env'),
+    'GATEWAY_IMAGE_TAG=4.0.0\n',
+  );
+
+  server.use(
+    http.head(
+      `https://example.org:5000/v2/team/host/manifests/sha256:${'5'.repeat(64)}`,
+      () =>
+        new HttpResponse(null, {
+          status: 200,
+          headers: { 'docker-content-digest': `sha256:${'5'.repeat(64)}` },
+        }),
+    ),
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: 1 pins hold: 0 release tags name their pinned digests, and 1 upstream digests are still served\n',
+  );
+});
+
 test('it fails, naming the file, when a pin file is missing', async () => {
   const ctx = await setupTest();
 
