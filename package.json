@@ -38,6 +38,7 @@
     "format:check": "oxfmt --check . && format-codemod --check --quiet .",
     "provider:build": "cd provider && go build -o bin/pulumi-resource-onidel ./cmd/pulumi-resource-onidel",
     "provider:check": "bash provider/check.sh",
+    "onidel:snapshot": "cd provider && go run ./cmd/onidel snapshot",
     "sdk:gen": "bash scripts/gen-sdk.sh",
     "check:pulumi-pins": "bash scripts/check-pulumi-pins.sh",
     "check:topology": "bun scripts/check-topology.ts",

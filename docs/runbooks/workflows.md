@@ -121,7 +121,7 @@ the node `Ready`.
 Before a risky host change, take an Onidel snapshot of the root disk:
 
 ```sh
-op run --env-file=.env -- bash scripts/snapshot-geoffcloud.sh pre-<change>
+op run --env-file=.env -- bun run onidel:snapshot pre-<change>
 ```
 
 The flake also has checks: `atc-daemon` and `impd-local-health` for its modules, `test-utils` for

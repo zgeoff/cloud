@@ -217,8 +217,8 @@ database copy that matches the snapshot's image (section 2).
 
 `vda` holds NixOS. `vdb` holds imp's ZFS pool and is never part of these steps.
 
-- **From a snapshot:** `scripts/snapshot-geoffcloud.sh` takes one before a risky change. Restore it
-  from the Onidel panel.
+- **From a snapshot:** `bun run onidel:snapshot` takes one before a risky change. Restore it from
+  the Onidel panel.
 - **From nothing:** follow `docs/runbooks/reinstall-geoffcloud.md`. NixOS imports the pool from
   `vdb`, so the imps survive.
 

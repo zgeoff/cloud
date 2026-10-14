@@ -232,6 +232,7 @@ func TestStubOnidelAPIAnswersAMissingResourceWithABare404(t *testing.T) {
 		{"it answers a read of an unknown VM", "GET", "/vm/x", ""},
 		{"it answers an update of an unknown VM", "PATCH", "/vm/x", `{"name":"web"}`},
 		{"it answers a removal of an unknown VM", "DELETE", "/vm/x", ""},
+		{"it answers a snapshot of an unknown VM", "POST", "/vm/x/snapshot", `{"name":"pre-change"}`},
 		{"it answers a read of an unknown firewall group", "GET", "/network/firewalls/x", ""},
 		{"it answers an update of an unknown firewall group", "PUT", "/network/firewalls/x", `{"description":"d"}`},
 		{"it answers a removal of an unknown firewall group", "DELETE", "/network/firewalls/x", ""},
@@ -317,6 +318,7 @@ func TestStubOnidelAPISettlesEachInFlightStatusAfterOneRead(t *testing.T) {
 		{"it settles a migrating VM", "migrating"},
 		// The spec spells the snapshot status taking_snaphot.
 		{"it settles a VM taking a snapshot", "taking_snaphot"},
+		{"it settles a VM taking a snapshot under the corrected spelling", "taking_snapshot"},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -369,11 +371,14 @@ func TestStubOnidelAPIRefusesAVMUpdateWhileAnActionRuns(t *testing.T) {
 
 func TestStubOnidelAPIRejectsAVMUpdateWithoutExactlyOneSetting(t *testing.T) {
 	rows := []struct {
-		name string
-		body string
+		name    string
+		body    string
+		problem string
 	}{
-		{"it rejects an update with only a team", `{"team_id":"t"}`},
-		{"it rejects an update with two settings", `{"name":"web-2","enable_ipv6":true}`},
+		{"it rejects an update with only a team", `{"team_id":"t"}`,
+			`request does not match the spec: PATCH /vm/v: value doesn't match any schema from "oneOf" at /`},
+		{"it rejects an update with two settings", `{"name":"web-2","enable_ipv6":true}`,
+			`request does not match the spec: PATCH /vm/v: value matches more than one schema from "oneOf" (matches schemas at indices [0 2]) at /`},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -383,6 +388,7 @@ func TestStubOnidelAPIRejectsAVMUpdateWithoutExactlyOneSetting(t *testing.T) {
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/vm/v", row.body)
 
 			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, []string{row.problem}, ctx.api.DrainProblems())
 			assert.Equal(t, map[string]map[string]any{
 				"v": {"id": "v", "name": "web", "status": "active", "active_action_id": nil},
 			}, ctx.api.GetVMs())
@@ -485,17 +491,20 @@ func TestStubOnidelAPIRejectsAFirewallGroupCreateWithoutADescription(t *testing.
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls", `{"team_id":"t"}`)
 
 	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, []string{`request does not match the spec: POST /network/firewalls: property "description" is missing at /description`},
+		ctx.api.DrainProblems())
 	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallGroups())
 }
 
-func TestStubOnidelAPIReportsAFirewallGroupUpdateWithoutADescription(t *testing.T) {
+func TestStubOnidelAPIRejectsAFirewallGroupUpdateWithoutADescription(t *testing.T) {
 	ctx := setupTest(t)
 	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "description": "edge"})
 
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "PUT", "/network/firewalls/g1", `{"team_id":"t"}`)
 
-	assert.Equal(t, http.StatusInternalServerError, status)
-	assert.Equal(t, []string{"undocumented response: PUT /network/firewalls/g1 without a description"}, ctx.api.DrainProblems())
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, []string{`request does not match the spec: PUT /network/firewalls/g1: property "description" is missing at /description`},
+		ctx.api.DrainProblems())
 	assert.Equal(t, map[string]map[string]any{"g1": {"id": "g1", "description": "edge"}}, ctx.api.GetFirewallGroups())
 }
 
@@ -587,12 +596,16 @@ func TestStubOnidelAPIStoresARuleUnderItsSubnetFamily(t *testing.T) {
 
 func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 	rows := []struct {
-		name string
-		body string
+		name    string
+		body    string
+		problem string
 	}{
-		{"it rejects a rule without a protocol", `{"subnet":"0.0.0.0","subnet_size":0}`},
-		{"it rejects a rule without a subnet", `{"protocol":"tcp","subnet_size":0}`},
-		{"it rejects a rule without a subnet size", `{"protocol":"tcp","subnet":"0.0.0.0"}`},
+		{"it rejects a rule without a protocol", `{"subnet":"0.0.0.0","subnet_size":0}`,
+			`request does not match the spec: POST /network/firewalls/g1/rules: property "protocol" is missing at /protocol`},
+		{"it rejects a rule without a subnet", `{"protocol":"tcp","subnet_size":0}`,
+			`request does not match the spec: POST /network/firewalls/g1/rules: property "subnet" is missing at /subnet`},
+		{"it rejects a rule without a subnet size", `{"protocol":"tcp","subnet":"0.0.0.0"}`,
+			`request does not match the spec: POST /network/firewalls/g1/rules: property "subnet_size" is missing at /subnet_size`},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -602,10 +615,22 @@ func TestStubOnidelAPIRejectsARuleMissingARequiredField(t *testing.T) {
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", row.body)
 
 			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, []string{row.problem}, ctx.api.DrainProblems())
 			assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallRules())
 			assert.Equal(t, map[string]map[string]any{"g1": {"id": "g1", "rule_count": 0}}, ctx.api.GetFirewallGroups())
 		})
 	}
+}
+
+func TestStubOnidelAPIRejectsARuleWithAnEmptySubnet(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetFirewallGroup(map[string]any{"id": "g1", "rule_count": 0})
+
+	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"tcp","subnet":"","subnet_size":0}`)
+
+	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallRules())
+	assert.Equal(t, map[string]map[string]any{"g1": {"id": "g1", "rule_count": 0}}, ctx.api.GetFirewallGroups())
 }
 
 func TestStubOnidelAPIRejectsARuleWithAnUnknownProtocol(t *testing.T) {
@@ -615,6 +640,8 @@ func TestStubOnidelAPIRejectsARuleWithAnUnknownProtocol(t *testing.T) {
 	status, _ := onideltest.SendRequest(t, ctx.api.URL, "POST", "/network/firewalls/g1/rules", `{"protocol":"gre","subnet":"0.0.0.0","subnet_size":0}`)
 
 	assert.Equal(t, http.StatusBadRequest, status)
+	assert.Equal(t, []string{`request does not match the spec: POST /network/firewalls/g1/rules: ` +
+		`value is not one of the allowed values ["tcp","udp","icmp","ipv6-icmp"] at /protocol`}, ctx.api.DrainProblems())
 	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallRules())
 	assert.Equal(t, map[string]map[string]any{"g1": {"id": "g1", "rule_count": 0}}, ctx.api.GetFirewallGroups())
 }
@@ -693,11 +720,14 @@ func TestStubOnidelAPIUpdatesARuleDescription(t *testing.T) {
 
 func TestStubOnidelAPIRejectsARuleUpdateWithoutAValidDescription(t *testing.T) {
 	rows := []struct {
-		name string
-		body string
+		name    string
+		body    string
+		problem string
 	}{
-		{"it rejects an update without desc", `{"team_id":"t"}`},
-		{"it rejects a desc longer than 255 characters", `{"desc":"` + strings.Repeat("x", 256) + `"}`},
+		{"it rejects an update without desc", `{"team_id":"t"}`, `request does not match the spec: ` +
+			`PATCH /network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001: property "desc" is missing at /desc`},
+		{"it rejects a desc longer than 255 characters", `{"desc":"` + strings.Repeat("x", 256) + `"}`, `request does not match the spec: ` +
+			`PATCH /network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001: maximum string length is 255 at /desc`},
 	}
 	for _, row := range rows {
 		t.Run(row.name, func(t *testing.T) {
@@ -711,6 +741,7 @@ func TestStubOnidelAPIRejectsARuleUpdateWithoutAValidDescription(t *testing.T) {
 			status, _ := onideltest.SendRequest(t, ctx.api.URL, "PATCH", "/network/firewalls/g1/rules/00000000-0000-4000-8000-000000000001", row.body)
 
 			assert.Equal(t, http.StatusBadRequest, status)
+			assert.Equal(t, []string{row.problem}, ctx.api.DrainProblems())
 			assert.Equal(t, map[string]map[string]any{"00000000-0000-4000-8000-000000000001": {
 				"id": "00000000-0000-4000-8000-000000000001", "group": "g1", "ip_type": "v4", "action": "allow",
 				"protocol": "tcp", "port": "", "subnet": "0.0.0.0", "subnet_size": 0.0, "desc": "",
@@ -790,4 +821,89 @@ func TestStubOnidelAPIDrainsTheProblemsItReports(t *testing.T) {
 
 	assert.Equal(t, []string{"unhandled request: GET /nope"}, first)
 	assert.Equal(t, []string(nil), second)
+}
+
+func TestStubOnidelAPIRejectsARequestThatDoesNotMatchTheSpec(t *testing.T) {
+	rows := []struct {
+		name    string
+		method  string
+		path    string
+		body    string
+		problem string
+	}{
+		{"it rejects a body field of the wrong type", "POST", "/vm", `{"name":"web","location":"Sydney","cpu":"two","ram":4096,"disk":40,"os":24}`,
+			`request does not match the spec: POST /vm: value must be an integer at /cpu`},
+		{"it rejects a value outside an enum", "POST", "/vm", `{"name":"web","location":"Sydney","cpu":2,"ram":4096,"disk":40,"os":24,"payment_cycle":"weekly"}`,
+			`request does not match the spec: POST /vm: value is not one of the allowed values ` +
+				`["hourly","monthly","quarterly","semiannually","annually","biennially","triennially"] at /payment_cycle`},
+		{"it rejects a snapshot without a name", "POST", "/vm/v/snapshot", `{"desc":"before the change"}`,
+			`request does not match the spec: POST /vm/v/snapshot: property "name" is missing at /name`},
+	}
+	for _, row := range rows {
+		t.Run(row.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ctx.api.SetVM(map[string]any{"id": "v", "status": "active"})
+
+			status, body := onideltest.SendRequest(t, ctx.api.URL, row.method, row.path, row.body)
+
+			assert.Equal(t, []any{http.StatusBadRequest, ""}, []any{status, body})
+			assert.Equal(t, []string{row.problem}, ctx.api.DrainProblems())
+			assert.Equal(t, map[string]map[string]any{"v": {"id": "v", "status": "active"}}, ctx.api.GetVMs())
+			assert.Equal(t, []map[string]any{}, ctx.api.GetSnapshots())
+		})
+	}
+}
+
+func TestStubOnidelAPIRejectsABodyThatIsNotSentAsJSON(t *testing.T) {
+	ctx := setupTest(t)
+	req, err := http.NewRequestWithContext(t.Context(), "POST", ctx.api.URL+"/network/firewalls",
+		strings.NewReader(`{"team_id":"t","description":"edge"}`))
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+onideltest.APIKey)
+	req.Header.Set("Content-Type", "text/plain")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = resp.Body.Close() })
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, []string{`request does not match the spec: POST /network/firewalls: header Content-Type has unexpected value "text/plain"`},
+		ctx.api.DrainProblems())
+	assert.Equal(t, map[string]map[string]any{}, ctx.api.GetFirewallGroups())
+}
+
+func TestStubOnidelAPIStartsASnapshotOfAStoredVM(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "disk": 240, "status": "active"})
+
+	status, body := onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/snapshot", `{"name":"pre-change","desc":"2026-10-14T09:30Z"}`)
+
+	assert.Equal(t, []any{http.StatusCreated, `{"snapshot_id":"00000000-0000-4000-8000-000000000001"}` + "\n"}, []any{status, body})
+	assert.Equal(t, []map[string]any{{
+		"id": "00000000-0000-4000-8000-000000000001", "created_at": "2026-10-02T06:00:00Z", "name": "pre-change",
+		"desc": "2026-10-14T09:30Z", "size": 240, "status": "pending",
+	}}, ctx.api.GetSnapshots())
+	assert.Equal(t, map[string]map[string]any{"v": {"id": "v", "disk": 240, "status": "taking_snaphot"}}, ctx.api.GetVMs())
+}
+
+func TestStubOnidelAPIListsSnapshotsAsABareArrayInTheOrderTaken(t *testing.T) {
+	ctx := setupTest(t)
+	ctx.api.SetVM(map[string]any{"id": "v", "disk": 240, "status": "active"})
+	onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/snapshot", `{"name":"first"}`)
+	onideltest.SendRequest(t, ctx.api.URL, "POST", "/vm/v/snapshot", `{"name":"second"}`)
+
+	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/snapshots", "")
+
+	assert.Equal(t, http.StatusOK, status)
+	assert.JSONEq(t, `[`+
+		`{"id":"00000000-0000-4000-8000-000000000001","created_at":"2026-10-02T06:00:00Z","name":"first","desc":"","size":240,"status":"pending"},`+
+		`{"id":"00000000-0000-4000-8000-000000000002","created_at":"2026-10-02T06:00:00Z","name":"second","desc":"","size":240,"status":"pending"}]`, body)
+}
+
+func TestStubOnidelAPIListsNoSnapshotsAsAnEmptyArrayWhenStarted(t *testing.T) {
+	ctx := setupTest(t)
+
+	status, body := onideltest.SendRequest(t, ctx.api.URL, "GET", "/snapshots", "")
+
+	assert.Equal(t, []any{http.StatusOK, "[]\n"}, []any{status, body})
 }

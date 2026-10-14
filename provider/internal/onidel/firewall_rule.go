@@ -8,6 +8,7 @@ import (
 	"github.com/pulumi/pulumi-go-provider/infer"
 
 	"github.com/zgeoff/cloud/provider/internal/client"
+	"github.com/zgeoff/cloud/provider/internal/onidelapi"
 )
 
 // FirewallRule is onidel:index:FirewallRule, one allow rule in a firewall group. Its ID
@@ -59,13 +60,13 @@ func (FirewallRule) Create(
 	}
 	api, teamID := getClient(ctx)
 	in := req.Inputs
-	rule, err := api.CreateFirewallRule(ctx, in.FirewallID, client.FirewallRuleInput{
-		TeamID:      teamID,
-		Protocol:    in.Protocol,
-		Port:        getOrDefault(in.Port, ""),
-		Subnet:      in.Subnet,
-		SubnetSize:  in.SubnetSize,
-		Description: getOrDefault(in.Description, ""),
+	rule, err := api.CreateFirewallRule(ctx, in.FirewallID, onidelapi.NewFirewallRule{
+		TeamID:     teamID,
+		Protocol:   onidelapi.NewFirewallRuleProtocol(in.Protocol),
+		Port:       getOrDefault(in.Port, ""),
+		Subnet:     in.Subnet,
+		SubnetSize: in.SubnetSize,
+		Desc:       getOrDefault(in.Description, ""),
 	})
 	if err != nil {
 		return infer.CreateResponse[FirewallRuleState]{}, err
@@ -152,9 +153,9 @@ func splitFirewallRuleID(id string) (string, string, error) {
 
 // buildFirewallRuleState maps an API rule to state, keeping the program's spelling
 // where the API normalizes an equivalent value (ICMP naming, an empty port).
-func buildFirewallRuleState(in FirewallRuleArgs, firewallID string, rule client.FirewallRule) FirewallRuleState {
-	protocol := rule.Protocol
-	if in.Protocol == "icmp" && rule.Protocol == "ipv6-icmp" {
+func buildFirewallRuleState(in FirewallRuleArgs, firewallID string, rule onidelapi.FirewallRule) FirewallRuleState {
+	protocol := string(rule.Protocol)
+	if in.Protocol == "icmp" && rule.Protocol == onidelapi.FirewallRuleProtocolIpv6Icmp {
 		protocol = in.Protocol
 	}
 
@@ -162,13 +163,13 @@ func buildFirewallRuleState(in FirewallRuleArgs, firewallID string, rule client.
 	if rule.Port != "" {
 		port = &rule.Port
 	}
-	if in.Port == nil && (rule.Port == "" || isICMP(rule.Protocol)) {
+	if in.Port == nil && (rule.Port == "" || isICMP(string(rule.Protocol))) {
 		port = nil
 	}
 
 	var desc *string
-	if rule.Description != "" {
-		desc = &rule.Description
+	if rule.Desc != "" {
+		desc = &rule.Desc
 	}
 
 	return FirewallRuleState{
@@ -181,7 +182,7 @@ func buildFirewallRuleState(in FirewallRuleArgs, firewallID string, rule client.
 			Description: desc,
 		},
 		RuleID: rule.ID,
-		IPType: rule.IPType,
+		IPType: string(rule.IPType),
 		Action: rule.Action,
 	}
 }
