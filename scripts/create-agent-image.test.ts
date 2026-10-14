@@ -321,6 +321,58 @@ test('it fails without an imp when the build fails', async () => {
   expect(imp.imps).toStrictEqual([]);
 });
 
+test('it leaves the image to an interrupt from the build on, newest of the steps', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
+  await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
+  await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM scratch\n');
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the image']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'push', '-q', 'origin', 'main']);
+  await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
+
+  const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
+
+  // each registered step, bound to a runner that records what an interrupt would run
+  const steps: (() => unknown)[] = [];
+  const interrupt = buildStubRunner(() => ({}));
+  const imp = buildStubImp({ images: [] });
+
+  // runs the newest step while the build runs, since the older one removes the build's directory
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['git', 'tar'], ctx.repo.env),
+    async (call) => {
+      if (call.argv[1] === 'image' && call.argv[2] === 'build') {
+        await steps.at(-1)?.();
+      }
+    },
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const exitCode = await createAgentImage({
+    args: [],
+    cwd: ctx.clone,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: (step) => {
+      steps.push(() => step({ run: interrupt.run, printOut() {}, printErr() {} }));
+
+      return () => {};
+    },
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(interrupt.calls.map((call) => call.argv)).toStrictEqual([
+    ['imp', 'image', 'rm', `agent-${short}`],
+  ]);
+});
+
 test('it fails when the build outlives AGENT_IMAGE_BUILD_TIMEOUT, and gives the build that timeout', async () => {
   const ctx = await setupTest();
 

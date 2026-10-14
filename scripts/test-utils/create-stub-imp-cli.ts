@@ -72,7 +72,10 @@ function parseState(text: string): Required<Pick<StubImpScenario, 'images' | 'im
   };
 }
 
-function toRecords(value: unknown, keys: readonly string[]) {
+function toRecords(
+  value: unknown,
+  keys: readonly string[],
+): readonly Readonly<Record<string, string>>[] {
   if (!Array.isArray(value)) {
     throw new TypeError(`the stub imp state holds ${JSON.stringify(value)}, not a list`);
   }

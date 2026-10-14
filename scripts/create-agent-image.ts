@@ -50,15 +50,15 @@ interface AgentImageRun {
 }
 
 async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run: AgentImageRun) {
-  const built = await runAgentImageBuild(options, { ...run, cwd: options.cwd });
-
-  // an interrupt leaves the image unchecked, so it goes as a failed check's image goes, and a
-  // retry finds the name free
+  // An interrupt leaves the image unchecked, so it goes as a failed check's image goes. The step
+  // comes before the build, since the image exists before the build call returns.
   const dropCleanup = run.keep
     ? () => {}
     : options.registerCleanup((io) => removeImage(io, run.image));
 
   try {
+    const built = await runAgentImageBuild(options, { ...run, cwd: options.cwd });
+
     options.printErr(`checking ${run.image} on a fresh imp, ${run.check}\n`);
 
     const passed = await runAgentImageCheck(options, { ...run, src: built.src });
