@@ -325,6 +325,7 @@ let
               enable = true;
               flushRuleset = false;
             };
+            networking.firewall.trustedInterfaces = [ "cni0" ];
             networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
             networking.cloudHost.admissions = [
               {
@@ -412,7 +413,7 @@ let
         '';
     }
     {
-      title = "it reports the atc daemon's admission once geoffcloud stops trusting cni0";
+      title = "it reports the atc daemon admission once geoffcloud stops trusting cni0";
       script =
         let
           # geoffcloud's own config, less cni0 in trustedInterfaces: inet cloud_host still admits
@@ -561,7 +562,7 @@ let
         '';
     }
     {
-      title = "it reports a port that nixos-fw opens on an interface where inet cloud_host drops it";
+      title = "it reports a port that nixos-fw opens on an interface where the cloud host table drops it";
       script =
         let
           system = buildModuleSystem firewallModules {
