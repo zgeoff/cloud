@@ -34,10 +34,7 @@ test('it holds the pinned gitleaks binary and the gitleaks config', async () => 
   const dir = await createAgentImageCheckDir(ctx.io, {
     work: ctx.work,
     repo: ctx.repo,
-    pins: new Map([
-      ['GITLEAKS_VERSION', '8.30.1'],
-      ['GITLEAKS_SHA256', sum],
-    ]),
+    pins: { GITLEAKS_VERSION: '8.30.1', GITLEAKS_SHA256: sum },
   });
 
   const files = await readdir(dir);
@@ -60,10 +57,7 @@ test('it stops before extracting a tarball whose sum the Dockerfile does not pin
     createAgentImageCheckDir(ctx.io, {
       work: ctx.work,
       repo: ctx.repo,
-      pins: new Map([
-        ['GITLEAKS_VERSION', '8.30.1'],
-        ['GITLEAKS_SHA256', pinned],
-      ]),
+      pins: { GITLEAKS_VERSION: '8.30.1', GITLEAKS_SHA256: pinned },
     }),
   ).rejects.toMatchObject({
     exitCode: 1,
@@ -87,10 +81,10 @@ test('it stops when the release download fails', async () => {
     createAgentImageCheckDir(ctx.io, {
       work: ctx.work,
       repo: ctx.repo,
-      pins: new Map([
-        ['GITLEAKS_VERSION', '8.30.1'],
-        ['GITLEAKS_SHA256', '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb'],
-      ]),
+      pins: {
+        GITLEAKS_VERSION: '8.30.1',
+        GITLEAKS_SHA256: '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb',
+      },
     }),
   ).rejects.toMatchObject({
     exitCode: 1,
@@ -105,7 +99,7 @@ test('it stops when the Dockerfile pins no gitleaks', async () => {
     createAgentImageCheckDir(ctx.io, {
       work: ctx.work,
       repo: ctx.repo,
-      pins: new Map([['BUN_VERSION', '1.4.2']]),
+      pins: { BUN_VERSION: '1.4.2' },
     }),
   ).rejects.toMatchObject({
     exitCode: 1,

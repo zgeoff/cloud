@@ -1,3 +1,5 @@
+// stdin is a Buffer, which has no readonly form
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { runOrExit } from './run-or-exit.ts';
 

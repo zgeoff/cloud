@@ -8,7 +8,7 @@ export interface AgentImageCheckDirInput {
   // a directory the caller owns and removes
   readonly work: string;
   readonly repo: string;
-  readonly pins: ReadonlyMap<string, string>;
+  readonly pins: Readonly<Record<string, string>>;
 }
 
 // Creates <work>/agent-image-check, which the check mounts or copies to /run/agent-image-check in
@@ -33,9 +33,9 @@ export async function createAgentImageCheckDir(
 
 // the linux_x64 tarball of the gitleaks release, whose line in the release's checksums file the
 // Dockerfile pins as GITLEAKS_SHA256
-async function readGitleaks(pins: ReadonlyMap<string, string>) {
-  const version = pins.get('GITLEAKS_VERSION');
-  const sum = pins.get('GITLEAKS_SHA256');
+async function readGitleaks(pins: Readonly<Record<string, string>>) {
+  const version = pins['GITLEAKS_VERSION'];
+  const sum = pins['GITLEAKS_SHA256'];
 
   if (version === undefined || sum === undefined) {
     throw new ExitError(1, 'images/agent/Dockerfile pins no GITLEAKS_VERSION and GITLEAKS_SHA256');

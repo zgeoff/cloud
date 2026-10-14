@@ -1,5 +1,6 @@
 // the vaults are mutable state by design
 /* oxlint-disable typescript/prefer-readonly-parameter-types */
+import { findJSONField } from '../find-json-field.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
 // Stands in for the 1Password CLI, op 2.40.0 as images/agent/Dockerfile pins it, at the calls
@@ -29,13 +30,13 @@ export function buildStubOp(scenario: StubOpScenario): StubOp {
 
   return {
     handle: (call) => {
-      if (call.argv[0] !== 'op') {
-        return;
+      const isOp = call.argv[0] === 'op';
+
+      if (isOp) {
+        tokensSeen.push(call.options.env?.['OP_SERVICE_ACCOUNT_TOKEN']);
       }
 
-      tokensSeen.push(call.options.env?.['OP_SERVICE_ACCOUNT_TOKEN']);
-
-      return buildOpAnswer(scenario, call);
+      return isOp ? buildOpAnswer(scenario, call) : undefined;
     },
     vaults: scenario.vaults,
     tokensSeen,
@@ -124,11 +125,6 @@ function buildListAnswer(scenario: StubOpScenario, args: readonly string[]) {
   return { stdout: `${JSON.stringify(listed, null, 2)}\n` };
 }
 
-interface ItemTemplate {
-  readonly title: string;
-  readonly fields: readonly { readonly id: string; readonly value: string }[];
-}
-
 function createItem(scenario: StubOpScenario, call: StubCall, args: readonly string[]) {
   const vault = args[0] ?? '';
   const items = scenario.vaults[vault];
@@ -141,11 +137,29 @@ function createItem(scenario: StubOpScenario, call: StubCall, args: readonly str
     return buildNoVaultError(vault);
   }
 
-  const template = JSON.parse(call.stdin) as ItemTemplate;
+  const template = parseItemTemplate(call.stdin);
 
-  items[template.title] = template.fields.find((field) => field.id === 'credential')?.value ?? '';
+  items[template.title] = template.credential;
 
   return { stdout: `${JSON.stringify(buildItem(vault, template.title), null, 2)}\n` };
+}
+
+// the item template the script sends on stdin: its title, and the value of its credential field
+function parseItemTemplate(text: string) {
+  const template: unknown = JSON.parse(text);
+  const title = findJSONField(template, 'title');
+  const fields = findJSONField(template, 'fields');
+
+  const field: unknown = Array.isArray(fields)
+    ? fields.find((entry) => findJSONField(entry, 'id') === 'credential')
+    : undefined;
+
+  const value = findJSONField(field, 'value');
+
+  return {
+    title: typeof title === 'string' ? title : '',
+    credential: typeof value === 'string' ? value : '',
+  };
 }
 
 // op read prints a newline after the secret unless -n is given

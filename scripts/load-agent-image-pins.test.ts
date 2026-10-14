@@ -22,7 +22,7 @@ test('it reads every ARG pin by name, in the file’s order, and nothing else', 
 
   const pins = await loadAgentImagePins(join(ctx.dir, 'Dockerfile'));
 
-  expect([...pins]).toStrictEqual([
+  expect(Object.entries(pins)).toStrictEqual([
     ['GIT_VERSION', '1:2.43.0-1ubuntu7.3'],
     ['BUN_VERSION', '1.4.2'],
     ['BUN_SHA256', '36368f'],
@@ -32,6 +32,6 @@ test('it reads every ARG pin by name, in the file’s order, and nothing else', 
 test('it reads the agent image’s own gitleaks pin', async () => {
   const pins = await loadAgentImagePins(join(import.meta.dir, '../images/agent/Dockerfile'));
 
-  expect(pins.get('GITLEAKS_VERSION')).toMatch(/^\d+\.\d+\.\d+$/u);
-  expect(pins.get('GITLEAKS_SHA256')).toMatch(/^[\da-f]{64}$/u);
+  expect(pins['GITLEAKS_VERSION']).toMatch(/^\d+\.\d+\.\d+$/u);
+  expect(pins['GITLEAKS_SHA256']).toMatch(/^[\da-f]{64}$/u);
 });

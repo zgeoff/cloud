@@ -2,11 +2,15 @@
 // (packages/api/src/secret-schema.ts): the glm secret that install-atc-gateway-credentials adds,
 // by default. Its values are fixed: the script compares them, so none is arbitrary.
 export interface MockImpSecret {
-  name: string;
-  kind: string;
-  rules: { host: string; header: string; scheme: string }[];
-  imps: string[];
-  createdAt: string;
+  readonly name: string;
+  readonly kind: string;
+  readonly rules: readonly {
+    readonly host: string;
+    readonly header: string;
+    readonly scheme: string;
+  }[];
+  readonly imps: readonly string[];
+  readonly createdAt: string;
 }
 
 export function buildMockImpSecret(overrides: Partial<MockImpSecret> = {}): MockImpSecret {

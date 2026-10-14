@@ -2,12 +2,12 @@
 // (packages/api/src/token-schema.ts): the atc-cloud token that install-atc-gateway-credentials
 // mints, by default. Its values are fixed: the script compares them, so none is arbitrary.
 export interface MockImpToken {
-  name: string;
-  scope: string;
-  imps: string[];
-  sshKeys: string[];
-  grantable: string[];
-  createdAt: string;
+  readonly name: string;
+  readonly scope: string;
+  readonly imps: readonly string[];
+  readonly sshKeys: readonly string[];
+  readonly grantable: readonly string[];
+  readonly createdAt: string;
 }
 
 export function buildMockImpToken(overrides: Partial<MockImpToken> = {}): MockImpToken {

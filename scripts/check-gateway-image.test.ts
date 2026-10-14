@@ -1,3 +1,5 @@
+// MSW's resolver info carries a Request, which has no readonly form
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkGatewayImage } from './check-gateway-image.ts';

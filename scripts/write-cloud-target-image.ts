@@ -6,7 +6,9 @@ export interface CloudTargetImageChange {
   readonly config: string;
   readonly image: string;
   readonly guestATC: string;
-  readonly now: Date;
+
+  // milliseconds since the epoch
+  readonly now: number;
 }
 
 // Copies the atc config to <config>.bak-<UTC stamp>-pre-<image> with its mode, then sets
@@ -26,8 +28,8 @@ export async function writeCloudTargetImage(
 }
 
 // the stamp `date -u +%Y%m%dT%H%M%SZ` prints
-function formatStamp(now: Date) {
-  return now
+function formatStamp(now: number) {
+  return new Date(now)
     .toISOString()
     .replace(/\.\d{3}Z$/u, 'Z')
     .replaceAll(/[-:]/gu, '');

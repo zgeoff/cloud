@@ -24,7 +24,7 @@ test('it names the backup for the UTC second and the image, and keeps the config
     config: join(ctx.dir, 'config.json'),
     image: 'agent-abc1234',
     guestATC: '/usr/local/bin/atc',
-    now: new Date('2026-01-02T03:04:05.999Z'),
+    now: Date.parse('2026-01-02T03:04:05.999Z'),
   });
 
   const info = await stat(backup);
@@ -45,7 +45,7 @@ test('it replaces the config with one readable by its owner only, and leaves no 
     config: join(ctx.dir, 'config.json'),
     image: 'agent-abc1234',
     guestATC: '/usr/local/bin/atc',
-    now: new Date('2026-10-10T05:06:07Z'),
+    now: Date.parse('2026-10-10T05:06:07Z'),
   });
 
   const info = await stat(join(ctx.dir, 'config.json'));

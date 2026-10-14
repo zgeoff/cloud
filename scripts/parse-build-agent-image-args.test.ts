@@ -24,7 +24,7 @@ test.each([
   ['an empty commit', ['']],
   ['a second commit', ['abc1234', 'def5678']],
   ['a second --keep', ['--keep', '--keep']],
-])('it refuses %s with its usage', (_label, args) => {
+] as const)('it refuses %s with its usage', (_label, args) => {
   expect(() => parseBuildAgentImageArgs(args, '45m')).toThrow(
     expect.objectContaining({
       exitCode: 2,

@@ -206,7 +206,7 @@ test.each([
     'an unknown command',
     ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', 'root@geoffcloud', "'reboot'"],
   ],
-])('it fails closed with exit 97 for %s', async (_label, argv) => {
+] as const)('it fails closed with exit 97 for %s', async (_label, argv) => {
   const stub = buildStubRunner(
     buildStubReadinessHost({
       destination: 'root@geoffcloud',

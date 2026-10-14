@@ -44,7 +44,7 @@ test('it backs up the config, then points the cloud target at the image and keep
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234', config],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07.123Z'),
+    now: () => Date.parse('2026-10-10T05:06:07.123Z'),
     run: stub.run,
     printOut,
     printErr,
@@ -94,7 +94,7 @@ test('it switches the config in its home by default', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut: () => {},
     printErr: () => {},
@@ -125,7 +125,7 @@ test('it leaves a config that already runs the image alone, without asking the i
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut,
     printErr: () => {},
@@ -154,7 +154,7 @@ test('it sets guestATC when the config names the image without it', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut,
     printErr: () => {},
@@ -192,7 +192,7 @@ test('it says the cloud target had no image before', async () => {
   await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut,
     printErr: () => {},
@@ -218,7 +218,7 @@ test('it refuses an image the imp host lacks, and changes nothing', async () => 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -246,7 +246,7 @@ test('it stops with imp’s own exit code when the imp host cannot list its imag
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -274,7 +274,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -301,7 +301,7 @@ test('it refuses a missing config', async () => {
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut: () => {},
     printErr,
@@ -318,7 +318,7 @@ test.each([
   ['no image', []],
   ['an empty image', ['']],
   ['an extra argument', ['agent-abc1234', 'config.json', 'more']],
-])('it prints its usage and exits 2 for %s', async (_label, args) => {
+] as const)('it prints its usage and exits 2 for %s', async (_label, args) => {
   const ctx = await setupTest();
 
   const stub = buildStubRunner();
@@ -327,7 +327,7 @@ test.each([
   const exitCode = await switchAgentImage({
     args,
     home: ctx.home,
-    now: () => new Date('2026-10-10T05:06:07Z'),
+    now: () => Date.parse('2026-10-10T05:06:07Z'),
     run: stub.run,
     printOut: () => {},
     printErr,

@@ -18,7 +18,9 @@ export interface SwitchAgentImageOptions extends ScriptIO {
 
   // the home whose .config/atc/config.json is the default config
   readonly home: string;
-  readonly now: () => Date;
+
+  // the time in milliseconds since the epoch, as Date.now returns it
+  readonly now: () => number;
 }
 
 // the atc that the agent image installs, which the daemon runs in the guest
@@ -80,7 +82,7 @@ if (import.meta.main) {
   process.exitCode = await switchAgentImage({
     args: process.argv.slice(2),
     home: homedir(),
-    now: () => new Date(),
+    now: () => Date.now(),
     run: runProcess,
     printOut: (text) => {
       process.stdout.write(text);

@@ -1,3 +1,5 @@
+// a fault table's rows are parts of the stand-ins' scenarios, whose state is mutable by design
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { expect, test } from 'bun:test';
 import { installATCGatewayToken } from './install-atc-gateway-token.ts';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
@@ -89,7 +91,7 @@ test.each([
   ['the host file', false, ['gateway-token']],
 ])(
   'it stops without a change when only %s holds the bearer',
-  async (_label: string, hasItem: boolean, hostFiles: string[]) => {
+  async (_label: string, hasItem: boolean, hostFiles: readonly string[]) => {
     const tools = buildStubCredentialTools({
       op: { vaults: { cloud: {} } },
       atcKey: { installed: true, zaiKey: 'zai_fixture_key' },

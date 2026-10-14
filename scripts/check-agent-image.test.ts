@@ -176,7 +176,7 @@ test.each([
   ['an unknown flag', ['--vm', 'agent']],
   ['an empty name', ['--imp', '']],
   ['an extra argument', ['--docker', 'cloud/agent-image', 'more']],
-])('it prints its usage and exits 2 for %s', async (_label, args) => {
+] as const)('it prints its usage and exits 2 for %s', async (_label, args) => {
   const ctx = await setupTest();
 
   const stub = buildStubRunner();

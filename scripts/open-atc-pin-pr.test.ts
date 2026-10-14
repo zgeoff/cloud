@@ -689,7 +689,7 @@ test.each([
   ['no arguments', []],
   ['a version without a SHA256SUMS file', ['3.11.0']],
   ['an extra argument', ['3.11.0', 'SHA256SUMS', 'more']],
-])('it prints its usage and exits 2 for %s', async (_label, args) => {
+] as const)('it prints its usage and exits 2 for %s', async (_label, args) => {
   const ctx = await setupTest();
 
   const stub = buildStubRunner();

@@ -48,6 +48,9 @@ test('it reports every check ok and exits 0 once the gateway is deployed', async
 
   server.use(
     http.get('https://ghcr.io/token', () => HttpResponse.json({ token: 'ghcr-t1' })),
+
+    // MSW's resolver info carries a Request, which has no readonly form
+    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
     http.get('https://ghcr.io/v2/zgeoff/atc-gateway/tags/list', (info) => {
       bearers.push(info.request.headers.get('authorization'));
 

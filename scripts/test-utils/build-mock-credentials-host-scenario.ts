@@ -1,3 +1,5 @@
+// the scenario's files are host state that the stand-in changes, so they stay mutable
+/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { buildMockImpSecret } from './build-mock-imp-secret.ts';
 import { buildMockImpToken } from './build-mock-imp-token.ts';
 import type { StubCredentialsHostScenario } from './build-stub-credentials-host.ts';
