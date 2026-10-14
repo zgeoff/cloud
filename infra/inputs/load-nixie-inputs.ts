@@ -1,9 +1,14 @@
 import { secret } from '@pulumi/pulumi';
-import type { NixieBackupInputs, NixieConfig, NixieInputs } from '../nixie.ts';
 import { findResticBackup } from './find-restic-backup.ts';
 import { pinnedImagePattern } from './pinned-image-pattern.ts';
 import { requireVariable } from './require-variable.ts';
-import type { Environment, StackConfig } from './types.ts';
+import type {
+  Environment,
+  NixieBackupInputs,
+  NixieConfig,
+  NixieInputs,
+  StackConfig,
+} from './types.ts';
 
 // why each of nixie's secrets is required, for requireVariable's error
 const nixieNeed = 'nixie needs it while stack config "nixie" is set';

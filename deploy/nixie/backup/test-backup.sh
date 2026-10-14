@@ -3,7 +3,7 @@
 # that the stack config pins as atcGateway.backupImage. It touches no cluster and no cloud account.
 #
 # It runs the script as the backup CronJob and the restore Job run it
-# (infra/build-nixie-backup-pod-spec.ts, deploy/nixie/restore-job.yaml): nixie's uid and gid
+# (infra/cluster/build-nixie-backup-pod-spec.ts, deploy/nixie/restore-job.yaml): nixie's uid and gid
 # 10001, the script mounted read-only and run by /bin/sh in place of the image's entrypoint, the
 # state volume at /state and a local restic repository at /repo. What this proves: a backup takes
 # nixie.db and keys.db alone, with the rows still in a live writer's WAL, and copies again when

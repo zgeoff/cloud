@@ -1,6 +1,6 @@
 import { faker } from '@faker-js/faker';
 import { output } from '@pulumi/pulumi';
-import type { TunnelRoute } from '../build-tunnel-ingresses.ts';
+import type { TunnelRoute } from '../ingress/build-tunnel-ingresses.ts';
 
 export function buildMockTunnelRoute(overrides: Partial<TunnelRoute> = {}): TunnelRoute {
   return {

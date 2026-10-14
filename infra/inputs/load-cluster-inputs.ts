@@ -1,11 +1,10 @@
 import { secret } from '@pulumi/pulumi';
 import type { Output } from '@pulumi/pulumi';
-import type { NixieInputs } from '../nixie.ts';
 import { loadATCGatewayInputs } from './load-atc-gateway-inputs.ts';
 import { loadNixieInputs } from './load-nixie-inputs.ts';
 import { requireKubeconfig } from './require-kubeconfig.ts';
 import { requireOnePasswordConnectCredentials } from './require-onepassword-connect-credentials.ts';
-import type { ATCGatewayInputs, Environment, StackConfig } from './types.ts';
+import type { ATCGatewayInputs, Environment, NixieInputs, StackConfig } from './types.ts';
 
 interface ClusterConfigInputs {
   readonly kubeconfig: string;

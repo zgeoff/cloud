@@ -3,7 +3,7 @@
 # no cluster, no tailnet and no cloud account.
 #
 # It runs the pinned atc-gateway release with the flags and the container security the
-# Deployment sets (infra/build-atc-gateway-spec.ts). What this proves: the image builds
+# Deployment sets (infra/cluster/build-atc-gateway-spec.ts). What this proves: the image builds
 # from a checked binary, runs as nonroot on a read-only root, answers /healthz, /readyz
 # and the metadata only on its public Host, adds a client, and keeps its state on the
 # volume across a restart. What it does not prove: gateway-to-daemon transport (the

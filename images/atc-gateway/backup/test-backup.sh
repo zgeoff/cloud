@@ -3,7 +3,7 @@
 # Docker. It touches no cluster and no cloud account.
 #
 # It runs the backup image as the backup CronJob and the restore Job run it
-# (infra/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml).
+# (infra/cluster/build-atc-gateway-backup-pod-spec.ts, images/atc-gateway/restore-job.yaml).
 # What this proves: a backup's retention groups the gateway's snapshots across source paths and
 # leaves other snapshots alone; and each declared path of the script (usage, a missing
 # STATE_DIR, no databases, an integrity failure on backup and on restore, a snapshot

@@ -1,0 +1,136 @@
+import { topology } from '@zgeoff/cloud-topology';
+import type { ATCDaemonEndpoint } from '../inputs/index.ts';
+import { impHealthProbeTarget } from './imp-health-probe-target.ts';
+import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
+
+interface AlertRule {
+  readonly alert: string;
+  readonly expr: string;
+  readonly for: string;
+  readonly labels: { readonly severity: 'critical' | 'warning' };
+  readonly annotations: { readonly summary: string };
+}
+
+interface AlertRuleGroup {
+  readonly name: string;
+  readonly rules: readonly AlertRule[];
+}
+
+interface AlertRuleInputs {
+  // the gateway's daemons, set only while the stack config sets atcGateway
+  readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
+}
+
+// geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
+// rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
+// branch, except ImpdLocalHealthDown, TargetDown and ContainerOOMKilled, which stay silent without theirs.
+export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
+  const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
+
+  return [
+    {
+      name: 'geoff-cloud',
+      rules: [
+        ...impdRules,
+        targetDownRule,
+        cloudflaredRule,
+        ...atcRules,
+        impHealthRule,
+        oomKilledRule,
+      ],
+    },
+  ];
+}
+
+// impd's loopback probe, written every minute by a host timer to node-exporter's
+// textfile collector (nixos/modules/impd-local-health.nix)
+const impdRules: readonly AlertRule[] = [
+  {
+    alert: 'ImpdLocalHealthDown',
+    expr: 'impd_local_health_up == 0',
+    for: '2m',
+    labels: { severity: 'critical' },
+    annotations: { summary: 'impd fails its loopback health check on geoffcloud.' },
+  },
+  {
+    // five missed probes, or no probe metric at all (the timer, the textfile or
+    // node-exporter is gone)
+    alert: 'ImpdLocalHealthStale',
+    expr: 'time() - impd_local_health_last_check_timestamp_seconds > 300 or absent(impd_local_health_up)',
+    for: '2m',
+    labels: { severity: 'warning' },
+    annotations: { summary: 'impd health probe has not reported for over 5 minutes.' },
+  },
+];
+
+// The probe of imp's /health over the tailnet (create-imp-health-probe.ts) fails, or
+// reports nothing: clients cannot reach impd then, though the loopback check above may
+// pass. A failed TLS check or a body without "ready": true fails it too.
+const impHealthRule: AlertRule = {
+  alert: 'ImpHealthUnreachable',
+  expr: `probe_success{target="${impHealthProbeTarget}"} == 0 or absent(probe_success{target="${impHealthProbeTarget}"})`,
+  for: '5m',
+  labels: { severity: 'critical' },
+  annotations: {
+    summary: `https://${topology.imp.domain}/health fails from the cluster over the tailnet.`,
+  },
+};
+
+// A container restarted in the last 10 minutes and its last end was an OOM kill: Grafana
+// at its old 256Mi limit restarted 9 times this way with no alert, since KubePodCrashLooping
+// needs a back-off that spaced restarts never hold. One alert per container.
+const oomKilledRule: AlertRule = {
+  alert: 'ContainerOOMKilled',
+  expr: [
+    'increase(kube_pod_container_status_restarts_total[10m]) > 0',
+    'and on (namespace, pod, container)',
+    'kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1',
+  ].join(' '),
+  for: '0m',
+  labels: { severity: 'warning' },
+  annotations: {
+    summary:
+      'Container {{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed.',
+  },
+};
+
+// per target, so one dead exporter is named; replaces the chart's ratio-based TargetDown
+const targetDownRule: AlertRule = {
+  alert: 'TargetDown',
+  expr: 'up == 0',
+  for: '5m',
+  labels: { severity: 'warning' },
+  annotations: { summary: 'Scrape target {{ $labels.job }} {{ $labels.instance }} is down.' },
+};
+
+// Summed over both cloudflared pods: the tunnel serves while either pod holds a
+// connection, so only zero across both is an outage. One pod down shows as TargetDown.
+// A dead exporter must not look healthy: no series, or no cloudflared target up, fires too.
+const cloudflaredRule: AlertRule = {
+  alert: 'CloudflaredNoConnections',
+  expr: [
+    'sum(cloudflared_tunnel_ha_connections) == 0',
+    'absent(cloudflared_tunnel_ha_connections)',
+    'absent(up{namespace="ingress", pod=~"cloudflared-.*"} == 1)',
+  ].join(' or '),
+  for: '5m',
+  labels: { severity: 'critical' },
+  annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
+};
+
+// A failing TCP connect to an atc daemon fires, as does a missing probe report (unknown reachability,
+// not proven downtime). One rule per daemon while the gateway is configured; the summary carries
+// the address since the absent() series has no instance label.
+function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
+  const series = `probe_success{target="${toATCDaemonProbeTarget(daemon.name)}"}`;
+
+  return {
+    alert: 'ATCDaemonUnreachable',
+    expr: `${series} == 0 or absent(${series})`,
+    for: '5m',
+    labels: { severity: daemon.alertSeverity },
+    annotations: {
+      summary: `atc's daemon at ${daemon.address} is unreachable from the cluster.`,
+    },
+  };
+}
