@@ -46,6 +46,8 @@ test('it kills the running command, runs the steps newest first, and exits 130 o
   const killed = Promise.withResolvers<RunResult>();
 
   const ctx = setupTest({
+    // RunOptions carries stdin as a Buffer, which has no readonly form
+    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
     run: async (argv, options) => {
       const result = await runProcess(argv, options);
 
