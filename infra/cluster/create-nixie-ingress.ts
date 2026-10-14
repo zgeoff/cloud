@@ -28,7 +28,6 @@ export interface NixieIngressInputs {
 }
 
 export interface NixieIngressOutputs {
-  readonly ingress: Ingress;
   readonly url: Output<string>;
 }
 
@@ -66,7 +65,14 @@ export function createNixieIngress(
     },
   );
 
-  const ingress = new Ingress(
+  createIngress(cluster, inputs, controller);
+
+  return { url: interpolate`https://${createRecord(inputs).name}` };
+}
+
+// nixie's Ingress, served by the Traefik release once it runs
+function createIngress(cluster: Provider, inputs: NixieIngressInputs, controller: Chart): Ingress {
+  return new Ingress(
     'nixie',
     {
       metadata: { name: 'nixie', namespace: inputs.namespace },
@@ -80,8 +86,6 @@ export function createNixieIngress(
     },
     { provider: cluster, dependsOn: [controller] },
   );
-
-  return { ingress, url: interpolate`https://${createRecord(inputs).name}` };
 }
 
 function createRecord(inputs: NixieIngressInputs): DnsRecord {

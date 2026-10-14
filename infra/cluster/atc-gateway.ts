@@ -2,7 +2,7 @@
 /* oxlint-disable import/max-dependencies */
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
-import type { CronJob } from '@pulumi/kubernetes/batch/v1';
+import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';
 import {
   ConfigMap,
   Namespace,
@@ -21,6 +21,7 @@ import {
   buildATCGatewaySpec,
 } from './build-atc-gateway-spec.ts';
 import { buildATCGatewayTokenData } from './build-atc-gateway-token-data.ts';
+import { buildServiceURL } from './build-service-url.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
 
 // The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
@@ -28,8 +29,6 @@ import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
 // atcGateway; setting it is an operator step that needs the owner's approval.
 
 export interface ATCGatewayOutputs {
-  readonly deployment: Deployment;
-  readonly backupJob?: CronJob;
   readonly serviceURL: Output<string>;
 
   // the host of the gateway's public URL, which the tunnel routes to serviceURL
@@ -38,17 +37,15 @@ export interface ATCGatewayOutputs {
 
 export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): ATCGatewayOutputs {
   const ns = new Namespace('atc', { metadata: { name: 'atc' } }, { provider: cluster });
+  const publicHost = new URL(inputs.config.publicURL).host;
 
   const claim = createStateVolume(cluster, ns.metadata.name);
   const objects = createConfigObjects(cluster, ns.metadata.name, inputs);
 
-  const deployment = new Deployment(
-    'atc-gateway',
-    {
-      metadata: { name: 'atc-gateway', namespace: ns.metadata.name },
-      spec: buildATCGatewaySpec({ config: inputs.config, claim, ...objects }),
-    },
-    { provider: cluster },
+  createDeployment(
+    cluster,
+    ns.metadata.name,
+    buildATCGatewaySpec({ config: inputs.config, publicHost, claim, ...objects }),
   );
 
   const service = new Service(
@@ -63,24 +60,34 @@ export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): A
     { provider: cluster },
   );
 
-  const backupJob =
-    inputs.secrets.backup === undefined
-      ? undefined
-      : createATCGatewayBackupJob(cluster, {
-          namespace: ns.metadata.name,
-          claim,
-          image: inputs.config.backupImage,
-          secrets: inputs.secrets.backup,
-        });
+  if (inputs.secrets.backup !== undefined) {
+    createATCGatewayBackupJob(cluster, {
+      namespace: ns.metadata.name,
+      claim,
+      image: inputs.config.backupImage,
+      secrets: inputs.secrets.backup,
+    });
+  }
 
   return {
-    deployment,
-    ...(backupJob === undefined ? {} : { backupJob }),
-    serviceURL: service.metadata.apply(
-      (meta) => `http://${meta.name}.${meta.namespace}.svc.cluster.local:${atcGatewayPort}`,
+    serviceURL: buildServiceURL(
+      { name: service.metadata.name, namespace: service.metadata.namespace },
+      atcGatewayPort,
     ),
-    publicHost: new URL(inputs.config.publicURL).host,
+    publicHost,
   };
+}
+
+function createDeployment(
+  cluster: Provider,
+  namespace: Output<string>,
+  spec: DeploymentArgs['spec'],
+): Deployment {
+  return new Deployment(
+    'atc-gateway',
+    { metadata: { name: 'atc-gateway', namespace }, spec },
+    { provider: cluster },
+  );
 }
 
 // local-path's default class deletes the volume with its claim; OAuth state must

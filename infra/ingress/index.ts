@@ -9,6 +9,9 @@ import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 import { createCloudflared } from './create-cloudflared.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 
+// the names observability's monitor and alert rule select cloudflared by
+export { cloudflaredNames } from './cloudflared-names.ts';
+
 interface IngressInputs {
   readonly accountID: string;
 

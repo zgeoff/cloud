@@ -1,8 +1,9 @@
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
+import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';
 import { Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
-import { all, secret } from '@pulumi/pulumi';
+import { secret } from '@pulumi/pulumi';
 import {
   buildOnePasswordConnectServiceSpec,
   onePasswordConnectServicePort,
@@ -11,6 +12,7 @@ import {
   buildOnePasswordConnectSpec,
   onePasswordConnectCredentialsKey,
 } from './build-onepassword-connect-spec.ts';
+import { buildServiceURL } from './build-service-url.ts';
 
 // 1Password Connect for imps (GEO-120), following charts/connect in 1Password/connect-helm-charts: the broker swaps a
 // placeholder bearer for the real token on op-connect.imp.internal requests, relayed from the host to this ClusterIP
@@ -21,8 +23,7 @@ export interface OnePasswordConnectInputs {
   readonly credentials: Output<string>;
 }
 
-export interface OnePasswordConnectOutputs {
-  readonly deployment: Deployment;
+interface OnePasswordConnectOutputs {
   readonly serviceURL: Output<string>;
 }
 
@@ -38,24 +39,32 @@ export function createOnePasswordConnect(
 
   const namespace = ns.metadata.name;
 
-  const deployment = new Deployment(
-    'onepassword-connect',
-    {
-      metadata: { name: 'onepassword-connect', namespace },
-      spec: buildOnePasswordConnectSpec(createCredentials(cluster, namespace, inputs)),
-    },
-    { provider: cluster },
+  createDeployment(
+    cluster,
+    namespace,
+    buildOnePasswordConnectSpec(createCredentials(cluster, namespace, inputs)),
   );
 
   const service = createService(cluster, namespace);
 
   return {
-    deployment,
-    serviceURL: all([service.metadata.name, service.metadata.namespace]).apply(
-      ([name, serviceNamespace]) =>
-        `http://${name}.${serviceNamespace}.svc.cluster.local:${onePasswordConnectServicePort}`,
+    serviceURL: buildServiceURL(
+      { name: service.metadata.name, namespace: service.metadata.namespace },
+      onePasswordConnectServicePort,
     ),
   };
+}
+
+function createDeployment(
+  cluster: Provider,
+  namespace: Output<string>,
+  spec: DeploymentArgs['spec'],
+): Deployment {
+  return new Deployment(
+    'onepassword-connect',
+    { metadata: { name: 'onepassword-connect', namespace }, spec },
+    { provider: cluster },
+  );
 }
 
 function createService(cluster: Provider, namespace: Output<string>): Service {

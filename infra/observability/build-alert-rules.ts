@@ -1,4 +1,5 @@
 import { topology } from '@zgeoff/cloud-topology';
+import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
@@ -111,7 +112,7 @@ const cloudflaredRule: AlertRule = {
   expr: [
     'sum(cloudflared_tunnel_ha_connections) == 0',
     'absent(cloudflared_tunnel_ha_connections)',
-    'absent(up{namespace="ingress", pod=~"cloudflared-.*"} == 1)',
+    `absent(up{namespace="${cloudflaredNames.namespace}", pod=~"${cloudflaredNames.name}-.*"} == 1)`,
   ].join(' or '),
   for: '5m',
   labels: { severity: 'critical' },

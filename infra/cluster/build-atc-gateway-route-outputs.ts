@@ -17,9 +17,7 @@ interface GatewayOutputs {
 // the gateway's in-cluster URL, and its route: the public host the tunnel sends to that
 // URL, and the OAuth metadata URL the health check probes, which the gateway serves
 // without a token
-export function buildATCGatewayRouteOutputs(
-  gateway: Pick<ATCGatewayOutputs, 'serviceURL' | 'publicHost'>,
-): GatewayOutputs {
+export function buildATCGatewayRouteOutputs(gateway: ATCGatewayOutputs): GatewayOutputs {
   return {
     atcGatewayServiceURL: gateway.serviceURL,
     atcGatewayRoute: {
