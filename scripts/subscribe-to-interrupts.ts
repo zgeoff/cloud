@@ -7,7 +7,7 @@ import type { RunResult, Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
 
 // a step that undoes what the script made; it gets the runner that an interrupt leaves working
-export type CleanupStep = (io: Readonly<ScriptIO>) => unknown;
+type CleanupStep = (io: Readonly<ScriptIO>) => unknown;
 
 export interface InterruptibleIO extends ScriptIO {
   // adds a step that runs on an interrupt, and returns the function that drops it once the
@@ -25,7 +25,7 @@ const interrupts = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 type Interrupt = (typeof interrupts)[number];
 
 // process in a script; a test passes an EventEmitter
-export interface SignalSource {
+interface SignalSource {
   readonly on: (signal: Interrupt, listener: () => void) => unknown;
   readonly off: (signal: Interrupt, listener: () => void) => unknown;
 }
