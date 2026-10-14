@@ -7,7 +7,8 @@
 # host" is a directory in the case's tree, where the ssh stand-in runs the script's remote
 # command. Failures that real state can reach run on real state: a secrets directory the
 # script may not write, an env file that is not there, and ssh refused by a dead loopback
-# port. Each case runs the script under `env -i` with only the variables it sets and
+# port. The case with the read-only directory runs the script through run_with_file_modes, so
+# the mode binds a run as root too. Each case runs the script under `env -i` with only the variables it sets and
 # compares its whole stdout, stderr, call log and the files it leaves, and its exact exit
 # code. The ssh call is written out as literal text, masking only the case's temporary
 # path as TREE.
@@ -23,6 +24,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-op-read
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-bash-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-with-file-modes.sh"
 
 it_installs_the_token_over_ssh_stdin_and_keeps_the_other_env_lines() {
   local status=0
@@ -272,7 +274,7 @@ it_fails_with_exit_1_and_leaves_both_files_when_the_host_may_not_write_the_secre
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
   chmod 0500 "$tree/host/secrets"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && run_with_file_modes env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     IMP_HOST=local IMP_ENV_FILE="$tree/host/secrets/imp-host.env" IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" \
     bash install-imp-dns-token.sh) > "$tree/out" 2> "$tree/err" || status=$?
 

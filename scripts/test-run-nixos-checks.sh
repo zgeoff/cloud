@@ -5,7 +5,8 @@
 # build only when the device is there for it. It runs no Nix and no container: git and docker
 # are stubs that log their argv as JSON lines and exit 97 on a call they do not expect, and each
 # case runs the script under `env -i` with only the variables it sets, KVM_DEVICE among them, so
-# no case depends on the machine's /dev/kvm. Each case compares the script's whole stdout, stderr
+# no case depends on the machine's /dev/kvm; the case with a device it may not write runs the
+# script through run_with_file_modes, so the mode binds a run as root too. Each case compares the script's whole stdout, stderr
 # and call log, masking only the temporary paths.
 #
 #   bash scripts/test-run-nixos-checks.sh
@@ -17,6 +18,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-checks-git.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-checks-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-with-file-modes.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-nixos-checks.sh"
@@ -153,7 +155,7 @@ it_builds_the_other_checks_then_fails_naming_impd_restore_when_the_kvm_device_is
   touch "$tree/kvm"
   chmod 0400 "$tree/kvm"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+  run_with_file_modes env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_BUILD_SAW="$tree/build-saw" \
     KVM_DEVICE="$tree/kvm" \
     bash "$script" impd-restore atc-daemon > "$tree/out" 2> "$tree/err" || status=$?
