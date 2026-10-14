@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
 import { checkImagePins } from './check-image-pins.ts';
 import { server } from './mocks/node.ts';
+import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 async function setupTest() {
   const root = await mkdtemp(join(tmpdir(), 'check-image-pins-'));
@@ -35,10 +36,17 @@ async function setupTest() {
     ].map((file) => writeFile(join(root, file), '')),
   );
 
+  // gh prints the token it holds, as `gh auth token` does once signed in or with GH_TOKEN set
+  const stub = buildStubRunner((call) =>
+    call.argv.join(' ') === 'gh auth token --hostname github.com'
+      ? { stdout: 'gh-token-1\n' }
+      : undefined,
+  );
+
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { root, printOut, printErr };
+  return { root, stub, printOut, printErr };
 }
 
 test('it passes when a release tag names its pinned digest, asking once for a pin two files hold', async () => {
@@ -72,6 +80,7 @@ test('it passes when a release tag names its pinned digest, asking once for a pi
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -107,6 +116,7 @@ test('it fails a release pin whose tag names another digest at the registry', as
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -139,6 +149,7 @@ test('it fails a release pin whose tag the registry does not have', async () => 
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -180,6 +191,7 @@ test('it passes an upstream pin whose tag moved, while the registry still serves
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -212,6 +224,7 @@ test('it fails an upstream pin whose digest the registry no longer serves', asyn
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -242,6 +255,7 @@ test('it fails a pin whose registry answers with an error', async () => {
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -255,6 +269,40 @@ test('it fails a pin whose registry answers with an error', async () => {
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
+test('it fails a ghcr.io pin without asking the registry when there is no GitHub token', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'images', 'atc-gateway', 'versions.env'),
+    `BASE_IMAGE=ghcr.io/zgeoff/atc-gateway:2.27.0@sha256:${'1'.repeat(64)}\n`,
+  );
+
+  // gh exits 1 with this message when it holds no token and neither GH_TOKEN nor GITHUB_TOKEN is set
+  const stub = buildStubRunner(() => ({
+    exitCode: 1,
+    stderr: 'no oauth token found for github.com\n',
+  }));
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: no GitHub token to read ghcr.io/zgeoff: set GH_TOKEN, or sign gh in with the read:packages scope\n',
+  );
+
+  expect(ctx.printOut).not.toHaveBeenCalled();
+
+  expect(stub.calls.map((call) => call.argv)).toStrictEqual([
+    ['gh', 'auth', 'token', '--hostname', 'github.com'],
+  ]);
+});
+
 test('it fails a digest with an extra hex digit, without asking the registry', async () => {
   const ctx = await setupTest();
 
@@ -265,6 +313,7 @@ test('it fails a digest with an extra hex digit, without asking the registry', a
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -291,6 +340,7 @@ test('it fails an image reference whose digest was removed', async () => {
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -311,6 +361,7 @@ test('it fails a lowercase Dockerfile from without a digest', async () => {
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -332,6 +383,7 @@ test('it fails a digest on a line that holds no image reference', async () => {
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -369,6 +421,7 @@ test('it reads a quoted Nix image and a tag-only key, which is not an image refe
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -387,6 +440,7 @@ test('it fails, naming the file, when a pin file is missing', async () => {
 
   const exitCode = await checkImagePins({
     args: [ctx.root],
+    run: ctx.stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -402,7 +456,12 @@ test('it prints its usage and exits 2 for more than one argument', async () => {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  const exitCode = await checkImagePins({ args: ['one', 'two'], printOut, printErr });
+  const exitCode = await checkImagePins({
+    args: ['one', 'two'],
+    run: buildStubRunner().run,
+    printOut,
+    printErr,
+  });
 
   expect(exitCode).toBe(2);
   expect(printErr).toHaveBeenCalledExactlyOnceWith('usage: check-image-pins.ts [repo root]\n');

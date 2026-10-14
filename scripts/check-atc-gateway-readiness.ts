@@ -33,7 +33,7 @@ export async function checkATCGatewayReadiness(
   const checks: readonly (() => Promise<ReadinessLine | readonly ReadinessLine[]>)[] = [
     () => checkGatewayHost(io),
     () => checkGatewayObjects(io),
-    () => checkGatewayImage(),
+    () => checkGatewayImage(io.run),
     () => checkGatewayRoute(io.run),
     () => checkImpdHealth(io),
     () => checkATCDaemon(io),
