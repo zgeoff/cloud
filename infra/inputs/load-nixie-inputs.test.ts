@@ -136,7 +136,14 @@ test.each([
         }),
       }),
       env,
-      'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+      {
+        reference:
+          'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
+        pullCredential: {
+          username: 'octo-puller',
+          token: secret('ghp_fake0token0for0tests0only0000000000'),
+        },
+      },
     ),
   ).toThrowWithMessage(Error, `${name} is unset; nixie needs it while stack config "nixie" is set`);
 });
