@@ -268,7 +268,7 @@ async function waitForExit(pid: number) {
 
 // The command's Bash starts a grandchild that holds the captured pipes, as an `imp exec` or a
 // `curl` in an older commit's check does. The grandchild runs prelude, then writes its pid.
-async function runGrandchildCommand(ctx: Readonly<ReturnType<typeof setupTest>>, prelude: string) {
+async function runGrandchildCommand(run: Runner, prelude: string) {
   const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
 
   const fifo = join(dir, 'started');
@@ -290,7 +290,7 @@ async function runGrandchildCommand(ctx: Readonly<ReturnType<typeof setupTest>>,
 
   const script = `(${prelude}echo $BASHPID > "$1"; echo > "$2"; exec sleep 30) & wait`;
 
-  void ctx.trap.run(['bash', '-c', script, 'bash', pidFile, fifo]);
+  void run(['bash', '-c', script, 'bash', pidFile, fifo]);
 
   await readFile(fifo);
 
@@ -305,7 +305,7 @@ test('it stops a grandchild that holds the command’s pipes, and runs the steps
 
   ctx.trap.registerCleanup(() => ran.push('remove the check imp'));
 
-  const pid = await runGrandchildCommand(ctx, '');
+  const pid = await runGrandchildCommand(ctx.trap.run, '');
 
   const started = performance.now();
 
@@ -329,7 +329,7 @@ test('it kills a grandchild that ignores SIGTERM and holds the command’s pipes
 
   ctx.trap.registerCleanup(() => ran.push('remove the check imp'));
 
-  const pid = await runGrandchildCommand(ctx, 'trap "" TERM; ');
+  const pid = await runGrandchildCommand(ctx.trap.run, 'trap "" TERM; ');
 
   ctx.signals.emit('SIGTERM');
 
