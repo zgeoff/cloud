@@ -2,7 +2,8 @@
 # Test for create-stub-release-docker.sh: the docker stand-in logs each call, prints the manifest
 # descriptor a test wrote for an image, answers a missing image as buildx 0.37.1 does, writes the
 # test's lock into the directory a `nix flake lock` run mounts or fails it with STUB_LOCK_ERROR,
-# and fails closed on any other call.
+# records the NIX_CONFIG that such a run passes with `-e NIX_CONFIG`, and fails closed on any
+# other call.
 #
 #   bash test-support/shell/test-create-stub-release-docker.sh
 # shellcheck source-path=SCRIPTDIR
@@ -74,6 +75,75 @@ it_writes_the_test_lock_into_the_mounted_directory() {
   diff - <(sed "s|$tree|TREE|g" "$tree/calls") << 'EOF'
 ["docker","run","--rm","-v","TREE/nixos:/src","-w","/src","example.invalid/nix:1","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown 0:0 flake.lock"]
 EOF
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_records_the_nix_config_that_a_lock_passes_to_the_container() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/nixos"
+  echo '{"new":true}' > "$tree/flake.lock"
+
+  "${case_env[@]}" NIX_CONFIG='access-tokens = github.com=example' docker run --rm -v "$tree/nixos:/src" -w /src -e NIX_CONFIG \
+    example.invalid/nix:1 sh -c "nix --extra-experimental-features 'nix-command flakes' flake lock" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/nixos/flake.lock" <<< '{"new":true}'
+  diff - "$tree/nix-config" <<< 'access-tokens = github.com=example'
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_records_no_nix_config_for_a_lock_that_does_not_pass_it() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/nixos"
+  echo '{"new":true}' > "$tree/flake.lock"
+
+  "${case_env[@]}" NIX_CONFIG='access-tokens = github.com=example' docker run --rm -v "$tree/nixos:/src" -w /src \
+    example.invalid/nix:1 sh -c "nix --extra-experimental-features 'nix-command flakes' flake lock" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/nixos/flake.lock" <<< '{"new":true}'
+  [ ! -e "$tree/nix-config" ] || {
+    echo "recorded a NIX_CONFIG that the call did not pass: $(cat "$tree/nix-config")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_records_no_nix_config_when_the_caller_has_none() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/nixos"
+  echo '{"new":true}' > "$tree/flake.lock"
+
+  "${case_env[@]}" docker run --rm -v "$tree/nixos:/src" -w /src -e NIX_CONFIG \
+    example.invalid/nix:1 sh -c "nix --extra-experimental-features 'nix-command flakes' flake lock" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/nixos/flake.lock" <<< '{"new":true}'
+  [ ! -e "$tree/nix-config" ] || {
+    echo "recorded a NIX_CONFIG that the caller lacks: $(cat "$tree/nix-config")" >&2
+    exit 1
+  }
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
     exit 1

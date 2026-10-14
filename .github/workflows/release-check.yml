@@ -82,10 +82,12 @@ jobs:
         run: bun run --silent ci:set-release-bot-identity "$SLUG"
 
       # every line runs, so one dependency's failure leaves the others' pull requests current;
-      # any failure fails the job once all have run
+      # any failure fails the job once all have run. The imp pin's nix lock sends NIX_GITHUB_TOKEN to
+      # api.github.com, so the runner IP's anonymous rate limit cannot fail it (pin-imp.sh)
       - name: Open or update the bump pull requests
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          NIX_GITHUB_TOKEN: ${{ github.token }}
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'

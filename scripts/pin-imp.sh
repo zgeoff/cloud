@@ -7,6 +7,9 @@
 #
 #   bash scripts/pin-imp.sh <version> <commit> <imp-host digest> <imp-base digest>
 #
+# NIX_GITHUB_TOKEN, when set, is a GitHub token that the lock sends to api.github.com, so a shared
+# runner IP's anonymous rate limit cannot fail it; the release check passes its job's token.
+#
 # The flake input takes the commit's first 8 hex digits, as it does by hand, and `nix flake lock`
 # then locks it, in the Nix image that scripts/nix-image.sh pins; the lock must name the
 # commit. The rules follow pin-agent-atc.sh's for each image on its own: an image that already
@@ -110,7 +113,16 @@ if [ "$pin_host" = true ]; then
   write "$flake" "s|^(      url = \"github:zgeoff/imp/)[0-9a-f]+(\";)\$|\\1${commit:0:8}\\2|"
   # shellcheck source-path=SCRIPTDIR source=nix-image.sh
   source "$here/nix-image.sh"
-  docker run --rm -v "$PWD/nixos:/src" -w /src "$NIX_IMAGE" sh -c \
+  # the lock resolves the short commit through api.github.com, whose anonymous quota a shared
+  # runner IP can spend; with NIX_GITHUB_TOKEN, nix sends it as a github.com access token, added
+  # after the caller's own NIX_CONFIG. docker takes NIX_CONFIG by name, so the token stays out of
+  # every argv and log line; without the token, the container gets no NIX_CONFIG at all.
+  nix_env=()
+  if [ -n "${NIX_GITHUB_TOKEN:-}" ]; then
+    export NIX_CONFIG="${NIX_CONFIG:+$NIX_CONFIG$'\n'}access-tokens = github.com=$NIX_GITHUB_TOKEN"
+    nix_env=(-e NIX_CONFIG)
+  fi
+  docker run --rm -v "$PWD/nixos:/src" -w /src "${nix_env[@]}" "$NIX_IMAGE" sh -c \
     "nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"
   locked="$(jq -r '.nodes.imp.locked.rev' "$lock")"
   if [ "$locked" != "$commit" ]; then
