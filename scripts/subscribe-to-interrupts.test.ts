@@ -2,7 +2,7 @@
 /* oxlint-disable max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -239,6 +239,112 @@ test('it sends SIGKILL to a command that outlives its SIGTERM by the grace, then
   expect(ctx.err).toStrictEqual([
     'stopped by SIGTERM; cleaning up\n',
     'a command outlived SIGTERM by 50 ms; killing it\n',
+  ]);
+});
+
+// A descendant that exits leaves a zombie until something reaps it, and a zombie holds no pipe
+function isAlive(pid: number) {
+  try {
+    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
+
+    return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) !== 'Z';
+  } catch {
+    return false;
+  }
+}
+
+// The kernel closes a dying process's pipes a moment before it becomes a zombie, so the test
+// polls for the exit. A second is long enough for a SIGKILL and far short of the grandchild's sleep.
+async function waitForExit(pid: number) {
+  const deadline = performance.now() + 1000;
+
+  while (isAlive(pid) && performance.now() < deadline) {
+    // oxlint-disable-next-line no-await-in-loop -- each poll waits for the pause before it
+    await Bun.sleep(5);
+  }
+
+  return !isAlive(pid);
+}
+
+// The command's Bash starts a grandchild that holds the captured pipes, as an `imp exec` or a
+// `curl` in an older commit's check does. The grandchild runs prelude, then writes its pid.
+async function runGrandchildCommand(run: Runner, prelude: string) {
+  const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
+
+  const fifo = join(dir, 'started');
+  const pidFile = join(dir, 'pid');
+
+  await runProcess(['mkfifo', fifo]);
+
+  onTestFinished(async () => {
+    const text = await readFile(pidFile, 'utf8').catch(() => '0');
+
+    const pid = Number(text);
+
+    if (pid > 0 && isAlive(pid)) {
+      process.kill(pid, 'SIGKILL');
+    }
+
+    await rm(dir, { recursive: true, force: true });
+  });
+
+  const script = `(${prelude}echo $BASHPID > "$1"; echo > "$2"; exec sleep 30) & wait`;
+
+  void run(['bash', '-c', script, 'bash', pidFile, fifo]);
+
+  await readFile(fifo);
+
+  const text = await readFile(pidFile, 'utf8');
+
+  return Number(text);
+}
+
+test('it stops a grandchild that holds the command’s pipes, and runs the steps within the grace', async () => {
+  const ctx = setupTest({ run: runProcess, graceMs: 2000 });
+  const ran: string[] = [];
+
+  ctx.trap.registerCleanup(() => ran.push('remove the check imp'));
+
+  const pid = await runGrandchildCommand(ctx.trap.run, '');
+
+  const started = performance.now();
+
+  ctx.signals.emit('SIGINT');
+
+  const exitCode = await ctx.exited;
+
+  expect(performance.now() - started).toBeLessThan(2000);
+  expect(exitCode).toBe(130);
+  expect(ran).toStrictEqual(['remove the check imp']);
+
+  const killed = await waitForExit(pid);
+
+  expect(killed).toBe(true);
+  expect(ctx.err).toStrictEqual(['stopped by SIGINT; cleaning up\n']);
+});
+
+test('it kills a grandchild that ignores SIGTERM and holds the command’s pipes once the grace ends', async () => {
+  const ctx = setupTest({ run: runProcess, graceMs: 200 });
+  const ran: string[] = [];
+
+  ctx.trap.registerCleanup(() => ran.push('remove the check imp'));
+
+  const pid = await runGrandchildCommand(ctx.trap.run, 'trap "" TERM; ');
+
+  ctx.signals.emit('SIGTERM');
+
+  const exitCode = await ctx.exited;
+
+  expect(exitCode).toBe(143);
+  expect(ran).toStrictEqual(['remove the check imp']);
+
+  const killed = await waitForExit(pid);
+
+  expect(killed).toBe(true);
+
+  expect(ctx.err).toStrictEqual([
+    'stopped by SIGTERM; cleaning up\n',
+    'a command outlived SIGTERM by 200 ms; killing it\n',
   ]);
 });
 
