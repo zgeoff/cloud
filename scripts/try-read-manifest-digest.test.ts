@@ -91,6 +91,87 @@ test("it takes an anonymous pull token from the registry's Bearer challenge", as
   expect(answer).toStrictEqual({ digest: `sha256:${'4'.repeat(64)}` });
 });
 
+test("it pays for ghcr.io's pull token with the GitHub token, which reads a private package", async () => {
+  const realmAuthorizations: (string | null)[] = [];
+
+  server.use(
+    http.head('https://ghcr.io/v2/zgeoff/atc-gateway/manifests/2.27.0', (info) =>
+      info.request.headers.get('authorization') === 'Bearer pull-token-9'
+        ? new HttpResponse(null, {
+            status: 200,
+            headers: { 'docker-content-digest': `sha256:${'6'.repeat(64)}` },
+          })
+        : new HttpResponse(null, {
+            status: 401,
+            headers: {
+              'www-authenticate':
+                'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:zgeoff/atc-gateway:pull"',
+            },
+          }),
+    ),
+    http.get('https://ghcr.io/token', (info) => {
+      const authorization = info.request.headers.get('authorization');
+
+      realmAuthorizations.push(authorization);
+
+      return authorization === `Basic ${btoa('x:gh-token-1')}`
+        ? HttpResponse.json({ token: 'pull-token-9' })
+        : HttpResponse.json({ token: 'pull-token-0' });
+    }),
+  );
+
+  const answer = await tryReadManifestDigest('ghcr.io/zgeoff/atc-gateway', '2.27.0', 'gh-token-1');
+
+  expect(answer).toStrictEqual({ digest: `sha256:${'6'.repeat(64)}` });
+  expect(realmAuthorizations).toStrictEqual([`Basic ${btoa('x:gh-token-1')}`]);
+});
+
+test("it never sends the GitHub token to another registry's realm", async () => {
+  const realmAuthorizations: (string | null)[] = [];
+
+  server.use(
+    http.head('https://registry-1.docker.io/v2/example/builder/manifests/2.30.0', (info) =>
+      info.request.headers.get('authorization') === 'Bearer pull-token-8'
+        ? new HttpResponse(null, {
+            status: 200,
+            headers: { 'docker-content-digest': `sha256:${'7'.repeat(64)}` },
+          })
+        : new HttpResponse(null, {
+            status: 401,
+            headers: {
+              'www-authenticate':
+                'Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:example/builder:pull"',
+            },
+          }),
+    ),
+    http.get('https://auth.docker.io/token', (info) => {
+      realmAuthorizations.push(info.request.headers.get('authorization'));
+
+      return HttpResponse.json({ token: 'pull-token-8' });
+    }),
+  );
+
+  const answer = await tryReadManifestDigest('example/builder', '2.30.0', 'gh-token-1');
+
+  expect(answer).toStrictEqual({ digest: `sha256:${'7'.repeat(64)}` });
+  expect(realmAuthorizations).toStrictEqual([null]);
+});
+
+test('it says the credential cannot read a manifest the registry refuses with its token', async () => {
+  server.use(
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/2.27.0',
+      () => new HttpResponse(null, { status: 403 }),
+    ),
+  );
+
+  const answer = await tryReadManifestDigest('ghcr.io/zgeoff/atc-gateway', '2.27.0', 'gh-token-1');
+
+  expect(answer).toStrictEqual({
+    error: 'the registry answered 403: the credential cannot read it',
+  });
+});
+
 test("it asks Docker Hub's library namespace for an official image", async () => {
   server.use(
     http.head(

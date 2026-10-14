@@ -19,9 +19,11 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # the gitleaks action comments findings on the PR, which needs write on pull-requests
+    # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
+    # image pin check reads the private ghcr.io/zgeoff packages, which needs read on packages
     permissions:
       contents: read
+      packages: read
       pull-requests: write
     env:
       LEFTHOOK: 0
@@ -106,6 +108,8 @@ jobs:
 
       # each release tag still names its pinned digest, and each upstream digest is still served
       - name: Image pins
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run check:image-pins
 
       # each restore Job's YAML is its backup pod builder's output

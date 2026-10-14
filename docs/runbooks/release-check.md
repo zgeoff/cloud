@@ -31,7 +31,9 @@ the release's version. A pin script never moves a pin back to an older release. 
 publishes is never replaced, so the check fails a pull request whose release tag names another
 digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves when its publisher
 rebuilds the image, so for an upstream pin the check asks only that the registry still serves the
-pinned digest.
+pinned digest. The atc-gateway packages on GHCR are private, so the check reads them with a GitHub
+token that can read packages: CI hands it the workflow's token, and on a PC it takes the token that
+`gh auth token` prints, which needs the `read:packages` scope (`gh auth refresh -s read:packages`).
 
 ## When a bump merges on its own
 

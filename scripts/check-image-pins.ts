@@ -1,5 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { missingGitHubTokenText, readGitHubToken } from './read-github-token.ts';
+import type { Runner } from './run-process.ts';
+import { runProcess } from './run-process.ts';
 import type { RegistryAnswer } from './try-read-manifest-digest.ts';
 import { tryReadManifestDigest } from './try-read-manifest-digest.ts';
 
@@ -8,6 +11,7 @@ import { tryReadManifestDigest } from './try-read-manifest-digest.ts';
 // name its digest; an upstream pin's digest must still be served, since upstream tags can move.
 export interface CheckImagePinsOptions {
   readonly args: readonly string[];
+  readonly run: Runner;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -32,18 +36,41 @@ export async function checkImagePins(options: Readonly<CheckImagePinsOptions>): 
     return 2;
   }
 
-  const loaded = await loadPins(options.args[0] ?? '.');
+  const loaded = await loadPinsAndToken(options.args[0] ?? '.', options.run);
 
-  // an unreadable file, or a malformed or missing digest, fails before any registry request
+  // an unreadable file, a malformed or missing digest, or a missing token fails before any
+  // registry request
   if ('failures' in loaded) {
     options.printErr(loaded.failures.join(''));
 
     return 1;
   }
 
-  const answers = await readRegistryDigests(loaded.pins);
+  const answers = await readRegistryDigests(loaded.pins, loaded.githubToken);
 
   return printReport(loaded.pins, answers, options);
+}
+
+// The pins, with the GitHub token that ghcr.io's private packages need when a pin is on ghcr.io.
+// Without it a private package would read as refused, so the check names the missing token.
+async function loadPinsAndToken(
+  root: string,
+  run: Runner,
+): Promise<
+  | { readonly pins: readonly Pin[]; readonly githubToken: string | undefined }
+  | { readonly failures: readonly string[] }
+> {
+  const loaded = await loadPins(root);
+
+  if ('failures' in loaded || !loaded.pins.some((pin) => pin.name.startsWith('ghcr.io/'))) {
+    return { ...loaded, githubToken: undefined };
+  }
+
+  const githubToken = await readGitHubToken(run);
+
+  return githubToken === undefined
+    ? { failures: [`check-image-pins: ${missingGitHubTokenText}\n`] }
+    : { pins: loaded.pins, githubToken };
 }
 
 // one pin as a file writes it: the image's name, its tag and the digest it pins
@@ -160,6 +187,7 @@ function toManifestRequest(pin: Pin): ManifestRequest {
 // one answer per distinct request, so a pin that several files hold costs one request
 async function readRegistryDigests(
   pins: readonly Pin[],
+  githubToken: string | undefined,
 ): Promise<Readonly<Record<string, RegistryAnswer>>> {
   const distinct = new Map(
     pins.map((pin) => toManifestRequest(pin)).map((request) => [request.key, request]),
@@ -168,7 +196,10 @@ async function readRegistryDigests(
   const answers = await Promise.all(
     [...distinct.values()].map(
       async (request) =>
-        [request.key, await tryReadManifestDigest(request.name, request.reference)] as const,
+        [
+          request.key,
+          await tryReadManifestDigest(request.name, request.reference, githubToken),
+        ] as const,
     ),
   );
 
@@ -229,6 +260,7 @@ function findFinding(
 if (import.meta.main) {
   process.exitCode = await checkImagePins({
     args: process.argv.slice(2),
+    run: runProcess,
     printOut: (text) => {
       process.stdout.write(text);
     },
