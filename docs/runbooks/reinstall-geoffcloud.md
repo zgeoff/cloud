@@ -34,7 +34,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    ```sh
    x=/tmp/geoffcloud-extra
-   mkdir -p $x/var/lib/tailscale $x/var/lib/imp-host/secrets $x/var/lib/zfs-keys
+   mkdir -p $x/var/lib/tailscale $x/var/lib/imp-host/secrets
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets hostAuthKey) \
      > $x/var/lib/tailscale/authkey
    (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impHostAuthKey) \
@@ -60,11 +60,15 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    the key's 64 hex characters, so the length check catches a wrong item before the install:
 
    ```sh
-   op read --no-newline op://cloud/zfs-tank-key/password > $x/var/lib/zfs-keys/tank.key
-   test "$(wc -c < $x/var/lib/zfs-keys/tank.key)" -eq 64 && echo ok
-   chmod 700 $x/var/lib/zfs-keys
+   install -d -m 0700 $x/var/lib/zfs-keys
+   (umask 077 && op read --no-newline op://cloud/zfs-tank-key/password > $x/var/lib/zfs-keys/tank.key)
    chmod 400 $x/var/lib/zfs-keys/tank.key
+   test "$(wc -c < $x/var/lib/zfs-keys/tank.key)" -eq 64 && echo ok
    ```
+
+   The key directory and file never exist with a mode another account can read. A `umask` around the
+   whole staging block would not do: `--extra-files` copies each directory's mode, so `/var` and
+   `/var/lib` would land as `0700` on the host.
 
    Expect `ok`. Without it, check the item and stage the key again before you go on.
 
