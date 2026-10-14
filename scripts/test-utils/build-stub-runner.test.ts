@@ -25,7 +25,7 @@ test('it answers with the first handler that answers, and records the call', asy
     {
       argv: ['git', 'branch', '--show-current'],
       stdin: 'in\n',
-      options: { stdin: Buffer.from('in\n'), timeoutMs: 1000 },
+      options: { timeoutMs: 1000 },
     },
   ]);
 });

@@ -25,7 +25,7 @@ test('it runs op with the service account token in its environment and the stdin
     {
       argv: ['op', 'item', 'create', '--vault', 'cloud', '-'],
       stdin: '{}',
-      options: { env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture_env' }, stdin: Buffer.from('{}') },
+      options: { env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture_env' } },
     },
   ]);
 });

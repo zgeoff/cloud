@@ -8,7 +8,13 @@ test('it returns the result of a command that succeeds and passes its stderr thr
   const printed: string[] = [];
 
   const result = await runOrExit(
-    { run: stub.run, printOut: () => {}, printErr: (text) => printed.push(text) },
+    {
+      run: stub.run,
+      printOut: () => {},
+      printErr: (text) => {
+        printed.push(text);
+      },
+    },
     ['ls'],
   );
 
@@ -21,7 +27,13 @@ test('it stops with the exit code of a command that fails, after its stderr', as
   const printed: string[] = [];
 
   const run = runOrExit(
-    { run: stub.run, printOut: () => {}, printErr: (text) => printed.push(text) },
+    {
+      run: stub.run,
+      printOut: () => {},
+      printErr: (text) => {
+        printed.push(text);
+      },
+    },
     ['op', 'vault', 'get', 'missing'],
   );
 
@@ -58,7 +70,7 @@ test('it hands the stdin and the timeout to the runner', async () => {
     {
       argv: ['cat'],
       stdin: 'value\n',
-      options: { stdin: Buffer.from('value\n'), timeoutMs: 5000 },
+      options: { timeoutMs: 5000 },
     },
   ]);
 });

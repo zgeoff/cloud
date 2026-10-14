@@ -1,6 +1,6 @@
 // each test states its whole host, registry and route inline and asserts the whole output, so its
 // body is long
-/* oxlint-disable max-lines-per-function, max-statements */
+/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkATCGatewayReadiness } from './check-atc-gateway-readiness.ts';
@@ -218,7 +218,7 @@ test('it reports what the deploy creates as missing, and exits 0, before the dep
       'missing  atc-daemon service on geoffcloud\n',
   );
 
-  expect(stub.calls.filter((call) => call.argv.at(-1)?.includes("'run'"))).toStrictEqual([]);
+  expect(stub.calls.filter((call) => (call.argv.at(-1) ?? '').includes("'run'"))).toStrictEqual([]);
 });
 
 test('it fails the four host checks and exits 4 when the host does not answer', async () => {

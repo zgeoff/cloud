@@ -6,7 +6,9 @@ test('it returns the exit code the body returns', async () => {
   const printed: string[] = [];
 
   const exitCode = await withExitCode(
-    (text) => printed.push(text),
+    (text) => {
+      printed.push(text);
+    },
     () => Promise.resolve(0),
   );
 
@@ -18,7 +20,9 @@ test('it prints an ExitError’s message and returns its exit code', async () =>
   const printed: string[] = [];
 
   const exitCode = await withExitCode(
-    (text) => printed.push(text),
+    (text) => {
+      printed.push(text);
+    },
     () => Promise.reject(new ExitError(3, 'the vault is missing')),
   );
 
@@ -30,7 +34,9 @@ test('it prints nothing for an ExitError whose tool has already said why', async
   const printed: string[] = [];
 
   const exitCode = await withExitCode(
-    (text) => printed.push(text),
+    (text) => {
+      printed.push(text);
+    },
     () => Promise.reject(new ExitError(255, '')),
   );
 

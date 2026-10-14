@@ -20,7 +20,7 @@ export async function findOpenATCPinPR(
   const listed = await runOrExit(io, [...argv, '--json', 'number,url,autoMergeRequest']);
 
   const prs = parseJSONOutput(listed.stdout.toString(), 'gh pr list');
-  const first = Array.isArray(prs) ? (prs as readonly unknown[])[0] : undefined;
+  const [first]: readonly unknown[] = Array.isArray(prs) ? prs : [];
   const number = findJSONField(first, 'number');
 
   if (typeof number !== 'number') {

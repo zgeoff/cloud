@@ -10,7 +10,10 @@ set -uo pipefail
 failures=0
 
 pass() { printf 'ok    %-16s %s\n' "$1" "$2"; }
-fail() { printf 'FAIL  %-16s %s\n' "$1" "$2"; failures=$((failures + 1)); }
+fail() {
+  printf 'FAIL  %-16s %s\n' "$1" "$2"
+  failures=$((failures + 1))
+}
 
 # a tool answers its version command, and the answer holds the pinned version.
 # The whole output is read before its first line is taken: piping into head -1
@@ -34,7 +37,7 @@ check_tool() {
 # an Ubuntu package is installed at the pinned version
 check_package() {
   local package="$1" expected="$2" actual
-  actual=$(dpkg-query -W -f '${Version}' "$package" 2>/dev/null || true)
+  actual=$(dpkg-query -W -f '${Version}' "$package" 2> /dev/null || true)
   if [[ "$actual" == "$expected" ]]; then
     pass "$package" "deb $actual"
   else
@@ -65,7 +68,7 @@ done
 [[ "$found" == 1 ]] || pass login-state "none of ${#login_paths[@]} paths under ${homes[*]}"
 names=$(env | cut -d= -f1 | grep -E 'TOKEN|SECRET|PASSWORD|API_KEY|AUTH|CREDENTIAL' || true)
 if [[ -n "$names" ]]; then
-  fail environment "credential-like variables: $(echo $names)"
+  fail environment "credential-like variables: ${names//$'\n'/ }"
 else
   pass environment "no credential-like variable names"
 fi
@@ -119,7 +122,7 @@ check_tool op "$OP_VERSION" op --version
 check_package docker-compose-plugin "$DOCKER_COMPOSE_VERSION"
 check_tool auto-mode "$AUTO_MODE_VERSION" jq -r .version /opt/auto-mode/package.json
 check_tool gitleaks "$GITLEAKS_VERSION" gitleaks version
-# shellcheck's first line is its name, so the check reads its version line
+# the first line that shellcheck prints is its name, so the check reads its version line
 check_tool shellcheck "version: $SHELLCHECK_VERSION" \
   bash -o pipefail -c "shellcheck --version | sed -n '/^version: /p'"
 check_tool shfmt "v$SHFMT_VERSION" shfmt --version
@@ -135,18 +138,18 @@ else
 fi
 # the boot service that lets oxc's allocator reserve its buffers on a small imp
 overcommit=/etc/imp/services.d/overcommit.json
-if [[ "$(jq -c '[.argv, .user, .restart]' "$overcommit" 2> /dev/null)" == '[["sysctl","-w","vm.overcommit_memory=1"],"root","never"]' ]] \
-  && command -v sysctl > /dev/null; then
+if [[ "$(jq -c '[.argv, .user, .restart]' "$overcommit" 2> /dev/null)" == '[["sysctl","-w","vm.overcommit_memory=1"],"root","never"]' ]] &&
+  command -v sysctl > /dev/null; then
   pass overcommit "$overcommit"
 else
   fail overcommit "$overcommit is missing or does not run sysctl -w vm.overcommit_memory=1 once as root"
 fi
 # the boot service that turns on the swapfile, so a heavy command slows a small imp down
 swap=/etc/imp/services.d/swap.json
-if [[ "$(jq -c '[.argv, .user, .restart]' "$swap" 2> /dev/null)" == '[["/usr/local/sbin/setup-swap"],"root","never"]' ]] \
-  && [[ -x /usr/local/sbin/setup-swap ]] \
-  && [[ -x /usr/bin/fallocate && -x /usr/sbin/mkswap && -x /usr/sbin/swapon && -x /usr/sbin/sysctl ]] \
-  && command -v df > /dev/null && command -v awk > /dev/null; then
+if [[ "$(jq -c '[.argv, .user, .restart]' "$swap" 2> /dev/null)" == '[["/usr/local/sbin/setup-swap"],"root","never"]' ]] &&
+  [[ -x /usr/local/sbin/setup-swap ]] &&
+  [[ -x /usr/bin/fallocate && -x /usr/sbin/mkswap && -x /usr/sbin/swapon && -x /usr/sbin/sysctl ]] &&
+  command -v df > /dev/null && command -v awk > /dev/null; then
   pass swap "$swap"
 else
   fail swap "$swap is missing or does not run /usr/local/sbin/setup-swap once as root, or a tool it runs is missing"

@@ -44,7 +44,7 @@ test('it builds from the commit’s archive of the image and scripts only, and r
 
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(buildRealProgramHandler(['git', 'tar'], ctx.repo.env), imp.handler);
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const built = await runAgentImageBuild(
     { run: stub.run, printOut: () => {}, printErr },

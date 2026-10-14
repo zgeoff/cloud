@@ -69,13 +69,8 @@ export function buildStubCredentialsHost(
   const secretValues: Record<string, string> = {};
 
   return {
-    handle: (call) => {
-      if (call.argv[0] !== 'ssh') {
-        return;
-      }
-
-      return buildSSHAnswer({ scenario, secretValues }, call);
-    },
+    handle: (call) =>
+      call.argv[0] === 'ssh' ? buildSSHAnswer({ scenario, secretValues }, call) : undefined,
     secretValues,
     files: scenario.files,
   };
@@ -86,16 +81,18 @@ interface HostState {
   readonly secretValues: Record<string, string>;
 }
 
-function buildSSHAnswer(state: HostState, call: StubCall): StubAnswer | undefined {
+function buildSSHAnswer(state: HostState, call: StubCall) {
   const [, option, batch, destination, ...remote] = call.argv;
 
-  if (option !== '-o' || batch !== 'BatchMode=yes' || destination !== state.scenario.host) {
-    return;
-  }
+  return option === '-o' && batch === 'BatchMode=yes' && destination === state.scenario.host
+    ? buildHostAnswer(state, call, remote)
+    : undefined;
+}
 
+function buildHostAnswer(state: HostState, call: StubCall, remote: readonly string[]) {
   // OpenSSH's message for a refused connection, with the CR LF its log function ends a line with
   if (state.scenario.unreachable === true) {
-    const name = destination.replace(/^.*@/u, '');
+    const name = state.scenario.host.replace(/^.*@/u, '');
 
     return {
       exitCode: 255,
@@ -130,15 +127,13 @@ function buildDockerAnswer(state: HostState, line: string, stdin: string) {
 
   const read = Object.entries(reads).find(([command]) => command === line)?.[1];
 
-  if (read === undefined) {
-    return;
-  }
+  return read === undefined ? undefined : buildReadAnswer(state, read);
+}
 
-  if (state.scenario.stoppedAt === read[0]) {
-    return { exitCode: 1, stderr: stoppedError };
-  }
-
-  return { stdout: `${JSON.stringify(read[1], null, 2)}\n` };
+function buildReadAnswer(state: HostState, [step, value]: readonly [string, unknown]): StubAnswer {
+  return state.scenario.stoppedAt === step
+    ? { exitCode: 1, stderr: stoppedError }
+    : { stdout: `${JSON.stringify(value, null, 2)}\n` };
 }
 
 // imp 1.0.0 reads the value's line and prints the secret with droppedGrants (SecretAddedSchema);

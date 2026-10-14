@@ -28,7 +28,7 @@ export async function checkATCGatewayReadiness(
     return 2;
   }
 
-  const io = { run: options.run, host: options.args[0] || 'geoffcloud' };
+  const io = { run: options.run, host: pickHost(options.args) };
 
   const checks: readonly (() => Promise<ReadinessLine | readonly ReadinessLine[]>)[] = [
     () => checkGatewayHost(io),
@@ -50,6 +50,12 @@ export async function checkATCGatewayReadiness(
   }
 
   return failures;
+}
+
+function pickHost(args: readonly string[]) {
+  const [host = ''] = args;
+
+  return host === '' ? 'geoffcloud' : host;
 }
 
 function printLines(io: Readonly<ScriptIO>, lines: readonly ReadinessLine[]) {

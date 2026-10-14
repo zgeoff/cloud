@@ -25,7 +25,7 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler, buildStubCheckAgentImage(0));
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const passed = await runAgentImageCheck(
     { run: stub.run, printOut: () => {}, printErr },

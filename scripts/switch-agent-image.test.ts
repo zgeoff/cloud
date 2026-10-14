@@ -38,8 +38,8 @@ test('it backs up the config, then points the cloud target at the image and keep
   });
 
   const stub = buildStubRunner(imp.handler);
-  const printOut = mock();
-  const printErr = mock();
+  const printOut = mock<(text: string) => void>();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234', config],
@@ -120,7 +120,7 @@ test('it leaves a config that already runs the image alone, without asking the i
   );
 
   const stub = buildStubRunner();
-  const printOut = mock();
+  const printOut = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
@@ -149,7 +149,7 @@ test('it sets guestATC when the config names the image without it', async () => 
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);
-  const printOut = mock();
+  const printOut = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
@@ -187,7 +187,7 @@ test('it says the cloud target had no image before', async () => {
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);
-  const printOut = mock();
+  const printOut = mock<(text: string) => void>();
 
   await switchAgentImage({
     args: ['agent-abc1234'],
@@ -213,7 +213,7 @@ test('it refuses an image the imp host lacks, and changes nothing', async () => 
 
   const imp = buildStubImp({ images: [{ name: 'agent-14d3c9d', digest: 'imp-build-1' }] });
   const stub = buildStubRunner(imp.handler);
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
@@ -241,7 +241,7 @@ test('it stops with imp’s own exit code when the imp host cannot list its imag
   await writeFile(join(ctx.configDir, 'config.json'), '{"targets":{"cloud":{}}}\n');
 
   const stub = buildStubRunner(() => ({ exitCode: 4, stderr: 'imp: UNAUTHORIZED\n' }));
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
@@ -269,7 +269,7 @@ test.each([
   await writeFile(join(ctx.configDir, 'config.json'), text);
 
   const stub = buildStubRunner();
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
@@ -296,7 +296,7 @@ test('it refuses a missing config', async () => {
   const ctx = await setupTest();
 
   const stub = buildStubRunner();
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args: ['agent-abc1234'],
@@ -322,7 +322,7 @@ test.each([
   const ctx = await setupTest();
 
   const stub = buildStubRunner();
-  const printErr = mock();
+  const printErr = mock<(text: string) => void>();
 
   const exitCode = await switchAgentImage({
     args,

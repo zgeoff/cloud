@@ -15,15 +15,11 @@ export function buildStubCheckAgentImage(failures: number): StubHandler {
       name !== undefined &&
       call.argv.length === 4;
 
-    if (!isCheck || !existsSync(script)) {
-      return;
-    }
-
     const answer: StubAnswer = {
       exitCode: failures === 0 ? 0 : 1,
       stdout: `== ${failures} failed\n`,
     };
 
-    return answer;
+    return isCheck && existsSync(script) ? answer : undefined;
   };
 }

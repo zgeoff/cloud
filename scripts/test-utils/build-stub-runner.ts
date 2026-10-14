@@ -10,7 +10,9 @@ export interface StubCall {
 
   // the stdin the script sent, as text; empty when it sent none
   readonly stdin: string;
-  readonly options: RunOptions;
+
+  // the call's other options; its stdin is the text above, so a handler sees no Buffer
+  readonly options: Readonly<Omit<RunOptions, 'stdin'>>;
 }
 
 export interface StubAnswer {
@@ -36,7 +38,11 @@ export function buildStubRunner(...handlers: readonly StubHandler[]): StubRunner
 
   return {
     run: async (argv, options = {}) => {
-      const call = { argv: [...argv], stdin: options.stdin?.toString() ?? '', options };
+      const call = {
+        argv: [...argv],
+        stdin: options.stdin?.toString() ?? '',
+        options: toCallOptions(options),
+      };
 
       calls.push(call);
 
@@ -59,6 +65,14 @@ async function findAnswer(handlers: readonly StubHandler[], call: StubCall) {
   }
 
   return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
+}
+
+function toCallOptions(options: Readonly<RunOptions>): Readonly<Omit<RunOptions, 'stdin'>> {
+  return {
+    ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+    ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    ...(options.env === undefined ? {} : { env: options.env }),
+  };
 }
 
 function toRunResult(answer: Readonly<StubAnswer>): RunResult {
