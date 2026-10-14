@@ -36,8 +36,44 @@ test('it passes a tree whose groups import a lower group through its entry modul
   expect(status).toBe(0);
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'check-boundaries: 2 modules hold every boundary\n',
+    '\n✔ no dependency violations found (2 modules, 1 dependencies cruised)\n\n',
   );
+});
+
+test("it fails a relative import into the generated SDK's built files", async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.root, 'infra', 'edge'), { recursive: true });
+  await mkdir(join(ctx.root, 'sdk', 'onidel', 'bin'), { recursive: true });
+  await writeFile(join(ctx.root, 'sdk', 'onidel', 'bin', 'index.js'), 'export const vm = 1;\n');
+
+  await writeFile(
+    join(ctx.root, 'infra', 'edge', 'index.ts'),
+    "import { vm } from '../../sdk/onidel/bin/index.js';\nexport const id = vm;\n",
+  );
+
+  const status = await checkBoundaries({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(status).toBe(1);
+
+  expect(ctx.printErr.mock.calls).toMatchInlineSnapshot(`
+    [
+      [
+        
+    "
+      error no-relative-import-into-another-package: infra/edge/index.ts → sdk/onidel/bin/index.js
+
+    x 1 dependency violations (1 errors, 0 warnings). 2 modules, 1 dependencies cruised.
+
+    "
+    ,
+      ],
+    ]
+  `);
 });
 
 test('it fails an upward import from inputs into the cluster group', async () => {

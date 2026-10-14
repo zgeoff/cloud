@@ -125,10 +125,10 @@
   "options": {
     "parser": "swc",
     "doNotFollow": {
-      "path": "node_modules"
+      "path": "(^|/)node_modules/|^sdk/onidel/bin/"
     },
     "exclude": {
-      "path": "(^|/)node_modules/|^sdk/onidel/bin/"
+      "path": "(^|/)node_modules/"
     },
     "enhancedResolveOptions": {
       "exportsFields": ["exports"],

@@ -1,7 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { cruise, format } from 'dependency-cruiser';
-import type { ICruiseResult } from 'dependency-cruiser';
+import { cruise } from 'dependency-cruiser';
+import type { IReporterOutput } from 'dependency-cruiser';
 import extractDepcruiseOptions from 'dependency-cruiser/config-utl/extract-depcruise-options';
 
 // Checks the import boundaries that .dependency-cruiser.json declares: the direction between
@@ -28,47 +28,49 @@ export async function checkBoundaries(options: Readonly<CheckBoundariesOptions>)
     return 2;
   }
 
-  const result = await loadImportGraph(resolve(options.args[0] ?? '.'));
+  const report = await runCruise(resolve(options.args[0] ?? '.'));
 
-  if (result.summary.error > 0) {
-    const report = await format(result, { outputType: 'err' });
+  // the err reporter's text: each violation and a summary, or one line that none was found
+  const text = typeof report.output === 'string' ? report.output : JSON.stringify(report.output);
 
-    options.printErr(report.output as string);
+  if (report.exitCode > 0) {
+    options.printErr(text);
 
     return 1;
   }
 
-  options.printOut(
-    `check-boundaries: ${result.summary.totalCruised} modules hold every boundary\n`,
-  );
+  options.printOut(text);
 
   return 0;
 }
 
-async function loadImportGraph(root: string): Promise<ICruiseResult> {
+async function runCruise(root: string): Promise<IReporterOutput> {
   const folders = await collectSourceFolders(root);
   const cruiseOptions = await extractDepcruiseOptions(configFile);
-  const cruised = await cruise(folders, { ...cruiseOptions, baseDir: root });
 
-  return cruised.output as ICruiseResult;
+  return cruise(folders, { ...cruiseOptions, baseDir: root, outputType: 'err' });
 }
 
 async function collectSourceFolders(root: string): Promise<string[]> {
   const present = await Promise.all(
-    sourceFolders.map((folder) =>
-      stat(join(root, folder))
-        .then((found) => found.isDirectory())
-        .catch(() => false),
-    ),
+    sourceFolders.map(async (folder) => {
+      const found = await stat(join(root, folder)).catch(() => null);
+
+      return found?.isDirectory() === true;
+    }),
   );
 
-  return sourceFolders.filter((_, index) => present[index]);
+  return sourceFolders.filter((_, index) => present[index] === true);
 }
 
 if (import.meta.main) {
   process.exitCode = await checkBoundaries({
     args: process.argv.slice(2),
-    printOut: (text) => process.stdout.write(text),
-    printErr: (text) => process.stderr.write(text),
+    printOut: (text) => {
+      process.stdout.write(text);
+    },
+    printErr: (text) => {
+      process.stderr.write(text);
+    },
   });
 }
