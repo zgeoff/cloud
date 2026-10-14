@@ -4,7 +4,7 @@ import { expect, test } from 'bun:test';
 import { requireExposureMatchesTopology } from './require-exposure-matches-topology.ts';
 
 test('it accepts registry ports that equal their constants', () => {
-  expect(() =>
+  expect(() => {
     requireExposureMatchesTopology(
       {
         entries: [
@@ -70,12 +70,12 @@ test('it accepts registry ports that equal their constants', () => {
         onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
         nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
       },
-    ),
-  ).not.toThrow();
+    );
+  }).not.toThrow();
 });
 
 test('it names every registry port that differs from its constant, and a missing entry', () => {
-  expect(() =>
+  expect(() => {
     requireExposureMatchesTopology(
       {
         entries: [
@@ -133,8 +133,8 @@ test('it names every registry port that differs from its constant, and a missing
         onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
         nodeExporter: { textfileDir: '/var/lib/node-exporter/textfile' },
       },
-    ),
-  ).toThrowWithMessage(
+    );
+  }).toThrowWithMessage(
     Error,
     'exposure entry tailscale has port 41642, but tailnet.directPort is 41641\n' +
       'exposure entry grafana has port undefined, but k3s.grafanaNodePort is 30300',

@@ -61,30 +61,8 @@ const entrySchema = z.discriminatedUnion('kind', [
 // tailnet or to itself. The rules that span fields run over the whole list, so each issue's path
 // names the entry and the field at fault.
 export const exposureSchema = z
-  .strictObject({ entries: z.array(entrySchema) })
-  .superRefine((exposure, context) => {
-    const names = exposure.entries.map((entry) => entry.name);
-
-    for (const [index, entry] of exposure.entries.entries()) {
-      if (names.indexOf(entry.name) !== index) {
-        context.addIssue({
-          code: 'custom',
-          path: ['entries', index, 'name'],
-          message: `${entry.name} names another entry`,
-        });
-      }
-
-      if (entry.kind === 'host-port') {
-        for (const issue of collectHostPortIssues(entry)) {
-          context.addIssue({
-            code: 'custom',
-            path: ['entries', index, issue.field],
-            message: issue.message,
-          });
-        }
-      }
-    }
-  });
+  .strictObject({ entries: z.array(entrySchema).readonly() })
+  .superRefine(checkEntries);
 
 export type Exposure = z.infer<typeof exposureSchema>;
 
@@ -124,4 +102,31 @@ function collectHostPortIssues(entry: HostPort): readonly HostPortIssue[] {
       ? [{ field: 'scope' as const, message: `a host port is never ${entry.scope}` }]
       : []),
   ];
+}
+
+// adds an issue for each entry whose name another entry holds, and for each host port whose fields
+// disagree with each other
+// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- zod owns the context
+function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
+  const names = exposure.entries.map((entry) => entry.name);
+
+  for (const [index, entry] of exposure.entries.entries()) {
+    if (names.indexOf(entry.name) !== index) {
+      context.addIssue({
+        code: 'custom',
+        path: ['entries', index, 'name'],
+        message: `${entry.name} names another entry`,
+      });
+    }
+
+    if (entry.kind === 'host-port') {
+      for (const issue of collectHostPortIssues(entry)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['entries', index, issue.field],
+          message: issue.message,
+        });
+      }
+    }
+  }
 }

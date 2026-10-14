@@ -213,7 +213,7 @@ test.each([
     { name: 'ssh', kind: 'host-port', protocol: 'tcp', port: 22, scope: 'reserved', reason: 'ssh' },
     'scope',
   ],
-])('it rejects %s', (_label, entry, field) => {
+])('it rejects %s', (_label: string, entry: unknown, field: string) => {
   const result = exposureSchema.safeParse({ entries: [entry] });
 
   expect(result.error?.issues).toPartiallyContain({ path: ['entries', 0, field] });

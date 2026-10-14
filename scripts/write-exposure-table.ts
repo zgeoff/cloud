@@ -139,7 +139,7 @@ function formatExposes(entry: ExposureEntry): string {
     case 'tailnet-capability': {
       return `node attribute \`${entry.attr}\``;
     }
-    case 'worker-url': {
+    default: {
       return `\`${entry.script}\` on workers.dev`;
     }
   }
