@@ -77,11 +77,11 @@ async function loadPins(
     : { pins: parsed.flatMap((result) => result.pins) };
 }
 
-// An image reference's place in a pin file: a Dockerfile's FROM, or the value of a key that ends in
-// image, such as YAML's `image:` and `backupImage:`, an env file's `BASE_IMAGE=` or Nix's
+// An image reference's place in a pin file: a Dockerfile's FROM in any case, or the value of a key
+// that ends in image, such as YAML's `backupImage:`, an env file's `BASE_IMAGE=` or Nix's
 // `image = "…"`. A key such as GATEWAY_IMAGE_TAG names a tag alone, so it is not one.
 const referencePattern =
-  /^\s*(?:FROM\s+(?:--platform=\S+\s+)?|(?:-\s+)?[\w-]*(?:image|Image|IMAGE)\s*[:=]\s*)["']?(?<reference>[^\s"']+)/u;
+  /^\s*(?:from\s+(?:--platform=\S+\s+)?|(?:-\s+)?[\w-]*image\s*[:=]\s*)["']?(?<reference>[^\s"']+)/iu;
 
 // a complete pin, <name>:<tag>@sha256:<digest>, where the name may start with a registry host and
 // port; the anchors make a digest with an extra digit fail, where a substring match would hold

@@ -304,6 +304,24 @@ test('it fails an image reference whose digest was removed', async () => {
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
+test('it fails a lowercase Dockerfile from without a digest', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.root, 'images', 'agent', 'Dockerfile'), 'from example/base:1.0.0\n');
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: images/agent/Dockerfile:1: example/base:1.0.0 pins no digest\n',
+  );
+});
+
 test('it fails a digest on a line that holds no image reference', async () => {
   const ctx = await setupTest();
 
