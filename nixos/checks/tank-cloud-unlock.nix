@@ -163,12 +163,12 @@ pkgs.testers.runNixOSTest {
         assert left == mount_points, f"the root disk holds {left}"
 
 
-    with subtest("it loads a key restored without a trailing newline when the services start again"):
+    with subtest("it loads a key restored without a trailing newline when tank-cloud.target and the services start again"):
         machine.succeed(f"printf '%s' {key} > /var/lib/zfs-keys/tank.key")
         machine.succeed("chmod 0400 /var/lib/zfs-keys/tank.key")
         machine.succeed("test \"$(wc -c < /var/lib/zfs-keys/tank.key)\" -eq 64")
 
-        machine.succeed(f"systemctl start {' '.join(services)}")
+        machine.succeed(f"systemctl start tank-cloud.target {' '.join(services)}")
 
         assert_unlocked()
         states = machine.succeed(f"systemctl show -p ActiveState --value {' '.join(services)}").split()

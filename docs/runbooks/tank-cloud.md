@@ -114,6 +114,8 @@ k3s, imp-host and the atc daemon stay stopped. The datasets keep their data.
    Expect `ok`. Without `ok`, the key is not 64 characters: check the item, and never write the key
    with a trailing newline.
 
-2. Start the services: `ssh root@geoffcloud systemctl start k3s imp-host atc-daemon`. Each start
-   pulls in its mounts, and the mounts load the key again.
+2. Mount the datasets and start the services:
+   `ssh root@geoffcloud systemctl start tank-cloud.target k3s imp-host atc-daemon`. The target
+   requires every mount, and each mount loads the key again. The services alone would mount only the
+   datasets they need, and leave `imp-db-backups` unmounted.
 3. Check as in [Switch and check](#switch-and-check).

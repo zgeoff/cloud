@@ -13,8 +13,8 @@
 # and every mount is nofail, so local-fs.target never waits on it and the host still reaches
 # multi-user and SSH. Each service named in requiredBy carries RequiresMountsFor on its
 # datasets, so it fails to start, rather than start on the empty directories under the mount
-# points on the root disk. After the key is restored, starting those services loads it and
-# mounts the datasets, since each start pulls its mounts and their key unit in again.
+# points on the root disk. After the key is restored, starting tank-cloud.target loads it and
+# mounts every dataset, since the target requires each mount and each mount its key unit.
 {
   config,
   lib,
@@ -87,6 +87,14 @@ in
         fsType = "ext4";
         options = [ "nofail" ];
       };
+    };
+
+    # every dataset mounted: the recovery after a restored key starts it, because the services
+    # pull in only the mounts they need
+    systemd.targets.tank-cloud = {
+      description = "ZFS encryption root ${root} mounted";
+      requires = map mountUnit datasets;
+      after = map mountUnit datasets;
     };
 
     systemd.services = {
