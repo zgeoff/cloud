@@ -67,7 +67,7 @@ lost: those clients sign in again. Take a fresh backup first if the current stat
 
    ```sh
    ssh root@geoffcloud k3s kubectl -n atc scale deploy/atc-gateway --replicas=1
-   bash scripts/check-atc-gateway-readiness.sh
+   bun scripts/check-atc-gateway-readiness.ts
    ```
 
 4. Record the restore (snapshot ID, time, why) in a cloud issue.

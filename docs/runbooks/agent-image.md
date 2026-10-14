@@ -24,7 +24,7 @@ tool, because a tool can write state when it runs (`codex --version` creates `~/
 | Path                                  | Holds                                                   |
 | ------------------------------------- | ------------------------------------------------------- |
 | `images/agent/Dockerfile`             | the pins, each with the command that checks its sum     |
-| `scripts/check-agent-image.sh`        | the version sweep, login-state check and secret scan    |
+| `scripts/agent-image-check-guest.sh`  | the version sweep, login-state check and secret scan    |
 | `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files |
 | `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`      |
 | `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use  |
@@ -41,13 +41,13 @@ Build and check in one command, from any zgeoff/cloud clone, on a machine whose 
 geoffcloud host. The token needs `manage` scope with no imp patterns.
 
 ```sh
-bash scripts/build-agent-image.sh            # origin/main's head, after a fetch
-bash scripts/build-agent-image.sh <commit>   # or an older commit on main
+bun scripts/build-agent-image.ts            # origin/main's head, after a fetch
+bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 ```
 
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
-runs that commit's `scripts/check-agent-image.sh` there, and removes the imp. Its last line is
+runs that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
 `agent-<short sha> <digest> check passed`; record that line on the PR. A failed check removes the
 image, unless `--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is
 not on `main`, and an image or check imp name that already exists.
@@ -83,10 +83,10 @@ The `cloud` target lives in `~/.config/atc/config.json` on the machine that runs
 into a fresh imp. Without it, a compiled daemon uploads its binary, about 100 MB, before each new
 imp's first session starts.
 
-1. Run `bash scripts/switch-agent-image.sh agent-<short sha>` on the machine that runs the daemon.
-   It refuses an image the host lacks, copies the config to
-   `config.json.bak-<UTC stamp>-pre-<image>`, then sets `targets.cloud.image` and
-   `targets.cloud.guestATC` and changes nothing else. A second argument names another config file.
+1. Run `bun scripts/switch-agent-image.ts agent-<short sha>` on the machine that runs the daemon. It
+   refuses an image the host lacks, copies the config to `config.json.bak-<UTC stamp>-pre-<image>`,
+   then sets `targets.cloud.image` and `targets.cloud.guestATC` and changes nothing else. A second
+   argument names another config file.
 2. Restart the daemon when no session needs it, with the command the script prints,
    `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
    `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The
@@ -150,7 +150,7 @@ is the release, such as `4.5.0`.
 1. Build and check the image from `main`'s head:
 
    ```bash
-   bash scripts/build-agent-image.sh
+   bun scripts/build-agent-image.ts
    ```
 
    Expect its last line to read `agent-<short sha> <digest> check passed`. Record that line on the
@@ -169,7 +169,7 @@ is the release, such as `4.5.0`.
 3. Switch the `cloud` target, and leave the daemon running:
 
    ```bash
-   bash scripts/switch-agent-image.sh agent-<short sha>
+   bun scripts/switch-agent-image.ts agent-<short sha>
    ```
 
    The script prints `atc daemon restart`. Wait for step 4 to run it.
@@ -232,7 +232,7 @@ the allowlist entry.
    above its pin.
 2. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
    its check; run it locally first to find a failure sooner.
-3. After the PR merges, run `bash scripts/build-agent-image.sh`, and record its last line on the PR.
+3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
    `imp image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.

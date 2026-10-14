@@ -1,0 +1,206 @@
+import { expect, onTestFinished, test } from 'bun:test';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { readHostScript } from '../read-host-script.ts';
+import { runProcess } from '../run-process.ts';
+import { toShellArg } from '../to-shell-arg.ts';
+import { buildMockCredentialsHostScenario } from './build-mock-credentials-host-scenario.ts';
+import { buildStubCredentialsHost } from './build-stub-credentials-host.ts';
+import { buildStubRunner } from './build-stub-runner.ts';
+
+async function setupTest() {
+  const dir = await mkdtemp(join(tmpdir(), 'build-stub-credentials-host-'));
+
+  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+
+  return { dir, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: dir } };
+}
+
+test('it saves the bearer as the real write script does', async () => {
+  const ctx = await setupTest();
+  const script = await readHostScript('write-atc-gateway-token.sh');
+
+  const stdin = Buffer.concat([script, Buffer.from('fixture-bearer\n')]);
+
+  const host = buildStubCredentialsHost(
+    buildMockCredentialsHostScenario({ dir: ctx.dir, files: {} }),
+  );
+
+  const stub = buildStubRunner(host.handle);
+
+  await stub.run(
+    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', `bash -s -- ${toShellArg(ctx.dir)}`],
+    {
+      stdin,
+    },
+  );
+
+  await runProcess(['bash', '-s', '--', ctx.dir], { stdin, env: ctx.env });
+
+  const real = await readFile(join(ctx.dir, 'gateway-token'), 'utf8');
+
+  expect(host.files['gateway-token']).toStrictEqual({ content: real, mode: '400' });
+});
+
+test('it exits 120 for a missing saved token, as the real check script does', async () => {
+  const ctx = await setupTest();
+  const script = await readHostScript('check-atc-imp-token.sh');
+
+  const host = buildStubCredentialsHost(
+    buildMockCredentialsHostScenario({ dir: ctx.dir, files: {} }),
+  );
+
+  const stub = buildStubRunner(host.handle);
+
+  const modelled = await stub.run(
+    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', `bash -s -- ${toShellArg(ctx.dir)} '7070'`],
+    { stdin: script },
+  );
+
+  const real = await runProcess(['bash', '-s', '--', ctx.dir, '7070'], {
+    stdin: script,
+    env: ctx.env,
+  });
+
+  expect(modelled.exitCode).toBe(120);
+  expect(real.exitCode).toBe(120);
+});
+
+test('it adds glm from the line on stdin and prints it with droppedGrants, as imp secret add does', async () => {
+  const host = buildStubCredentialsHost(buildMockCredentialsHostScenario({ secrets: [] }));
+  const stub = buildStubRunner(host.handle);
+
+  const result = await stub.run(
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      'root@geoffcloud',
+      ...'docker exec -i imp-host imp secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json'.split(
+        ' ',
+      ),
+    ],
+    { stdin: Buffer.from('zai_fixture_key\n') },
+  );
+
+  expect(host.secretValues).toStrictEqual({ glm: 'zai_fixture_key' });
+
+  expect(JSON.parse(result.stdout.toString())).toStrictEqual({
+    name: 'glm',
+    kind: 'custom',
+    rules: [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }],
+    imps: [],
+    createdAt: '2026-10-07T12:00:00.000Z',
+    droppedGrants: 0,
+  });
+});
+
+test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice on stderr', async () => {
+  const script = await readHostScript('mint-atc-imp-token.sh');
+
+  const scenario = buildMockCredentialsHostScenario({
+    tokens: [],
+    files: {},
+    minted: 'imp_fixture_minted_token\n',
+  });
+
+  const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
+
+  const result = await stub.run(
+    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', "bash -s -- '/var/lib/atc-daemon-secrets'"],
+    { stdin: script },
+  );
+
+  expect(result.stderr.toString()).toBe(
+    'imp: token atc-cloud made; impd shows its secret only this once\n',
+  );
+
+  expect(scenario.files).toStrictEqual({
+    'imp-token': { content: 'imp_fixture_minted_token\n', mode: '400' },
+  });
+
+  expect(scenario.tokens).toPartiallyContain({
+    name: 'atc-cloud',
+    scope: 'manage',
+    grantable: ['glm'],
+  });
+});
+
+test('it fails docker exec as docker does when imp-host is stopped', async () => {
+  const stub = buildStubRunner(
+    buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'info' })).handle,
+  );
+
+  const result = await stub.run([
+    'ssh',
+    '-o',
+    'BatchMode=yes',
+    'root@geoffcloud',
+    'docker',
+    'exec',
+    'imp-host',
+    'imp',
+    'info',
+    '--json',
+  ]);
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stderr.toString()).toBe(
+    'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n',
+  );
+});
+
+test('it stats the secrets directory and its files as stat -c prints them, and fails for a gone one', async () => {
+  const stub = buildStubRunner(
+    buildStubCredentialsHost(
+      buildMockCredentialsHostScenario({
+        files: { 'gateway-token': { content: 'fixture-bearer\n', mode: '400' } },
+      }),
+    ).handle,
+  );
+
+  const result = await stub.run([
+    'ssh',
+    '-o',
+    'BatchMode=yes',
+    'root@geoffcloud',
+    "stat -c '%n %U %a %s bytes' '/var/lib/atc-daemon-secrets' '/var/lib/atc-daemon-secrets/gateway-token' '/var/lib/atc-daemon-secrets/imp-token'",
+  ]);
+
+  expect(result).toStrictEqual({
+    exitCode: 1,
+    stdout: Buffer.from(
+      '/var/lib/atc-daemon-secrets root 700 4096 bytes\n/var/lib/atc-daemon-secrets/gateway-token root 400 15 bytes\n',
+    ),
+    stderr: Buffer.from(
+      "stat: cannot statx '/var/lib/atc-daemon-secrets/imp-token': No such file or directory\n",
+    ),
+    timedOut: false,
+  });
+});
+
+test('it refuses a call to another host, or without BatchMode', async () => {
+  const stub = buildStubRunner(buildStubCredentialsHost(buildMockCredentialsHostScenario()).handle);
+
+  const other = await stub.run(['ssh', '-o', 'BatchMode=yes', 'root@elsewhere', 'true']);
+  const interactive = await stub.run(['ssh', 'root@geoffcloud', 'true']);
+
+  expect(other.exitCode).toBe(97);
+  expect(interactive.exitCode).toBe(97);
+});
+
+test('it fails every call with ssh’s 255 when the host is unreachable', async () => {
+  const stub = buildStubRunner(
+    buildStubCredentialsHost(buildMockCredentialsHostScenario({ unreachable: true })).handle,
+  );
+
+  const result = await stub.run(['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', 'true']);
+
+  expect(result.exitCode).toBe(255);
+
+  expect(result.stderr.toString()).toBe(
+    'ssh: connect to host geoffcloud port 22: Connection refused\r\n',
+  );
+});

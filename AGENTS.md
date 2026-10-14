@@ -120,7 +120,7 @@ the architecture and runbooks. `scripts/` holds repo tooling.
 - Tailscale SSH logs each session's full remote command line in `tailscaled.service`'s journal, and
   Alloy ships the host journal to Loki. So never put a secret in the command line of
   `ssh root@geoffcloud …`, including the `kubectl` arguments and inline scripts it runs: send it on
-  SSH's stdin, as `scripts/install-atc-gateway-credentials.sh` does, or read it from a root-only
+  SSH's stdin, as `scripts/install-atc-gateway-credentials.ts` does, or read it from a root-only
   file on the host. Seen on 2026-10-04 with a dummy bearer; no real credential is known to have
   leaked this way.
 - impd owns the DNS records `imps.geoff.cloud`, `*.imps.geoff.cloud` and

@@ -115,6 +115,27 @@ health-check worker in `workers/health-check/` is HTTP-mocked.
   (`(value: string) => /…/u.test(value)`) or an `instanceof` check
   (`(value: unknown) => value instanceof ArrayBuffer`).
 
+## Operator scripts (TypeScript)
+
+An operator script in `scripts/` runs every subprocess through an injected `Runner`, so a test
+hands it `buildStubRunner` from `scripts/test-utils/` instead of `runProcess`. The stub runner
+records each call's argv, stdin and options, and passes the call to its handlers in turn. A call
+that no handler answers exits 97 with `unexpected: <argv>`, so a call the test did not expect
+fails closed and never reaches a real tool.
+
+- Each remote tool gets a `build-stub-<tool>.ts` handler that answers as the real tool does, with
+  its exit codes and messages, and names its source in a comment. An ssh handler answers only its
+  scenario's destination and runs nothing.
+- A local tool that touches only the case's own files, such as git, tar or bash, runs for real
+  through `buildRealProgramHandler`. Git runs with the environment `createGitOrigin` returns, so
+  the user's global and system config never reach a case.
+- A script for the host lives in `scripts/host/` and travels on ssh's stdin. Its test runs it with
+  real bash against loopback stand-ins, such as `startStubImpd`, beside the TypeScript that sends
+  it.
+- A script takes the time through a `now` function, and a test passes a fixed `Date`.
+- A test asserts that no secret appears in any recorded argv, and that each secret reaches its
+  call on stdin.
+
 ## provider (Go)
 
 Each shared rule takes its Go form:
@@ -175,7 +196,7 @@ journey. Each shared rule takes its shell form:
 | `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `test-support/shell/`; mask only a temp path, a generated id, or a measurement that changes between runs (a wall-clock time, a duration, a size, a memory or CPU reading), never the value under test                                     |
 | Exact errors                 | the exact exit code, never "non-zero", plus the exact stderr                                                                                                                                                       |
 | Polling `waitFor`            | `wait_for <seconds> <what> <command…>` from `test-support/shell/wait-for.sh`                                                                                                                                         |
-| Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a case that pins the exact stamp a script embeds from `date`, such as in a name it compares, uses a `date` wrapper reading a fixed time (`create_stub_date`); a case that only bounds the stamp reads the clock before and after the act and checks it with `assert_between` |
+| Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a case that only bounds the stamp reads the clock before and after the act and checks it with `assert_between` |
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                             |
 
 - A case checks its exit status exactly, with

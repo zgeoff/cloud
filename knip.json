@@ -13,6 +13,7 @@
       "project": ["**/*.ts"]
     },
     ".": {
+      "entry": ["scripts/build-agent-image.ts"],
       "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },

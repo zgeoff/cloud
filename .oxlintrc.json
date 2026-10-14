@@ -5,7 +5,9 @@
     "node": true,
     "es2024": true
   },
-  "rules": {},
+  "rules": {
+    "zgeoff/function-verb": ["error", { "verbs": ["install", "open", "switch"] }]
+  },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [
     {
