@@ -112,12 +112,13 @@
       }
     },
     {
-      "name": "not-to-unresolvable",
-      "comment": "An import the cruiser cannot resolve would skip every rule above, so it fails the check.",
+      "name": "no-unresolvable-relative-import",
+      "comment": "A relative import the cruiser cannot resolve would skip every rule above, so it fails the check. A bare package name crosses no boundary, so the check never needs a built package.",
       "severity": "error",
       "from": {},
       "to": {
-        "couldNotResolve": true
+        "couldNotResolve": true,
+        "path": "^\\."
       }
     }
   ],
