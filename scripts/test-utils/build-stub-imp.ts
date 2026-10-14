@@ -6,12 +6,12 @@ import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
 // Stands in for the imp CLI calls that build-agent-image.ts and switch-agent-image.ts make, over
 // the host's images and imps. `image ls --json` prints the fields of the real output they read.
-export interface StubImpImage {
+interface StubImpImage {
   readonly name: string;
   readonly digest: string;
 }
 
-export interface StubImpInstance {
+interface StubImpInstance {
   readonly name: string;
   readonly image: string;
 }

@@ -48,7 +48,7 @@ export interface StubCredentialsHostScenario {
   readonly goneBeforeStat?: readonly string[];
 }
 
-export interface StubHostFile {
+interface StubHostFile {
   readonly content: string;
   readonly mode: string;
 }

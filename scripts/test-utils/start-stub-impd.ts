@@ -5,7 +5,7 @@ import { onTestFinished } from 'bun:test';
 // Stands in for impd's tokens.whoami and /health on an ephemeral loopback port, for real curl to
 // ask; the test stops it when it ends. Any other request fails closed with a 500 that names the
 // stand-in, and every request is recorded.
-export interface StubImpdRequest {
+interface StubImpdRequest {
   readonly method: string;
 
   // the path, or the whole URL a proxy request names
