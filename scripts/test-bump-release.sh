@@ -140,8 +140,13 @@ EOF
   echo '{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999","size":1}' > "$tree/images/ghcr.io_zgeoff_imp-base:1.0.1.json"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
-  (cd "$tree/clone" && "${case_env[@]}" bash "$script" imp 1.0.1 1.0.0 1.0.0) > "$tree/out" 2> "$tree/err" || status=$?
+  (cd "$tree/clone" && "${case_env[@]}" NIX_GITHUB_TOKEN=ghs_exampletoken bash "$script" imp 1.0.1 1.0.0 1.0.0) > "$tree/out" 2> "$tree/err" || status=$?
 
+  diff - "$tree/nix-config" <<< 'access-tokens = github.com=ghs_exampletoken'
+  ! grep -l ghs_exampletoken "$tree/out" "$tree/err" "$tree/calls" "$tree/body" || {
+    echo "the token is printed or in an argv" >&2
+    exit 1
+  }
   diff - "$tree/out" << 'EOF'
 pinned imp 1.0.1 in nixos/flake.nix and nixos/flake.lock: c5bea94080fdde9e21e9720295c1ca727302662e
 pinned imp-host 1.0.1: sha256:8888888888888888888888888888888888888888888888888888888888888888
@@ -171,7 +176,7 @@ EOF
 ["gh","api","repos/zgeoff/imp/commits/v1.0.1","--jq",".sha"]
 ["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-host:1.0.1","--format","{{json .Manifest}}"]
 ["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-base:1.0.1","--format","{{json .Manifest}}"]
-["docker","run","--rm","-v","<clone>/nixos:/src","-w","/src","$NIX_IMAGE","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"]
+["docker","run","--rm","-v","<clone>/nixos:/src","-w","/src","-e","NIX_CONFIG","$NIX_IMAGE","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"]
 ["gh","pr","list","--repo","zgeoff/cloud","--head","release-check/imp","--state","open","--json","number,url,autoMergeRequest,labels,isCrossRepository"]
 ["gh","label","create","update:patch","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","a patch release"]
 ["gh","label","create","auto-merge","--repo","zgeoff/cloud","--force","--color","0e8a16","--description","merges on its own once its checks pass"]

@@ -5,8 +5,8 @@
 # changed: it resets the checkout hard and removes every untracked file first. Every line runs, so
 # one dependency's failure leaves the others' pull requests current; a failed bump prints a GitHub
 # Actions error naming its dependency, and once all have run, any failure fails the script. Each
-# bump's log sits in its own collapsed group. The release check workflow's bump job runs it from
-# the root of its clone, with gh signed in to the app's token, a git identity, and docker:
+# bump's log sits in its own collapsed group. The release check's bump job runs it from its clone's
+# root, with gh signed in to the app's token, a git identity, docker, and NIX_GITHUB_TOKEN:
 #
 #   BUMPS='atc 4.3.0 4.2.0 4.2.0 4.2.0' bash scripts/bump-releases.sh
 set -euo pipefail
