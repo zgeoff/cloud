@@ -69,14 +69,6 @@
       "reason": "Held for imp's own public MCP route: the /mcp and OAuth paths only, once imp has an OAuth boundary of its own"
     },
     {
-      "name": "tailnet-funnel",
-      "kind": "tailnet-capability",
-      "attr": "funnel",
-      "scope": "public",
-      "reason": "Every member device may publish a local port to the internet through Tailscale Funnel; the grant has no recorded reason",
-      "ticket": "GEO-425"
-    },
-    {
       "name": "health-check-workers-dev",
       "kind": "worker-url",
       "script": "health-check",

@@ -89,8 +89,8 @@ narrowing table, needs a host-scope entry for that interface. An interface with 
 static address faces outside the host, so a port open there needs a public entry, and no host-scope
 entry may name it. Each port that imp's module publishes for public imps passes NixOS's input chain
 through Docker's forwarding, so it needs a public entry as well. A port range or a hand-written
-input rule cannot be matched with an entry, so the check fails on either. The tailnet capability and
-the Worker URL entries record a decision that no code reads yet.
+input rule cannot be matched with an entry, so the check fails on either. A tailnet capability entry
+and a Worker URL entry each record a decision that no code reads.
 
 ## NodePorts
 
