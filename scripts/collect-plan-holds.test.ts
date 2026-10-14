@@ -97,12 +97,12 @@ test('it holds the create of a guarded resource under a parent component', () =>
       steps: [
         {
           op: 'create',
-          urn: 'urn:pulumi:prod::geoff-cloud::geoff:edge:Edge$onidel:index:FirewallRule::edge-ssh',
+          urn: 'urn:pulumi:prod::geoff-cloud::cloud:edge:Edge$onidel:index:FirewallRule::edge-ssh',
         },
       ],
     }),
   ).toStrictEqual([
-    'create of a guarded resource urn:pulumi:prod::geoff-cloud::geoff:edge:Edge$onidel:index:FirewallRule::edge-ssh',
+    'create of a guarded resource urn:pulumi:prod::geoff-cloud::cloud:edge:Edge$onidel:index:FirewallRule::edge-ssh',
   ]);
 });
 
