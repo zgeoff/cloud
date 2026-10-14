@@ -93,7 +93,7 @@ type RegistryAnswer = { readonly digest: string } | { readonly error: string };
 // one answer per distinct name and tag, so a pin that several files hold costs one request
 async function readRegistryDigests(
   pins: readonly Pin[],
-): Promise<ReadonlyMap<string, RegistryAnswer>> {
+): Promise<Readonly<Record<string, RegistryAnswer>>> {
   const distinct = new Map(pins.map((pin) => [`${pin.name}:${pin.tag}`, pin]));
 
   const answers = await Promise.all(
@@ -102,7 +102,7 @@ async function readRegistryDigests(
     ),
   );
 
-  return new Map(answers);
+  return Object.fromEntries(answers);
 }
 
 async function tryReadTagDigest(name: string, tag: string): Promise<RegistryAnswer> {
@@ -220,12 +220,13 @@ function parseChallenge(challenge: string): ReadonlyMap<string, string> {
     return new Map();
   }
 
-  return new Map(
-    [...challenge.matchAll(/(?<key>\w+)="(?<value>[^"]*)"/gu)].map((match) => [
-      match.groups?.['key'] ?? '',
-      match.groups?.['value'] ?? '',
-    ]),
-  );
+  const parameters = new Map<string, string>();
+
+  for (const match of challenge.matchAll(/(?<key>\w+)="(?<value>[^"]*)"/gu)) {
+    parameters.set(match.groups?.['key'] ?? '', match.groups?.['value'] ?? '');
+  }
+
+  return parameters;
 }
 
 // a token realm answers with token, access_token, or both
@@ -242,11 +243,11 @@ function findToken(body: unknown): string | undefined {
 
 function printReport(
   pins: readonly Pin[],
-  answers: ReadonlyMap<string, RegistryAnswer>,
+  answers: Readonly<Record<string, RegistryAnswer>>,
   options: Readonly<CheckImagePinsOptions>,
 ): number {
   const findings = pins.flatMap((pin) => {
-    const answer = answers.get(`${pin.name}:${pin.tag}`);
+    const answer = answers[`${pin.name}:${pin.tag}`];
     const finding = answer === undefined ? undefined : findFinding(pin, answer);
 
     return finding === undefined ? [] : [finding];
@@ -259,7 +260,7 @@ function printReport(
   }
 
   options.printOut(
-    `check-image-pins: ${pins.length} pins of ${answers.size} tags agree with their registries\n`,
+    `check-image-pins: ${pins.length} pins of ${Object.keys(answers).length} tags agree with their registries\n`,
   );
 
   return 0;
