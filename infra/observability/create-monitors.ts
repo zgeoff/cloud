@@ -1,6 +1,7 @@
 import { CustomResource } from '@pulumi/kubernetes/apiextensions';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import type { CustomResourceOptions } from '@pulumi/pulumi';
+import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
 import { createAlertRules } from './create-alert-rules.ts';
 import { createATCDaemonProbe } from './create-atc-daemon-probe.ts';
@@ -23,7 +24,7 @@ export function createMonitors(
   }
 }
 
-// cloudflared serves Prometheus metrics on its `metrics` port (ingress/create-cloudflared.ts)
+// cloudflared serves Prometheus metrics on its metrics port, with the names ingress gives it
 function createCloudflaredMonitor(ns: Namespace, opts: CustomResourceOptions): CustomResource {
   return new CustomResource(
     'cloudflared',
@@ -32,9 +33,9 @@ function createCloudflaredMonitor(ns: Namespace, opts: CustomResourceOptions): C
       kind: 'PodMonitor',
       metadata: { name: 'cloudflared', namespace: ns.metadata.name },
       spec: {
-        namespaceSelector: { matchNames: ['ingress'] },
-        selector: { matchLabels: { app: 'cloudflared' } },
-        podMetricsEndpoints: [{ port: 'metrics' }],
+        namespaceSelector: { matchNames: [cloudflaredNames.namespace] },
+        selector: { matchLabels: cloudflaredNames.labels },
+        podMetricsEndpoints: [{ port: cloudflaredNames.metricsPort }],
       },
     },
     opts,

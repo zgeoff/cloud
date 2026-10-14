@@ -16,6 +16,9 @@ const defaultStateDir = '/home/nonroot/.local/state/atc';
 
 interface GatewaySpecInputs {
   readonly config: ATCGatewayConfig;
+
+  // the host of config.publicURL, which the gateway serves and its probes send as Host
+  readonly publicHost: string;
   readonly claim: Output<string>;
   readonly tokens: Output<string>;
   readonly registry: Output<string>;
@@ -60,8 +63,6 @@ export function buildATCPodSecurity(): input.core.v1.PodSecurityContext {
 }
 
 function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Container {
-  const publicHost = new URL(inputs.config.publicURL).host;
-
   const stateDir = inputs.config.stateDir ?? defaultStateDir;
 
   return {
@@ -96,11 +97,11 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
       { name: 'registry', mountPath: registryDir, readOnly: true },
     ],
     livenessProbe: {
-      ...buildProbe('/healthz', publicHost),
+      ...buildProbe('/healthz', inputs.publicHost),
       periodSeconds: 20,
       failureThreshold: 3,
     },
-    readinessProbe: { ...buildProbe('/readyz', publicHost), periodSeconds: 10 },
+    readinessProbe: { ...buildProbe('/readyz', inputs.publicHost), periodSeconds: 10 },
     resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '256Mi' } },
     securityContext: {
       readOnlyRootFilesystem: true,

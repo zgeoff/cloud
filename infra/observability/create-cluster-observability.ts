@@ -11,13 +11,13 @@ import { alloyValues } from './alloy-values.ts';
 import { createDashboards } from './create-dashboards.ts';
 import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
+import { observabilityNamespace } from './observability-namespace.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
 // and opens no public port, so http://geoffcloud:<grafanaNodePort> works from the tailnet alone.
 const grafanaNodePort = topology.k3s.grafanaNodePort;
 
-export interface ClusterObservabilityOutputs {
-  readonly logShipper: Chart;
+interface ClusterObservabilityOutputs {
   readonly grafanaURL: string;
   readonly grafanaAdminPassword: Output<string>;
 }
@@ -67,7 +67,7 @@ export function createClusterObservability(
 ): ClusterObservabilityOutputs {
   const opts = { provider: cluster };
 
-  const ns = new Namespace('observability', { metadata: { name: 'observability' } }, opts);
+  const ns = new Namespace('observability', { metadata: { name: observabilityNamespace } }, opts);
   const adminPassword = new RandomPassword('grafana-admin', { length: 32, special: false });
 
   const metrics = createMetrics(
@@ -88,13 +88,11 @@ export function createClusterObservability(
     opts,
   );
 
-  const shipper = createLogShipper(ns, [logs, metrics], cluster);
-
+  createLogShipper(ns, [logs, metrics], cluster);
   createMonitors(ns, atcDaemons, { provider: cluster, dependsOn: [metrics] });
   createDashboards(ns, cluster);
 
   return {
-    logShipper: shipper,
     grafanaURL: `http://geoffcloud:${grafanaNodePort}`,
     grafanaAdminPassword: adminPassword.result,
   };

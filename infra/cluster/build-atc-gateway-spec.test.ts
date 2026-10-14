@@ -18,6 +18,7 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir when the config sets
         publicURL: 'https://atc.geoff.cloud',
         stateDir: undefined,
       }),
+      publicHost: 'atc.geoff.cloud',
       claim,
       tokens,
       registry,
@@ -115,6 +116,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
         publicURL: 'https://atc.geoff.cloud',
         stateDir: '/var/lib/atc-gateway',
       }),
+      publicHost: 'atc.geoff.cloud',
       claim,
       tokens,
       registry,
@@ -199,7 +201,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
   });
 });
 
-test("#buildATCGatewaySpec sends the public URL's host, port included, as the probes' Host header", () => {
+test("#buildATCGatewaySpec sends the public host it is given, port included, as the probes' Host header", () => {
   const claim = output('atc-gateway-state');
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
@@ -212,6 +214,7 @@ test("#buildATCGatewaySpec sends the public URL's host, port included, as the pr
         publicURL: 'https://atc.geoff.cloud:8443',
         stateDir: undefined,
       }),
+      publicHost: 'atc.geoff.cloud:8443',
       claim,
       tokens,
       registry,
