@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for write-release-bumps.sh: from a checkout's pins and the releases that the gh stand-in
-# (scripts/test-lib/create-stub-release-gh.sh) lists, it writes find-release-bumps.sh's lines as
+# (test-support/shell/create-stub-release-gh.sh) lists, it writes find-release-bumps.sh's lines as
 # the multiline `bumps` output and lists them on stdout and in the step summary; when every pin is
 # current it says so and writes no output; and a failed search fails it with that error, writing
 # nothing. Each case runs the script under `env -i` from the checkout and compares its whole
@@ -12,8 +12,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
-source "$scripts/test-lib/create-stub-release-gh.sh"
+source "$scripts/../test-support/shell/run-cases.sh"
+source "$scripts/../test-support/shell/create-stub-release-gh.sh"
 
 script="$scripts/write-release-bumps.sh"
 

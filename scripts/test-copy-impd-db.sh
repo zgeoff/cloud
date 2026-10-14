@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Hermetic test for copy-impd-db.sh: it checks the label, then runs `bash -s -- <label>` on
-# root@geoffcloud or the host IMPD_DB_HOST names, with copy-impd-db-host.sh on ssh's stdin,
-# and passes the host's report and exit code through. It touches no host: ssh is a stand-in
-# from test-lib that logs its argv as a JSON line and its stdin, and answers as the host does
-# without running the host script, which needs root, Nix and the imp-host container;
-# nixos/checks/impd-restore.nix runs that script in the restore VM. One case hands ssh to the
+# Hermetic test for copy-impd-db.sh: it checks the label, then runs `copy-impd-db-host <label>`
+# on root@geoffcloud or the host IMPD_DB_HOST names, with nothing on ssh's stdin, and passes the
+# host's report and exit code through. It touches no host: ssh is a stand-in from
+# test-support/shell that logs its argv as a JSON line and its stdin, and answers as the host
+# does without running the host's tool, which needs root, Docker and the imp-host container;
+# nixos/checks/impd-restore.nix runs that tool in the restore VM. One case hands ssh to the
 # real ssh, refused by a dead loopback port. Each case runs the script under `env -i` with
 # only the variables it sets and compares its whole stdout, stderr, call log and the stdin it
 # sent, and its exact exit code.
@@ -15,17 +15,17 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-impd-db-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-impd-db-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 it_sends_the_copy_to_geoffcloud_with_the_label_and_prints_the_hosts_report() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
+  printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud bash copy-impd-db.sh imp-0.29.0-pre-0.30.0) \
@@ -43,7 +43,7 @@ copy: /root/imp-db-backups/imp-0.29.0-pre-0.30.0-20261008T120000 (73728 bytes, m
 OUT
   diff /dev/null "$tree/err"
   diff "$tree/calls-expected" "$tree/calls"
-  diff "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db-host.sh" "$tree/stdin"
+  diff /dev/null "$tree/stdin"
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
     exit 1
@@ -55,7 +55,7 @@ it_sends_the_copy_to_the_host_IMPD_DB_HOST_names() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  printf '%s\n' '["ssh","-o","BatchMode=yes","root@imp-staging","bash -s -- imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
+  printf '%s\n' '["ssh","-o","BatchMode=yes","root@imp-staging","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@imp-staging IMPD_DB_HOST=root@imp-staging bash copy-impd-db.sh imp-0.29.0-pre-0.30.0) \
@@ -73,7 +73,7 @@ copy: /root/imp-db-backups/imp-0.29.0-pre-0.30.0-20261008T120000 (73728 bytes, m
 OUT
   diff /dev/null "$tree/err"
   diff "$tree/calls-expected" "$tree/calls"
-  diff "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db-host.sh" "$tree/stdin"
+  diff /dev/null "$tree/stdin"
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
     exit 1
@@ -85,7 +85,7 @@ it_exits_1_with_the_hosts_report_when_the_copy_fails_its_integrity_check() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
+  printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_COPY_FAIL=integrity bash copy-impd-db.sh imp-0.29.0-pre-0.30.0) \
@@ -103,7 +103,7 @@ copy: /root/imp-db-backups/imp-0.29.0-pre-0.30.0-20261008T120000 (73728 bytes, m
 OUT
   diff /dev/null "$tree/err"
   diff "$tree/calls-expected" "$tree/calls"
-  diff "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db-host.sh" "$tree/stdin"
+  diff /dev/null "$tree/stdin"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1
@@ -115,7 +115,7 @@ it_exits_1_with_dockers_error_when_imp_host_is_not_running() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","bash -s -- imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
+  printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_COPY_FAIL=imp-host-stopped bash copy-impd-db.sh imp-0.29.0-pre-0.30.0) \
@@ -124,7 +124,7 @@ it_exits_1_with_dockers_error_when_imp_host_is_not_running() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error response from daemon: No such container: imp-host'
   diff "$tree/calls-expected" "$tree/calls"
-  diff "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db-host.sh" "$tree/stdin"
+  diff /dev/null "$tree/stdin"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1
@@ -136,7 +136,7 @@ it_fails_with_ssh_exit_255_when_the_host_refuses_the_connection() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  printf '%s\n' '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -s -- imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
+  printf '%s\n' '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     STUB_HOST=root@geoffcloud STUB_SSH_PASS=1 IMPD_DB_HOST=ssh://root@127.0.0.1:1 bash copy-impd-db.sh imp-0.29.0-pre-0.30.0) \
@@ -162,7 +162,7 @@ it_stops_with_exit_1_and_its_usage_before_any_call_when_no_label_is_given() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'copy-impd-db.sh: line 15: 1: usage: copy-impd-db.sh <label>, such as imp-0.29.0-pre-0.30.0'
+  diff - "$tree/err" <<< 'copy-impd-db.sh: line 17: 1: usage: copy-impd-db.sh <label>, such as imp-0.29.0-pre-0.30.0'
   diff /dev/null "$tree/calls"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
@@ -196,7 +196,7 @@ setup_test() {
   local tree="$1"
   mkdir "$tree/bin" "$tree/home" "$tree/tmp"
   : > "$tree/calls"
-  cp "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db.sh" "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db-host.sh" "$tree/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db.sh" "$tree/"
   create_stub_impd_db_ssh "$tree/bin"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
   require_remote_tool_stubs "$tree/bin"

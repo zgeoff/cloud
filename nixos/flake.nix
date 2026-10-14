@@ -30,22 +30,30 @@
           imp.nixosModules.imp
           ./modules/impd-local-health.nix
           ./modules/atc-daemon.nix
+          ./modules/cloud-host-firewall.nix
+          ./modules/onepassword-connect-relay.nix
           ./hosts/geoffcloud/configuration.nix
           ./hosts/geoffcloud/disko.nix
         ];
       };
 
       # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config. Every other
-      # check reads ../scripts (scripts/test-lib, and
-      # the impd-restore checks the script they rehearse), so they build only with the repo root
-      # as the flake's source (path:.?dir=nixos); the impd-restore checks boot one VM each, from
-      # checks/test-utils/build-restore-rehearsal.nix, and need KVM. impd-restore-reset tests that
-      # rehearsal's own reset
+      # check reads ../test-support/shell (checks/test-utils/build-shell-lib-source.nix), so they
+      # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
+      # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
+      # impd-restore-reset tests that rehearsal's own reset
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs imp; };
+      checks.x86_64-linux.cloud-host-firewall = import ./checks/cloud-host-firewall.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.impd-db-tools = import ./checks/impd-db-tools.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.test-utils = import ./checks/test-utils-check.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         inherit imp;

@@ -6,11 +6,12 @@
 # the copy staged in the mount, which is the test's signal to interrupt it. Any other call is the
 # real sqlite3 alone. Without $HOLDER_PID_FILE it exits 2.
 #
-#   SQLITE3=<this> HOLDER_PID_FILE=/tmp/holder.pid bash restore-impd-db.sh ...
+#   SQLITE3=<this> HOLDER_PID_FILE=/tmp/holder.pid restore-impd-db ...
 #
 # The PID file is the one the rehearsal's reset reads, so a stand-in left blocked after its
 # script is killed is ended by the reset like any other holder. What it assumes of
-# scripts/restore-impd-db.sh, which nixos/checks/test-utils-check.nix pins: it stages the copy
+# restore-impd-db (nixos/packages/impd-db-tools), which nixos/checks/test-utils-check.nix pins:
+# it stages the copy
 # as db/imp.sqlite.restore inside the mount and checks it through $SQLITE3 with a file: URI.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:

@@ -14,9 +14,9 @@
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-publish-docker.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-release-download-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-publish-docker.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-release-download-gh.sh"
 
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

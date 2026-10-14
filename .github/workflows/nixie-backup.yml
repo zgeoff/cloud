@@ -8,10 +8,10 @@ on:
     paths:
       - deploy/nixie/backup/**
       - scripts/run-shell-suites.sh
-      - scripts/test-lib/run-cases.sh
-      - scripts/test-lib/run-backup.sh
-      - scripts/test-lib/run-backup-shell.sh
-      - scripts/test-lib/normalize-restic-output.sh
+      - test-support/shell/run-cases.sh
+      - test-support/shell/run-backup.sh
+      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/normalize-restic-output.sh
       - infra/Pulumi.prod.yaml
       - .bun-version
       - package.json
@@ -20,10 +20,10 @@ on:
     paths:
       - deploy/nixie/backup/**
       - scripts/run-shell-suites.sh
-      - scripts/test-lib/run-cases.sh
-      - scripts/test-lib/run-backup.sh
-      - scripts/test-lib/run-backup-shell.sh
-      - scripts/test-lib/normalize-restic-output.sh
+      - test-support/shell/run-cases.sh
+      - test-support/shell/run-backup.sh
+      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/normalize-restic-output.sh
       - infra/Pulumi.prod.yaml
       - .bun-version
       - package.json

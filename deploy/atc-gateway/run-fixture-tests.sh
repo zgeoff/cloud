@@ -9,4 +9,4 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 bash scripts/run-shell-suites.sh fixture-images
-bash scripts/test-lib/with-fixture-images.sh bash scripts/run-shell-suites.sh atc-gateway-fixture
+bash test-support/shell/with-fixture-images.sh bash scripts/run-shell-suites.sh atc-gateway-fixture

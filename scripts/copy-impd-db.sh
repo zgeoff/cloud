@@ -10,6 +10,8 @@
 # imp-host and writes one `VACUUM INTO` file: a single read transaction, consistent while
 # impd writes, with no -wal or -shm beside it. The copy holds token hashes and secret
 # metadata, so it stays root-only on the host. Until imp ships `imp db copy` (imp #171).
+# The host side is copy-impd-db-host, which the host's NixOS config puts on its PATH
+# (nixos/packages/impd-db-tools), so a change to it reaches the host only with a host switch.
 set -euo pipefail
 
 label="${1:?usage: copy-impd-db.sh <label>, such as imp-0.29.0-pre-0.30.0}"
@@ -20,6 +22,5 @@ if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
   exit 1
 fi
 
-# The host side is copy-impd-db-host.sh, sent on ssh's stdin rather than in the command line,
-# which tailscaled logs in full.
-ssh -o BatchMode=yes "$host" "bash -s -- $label" < "$(dirname "${BASH_SOURCE[0]}")/copy-impd-db-host.sh"
+# tailscaled logs the command line in full; it holds only the label, which is no secret
+ssh -o BatchMode=yes "$host" "copy-impd-db-host $label" < /dev/null

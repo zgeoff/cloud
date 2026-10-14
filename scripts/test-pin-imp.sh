@@ -14,8 +14,8 @@
 set -euo pipefail
 umask 022
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
-source "$scripts/test-lib/create-stub-release-docker.sh"
+source "$scripts/../test-support/shell/run-cases.sh"
+source "$scripts/../test-support/shell/create-stub-release-docker.sh"
 source "$scripts/nix-image.sh"
 
 script="$scripts/pin-imp.sh"

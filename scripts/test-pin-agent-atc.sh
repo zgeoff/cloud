@@ -10,7 +10,7 @@
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/pin-agent-atc.sh"
 

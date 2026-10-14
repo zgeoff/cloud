@@ -9,23 +9,23 @@
 # volume across a restart. What it does not prove: gateway-to-daemon transport (the
 # registry's daemon is a dead address), k3s.
 #
-# The images come from scripts/test-lib/with-fixture-images.sh, which builds them once
+# The images come from test-support/shell/with-fixture-images.sh, which builds them once
 # per run under tags carrying a random per-run id, removes them after, and sets
 # FIXTURE_RUN, FIXTURE_GATEWAY_IMAGE and FIXTURE_BACKUP_IMAGE. Each case starts its own
 # container on its own volume and an ephemeral host port, all named from that id, and
 # removes them when it exits. `bun run test:atc-gateway-fixture` runs it after the helper
 # tests; alone:
 #
-#   bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
-#   CASE='foreign Host' bash scripts/test-lib/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
+#   bash test-support/shell/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
+#   CASE='foreign Host' bash test-support/shell/with-fixture-images.sh bash deploy/atc-gateway/test-atc-gateway-image.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-lib/start-gateway.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/test-lib/wait-for-ready.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/start-gateway.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/wait-for-ready.sh"
 
 it_answers_the_protected_resource_metadata_on_its_public_Host() {
   local gateway_image="$1" port code
@@ -248,8 +248,8 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # sets RESTIC_IMAGE, among the pins
 # shellcheck source=/dev/null
 source "$repo/deploy/atc-gateway/versions.env"
-: "${FIXTURE_RUN:?is unset: run this under scripts/test-lib/with-fixture-images.sh}"
-: "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under scripts/test-lib/with-fixture-images.sh}"
-: "${FIXTURE_BACKUP_IMAGE:?is unset: run this under scripts/test-lib/with-fixture-images.sh}"
+: "${FIXTURE_RUN:?is unset: run this under test-support/shell/with-fixture-images.sh}"
+: "${FIXTURE_GATEWAY_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"
+: "${FIXTURE_BACKUP_IMAGE:?is unset: run this under test-support/shell/with-fixture-images.sh}"
 # shellcheck disable=SC2153 # RESTIC_IMAGE comes from versions.env
 run_cases "$FIXTURE_GATEWAY_IMAGE" "$FIXTURE_BACKUP_IMAGE" "$RESTIC_IMAGE" "$FIXTURE_RUN"

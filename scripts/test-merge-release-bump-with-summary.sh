@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for merge-release-bump-with-summary.sh: it runs merge-release-bump.sh, with the gh
-# stand-in (scripts/test-lib/create-stub-release-gh.sh), and prints its decision on stdout and in
+# stand-in (test-support/shell/create-stub-release-gh.sh), and prints its decision on stdout and in
 # the step summary; it fails with merge-release-bump.sh's own status and error when that fails,
 # though tee succeeds; and it fails without a step summary file before running anything. Each case
 # runs it under `env -i` and compares its whole stdout, stderr, step summary and gh call log.
@@ -11,8 +11,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
-source "$scripts/test-lib/create-stub-release-gh.sh"
+source "$scripts/../test-support/shell/run-cases.sh"
+source "$scripts/../test-support/shell/create-stub-release-gh.sh"
 
 script="$scripts/merge-release-bump-with-summary.sh"
 

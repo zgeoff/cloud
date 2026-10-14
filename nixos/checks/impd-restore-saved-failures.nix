@@ -1,4 +1,4 @@
-# The restore rehearsal's subtests for scripts/restore-impd-db.sh's failures after it has saved
+# The restore rehearsal's subtests for restore-impd-db's failures after it has saved
 # the original, in a NixOS VM: the machine, its reset and its boot subtests are
 # test-utils/build-restore-rehearsal.nix's, the same as impd-restore's. Real state on the
 # machine reaches each failure: a generation whose switch fails, an imp-host whose seccomp
@@ -9,8 +9,8 @@
 # Stand-ins, from test-utils, beside the rehearsal's own: a sleep that records each pause and
 # returns at once (build-stub-sleep.nix), so the wait for imp-host's container is counted, not
 # waited out. Each subtest writes its own database, secret, copy and COPY-INFO, so every
-# subtest stands alone. It needs KVM, and it reads scripts/ beside nixos/, so it builds only
-# from the repo root: run `bun run test:nixos impd-restore-saved-failures`.
+# subtest stands alone. It needs KVM, and it reads test-support/shell beside nixos/, so it builds
+# only from the repo root: run `bun run test:nixos impd-restore-saved-failures`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -46,7 +46,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           # the failing unit's script, a store path of the broken generation
           fail_script = machine.succeed(f"grep -o '^ExecStart=.*' {ctx['broken_path']}/etc/systemd/system/fail-on-switch.service | cut -d= -f2-").strip()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -103,7 +103,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "restarting sysinit-reactivation.target",
               "reloading the following units: dbus-broker.service",
               "warning: the following units failed: fail-on-switch.service",
-              "restore-impd-db: failed at line 177",
+              "restore-impd-db: failed at line 185",
               f"restore-impd-db: the copy is in place (the original is in {saved}); "
               "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
           ], err
@@ -169,7 +169,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("printf '{' > /tmp/broken-seccomp.json")
           machine.succeed(f"mount --bind /tmp/broken-seccomp.json {seccomp[0]}")
 
-          status, out = machine.execute("IMPD_START_WAIT_SECONDS=3 IMPD_START_SLEEP=${stubSleep} SLEEP_LOG=/tmp/sleep.log SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("IMPD_START_WAIT_SECONDS=3 IMPD_START_SLEEP=${stubSleep} SLEEP_LOG=/tmp/sleep.log restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -256,7 +256,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -326,7 +326,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
-          status, out = machine.execute("SQLITE3=sqlite3 bash ${../../scripts/restore-impd-db.sh} /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
+          status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for find-ci-run.sh: against a real git repository in the case tree and a gh stand-in
-# (scripts/test-lib/create-stub-ci-runs-gh.sh), it asks for the green push runs on main of the
+# (test-support/shell/create-stub-ci-runs-gh.sh), it asks for the green push runs on main of the
 # exact commit, prints the first run's URL, prints nothing when no run is green, fails with gh's
 # error and exit when gh fails, and refuses a commit git cannot resolve. Each case runs the script
 # under `env -i` with git's global and system config off, and compares its whole stdout, stderr and
@@ -11,8 +11,8 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-ci-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-ci-runs-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/find-ci-run.sh"
 

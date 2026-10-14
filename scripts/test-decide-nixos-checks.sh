@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for decide-nixos-checks.sh: against a real git repository in the case tree and a gh
-# stand-in (scripts/test-lib/create-stub-runs-gh.sh) that lists the green runs, it writes
+# stand-in (test-support/shell/create-stub-runs-gh.sh) that lists the green runs, it writes
 # needed=true for any event but schedule without asking gh, needed=false with the summary line for
 # a nightly run on a covered commit, needed=true for a nightly run on a commit no run covers, and
 # fails with gh's error and writes nothing when gh fails. Each case runs the script under `env -i`
@@ -12,8 +12,8 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-runs-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks.sh"
 

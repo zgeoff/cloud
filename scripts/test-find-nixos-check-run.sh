@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Test for find-nixos-check-run.sh: against a real git repository in the case tree and a gh
-# stand-in (scripts/test-lib/create-stub-runs-gh.sh) that lists the green runs, it prints the URL
+# stand-in (test-support/shell/create-stub-runs-gh.sh) that lists the green runs, it prints the URL
 # of the newest run whose commit is the given commit or an ancestor with no input of the checks
 # changed since, skips runs it cannot use, prints nothing when no run covers the commit, and
 # fails with gh's error and exit when gh fails. Each case runs the script under `env -i` with
@@ -11,8 +11,8 @@
 set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-runs-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/find-nixos-check-run.sh"
 

@@ -1,6 +1,6 @@
 # A stand-in imp-host image for the impd-restore rehearsal: busybox, whose command only sleeps,
 # with an imp-docker-proxy that only opens the socket imp's module waits for, an `imp info` that
-# prints only its version line, and a /tmp, where copy-impd-db-host.sh makes its work
+# prints only its version line, and a /tmp, where copy-impd-db-host makes its work
 # directory. Given a tag, it returns { layout, ref }: the image as an OCI layout, and the reference geoffcloud would pin it
 # by, ghcr.io/zgeoff/imp-host:<tag>@<digest>, whose digest is the layout's manifest digest, the
 # one a registry serves it under once skopeo copies it with --preserve-digests. Reading that
@@ -10,7 +10,7 @@
 # flake's imp input: imp's module runs the proxy as /usr/local/bin/imp-docker-proxy in the same
 # image, and waits for the socket /run/imp-docker/docker.sock; it runs imp-host from the image's
 # own command; and `imp info` prints each line as its label padded to 12 characters, then the
-# value, with the version first. The real one prints more lines; copy-impd-db-host.sh reads
+# value, with the version first. The real one prints more lines; copy-impd-db-host reads
 # only the version.
 { pkgs }:
 tag:

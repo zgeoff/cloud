@@ -8,12 +8,12 @@
 # and runs swapon as root, so check-agent-image.sh checks it in a fresh imp instead.
 #
 #   bash images/agent/test-setup-swap.sh
-# shellcheck source-path=SCRIPTDIR/../../scripts
+# shellcheck source-path=SCRIPTDIR/../..
 set -euo pipefail
 umask 022
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/test-lib/run-cases.sh
-source "$here/../../scripts/test-lib/run-cases.sh"
+# shellcheck source=test-support/shell/run-cases.sh
+source "$here/../../test-support/shell/run-cases.sh"
 
 script="$here/sbin/setup-swap"
 

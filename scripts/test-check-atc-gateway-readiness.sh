@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Hermetic test for check-atc-gateway-readiness.sh: it prints one ok, missing or FAIL line
 # per readiness check and exits with the number of FAIL lines; missing is no failure. It
-# touches no host, registry, DNS or route: ssh, curl and getent are stand-ins from test-lib
+# touches no host, registry, DNS or route: ssh, curl and getent are stand-ins from test-support/shell
 # that log their argv as JSON lines and answer from the case's tree, where the cluster's
 # objects are files, the DNS records a hosts file, and infra/tailnet-policy.ts the policy
 # the script greps. Each case runs the script under `env -i` with only the variables it
@@ -13,12 +13,12 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-readiness-ssh.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-readiness-curl.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-getent.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-remote-tools.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/require-remote-tool-stubs.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-readiness-ssh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-readiness-curl.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-getent.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 it_reports_every_check_ok_once_the_gateway_is_deployed() {
   local status=0

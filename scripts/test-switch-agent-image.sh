@@ -11,9 +11,9 @@
 set -euo pipefail
 umask 022
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$scripts/test-lib/run-cases.sh"
-source "$scripts/test-lib/create-stub-imp.sh"
-source "$scripts/test-lib/create-stub-date.sh"
+source "$scripts/../test-support/shell/run-cases.sh"
+source "$scripts/../test-support/shell/create-stub-imp.sh"
+source "$scripts/../test-support/shell/create-stub-date.sh"
 
 script="$scripts/switch-agent-image.sh"
 

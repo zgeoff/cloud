@@ -6,9 +6,10 @@
 # reads the other unit's state, and its failure path stops the units, so the stand-in passes
 # what it does not expect through rather than failing it. Without $FAIL_SHOW_UNIT it exits 2.
 #
-#   SYSTEMCTL=<this> FAIL_SHOW_UNIT=imp-docker-proxy bash restore-impd-db.sh ...
+#   SYSTEMCTL=<this> FAIL_SHOW_UNIT=imp-docker-proxy restore-impd-db ...
 #
-# What it assumes of scripts/restore-impd-db.sh, which nixos/checks/test-utils-check.nix pins:
+# What it assumes of restore-impd-db (nixos/packages/impd-db-tools), which
+# nixos/checks/test-utils-check.nix pins:
 # it reads each unit's state through $SYSTEMCTL as `show -p ActiveState --value <unit>`.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:

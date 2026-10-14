@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for preview-and-guard-prod.sh: with a bun stand-in (scripts/test-lib/create-stub-prod-apply-bun.sh)
+# Test for preview-and-guard-prod.sh: with a bun stand-in (test-support/shell/create-stub-prod-apply-bun.sh)
 # answering the SDK build, the preview and the guard, it builds the SDK, previews into the
 # runner's plan file, runs the guard on that file and the drift outcome, shows the guard's text on
 # stdout and in the step summary, and writes verdict=apply or verdict=hold; it fails after showing
@@ -13,8 +13,8 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-prod-apply-bun.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-prod-apply-bun.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preview-and-guard-prod.sh"
 

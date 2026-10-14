@@ -1,4 +1,4 @@
-# The restore rehearsal's VM, for the checks of scripts/restore-impd-db.sh, so each runs its
+# The restore rehearsal's VM, for the checks of restore-impd-db, so each runs its
 # subtests on the identical machine and reset: imp's own NixOS module (the flake's pinned imp
 # input) runs imp-host and imp-docker-proxy, on a real ZFS pool with the module's legacy dataset
 # tank/imp, real generations in the system profile and a real switch-to-configuration. The images
@@ -12,8 +12,8 @@
 # boot subtests first, then defines setup_test(), which returns the VM to the same boot state
 # before each subtest: the 0.29.0 system running, its image pulled fresh, an empty tank/imp
 # mounted nowhere, generations 1 to 3, and nothing an earlier subtest left. The given subtests
-# follow, each calling setup_test() first. It needs KVM, and the checks it builds read scripts/
-# beside nixos/, so they build only from the repo root. The test utilities pass their own check
+# follow, each calling setup_test() first. It needs KVM, and the checks it builds read
+# test-support/shell beside nixos/, so they build only from the repo root. The test utilities pass their own check
 # (test-utils-check.nix) before the VM runs, and every check that uses this runs it on every
 # build: its boot subtests are its tests, and impd-restore-reset.nix checks its reset.
 { nixpkgs, imp }:
@@ -26,6 +26,8 @@ let
   image28 = import ./build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
   image29 = import ./build-stub-imp-host-image.nix { inherit pkgs; } "0.29.0";
   testUtilsCheck = import ../test-utils-check.nix { inherit pkgs imp; };
+  shellLib = import ./build-shell-lib-source.nix { inherit lib; };
+  impdDbTools = pkgs.callPackage ../../packages/impd-db-tools { };
 in
 pkgs.testers.runNixOSTest {
   inherit name;
@@ -45,22 +47,11 @@ pkgs.testers.runNixOSTest {
       boot.zfs.forceImportRoot = false;
       virtualisation.emptyDiskImages = [ 1024 ];
       virtualisation.memorySize = 2048;
-      environment.systemPackages = [ pkgs.sqlite ];
-      # scripts/copy-impd-db-host.sh builds both its sqlite3s from the nixpkgs registry entry,
-      # as geoffcloud does; the VM has no network, so the flake and both outputs are in its
-      # store already, and nix skips the global registry it would otherwise download (a setting
-      # nix.conf accepts only with flakes on; the script turns them on for its own calls anyway)
-      nix.registry.nixpkgs.flake = nixpkgs;
-      nix.settings = {
-        experimental-features = [
-          "nix-command"
-          "flakes"
-        ];
-        flake-registry = "";
-      };
-      system.extraDependencies = [
-        pkgs.pkgsStatic.sqlite.bin
-        pkgs.sqlite.bin
+      # the subtests run copy-impd-db-host and restore-impd-db from PATH, as geoffcloud does, and
+      # make their scenario databases with sqlite3
+      environment.systemPackages = [
+        pkgs.sqlite
+        impdDbTools
       ];
 
       # the registry that answers for ghcr.io: plain HTTP on port 80, which Docker falls back to
@@ -90,7 +81,7 @@ pkgs.testers.runNixOSTest {
         # docker-registry is Type=simple, so "after" orders on its start, not on its port: wait
         # until it answers before the first copy
         script = ''
-          source ${../../../scripts/test-lib/wait-for.sh}
+          source ${shellLib}/wait-for.sh
           wait_for 30 "the registry" curl -sf -o /dev/null http://ghcr.io/v2/
           skopeo --insecure-policy copy --preserve-digests --dest-tls-verify=false \
             oci:${image28.layout}:0.28.0 docker://ghcr.io/zgeoff/imp-host:0.28.0

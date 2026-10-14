@@ -51,8 +51,9 @@ Every imp upgrade takes a copy first with `bash scripts/copy-impd-db.sh <label>`
 `imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: `path`,
 `sizeBytes`, `lastMigration`, `impVersion`, `createdAt` and `integrity`, the names
 `imp db copy --json` returns (imp #171), plus `image`, which impd cannot know. Copies from before
-those names say `imp` and `migration`; the restore script reads both. `scripts/restore-impd-db.sh`
-puts a copy back.
+those names say `imp` and `migration`; the restore script reads both. `restore-impd-db` puts a copy
+back. The host's NixOS config puts it and the copy's host side on the host's PATH, with the sqlite3
+of the flake's pinned nixpkgs, so a fix to either reaches the host only with a host switch.
 
 **CAUTION:** A restore discards every change impd made after the copy. It is one-way: impd runs
 migrations forward only, and an older binary refuses a newer database. Disks and checkpoints made
@@ -82,13 +83,10 @@ stopped, and switch after.
    systemctl stop imp-host imp-docker-proxy
    ```
 
-3. Copy the script to the host and run it with the copy and that generation, using sqlite from
-   nixpkgs (the host has none):
+3. Run the restore on the host with the copy and that generation:
 
    ```sh
-   scp scripts/restore-impd-db.sh root@geoffcloud:/root/
-   ssh root@geoffcloud nix --extra-experimental-features "'nix-command flakes'" \
-     shell nixpkgs#sqlite -c bash /root/restore-impd-db.sh /root/imp-db-backups/<copy> <generation>
+   ssh root@geoffcloud restore-impd-db /root/imp-db-backups/<copy> <generation>
    ```
 
    The copy's newest migration must be at or below the newest migration of the image that starts; a

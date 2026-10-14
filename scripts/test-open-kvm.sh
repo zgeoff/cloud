@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for open-kvm.sh: through a sudo stand-in (scripts/test-lib/create-stub-kvm-sudo.sh) that
+# Test for open-kvm.sh: through a sudo stand-in (test-support/shell/create-stub-kvm-sudo.sh) that
 # runs nothing as root, it writes the udev rule that opens /dev/kvm to every user, then reloads
 # udev's rules and triggers the device, in that order; a sudo that needs a password fails it with
 # sudo's error before any udev call. Each case runs the script under `env -i` and compares its
@@ -10,8 +10,8 @@
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/test-lib/create-stub-kvm-sudo.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kvm-sudo.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/open-kvm.sh"
 

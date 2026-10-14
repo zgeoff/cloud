@@ -22,7 +22,7 @@ is decided in the shared skill, not here.
 | TypeScript unit tests in `infra/` and `scripts/`   | `bun run test`                     | `CI` → `ci`                         |
 | The health-check Worker's tests                    | `bun run test:health-check`        | `CI` → `ci`                         |
 | Go tests in `provider/`                            | `bun run provider:check`           | `CI` → `ci`, if `provider/` changed |
-| Shell suites and `scripts/test-lib/` tests         | `bun run test:scripts`             | `CI` → `ci`, unless only Markdown changed |
+| Shell suites and `test-support/shell/` tests       | `bun run test:scripts`             | `CI` → `ci`, unless only Markdown changed |
 | Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture` | `atc-gateway images` → `fixture`    |
 | nixie's backup script in its pinned image (Docker) | `bun run test:nixie-backup-fixture` | `nixie backup` → `fixture`         |
 | NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`      | `NixOS checks` → `nixos`            |
@@ -168,20 +168,20 @@ journey. Each shared rule takes its shell form:
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `test('it …')`               | a function `it_<words>`; its title is the name with spaces; `CASE='<part of a title>'` runs the matching cases                                                                                                     |
 | `#<unit> <behaviour>`        | `it <unit> <behaviour>` in a file that tests several units, here and in the NixOS checks; the runners keep "it" as the first word, and Bun tests keep the shared `#<unit>` form                                       |
-| The runner                   | `run_cases` from `scripts/test-lib/run-cases.sh`: each case in its own errexit subshell, `ok`/`FAIL` per case, exit 1 on any failure or when no case ran                                                            |
+| The runner                   | `run_cases` from `test-support/shell/run-cases.sh`: each case in its own errexit subshell, `ok`/`FAIL` per case, exit 1 on any failure or when no case ran                                                            |
 | `setupTest()`                | one `setup_test` per suite: a fresh `mktemp -d` tree and the stand-ins every case needs, with no scenario data; its config chooses which stand-ins to wire                                                          |
 | Dispose and `onTestFinished` | one `trap '…' EXIT` per case, because bash keeps one EXIT trap: on the line after `mktemp -d`, before `setup_test` acquires containers or processes, with each step safe when its resource was never reached; in a trap with more than one step, every step ends `\|\| true`; a variable a step reads is global, since a `local` is gone when the trap runs |
 | Every test stands alone      | the script under test runs under `env -i` with an explicit `PATH`, `HOME` and `TMPDIR` inside the case tree; git with `GIT_CONFIG_GLOBAL=/dev/null` and `GIT_CONFIG_NOSYSTEM=1`; each suite starts with `umask 022` |
-| `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `scripts/test-lib/`; mask only a temp path, a generated id, or a measurement that changes between runs (a wall-clock time, a duration, a size, a memory or CPU reading), never the value under test                                     |
+| `toStrictEqual`              | the whole stdout, stderr and stand-in call log compared with `diff` against a heredoc, or the `assert_*` helpers in `test-support/shell/`; mask only a temp path, a generated id, or a measurement that changes between runs (a wall-clock time, a duration, a size, a memory or CPU reading), never the value under test                                     |
 | Exact errors                 | the exact exit code, never "non-zero", plus the exact stderr                                                                                                                                                       |
-| Polling `waitFor`            | `wait_for <seconds> <what> <command…>` from `scripts/test-lib/wait-for.sh`                                                                                                                                         |
+| Polling `waitFor`            | `wait_for <seconds> <what> <command…>` from `test-support/shell/wait-for.sh`                                                                                                                                         |
 | Injected time                | `WAIT_FOR_CLOCK` and `WAIT_FOR_SLEEP`, stepped by `create_stub_clock`, so a timeout case counts pauses instead of waiting out seconds; the defaults are covered by a polled command that advances bash's `SECONDS` and by the clock's pause first on `PATH` as `sleep`; a case that pins the exact stamp a script embeds from `date`, such as in a name it compares, uses a `date` wrapper reading a fixed time (`create_stub_date`); a case that only bounds the stamp reads the clock before and after the act and checks it with `assert_between` |
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                             |
 
 - A case checks its exit status exactly, with
   `[ "$status" = N ] || { echo "exit $status, want N" >&2; exit 1; }` or `assert_equals`; both
   are exact.
-- A stand-in lives in `scripts/test-lib/` with its own `test-<file>.sh`, never inline in a suite:
+- A stand-in lives in `test-support/shell/` with its own `test-<file>.sh`, never inline in a suite:
   `create-stub-<thing>.sh` writes an executable to disk, and `start-stub-<thing>.sh` runs a process.
 - A stand-in that replaces a tool logs its argv as one JSON line, matches the real tool's exit codes
   and messages, and ends with `*) echo "unexpected: $*" >&2; exit 97`. Where the real tool's output
@@ -203,10 +203,10 @@ journey. Each shared rule takes its shell form:
   host.
 - A producer whose output a case compares writes to a file under errexit first, so a failing
   producer fails the case instead of producing an empty match.
-- Every other helper in `scripts/test-lib/` exports one public function, named for its file, and
+- Every other helper in `test-support/shell/` exports one public function, named for its file, and
   has its own `test-<helper>.sh` that `test:scripts` runs, or `test:atc-gateway-fixture` when it needs
   Docker.
-- The Docker suites run under `scripts/test-lib/with-fixture-images.sh`, which builds the images
+- The Docker suites run under `test-support/shell/with-fixture-images.sh`, which builds the images
   once per run under tags that carry a random run id and removes them after. Every container and
   volume name carries that id, and each case's trap removes its containers before its volumes. The
   images run as production runs them: uid 65532, no capabilities, no privilege escalation.
@@ -215,8 +215,12 @@ journey. Each shared rule takes its shell form:
 
 The checks live in `nixos/checks/` and are wired into `checks.x86_64-linux`. `bun run test:nixos`
 builds every check the flake declares, from the repo root as the flake source (`path:.?dir=nixos`),
-because every check reads `scripts/test-lib/`. It builds in a `nixos/nix` container on the
+because every check reads `test-support/shell/`. It builds in a `nixos/nix` container on the
 `cloud-nixos-checks-store` volume, never the switch's `geoffcloud-nix-store`.
+
+- A check reads only the shell helpers that `nixos/checks/test-utils/build-shell-lib-source.nix`
+  selects, and `scripts/needs-nixos-checks.sh` lists the same files. A helper a check starts to
+  read joins both lists. The checks read nothing else outside `nixos/` but `packages/topology/`.
 
 - `geoffcloud-eval` evaluates the host's system derivation and builds nothing of the host, so a
   change that breaks the host config fails CI instead of the switch.

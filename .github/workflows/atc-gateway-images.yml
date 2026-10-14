@@ -14,7 +14,7 @@ on:
       - infra/build-atc-gateway-spec.ts
       - infra/create-atc-gateway-backup-job.ts
       - infra/build-atc-gateway-backup-pod-spec.ts
-      - scripts/test-lib/**
+      - test-support/shell/**
       - .github/workflows/atc-gateway-images.yml
   pull_request:
     paths:
@@ -26,7 +26,7 @@ on:
       - infra/build-atc-gateway-spec.ts
       - infra/create-atc-gateway-backup-job.ts
       - infra/build-atc-gateway-backup-pod-spec.ts
-      - scripts/test-lib/**
+      - test-support/shell/**
       - .github/workflows/atc-gateway-images.yml
   workflow_dispatch:
     inputs:
