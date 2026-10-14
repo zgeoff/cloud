@@ -7,6 +7,17 @@
 }:
 let
   topology = import ../../topology.nix;
+  # the exposure registry (packages/topology/exposure.json): the firewall's public ports and the
+  # cloud_host admissions come from it, and checks/exposure.nix compares it with this config
+  exposure = (import ../../exposure.nix).entries;
+  hostPorts = builtins.filter (entry: entry.kind == "host-port") exposure;
+  getHostPort = name: builtins.head (builtins.filter (entry: entry.name == name) hostPorts);
+  publicPorts =
+    protocol:
+    map (entry: entry.port) (
+      builtins.filter (entry: entry.scope == "public" && entry.protocol == protocol) hostPorts
+    );
+  atcDaemonExposure = getHostPort "atc-daemon";
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -86,8 +97,13 @@ in
   };
   networking.firewall = {
     enable = true;
-    # public: nothing but Tailscale. Everything else is reached over the tailnet.
-    allowedUDPPorts = [ topology.tailnet.directPort ];
+    # public: the registry's public host ports, Tailscale's direct-connection port alone.
+    # Everything else is reached over the tailnet.
+    allowedTCPPorts = publicPorts "tcp";
+    allowedUDPPorts = publicPorts "udp";
+    # ICMP stays open (the registry's icmp entry): path MTU discovery needs fragmentation-needed
+    # and ICMPv6 packet-too-big, and ping checks that the host is reachable
+    allowPing = true;
     # trusted as a source, in input and forward: the tailnet and k3s pods (pods
     # reach the API server and kubelet on the host)
     trustedInterfaces = [
@@ -116,8 +132,7 @@ in
   # host can still reach the port; the daemon's bearer token gates the rest.
   networking.cloudHost.admissions = [
     {
-      port = atcDaemonPort;
-      interface = "cni0";
+      inherit (atcDaemonExposure) port interface;
       sourceCIDR = k3sPodCIDR;
       destinationAddress = atcDaemonAddress;
     }
@@ -128,14 +143,17 @@ in
   services.onepassword-connect-relay = {
     enable = true;
     address = topology.docker.bridgeAddress;
-    port = 18081;
+    inherit (getHostPort "onepassword-connect-relay") port;
     allowedSubnet = topology.docker.subnet;
     target = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
   };
 
   services.openssh = {
     enable = true;
-    # reachable on the tailnet only once Onidel's cloud firewall closes 22 (#4)
+    # tailnet only (the registry's ssh entry): the module's default opens 22 on every interface,
+    # the public one included. tailscale0 is trusted, so OpenSSH still answers on the tailnet, and
+    # Tailscale SSH stays the access path.
+    openFirewall = false;
     settings = {
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;

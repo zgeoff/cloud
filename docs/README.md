@@ -33,6 +33,11 @@ call, the path of a change, the topology and the data.
   - [Observability](./architecture/workloads/observability.md): metrics, logs, probes, alerts and
     the check from the edge.
 
+## Reference
+
+- [Exposure](./reference/exposure.md): every public route and port, generated from the exposure
+  registry.
+
 ## Runbooks
 
 - [Development](./runbooks/development.md): set up a machine and run a first preview.

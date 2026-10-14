@@ -33,12 +33,15 @@ bridge.
 
 ### NixOS's table
 
-NixOS's table admits nothing from the public interface but Tailscale's port. It trusts the tailnet
-interface and the cluster's pod and overlay interfaces as sources, because pods reach the API server
-and the kubelet on the host, and the tailnet is already filtered by the policy. It filters forwarded
-traffic too, so no public packet reaches a pod or a NodePort, and it forwards the pods' own traffic.
-It does not trust Docker's bridge, so a container on it reaches the host only on the one port opened
-there, the Connect relay's.
+NixOS's table admits nothing from the public interface but Tailscale's port and ICMP. ICMP stays
+open because path MTU discovery needs ICMP's fragmentation-needed and ICMPv6's packet-too-big
+messages, and ping checks that the host is reachable. OpenSSH's NixOS module opens its port on every
+interface by default, so the host turns that off, and sshd answers only through the trusted tailnet
+interface. It trusts the tailnet interface and the cluster's pod and overlay interfaces as sources,
+because pods reach the API server and the kubelet on the host, and the tailnet is already filtered
+by the policy. It filters forwarded traffic too, so no public packet reaches a pod or a NodePort,
+and it forwards the pods' own traffic. It does not trust Docker's bridge, so a container on it
+reaches the host only on the one port opened there, the Connect relay's.
 
 ### The narrowing table
 
@@ -63,6 +66,31 @@ service ranges, because an imp is an agent sandbox and must not reach a workload
 why imp-host cannot reach 1Password Connect's Service itself, and the host relays the requests for
 it. impd keeps each imp's egress policy in a table of its own inside the imp-host container, outside
 the host's view.
+
+## The exposure registry
+
+The exposure registry in the topology package lists every public route and port, and each port the
+host keeps to the tailnet or to itself, with its scope and its reason. Each part of the estate that
+opens something reads the registry instead of its own list, and a check compares the rest with it,
+so a port or a hostname cannot go public without an entry that records why. The registry's
+[reference table](../../reference/exposure.md) is generated from it.
+
+| Kind               | Read by                                            | Checked by                                                     |
+| ------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
+| host port          | the host's public ports and admissions, edge rules | the `exposure` NixOS check, against the evaluated host config  |
+| tunnel hostname    | the tunnel's routes                                | the Pulumi program, which refuses a hostname not listed public |
+| tailnet capability | nothing                                            | nothing                                                        |
+| Worker URL         | nothing                                            | nothing                                                        |
+
+The `exposure` check reads NixOS's evaluated firewall and fails on any difference in either
+direction. A port open on every interface needs a public entry, and a tailnet entry's port open
+there, such as OpenSSH's default, fails the check. A port open on one interface, or narrowed by the
+narrowing table, needs a host-scope entry for that interface. An interface with a default route or a
+static address faces outside the host, so a port open there needs a public entry, and no host-scope
+entry may name it. Each port that imp's module publishes for public imps passes NixOS's input chain
+through Docker's forwarding, so it needs a public entry as well. A port range or a hand-written
+input rule cannot be matched with an entry, so the check fails on either. The tailnet capability and
+the Worker URL entries record a decision that no code reads yet.
 
 ## NodePorts
 

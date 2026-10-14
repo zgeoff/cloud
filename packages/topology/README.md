@@ -29,5 +29,15 @@ that the deploy workflow passes to an action. `bun run check:topology` compares 
 constants and fails on a mismatch. It runs in CI and before a push.
 
 Version pins are not topology: each keeps its own pin file, which its bump tooling rewrites. Other
-data that the host, infra and the scripts all read, such as a registry of what the host exposes,
-belongs in this package as its own file beside `constants.json`.
+data that the host, infra and the scripts all read belongs in this package as its own file beside
+`constants.json`.
+
+## The exposure registry
+
+`exposure.json` lists every public route and port, and each port the host keeps to the tailnet or to
+itself, with its scope and its reason. The package exports it parsed as `exposure`, and fails to
+load when one of its ports differs from the same port in the constants. The host reads it through
+`nixos/exposure.nix`, and `bun run docs:exposure` writes its table into
+`docs/reference/exposure.md`.
+[Firewalls](../../docs/architecture/network/firewalls.md#the-exposure-registry) covers the checks
+that hold it to the code.

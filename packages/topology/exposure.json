@@ -1,0 +1,87 @@
+{
+  "entries": [
+    {
+      "name": "tailscale",
+      "kind": "host-port",
+      "protocol": "udp",
+      "port": 41641,
+      "scope": "public",
+      "edge": "Tailscale direct connections",
+      "reason": "WireGuard's direct-connection port: tailnet peers reach the host directly instead of through a DERP relay"
+    },
+    {
+      "name": "icmp",
+      "kind": "host-port",
+      "protocol": "icmp",
+      "scope": "public",
+      "edge": "ICMP: path MTU discovery and ping",
+      "reason": "Path MTU discovery needs ICMP fragmentation-needed and ICMPv6 packet-too-big, and ping checks that the host is reachable"
+    },
+    {
+      "name": "ssh",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 22,
+      "scope": "tailnet",
+      "reason": "OpenSSH and Tailscale SSH, over the tailnet only: the host keeps 22 shut on its public interface, and the edge drops it once the host is on the tailnet",
+      "ticket": "GEO-420"
+    },
+    {
+      "name": "atc-daemon",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 8415,
+      "scope": "host",
+      "interface": "cni0",
+      "admission": true,
+      "reason": "The atc gateway's pod dials the daemon on the host's tailnet address, and inet cloud_host admits only pod addresses on cni0"
+    },
+    {
+      "name": "onepassword-connect-relay",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 18081,
+      "scope": "host",
+      "interface": "docker0",
+      "admission": true,
+      "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from docker0's subnet only"
+    },
+    {
+      "name": "grafana",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 30300,
+      "scope": "tailnet",
+      "reason": "Grafana's NodePort, which k3s binds to the tailnet range only"
+    },
+    {
+      "name": "atc-gateway",
+      "kind": "tunnel-hostname",
+      "hostname": "atc.geoff.cloud",
+      "scope": "public",
+      "reason": "The atc gateway's MCP and OAuth endpoints for remote MCP clients; the gateway authenticates every call itself"
+    },
+    {
+      "name": "imp",
+      "kind": "tunnel-hostname",
+      "hostname": "imp.geoff.cloud",
+      "scope": "reserved",
+      "reason": "Held for imp's own public MCP route: the /mcp and OAuth paths only, once imp has an OAuth boundary of its own"
+    },
+    {
+      "name": "tailnet-funnel",
+      "kind": "tailnet-capability",
+      "attr": "funnel",
+      "scope": "public",
+      "reason": "Every member device may publish a local port to the internet through Tailscale Funnel; the grant has no recorded reason",
+      "ticket": "GEO-425"
+    },
+    {
+      "name": "health-check-workers-dev",
+      "kind": "worker-url",
+      "script": "health-check",
+      "scope": "closed",
+      "reason": "The health-check Worker runs on its cron only, so its workers.dev subdomain is disabled"
+    }
+  ]
+}
