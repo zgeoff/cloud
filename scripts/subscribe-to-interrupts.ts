@@ -127,16 +127,21 @@ function makeParkingRunner(run: Runner, commands: Readonly<Commands>): Runner {
       forceStop: commands.force.signal,
     });
 
-    commands.active.add(running);
+    const result = await waitForCommand(commands.active, running);
 
-    try {
-      const result = await running;
-
-      return commands.stop.signal.aborted ? parked : result;
-    } finally {
-      commands.active.delete(running);
-    }
+    return commands.stop.signal.aborted ? parked : result;
   };
+}
+
+// holds the command in active until it exits
+async function waitForCommand(active: Set<Promise<RunResult>>, running: Promise<RunResult>) {
+  active.add(running);
+
+  try {
+    return await running;
+  } finally {
+    active.delete(running);
+  }
 }
 
 interface Cleanup {
