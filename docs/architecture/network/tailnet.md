@@ -75,8 +75,8 @@ and mints the host's and impd's auth keys with it.
 Tailscale SSH replaces public SSH to the host. An admin reaches a `tag:cloud` host as root or as any
 non-root user with no browser check, because scripts and agents connect unattended and a check would
 ask for a browser login again on a timer. A member reaches their own devices with the check. The
-host's sshd still runs with keys only, and the cloud firewall keeps its port off the internet
-([firewalls](./firewalls.md)).
+host's sshd runs with keys only, and both the host's own firewall and the cloud firewall keep its
+port off the internet ([firewalls](./firewalls.md)).
 
 Tailscale SSH logs each session's full remote command line in the host's journal, and Alloy ships
 the journal to Loki, so a secret never travels in an SSH command line ([secrets](../secrets.md)).

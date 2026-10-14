@@ -1,5 +1,5 @@
 import type { Output } from '@pulumi/pulumi';
-import { topology } from '@zgeoff/cloud-topology';
+import { exposure } from '@zgeoff/cloud-topology';
 
 interface EdgeRulesInputs {
   // set once the NixOS host answers tailnet SSH: public SSH leaves the edge then
@@ -52,18 +52,41 @@ interface EdgeRule {
   readonly description: string;
 }
 
+// The exposure registry's public host ports, in its order, each as its own edge rule. SSH, a
+// tailnet port in the registry, stays public at the edge only until tailnet SSH works on the
+// NixOS host (#6).
 function buildRules(hostOnTailnet: boolean): readonly EdgeRule[] {
+  const hostPorts = exposure.entries.filter((entry) => entry.kind === 'host-port');
+  const ssh = hostPorts.find((entry) => entry.name === 'ssh');
+
+  if (ssh?.port === undefined) {
+    throw new Error('the exposure registry has no ssh entry with a port');
+  }
+
   return [
-    // SSH stays public until tailnet SSH works on the NixOS host (#6)
     ...(hostOnTailnet
       ? []
-      : [{ name: 'ssh', protocol: 'tcp', port: '22', description: 'SSH, until tailnet SSH (#6)' }]),
-    {
-      name: 'tailscale',
-      protocol: 'udp',
-      port: String(topology.tailnet.directPort),
-      description: 'Tailscale direct connections',
-    },
-    { name: 'icmp', protocol: 'icmp', description: 'ICMP' },
+      : [
+          {
+            name: 'ssh',
+            protocol: ssh.protocol,
+            port: String(ssh.port),
+            description: 'SSH, until tailnet SSH (#6)',
+          },
+        ]),
+
+    // the registry's schema gives every public host port its edge description
+    ...hostPorts.flatMap((entry) =>
+      entry.scope === 'public' && entry.edge !== undefined
+        ? [
+            {
+              name: entry.name,
+              protocol: entry.protocol,
+              ...(entry.port === undefined ? {} : { port: String(entry.port) }),
+              description: entry.edge,
+            },
+          ]
+        : [],
+    ),
   ];
 }

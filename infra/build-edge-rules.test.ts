@@ -59,7 +59,7 @@ test('it opens public SSH, Tailscale and ICMP on both families before the host i
         protocol: 'icmp',
         subnet: '0.0.0.0',
         subnetSize: 0,
-        description: 'ICMP',
+        description: 'ICMP: path MTU discovery and ping',
       },
     },
     {
@@ -69,7 +69,7 @@ test('it opens public SSH, Tailscale and ICMP on both families before the host i
         protocol: 'icmp',
         subnet: '::',
         subnetSize: 0,
-        description: 'ICMP',
+        description: 'ICMP: path MTU discovery and ping',
       },
     },
   ]);
@@ -108,7 +108,7 @@ test('it drops public SSH and keeps Tailscale and ICMP on both families once the
         protocol: 'icmp',
         subnet: '0.0.0.0',
         subnetSize: 0,
-        description: 'ICMP',
+        description: 'ICMP: path MTU discovery and ping',
       },
     },
     {
@@ -118,7 +118,7 @@ test('it drops public SSH and keeps Tailscale and ICMP on both families once the
         protocol: 'icmp',
         subnet: '::',
         subnetSize: 0,
-        description: 'ICMP',
+        description: 'ICMP: path MTU discovery and ping',
       },
     },
   ]);

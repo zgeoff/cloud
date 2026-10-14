@@ -44,6 +44,8 @@ itself, so the tunnel carries traffic and decides nothing about who may make it.
 
 A new public route is the exception in this estate. A service stays on the host or the tailnet
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
-catch-all and a proxied record for its hostname, reviewed in the same preview. `imp.geoff.cloud` is
-held free for imp's own public endpoint, and impd's tailnet names under `imps.geoff.cloud` never
-pass through the tunnel ([imp on the host](../host/imp.md#dns-and-certificates)).
+catch-all and a proxied record for its hostname, reviewed in the same preview. The hostname needs a
+public entry in the [exposure registry](./firewalls.md#the-exposure-registry), and the Pulumi
+program refuses a route to any other hostname. `imp.geoff.cloud` has a reserved entry, held free for
+imp's own public endpoint, and impd's tailnet names under `imps.geoff.cloud` never pass through the
+tunnel ([imp on the host](../host/imp.md#dns-and-certificates)).

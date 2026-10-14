@@ -37,13 +37,18 @@
         ];
       };
 
-      # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config. Every other
+      # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config, and exposure
+      # compares its firewall with the exposure registry (packages/topology/exposure.json). Every other
       # check reads ../test-support/shell (checks/test-utils/build-shell-lib-source.nix), so they
       # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
       # impd-restore-reset tests that rehearsal's own reset
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.exposure = import ./checks/exposure.nix {
+        inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs imp; };
