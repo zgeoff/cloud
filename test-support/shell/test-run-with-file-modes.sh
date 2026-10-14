@@ -18,6 +18,7 @@ it_runs_the_command_with_its_arguments_and_returns_its_exit_status() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
 
+  # shellcheck disable=SC2016 # expanded by the inner bash
   run_with_file_modes env -i PATH=/usr/bin:/bin bash -c 'printf "%s|" "$@"; exit 3' bash 'one two' three \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -52,6 +53,7 @@ it_denies_an_append_to_a_file_without_write_permission() {
   printf '%s\n' 'first line' > "$tree/notes"
   chmod 0444 "$tree/notes"
 
+  # shellcheck disable=SC2016 # expanded by the inner bash
   run_with_file_modes env -i PATH=/usr/bin:/bin bash -c 'echo second line >> "$1"' bash "$tree/notes" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -91,6 +93,7 @@ it_fails_the_write_test_for_a_file_without_write_permission() {
   touch "$tree/device"
   chmod 0400 "$tree/device"
 
+  # shellcheck disable=SC2016 # expanded by the inner bash
   run_with_file_modes env -i PATH=/usr/bin:/bin bash -c '[ -w "$1" ]' bash "$tree/device" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -108,6 +111,7 @@ it_lets_the_command_write_where_the_mode_allows_it() {
   trap 'rm -rf "$tree"' EXIT
   printf '%s\n' 'first line' > "$tree/notes"
 
+  # shellcheck disable=SC2016 # expanded by the inner bash
   run_with_file_modes env -i PATH=/usr/bin:/bin bash -c 'echo second line >> "$1" && echo new > "$2"' bash \
     "$tree/notes" "$tree/created" > "$tree/out" 2> "$tree/err" || status=$?
 
