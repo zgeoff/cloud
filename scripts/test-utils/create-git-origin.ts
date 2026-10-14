@@ -20,7 +20,7 @@ export async function createGitOrigin(dir: string): Promise<GitOrigin> {
   const home = join(dir, 'home');
 
   const env = {
-    PATH: process.env.PATH ?? '/usr/bin:/bin',
+    PATH: process.env['PATH'] ?? '/usr/bin:/bin',
     HOME: home,
     GIT_CONFIG_GLOBAL: '/dev/null',
     GIT_CONFIG_NOSYSTEM: '1',

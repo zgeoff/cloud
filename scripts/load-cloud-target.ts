@@ -3,8 +3,8 @@ import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 
 export interface CloudTarget {
-  readonly image?: string;
-  readonly guestATC?: string;
+  readonly image?: string | undefined;
+  readonly guestATC?: string | undefined;
 }
 
 // Loads the image fields of an atc config's targets.cloud. A config that is missing, is not JSON,

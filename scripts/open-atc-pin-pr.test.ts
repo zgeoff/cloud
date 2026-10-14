@@ -712,7 +712,7 @@ test('it runs through the bash entry point that atc’s release job calls', asyn
 
   const result = await runProcess(['bash', join(import.meta.dir, 'open-atc-pin-pr.sh'), '3.11.0'], {
     cwd: ctx.dir,
-    env: { PATH: process.env.PATH ?? '/usr/bin:/bin', HOME: ctx.dir },
+    env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: ctx.dir },
   });
 
   expect(result).toStrictEqual({

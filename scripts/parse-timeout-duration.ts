@@ -13,8 +13,8 @@ const unitMs: Readonly<Record<string, number>> = {
 // disables the timeout there, so it is refused here instead.
 export function parseTimeoutDuration(text: string, name: string): number {
   const match = /^(?<amount>\d+(?:\.\d+)?)(?<unit>[smhd]?)$/u.exec(text);
-  const amount = Number(match?.groups?.amount ?? 'NaN');
-  const ms = amount * (unitMs[match?.groups?.unit ?? ''] ?? 1000);
+  const amount = Number(match?.groups?.['amount'] ?? 'NaN');
+  const ms = amount * (unitMs[match?.groups?.['unit'] ?? ''] ?? 1000);
 
   if (!(ms > 0)) {
     throw new ExitError(2, `${name} holds '${text}', not a duration such as 45m`);

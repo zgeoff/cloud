@@ -18,7 +18,7 @@ export interface CreateAgentImageOptions extends ScriptIO {
   readonly cwd: string;
 
   // AGENT_IMAGE_BUILD_TIMEOUT, a `timeout` duration, when set
-  readonly buildTimeout?: string;
+  readonly buildTimeout?: string | undefined;
 }
 
 // Builds images/agent for one commit on origin's main as agent-<short sha>, then checks it on a

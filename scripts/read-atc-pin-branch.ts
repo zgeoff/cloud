@@ -34,7 +34,7 @@ export async function readATCPinBranch(
 
   const match = /^ARG ATC_VERSION=(?<version>.*)$/mu.exec(dockerfile.stdout.toString());
 
-  return { lease: head.stdout.toString().trim(), version: match?.groups?.version ?? '' };
+  return { lease: head.stdout.toString().trim(), version: match?.groups?.['version'] ?? '' };
 }
 
 // git ls-remote --exit-code exits 2 when no ref matches

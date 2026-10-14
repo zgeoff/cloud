@@ -7,7 +7,7 @@ import { runProcess } from './run-process.ts';
 process.exitCode = await createAgentImage({
   args: process.argv.slice(2),
   cwd: process.cwd(),
-  buildTimeout: process.env.AGENT_IMAGE_BUILD_TIMEOUT,
+  buildTimeout: process.env['AGENT_IMAGE_BUILD_TIMEOUT'],
   run: runProcess,
   printOut: (text) => {
     process.stdout.write(text);

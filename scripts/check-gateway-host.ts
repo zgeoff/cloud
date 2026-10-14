@@ -38,7 +38,7 @@ async function checkMemory(io: Readonly<HostCheckIO>): Promise<ReadinessLine> {
   const result = await runHostCheck(io, ['free', '-m']);
 
   const match = /^Mem:(?:\s+\d+){5}\s+(?<available>\d+)\s*$/mu.exec(result.stdout.toString());
-  const available = match?.groups?.available;
+  const available = match?.groups?.['available'];
 
   if (result.exitCode === 0 && available !== undefined && Number(available) >= 1024) {
     return { status: 'ok', text: `host has ${available} MiB available (gateway needs 256 MiB)` };

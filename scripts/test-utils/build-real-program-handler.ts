@@ -13,7 +13,10 @@ export function buildRealProgramHandler(
       return;
     }
 
-    const result = await runProcess(call.argv, { ...call.options, env: call.options.env ?? env });
+    const envOf = call.options.env ?? env;
+    const options = envOf === undefined ? call.options : { ...call.options, env: envOf };
+
+    const result = await runProcess(call.argv, options);
 
     return {
       exitCode: result.exitCode,

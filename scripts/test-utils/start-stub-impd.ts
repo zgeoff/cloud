@@ -39,13 +39,13 @@ export function startStubImpd(goodToken: string, health: StubImpdHealth = readyH
   const server = Bun.serve({
     hostname: '127.0.0.1',
     port: 0,
-    fetch: async (request) => {
+    fetch: async (request): Promise<Response> => {
       const url = new URL(request.url);
 
       const authorization = request.headers.get('authorization');
 
       // a proxy request names a whole URL, which Bun hands on as the request's URL
-      const target = url.host === `127.0.0.1:${server.port}` ? url.pathname : request.url;
+      const target: string = url.host === `127.0.0.1:${server.port}` ? url.pathname : request.url;
 
       requests.push({ method: request.method, target, authorization, body: await request.text() });
 
