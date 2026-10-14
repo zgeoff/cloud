@@ -224,8 +224,8 @@ async function renderRestoreJob(job: RestoreJobFile): Promise<string> {
   await formatter.stdin.end();
 
   const [text, error, status] = await Promise.all([
-    formatter.stdout.text(),
-    formatter.stderr.text(),
+    new Response(formatter.stdout).text(),
+    new Response(formatter.stderr).text(),
     formatter.exited,
   ]);
 
