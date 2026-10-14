@@ -155,10 +155,15 @@ test('it stops reading the pipes that a descendant outside its group holds once 
 async function removeDescendant(dir: string, pidFile: string) {
   const text = await readFile(pidFile, 'utf8').catch(() => '');
 
-  try {
-    process.kill(Number(text), 'SIGKILL');
-  } catch {
-    // the descendant has exited, or never started
+  const pid = Number(text);
+
+  // a pid of 0 or below would signal this test's own process group
+  if (Number.isInteger(pid) && pid > 0) {
+    try {
+      process.kill(pid, 'SIGKILL');
+    } catch {
+      // the descendant has exited
+    }
   }
 
   await rm(dir, { recursive: true, force: true });

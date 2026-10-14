@@ -135,14 +135,9 @@ function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>)
     sendSignal(child, 'SIGTERM');
   };
 
-  const onForceStop = async () => {
+  const onForceStop = () => {
     sendSignal(child, 'SIGKILL');
-
-    await child.spawned.exited;
-
-    await Bun.sleep(releaseDelayMs);
-
-    release.abort();
+    void stopReadsAfterExit(child, release);
   };
 
   subscribeToAbort(options.signal, onStop);
@@ -159,8 +154,17 @@ function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>)
   };
 }
 
+// stops the pipe reads once the child has exited and the group's pipes have had time to close
+async function stopReadsAfterExit(child: Readonly<Child>, release: Readonly<AbortController>) {
+  await child.spawned.exited;
+
+  await Bun.sleep(releaseDelayMs);
+
+  release.abort();
+}
+
 // runs listener now when signal has already aborted, and on its abort otherwise
-function subscribeToAbort(signal: AbortSignal | undefined, listener: () => unknown) {
+function subscribeToAbort(signal: AbortSignal | undefined, listener: () => void) {
   if (signal?.aborted === true) {
     listener();
   } else {
