@@ -10,6 +10,11 @@
 # - A port that networking.firewall.interfaces.<name> opens, or that an inet cloud_host admission
 #   narrows, needs a host-scope entry for that interface, and each host-scope entry needs one of
 #   them. An entry that marks an admission needs the admission.
+# - A path counts as open only when both input chains pass it. An admission only passes its
+#   packets on to nixos-fw, so nixos-fw must still accept the port on the admission's interface:
+#   the interface is trusted, or nixos-fw opens the port there or on every interface. And
+#   inet cloud_host drops a TCP port it admits on every other interface, so nixos-fw opening the
+#   port elsewhere opens nothing, and a port open on every interface narrows to the admission.
 # - sshd answers on the trusted tailnet interface whatever the firewall opens, so each of its
 #   ports needs a tailnet-scope or public tcp entry while it runs.
 # - An interface that carries a default route or a static address is public, so a port opened
@@ -64,7 +69,28 @@ let
     ++ map (range: range // { protocol = "udp"; }) lists.allowedUDPPortRanges;
   formatRange = range: "${range.protocol} ${toString range.from}-${toString range.to}";
 
-  publicPorts = toOpenPorts firewall;
+  isTCPPortIn =
+    lists: port:
+    lib.elem port lists.allowedTCPPorts
+    || lib.any (range: range.from <= port && port <= range.to) lists.allowedTCPPortRanges;
+  # nixos-fw's input chain: a trusted interface (lo always is) passes every port
+  isAcceptedByNixosFw =
+    interface: port:
+    lib.elem interface firewall.trustedInterfaces
+    || isTCPPortIn firewall port
+    || (firewall.interfaces ? ${interface} && isTCPPortIn firewall.interfaces.${interface} port);
+  findAdmission = port: lib.findFirst (admission: admission.port == port) null admissions;
+  # inet cloud_host's input chain: it drops a TCP port it admits on every other interface
+  isPassedByCloudHost =
+    interface: protocol: port:
+    let
+      admission = findAdmission port;
+    in
+    protocol != "tcp" || admission == null || admission.interface == interface;
+
+  publicPorts = lib.filter (open: open.protocol != "tcp" || findAdmission open.port == null) (
+    toOpenPorts firewall
+  );
 
   publicPortMismatches = lib.concatMap (
     open:
@@ -123,7 +149,10 @@ let
       name: lists: map (open: open // { interface = name; }) (toOpenPorts lists)
     ) firewall.interfaces
   );
-  publicInterfacePorts = lib.filter (open: isPublicInterface open.interface) interfacePorts;
+  openInterfacePorts = lib.filter (
+    open: isPassedByCloudHost open.interface open.protocol open.port
+  ) interfacePorts;
+  publicInterfacePorts = lib.filter (open: isPublicInterface open.interface) openInterfacePorts;
   findHostEntry =
     interface: protocol: port:
     lib.findFirst (entry: entry.interface == interface && isPort protocol port entry) null hostEntries;
@@ -148,7 +177,7 @@ let
       ]
     else
       [ ]
-  ) interfacePorts;
+  ) openInterfacePorts;
 
   admissionMismatches = lib.concatMap (
     admission:
@@ -173,11 +202,21 @@ let
     let
       isEntryPath =
         candidate: candidate.interface == entry.interface && isPort entry.protocol entry.port candidate;
-      opened = lib.any isEntryPath interfacePorts;
+      opened = lib.any isEntryPath openInterfacePorts;
+      dropped = lib.any isEntryPath interfacePorts;
       admitted = lib.any (admission: isEntryPath (admission // { protocol = "tcp"; })) admissions;
+      accepted = admitted && isAcceptedByNixosFw entry.interface entry.port;
+      port = formatEntryPort entry;
+      prefix = "the registry's ${entry.name} entry is host scope on ${entry.interface}";
     in
-    lib.optional (!opened && !admitted)
-      "the registry's ${entry.name} entry is host scope on ${entry.interface}, but nothing opens or admits ${formatEntryPort entry} there"
+    lib.optional (!opened && !accepted) (
+      if admitted then
+        "${prefix}, and inet cloud_host admits ${port} there, but nixos-fw drops it: ${entry.interface} is not trusted, and nixos-fw opens ${port} neither there nor on every interface"
+      else if dropped then
+        "${prefix}, and nixos-fw opens ${port} there, but inet cloud_host drops it: its admission for ${port} is on ${(findAdmission entry.port).interface}"
+      else
+        "${prefix}, but nothing opens or admits ${port} there"
+    )
     ++
       lib.optional ((entry.admission or false) && !admitted)
         "the registry's ${entry.name} entry marks an admission, but inet cloud_host admits no ${formatEntryPort entry} on ${entry.interface}"
