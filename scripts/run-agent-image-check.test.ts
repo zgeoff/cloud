@@ -28,7 +28,7 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
   const printErr = mock<(text: string) => void>();
 
   const passed = await runAgentImageCheck(
-    { run: stub.run, printOut: () => {}, printErr },
+    { run: stub.run, printOut: () => {}, printErr, registerCleanup: () => () => {} },
     { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
   );
 
@@ -53,13 +53,61 @@ test('it reports a failed check after it removes the imp', async () => {
   const stub = buildStubRunner(imp.handler, buildStubCheckAgentImage(3));
 
   const passed = await runAgentImageCheck(
-    { run: stub.run, printOut: () => {}, printErr: () => {} },
+    { run: stub.run, printOut: () => {}, printErr: () => {}, registerCleanup: () => () => {} },
     { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
   );
 
   expect(passed).toBe(false);
   expect(stub.calls[1]?.argv[0]).toBe('bash');
   expect(imp.imps).toStrictEqual([]);
+});
+
+test('it leaves the imp’s removal to an interrupt from imp new on, and drops that step after', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.src, 'scripts/check-agent-image.ts'), '');
+
+  // each registered step, bound to a runner that records what an interrupt would run
+  const steps = new Set<() => unknown>();
+
+  const interrupt = buildStubRunner(() => ({}));
+  const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
+
+  const stub = buildStubRunner(
+    async (call) => {
+      if (call.argv[1] === 'new') {
+        await Promise.all([...steps].map((step) => step()));
+      }
+    },
+    imp.handler,
+    buildStubCheckAgentImage(0),
+  );
+
+  const passed = await runAgentImageCheck(
+    {
+      run: stub.run,
+      printOut: () => {},
+      printErr: () => {},
+      registerCleanup: (step) => {
+        const runStep = () => step({ run: interrupt.run, printOut() {}, printErr() {} });
+
+        steps.add(runStep);
+
+        return () => {
+          steps.delete(runStep);
+        };
+      },
+    },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+  );
+
+  expect(passed).toBe(true);
+
+  expect(interrupt.calls.map((call) => call.argv)).toStrictEqual([
+    ['imp', 'rm', 'agent-check-abc1234'],
+  ]);
+
+  expect(steps.size).toBe(0);
 });
 
 test('it reports a check that outlives its timeout as failed', async () => {
@@ -71,7 +119,7 @@ test('it reports a check that outlives its timeout as failed', async () => {
   const stub = buildStubRunner(imp.handler, () => ({ exitCode: 0, timedOut: true }));
 
   const passed = await runAgentImageCheck(
-    { run: stub.run, printOut: () => {}, printErr: () => {} },
+    { run: stub.run, printOut: () => {}, printErr: () => {}, registerCleanup: () => () => {} },
     { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
   );
 

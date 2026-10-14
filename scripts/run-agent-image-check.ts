@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
+import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
 
 export interface AgentImageCheck {
   readonly image: string;
@@ -21,9 +22,21 @@ const checkTimeoutMs = 1_800_000;
 // output on to stderr. Returns whether the check passed. A commit from before the check moved to
 // Bun has only check-agent-image.sh.
 export async function runAgentImageCheck(
-  io: Readonly<ScriptIO>,
+  io: Readonly<InterruptibleIO>,
   target: Readonly<AgentImageCheck>,
 ): Promise<boolean> {
+  // registered before `imp new`, since impd can create the imp after an interrupt stops the CLI,
+  // and the caller found its name free
+  const dropCleanup = io.registerCleanup((cleanupIO) => removeCheckImp(cleanupIO, target.check));
+
+  try {
+    return await runCheckOnImp(io, target);
+  } finally {
+    dropCleanup();
+  }
+}
+
+async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImageCheck>) {
   const created = await runOrExit(io, ['imp', 'new', target.check, '--image', target.image]);
 
   printErrText(io, created.stdout.toString());
@@ -38,11 +51,15 @@ export async function runAgentImageCheck(
 
   printErrText(io, `${result.stdout.toString()}${result.stderr.toString()}`);
 
-  const removed = await runOrExit(io, ['imp', 'rm', target.check]);
-
-  printErrText(io, removed.stdout.toString());
+  await removeCheckImp(io, target.check);
 
   return result.exitCode === 0 && !result.timedOut;
+}
+
+async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {
+  const removed = await runOrExit(io, ['imp', 'rm', check]);
+
+  printErrText(io, removed.stdout.toString());
 }
 
 function printErrText(io: Readonly<ScriptIO>, text: string) {

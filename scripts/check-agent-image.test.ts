@@ -72,6 +72,7 @@ test('it runs the checks in a docker container with the check directory mounted,
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const [, run] = stub.calls;
@@ -122,6 +123,7 @@ test('it copies the check directory into the imp, then runs the checks there', a
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const dir = stub.calls[1]?.argv[2] ?? '';
@@ -160,6 +162,7 @@ test('it removes its work directory and stops when the copy into the imp fails',
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   const work = dirname(stub.calls[1]?.argv[2] ?? '');
@@ -169,6 +172,61 @@ test('it removes its work directory and stops when the copy into the imp fails',
   expect(work).toStartWith(join(tmpdir(), 'agent-image-check-'));
   expect(existsSync(work)).toBe(false);
   expect(ctx.err).toStrictEqual(['imp: no such imp\n']);
+});
+
+test('it leaves its work directory to an interrupt while the checks run, and drops that step after', async () => {
+  const ctx = await setupTest();
+  const sum = await startStubGitleaksRelease('8.30.1', 'fake gitleaks\n');
+
+  await writeFile(
+    join(ctx.repo, 'images/agent/Dockerfile'),
+    `ARG GITLEAKS_VERSION=8.30.1\nARG GITLEAKS_SHA256=${sum}\n`,
+  );
+
+  // each registered step, bound to a runner, as an interrupt would run it
+  const steps = new Set<() => unknown>();
+
+  const removedByInterrupt: boolean[] = [];
+  const copied: string[] = [];
+  const guest = buildStubAgentImageGuest({ guest: { stdout: '== 0 failed\n' } });
+
+  // runs the registered steps while the guest runs, then lets the guest answer
+  const stub = buildStubRunner(
+    buildRealProgramHandler(['tar']),
+    async (call) => {
+      if (call.argv[1] === 'cp') {
+        copied.push(dirname(call.argv[2] ?? ''));
+      }
+
+      if (call.argv[1] === 'exec') {
+        await Promise.all([...steps].map((step) => step()));
+
+        removedByInterrupt.push(!existsSync(copied[0] ?? ''));
+      }
+    },
+    guest.handler,
+  );
+
+  const exitCode = await checkAgentImage({
+    args: ['--imp', 'agent-check'],
+    repo: ctx.repo,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+    registerCleanup: (step) => {
+      const runStep = () => step({ run: buildStubRunner().run, printOut() {}, printErr() {} });
+
+      steps.add(runStep);
+
+      return () => {
+        steps.delete(runStep);
+      };
+    },
+  });
+
+  expect(exitCode).toBe(0);
+  expect(removedByInterrupt).toStrictEqual([true]);
+  expect(steps.size).toBe(0);
 });
 
 test.each([
@@ -187,6 +245,7 @@ test.each([
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    registerCleanup: () => () => {},
   });
 
   expect(exitCode).toBe(2);

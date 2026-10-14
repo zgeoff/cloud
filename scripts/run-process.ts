@@ -10,6 +10,9 @@ export interface RunOptions {
 
   // the child gets SIGTERM after this long, as `timeout` sends it
   readonly timeoutMs?: number;
+
+  // the child gets SIGTERM when this aborts, which no timeout reports
+  readonly signal?: AbortSignal;
   readonly cwd?: string;
 
   // the child's whole environment; without it, the child inherits this process's
@@ -79,6 +82,7 @@ function trySpawn(argv: readonly string[], options: Readonly<RunOptions>) {
       stdout: 'pipe',
       stderr: 'pipe',
       ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+      ...(options.signal === undefined ? {} : { signal: options.signal }),
       ...(options.env === undefined ? {} : { env: { ...options.env } }),
     });
   } catch (error) {
