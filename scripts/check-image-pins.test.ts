@@ -128,11 +128,11 @@ test("it takes an anonymous pull token from the registry's Bearer challenge", as
 
   await writeFile(
     join(ctx.root, 'scripts', 'nix-image.sh'),
-    `NIX_IMAGE='nixos/nix:2.30.0@sha256:${'4'.repeat(64)}'\n`,
+    `NIX_IMAGE='example/builder:2.30.0@sha256:${'4'.repeat(64)}'\n`,
   );
 
   server.use(
-    http.head('https://registry-1.docker.io/v2/nixos/nix/manifests/2.30.0', (info) =>
+    http.head('https://registry-1.docker.io/v2/example/builder/manifests/2.30.0', (info) =>
       info.request.headers.get('authorization') === 'Bearer pull-token-7'
         ? new HttpResponse(null, {
             status: 200,
@@ -142,7 +142,7 @@ test("it takes an anonymous pull token from the registry's Bearer challenge", as
             status: 401,
             headers: {
               'www-authenticate':
-                'Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:nixos/nix:pull"',
+                'Bearer realm="https://auth.docker.io/token",service="registry.docker.io",scope="repository:example/builder:pull"',
             },
           }),
     ),
@@ -150,7 +150,7 @@ test("it takes an anonymous pull token from the registry's Bearer challenge", as
       const query = new URL(info.request.url).searchParams;
 
       return query.get('service') === 'registry.docker.io' &&
-        query.get('scope') === 'repository:nixos/nix:pull'
+        query.get('scope') === 'repository:example/builder:pull'
         ? HttpResponse.json({ token: 'pull-token-7', access_token: 'pull-token-7' })
         : HttpResponse.json({ errors: [{ code: 'DENIED' }] }, { status: 403 });
     }),

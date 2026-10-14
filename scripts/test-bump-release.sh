@@ -82,8 +82,8 @@ https://github.com/zgeoff/cloud/pull/200
 EOF
   diff /dev/null "$tree/err"
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" diff --stat=200 main release-check/atc) << 'EOF'
- images/atc-gateway/versions.env | 6 +++---
  images/agent/Dockerfile         | 4 ++--
+ images/atc-gateway/versions.env | 6 +++---
  nixos/packages/atc.nix          | 4 ++--
  3 files changed, 7 insertions(+), 7 deletions(-)
 EOF

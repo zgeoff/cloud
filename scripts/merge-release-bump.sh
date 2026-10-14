@@ -42,8 +42,8 @@ repo=zgeoff/cloud
 
 case "$branch" in
   release-check/atc)
-    allowed='images/atc-gateway/versions.env
-images/agent/Dockerfile
+    allowed='images/agent/Dockerfile
+images/atc-gateway/versions.env
 nixos/packages/atc.nix'
     ;;
   release-check/imp)
