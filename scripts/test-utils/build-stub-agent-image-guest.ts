@@ -2,13 +2,13 @@ import { readdir } from 'node:fs/promises';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
 // Stands in for the agent image that check-agent-image.ts runs its checks in: `docker run` with the
-// check directory mounted, or `imp cp` of it and then `imp exec`. It lists the directory when the
+// check directory mounted, or `impz cp` of it and then `impz exec`. It lists the directory when the
 // image receives it, since the check removes it after the run.
 export interface StubAgentImageGuestScenario {
   // the guest's result for the `bash -s` run
   readonly guest: StubAnswer;
 
-  // the result of `imp cp`; the copy succeeds silently when absent
+  // the result of `impz cp`; the copy succeeds silently when absent
   readonly copy?: StubAnswer;
 }
 
@@ -40,7 +40,7 @@ export function buildStubAgentImageGuest(
   };
 }
 
-// the host side of `-v <dir>:/run/agent-image-check:ro`, or the source of `imp cp`
+// the host side of `-v <dir>:/run/agent-image-check:ro`, or the source of `impz cp`
 function findCheckDir(call: StubCall) {
   const [program, verb, source] = call.argv;
 
@@ -48,18 +48,18 @@ function findCheckDir(call: StubCall) {
     return call.argv[5]?.replace(/:\/run\/agent-image-check:ro$/u, '');
   }
 
-  return program === 'imp' && verb === 'cp' ? source : undefined;
+  return program === 'impz' && verb === 'cp' ? source : undefined;
 }
 
 function buildAnswer(scenario: Readonly<StubAgentImageGuestScenario>, call: StubCall) {
   const [program, verb] = call.argv;
 
-  if (program === 'imp' && verb === 'cp') {
+  if (program === 'impz' && verb === 'cp') {
     return scenario.copy ?? {};
   }
 
   const isGuest =
-    (program === 'docker' && verb === 'run') || (program === 'imp' && verb === 'exec');
+    (program === 'docker' && verb === 'run') || (program === 'impz' && verb === 'exec');
 
   return isGuest ? scenario.guest : undefined;
 }

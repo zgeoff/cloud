@@ -1,4 +1,4 @@
-// An impd secret as `imp secret ls --json` prints it, after imp 1.0.0's SecretSchema
+// An impd secret as `impz secret ls --json` prints it, after imp 1.0.0's SecretSchema
 // (packages/api/src/secret-schema.ts): the glm secret that install-atc-gateway-credentials adds,
 // by default. Its values are fixed: the script compares them, so none is arbitrary.
 export interface MockImpSecret {

@@ -35,9 +35,9 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
   expect(passed).toBe(true);
 
   expect(stub.calls.map((call) => call.argv)).toStrictEqual([
-    ['imp', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234'],
+    ['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234'],
     ['bun', join(ctx.src, 'scripts/check-agent-image.ts'), '--imp', 'agent-check-abc1234'],
-    ['imp', 'rm', 'agent-check-abc1234'],
+    ['impz', 'rm', 'agent-check-abc1234'],
   ]);
 
   expect(stub.calls[1]?.options).toStrictEqual({ cwd: ctx.work, timeoutMs: 1_800_000 });
@@ -62,7 +62,7 @@ test('it reports a failed check after it removes the imp', async () => {
   expect(imp.imps).toStrictEqual([]);
 });
 
-test('it leaves the imp’s removal to an interrupt from imp new on, and drops that step after', async () => {
+test('it leaves the imp’s removal to an interrupt from impz new on, and drops that step after', async () => {
   const ctx = await setupTest();
 
   await writeFile(join(ctx.src, 'scripts/check-agent-image.ts'), '');
@@ -104,7 +104,7 @@ test('it leaves the imp’s removal to an interrupt from imp new on, and drops t
   expect(passed).toBe(true);
 
   expect(interrupt.calls.map((call) => call.argv)).toStrictEqual([
-    ['imp', 'rm', 'agent-check-abc1234'],
+    ['impz', 'rm', 'agent-check-abc1234'],
   ]);
 
   expect(steps.size).toBe(0);

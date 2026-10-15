@@ -2,7 +2,7 @@
 # It holds binaries only: no configuration, no login state and no secret. atc
 # sets those up per session at launch. Build it on the imp host, from a clean
 # checkout of the zgeoff/cloud commit on main that the image records:
-#   imp image build images/agent --name "agent-$(git rev-parse --short HEAD)"
+#   impz image build images/agent --name "agent-$(git rev-parse --short HEAD)"
 # docs/runbooks/agent-image.md covers the build, an update and a rollback.
 #
 # Every pin below is a reviewed change. The image name carries the commit, so
@@ -10,7 +10,7 @@
 # rollback.
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
-#   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/imp
+#   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
 FROM ghcr.io/zgeoff/imp-base:2.0.3@sha256:2c199f2491b1036b5a16e59a75bd523d3d334cc2133920fda6a0e828d6c2e154
 
 ARG DEBIAN_FRONTEND=noninteractive

@@ -50,12 +50,12 @@ test('it stops with 124 when a command times out, as timeout exits', () => {
   expect(
     runOrExit(
       { run: stub.run, printOut: () => {}, printErr: () => {} },
-      ['imp', 'image', 'build'],
+      ['impz', 'image', 'build'],
       {
         timeoutMs: 1000,
       },
     ),
-  ).rejects.toStrictEqual(new ExitError(124, 'imp timed out'));
+  ).rejects.toStrictEqual(new ExitError(124, 'impz timed out'));
 });
 
 test('it hands the stdin and the timeout to the runner', async () => {

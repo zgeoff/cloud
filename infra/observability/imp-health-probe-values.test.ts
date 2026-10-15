@@ -28,7 +28,7 @@ test("it probes imp's /health over verified TLS every 30s, failing unless the bo
 });
 
 // impd's /health body as its daemon serves it: `{ status: 'ok', ready: deps.isReady() }`
-// as JSON (zgeoff/imp packages/daemon/src/build-app.ts at 51df459d)
+// as JSON (zgeoff/impz packages/daemon/src/build-app.ts at 51df459d)
 test.each([
   ['{"status":"ok","ready":true}', true],
   ['{"status":"ok","ready":false}', false],

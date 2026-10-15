@@ -5,7 +5,7 @@ single-node k3s cluster and imp, and that joins the owner's tailnet as its priva
 cloud resource is declared in one Pulumi program, and the host itself is one NixOS flake, so this
 repo holds the whole estate and a change to it is a reviewed PR before it is a live change. The
 first workload is an agent platform: [atc](https://github.com/zgeoff/atc) manages agent sessions,
-and [imp](https://github.com/zgeoff/imp) runs each one in a Firecracker microVM. The one public
+and [imp](https://github.com/zgeoff/impz) runs each one in a Firecracker microVM. The one public
 entry point is atc's MCP endpoint, which an assistant such as ChatGPT reaches through a Cloudflare
 tunnel. Everything else stays on the host or on the tailnet.
 

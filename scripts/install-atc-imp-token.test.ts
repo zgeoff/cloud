@@ -132,7 +132,7 @@ test.each([
       exitCode: 1,
       message: `/var/lib/atc-daemon-secrets/imp-token does not authenticate to impd as the token atc-cloud (empty, more
 than one line, stale or another token). impd shows a token once, so remove
-/var/lib/atc-daemon-secrets/imp-token and run 'imp token rm atc-cloud' in imp-host, then rerun to mint
+/var/lib/atc-daemon-secrets/imp-token and run 'impz token rm atc-cloud' in imp-host, then rerun to mint
 a new one`,
     });
   },
@@ -256,7 +256,7 @@ test.each([
       installATCImpToken(ctx.context, { secrets: [], tokens, hasItem: false, hostFiles }),
     ).rejects.toMatchObject({
       exitCode: 1,
-      message: `only one exists (token: ${tokens.length > 0}, host file: ${hostFiles.length > 0}). impd shows a token once,\nso run 'imp token rm atc-cloud' in imp-host and remove /var/lib/atc-daemon-secrets/imp-token, then rerun`,
+      message: `only one exists (token: ${tokens.length > 0}, host file: ${hostFiles.length > 0}). impd shows a token once,\nso run 'impz token rm atc-cloud' in imp-host and remove /var/lib/atc-daemon-secrets/imp-token, then rerun`,
     });
 
     expect(tools.calls).toStrictEqual([]);
@@ -299,7 +299,7 @@ test('it mints atc-cloud on the host with the mint script on stdin when neither 
 
 test.each([
   ['the mint prints more than one line', { minted: 'imp_fixture_minted_token\nsecond line\n' }],
-  ['imp token new fails', { mintError: 'imp: CONFLICT: token atc-cloud exists' }],
+  ['impz token new fails', { mintError: 'imp: CONFLICT: token atc-cloud exists' }],
 ])('it saves no token when %s', async (_label: string, fault: object) => {
   const tools = buildStubCredentialTools({
     op: { vaults: {} },

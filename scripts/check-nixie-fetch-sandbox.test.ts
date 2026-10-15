@@ -40,9 +40,9 @@ test('it reads a public page from the sandbox, finds every internal address bloc
   expect(host.sandboxes).toBeEmpty();
 
   expect(
-    host.commands.filter((command) => command.startsWith('docker exec imp-host imp new')),
+    host.commands.filter((command) => command.startsWith('docker exec imp-host impz new')),
   ).toStrictEqual([
-    'docker exec imp-host imp new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'docker exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
   ]);
 
   expect(printOut.mock.calls).toStrictEqual([
@@ -130,7 +130,7 @@ test('it fails when a sandbox probe exits with a status that proves no block, su
     runRemote: async (command: string) => {
       const result = await host.runRemote(command);
 
-      return command.includes('imp exec')
+      return command.includes('impz exec')
         ? { ...result, stdout: result.stdout.replace('probe-exit:124', 'probe-exit:127') }
         : result;
     },
@@ -273,7 +273,7 @@ test('it creates no sandbox when a target does not answer the host', async () =>
   ]);
 });
 
-test('it stops when impd cannot create the sandbox, and names it for imp ls', async () => {
+test('it stops when impd cannot create the sandbox, and names it for impz ls', async () => {
   const host = buildStubGeoffcloud({
     manifest:
       '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
@@ -306,12 +306,12 @@ test('it stops when impd cannot create the sandbox, and names it for imp ls', as
   expect(exitCode).toBe(1);
 
   expect(host.commands.filter((command) => command.startsWith('docker'))).toStrictEqual([
-    'docker exec imp-host imp new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'docker exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
   ]);
 
   expect(printErr.mock.calls).toStrictEqual([
     [
-      'check-nixie-fetch-sandbox: cannot create sandbox fetch-check-1a2b3c4d: imp: no image by that name; look for it with imp ls\n',
+      'check-nixie-fetch-sandbox: cannot create sandbox fetch-check-1a2b3c4d: imp: no image by that name; look for it with impz ls\n',
     ],
   ]);
 });

@@ -131,8 +131,8 @@ test('it copies the check directory into the imp, then runs the checks there', a
   expect(exitCode).toBe(0);
 
   expect(stub.calls.slice(1).map((call) => call.argv)).toStrictEqual([
-    ['imp', 'cp', dir, 'agent-check:/run/agent-image-check'],
-    ['imp', 'exec', 'agent-check', '--', 'bash', '-s'],
+    ['impz', 'cp', dir, 'agent-check:/run/agent-image-check'],
+    ['impz', 'exec', 'agent-check', '--', 'bash', '-s'],
   ]);
 
   expect(stub.calls[2]?.stdin).toBe(`GITLEAKS_VERSION='8.30.1'\ncheck_mode='imp'\n${ctx.body}`);

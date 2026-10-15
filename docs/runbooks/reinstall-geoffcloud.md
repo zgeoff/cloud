@@ -101,7 +101,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 6. Remove the staged key: `rm -rf /tmp/geoffcloud-extra`.
 7. Check the host over the tailnet: `ssh root@geoffcloud`, then `zpool status`,
    `zfs get -H -o value keystatus tank/cloud` (expect `available`), `k3s kubectl get nodes`,
-   `tailscale status` and `imp status`.
+   `tailscale status` and `impz status`.
 
    **NOTE:** The installed host keeps port 22 shut on its public interface, whatever the edge
    allows, so the tailnet is its only SSH path. If the host does not join the tailnet, reach it

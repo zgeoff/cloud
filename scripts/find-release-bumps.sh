@@ -10,7 +10,7 @@
 # | Dependency | Newest release                    | Pins, in order                                                   |
 # | ---------- | --------------------------------- | ---------------------------------------------------------------- |
 # | atc        | zgeoff/atc `@zgeoff/atc@X`        | agent image, host daemon (nixos/packages/atc.nix), versions.env  |
-# | imp        | zgeoff/imp `vX`                   | imp-host (configuration.nix), imp-base (images/agent/Dockerfile) |
+# | imp        | zgeoff/impz `vX`                  | imp-host (configuration.nix), imp-base (images/agent/Dockerfile) |
 # | nixie      | zgeoff/nixie `vX`                 | nixie, nixie-web (infra/Pulumi.prod.yaml)                        |
 # | auto-mode  | zgeoff/auto-mode `auto-mode-vX`   | agent image (images/agent/Dockerfile)                            |
 #
@@ -69,7 +69,7 @@ nixie_web="$(read_pin infra/Pulumi.prod.yaml "^ +webImage: ghcr\\.io/zgeoff/nixi
 auto_mode="$(read_pin images/agent/Dockerfile "^ARG AUTO_MODE_VERSION=$version\$")"
 
 atc="$(read_newest atc @zgeoff/atc@)"
-imp="$(read_newest imp v)"
+imp="$(read_newest impz v)"
 nixie_newest="$(read_newest nixie v)"
 auto_mode_newest="$(read_newest auto-mode auto-mode-v)"
 

@@ -95,7 +95,7 @@ write() {
 
 host_pattern='^    image = "ghcr\.io/zgeoff/imp-host:([^@"]+)@(sha256:[0-9a-f]{64})";$'
 base_pattern='^FROM ghcr\.io/zgeoff/imp-base:([^@ ]+)@(sha256:[0-9a-f]{64})$'
-input_pattern='^      url = "github:zgeoff/imp/([0-9a-f]+)";$'
+input_pattern='^      url = "github:zgeoff/impz/([0-9a-f]+)";$'
 host_pin="$(read_pin "$config" "$host_pattern")"
 base_pin="$(read_pin "$dockerfile" "$base_pattern")"
 count="$(grep -cE "$input_pattern" "$flake" || true)"
@@ -110,7 +110,7 @@ if needs_pin imp-host "$host_digest" "$host_pin"; then pin_host=true; fi
 if needs_pin imp-base "$base_digest" "$base_pin"; then pin_base=true; fi
 
 if [ "$pin_host" = true ]; then
-  write "$flake" "s|^(      url = \"github:zgeoff/imp/)[0-9a-f]+(\";)\$|\\1${commit:0:8}\\2|"
+  write "$flake" "s|^(      url = \"github:zgeoff/impz/)[0-9a-f]+(\";)\$|\\1${commit:0:8}\\2|"
   # shellcheck source-path=SCRIPTDIR source=nix-image.sh
   source "$here/nix-image.sh"
   # the lock resolves the short commit through api.github.com, whose anonymous quota a shared

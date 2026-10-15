@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for the imp CLI calls that build-agent-image.ts and switch-agent-image.ts make, over
+// Stands in for the impz CLI calls that build-agent-image.ts and switch-agent-image.ts make, over
 // the host's images and imps. `image ls --json` prints the fields of the real output they read.
 interface StubImpImage {
   readonly name: string;
@@ -47,7 +47,7 @@ export function buildStubImp(scenario: Readonly<StubImpScenario>): StubImp {
   };
 
   return {
-    handler: (call) => (call.argv[0] === 'imp' ? buildImpAnswer(state, call) : undefined),
+    handler: (call) => (call.argv[0] === 'impz' ? buildImpAnswer(state, call) : undefined),
     images: state.images,
     imps: state.imps,
     builtDockerfiles: state.builtDockerfiles,
@@ -66,7 +66,7 @@ type ImpCommand = (
   args: readonly string[],
 ) => StubAnswer | Promise<StubAnswer>;
 
-// each command's argv after `imp`, with `*` for one argument of any value
+// each command's argv after `impz`, with `*` for one argument of any value
 const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ['image ls --json', buildImageList],
   ['image build * --name *', (state, args) => runBuild(state, args[2] ?? '', args[4] ?? '')],

@@ -17,7 +17,7 @@ test('it lists each image with the name, ref and digest the scripts read', async
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'image', 'ls', '--json']);
+  const result = await stub.run(['impz', 'image', 'ls', '--json']);
 
   expect(result.stdout.toString()).toBe(
     '[{"name":"agent-abc1234","ref":"imp/agent-abc1234:latest","digest":"imp-build-2"}]\n',
@@ -32,7 +32,7 @@ test('it builds an image from a folder and reads the folder’s Dockerfile when 
 
   await writeFile(join(ctx.dir, 'Dockerfile'), 'FROM ghcr.io/zgeoff/imp-base:0.33.0\n');
 
-  const result = await stub.run(['imp', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(0);
 
@@ -51,7 +51,7 @@ test('it fails a build with the scenario’s error and adds no image', async () 
 
   await writeFile(join(ctx.dir, 'Dockerfile'), 'FROM scratch\n');
 
-  const result = await stub.run(['imp', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
 
   expect(result).toStrictEqual({
     exitCode: 1,
@@ -71,7 +71,7 @@ test('it answers a build that outlives its timeout as the runner does, and adds 
 
   await writeFile(join(ctx.dir, 'Dockerfile'), 'FROM scratch\n');
 
-  const result = await stub.run(['imp', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
 
   expect(result).toStrictEqual({
     exitCode: 143,
@@ -87,7 +87,7 @@ test('it removes an image no imp uses', async () => {
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'image', 'rm', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'image', 'rm', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(0);
   expect(imp.images).toStrictEqual([]);
@@ -97,7 +97,7 @@ test('it refuses to remove a missing image', async () => {
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'image', 'rm', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'image', 'rm', 'agent-abc1234']);
 
   expect(result).toStrictEqual({
     exitCode: 1,
@@ -115,7 +115,7 @@ test('it refuses to remove an image an imp uses', async () => {
 
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'image', 'rm', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'image', 'rm', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('imp: CONFLICT: image agent-abc1234 is in use\n');
@@ -126,7 +126,7 @@ test('it creates an imp on an image and prints its name', async () => {
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
 
   expect(result.stdout.toString()).toBe('agent-check-abc1234\n');
   expect(imp.imps).toStrictEqual([{ name: 'agent-check-abc1234', image: 'agent-abc1234' }]);
@@ -136,7 +136,7 @@ test('it refuses an imp on a missing image', async () => {
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('imp: NOT_FOUND: image agent-abc1234 not found\n');
@@ -151,7 +151,7 @@ test('it refuses an imp under a taken name', async () => {
 
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+  const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('imp: CONFLICT: imp agent-check-abc1234 already exists\n');
@@ -165,7 +165,7 @@ test('it lists the imps', async () => {
 
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'ls', '--json']);
+  const result = await stub.run(['impz', 'ls', '--json']);
 
   expect(result.stdout.toString()).toBe(
     '[{"name":"agent-check-abc1234","image":"agent-abc1234"}]\n',
@@ -180,7 +180,7 @@ test('it removes an imp', async () => {
 
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'rm', 'agent-check-abc1234']);
+  const result = await stub.run(['impz', 'rm', 'agent-check-abc1234']);
 
   expect(result.exitCode).toBe(0);
   expect(imp.imps).toStrictEqual([]);
@@ -190,7 +190,7 @@ test('it refuses to remove a missing imp', async () => {
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(imp.handler);
 
-  const result = await stub.run(['imp', 'rm', 'agent-check-abc1234']);
+  const result = await stub.run(['impz', 'rm', 'agent-check-abc1234']);
 
   expect(result.exitCode).toBe(1);
   expect(result.stderr.toString()).toBe('imp: NOT_FOUND: imp agent-check-abc1234 not found\n');
@@ -200,13 +200,13 @@ test('it fails closed with exit 97 on any other imp call, and leaves other progr
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(imp.handler);
 
-  const unknown = await stub.run(['imp', 'image', 'ls']);
+  const unknown = await stub.run(['impz', 'image', 'ls']);
   const other = await stub.run(['git', 'status']);
 
   expect(unknown).toStrictEqual({
     exitCode: 97,
     stdout: Buffer.from(''),
-    stderr: Buffer.from('unexpected: ["imp","image","ls"]\n'),
+    stderr: Buffer.from('unexpected: ["impz","image","ls"]\n'),
     timedOut: false,
   });
 

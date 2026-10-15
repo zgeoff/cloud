@@ -42,8 +42,8 @@ case "$dependency" in
     ;;
   imp)
     names=("imp's NixOS module and the imp-host image (\`nixos/\`)" "the imp-base image (\`images/agent/Dockerfile\`)")
-    url="https://github.com/zgeoff/imp/releases/tag/v$version"
-    commit="$(gh api "repos/zgeoff/imp/commits/v$version" --jq .sha)"
+    url="https://github.com/zgeoff/impz/releases/tag/v$version"
+    commit="$(gh api "repos/zgeoff/impz/commits/v$version" --jq .sha)"
     digests=()
     for image in imp-host imp-base; do
       docker buildx imagetools inspect "ghcr.io/zgeoff/$image:$version" --format '{{json .Manifest}}' > "$work/$image.json"

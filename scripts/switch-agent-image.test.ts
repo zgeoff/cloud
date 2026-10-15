@@ -77,7 +77,7 @@ test('it backs up the config, then points the cloud target at the image and keep
 
   expect(configInfo.mode & 0o777).toBe(0o600);
   expect(backupInfo.mode & 0o777).toBe(0o600);
-  expect(stub.calls.map((call) => call.argv)).toStrictEqual([['imp', 'image', 'ls', '--json']]);
+  expect(stub.calls.map((call) => call.argv)).toStrictEqual([['impz', 'image', 'ls', '--json']]);
 });
 
 test('it switches the config in its home by default', async () => {

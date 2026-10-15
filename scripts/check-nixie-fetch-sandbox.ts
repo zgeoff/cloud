@@ -168,9 +168,9 @@ function printProbes(
   }
 }
 
-const impCommand = 'docker exec imp-host imp';
+const impCommand = 'docker exec imp-host impz';
 
-// A failed create can still leave the imp, so the error names it for imp ls
+// A failed create can still leave the imp, so the error names it for impz ls
 async function createSandbox(
   options: Readonly<CheckFetchSandboxOptions>,
   image: string,
@@ -181,7 +181,7 @@ async function createSandbox(
 
   if (created.exitCode !== 0) {
     options.printErr(
-      `check-nixie-fetch-sandbox: cannot create sandbox ${options.sandboxName}: ${created.stderr.trim()}; look for it with imp ls\n`,
+      `check-nixie-fetch-sandbox: cannot create sandbox ${options.sandboxName}: ${created.stderr.trim()}; look for it with impz ls\n`,
     );
 
     return false;
@@ -258,7 +258,7 @@ async function removeSandbox(options: Readonly<CheckFetchSandboxOptions>): Promi
 
   if (removed.exitCode !== 0) {
     options.printErr(
-      `check-nixie-fetch-sandbox: cannot remove sandbox ${options.sandboxName}: ${removed.stderr.trim()}; remove it with imp rm\n`,
+      `check-nixie-fetch-sandbox: cannot remove sandbox ${options.sandboxName}: ${removed.stderr.trim()}; remove it with impz rm\n`,
     );
 
     return false;

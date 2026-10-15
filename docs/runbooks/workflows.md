@@ -187,7 +187,7 @@ imp is pinned in two places, and both move together:
    [The restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy back.
 
 3. [Switch the host](#switch-the-host). The switch restarts impd.
-4. Check: `ssh root@geoffcloud docker exec imp-host imp info` shows the new version,
+4. Check: `ssh root@geoffcloud docker exec imp-host impz info` shows the new version,
    `https://imps.geoff.cloud/health` answers 200 from the tailnet, and the `imp` dashboard in
    Grafana shows impd's logs.
 

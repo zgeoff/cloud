@@ -71,6 +71,6 @@ test('it builds from the commit’s archive of the image and scripts only, and r
   expect(hasReadme).toBe(false);
 
   expect(printErr.mock.calls).toStrictEqual([
-    [`building agent-abc1234 from ${sha}; imp image build shows no progress off a terminal\n`],
+    [`building agent-abc1234 from ${sha}; impz image build shows no progress off a terminal\n`],
   ]);
 });

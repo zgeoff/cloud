@@ -46,7 +46,7 @@ test('it fails a call no handler answers with exit 97, as a stand-in’s unknown
 test('it reports a timeout a handler answers', async () => {
   const stub = buildStubRunner(() => ({ exitCode: 143, timedOut: true }));
 
-  const result = await stub.run(['imp', 'image', 'build']);
+  const result = await stub.run(['impz', 'image', 'build']);
 
   expect(result.timedOut).toBe(true);
   expect(result.exitCode).toBe(143);

@@ -35,7 +35,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -86,7 +86,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -162,7 +162,7 @@ setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/seed/images/agent" "$tree/seed/nixos/packages" \
     "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/images/atc-gateway" "$tree/seed/infra" \
-    "$tree/releases/atc" "$tree/releases/imp" "$tree/releases/nixie" "$tree/releases/auto-mode"
+    "$tree/releases/atc" "$tree/releases/impz" "$tree/releases/nixie" "$tree/releases/auto-mode"
   : > "$tree/calls"
   # boot data: the runner creates both files before a step runs
   : > "$tree/output"

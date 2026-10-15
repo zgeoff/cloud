@@ -41,11 +41,13 @@ integrity=$("$sqlite" "$dir/imp.sqlite" "PRAGMA integrity_check;")
 # integrity_check prints one finding per line; COPY-INFO keeps them on its one integrity line
 integrity=${integrity//$'\n'/; }
 migration=$("$sqlite" "$dir/imp.sqlite" "SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1;")
-version=$(docker exec imp-host imp info | sed -n "s/^version *//p")
+# impz is imp's CLI from its rename on; an imp-host image from before the rename has only imp
+version=$(docker exec imp-host sh -c 'if command -v impz > /dev/null; then impz info; else imp info; fi' |
+  sed -n "s/^version *//p")
 image=$(docker inspect imp-host --format "{{.Config.Image}}")
 created=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 size=$(stat -c %s "$dir/imp.sqlite")
-# the field names match `imp db copy --json` (imp #171); impd cannot know the image, so cloud adds it
+# the field names match `impz db copy --json` (imp #171); impd cannot know the image, so cloud adds it
 printf "path %s\nsizeBytes %s\nlastMigration %s\nimpVersion %s\ncreatedAt %s\nintegrity %s\nimage %s\n" \
   "$dir/imp.sqlite" "$size" "$migration" "$version" "$created" "$integrity" "$image" > "$dir/COPY-INFO"
 cat "$dir/COPY-INFO"

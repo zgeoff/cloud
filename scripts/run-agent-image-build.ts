@@ -29,7 +29,7 @@ export interface BuiltAgentImage {
 }
 
 // Builds the image from a git archive of the commit, so the clone's working tree never reaches it.
-// imp image build prints no progress off a terminal, so the build runs quietly.
+// impz image build prints no progress off a terminal, so the build runs quietly.
 export async function runAgentImageBuild(
   io: Readonly<ScriptIO>,
   build: Readonly<AgentImageBuild>,
@@ -62,10 +62,10 @@ async function createImageSource(io: Readonly<ScriptIO>, build: Readonly<AgentIm
 // ls before a retry
 async function runImpBuild(io: Readonly<ScriptIO>, build: Readonly<AgentImageBuild>, src: string) {
   io.printErr(
-    `building ${build.image} from ${build.sha}; imp image build shows no progress off a terminal\n`,
+    `building ${build.image} from ${build.sha}; impz image build shows no progress off a terminal\n`,
   );
 
-  const argv = ['imp', 'image', 'build', join(src, 'images/agent'), '--name', build.image];
+  const argv = ['impz', 'image', 'build', join(src, 'images/agent'), '--name', build.image];
 
   const result = await io.run(argv, { timeoutMs: build.timeoutMs });
 
@@ -78,11 +78,11 @@ async function runImpBuild(io: Readonly<ScriptIO>, build: Readonly<AgentImageBui
   if (result.timedOut) {
     throw new ExitError(
       1,
-      `imp image build did not finish within ${build.timeout}; impd may still finish ${build.image}, so read imp image ls before a retry`,
+      `impz image build did not finish within ${build.timeout}; impd may still finish ${build.image}, so read impz image ls before a retry`,
     );
   }
 
   if (result.exitCode !== 0) {
-    throw new ExitError(1, `imp image build failed for ${build.image}`);
+    throw new ExitError(1, `impz image build failed for ${build.image}`);
   }
 }

@@ -44,9 +44,9 @@ test('it reads what exists, in this order, and creates only the secrets director
     'op vault get cloud --format json',
     'sh -c command -v atc-key > /dev/null',
     'ssh -o BatchMode=yes root@geoffcloud true',
-    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host imp info --json',
-    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host imp secret ls --json',
-    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host imp token ls --json',
+    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz info --json',
+    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz secret ls --json',
+    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz token ls --json',
     'op item list --vault cloud --format json',
     "ssh -o BatchMode=yes root@geoffcloud install -d -m 0700 -o root -g root '/var/lib/atc-daemon-secrets'",
     "ssh -o BatchMode=yes root@geoffcloud ls '/var/lib/atc-daemon-secrets'",
@@ -154,16 +154,16 @@ test.each([
     'docker',
     'exec',
     'imp-host',
-    'imp',
+    'impz',
     'info',
     '--json',
   ]);
 });
 
 test.each([
-  ['imp info', 'info', 'info'],
-  ['imp secret ls', 'secret-ls', 'secret'],
-  ['imp token ls', 'token-ls', 'token'],
+  ['impz info', 'info', 'info'],
+  ['impz secret ls', 'secret-ls', 'secret'],
+  ['impz token ls', 'token-ls', 'token'],
 ] as const)(
   'it stops with docker’s message when %s fails',
   async (_label: string, stoppedAt: 'info' | 'secret-ls' | 'token-ls', verb: string) => {

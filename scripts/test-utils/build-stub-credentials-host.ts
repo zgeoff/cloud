@@ -13,7 +13,7 @@ export interface StubCredentialsHostScenario {
   readonly dir: string;
   readonly impdPort: string;
 
-  // what `imp info --json` prints
+  // what `impz info --json` prints
   readonly info: unknown;
   readonly secrets: Record<string, unknown>[];
   readonly tokens: Record<string, unknown>[];
@@ -40,7 +40,7 @@ export interface StubCredentialsHostScenario {
   // the saved token's check answers this, in place of a good identity
   readonly tokenCheck?: StubAnswer;
 
-  // what `imp token new` prints, a line by default; mintError fails it with exit 1
+  // what `impz token new` prints, a line by default; mintError fails it with exit 1
   readonly minted?: string;
   readonly mintError?: string;
 
@@ -112,7 +112,7 @@ const stoppedError =
   'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n';
 
 const secretAdd =
-  'exec -i imp-host imp secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json';
+  'exec -i imp-host impz secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json';
 
 function buildDockerAnswer(state: HostState, line: string, stdin: string) {
   if (line === secretAdd) {
@@ -120,9 +120,9 @@ function buildDockerAnswer(state: HostState, line: string, stdin: string) {
   }
 
   const reads = {
-    'exec imp-host imp info --json': ['info', state.scenario.info],
-    'exec imp-host imp secret ls --json': ['secret-ls', state.scenario.secrets],
-    'exec imp-host imp token ls --json': ['token-ls', state.scenario.tokens],
+    'exec imp-host impz info --json': ['info', state.scenario.info],
+    'exec imp-host impz secret ls --json': ['secret-ls', state.scenario.secrets],
+    'exec imp-host impz token ls --json': ['token-ls', state.scenario.tokens],
   } as const;
 
   const read = Object.entries(reads).find(([command]) => command === line)?.[1];

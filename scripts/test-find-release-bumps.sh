@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for find-release-bumps.sh: from a checkout's pins and the releases of zgeoff/atc, zgeoff/imp,
+# Test for find-release-bumps.sh: from a checkout's pins and the releases of zgeoff/atc, zgeoff/impz,
 # zgeoff/nixie and zgeoff/auto-mode, it prints one line for each dependency with a pin older than its newest
 # release, and nothing when every pin is current. It takes the highest X.Y.Z among the tags of the
 # dependency's own form, and fails on a missing or doubled pin and on a repository with no
@@ -23,7 +23,7 @@ setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/seed/images/agent" "$tree/seed/nixos/packages" \
     "$tree/seed/nixos/hosts/geoffcloud" "$tree/seed/images/atc-gateway" "$tree/seed/infra" \
-    "$tree/releases/atc" "$tree/releases/imp" "$tree/releases/nixie" "$tree/releases/auto-mode"
+    "$tree/releases/atc" "$tree/releases/impz" "$tree/releases/nixie" "$tree/releases/auto-mode"
   create_stub_release_gh "$tree/bin"
   case_env=(env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree")
 }
@@ -46,7 +46,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -56,7 +56,7 @@ EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
 ["gh","release","list","-R","zgeoff/atc","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
-["gh","release","list","-R","zgeoff/imp","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
+["gh","release","list","-R","zgeoff/impz","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 ["gh","release","list","-R","zgeoff/nixie","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 ["gh","release","list","-R","zgeoff/auto-mode","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]
 EOF
@@ -84,7 +84,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -116,7 +116,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.6.2@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -151,7 +151,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   printf '%s\n' 'v9.0.0' 'auto-mode-v0.19.3' 'auto-mode-v0.19.2' 'auto-mode-v0.17.0' > "$tree/releases/auto-mode/tags"
 
@@ -183,7 +183,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   printf '%s\n' '@zgeoff/atc-client@9.0.0' '@zgeoff/atc@4.9.0' '@zgeoff/atc@4.10.0' '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  printf '%s\n' 'v1.2.3-rc.1' 'v1.0.1' > "$tree/releases/imp/tags"
+  printf '%s\n' 'v1.2.3-rc.1' 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -215,7 +215,7 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.0.1' > "$tree/releases/imp/tags"
+  echo 'v1.0.1' > "$tree/releases/impz/tags"
   echo 'v0.7.0' > "$tree/releases/nixie/tags"
   echo 'auto-mode-v0.19.3' > "$tree/releases/auto-mode/tags"
 
@@ -308,12 +308,12 @@ EOF
     webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:4444444444444444444444444444444444444444444444444444444444444444
 EOF
   echo '@zgeoff/atc@4.3.0' > "$tree/releases/atc/tags"
-  echo 'v1.2.3-rc.1' > "$tree/releases/imp/tags"
+  echo 'v1.2.3-rc.1' > "$tree/releases/impz/tags"
 
   (cd "$tree/seed" && "${case_env[@]}" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'zgeoff/imp has no release tagged vX.Y.Z'
+  diff - "$tree/err" <<< 'zgeoff/impz has no release tagged vX.Y.Z'
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1

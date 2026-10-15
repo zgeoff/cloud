@@ -25,7 +25,7 @@ export async function runAgentImageCheck(
   io: Readonly<InterruptibleIO>,
   target: Readonly<AgentImageCheck>,
 ): Promise<boolean> {
-  // registered before `imp new`, since impd can create the imp after an interrupt stops the CLI,
+  // registered before `impz new`, since impd can create the imp after an interrupt stops the CLI,
   // and the caller found its name free
   const dropCleanup = io.registerCleanup((cleanupIO) => removeCheckImp(cleanupIO, target.check));
 
@@ -37,7 +37,7 @@ export async function runAgentImageCheck(
 }
 
 async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImageCheck>) {
-  const created = await runOrExit(io, ['imp', 'new', target.check, '--image', target.image]);
+  const created = await runOrExit(io, ['impz', 'new', target.check, '--image', target.image]);
 
   printErrText(io, created.stdout.toString());
 
@@ -57,7 +57,7 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
 }
 
 async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {
-  const removed = await runOrExit(io, ['imp', 'rm', check]);
+  const removed = await runOrExit(io, ['impz', 'rm', check]);
 
   printErrText(io, removed.stdout.toString());
 }

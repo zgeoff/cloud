@@ -9,7 +9,7 @@
 # resolves /proc/<pid>/root back to the host's root. So a static sqlite3 runs inside
 # imp-host and writes one `VACUUM INTO` file: a single read transaction, consistent while
 # impd writes, with no -wal or -shm beside it. The copy holds token hashes and secret
-# metadata, so it stays root-only on the host. Until imp ships `imp db copy` (imp #171).
+# metadata, so it stays root-only on the host. Until imp ships `impz db copy` (imp #171).
 # The host side is copy-impd-db-host, which the host's NixOS config puts on its PATH
 # (nixos/packages/impd-db-tools), so a change to it reaches the host only with a host switch.
 set -euo pipefail

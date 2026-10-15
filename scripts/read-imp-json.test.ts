@@ -11,7 +11,7 @@ test('it parses the listing imp prints', async () => {
   ]);
 
   expect(list).toStrictEqual([{ name: 'agent-check-abc1234' }]);
-  expect(stub.calls.map((call) => call.argv)).toStrictEqual([['imp', 'ls', '--json']]);
+  expect(stub.calls.map((call) => call.argv)).toStrictEqual([['impz', 'ls', '--json']]);
 });
 
 test('it stops when imp prints no JSON', () => {
@@ -23,7 +23,7 @@ test('it stops when imp prints no JSON', () => {
       'ls',
       '--json',
     ]),
-  ).rejects.toMatchObject({ exitCode: 1, message: 'no JSON from imp image ls --json' });
+  ).rejects.toMatchObject({ exitCode: 1, message: 'no JSON from impz image ls --json' });
 });
 
 test('it stops with imp’s exit code when the call fails', () => {
