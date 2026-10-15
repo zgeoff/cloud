@@ -162,7 +162,7 @@ function buildBootingPage(preview: Preview): StatusPage {
     status: 202,
     title: 'Preview booting',
     message: `Booting ${formatPreview(preview)} at ${preview.headSHA.slice(0, 7)}. This page reloads until the preview answers.`,
-    refreshSeconds: 5,
+    refresh: { seconds: 5, url: formatLinkPath(preview) },
   };
 }
 
@@ -171,12 +171,16 @@ function buildWaitingPage(preview: Preview): StatusPage {
     status: 202,
     title: 'Preview waiting for a slot',
     message: `Another preview is booting. ${formatPreview(preview)} wakes once it settles; this page reloads until then.`,
-    refreshSeconds: 5,
+    refresh: { seconds: 5, url: formatLinkPath(preview) },
   };
 }
 
 function formatPreview(preview: PreviewKey): string {
   return `${preview.repo}#${preview.number}`;
+}
+
+function formatLinkPath(preview: PreviewKey): string {
+  return `/${preview.repo}/${preview.number}`;
 }
 
 function buildPageResponse(page: StatusPage): Response {
