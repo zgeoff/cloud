@@ -63,7 +63,7 @@ The program reads the items `.env` references. Four more items in the vault serv
 
 | Item                    | Read by                                                                  |
 | ----------------------- | ------------------------------------------------------------------------ |
-| `imp-tailscale-authkey` | imp's dev instances; Pulumi writes each new `tag:imp` key into it        |
+| `imp-tailscale-authkey` | the `tag:imp` key; Pulumi writes each new one into it                    |
 | `imp-restic`            | imp's backup password, placed on the host at reinstall                   |
 | `r2-backups`            | imp's backup repository and its R2 keys, placed on the host at reinstall |
 | `imp-dns-cloudflare`    | imp's DNS token and ACME email, which the DNS token script installs      |
