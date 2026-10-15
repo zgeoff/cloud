@@ -47,11 +47,13 @@ function shouldPreview(deps: PreviewDeps, event: PullRequestEvent): boolean {
   return listed && !event.fromFork;
 }
 
-// opened, reopened or synchronize: a head commit with preview/compose.yaml gets the link
+// opened, reopened or synchronize: a head commit with preview/compose.yaml gets the link. Only an
+// open brings an ended preview back, so a push delivered after the close never revives it; the
+// check follows the last await, so a close that lands during the compose read counts.
 async function updatePreviewHead(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
   const compose = await deps.github.readComposeFile(event.repo, event.headSHA);
 
-  if (compose === null) {
+  if (compose === null || isEndedPush(deps, event)) {
     return;
   }
 
@@ -68,6 +70,10 @@ async function updatePreviewHead(deps: PreviewDeps, event: PullRequestEvent): Pr
   });
 
   deps.log(`${event.repo}#${event.number}: preview link for ${event.headSHA}`);
+}
+
+function isEndedPush(deps: PreviewDeps, event: PullRequestEvent): boolean {
+  return event.action === 'update' && deps.store.findPreview(event)?.phase === 'ended';
 }
 
 // closed, merged or not: the imp goes, and the link reports the preview ended

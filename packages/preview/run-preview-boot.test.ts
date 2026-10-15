@@ -257,6 +257,55 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.httpPort).toBe(4000);
 });
 
+test('it replaces an imp left without its grant by a boot that never built', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set(
+    'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'x-preview:\n  port: 3000\nservices: {}\n',
+  );
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 3000,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  await runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  expect(ctx.impd.calls).toStrictEqual([
+    'imps/get pv-0a1b2c3d-17',
+    'imps/list undefined',
+    'imps/destroy pv-0a1b2c3d-17',
+    'imps/create pv-0a1b2c3d-17',
+    'grants/add pv-0a1b2c3d-17',
+  ]);
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh']);
+});
+
 test('it leaves a preview ended when its pull request closed during the boot', async () => {
   const ctx = await setupTest();
 

@@ -109,8 +109,9 @@ async function runBuild(
   return waitForHealth(deps, preview, contract);
 }
 
-// Frees a slot, then starts the imp: a new one with the contract's port and the GitHub grant, or the
-// one from an earlier build, awake, with the port of the commit it rebuilds
+// Frees a slot, then starts the imp: the one from an earlier build, awake, with the port of the
+// commit it rebuilds, or a new one with the contract's port and the GitHub grant. Only a preview
+// that built once proves its imp got the grant, so an imp without a build is replaced.
 async function startImpInSlot(
   deps: PreviewDeps,
   preview: Preview,
@@ -120,7 +121,7 @@ async function startImpInSlot(
 
   await applySlotEvictions(deps, preview.imp);
 
-  if (imp !== null) {
+  if (imp !== null && preview.builtSHA !== null) {
     await deps.impd.updateHTTPPort(preview.imp, contract.port);
 
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
@@ -128,6 +129,15 @@ async function startImpInSlot(
     return;
   }
 
+  await (imp === null ? Promise.resolve() : deps.impd.removeImp(preview.imp));
+  await createPreviewImp(deps, preview, contract);
+}
+
+async function createPreviewImp(
+  deps: PreviewDeps,
+  preview: Preview,
+  contract: PreviewContract,
+): Promise<void> {
   await deps.impd.createImp({
     name: preview.imp,
     image: deps.settings.impImage,
