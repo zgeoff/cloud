@@ -234,7 +234,7 @@ let
         mkfifo port.fifo
         exec 3<>port.fifo
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -244,7 +244,7 @@ let
         assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
         assert_equals "Content-Type: application/json;charset=utf-8" \
           "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
-        assert_equals '{"status":"ok","ready":true}' "$(cat body)" "the body"
+        assert_equals '{"status":"ok","ready":true,"warnings":[]}' "$(cat body)" "the body"
         assert_equals "GET /health" "$(cat requests)" "the requests"
       '';
     }
@@ -255,7 +255,7 @@ let
         mkfifo port.fifo
         exec 3<>port.fifo
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -275,7 +275,7 @@ let
         mkfifo port.fifo
         exec 3<>port.fifo
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -295,7 +295,7 @@ let
         mkfifo port.fifo
         exec 3<>port.fifo
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
         stub_pid=$!
         trap 'kill "$stub_pid"' EXIT
         read -r -t 5 -u 3 port
@@ -321,10 +321,13 @@ let
       '';
     }
     {
-      title = "it run-stub-impd holds to the pinned imp: its /health handler, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
       script = ''
-        handlers=$(grep -cxF "    .get('/health', () => ({ status: 'ok', ready: deps.isReady() }))" \
-          ${imp}/packages/daemon/src/build-app.ts || true)
+        handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts || true)
+        grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts > handler || true
+        # with no reboot reason, the warnings are the empty list the stand-in's bodies hold
+        grep -xF -A2 'function buildHealthWarnings(rebootReason: string | null): string[] {' \
+          ${imp}/packages/daemon/src/build-app.ts > warnings || true
         # an Elysia onError hook would replace the default 404; build-app.ts's onError is oRPC's
         error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/build-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
@@ -333,6 +336,18 @@ let
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
         assert_equals 1 "$handlers" "build-app.ts's /health handlers"
+        assert_files_equal - handler <<'EOF'
+            .get('/health', () => ({
+              status: 'ok',
+              ready: deps.isReady(),
+              warnings: buildHealthWarnings(deps.imps.readRebootReason()),
+            }))
+        EOF
+        assert_files_equal - warnings <<'EOF'
+        function buildHealthWarnings(rebootReason: string | null): string[] {
+          return rebootReason === null ? [] : [`host needs a reboot: ''${rebootReason}`];
+        }
+        EOF
         assert_equals 0 "$error_hooks" "build-app.ts's Elysia onError hooks"
         assert_equals 1.4.29 "$elysia" "imp's Elysia version"
         assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.2 stages"
@@ -413,9 +428,9 @@ let
           cat > $out/app.ts <<'EOF'
           import { Elysia } from 'elysia';
 
-          // packages/daemon/src/build-app.ts's /health handler, with impd ready
+          // packages/daemon/src/build-app.ts's /health handler, with impd ready and no reboot reason
           const app = new Elysia()
-            .get('/health', () => ({ status: 'ok', ready: true }))
+            .get('/health', () => ({ status: 'ok', ready: true, warnings: [] }))
             .listen({ hostname: '127.0.0.1', port: 0 });
 
           console.log(app.server?.port);
@@ -435,7 +450,7 @@ let
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pinnedBun}/bin/bun ${pinnedElysiaApp}/app.ts >&3 &
           real_pid=$!
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/health.requests" >&4 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/health.requests" >&4 &
           health_pid=$!
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
             /missing 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/missing.requests" >&5 &

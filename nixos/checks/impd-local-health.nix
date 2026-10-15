@@ -226,7 +226,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
@@ -274,7 +274,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":false}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":false,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
@@ -370,7 +370,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 500 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 500 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
@@ -419,7 +419,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid" 2>/dev/null || true' EXIT
           read -r -t 5 -u 3 port
@@ -606,7 +606,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
@@ -684,7 +684,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
@@ -715,7 +715,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
@@ -746,7 +746,7 @@ let
           mkfifo port.fifo
           exec 3<>port.fifo
           env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true}' "$PWD/requests" >&3 &
+            /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
           stub_pid=$!
           trap 'kill "$stub_pid"' EXIT
           read -r -t 5 -u 3 port
