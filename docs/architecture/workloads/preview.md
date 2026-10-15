@@ -40,7 +40,9 @@ tailnet policy lets only member devices reach it.
 A signed delivery changes a preview only for a repository the service lists, by name or by its
 owner, and only when the pull request's head branch lives in that repository. A pull request from a
 fork never gets a preview, because its code would run in an imp that holds the broker's GitHub
-credential.
+credential. That credential is impd's `gh` secret, a fine-grained token that reads the contents of
+the listed repositories and nothing else, so a preview's code can clone its own repository but can
+neither push to it nor reach a repository the service does not list.
 
 ## A pull request's preview
 
