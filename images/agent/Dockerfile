@@ -110,6 +110,23 @@ RUN curl -fsSL -o /tmp/gh.tar.gz \
  && install -m 0755 "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" /usr/local/bin/gh \
  && rm -rf /tmp/gh.tar.gz "/tmp/gh_${GH_VERSION}_linux_amd64"
 
+# The gh-stack extension, for stacked PRs (`gh stack`). gh finds an extension
+# only in its extensions folder with a manifest, so install both there. The sum
+# is the asset digest GitHub lists on the release:
+#   gh api repos/github/gh-stack/releases/tags/v$VERSION \
+#     --jq '.assets[] | select(.name == "linux-amd64") | .digest'
+ARG GH_STACK_VERSION=0.2.0
+ARG GH_STACK_SHA256=577065033b49d4505730ea0ad43ab1b0374b0d9b1308e9765647a6aa8eba3cb7
+RUN dir=/root/.local/share/gh/extensions/gh-stack \
+ && mkdir -p "$dir" \
+ && curl -fsSL -o "$dir/gh-stack" \
+      "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" \
+ && echo "${GH_STACK_SHA256}  $dir/gh-stack" | sha256sum -c - \
+ && chmod 0755 "$dir/gh-stack" \
+ && printf 'owner: github\nname: gh-stack\nhost: github.com\ntag: v%s\nispinned: true\npath: %s\n' \
+      "$GH_STACK_VERSION" "$dir/gh-stack" > "$dir/manifest.yml" \
+ && GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 gh stack --help >/dev/null
+
 # Node 24 from nodejs.org, with npm and corepack. The sum is the tarball's line
 # in the release's SHASUMS256.txt.
 ARG NODE_VERSION=24.21.0
