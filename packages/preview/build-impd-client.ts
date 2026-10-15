@@ -30,7 +30,7 @@ export interface ImpdClient {
   readonly wakeImp: (name: string) => Promise<void>;
   readonly updateHTTPPort: (name: string, httpPort: number) => Promise<void>;
   readonly removeImp: (name: string) => Promise<void>;
-  readonly createGrant: (name: string, secret: string) => Promise<void>;
+  readonly installGrant: (name: string, secret: string) => Promise<void>;
   readonly runCommand: (
     name: string,
     argv: readonly string[],
@@ -85,9 +85,7 @@ export function buildImpdClient(
     removeImp: async (name) => {
       await sendRPC('imps/destroy', { name });
     },
-    createGrant: async (name, secret) => {
-      await sendRPC('grants/add', { name, secret });
-    },
+    installGrant: (name, secret) => installImpGrant(sendRPC, name, secret),
     runCommand: (name, argv, options = {}) => {
       const require = options.requireBroker === true ? { require: ['broker'] } : {};
 
@@ -163,6 +161,21 @@ function toImpActivity(value: unknown): ImpActivity {
   const lastActiveAt = typeof imp.lastActiveAt === 'string' ? new Date(imp.lastActiveAt) : null;
 
   return { name: imp.name, state: imp.state, lastActiveAt };
+}
+
+// Adds the grant only when the imp lacks it, so a boot can repair an imp whose grant never landed
+async function installImpGrant(
+  sendRPC: (procedure: string, input: unknown) => Promise<unknown>,
+  name: string,
+  secret: string,
+): Promise<void> {
+  const granted = await sendRPC('grants/list', { name });
+
+  if (Array.isArray(granted) && granted.includes(secret)) {
+    return;
+  }
+
+  await sendRPC('grants/add', { name, secret });
 }
 
 interface ExecServerMessage {

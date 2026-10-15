@@ -29,6 +29,9 @@ async function setupTest() {
 
   const pendingBoots = new Set<Promise<void>>();
 
+  // a clock that each pause between health probes moves on
+  const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
+
   const deps: PreviewDeps = {
     settings: {
       baseURL: 'http://geoffcloud:8417',
@@ -55,8 +58,12 @@ async function setupTest() {
     webhookSecret: 'stub-webhook-secret',
     pendingBoots,
     withSlotLock: makeSlotLock(),
-    now: () => new Date('2026-10-15T09:00:00Z'),
-    sleep: async () => {},
+    now: () => new Date(clock.now),
+    sleep: (ms) => {
+      clock.now += ms;
+
+      return Promise.resolve();
+    },
     log: () => {},
   };
 
@@ -269,8 +276,13 @@ test('it answers a ready preview with a waiting page while another preview boots
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
 });
 
-test('it wakes a sleeping ready preview and redirects to its imp', async () => {
+test('it wakes a sleeping ready preview, checks its health and redirects to its imp', async () => {
   const ctx = await setupTest();
+
+  composeFiles.set(
+    'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'x-preview:\n  health: /healthz\nservices: {}\n',
+  );
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -300,6 +312,65 @@ test('it wakes a sleeping ready preview and redirects to its imp', async () => {
   expect(response.status).toBe(302);
   expect(response.headers.get('location')).toBe('https://pv-0a1b2c3d-17.imps.example.test/');
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+
+  expect(ctx.impd.commands).toStrictEqual([
+    {
+      imp: 'pv-0a1b2c3d-17',
+      argv: [
+        'curl',
+        '--fail',
+        '--silent',
+        '--output',
+        '/dev/null',
+        '--max-time',
+        '5',
+        'http://127.0.0.1:8080/healthz',
+      ],
+      require: [],
+    },
+  ]);
+});
+
+test('it boots a woken preview again when its stack never answers', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set(
+    'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'x-preview:\n  health: /healthz\nservices: {}\n',
+  );
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+    phase: 'ready',
+    builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'sleeping',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  // a cold boot left the stack down: no probe answers until a build runs
+  ctx.impd.answerCommand = (command) => ({ code: command.argv[0] === 'curl' ? 7 : 0 });
+
+  const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
+
+  await Promise.all(ctx.pendingBoots);
+
+  expect(response.status).toBe(202);
+  expect(ctx.impd.commands.map((command) => command.argv[0])).toContain('timeout');
 });
 
 test('it rebuilds a ready preview once a push moved its head', async () => {

@@ -165,6 +165,10 @@ function buildProcedureResponse(
       return buildRPCResult({});
     }
 
+    case 'grants/list': {
+      return buildRPCResult(imp.grants);
+    }
+
     case 'grants/add': {
       imp.grants.push(String(input['secret']));
 

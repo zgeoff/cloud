@@ -1,9 +1,11 @@
 import { applySlotEvictions } from './apply-slot-evictions.ts';
 import type { Preview, PreviewKey } from './create-preview-store.ts';
+import { parsePreviewContract } from './parse-preview-contract.ts';
 import type { PreviewPage } from './render-preview-page.ts';
 import { renderPreviewPage } from './render-preview-page.ts';
 import { runPreviewBoot } from './run-preview-boot.ts';
 import type { PreviewDeps } from './types.ts';
+import { waitForHealthy } from './wait-for-healthy.ts';
 
 // The tailnet link, GET /<owner>/<name>/<number>. A ready preview of the head commit redirects to
 // its imp, which impd's wake proxy serves; any other preview gets a page that says where it stands.
@@ -85,9 +87,7 @@ async function openPreview(deps: PreviewDeps, preview: Preview): Promise<Respons
     return buildPageResponse(buildWaitingPage(preview));
   }
 
-  const started = isCurrent
-    ? await deps.withSlotLock(() => startReadyImp(deps, preview.imp))
-    : false;
+  const started = isCurrent ? await deps.withSlotLock(() => startReadyImp(deps, preview)) : false;
 
   if (started) {
     return Response.redirect(`https://${preview.imp}.${deps.settings.impDomain}/`, 302);
@@ -111,21 +111,43 @@ function startPreviewBoot(deps: PreviewDeps, preview: Preview): void {
   void removeSettledBoot(deps.pendingBoots, boot);
 }
 
-// false when impd no longer holds the imp, so the preview boots again
-async function startReadyImp(deps: PreviewDeps, name: string): Promise<boolean> {
-  const imp = await deps.impd.findImp(name);
+// false when impd no longer holds the imp, or when a woken imp's stack does not answer, so the
+// preview boots again
+async function startReadyImp(deps: PreviewDeps, preview: Preview): Promise<boolean> {
+  const imp = await deps.impd.findImp(preview.imp);
 
   if (imp === null) {
     return false;
   }
 
-  await applySlotEvictions(deps, name);
+  await applySlotEvictions(deps, preview.imp);
 
-  if (imp.state !== 'running') {
-    await deps.impd.wakeImp(name);
+  if (imp.state === 'running') {
+    return true;
   }
 
-  return true;
+  await deps.impd.wakeImp(preview.imp);
+
+  return checkWokenStack(deps, preview);
+}
+
+// A wake that restores the imp's memory brings its containers back as they were. A cold boot
+// starts dockerd alone, so a service without a restart policy stays down, and a rebuild seeds a
+// fresh stack instead of starting the seed step over old data.
+const wakeGraceMs = 30_000;
+
+async function checkWokenStack(deps: PreviewDeps, preview: Preview): Promise<boolean> {
+  const compose = await deps.github.readComposeFile(preview.repo, preview.headSHA);
+
+  if (compose === null) {
+    return false;
+  }
+
+  return waitForHealthy(deps, {
+    imp: preview.imp,
+    contract: parsePreviewContract(compose),
+    windowMs: wakeGraceMs,
+  });
 }
 
 // a boot never rejects: it records its own failure

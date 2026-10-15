@@ -1,9 +1,10 @@
-/* oxlint-disable import/max-dependencies, max-lines-per-function */
+/* oxlint-disable import/max-dependencies, max-lines-per-function, max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setImmediate as waitForImmediate } from 'node:timers/promises';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -60,7 +61,7 @@ async function setupTest() {
     log: () => {},
   };
 
-  return { handler: makeWebhookHandler(deps), store, impd };
+  return { handler: makeWebhookHandler(deps), deps, store, impd };
 }
 
 test('it posts one comment with the tailnet link when a pull request opens', async () => {
@@ -213,6 +214,202 @@ test('it keeps a preview ended when a push arrives after its pull request closed
   });
 
   expect(issueComments).toStrictEqual([]);
+});
+
+test('it keeps the newer head when an older push still reads GitHub as a newer one arrives', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+  composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
+
+  const reached = Promise.withResolvers<void>();
+  const gate = Promise.withResolvers<void>();
+
+  // the older head's compose read stalls until the newer delivery is in, then reads GitHub
+  const handler = makeWebhookHandler({
+    ...ctx.deps,
+    github: {
+      ...ctx.deps.github,
+      readComposeFile: async (repo, sha) => {
+        if (sha.startsWith('a')) {
+          reached.resolve();
+
+          await gate.promise;
+        }
+
+        return ctx.deps.github.readComposeFile(repo, sha);
+      },
+    },
+  });
+
+  const older = JSON.stringify({
+    action: 'synchronize',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  const newer = JSON.stringify({
+    action: 'synchronize',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  const olderDone = handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(older).digest('hex')}`,
+      },
+      body: older,
+    }),
+  );
+
+  await reached.promise;
+
+  const newerDone = handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(newer).digest('hex')}`,
+      },
+      body: newer,
+    }),
+  );
+
+  // an unserialized newer delivery stores its head within 2 event-loop turns; a serialized one
+  // waits behind the older delivery and stores nothing until the gate opens
+  for (
+    let turn = 0;
+    turn < 100 && ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 }) === null;
+    turn += 1
+  ) {
+    // oxlint-disable-next-line no-await-in-loop -- each pass yields one event-loop turn
+    await waitForImmediate();
+  }
+
+  gate.resolve();
+
+  await Promise.all([olderDone, newerDone]);
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.headSHA).toBe(
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  );
+});
+
+test('it keeps a pull request ended when a push arrives after a close it saw before any head', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
+
+  const closed = JSON.stringify({
+    action: 'closed',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(closed).digest('hex')}`,
+      },
+      body: closed,
+    }),
+  );
+
+  const pushed = JSON.stringify({
+    action: 'synchronize',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(pushed).digest('hex')}`,
+      },
+      body: pushed,
+    }),
+  );
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ended');
+  expect(issueComments).toStrictEqual([]);
+});
+
+test('it posts the ended comment again when GitHub redelivers a close', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0bcd7c17-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  // the first close ended the record, then its comment failed
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'ended' });
+
+  const closed = JSON.stringify({
+    action: 'closed',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(closed).digest('hex')}`,
+      },
+      body: closed,
+    }),
+  );
+
+  expect(issueComments).toStrictEqual([
+    {
+      id: expect.toBeNumber(),
+      author: 'preview-bot',
+      repo: 'acme/greenhouse',
+      number: 17,
+      body: expect.toInclude('**Preview ended.**'),
+    },
+  ]);
 });
 
 test('it refuses an unsigned delivery', async () => {

@@ -172,6 +172,7 @@ let
         ./start-preview-service.ts
         ./types.ts
         ./verify-webhook-signature.ts
+        ./wait-for-healthy.ts
         EOF
 
         src=$(sed -n 's|^exec bun run \(/nix/store/[^ ]*\)/main\.ts$|\1|p' ${package}/bin/preview-service)

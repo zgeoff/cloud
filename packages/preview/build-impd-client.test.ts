@@ -76,6 +76,44 @@ test('#readImps rejects with UNAUTHORIZED when impd refuses the token', () => {
   expect(client.readImps()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
 });
 
+test('#installGrant adds the secret to an imp that lacks it', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  await ctx.client.installGrant('pv-0a1b2c3d-7', 'gh');
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-7')?.grants).toStrictEqual(['gh']);
+});
+
+test('#installGrant leaves an imp that holds the secret without a second grant', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  await ctx.client.installGrant('pv-0a1b2c3d-7', 'gh');
+
+  expect(ctx.impd.calls).toStrictEqual(['grants/list pv-0a1b2c3d-7']);
+});
+
 test('#runCommand returns the exit code and output of a guest command that requires the broker', async () => {
   const ctx = setupTest();
 

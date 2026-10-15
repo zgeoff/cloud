@@ -3,6 +3,7 @@ import type { PhaseChange, Preview } from './create-preview-store.ts';
 import type { PreviewContract } from './parse-preview-contract.ts';
 import { parsePreviewContract } from './parse-preview-contract.ts';
 import type { PreviewDeps } from './types.ts';
+import { buildHealthURL, waitForHealthy } from './wait-for-healthy.ts';
 
 // Boots a preview of the pull request's head commit, or rebuilds the imp that runs an older one,
 // and leaves it `ready` or `failed`. A preview that left `booting` meanwhile, because its pull
@@ -39,10 +40,25 @@ async function checkClosedDuringBoot(
   return { phase: 'failed', detail: 'the pull request closed during the boot' };
 }
 
+// Docker Compose's release binary for the guests whose image lacks the plugin, such as imp's base
+// image; its sha256 is the release's own, and apt's docker-compose-plugin ships the same bytes
+const composeURL =
+  'https://github.com/docker/compose/releases/download/v5.6.0/docker-compose-linux-x86_64';
+
+const composeSHA256 = '40343e21ca777173e69cff5dbafeb37c6f81f3b0d57d9e597f036e95eb63e76a';
+
 // The guest script takes the repository and the commit as arguments, never inside its text. A
 // rebuild takes the old stack down with its volumes first, so every build seeds fresh, invented
 // data from the contract's seed step.
 const bootScript = `set -eu
+if ! docker compose version >/dev/null 2>&1; then
+  plugins=/usr/local/lib/docker/cli-plugins
+  mkdir -p "$plugins"
+  curl -fsSL -o "$plugins/docker-compose.part" ${composeURL}
+  echo "${composeSHA256}  $plugins/docker-compose.part" | sha256sum -c - >/dev/null
+  chmod 0755 "$plugins/docker-compose.part"
+  mv "$plugins/docker-compose.part" "$plugins/docker-compose"
+fi
 mkdir -p /srv/preview
 cd /srv/preview
 if [ ! -d .git ]; then
@@ -110,8 +126,8 @@ async function runBuild(
 }
 
 // Frees a slot, then starts the imp: the one from an earlier build, awake, with the port of the
-// commit it rebuilds, or a new one with the contract's port and the GitHub grant. Only a preview
-// that built once proves its imp got the grant, so an imp without a build is replaced.
+// commit it rebuilds, or a new one with the contract's port. Every boot then installs the GitHub
+// grant, so an imp whose grant failed or never came gets it on the next try.
 async function startImpInSlot(
   deps: PreviewDeps,
   preview: Preview,
@@ -121,66 +137,39 @@ async function startImpInSlot(
 
   await applySlotEvictions(deps, preview.imp);
 
-  if (imp !== null && preview.builtSHA !== null) {
+  if (imp === null) {
+    await deps.impd.createImp({
+      name: preview.imp,
+      image: deps.settings.impImage,
+      memoryMib: deps.settings.impMemoryMib,
+      httpPort: contract.port,
+    });
+  } else {
     await deps.impd.updateHTTPPort(preview.imp, contract.port);
 
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
-
-    return;
   }
-
-  await (imp === null ? Promise.resolve() : deps.impd.removeImp(preview.imp));
-  await createPreviewImp(deps, preview, contract);
-}
-
-async function createPreviewImp(
-  deps: PreviewDeps,
-  preview: Preview,
-  contract: PreviewContract,
-): Promise<void> {
-  await deps.impd.createImp({
-    name: preview.imp,
-    image: deps.settings.impImage,
-    memoryMib: deps.settings.impMemoryMib,
-    httpPort: contract.port,
-  });
 
   if (deps.settings.impGitHubSecret !== null) {
-    await deps.impd.createGrant(preview.imp, deps.settings.impGitHubSecret);
+    await deps.impd.installGrant(preview.imp, deps.settings.impGitHubSecret);
   }
 }
 
-// Polls the health path from inside the guest, so the probe needs no route to the imp
 async function waitForHealth(
   deps: PreviewDeps,
   preview: Preview,
   contract: PreviewContract,
 ): Promise<PhaseChange> {
-  const healthURL = `http://127.0.0.1:${contract.port}${contract.healthPath}`;
-  const deadline = deps.now().getTime() + deps.settings.healthTimeoutMs;
+  const healthy = await waitForHealthy(deps, {
+    imp: preview.imp,
+    contract,
+    windowMs: deps.settings.healthTimeoutMs,
+  });
 
-  const probe = [
-    'curl',
-    '--fail',
-    '--silent',
-    '--output',
-    '/dev/null',
-    '--max-time',
-    '5',
-    healthURL,
-  ];
-
-  while (deps.now().getTime() < deadline) {
-    // oxlint-disable-next-line no-await-in-loop -- each probe waits for the pause before it
-    const answer = await deps.impd.runCommand(preview.imp, probe);
-
-    if (answer.code === 0) {
-      return { phase: 'ready', builtSHA: preview.headSHA };
-    }
-
-    // oxlint-disable-next-line no-await-in-loop -- the pause sits between two probes
-    await deps.sleep(deps.settings.healthPollMs);
-  }
-
-  return { phase: 'failed', detail: `${healthURL} did not answer before the boot timed out` };
+  return healthy
+    ? { phase: 'ready', builtSHA: preview.headSHA }
+    : {
+        phase: 'failed',
+        detail: `${buildHealthURL(contract)} did not answer before the boot timed out`,
+      };
 }

@@ -66,14 +66,23 @@ stateDiagram-v2
 - **opened, reopened or synchronize.** The service reads `preview/compose.yaml` at the head commit.
   A commit without the file has not opted in, and the service does nothing. Otherwise it records the
   head commit and posts the pull request's comment, or edits it in place: a marker in the comment
-  body tells the service's comment from every other.
+  body and the token's own login tell the service's comment from every other. A synchronize never
+  brings an ended preview back; only an open or a reopen does.
 - **The link opens.** A ready preview whose built commit is the head wakes if it sleeps, and the
-  link redirects to the imp's own HTTPS name, which impd's wake proxy serves on the tailnet. Any
-  other preview starts a boot and answers with a page that reloads until the boot settles. A failed
-  preview shows the tail of its build output and a retry link instead of booting again on every
-  reload.
+  link redirects to the imp's own HTTPS name, which impd's wake proxy serves on the tailnet. A wake
+  that restores the imp's memory brings its containers back as they were, but a cold boot starts
+  dockerd alone, so a woken preview must answer its health path within a short grace before the
+  redirect, and otherwise boots again. Any other preview starts a boot and answers with a page that
+  reloads until the boot settles. A failed preview shows the tail of its build output and a retry
+  link instead of booting again on every reload.
 - **closed, merged or not.** The service marks the preview ended, destroys its imp, and edits the
-  comment to say the preview ended. The link then answers that the preview is gone.
+  comment to say the preview ended. The link then answers that the preview is gone. A close for a
+  pull request the service has no record of still records it as ended, and posts no comment. A
+  redelivered close removes the imp and posts the comment again, so a failed first attempt heals on
+  GitHub's next delivery.
+
+The service handles one delivery at a time, in the order they arrive, so an older push that still
+waits on GitHub never stores its head after a newer one.
 
 A phase change names the phases it may leave, and the store makes it only from one of them. Two
 opens at once therefore start one boot, and a boot that settles after its pull request closed leaves
@@ -85,12 +94,15 @@ A boot runs after the link answers, so a slow build never holds a request open.
 
 1. The service reads the head commit's Compose file again, since the head may have moved, and takes
    the app's port and health path from its `x-preview` block, a top-level key that Compose ignores.
-2. A new imp gets that port as impd's HTTP port, no backup, and a grant of the broker's GitHub
-   secret. An imp from an earlier build keeps its disk and takes the new commit's port.
-3. A guest command fetches the head commit into a checkout in the imp, takes down the stack of the
-   previous build with its volumes, and runs `docker compose up` from `preview/`, waiting for each
-   service. The fetch runs only when impd confirms the broker reaches it, so a private repository
-   clones with the broker's credential and no key sits in the guest.
+2. A new imp gets that port as impd's HTTP port and no backup. An imp from an earlier build keeps
+   its disk and takes the new commit's port. Either way, the boot adds the grant of the broker's
+   GitHub secret when the imp lacks it, so an imp whose grant failed gets it on the next boot.
+3. A guest command installs Docker Compose's pinned release binary, checked against its sha256, when
+   the image lacks the Compose plugin, as imp's base image does. It then fetches the head commit
+   into a checkout in the imp, takes down the stack of the previous build with its volumes, and runs
+   `docker compose up` from `preview/`, waiting for each service. The fetch runs only when impd
+   confirms the broker reaches it, so a private repository clones with the broker's credential and
+   no key sits in the guest.
 4. The service probes the health path from inside the guest until it answers or the boot times out.
 
 A rebuild discards the old volumes, so every build seeds its data afresh, and the seed never needs
