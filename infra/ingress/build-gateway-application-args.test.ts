@@ -5,6 +5,7 @@ import { buildGatewayApplicationArgs } from './build-gateway-application-args.ts
 const destinations = [
   { type: 'public', uri: 'atc.geoff.cloud/oauth2/authorize' },
   { type: 'public', uri: 'atc.geoff.cloud/login' },
+  { type: 'public', uri: 'atc.geoff.cloud/enroll' },
   { type: 'public', uri: 'atc.geoff.cloud/consent' },
   { type: 'public', uri: 'atc.geoff.cloud/error' },
 ];

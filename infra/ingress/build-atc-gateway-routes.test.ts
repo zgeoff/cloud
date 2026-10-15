@@ -5,7 +5,7 @@ import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
 import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 
-const browserPattern = '^(?:/oauth2/authorize|/login|/consent|/error)$';
+const browserPattern = '^(?:/oauth2/authorize|/login|/enroll|/consent|/error)$';
 const machinePattern = String.raw`^(?:/|/mcp|/oauth2/token|/oauth2/revoke|/\.well-known/oauth-authorization-server|/\.well-known/oauth-protected-resource|/\.well-known/oauth-protected-resource/mcp)$`;
 const access = { teamName: output('example-team'), audience: output('0123456789abcdef') };
 
@@ -39,6 +39,7 @@ function findRuleIndex(hostname: string, path: string): number {
 test.each([
   ['GET /oauth2/authorize', '/oauth2/authorize'],
   ['GET /login and POST /login', '/login'],
+  ['GET /enroll and POST /enroll', '/enroll'],
   ['GET /consent and POST /consent', '/consent'],
   ['GET /error', '/error'],
 ])('it sends %s to the Access-checked rule', (_route: string, path: string) => {
@@ -59,6 +60,7 @@ test.each([
 
 test.each([
   ['a trailing slash', '/login/'],
+  ['a trailing slash on the enrollment page', '/enroll/'],
   ['another case', '/LOGIN'],
   ['a longer name', '/login2'],
   ['a subpath of a machine route', '/mcp/login'],
@@ -78,7 +80,7 @@ test.each([
   },
 );
 
-test.each(['/login', '/consent', '/oauth2/authorize'])(
+test.each(['/login', '/enroll', '/consent', '/oauth2/authorize'])(
   'it answers the browser path %s on the preview webhook hostname with the 404 catch-all',
   (path: string) => {
     expect(findRuleIndex('preview-webhook.geoff.cloud', path)).toBe(3);

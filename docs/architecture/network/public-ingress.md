@@ -61,6 +61,7 @@ A route atc adds later reaches nothing until it joins that list.
 | ------------------------------------------- | ------------------ | ----------------- | ------------ |
 | `/oauth2/authorize`                         | GET                | the owner browser | Access login |
 | `/login`                                    | GET, POST          | the owner browser | Access login |
+| `/enroll`                                   | GET, POST          | the owner browser | Access login |
 | `/consent`                                  | GET, POST          | the owner browser | Access login |
 | `/error`                                    | GET                | the owner browser | Access login |
 | `/mcp` and its alias `/`                    | POST               | an MCP client     | straight in  |

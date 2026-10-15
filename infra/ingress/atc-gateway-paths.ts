@@ -2,7 +2,7 @@
 // browser pages behind Access, the MCP clients' machine routes without it. The tunnel answers any
 // other path with a 404 (public-ingress.md in docs/architecture/network).
 export const atcGatewayPaths = {
-  browser: ['/oauth2/authorize', '/login', '/consent', '/error'],
+  browser: ['/oauth2/authorize', '/login', '/enroll', '/consent', '/error'],
   machine: [
     '/',
     '/mcp',
