@@ -1,11 +1,13 @@
+/* oxlint-disable typescript/no-unsafe-type-assertion -- each body is GitHub's documented request shape */
 import { HttpResponse, http } from 'msw';
 import { githubAPIURL } from './github-api-url.ts';
-import { composeFiles, issueComments } from './github-state.ts';
+import { composeFiles, issueComments, tokenLogin } from './github-state.ts';
 
-// GitHub's REST endpoints that the service calls, with GitHub's status codes and the fields the
-// service reads (https://docs.github.com/en/rest/repos/contents,
-// https://docs.github.com/en/rest/issues/comments). A missing file or comment is a 404.
+// GitHub's REST endpoints that the service calls (docs.github.com/en/rest: repos/contents,
+// issues/comments, users/users), with GitHub's status codes and the fields the service reads; a
+// missing file or comment is a 404
 export const handlers = [
+  http.get(`${githubAPIURL}/user`, () => HttpResponse.json({ login: tokenLogin, type: 'User' })),
   http.get(`${githubAPIURL}/repos/:owner/:name/contents/preview/compose.yaml`, (info) => {
     const ref = new URL(info.request.url).searchParams.get('ref');
 
@@ -34,7 +36,7 @@ export const handlers = [
         (comment) => comment.repo === repo && comment.number === Number(info.params['number']),
       )
       .slice((page - 1) * perPage, page * perPage)
-      .map((comment) => ({ id: comment.id, body: comment.body }));
+      .map((comment) => ({ id: comment.id, body: comment.body, user: { login: comment.author } }));
 
     return HttpResponse.json(comments);
   }),
@@ -43,6 +45,7 @@ export const handlers = [
 
     const comment = {
       id: 9000 + issueComments.length,
+      author: tokenLogin,
       repo: `${String(info.params['owner'])}/${String(info.params['name'])}`,
       number: Number(info.params['number']),
       body: payload.body,
@@ -58,6 +61,11 @@ export const handlers = [
 
     if (comment === undefined) {
       return HttpResponse.json({ message: 'Not Found', status: '404' }, { status: 404 });
+    }
+
+    // the stand-in's token edits only its own comments
+    if (comment.author !== tokenLogin) {
+      return HttpResponse.json({ message: 'Forbidden', status: '403' }, { status: 403 });
     }
 
     comment.body = payload.body;

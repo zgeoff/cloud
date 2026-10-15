@@ -7,8 +7,12 @@ const config = await loadPreviewConfig(process.env, (path) => Bun.file(path).tex
 
 const service = startPreviewService(config);
 
-process.once('SIGTERM', async () => {
-  await service.stop();
+process.once('SIGTERM', () => {
+  void stopService(service);
+});
+
+async function stopService(running: ReturnType<typeof startPreviewService>): Promise<void> {
+  await running.stop();
 
   process.exit(0);
-});
+}

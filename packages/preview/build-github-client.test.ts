@@ -57,6 +57,38 @@ test('#updatePreviewComment posts a comment that starts with the marker', async 
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
+      author: 'preview-bot',
+      repo: 'acme/greenhouse',
+      number: 17,
+      body: `${previewCommentMarker}\nfirst`,
+    },
+  ]);
+});
+
+test("#updatePreviewComment posts its own comment when another user's comment carries the marker", async () => {
+  issueComments.push({
+    id: 1,
+    author: 'fern-reviewer',
+    repo: 'acme/greenhouse',
+    number: 17,
+    body: `${previewCommentMarker}\nquoted from the preview`,
+  });
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  await client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' });
+
+  expect(issueComments).toStrictEqual([
+    {
+      id: 1,
+      author: 'fern-reviewer',
+      repo: 'acme/greenhouse',
+      number: 17,
+      body: `${previewCommentMarker}\nquoted from the preview`,
+    },
+    {
+      id: expect.toBeNumber(),
+      author: 'preview-bot',
       repo: 'acme/greenhouse',
       number: 17,
       body: `${previewCommentMarker}\nfirst`,
@@ -68,11 +100,18 @@ test('#updatePreviewComment edits the marked comment past the first page of comm
   issueComments.push(
     ...Array.from({ length: 100 }, (_, index) => ({
       id: index + 1,
+      author: 'fern-reviewer',
       repo: 'acme/greenhouse',
       number: 17,
       body: `a review note ${index}`,
     })),
-    { id: 101, repo: 'acme/greenhouse', number: 17, body: `${previewCommentMarker}\nfirst` },
+    {
+      id: 101,
+      author: 'preview-bot',
+      repo: 'acme/greenhouse',
+      number: 17,
+      body: `${previewCommentMarker}\nfirst`,
+    },
   );
 
   const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');

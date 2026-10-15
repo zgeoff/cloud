@@ -36,6 +36,7 @@ test('it reads the settings from the environment and the secrets from the creden
       impGitHubSecret: 'gh',
       healthTimeoutMs: 600_000,
       healthPollMs: 2000,
+      buildTimeoutMs: 1_800_000,
     },
     linkListener: { hostname: '100.64.0.10', port: 8417 },
     webhookListener: { hostname: '100.64.0.10', port: 8418 },

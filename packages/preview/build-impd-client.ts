@@ -118,6 +118,7 @@ async function sendImpdRPC(rpc: ImpdRPC): Promise<unknown> {
     body: JSON.stringify({ json: rpc.input }),
   });
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oRPC's response envelope
   const body = (await response.json()) as { readonly json?: unknown };
 
   if (response.ok) {
@@ -157,6 +158,7 @@ interface ImpRecord {
 // impd's imp record carries far more; lastActiveAt is a Date in the contract, which oRPC sends as
 // an ISO string
 function toImpActivity(value: unknown): ImpActivity {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- impd's ImpSchema, a superset
   const imp = value as ImpRecord;
   const lastActiveAt = typeof imp.lastActiveAt === 'string' ? new Date(imp.lastActiveAt) : null;
 
@@ -198,11 +200,13 @@ function runExec(impd: ExecTarget, start: object): Promise<CommandResult> {
 
   socket.addEventListener('message', (event) => {
     if (typeof event.data !== 'string') {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- binaryType is arraybuffer
       state.output += toFrameText(decoder, event.data as ArrayBuffer);
 
       return;
     }
 
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- impd's exec server messages
     const message = JSON.parse(event.data) as ExecServerMessage;
 
     if (message.type === 'started') {

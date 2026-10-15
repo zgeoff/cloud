@@ -41,8 +41,12 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
 
    ```bash
    op read --no-newline op://cloud/preview-github-token/credential | ssh root@geoffcloud \
-     '(umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/github-token) && echo ok'
+     'cd /var/lib/tank-cloud/host-secrets/preview && (umask 077 && cat > github-token.new) && test -s github-token.new \
+       && mv github-token.new github-token && echo ok'
    ```
+
+   The host keeps the old file when the read sends nothing, and the command prints `ok` only after
+   it replaces the file.
 
 4. Make the webhook secret, store it, and send it the same way:
 
@@ -50,7 +54,8 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
    op item create --vault cloud --category password --title preview-webhook-secret \
      "password=$(openssl rand -hex 32)" > /dev/null
    op read --no-newline op://cloud/preview-webhook-secret/password | ssh root@geoffcloud \
-     '(umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/webhook-secret) && echo ok'
+     'cd /var/lib/tank-cloud/host-secrets/preview && (umask 077 && cat > webhook-secret.new) && test -s webhook-secret.new \
+       && mv webhook-secret.new webhook-secret && echo ok'
    ```
 
 5. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:

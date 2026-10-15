@@ -1,14 +1,16 @@
-/* oxlint-disable import/max-dependencies */
+/* oxlint-disable import/max-dependencies, max-lines-per-function, max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { HttpResponse, http, passthrough } from 'msw';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
+import { server } from './mocks/node.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
@@ -25,7 +27,7 @@ async function setupTest() {
   });
 
   const impd = startStubImpd();
-  const log = mock();
+  const log = mock<(message: string) => void>();
 
   const deps: PreviewDeps = {
     settings: {
@@ -41,6 +43,7 @@ async function setupTest() {
       impGitHubSecret: 'gh',
       healthTimeoutMs: 60_000,
       healthPollMs: 1000,
+      buildTimeoutMs: 1_800_000,
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
@@ -87,6 +90,97 @@ test('it sleeps the preview unused for the idle timeout and keeps the one in use
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
   expect(ctx.impd.imps.get('pv-0a1b2c3d-18')?.state).toBe('running');
+});
+
+test('it waits for a running boot to settle before it sleeps an idle preview', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  const gate = Promise.withResolvers<void>();
+  const held = ctx.deps.withSlotLock(() => gate.promise);
+  const sweep = runIdleSweep(ctx.deps);
+
+  // two impd round trips while the lock is held give an unlocked sweep time to list and sleep
+  await ctx.deps.impd.readImps();
+  await ctx.deps.impd.readImps();
+
+  const stateWhileHeld = ctx.impd.imps.get('pv-0a1b2c3d-17')?.state;
+
+  gate.resolve();
+
+  await held;
+  await sweep;
+
+  expect(stateWhileHeld).toBe('running');
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
+});
+
+test('it sleeps the other idle previews when impd refuses one', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-18', {
+    name: 'pv-0a1b2c3d-18',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  server.use(
+    http.post(`${ctx.impd.url}/rpc/imps/sleep`, async (info) => {
+      const body = await info.request.clone().text();
+
+      return body.includes('pv-0a1b2c3d-17')
+        ? HttpResponse.json(
+            {
+              json: {
+                defined: true,
+                code: 'CONFLICT',
+                status: 409,
+                message: 'pv-0a1b2c3d-17 holds a lease',
+              },
+            },
+            { status: 409 },
+          )
+        : passthrough();
+    }),
+  );
+
+  await runIdleSweep(ctx.deps);
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-18')?.state).toBe('sleeping');
+
+  expect(ctx.log.mock.calls).toStrictEqual([
+    [
+      'pv-0a1b2c3d-17: the idle sleep failed: ImpdError: impd CONFLICT: pv-0a1b2c3d-17 holds a lease',
+    ],
+    ['pv-0a1b2c3d-18: asleep after the idle timeout'],
+  ]);
 });
 
 test('it logs a failed sweep instead of throwing', async () => {

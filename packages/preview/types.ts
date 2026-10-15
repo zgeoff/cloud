@@ -24,6 +24,9 @@ export interface PreviewSettings {
   // null clones without a credential, which reaches public repositories only
   readonly impGitHubSecret: string | null;
 
+  // how long the build, the checkout and `docker compose up`, may run before the boot fails
+  readonly buildTimeoutMs: number;
+
   // how long a boot waits for the health path to answer
   readonly healthTimeoutMs: number;
   readonly healthPollMs: number;

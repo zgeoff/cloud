@@ -45,6 +45,7 @@ async function setupTest() {
       impGitHubSecret: 'gh',
       healthTimeoutMs: 60_000,
       healthPollMs: 1000,
+      buildTimeoutMs: 1_800_000,
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
@@ -98,6 +99,7 @@ test('it posts one comment with the tailnet link when a pull request opens', asy
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
+      author: 'preview-bot',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('**Preview:** http://geoffcloud:8417/acme/greenhouse/17'),
@@ -160,6 +162,7 @@ test('it edits the same comment when a push moves the head of the pull request',
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
+      author: 'preview-bot',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('Opening the link boots `bbbbbbb`'),
@@ -323,6 +326,7 @@ test('it posts the link for a repository its owner wildcard lists', async () => 
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
+      author: 'preview-bot',
       repo: 'nursery/seedlings',
       number: 3,
       body: expect.toInclude('**Preview:** http://geoffcloud:8417/nursery/seedlings/3'),
@@ -440,6 +444,7 @@ test('it removes the imp and says the preview ended when the pull request closes
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
+      author: 'preview-bot',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('**Preview ended.**'),

@@ -61,6 +61,16 @@ interface PreviewRow {
   readonly detail: string | null;
 }
 
+// A reopened preview, and a failed one whose head moved, wait for the next open again. SET reads
+// the row as it was before the update, so each CASE compares the old head.
+const restartsWhen = `phase = 'ended' OR (phase = 'failed' AND head_sha <> excluded.head_sha)`;
+
+const upsertHeadSQL = `INSERT INTO previews (repo, number, imp, head_sha, phase)
+  VALUES (?1, ?2, ?3, ?4, 'waiting')
+  ON CONFLICT (repo, number) DO UPDATE SET head_sha = excluded.head_sha,
+    phase = CASE WHEN ${restartsWhen} THEN 'waiting' ELSE phase END,
+    detail = CASE WHEN ${restartsWhen} THEN NULL ELSE detail END`;
+
 // The service's own record of each pull request it has seen, in one SQLite file. impd stays the
 // source of truth for whether an imp runs or sleeps.
 export function createPreviewStore(path: string): PreviewStore {
@@ -72,10 +82,7 @@ export function createPreviewStore(path: string): PreviewStore {
     'SELECT * FROM previews WHERE repo = ?1 AND number = ?2',
   );
 
-  const upsert = db.query(`INSERT INTO previews (repo, number, imp, head_sha, phase)
-    VALUES (?1, ?2, ?3, ?4, 'waiting')
-    ON CONFLICT (repo, number) DO UPDATE SET head_sha = excluded.head_sha,
-      phase = CASE phase WHEN 'ended' THEN 'waiting' ELSE phase END`);
+  const upsert = db.query(upsertHeadSQL);
 
   const update = db.query(`UPDATE previews
     SET phase = ?3, built_sha = coalesce(?4, built_sha), detail = ?5

@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines-per-function, max-statements, typescript/prefer-readonly-parameter-types */
+/* oxlint-disable max-lines-per-function, max-statements, typescript/no-unsafe-type-assertion */
 import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { http, passthrough } from 'msw';

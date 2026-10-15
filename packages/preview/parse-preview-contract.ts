@@ -29,5 +29,6 @@ function requireMapping(value: unknown, what: string): Readonly<Record<string, u
     throw new TypeError(`${what} is not a mapping`);
   }
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked as an object above
   return value as Readonly<Record<string, unknown>>;
 }

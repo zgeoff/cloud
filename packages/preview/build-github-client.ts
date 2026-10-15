@@ -20,6 +20,9 @@ export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
   const send = (request: GitHubRequest): Promise<Response> =>
     sendGitHubRequest(apiURL, token, request);
 
+  // the token's user, read once, which writes the preview comment
+  const tokenUser: { login?: string } = {};
+
   return {
     readComposeFile: async (repo, sha) => {
       const path = `/repos/${repo}/contents/preview/compose.yaml?ref=${encodeURIComponent(sha)}`;
@@ -30,12 +33,15 @@ export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
         return null;
       }
 
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's contents API shape
       const file = (await response.json()) as { readonly content?: string };
 
       return Buffer.from(file.content ?? '', 'base64').toString('utf8');
     },
     updatePreviewComment: async (comment) => {
-      const id = await findPreviewCommentID(send, comment);
+      tokenUser.login ??= await readTokenLogin(send);
+
+      const id = await findPreviewCommentID(send, comment, tokenUser.login);
 
       const body = JSON.stringify({ body: `${previewCommentMarker}\n${comment.body}` });
 
@@ -88,12 +94,16 @@ async function sendGitHubRequest(
 interface IssueComment {
   readonly id: number;
   readonly body?: string;
+  readonly user?: { readonly login: string } | null;
 }
 
-// pages through the pull request's comments, a hundred at a time, until one holds the marker
+// Pages through the pull request's comments, a hundred at a time, until one that the token's own
+// user wrote holds the marker. Anyone can paste the marker, and GitHub lets the service edit only
+// its own comments.
 async function findPreviewCommentID(
   send: (request: GitHubRequest) => Promise<Response>,
   comment: PreviewComment,
+  login: string,
 ): Promise<number | null> {
   for (let page = 1; ; page += 1) {
     const path = `/repos/${comment.repo}/issues/${comment.number}/comments?per_page=100&page=${page}`;
@@ -101,12 +111,27 @@ async function findPreviewCommentID(
     // oxlint-disable-next-line no-await-in-loop -- each page follows the one before it
     const response = await send({ path });
 
-    // oxlint-disable-next-line no-await-in-loop -- the same page's body
+    // oxlint-disable-next-line no-await-in-loop, typescript/no-unsafe-type-assertion -- the same page, in GitHub's issue comments shape
     const comments = (await response.json()) as readonly IssueComment[];
-    const match = comments.find((candidate) => candidate.body?.includes(previewCommentMarker));
+
+    const match = comments.find(
+      (candidate) =>
+        candidate.user?.login === login && candidate.body?.includes(previewCommentMarker) === true,
+    );
 
     if (match !== undefined || comments.length < 100) {
       return match?.id ?? null;
     }
   }
+}
+
+async function readTokenLogin(
+  send: (request: GitHubRequest) => Promise<Response>,
+): Promise<string> {
+  const response = await send({ path: '/user' });
+
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's authenticated user shape
+  const user = (await response.json()) as { readonly login: string };
+
+  return user.login;
 }

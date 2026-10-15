@@ -59,6 +59,7 @@ function requireObject(value: unknown, field: string): Readonly<Record<string, u
     throw new TypeError(`the payload has no ${field} object`);
   }
 
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked as an object above
   return value as Readonly<Record<string, unknown>>;
 }
 

@@ -74,15 +74,29 @@ async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseC
   return closed ?? runBuild(deps, preview, contract);
 }
 
-// Checks out the head commit and starts its stack in the imp, then waits for the health path
+// Checks out the head commit and starts its stack in the imp, then waits for the health path. The
+// guest's `timeout` bounds the build, which holds the slot lock, so a hung build fails its boot
+// rather than block every other preview; it exits 124 when the bound passes.
 async function runBuild(
   deps: PreviewDeps,
   preview: Preview,
   contract: PreviewContract,
 ): Promise<PhaseChange> {
+  const seconds = String(Math.ceil(deps.settings.buildTimeoutMs / 1000));
+
   const build = await deps.impd.runCommand(
     preview.imp,
-    ['sh', '-c', bootScript, 'preview-boot', preview.repo, preview.headSHA],
+    [
+      'timeout',
+      '--kill-after=30',
+      seconds,
+      'sh',
+      '-c',
+      bootScript,
+      'preview-boot',
+      preview.repo,
+      preview.headSHA,
+    ],
     { requireBroker: deps.settings.impGitHubSecret !== null },
   );
 

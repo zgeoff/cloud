@@ -46,6 +46,9 @@ async function setupTest() {
       // three probes fit before the boot times out
       healthTimeoutMs: 3000,
       healthPollMs: 1000,
+
+      // half an hour bounds the build, the first argument of its timeout
+      buildTimeoutMs: 1_800_000,
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
@@ -107,6 +110,9 @@ test('it creates the imp with the contract port and the grant, then builds and p
     {
       imp: 'pv-0a1b2c3d-17',
       argv: [
+        'timeout',
+        '--kill-after=30',
+        '1800',
         'sh',
         '-c',
         expect.toInclude('docker compose up --detach --build --wait'),

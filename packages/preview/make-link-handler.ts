@@ -24,7 +24,9 @@ export function makeLinkHandler(deps: PreviewDeps): (request: Request) => Promis
       return buildPageResponse(page ?? buildNoPreviewPage(key));
     }
 
-    return await openPreview(deps, preview);
+    const response = await openPreview(deps, preview);
+
+    return response;
   };
 }
 
