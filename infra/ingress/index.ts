@@ -29,6 +29,7 @@ interface IngressOutputs {
   readonly tunnelToken: Output<string>;
   readonly tunnelConfigVersion: Output<number>;
   readonly atcURL?: Output<string>;
+  readonly previewWebhookURL: Output<string>;
 }
 
 // Public ingress (#7). One tunnel for every public hostname under geoff.cloud;
@@ -50,7 +51,8 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     createCloudflared(inputs.cluster, tunnelToken);
   }
 
-  // the tunnel's one route: atc.geoff.cloud, a workload in k3s
+  // the tunnel's routes: atc.geoff.cloud, a workload in k3s, and the preview service's webhook
+  // listener on the host
   const routes = createTunnelRoutes({
     accountID: inputs.accountID,
     zoneID: inputs.zoneID,
@@ -62,5 +64,6 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     tunnelToken,
     tunnelConfigVersion: routes.configVersion,
     ...(routes.atcURL === undefined ? {} : { atcURL: routes.atcURL }),
+    previewWebhookURL: routes.previewWebhookURL,
   };
 }

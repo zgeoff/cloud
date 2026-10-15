@@ -3,9 +3,11 @@
 The estate has one way in from the internet: a Cloudflare tunnel that cloudflared holds open from
 inside the cluster. The host opens no inbound port for it, so a public route exists only as a rule
 in the tunnel's configuration and a DNS record that points at the tunnel, and Pulumi declares both.
-Each workload behind the tunnel brings its own authentication, and the only route is
-`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server.
-[The atc gateway](../workloads/atc-gateway.md) covers what answers behind the route.
+Each workload behind the tunnel brings its own authentication. The tunnel has two routes:
+`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server, and
+`preview-webhook.geoff.cloud`, the preview service's webhook listener, which checks the signature of
+every GitHub delivery. [The atc gateway](../workloads/atc-gateway.md) and
+[the preview service](../workloads/preview.md) cover what answers behind each route.
 
 ## The tunnel
 
@@ -16,10 +18,13 @@ a file in the cluster, so a route change is a Pulumi change to the tunnel's conf
 cloudflared picks it up with no redeploy.
 
 The tunnel's configuration is an ordered list, and cloudflared takes the first rule that matches.
-The list holds the gateway's hostname, routed to the gateway's Service in the cluster, and then a
-catch-all that answers 404. The catch-all stays last, so a hostname with no rule of its own, or any
-other name that reaches the tunnel, gets a 404 and never a workload. The gateway's hostname is a
-proxied CNAME to the tunnel, so it resolves to Cloudflare's edge and never to the host.
+The list holds the gateway's hostname, routed to the gateway's Service in the cluster, then the
+preview webhook's hostname, and then a catch-all that answers 404. The webhook's rule matches the
+path `/webhook` alone and routes it to the listener on the host's tailnet address, which the host
+admits only from pod addresses. The catch-all stays last, so a hostname with no rule of its own, a
+request to the webhook's hostname on any other path, or any other name that reaches the tunnel, gets
+a 404 and never a workload. Each hostname is a proxied CNAME to the tunnel, so it resolves to
+Cloudflare's edge and never to the host.
 
 cloudflared passes the request's own host header through to the gateway. The gateway answers only
 requests addressed to its public host or to loopback, so a request that reached its Service by any

@@ -80,6 +80,13 @@
       "reason": "The atc gateway's MCP and OAuth endpoints for remote MCP clients; the gateway authenticates every call itself"
     },
     {
+      "name": "preview-webhook-route",
+      "kind": "tunnel-hostname",
+      "hostname": "preview-webhook.geoff.cloud",
+      "scope": "public",
+      "reason": "GitHub's pull_request webhooks for the preview service, POST /webhook only; the service refuses every call without a valid signature"
+    },
+    {
       "name": "imp",
       "kind": "tunnel-hostname",
       "hostname": "imp.geoff.cloud",
