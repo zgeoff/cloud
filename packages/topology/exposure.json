@@ -47,6 +47,24 @@
       "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from docker0's subnet only"
     },
     {
+      "name": "preview-link",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 8417,
+      "scope": "tailnet",
+      "reason": "The preview service's links, which it serves on the host's tailnet address only: each redirects to a pull request's imp, itself on the tailnet only"
+    },
+    {
+      "name": "preview-webhook",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 8418,
+      "scope": "host",
+      "interface": "cni0",
+      "admission": true,
+      "reason": "cloudflared's pod dials the preview service's webhook listener on the host's tailnet address, and inet cloud_host admits only pod addresses on cni0; the service refuses every unsigned call"
+    },
+    {
       "name": "grafana",
       "kind": "host-port",
       "protocol": "tcp",

@@ -30,6 +30,8 @@ call, the path of a change, the topology and the data.
     route on the tailnet, and its backup.
   - [The agent image](./architecture/workloads/agent-image.md): what sessions run on, and how it is
     built and pinned.
+  - [Previews](./architecture/workloads/preview.md): one imp per pull request, behind a tailnet
+    link, and the signed webhook that posts it.
   - [Observability](./architecture/workloads/observability.md): metrics, logs, probes, alerts and
     the check from the edge.
 
@@ -61,6 +63,8 @@ call, the path of a change, the topology and the data.
   forgotten item, test a restore.
 - [Release check](./runbooks/release-check.md): the bump pull requests for new atc, imp, nixie and
   auto-mode releases, when they merge on their own, and the app they run as.
+- [Previews](./runbooks/preview.md): set up the preview service, opt a repository in, check a
+  preview live.
 - [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): the tailnet client for imp's end-to-end suites.
 
 Planned work and open choices live in Linear, not in this tree.

@@ -43,6 +43,15 @@
         "zod": "4.6.5",
       },
     },
+    "packages/preview": {
+      "name": "@zgeoff/cloud-preview",
+      "devDependencies": {
+        "@faker-js/faker": "10.6.0",
+        "@types/bun": "1.3.14",
+        "@zgeoff/bun-test-extended": "0.1.0",
+        "msw": "2.15.0",
+      },
+    },
     "packages/topology": {
       "name": "@zgeoff/cloud-topology",
       "dependencies": {
@@ -596,6 +605,8 @@
     "@zgeoff/cloud-health-check": ["@zgeoff/cloud-health-check@workspace:workers/health-check"],
 
     "@zgeoff/cloud-infra": ["@zgeoff/cloud-infra@workspace:infra"],
+
+    "@zgeoff/cloud-preview": ["@zgeoff/cloud-preview@workspace:packages/preview"],
 
     "@zgeoff/cloud-topology": ["@zgeoff/cloud-topology@workspace:packages/topology"],
 

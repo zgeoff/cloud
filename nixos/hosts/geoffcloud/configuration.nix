@@ -18,6 +18,8 @@ let
       builtins.filter (entry: entry.scope == "public" && entry.protocol == protocol) hostPorts
     );
   atcDaemonExposure = getHostPort "atc-daemon";
+  previewLinkExposure = getHostPort "preview-link";
+  previewWebhookExposure = getHostPort "preview-webhook";
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -136,6 +138,12 @@ in
       sourceCIDR = k3sPodCIDR;
       destinationAddress = atcDaemonAddress;
     }
+    # the preview service's webhook listener, on the same path for cloudflared's pod
+    {
+      inherit (previewWebhookExposure) port interface;
+      sourceCIDR = k3sPodCIDR;
+      destinationAddress = topology.tailnet.nodes.geoffcloud.address;
+    }
   ];
 
   # 1Password Connect for imps, relayed from docker0 to the Service's pinned ClusterIP; the
@@ -217,6 +225,7 @@ in
       k3s = [ "rancher" ];
       imp-host = [ "host-secrets" ];
       atc-daemon = [ "host-secrets" ];
+      preview = [ "host-secrets" ];
     };
   };
 
@@ -241,6 +250,23 @@ in
       # ChatGPT's connector, added 2026-10-04
       "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
     };
+  };
+
+  # The preview service (docs/architecture/workloads/preview.md, docs/runbooks/preview.md). Its
+  # secrets sit on host-secrets, staged by the runbook; until they exist, the unit is skipped.
+  # A repository opts in with preview/compose.yaml and a webhook to the public route.
+  services.preview = {
+    enable = true;
+    linkListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewLinkExposure.port}";
+    webhookListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewWebhookExposure.port}";
+    baseURL = "http://geoffcloud:${toString previewLinkExposure.port}";
+    repos = [ "zgeoff/*" ];
+    impdURL = impdLoopbackURL;
+    impDomain = topology.imp.domain;
+    impGitHubSecret = "gh";
+    webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
+    githubTokenFile = "/var/lib/tank-cloud/host-secrets/preview/github-token";
+    impTokenFile = "/var/lib/tank-cloud/host-secrets/preview/imp-token";
   };
 
   services.k3s = {

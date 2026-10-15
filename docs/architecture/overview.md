@@ -95,6 +95,8 @@ flowchart TB
   ([imp on the host](./host/imp.md)).
 - **The cloud daemon** is a NixOS service on the host, beside imp-host, so it reaches impd on the
   host's loopback.
+- **The preview service** is a NixOS service on the host for the same reason: it runs each pull
+  request's preview in an imp, behind a tailnet link ([previews](./workloads/preview.md)).
 
 The host's tailnet node carries every pod's tailnet traffic, so a pod reaches the tailnet with the
 host's identity. The tailnet policy therefore grants the host only the ports its workloads dial

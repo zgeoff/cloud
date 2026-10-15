@@ -11,7 +11,7 @@
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [
     {
-      "files": ["infra/**/*.ts", "workers/**/*.ts"],
+      "files": ["infra/**/*.ts", "workers/**/*.ts", "packages/preview/**/*.ts"],
       "rules": {
         "typescript/prefer-readonly-parameter-types": "off"
       }

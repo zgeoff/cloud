@@ -24,6 +24,7 @@
     "lint:full": "oxlint --type-aware --type-check --report-unused-disable-directives-severity error",
     "test": "bun test",
     "test:health-check": "cd workers/health-check && bun test",
+    "test:preview": "cd packages/preview && bun test",
     "test:related": "bun scripts/run-related-tests.ts",
     "test:scripts": "bash scripts/run-shell-suites.sh",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
