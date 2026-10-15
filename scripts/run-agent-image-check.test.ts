@@ -40,8 +40,40 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
     ['impz', 'rm', 'agent-check-abc1234'],
   ]);
 
-  expect(stub.calls[1]?.options).toStrictEqual({ cwd: ctx.work, timeoutMs: 1_800_000 });
+  expect(stub.calls[1]?.options).toStrictEqual({
+    cwd: ctx.work,
+    timeoutMs: 1_800_000,
+    env: expect.objectContaining({
+      PATH: `${join(ctx.work, 'imp-shim')}:${process.env['PATH'] ?? ''}`,
+    }),
+  });
+
   expect(printErr.mock.calls).toStrictEqual([['agent-check-abc1234\n'], ['== 0 failed\n']]);
+});
+
+test('it hands a pre-rename check’s imp calls to impz through the shim on its PATH', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.src, 'scripts/check-agent-image.sh'), '');
+
+  const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
+  const stub = buildStubRunner(imp.handler, buildStubCheckAgentImage(0));
+
+  await runAgentImageCheck(
+    { run: stub.run, printOut: () => {}, printErr: () => {}, registerCleanup: () => () => {} },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+  );
+
+  const bin = join(ctx.work, 'stub-bin');
+
+  await mkdir(bin);
+  await writeFile(join(bin, 'impz'), '#!/bin/sh\necho "impz $*"\n', { mode: 0o755 });
+
+  const result = Bun.spawnSync([join(ctx.work, 'imp-shim', 'imp'), 'cp', 'dir', 'box:/x'], {
+    env: { PATH: `${bin}:/usr/bin:/bin` },
+  });
+
+  expect(result.stdout.toString()).toBe('impz cp dir box:/x\n');
 });
 
 test('it reports a failed check after it removes the imp', async () => {
