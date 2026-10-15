@@ -43,9 +43,7 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
   expect(stub.calls[1]?.options).toStrictEqual({
     cwd: ctx.work,
     timeoutMs: 1_800_000,
-    env: expect.objectContaining({
-      PATH: `${join(ctx.work, 'imp-shim')}:${process.env['PATH'] ?? ''}`,
-    }),
+    env: { ...process.env, PATH: `${join(ctx.work, 'imp-shim')}:${process.env['PATH'] ?? ''}` },
   });
 
   expect(printErr.mock.calls).toStrictEqual([['agent-check-abc1234\n'], ['== 0 failed\n']]);
