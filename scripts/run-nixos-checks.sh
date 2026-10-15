@@ -9,8 +9,8 @@
 # they need KVM:
 # unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the
 # script builds every other check it was asked for and then fails, naming those checks. Each such
-# check itself fails if QEMU still falls back to emulation. One container evaluates the checks to
-# their derivations, and a second builds those derivations from the store. The checks read
+# check itself fails if QEMU still falls back to emulation. A container for each check evaluates it to
+# its derivation, and one more builds those derivations from the store. The checks read
 # test-support/shell beside nixos/, so the evaluation's flake source is the repo root
 # (path:.?dir=nixos), not nixos/ alone. The source is a snapshot of the working tree's
 # tracked and unignored files, so a local edit is tested before it is committed and nothing
@@ -93,14 +93,17 @@ for check in "${checks[@]}"; do
   installables+=("path:/src?dir=nixos#checks.x86_64-linux.$check")
 done
 
-# the checks are evaluated to their derivations in one container and built from them in another:
-# a nix that has evaluated every check keeps that heap, about 5.5 GB, until it exits, so one that
-# also ran the build left the VMs too little of the 7 GB cap, and the kernel killed it (GEO-937).
-# The build's nix reads only the store. Two builds at once: each restore rehearsal boots a
-# 2048 MB VM, so two of them fit in 7 GB beside Nix, where all four would not
+# each check is evaluated to its derivation in a container of its own, and the derivations are
+# built in another: a nix keeps the heap of everything it evaluated until it exits, and one that
+# evaluated every check held about 5.5 GB. As the build's nix, it left the VMs too little of the
+# 7 GB cap, and the kernel killed it (GEO-937); even alone, it reached the cap. One check's heap
+# is far smaller, and the build's nix reads only the store. Two builds at once: each restore
+# rehearsal boots a 2048 MB VM, so two of them fit in 7 GB beside Nix, where all four would not
 if [ "${#installables[@]}" -gt 0 ]; then
-  run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
-    nix "${nix_args[@]}" path-info --derivation "${installables[@]}" > "$derivations"
+  for installable in "${installables[@]}"; do
+    run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
+      nix "${nix_args[@]}" path-info --derivation "$installable" >> "$derivations"
+  done
   mapfile -t outputs < <(sed 's/$/^*/' "$derivations")
   run_nix "${kvm[@]}" -v "$volume":/nix "$NIX_IMAGE" \
     nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \

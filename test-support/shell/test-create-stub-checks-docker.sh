@@ -77,6 +77,29 @@ EOF
   }
 }
 
+it_replaces_an_earlier_calls_copy_of_the_source_for_a_path_info() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/src/nixos" "$tree/saw/stale"
+  echo '{ }' > "$tree/src/nixos/flake.nix"
+  echo 'from an earlier call' > "$tree/saw/stale/file"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_SOURCE_SAW="$tree/saw" \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix path-info --derivation 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff -r "$tree/src" "$tree/saw"
+  diff - "$tree/out" <<< '/nix/store/00000000000000000000000000000000-atc-daemon.drv'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
 it_copies_the_source_then_fails_a_path_info_with_the_set_error_and_exit_1() {
   local status=0
   tree="$(mktemp -d)"

@@ -6,8 +6,9 @@
 #   with no trailing newline, as `nix eval --raw` prints a string, or, when STUB_EVAL_ERROR is
 #   set, prints it on stderr and exits 1, nix's exit for a failed evaluation;
 # - a `run … path-info --derivation …`: copies the directory mounted at /src (its `<dir>:/src:ro`
-#   argument) to STUB_SOURCE_SAW, then, when STUB_DERIVATION_ERROR is set, prints it on stderr and
-#   exits 1, nix's exit for a failed evaluation; otherwise it prints one line for each
+#   argument) to STUB_SOURCE_SAW, in place of an earlier call's copy, then, when
+#   STUB_DERIVATION_ERROR is set, prints it on stderr and exits 1, nix's exit for a failed
+#   evaluation; otherwise it prints one line for each
 #   `path:/src?dir=nixos#checks.x86_64-linux.<name>` argument,
 #   /nix/store/00000000000000000000000000000000-<name>.drv, as nix prints each derivation's path;
 # - a `run … build --no-link -L …`: when STUB_BUILD_ERROR is set, prints it on stderr and exits 1,
@@ -37,6 +38,7 @@ case "$*" in
     for arg in "$@"; do
       case "$arg" in *":/src:ro") src="${arg%:/src:ro}" ;; esac
     done
+    rm -rf "$STUB_SOURCE_SAW"
     cp -R "$src" "$STUB_SOURCE_SAW"
     if [ -n "${STUB_DERIVATION_ERROR:-}" ]; then echo "$STUB_DERIVATION_ERROR" >&2; exit 1; fi
     for arg in "$@"; do
