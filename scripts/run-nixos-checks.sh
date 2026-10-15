@@ -9,9 +9,10 @@
 # they need KVM:
 # unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the
 # script builds every other check it was asked for and then fails, naming those checks. Each such
-# check itself fails if QEMU still falls back to emulation. The checks read test-support/shell
-# beside nixos/, so the build's flake source is the repo root (path:.?dir=nixos), not nixos/
-# alone. The source is a snapshot of the working tree's
+# check itself fails if QEMU still falls back to emulation. One container evaluates the checks to
+# their derivations, and a second builds those derivations from the store. The checks read
+# test-support/shell beside nixos/, so the evaluation's flake source is the repo root
+# (path:.?dir=nixos), not nixos/ alone. The source is a snapshot of the working tree's
 # tracked and unignored files, so a local edit is tested before it is committed and nothing
 # ignored, such as node_modules or .worktrees, is copied. The Docker
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it
@@ -23,9 +24,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
 repo="$(git rev-parse --show-toplevel)"
 snapshot="$(mktemp -d)"
+derivations="$(mktemp)"
 
 teardown() {
-  rm -rf "$snapshot"
+  rm -rf "$snapshot" "$derivations"
 }
 trap teardown EXIT
 
@@ -91,12 +93,18 @@ for check in "${checks[@]}"; do
   installables+=("path:/src?dir=nixos#checks.x86_64-linux.$check")
 done
 
-# two builds at once: each restore rehearsal boots a 2048 MB VM, so two of them fit in 8 GB beside
-# Nix, where all four would not
+# the checks are evaluated to their derivations in one container and built from them in another:
+# a nix that has evaluated every check keeps that heap, about 5.5 GB, until it exits, so one that
+# also ran the build left the VMs too little of the 7 GB cap, and the kernel killed it (GEO-937).
+# The build's nix reads only the store. Two builds at once: each restore rehearsal boots a
+# 2048 MB VM, so two of them fit in 7 GB beside Nix, where all four would not
 if [ "${#installables[@]}" -gt 0 ]; then
-  run_nix "${kvm[@]}" -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
+  run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
+    nix "${nix_args[@]}" path-info --derivation "${installables[@]}" > "$derivations"
+  mapfile -t outputs < <(sed 's/$/^*/' "$derivations")
+  run_nix "${kvm[@]}" -v "$volume":/nix "$NIX_IMAGE" \
     nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
-    --max-jobs 2 build --no-link -L "${installables[@]}"
+    --max-jobs 2 build --no-link -L "${outputs[@]}"
 fi
 
 if [ "${#missing_kvm[@]}" -eq 1 ]; then
