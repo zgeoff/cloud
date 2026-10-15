@@ -28,6 +28,14 @@ test('it accepts registry ports that equal their constants', () => {
             reason: 'the gateway',
           },
           {
+            name: 'k3s-api',
+            kind: 'host-port',
+            protocol: 'tcp',
+            port: 6443,
+            scope: 'tailnet',
+            reason: 'the cluster API',
+          },
+          {
             name: 'grafana',
             kind: 'host-port',
             protocol: 'tcp',
@@ -98,6 +106,14 @@ test('it names every registry port that differs from its constant, and a missing
             admission: true,
             reason: 'the gateway',
           },
+          {
+            name: 'k3s-api',
+            kind: 'host-port',
+            protocol: 'tcp',
+            port: 6444,
+            scope: 'tailnet',
+            reason: 'the cluster API',
+          },
         ],
       },
       {
@@ -137,6 +153,7 @@ test('it names every registry port that differs from its constant, and a missing
   }).toThrowWithMessage(
     Error,
     'exposure entry tailscale has port 41642, but tailnet.directPort is 41641\n' +
+      'exposure entry k3s-api has port 6444, but k3s.apiPort is 6443\n' +
       'exposure entry grafana has port undefined, but k3s.grafanaNodePort is 30300',
   );
 });

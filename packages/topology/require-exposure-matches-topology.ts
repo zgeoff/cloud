@@ -9,6 +9,7 @@ const constantPorts = [
     read: (t: Topology) => t.tailnet.directPort,
   },
   { entry: 'atc-daemon', constant: 'atc.daemonPort', read: (t: Topology) => t.atc.daemonPort },
+  { entry: 'k3s-api', constant: 'k3s.apiPort', read: (t: Topology) => t.k3s.apiPort },
   {
     entry: 'grafana',
     constant: 'k3s.grafanaNodePort',

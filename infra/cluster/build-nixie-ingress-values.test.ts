@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
 import { buildNixieIngressValues } from './build-nixie-ingress-values.ts';
 
 test("it holds the host's port 443, reads Ingress objects from nixie's namespace alone and reports the host's tailnet address as their endpoint", () => {
@@ -34,4 +35,22 @@ test("it holds the host's port 443, reads Ingress objects from nixie's namespace
     },
     service: { spec: { type: 'ClusterIP' } },
   });
+});
+
+test("it builds the same release values from the registry's nixie-ingress port as from the 443 it held before", () => {
+  expect(
+    buildNixieIngressValues({
+      httpsPort: geoffcloudNode.httpsPort,
+      endpointIP: geoffcloudNode.ip,
+      ingressClass: 'nixie',
+      namespace: 'nixie',
+    }),
+  ).toStrictEqual(
+    buildNixieIngressValues({
+      httpsPort: 443,
+      endpointIP: '100.69.47.33',
+      ingressClass: 'nixie',
+      namespace: 'nixie',
+    }),
+  );
 });
