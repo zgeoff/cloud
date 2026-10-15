@@ -325,9 +325,9 @@ let
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts || true)
         grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts > handler || true
-        # with no reboot reason, the warnings are the empty list the stand-in's bodies hold
-        grep -xF -A2 'function buildHealthWarnings(rebootReason: string | null): string[] {' \
-          ${imp}/packages/daemon/src/build-app.ts > warnings || true
+        # with no reboot reason and no storage warnings, the warnings are the empty list the
+        # stand-in's bodies hold
+        grep -xF -A7 'function buildHealthWarnings(' ${imp}/packages/daemon/src/build-app.ts > warnings || true
         # an Elysia onError hook would replace the default 404; build-app.ts's onError is oRPC's
         error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/build-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
@@ -340,12 +340,17 @@ let
             .get('/health', () => ({
               status: 'ok',
               ready: deps.isReady(),
-              warnings: buildHealthWarnings(deps.imps.readRebootReason()),
+              warnings: buildHealthWarnings(deps.imps.readRebootReason(), deps.storage.readWarnings()),
             }))
         EOF
         assert_files_equal - warnings <<'EOF'
-        function buildHealthWarnings(rebootReason: string | null): string[] {
-          return rebootReason === null ? [] : [`host needs a reboot: ''${rebootReason}`];
+        function buildHealthWarnings(
+          rebootReason: string | null,
+          storageWarnings: readonly string[],
+        ): string[] {
+          const reboot = rebootReason === null ? [] : [`host needs a reboot: ''${rebootReason}`];
+
+          return [...reboot, ...storageWarnings];
         }
         EOF
         assert_equals 0 "$error_hooks" "build-app.ts's Elysia onError hooks"
@@ -428,7 +433,8 @@ let
           cat > $out/app.ts <<'EOF'
           import { Elysia } from 'elysia';
 
-          // packages/daemon/src/build-app.ts's /health handler, with impd ready and no reboot reason
+          // packages/daemon/src/build-app.ts's /health handler, with impd ready, no reboot reason and
+          // no storage warnings
           const app = new Elysia()
             .get('/health', () => ({ status: 'ok', ready: true, warnings: [] }))
             .listen({ hostname: '127.0.0.1', port: 0 });
