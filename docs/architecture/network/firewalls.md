@@ -75,12 +75,12 @@ opens something reads the registry instead of its own list, and a check compares
 so a port or a hostname cannot go public without an entry that records why. The registry's
 [reference table](../../reference/exposure.md) is generated from it.
 
-| Kind               | Read by                                            | Checked by                                                     |
-| ------------------ | -------------------------------------------------- | -------------------------------------------------------------- |
-| host port          | the host's public ports and admissions, edge rules | the `exposure` NixOS check, against the evaluated host config  |
-| tunnel hostname    | the tunnel's routes                                | the Pulumi program, which refuses a hostname not listed public |
-| tailnet capability | nothing                                            | nothing                                                        |
-| Worker URL         | nothing                                            | nothing                                                        |
+| Kind               | Read by                                                                  | Checked by                                                     |
+| ------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| host port          | the host's public ports and admissions, edge rules, nixie's ingress port | the `exposure` NixOS check, against the evaluated host config  |
+| tunnel hostname    | the tunnel's routes                                                      | the Pulumi program, which refuses a hostname not listed public |
+| tailnet capability | nothing                                                                  | nothing                                                        |
+| Worker URL         | nothing                                                                  | nothing                                                        |
 
 The `exposure` check reads NixOS's evaluated firewall and fails on any difference in either
 direction. A port open on every interface needs a public entry, and a tailnet entry's port open

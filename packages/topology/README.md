@@ -37,7 +37,7 @@ data that the host, infra and the scripts all read belongs in this package as it
 `exposure.json` lists every public route and port, and each port the host keeps to the tailnet or to
 itself, with its scope and its reason. The package exports it parsed as `exposure`, and fails to
 load when one of its ports differs from the same port in the constants. The host reads it through
-`nixos/exposure.nix`, and `bun run docs:exposure` writes its table into
-`docs/reference/exposure.md`.
+`nixos/exposure.nix`, nixie's ingress takes its port from it, and `bun run docs:exposure` writes its
+table into `docs/reference/exposure.md`.
 [Firewalls](../../docs/architecture/network/firewalls.md#the-exposure-registry) covers the checks
 that hold it to the code.

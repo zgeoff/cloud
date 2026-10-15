@@ -73,6 +73,22 @@
       "reason": "Grafana's NodePort, which k3s binds to the tailnet range only"
     },
     {
+      "name": "nixie-ingress",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 443,
+      "scope": "tailnet",
+      "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only: nixie.geoff.cloud points at that address"
+    },
+    {
+      "name": "k3s-api",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 6443,
+      "scope": "tailnet",
+      "reason": "k3s's API server, which the tailnet policy grants to the prod apply job and to the Pulumi runs on home-pc only"
+    },
+    {
       "name": "atc-gateway",
       "kind": "tunnel-hostname",
       "hostname": "atc.geoff.cloud",
