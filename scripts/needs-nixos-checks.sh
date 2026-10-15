@@ -8,7 +8,8 @@
 # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file there), the
 # scripts that run them and pin their image (run-nixos-checks.sh and nix-image.sh), the scripts
 # that decide when they run (this script, find-nixos-check-run.sh and decide-nixos-checks.sh),
-# the script that opens KVM to them (open-kvm.sh), .bun-version and the workflow itself. A rename
+# the script that opens KVM to them (open-kvm.sh), .bun-version, the workflow itself, and the
+# preview service's source (packages/preview/), which the host's package copies. A rename
 # counts both its old and new path. The root package.json is no input, although its test:nixos
 # script runs the checks: it changes with every dependency bump, and a bump would otherwise
 # re-run the VM rehearsals. An edit to test:nixos runs at the next change to an input, or on a
@@ -46,7 +47,7 @@ fi
 
 while IFS= read -r -d '' path; do
   case "$path" in
-    nixos/* | packages/topology/* | \
+    nixos/* | packages/topology/* | packages/preview/* | \
       test-support/shell/run-cases.sh | test-support/shell/test-run-cases.sh | \
       test-support/shell/assert-equals.sh | test-support/shell/test-assert-equals.sh | \
       test-support/shell/assert-not-equals.sh | test-support/shell/test-assert-not-equals.sh | \

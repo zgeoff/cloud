@@ -9,6 +9,10 @@
       "entry": ["index.ts"],
       "project": ["**/*.ts"]
     },
+    "packages/preview": {
+      "entry": ["main.ts"],
+      "project": ["**/*.ts"]
+    },
     "workers/health-check": {
       "entry": ["index.ts"],
       "project": ["**/*.ts"]

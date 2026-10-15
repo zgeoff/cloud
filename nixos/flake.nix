@@ -32,6 +32,7 @@
           ./modules/atc-daemon.nix
           ./modules/cloud-host-firewall.nix
           ./modules/onepassword-connect-relay.nix
+          ./modules/preview.nix
           ./modules/tank-cloud.nix
           ./hosts/geoffcloud/configuration.nix
           ./hosts/geoffcloud/disko.nix
@@ -62,6 +63,7 @@
       checks.x86_64-linux.cloud-host-firewall = import ./checks/cloud-host-firewall.nix {
         inherit nixpkgs imp;
       };
+      checks.x86_64-linux.preview = import ./checks/preview.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
         inherit nixpkgs imp;
       };
