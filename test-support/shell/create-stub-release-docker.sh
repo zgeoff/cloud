@@ -11,7 +11,10 @@
 #   `nix … flake lock`, copies STUB_TREE/flake.lock over <dir>/flake.lock, as the real lock writes
 #   it, or, with STUB_LOCK_ERROR set, prints it on stderr and exits 1 with the lock unchanged, as
 #   nix exits 1 on a failed lock (nix 2.35.2 in the pinned image, checked on 2026-10-13 with an
-#   input whose commit does not exist).
+#   input whose commit does not exist). A run with `-e NIX_CONFIG` before the image first writes
+#   the NIX_CONFIG it runs with to STUB_TREE/nix-config, as the real docker hands the caller's
+#   NIX_CONFIG to the container. A run without the flag, or a caller without NIX_CONFIG, writes no
+#   such file, as docker 29.8.2 sets no variable that the caller lacks.
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 create_stub_release_docker() {
   local bin="$1"
@@ -25,6 +28,7 @@ case "$*" in
     cat "$file"
     ;;
   "run --rm -v "*":/src -w /src "*" sh -c "*"flake lock"*)
+    if [ "$7 $8" = "-e NIX_CONFIG" ] && [ -n "${NIX_CONFIG+set}" ]; then printf '%s\n' "${NIX_CONFIG-}" > "$STUB_TREE/nix-config"; fi
     if [ -n "${STUB_LOCK_ERROR:-}" ]; then echo "$STUB_LOCK_ERROR" >&2; exit 1; fi
     cp "$STUB_TREE/flake.lock" "${4%:/src}/flake.lock"
     ;;
