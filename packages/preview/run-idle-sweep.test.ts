@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
+import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
@@ -46,6 +47,7 @@ async function setupTest() {
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
+    withSlotLock: makeSlotLock(),
 
     // the sweep runs at this moment
     now: () => new Date('2026-10-15T09:00:00Z'),

@@ -3,6 +3,7 @@ import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import type { PreviewConfig } from './load-preview-config.ts';
 import { makeLinkHandler } from './make-link-handler.ts';
+import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
 import type { PreviewDeps } from './types.ts';
@@ -12,6 +13,9 @@ import type { PreviewDeps } from './types.ts';
 export function startPreviewService(config: PreviewConfig): { readonly stop: () => Promise<void> } {
   const store = createPreviewStore(config.databasePath);
 
+  // a boot runs only inside the process that started it, so none survives a restart
+  const interrupted = store.updateInterruptedBoots();
+
   const deps: PreviewDeps = {
     settings: config.settings,
     store,
@@ -19,6 +23,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     github: buildGitHubClient('https://api.github.com', config.githubToken),
     webhookSecret: config.webhookSecret,
     pendingBoots: new Set(),
+    withSlotLock: makeSlotLock(),
     now: () => new Date(),
     sleep: (ms) => Bun.sleep(ms),
     log: (line) => {
@@ -32,6 +37,8 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
   const sweep = setInterval(() => {
     void runIdleSweep(deps);
   }, config.sweepIntervalMs);
+
+  deps.log(`previews: ${interrupted} boots failed by the last stop`);
 
   deps.log(
     `previews: links on ${config.linkListener.hostname}:${config.linkListener.port}, webhook on ${config.webhookListener.hostname}:${config.webhookListener.port}`,

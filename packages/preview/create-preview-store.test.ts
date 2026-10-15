@@ -129,6 +129,37 @@ test('it keeps the previews across a reopen of the database file', async () => {
   expect(reopened.findPreview({ repo: 'acme/greenhouse', number: 17 })?.imp).toBe('pv-0a1b2c3d-17');
 });
 
+test('it fails the boots a stopped process left booting and leaves every other phase', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 18,
+    imp: 'pv-0a1b2c3d-18',
+    headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  });
+
+  const failed = ctx.store.updateInterruptedBoots();
+
+  expect(failed).toBe(1);
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toMatchObject({
+    phase: 'failed',
+    detail: 'the service stopped during the boot',
+  });
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 18 })?.phase).toBe('waiting');
+});
+
 test('it returns null for a pull request it has not seen', async () => {
   const ctx = await setupTest();
 

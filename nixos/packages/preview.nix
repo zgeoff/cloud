@@ -10,12 +10,15 @@ let
   root = ../../packages/preview;
   src = lib.fileset.toSource {
     inherit root;
-    fileset = lib.fileset.difference (lib.fileset.fileFilter (
-      file: file.hasExt "ts" && !(lib.hasSuffix ".test.ts" file.name)
-    ) root) (lib.fileset.unions [
-      (root + "/mocks")
-      (root + "/test-utils")
-    ]);
+    fileset =
+      lib.fileset.difference
+        (lib.fileset.fileFilter (file: file.hasExt "ts" && !(lib.hasSuffix ".test.ts" file.name)) root)
+        (
+          lib.fileset.unions [
+            (root + "/mocks")
+            (root + "/test-utils")
+          ]
+        );
   };
 in
 writeShellApplication {

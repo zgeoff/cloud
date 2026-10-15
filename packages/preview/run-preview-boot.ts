@@ -1,3 +1,4 @@
+import { applySlotEvictions } from './apply-slot-evictions.ts';
 import type { PhaseChange, Preview } from './create-preview-store.ts';
 import type { PreviewContract } from './parse-preview-contract.ts';
 import { parsePreviewContract } from './parse-preview-contract.ts';
@@ -7,7 +8,9 @@ import type { PreviewDeps } from './types.ts';
 // and leaves it `ready` or `failed`. A preview that left `booting` meanwhile, because its pull
 // request closed, stays as it is.
 export async function runPreviewBoot(deps: PreviewDeps, preview: Preview): Promise<void> {
-  const result = await tryRunBootSteps(deps, preview);
+  // the whole boot holds the slot lock: its build's guest commands would wake an imp that another
+  // open put to sleep while it ran
+  const result = await deps.withSlotLock(() => tryRunBootSteps(deps, preview));
 
   deps.store.updatePhase(preview, ['booting'], result);
   deps.log(`${preview.repo}#${preview.number}: ${result.phase} at ${preview.headSHA}`);
@@ -19,6 +22,21 @@ async function tryRunBootSteps(deps: PreviewDeps, preview: Preview): Promise<Pha
   } catch (error) {
     return { phase: 'failed', detail: error instanceof Error ? error.message : String(error) };
   }
+}
+
+// A close that came before the imp existed found nothing to remove, so the boot removes the imp
+// it started
+async function checkClosedDuringBoot(
+  deps: PreviewDeps,
+  preview: Preview,
+): Promise<PhaseChange | null> {
+  if (deps.store.findPreview(preview)?.phase === 'booting') {
+    return null;
+  }
+
+  await deps.impd.removeImp(preview.imp);
+
+  return { phase: 'failed', detail: 'the pull request closed during the boot' };
 }
 
 // The guest script takes the repository and the commit as arguments, never inside its text. A
@@ -49,8 +67,19 @@ async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseC
 
   const contract = parsePreviewContract(compose);
 
-  await createOrUpdateImp(deps, preview, contract);
+  await startImpInSlot(deps, preview, contract);
 
+  const closed = await checkClosedDuringBoot(deps, preview);
+
+  return closed ?? runBuild(deps, preview, contract);
+}
+
+// Checks out the head commit and starts its stack in the imp, then waits for the health path
+async function runBuild(
+  deps: PreviewDeps,
+  preview: Preview,
+  contract: PreviewContract,
+): Promise<PhaseChange> {
   const build = await deps.impd.runCommand(
     preview.imp,
     ['sh', '-c', bootScript, 'preview-boot', preview.repo, preview.headSHA],
@@ -66,17 +95,21 @@ async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseC
   return waitForHealth(deps, preview, contract);
 }
 
-// A new imp gets the contract's port and the GitHub grant; an existing one, asleep or awake, takes
-// the port of the commit it rebuilds
-async function createOrUpdateImp(
+// Frees a slot, then starts the imp: a new one with the contract's port and the GitHub grant, or the
+// one from an earlier build, awake, with the port of the commit it rebuilds
+async function startImpInSlot(
   deps: PreviewDeps,
   preview: Preview,
   contract: PreviewContract,
 ): Promise<void> {
   const imp = await deps.impd.findImp(preview.imp);
 
+  await applySlotEvictions(deps, preview.imp);
+
   if (imp !== null) {
     await deps.impd.updateHTTPPort(preview.imp, contract.port);
+
+    await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
 
     return;
   }

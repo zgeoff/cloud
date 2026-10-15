@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
+import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { composeFiles, issueComments } from './mocks/github-state.ts';
@@ -52,6 +53,7 @@ async function setupTest() {
     // the secret every delivery below is signed with, or deliberately not
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
+    withSlotLock: makeSlotLock(),
     now: () => new Date('2026-10-15T09:00:00Z'),
     sleep: async () => {},
     log: () => {},

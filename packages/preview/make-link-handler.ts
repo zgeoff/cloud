@@ -1,5 +1,5 @@
+import { applySlotEvictions } from './apply-slot-evictions.ts';
 import type { Preview, PreviewKey } from './create-preview-store.ts';
-import { planSlotEvictions } from './plan-slot-evictions.ts';
 import type { PreviewPage } from './render-preview-page.ts';
 import { renderPreviewPage } from './render-preview-page.ts';
 import { runPreviewBoot } from './run-preview-boot.ts';
@@ -73,18 +73,21 @@ function buildNoPreviewPage(key: PreviewKey): StatusPage {
   };
 }
 
-// Frees a slot first: before a preview wakes or boots, the least recently used previews sleep
-// until it fits. A ready preview of the head commit wakes and redirects; any other boots.
+// A ready preview of the head commit takes a slot, wakes and redirects; any other boots, and its
+// boot takes the slot once it starts the imp.
 async function openPreview(deps: PreviewDeps, preview: Preview): Promise<Response> {
-  await applySlotEvictions(deps, preview.imp);
+  const isCurrent = preview.phase === 'ready' && preview.builtSHA === preview.headSHA;
 
-  const imp = await deps.impd.findImp(preview.imp);
+  // a boot holds the slot lock until it settles, which can take minutes, so a page waits instead
+  if (isCurrent && deps.pendingBoots.size > 0) {
+    return buildPageResponse(buildWaitingPage(preview));
+  }
 
-  if (preview.phase === 'ready' && preview.builtSHA === preview.headSHA && imp !== null) {
-    if (imp.state !== 'running') {
-      await deps.impd.wakeImp(preview.imp);
-    }
+  const started = isCurrent
+    ? await deps.withSlotLock(() => startReadyImp(deps, preview.imp))
+    : false;
 
+  if (started) {
     return Response.redirect(`https://${preview.imp}.${deps.settings.impDomain}/`, 302);
   }
 
@@ -106,22 +109,21 @@ function startPreviewBoot(deps: PreviewDeps, preview: Preview): void {
   void removeSettledBoot(deps.pendingBoots, boot);
 }
 
-async function applySlotEvictions(deps: PreviewDeps, opening: string): Promise<void> {
-  const imps = await deps.impd.readImps();
+// false when impd no longer holds the imp, so the preview boots again
+async function startReadyImp(deps: PreviewDeps, name: string): Promise<boolean> {
+  const imp = await deps.impd.findImp(name);
 
-  const evictions = planSlotEvictions(imps, deps.settings.slots, opening);
-
-  // a preview that will not sleep, such as one under a lease, keeps running beside the opening one
-  for (const name of evictions) {
-    try {
-      // oxlint-disable-next-line no-await-in-loop -- one sleep at a time keeps impd's work bounded
-      await deps.impd.sleepImp(name);
-
-      deps.log(`${name}: asleep to free a slot for ${opening}`);
-    } catch (error) {
-      deps.log(`${name}: could not sleep it to free a slot: ${String(error)}`);
-    }
+  if (imp === null) {
+    return false;
   }
+
+  await applySlotEvictions(deps, name);
+
+  if (imp.state !== 'running') {
+    await deps.impd.wakeImp(name);
+  }
+
+  return true;
 }
 
 // a boot never rejects: it records its own failure
@@ -136,6 +138,15 @@ function buildBootingPage(preview: Preview): StatusPage {
     status: 202,
     title: 'Preview booting',
     message: `Booting ${formatPreview(preview)} at ${preview.headSHA.slice(0, 7)}. This page reloads until the preview answers.`,
+    refreshSeconds: 5,
+  };
+}
+
+function buildWaitingPage(preview: Preview): StatusPage {
+  return {
+    status: 202,
+    title: 'Preview waiting for a slot',
+    message: `Another preview is booting. ${formatPreview(preview)} wakes once it settles; this page reloads until then.`,
     refreshSeconds: 5,
   };
 }

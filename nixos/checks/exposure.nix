@@ -413,11 +413,11 @@ let
         '';
     }
     {
-      title = "it reports the atc daemon admission once geoffcloud stops trusting cni0";
+      title = "it reports the atc daemon and preview webhook admissions once geoffcloud stops trusting cni0";
       script =
         let
           # geoffcloud's own config, less cni0 in trustedInterfaces: inet cloud_host still admits
-          # the gateway's pods to tcp 8415, but nixos-fw now drops them
+          # the pods to tcp 8415 and 8418, but nixos-fw now drops them
           untrusted = geoffcloud.extendModules {
             modules = [
               {
@@ -433,6 +433,7 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "the registry's atc-daemon entry is host scope on cni0, and inet cloud_host admits tcp 8415 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8415 neither there nor on every interface"
+                "the registry's preview-webhook entry is host scope on cni0, and inet cloud_host admits tcp 8418 there, but nixos-fw drops it: cni0 is not trusted, and nixos-fw opens tcp 8418 neither there nor on every interface"
               ]
             )
           } ${

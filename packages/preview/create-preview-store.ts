@@ -44,6 +44,10 @@ export interface PreviewStore {
     from: readonly PreviewPhase[],
     to: PhaseChange,
   ) => boolean;
+
+  // fails every boot a stopped process left in `booting`, so its next open retries it; returns
+  // how many it failed
+  readonly updateInterruptedBoots: () => number;
   readonly close: () => void;
 }
 
@@ -101,10 +105,19 @@ export function createPreviewStore(path: string): PreviewStore {
 
       return result.changes === 1;
     },
+    updateInterruptedBoots: () => updateInterruptedBoots(db),
     close: () => {
       db.close();
     },
   };
+}
+
+function updateInterruptedBoots(db: Database): number {
+  const detail = 'the service stopped during the boot';
+
+  return db.run(`UPDATE previews SET phase = 'failed', detail = ?1 WHERE phase = 'booting'`, [
+    detail,
+  ]).changes;
 }
 
 function createPreviewsTable(db: Database): void {

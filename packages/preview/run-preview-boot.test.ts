@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
+import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { composeFiles } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
@@ -51,6 +52,7 @@ async function setupTest() {
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
+    withSlotLock: makeSlotLock(),
     now: () => new Date(clock.now),
     sleep: (ms) => {
       clock.now += ms;
@@ -240,7 +242,12 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
     detail: null,
   });
 
-  expect(ctx.impd.calls).toStrictEqual(['imps/get pv-0a1b2c3d-17', 'imps/update pv-0a1b2c3d-17']);
+  expect(ctx.impd.calls).toStrictEqual([
+    'imps/get pv-0a1b2c3d-17',
+    'imps/list undefined',
+    'imps/update pv-0a1b2c3d-17',
+  ]);
+
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.httpPort).toBe(4000);
 });
 
@@ -269,6 +276,34 @@ test('it leaves a preview ended when its pull request closed during the boot', a
   });
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ended');
+});
+
+test('it removes the imp it started when the pull request closed before the imp existed', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'ended' });
+
+  await runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  expect(ctx.impd.imps.has('pv-0a1b2c3d-17')).toBeFalse();
+  expect(ctx.impd.commands).toStrictEqual([]);
 });
 
 test('it fails the boot when the head commit has no preview/compose.yaml', async () => {

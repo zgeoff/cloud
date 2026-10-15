@@ -105,6 +105,12 @@ fits. A sleeping imp keeps its memory on disk, so its next open resumes it where
 on a timer puts every preview to sleep that nobody used for the idle timeout, and impd counts each
 request through its wake proxy as use.
 
+The slot rule runs under one lock, so two opens at once never both find a free slot. A boot holds
+the lock until it settles, because its build's guest commands would wake an imp that another open
+put to sleep while it ran. Boots therefore run one at a time, and a ready preview opened while
+another boots gets a page that reloads until the boot settles, rather than a request held open for
+the length of a build.
+
 impd confines the service's token to the imps whose names start with the preview prefix, so the slot
 rule and the sweep never sleep another imp, and a mistake in the service cannot reach the agents'
 imps.

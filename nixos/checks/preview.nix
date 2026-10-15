@@ -142,13 +142,16 @@ let
           };
         in
         ''
-          assert_equals false ${lib.boolToString (system.config.systemd.services.preview.environment ? PREVIEW_IMP_GITHUB_SECRET)} "the grant's variable is set"
+          assert_equals false ${
+            lib.boolToString (system.config.systemd.services.preview.environment ? PREVIEW_IMP_GITHUB_SECRET)
+          } "the grant's variable is set"
         '';
     }
     {
       title = "it packages the service modules without the tests, mocks or stand-ins";
       script = ''
         cat > expected <<'EOF'
+        ./apply-slot-evictions.ts
         ./build-github-client.ts
         ./build-imp-name.ts
         ./build-impd-client.ts
@@ -156,6 +159,7 @@ let
         ./load-preview-config.ts
         ./main.ts
         ./make-link-handler.ts
+        ./make-slot-lock.ts
         ./make-webhook-handler.ts
         ./parse-preview-contract.ts
         ./parse-pull-request-event.ts

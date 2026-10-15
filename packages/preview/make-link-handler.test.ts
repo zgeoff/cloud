@@ -1,4 +1,4 @@
-/* oxlint-disable import/max-dependencies, max-lines-per-function */
+/* oxlint-disable import/max-dependencies, max-lines-per-function, max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -7,6 +7,7 @@ import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeLinkHandler } from './make-link-handler.ts';
+import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { composeFiles } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
@@ -52,6 +53,7 @@ async function setupTest() {
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots,
+    withSlotLock: makeSlotLock(),
     now: () => new Date('2026-10-15T09:00:00Z'),
     sleep: async () => {},
     log: () => {},
@@ -102,6 +104,38 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
   expect(ctx.impd.imps.get('pv-0a1b2c3d-18')?.state).toBe('running');
 });
 
+test('it runs one preview when two first opens with one slot arrive at once', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 18,
+    imp: 'pv-0a1b2c3d-18',
+    headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  });
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+  composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
+
+  await Promise.all([
+    ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17')),
+    ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18')),
+  ]);
+
+  await Promise.all(ctx.pendingBoots);
+
+  const running = [...ctx.impd.imps.values()].filter((imp) => imp.state === 'running');
+
+  expect(running).toBeArrayOfSize(1);
+});
+
 test('it keeps both previews running when two slots fit them', async () => {
   const ctx = await setupTest();
 
@@ -143,6 +177,7 @@ test('it keeps both previews running when two slots fit them', async () => {
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: ctx.pendingBoots,
+    withSlotLock: makeSlotLock(),
     now: () => new Date('2026-10-15T09:00:00Z'),
     sleep: async () => {},
     log: () => {},
@@ -188,6 +223,48 @@ test('it answers a first open with the booting page and boots the head commit', 
     phase: 'ready',
     detail: null,
   });
+});
+
+test('it answers a ready preview with a waiting page while another preview boots', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+    phase: 'ready',
+    builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'sleeping',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  const otherBoot = Promise.withResolvers<void>();
+
+  ctx.pendingBoots.add(otherBoot.promise);
+
+  onTestFinished(() => {
+    otherBoot.resolve();
+  });
+
+  const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
+  const text = await response.text();
+
+  expect(response.status).toBe(202);
+  expect(text).toInclude('Another preview is booting.');
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
 });
 
 test('it wakes a sleeping ready preview and redirects to its imp', async () => {
