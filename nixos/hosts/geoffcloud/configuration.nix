@@ -260,7 +260,7 @@ in
     linkListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewLinkExposure.port}";
     webhookListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewWebhookExposure.port}";
     baseURL = "http://geoffcloud:${toString previewLinkExposure.port}";
-    repos = [ "zgeoff/*" ];
+    repos = [ "zgeoff/nixie" ];
     impdURL = impdLoopbackURL;
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";

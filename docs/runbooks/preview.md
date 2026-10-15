@@ -21,8 +21,8 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
    host_imp secret ls < /dev/null
    ```
 
-   Expect a line for `gh` of kind `github`. Without it, add a token that reads the opted-in
-   repositories:
+   Expect a line for `gh` of kind `github`. Without it, add a fine-grained token with Contents
+   read-only on the opted-in repositories and no other permission:
    `op read op://cloud/<github_item>/credential | host_imp secret add gh --kind github`.
 
 2. Mint the service's impd token, which manages only the imps named `pv-*` and grants only `gh`, and
@@ -87,8 +87,9 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
 ## Opt a repository in
 
 A repository opts in with a `preview/` folder, a webhook, and a place in the host's
-`services.preview.repos`, which lists `zgeoff/*`. The folder holds one Compose file, whose services
-start the app, seed it with invented data, and publish the app's HTTP port on the guest:
+`services.preview.repos`, which names each opted-in repository, and in the `gh` token's repository
+list. The folder holds one Compose file, whose services start the app, seed it with invented data,
+and publish the app's HTTP port on the guest:
 
 ```yaml
 x-preview:
