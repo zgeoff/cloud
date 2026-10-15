@@ -127,11 +127,11 @@ function removeImage(state: StubImpState, name: string): StubAnswer {
   const index = state.images.findIndex((image) => image.name === name);
 
   if (index === -1) {
-    return { exitCode: 1, stderr: `imp: NOT_FOUND: image ${name} not found\n` };
+    return { exitCode: 1, stderr: `impz: NOT_FOUND: image ${name} not found\n` };
   }
 
   if (state.imps.some((imp) => imp.image === name)) {
-    return { exitCode: 1, stderr: `imp: CONFLICT: image ${name} is in use\n` };
+    return { exitCode: 1, stderr: `impz: CONFLICT: image ${name} is in use\n` };
   }
 
   state.images.splice(index, 1);
@@ -141,11 +141,11 @@ function removeImage(state: StubImpState, name: string): StubAnswer {
 
 function createImp(state: StubImpState, name: string, image: string): StubAnswer {
   if (!state.images.some((record) => record.name === image)) {
-    return { exitCode: 1, stderr: `imp: NOT_FOUND: image ${image} not found\n` };
+    return { exitCode: 1, stderr: `impz: NOT_FOUND: image ${image} not found\n` };
   }
 
   if (state.imps.some((imp) => imp.name === name)) {
-    return { exitCode: 1, stderr: `imp: CONFLICT: imp ${name} already exists\n` };
+    return { exitCode: 1, stderr: `impz: CONFLICT: imp ${name} already exists\n` };
   }
 
   state.imps.push({ name, image });
@@ -157,7 +157,7 @@ function removeImp(state: StubImpState, name: string): StubAnswer {
   const index = state.imps.findIndex((imp) => imp.name === name);
 
   if (index === -1) {
-    return { exitCode: 1, stderr: `imp: NOT_FOUND: imp ${name} not found\n` };
+    return { exitCode: 1, stderr: `impz: NOT_FOUND: imp ${name} not found\n` };
   }
 
   state.imps.splice(index, 1);

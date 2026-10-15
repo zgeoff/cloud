@@ -93,7 +93,7 @@ test('it refuses impz exec and impz rm on a sandbox that does not exist, as imp 
   expect(removed).toStrictEqual({
     exitCode: 1,
     stdout: '',
-    stderr: 'imp: no imp named fetch-check-1a2b3c4d\n',
+    stderr: 'impz: no imp named fetch-check-1a2b3c4d\n',
   });
 });
 

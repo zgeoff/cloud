@@ -113,7 +113,7 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
   );
 
   expect(result.stderr.toString()).toBe(
-    'imp: token atc-cloud made; impd shows its secret only this once\n',
+    'impz: token atc-cloud made; impd shows its secret only this once\n',
   );
 
   expect(scenario.files).toStrictEqual({

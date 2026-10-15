@@ -250,7 +250,7 @@ function createImpToken(state: HostState) {
   });
 
   const minted = state.scenario.minted ?? 'imp_fixture_minted_token\n';
-  const notice = 'imp: token atc-cloud made; impd shows its secret only this once\n';
+  const notice = 'impz: token atc-cloud made; impd shows its secret only this once\n';
 
   if (minted.split('\n').length !== 2) {
     return { exitCode: 1, stderr: notice };

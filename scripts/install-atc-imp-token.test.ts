@@ -286,7 +286,7 @@ test('it mints atc-cloud on the host with the mint script on stdin when neither 
   });
 
   expect(ctx.err.join('')).toBe(
-    'imp: token atc-cloud made; impd shows its secret only this once\n',
+    'impz: token atc-cloud made; impd shows its secret only this once\n',
   );
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
@@ -299,7 +299,7 @@ test('it mints atc-cloud on the host with the mint script on stdin when neither 
 
 test.each([
   ['the mint prints more than one line', { minted: 'imp_fixture_minted_token\nsecond line\n' }],
-  ['impz token new fails', { mintError: 'imp: CONFLICT: token atc-cloud exists' }],
+  ['impz token new fails', { mintError: 'impz: CONFLICT: token atc-cloud exists' }],
 ])('it saves no token when %s', async (_label: string, fault: object) => {
   const tools = buildStubCredentialTools({
     op: { vaults: {} },

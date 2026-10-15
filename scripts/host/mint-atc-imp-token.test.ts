@@ -30,7 +30,7 @@ test('it mints atc-cloud straight into a root-only imp-token in one rename', asy
 
   await createStubImpDocker(ctx.bin, {
     stdout: 'imp_fixture_minted_token\n',
-    stderr: 'imp: token atc-cloud made; impd shows its secret only this once\n',
+    stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
   });
 
@@ -57,7 +57,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
 
   await createStubImpDocker(ctx.bin, {
     stdout: 'imp_fixture_minted_token\n',
-    stderr: 'imp: token atc-cloud made; impd shows its secret only this once\n',
+    stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
   });
 
@@ -71,7 +71,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
   expect(result.stdout.toString()).toBe('');
 
   expect(result.stderr.toString()).toBe(
-    'imp: token atc-cloud made; impd shows its secret only this once\n',
+    'impz: token atc-cloud made; impd shows its secret only this once\n',
   );
 
   expect(calls).toBe(

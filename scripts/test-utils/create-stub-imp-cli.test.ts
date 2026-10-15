@@ -59,7 +59,7 @@ test('it answers a failing call with buildStubImp’s exit code and stderr', asy
   expect(result).toStrictEqual({
     exitCode: 1,
     stdout: Buffer.from(''),
-    stderr: Buffer.from('imp: NOT_FOUND: imp agent-check-abc1234 not found\n'),
+    stderr: Buffer.from('impz: NOT_FOUND: imp agent-check-abc1234 not found\n'),
     timedOut: false,
   });
 });

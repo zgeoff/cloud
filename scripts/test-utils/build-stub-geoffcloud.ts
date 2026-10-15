@@ -126,7 +126,7 @@ function buildImpAnswer(state: StubState, call: ImpCall): RemoteResult {
   }
 
   if (!state.sandboxes.has(call.name)) {
-    return { exitCode: 1, stdout: '', stderr: `imp: no imp named ${call.name}\n` };
+    return { exitCode: 1, stdout: '', stderr: `impz: no imp named ${call.name}\n` };
   }
 
   if (call.verb === 'rm') {
@@ -153,7 +153,7 @@ function buildCreateAnswer(state: StubState, call: ImpCall): RemoteResult {
     return {
       exitCode: state.scenario.createExitCode,
       stdout: '',
-      stderr: 'imp: no image by that name\n',
+      stderr: 'impz: no image by that name\n',
     };
   }
 

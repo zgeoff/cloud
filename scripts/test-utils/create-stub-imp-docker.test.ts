@@ -18,7 +18,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
 
   const docker = await createStubImpDocker(ctx.dir, {
     stdout: 'imp_fixture_minted_token\n',
-    stderr: 'imp: token atc-cloud made; impd shows its secret only this once\n',
+    stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
   });
 
@@ -41,7 +41,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
   expect(result).toStrictEqual({
     exitCode: 0,
     stdout: Buffer.from('imp_fixture_minted_token\n'),
-    stderr: Buffer.from('imp: token atc-cloud made; impd shows its secret only this once\n'),
+    stderr: Buffer.from('impz: token atc-cloud made; impd shows its secret only this once\n'),
     timedOut: false,
   });
 

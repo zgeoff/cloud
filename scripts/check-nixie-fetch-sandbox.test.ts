@@ -311,7 +311,7 @@ test('it stops when impd cannot create the sandbox, and names it for impz ls', a
 
   expect(printErr.mock.calls).toStrictEqual([
     [
-      'check-nixie-fetch-sandbox: cannot create sandbox fetch-check-1a2b3c4d: imp: no image by that name; look for it with impz ls\n',
+      'check-nixie-fetch-sandbox: cannot create sandbox fetch-check-1a2b3c4d: impz: no image by that name; look for it with impz ls\n',
     ],
   ]);
 });

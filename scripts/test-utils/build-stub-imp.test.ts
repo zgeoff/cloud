@@ -102,7 +102,7 @@ test('it refuses to remove a missing image', async () => {
   expect(result).toStrictEqual({
     exitCode: 1,
     stdout: Buffer.from(''),
-    stderr: Buffer.from('imp: NOT_FOUND: image agent-abc1234 not found\n'),
+    stderr: Buffer.from('impz: NOT_FOUND: image agent-abc1234 not found\n'),
     timedOut: false,
   });
 });
@@ -118,7 +118,7 @@ test('it refuses to remove an image an imp uses', async () => {
   const result = await stub.run(['impz', 'image', 'rm', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toBe('imp: CONFLICT: image agent-abc1234 is in use\n');
+  expect(result.stderr.toString()).toBe('impz: CONFLICT: image agent-abc1234 is in use\n');
   expect(imp.images).toStrictEqual([{ name: 'agent-abc1234', digest: 'imp-build-2' }]);
 });
 
@@ -139,7 +139,7 @@ test('it refuses an imp on a missing image', async () => {
   const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toBe('imp: NOT_FOUND: image agent-abc1234 not found\n');
+  expect(result.stderr.toString()).toBe('impz: NOT_FOUND: image agent-abc1234 not found\n');
   expect(imp.imps).toStrictEqual([]);
 });
 
@@ -154,7 +154,7 @@ test('it refuses an imp under a taken name', async () => {
   const result = await stub.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
 
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toBe('imp: CONFLICT: imp agent-check-abc1234 already exists\n');
+  expect(result.stderr.toString()).toBe('impz: CONFLICT: imp agent-check-abc1234 already exists\n');
 });
 
 test('it lists the imps', async () => {
@@ -193,7 +193,7 @@ test('it refuses to remove a missing imp', async () => {
   const result = await stub.run(['impz', 'rm', 'agent-check-abc1234']);
 
   expect(result.exitCode).toBe(1);
-  expect(result.stderr.toString()).toBe('imp: NOT_FOUND: imp agent-check-abc1234 not found\n');
+  expect(result.stderr.toString()).toBe('impz: NOT_FOUND: imp agent-check-abc1234 not found\n');
 });
 
 test('it fails closed with exit 97 on any other imp call, and leaves other programs alone', async () => {
