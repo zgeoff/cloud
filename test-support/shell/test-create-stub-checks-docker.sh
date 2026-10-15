@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Test for create-stub-checks-docker.sh: the docker stand-in answers the nix eval and build that
-# run-nixos-checks.sh runs, copies what the build mounts at /src, logs every call, and fails closed on
-# any other call. No nix runs here; the stand-in's exit 1 for a failed eval or build is the
-# one its header records from a one-off check against nix 2.35.2.
+# Test for create-stub-checks-docker.sh: the docker stand-in answers the nix eval, path-info and
+# build that run-nixos-checks.sh runs, copies what the path-info call mounts at /src, logs every
+# call, and fails closed on any other call. No nix runs here; the stand-in's exit 1 for a failed
+# eval, path-info or build is the one its header records from one-off checks against nix 2.35.2.
 #
 #   bash test-support/shell/test-create-stub-checks-docker.sh
 # shellcheck source-path=SCRIPTDIR
@@ -51,7 +51,7 @@ it_fails_an_eval_with_the_set_error_and_exit_1() {
   }
 }
 
-it_copies_the_directory_mounted_at_src_for_a_build() {
+it_copies_the_source_and_prints_each_checks_derivation_for_a_path_info() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
@@ -59,21 +59,48 @@ it_copies_the_directory_mounted_at_src_for_a_build() {
   mkdir -p "$tree/src/nixos"
   echo '{ }' > "$tree/src/nixos/flake.nix"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
-    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link -L 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_SOURCE_SAW="$tree/saw" \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix path-info --derivation \
+    'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' 'path:/src?dir=nixos#checks.x86_64-linux.impd-restore' \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff -r "$tree/src" "$tree/saw"
-  diff /dev/null "$tree/out"
+  diff - "$tree/out" << 'EOF'
+/nix/store/00000000000000000000000000000000-atc-daemon.drv
+/nix/store/00000000000000000000000000000000-impd-restore.drv
+EOF
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\",\"path:/src?dir=nixos#checks.x86_64-linux.impd-restore\"]"
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
     exit 1
   }
 }
 
-it_copies_the_source_then_fails_a_build_with_the_set_error_and_exit_1() {
+it_replaces_an_earlier_calls_copy_of_the_source_for_a_path_info() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/src/nixos" "$tree/saw/stale"
+  echo '{ }' > "$tree/src/nixos/flake.nix"
+  echo 'from an earlier call' > "$tree/saw/stale/file"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_SOURCE_SAW="$tree/saw" \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix path-info --derivation 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff -r "$tree/src" "$tree/saw"
+  diff - "$tree/out" <<< '/nix/store/00000000000000000000000000000000-atc-daemon.drv'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_copies_the_source_then_fails_a_path_info_with_the_set_error_and_exit_1() {
   local status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
@@ -81,15 +108,54 @@ it_copies_the_source_then_fails_a_build_with_the_set_error_and_exit_1() {
   mkdir -p "$tree/src/nixos"
   echo '{ }' > "$tree/src/nixos/flake.nix"
 
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_BUILD_SAW="$tree/saw" \
-    STUB_BUILD_ERROR="error: Cannot build 'x.drv'." \
-    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix build --no-link -L 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_SOURCE_SAW="$tree/saw" \
+    STUB_DERIVATION_ERROR="error: attribute 'atc-daemon' missing" \
+    docker run --rm -v "$tree/src:/src:ro" "$NIX_IMAGE" nix path-info --derivation 'path:/src?dir=nixos#checks.x86_64-linux.atc-daemon' \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff -r "$tree/src" "$tree/saw"
   diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "error: attribute 'atc-daemon' missing"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_prints_nothing_for_a_build() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    docker run --rm "$NIX_IMAGE" nix build --no-link -L '/nix/store/00000000000000000000000000000000-atc-daemon.drv^*' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"/nix/store/00000000000000000000000000000000-atc-daemon.drv^*\"]"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_fails_a_build_with_the_set_error_and_exit_1() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_BUILD_ERROR="error: Cannot build 'x.drv'." \
+    docker run --rm "$NIX_IMAGE" nix build --no-link -L '/nix/store/00000000000000000000000000000000-atc-daemon.drv^*' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: Cannot build 'x.drv'."
-  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"/nix/store/00000000000000000000000000000000-atc-daemon.drv^*\"]"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1

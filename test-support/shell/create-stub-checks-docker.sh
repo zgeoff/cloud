@@ -5,9 +5,14 @@
 # - a `run … eval --raw path:/src?dir=nixos#checks.x86_64-linux --apply …`: prints STUB_CHECKS
 #   with no trailing newline, as `nix eval --raw` prints a string, or, when STUB_EVAL_ERROR is
 #   set, prints it on stderr and exits 1, nix's exit for a failed evaluation;
-# - a `run … build --no-link -L …`: copies the directory mounted at /src (its `<dir>:/src:ro`
-#   argument) to STUB_BUILD_SAW, then, when STUB_BUILD_ERROR is set, prints it on stderr and
-#   exits 1, nix's exit for a failed build;
+# - a `run … path-info --derivation …`: copies the directory mounted at /src (its `<dir>:/src:ro`
+#   argument) to STUB_SOURCE_SAW, in place of an earlier call's copy, then, when
+#   STUB_DERIVATION_ERROR is set, prints it on stderr and exits 1, nix's exit for a failed
+#   evaluation; otherwise it prints one line for each
+#   `path:/src?dir=nixos#checks.x86_64-linux.<name>` argument,
+#   /nix/store/00000000000000000000000000000000-<name>.drv, as nix prints each derivation's path;
+# - a `run … build --no-link -L …`: when STUB_BUILD_ERROR is set, prints it on stderr and exits 1,
+#   nix's exit for a failed build;
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
 # Nix documents no exit-code table for these commands, so the exit 1 was checked on
@@ -15,7 +20,8 @@
 # (nixos/nix:2.35.2@sha256:7a007c766426c1877758ddc5cb87a965ac131fc78c582ce0083d922d51ae945c,
 # scripts/nix-image.sh), in a container without network. A failed `nix eval --raw`, a `nix
 # build` whose builder exits 1 and a `nix copy --to ssh://` to a refused port each
-# exited 1. A later image could change the exit, and nix's manual gives 100-and-up codes for
+# exited 1. On 2026-10-15 the same image's `nix path-info --derivation` exited 1 for a check
+# that fails to evaluate. A later image could change the exit, and nix's manual gives 100-and-up codes for
 # some build failures under `nix-store --realise`, which this check did not reach.
 create_stub_checks_docker() {
   local bin="$1"
@@ -27,12 +33,23 @@ case "$*" in
     if [ -n "${STUB_EVAL_ERROR:-}" ]; then echo "$STUB_EVAL_ERROR" >&2; exit 1; fi
     printf '%s' "$STUB_CHECKS"
     ;;
-  "run "*" build --no-link -L "*)
+  "run "*" path-info --derivation "*)
     src=""
     for arg in "$@"; do
       case "$arg" in *":/src:ro") src="${arg%:/src:ro}" ;; esac
     done
-    cp -R "$src" "$STUB_BUILD_SAW"
+    rm -rf "$STUB_SOURCE_SAW"
+    cp -R "$src" "$STUB_SOURCE_SAW"
+    if [ -n "${STUB_DERIVATION_ERROR:-}" ]; then echo "$STUB_DERIVATION_ERROR" >&2; exit 1; fi
+    for arg in "$@"; do
+      case "$arg" in
+        "path:/src?dir=nixos#checks.x86_64-linux."*)
+          echo "/nix/store/00000000000000000000000000000000-${arg#path:/src?dir=nixos#checks.x86_64-linux.}.drv"
+          ;;
+      esac
+    done
+    ;;
+  "run "*" build --no-link -L "*)
     if [ -n "${STUB_BUILD_ERROR:-}" ]; then echo "$STUB_BUILD_ERROR" >&2; exit 1; fi
     ;;
   *) echo "unexpected: $*" >&2; exit 97 ;;
