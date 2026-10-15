@@ -39,8 +39,8 @@ const allButK3sAPI = [
 const impAPIPort = `tcp:${topology.imp.apiPort}`;
 
 // Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; members reach tag:imp nodes on any port,
-// while those reach each other on impd's API port and nothing else (imp's isolation goal). tag:imp-e2e reaches only its
-// own API, never a live impd, keyed by its own OAuth client (1Password imp-e2e vault, docs/runbooks/imp-e2e-tailnet.md).
+// while those reach each other on impd's API port and nothing else (imp's isolation goal). impz owns tag:imp-e2e, which
+// reaches only its own API, never a live impd (docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
@@ -54,8 +54,9 @@ export const tailnetPolicy = {
     [tags.cloud]: ['autogroup:admin', tags.cloud],
     [tags.imp]: ['autogroup:admin', tags.imp],
 
-    // owns itself, so the e2e OAuth client (tag:imp-e2e) may mint keys for it; no
-    // other tag owns it, and it owns no other tag
+    // impz's tag: change it only with impz's docs/runbooks/e2e-tailnet.md. Owns itself, so
+    // the e2e OAuth client (tag:imp-e2e) may mint keys for it; no other tag owns it, and it
+    // owns no other tag
     [tags.impE2E]: ['autogroup:admin', tags.impE2E],
 
     // the prod apply job's runner, an ephemeral node that joins through the deploy workflow's
@@ -78,8 +79,9 @@ export const tailnetPolicy = {
     // adding it shifts no other grant
     { src: [tags.cloud], dst: [impHostname], ip: [`tcp:${impNode.httpsPort}`] },
 
-    // imp's e2e nodes reach each other's API only, for the two-node moves suite; no
-    // grant takes them to tag:imp. Last, so adding it shifts no other grant
+    // impz's e2e and dev nodes reach each other's API only, for the two-node moves suite;
+    // no grant takes them to tag:imp. impz's tests rely on it as written. Last, so adding it
+    // shifts no other grant
     { src: [tags.impE2E], dst: [tags.impE2E], ip: [impAPIPort] },
 
     // members → nixie's web client and API on the host's 443. The first grant already covers it;

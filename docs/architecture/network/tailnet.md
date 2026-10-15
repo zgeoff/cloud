@@ -20,14 +20,14 @@ visible change to the test as well.
 A tagged node holds only what a grant gives it, while a member's device reaches every device on any
 port except the host's k3s API.
 
-| Identity           | Holder                                         | Reaches                                                                     |
-| ------------------ | ---------------------------------------------- | --------------------------------------------------------------------------- |
-| a member's device  | the owner's devices, the PC among them         | every device on any port but the host's k3s API; the host's HTTPS for nixie |
-| the PC (`home-pc`) | the owner's WSL node, where Pulumi runs        | the host's k3s API, beside a member's reach                                 |
-| `tag:cloud`        | the host's node, and through it every pod      | the PC's atc daemon; impd's node for HTTPS                                  |
-| `tag:imp`          | impd's node on the host, and imp's dev nodes   | other `tag:imp` nodes' API                                                  |
-| `tag:imp-e2e`      | the throwaway nodes of imp's end-to-end suites | other `tag:imp-e2e` nodes' API only                                         |
-| `tag:cloud-deploy` | the prod apply job's ephemeral runner node     | the host's k3s API only                                                     |
+| Identity           | Holder                                        | Reaches                                                                     |
+| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------- |
+| a member's device  | the owner's devices, the PC among them        | every device on any port but the host's k3s API; the host's HTTPS for nixie |
+| the PC (`home-pc`) | the owner's WSL node, where Pulumi runs       | the host's k3s API, beside a member's reach                                 |
+| `tag:cloud`        | the host's node, and through it every pod     | the PC's atc daemon; impd's node for HTTPS                                  |
+| `tag:imp`          | impd's node on the host                       | other `tag:imp` nodes' API                                                  |
+| `tag:imp-e2e`      | impz's end-to-end and dev nodes; impz owns it | other `tag:imp-e2e` nodes' API only                                         |
+| `tag:cloud-deploy` | the prod apply job's ephemeral runner node    | the host's k3s API only                                                     |
 
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the cluster
 as a whole is `tag:cloud`, and every pod gains whatever the host is granted. The grants for

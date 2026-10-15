@@ -58,8 +58,8 @@ function createHostKey(policy: Acl): TailnetKey {
 
 function createImpKeySync(policy: Acl): Command {
   // imp's key (tag:imp) for impd nodes, at Tailscale's 90-day maximum expiry (an apply after expiry
-  // mints a fresh one); imp's dev.sh reads it from op://cloud/imp-tailscale-authkey, so Pulumi writes
-  // each new key into that item. E2e suites use tag:imp-e2e with their own OAuth client (docs/runbooks/imp-e2e-tailnet.md).
+  // mints a fresh one); Pulumi writes each new key into op://cloud/imp-tailscale-authkey. impz's dev
+  // and e2e scripts never read it: they join as tag:imp-e2e, the tag impz owns (docs/runbooks/imp-e2e-tailnet.md).
   const impKey = new TailnetKey(
     'imp',
     {

@@ -1,18 +1,20 @@
 # imp's e2e nodes on the tailnet
 
-imp's `tailscale` and `moves-tailnet` e2e suites join throwaway impd nodes to the tailnet as
-`tag:imp-e2e`. The policy (`infra/tailnet/tailnet-policy.ts`) lets those nodes reach only each other
-on tcp 7070. No grant takes them to `tag:imp`, so a test run cannot reach a live impd such as
+impz owns the tag `tag:imp-e2e`. Its `tailscale` and `moves-tailnet` e2e suites, and its dev
+instances that read 1Password, join throwaway impd nodes to the tailnet as `tag:imp-e2e`. impz's
+[e2e tailnet runbook](https://github.com/zgeoff/impz/blob/main/docs/runbooks/e2e-tailnet.md) states
+the tag's owner and grant that its tests rely on, so a change to either in this repo's policy starts
+there. The policy (`infra/tailnet/tailnet-policy.ts`) lets those nodes reach only each other on
+tcp 7070. No grant takes them to `tag:imp`, so a test run cannot reach a live impd such as
 `imp-geoffcloud`. Tracked as GEO-228.
 
 ## What holds what
 
-| Where                                           | Holds                                                                |
-| ----------------------------------------------- | -------------------------------------------------------------------- |
-| the tailnet policy (Pulumi)                     | the tag `tag:imp-e2e`, owned by admins and itself; its one grant     |
-| the OAuth client `imp-e2e` (made by hand)       | scope `auth_keys` only, tag `tag:imp-e2e` only                       |
-| vault `imp-e2e`, item `imp-e2e-tailscale-oauth` | the client's `client-id` and `client-secret`                         |
-| vault `cloud`, item `imp-tailscale-authkey`     | the `tag:imp` key, still used by imp's dev instances, not by its e2e |
+| Where                                           | Holds                                                            |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| the tailnet policy (Pulumi)                     | the tag `tag:imp-e2e`, owned by admins and itself; its one grant |
+| the OAuth client `imp-e2e` (made by hand)       | scope `auth_keys` only, tag `tag:imp-e2e` only                   |
+| vault `imp-e2e`, item `imp-e2e-tailscale-oauth` | the client's `client-id` and `client-secret`                     |
 
 imp's e2e harness passes the client secret to `tailscale up` as the auth key, with
 `?ephemeral=true&preauthorized=true` and `--advertise-tags=tag:imp-e2e`. Each node is ephemeral, so
