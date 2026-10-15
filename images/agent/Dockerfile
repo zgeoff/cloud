@@ -125,7 +125,7 @@ RUN dir=/root/.local/share/gh/extensions/gh-stack \
  && chmod 0755 "$dir/gh-stack" \
  && printf 'owner: github\nname: gh-stack\nhost: github.com\ntag: v%s\nispinned: true\npath: %s\n' \
       "$GH_STACK_VERSION" "$dir/gh-stack" > "$dir/manifest.yml" \
- && gh stack --help >/dev/null
+ && GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 gh stack --help >/dev/null
 
 # Node 24 from nodejs.org, with npm and corepack. The sum is the tarball's line
 # in the release's SHASUMS256.txt.
