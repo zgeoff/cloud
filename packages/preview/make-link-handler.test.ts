@@ -484,6 +484,50 @@ test('it boots a failed preview again when the retry link opens', async () => {
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
 });
 
+test('it shows the failure page and boots nothing more when the booting page reloads after a failed retry', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+    phase: 'failed',
+    detail: 'the build exited 1:\nseed: relation "plants" already exists',
+  });
+
+  // the retry's build fails the same way
+  ctx.impd.answerCommand = (command) => ({ code: command.argv[0] === 'timeout' ? 1 : 0 });
+
+  const retried = await ctx.handler(
+    new Request('http://geoffcloud:8417/acme/greenhouse/17?retry=1'),
+  );
+
+  const retriedText = await retried.text();
+
+  await Promise.all(ctx.pendingBoots);
+
+  // a browser reloads the refresh's URL, or the page's own URL when the refresh names none
+  const reloadPath =
+    /content="5; url=(?<url>[^"]+)"/u.exec(retriedText)?.groups?.['url'] ??
+    '/acme/greenhouse/17?retry=1';
+
+  const commandsAfterRetry = ctx.impd.commands.length;
+
+  const reloaded = await ctx.handler(new Request(`http://geoffcloud:8417${reloadPath}`));
+
+  await Promise.all(ctx.pendingBoots);
+
+  expect(reloaded.status).toBe(502);
+  expect(ctx.pendingBoots.size).toBe(0);
+  expect(ctx.impd.commands).toHaveLength(commandsAfterRetry);
+});
+
 test('it answers 404 for a pull request the service has not seen', async () => {
   const ctx = await setupTest();
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/99'));

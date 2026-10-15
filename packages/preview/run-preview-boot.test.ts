@@ -176,6 +176,54 @@ test('it records the tail of the build output when the build fails', async () =>
   });
 });
 
+test('it leaves a newer head waiting, not failed, when the older head it booted fails', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  // a push moves the head to the next commit while the older head's build runs, then that build
+  // fails
+  ctx.impd.answerCommand = () => {
+    ctx.store.upsertHead({
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    });
+
+    return { code: 1 };
+  };
+
+  await runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toStrictEqual({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    builtSHA: null,
+    phase: 'waiting',
+    detail: null,
+  });
+});
+
 test('it fails the boot when the health path never answers', async () => {
   const ctx = await setupTest();
 

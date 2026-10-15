@@ -54,6 +54,7 @@ stateDiagram-v2
   waiting --> booting: link opened
   booting --> ready: health path answers
   booting --> failed: build or probe fails
+  booting --> waiting: an older head fails after a push
   failed --> booting: retry
   ready --> booting: link opened after a push
   waiting --> ended: closed
@@ -86,7 +87,9 @@ waits on GitHub never stores its head after a newer one.
 
 A phase change names the phases it may leave, and the store makes it only from one of them. Two
 opens at once therefore start one boot, and a boot that settles after its pull request closed leaves
-the preview ended.
+the preview ended. A boot's failure belongs to the head it built, so when a push moved the head
+during the boot, the preview waits for its next open instead of failing. The pages that reload while
+a boot runs load the link without its query, so one click on the retry link starts one boot.
 
 ## A boot
 

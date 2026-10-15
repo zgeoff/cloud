@@ -13,8 +13,17 @@ export async function runPreviewBoot(deps: PreviewDeps, preview: Preview): Promi
   // open put to sleep while it ran
   const result = await deps.withSlotLock(() => tryRunBootSteps(deps, preview));
 
-  deps.store.updatePhase(preview, ['booting'], result);
+  deps.store.updatePhase(preview, ['booting'], pickSettledPhase(deps, preview, result));
   deps.log(`${preview.repo}#${preview.number}: ${result.phase} at ${preview.headSHA}`);
+}
+
+// An older head's failure says nothing about the head a push moved to meanwhile, so that preview
+// waits for its next open instead of showing the older failure. A ready result keeps its built
+// commit, which the next open sees is not the head.
+function pickSettledPhase(deps: PreviewDeps, preview: Preview, result: PhaseChange): PhaseChange {
+  const headSHA = deps.store.findPreview(preview)?.headSHA;
+
+  return result.phase === 'failed' && headSHA !== preview.headSHA ? { phase: 'waiting' } : result;
 }
 
 async function tryRunBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseChange> {

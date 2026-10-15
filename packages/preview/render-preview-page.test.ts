@@ -6,12 +6,12 @@ test('it renders a page that reloads while a boot runs', () => {
     renderPreviewPage({
       title: 'Preview booting',
       message: 'Booting acme/greenhouse#17.',
-      refreshSeconds: 5,
+      refresh: { seconds: 5, url: '/acme/greenhouse/17' },
     }),
   ).toMatchInlineSnapshot(`
 "<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta http-equiv="refresh" content="5"><title>Preview booting</title></head>
+<head><meta charset="utf-8"><meta http-equiv="refresh" content="5; url=/acme/greenhouse/17"><title>Preview booting</title></head>
 <body style="font-family: system-ui, sans-serif; max-width: 40rem; margin: 3rem auto">
 <h1>Preview booting</h1>
 <pre style="white-space: pre-wrap">Booting acme/greenhouse#17.</pre>
