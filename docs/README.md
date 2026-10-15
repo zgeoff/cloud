@@ -46,6 +46,7 @@ call, the path of a change, the topology and the data.
 - [The prod apply job](./runbooks/prod-apply.md): set up the job, read a run, answer a held one.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
+- [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.
 - [atc gateway backup and restore](./runbooks/atc-gateway-backup-restore.md): back up and restore

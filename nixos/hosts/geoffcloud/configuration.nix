@@ -208,6 +208,18 @@ in
     ];
   };
 
+  # tank/cloud, the encrypted datasets on tank (modules/tank-cloud.nix, docs/runbooks/tank-cloud.md):
+  # unlocked at boot from /var/lib/zfs-keys/tank.key. Each service here refuses to start while
+  # its datasets are not mounted, instead of starting on the empty mount points on vda.
+  services.tank-cloud = {
+    enable = true;
+    requiredBy = {
+      k3s = [ "rancher" ];
+      imp-host = [ "host-secrets" ];
+      atc-daemon = [ "host-secrets" ];
+    };
+  };
+
   # atc's daemon for the atc gateway (docs/architecture/workloads/atc-gateway.md). The token
   # files are root-only and staged by scripts/install-atc-gateway-credentials.ts; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
