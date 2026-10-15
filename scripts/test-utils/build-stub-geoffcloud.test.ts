@@ -47,7 +47,7 @@ test('it connects the host’s probe only to an address the scenario lets the ho
   expect(dropped.stdout).toBe('probe-exit:124\n');
 });
 
-test('it answers a sandbox’s probe from the sandbox’s reach once imp new has created it', async () => {
+test('it answers a sandbox’s probe from the sandbox’s reach once impz new has created it', async () => {
   const host = buildStubGeoffcloud({
     manifest:
       '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
@@ -62,11 +62,11 @@ test('it answers a sandbox’s probe from the sandbox’s reach once imp new has
   });
 
   const created = await host.runRemote(
-    'docker exec imp-host imp new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'docker exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
   );
 
   const probe = await host.runRemote(
-    `docker exec imp-host imp exec fetch-check-1a2b3c4d -- bash -c ${toShellArg(buildTCPProbe({ host: '1.1.1.1', port: 443 }))}`,
+    `docker exec imp-host impz exec fetch-check-1a2b3c4d -- bash -c ${toShellArg(buildTCPProbe({ host: '1.1.1.1', port: 443 }))}`,
   );
 
   expect(created.exitCode).toBe(0);
@@ -74,7 +74,7 @@ test('it answers a sandbox’s probe from the sandbox’s reach once imp new has
   expect(host.sandboxes).toStrictEqual(new Set(['fetch-check-1a2b3c4d']));
 });
 
-test('it refuses imp exec and imp rm on a sandbox that does not exist, as imp does', async () => {
+test('it refuses impz exec and impz rm on a sandbox that does not exist, as imp does', async () => {
   const host = buildStubGeoffcloud({
     manifest:
       '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
@@ -88,12 +88,12 @@ test('it refuses imp exec and imp rm on a sandbox that does not exist, as imp do
     createExitCode: 0,
   });
 
-  const removed = await host.runRemote('docker exec imp-host imp rm fetch-check-1a2b3c4d');
+  const removed = await host.runRemote('docker exec imp-host impz rm fetch-check-1a2b3c4d');
 
   expect(removed).toStrictEqual({
     exitCode: 1,
     stdout: '',
-    stderr: 'imp: no imp named fetch-check-1a2b3c4d\n',
+    stderr: 'impz: no imp named fetch-check-1a2b3c4d\n',
   });
 });
 
@@ -112,7 +112,7 @@ test('it refuses a sandbox that is not public on a nixie fetch image', async () 
   });
 
   const created = await host.runRemote(
-    'docker exec imp-host imp new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3',
+    'docker exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3',
   );
 
   expect(created.exitCode).toBe(97);

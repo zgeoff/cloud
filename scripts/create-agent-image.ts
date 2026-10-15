@@ -98,5 +98,5 @@ async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
 }
 
 async function removeImage(io: Readonly<ScriptIO>, image: string) {
-  await runOrExit(io, ['imp', 'image', 'rm', image]);
+  await runOrExit(io, ['impz', 'image', 'rm', image]);
 }

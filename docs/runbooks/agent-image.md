@@ -14,7 +14,7 @@ The image holds binaries and two boot services for a 2 GiB imp:
 The swap service sizes `/swapfile` from the free space on `/`, so the swapfile never fills the disk.
 A 32 GiB agent imp gets 2 GiB. A small disk, such as a 4 GiB test imp, gets a smaller swapfile or
 none, because the service keeps room free for the session's checkout and the broker's files. The
-service prints its choice and the free space it read, which `imp logs <name> swap` shows.
+service prints its choice and the free space it read, which `impz logs <name> swap` shows.
 `images/agent/sbin/setup-swap` holds the bounds and the reason for each.
 
 The image holds no other configuration, no login state and no secret: atc sets up grants,
@@ -37,7 +37,7 @@ rollback.
 
 ## Build
 
-Build and check in one command, from any zgeoff/cloud clone, on a machine whose `imp` CLI calls the
+Build and check in one command, from any zgeoff/cloud clone, on a machine whose `impz` CLI calls the
 geoffcloud host. The token needs `manage` scope with no imp patterns.
 
 ```sh
@@ -52,9 +52,9 @@ runs that commit's `scripts/check-agent-image.ts` there, and removes the imp. It
 image, unless `--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is
 not on `main`, and an image or check imp name that already exists.
 
-`imp image build` prints no progress off a terminal, so the build runs quietly for several minutes.
+`impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
-build afterwards, so read `imp image ls` before a retry.
+build afterwards, so read `impz image ls` before a retry.
 
 ## Check
 
@@ -91,7 +91,7 @@ imp's first session starts.
    `atc daemon restart`. It restarts the daemon through its systemd unit and restores the fleet;
    `--dry-run` first lists the sessions a restart interrupts. The script never restarts it. The
    daemon reads its targets at startup only, so the change reaches the next spawn after the restart.
-3. Spawn a session on `cloud`, and check that its imp runs the new image: `imp ls` shows the image
+3. Spawn a session on `cloud`, and check that its imp runs the new image: `impz ls` shows the image
    of each imp.
 
 A switch changes new imps only. An imp keeps the image it was created from.
@@ -235,7 +235,7 @@ the allowlist entry.
 3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
-   `imp image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
+   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
 
 ## Roll back
 
@@ -244,9 +244,9 @@ records, `agent-1` before the first image named for a commit, or `coder` before 
 image. An image without atc, such as `agent-1` or `coder`, needs `guestATC` removed from the target
 too, so the daemon copies its binary in again.
 
-1. Check that the earlier image is still on the host: `imp image ls`.
+1. Check that the earlier image is still on the host: `impz image ls`.
 2. Set `targets.cloud.image` to it, as in the switch, and restart the daemon.
-3. Spawn a session on `cloud`, and check its imp's image with `imp ls`.
+3. Spawn a session on `cloud`, and check its imp's image with `impz ls`.
 
 Imps created from the new image keep it. Remove them, or let their sessions end, when the image is
 at fault.

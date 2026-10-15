@@ -2,7 +2,7 @@
 
 **cloud** is the infrastructure for `geoff.cloud`, a private cloud on a tailnet.
 
-One Onidel VM runs NixOS, k3s and [imp](https://github.com/zgeoff/imp), and hosts coding agents:
+One Onidel VM runs NixOS, k3s and [imp](https://github.com/zgeoff/impz), and hosts coding agents:
 [atc](https://github.com/zgeoff/atc) runs each session in its own imp, and assistants reach atc
 through one public endpoint. Pulumi manages the cloud resources and the cluster, and a NixOS flake
 manages the host.

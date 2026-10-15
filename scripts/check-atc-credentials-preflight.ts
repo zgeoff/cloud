@@ -9,7 +9,7 @@ import { runOp } from './run-op.ts';
 import { toShellArg } from './to-shell-arg.ts';
 
 export interface ATCCredentialsPreflight {
-  // impd's secrets and tokens, as imp's CLI prints them
+  // impd's secrets and tokens, as the impz CLI prints them
   readonly secrets: unknown;
   readonly tokens: unknown;
   readonly hasItem: boolean;
@@ -52,11 +52,11 @@ async function requireTools(context: Readonly<ATCCredentialsContext>) {
   await runOnHost(context, ['true']);
 }
 
-// a failing `imp info` stops here with docker's own message, so the check reads only a real answer
+// a failing `impz info` stops here with docker's own message, so the check reads only a real answer
 async function requireGrantableTokens(context: Readonly<ATCCredentialsContext>) {
-  const text = await runOnHost(context, ['docker', 'exec', 'imp-host', 'imp', 'info', '--json']);
+  const text = await runOnHost(context, ['docker', 'exec', 'imp-host', 'impz', 'info', '--json']);
 
-  const features = findJSONField(parseJSONOutput(text, 'imp info'), 'features');
+  const features = findJSONField(parseJSONOutput(text, 'impz info'), 'features');
 
   if (findJSONField(features, 'grantableTokens') !== true) {
     throw new ExitError(1, 'impd lacks grantableTokens; nothing changed');

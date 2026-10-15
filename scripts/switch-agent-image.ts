@@ -66,9 +66,9 @@ function parseArgs(args: readonly string[], home: string): readonly [string, str
 }
 
 async function requireImpImage(io: Readonly<ScriptIO>, image: string) {
-  const result = await runOrExit(io, ['imp', 'image', 'ls', '--json']);
+  const result = await runOrExit(io, ['impz', 'image', 'ls', '--json']);
 
-  const images = parseJSONOutput(result.stdout.toString(), 'imp image ls');
+  const images = parseJSONOutput(result.stdout.toString(), 'impz image ls');
 
   if (findRecord(images, 'name', image) === undefined) {
     throw new ExitError(

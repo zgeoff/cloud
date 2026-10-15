@@ -30,7 +30,7 @@ test('it mints atc-cloud straight into a root-only imp-token in one rename', asy
 
   await createStubImpDocker(ctx.bin, {
     stdout: 'imp_fixture_minted_token\n',
-    stderr: 'imp: token atc-cloud made; impd shows its secret only this once\n',
+    stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
   });
 
@@ -52,12 +52,12 @@ test('it mints atc-cloud straight into a root-only imp-token in one rename', asy
   });
 });
 
-test('it runs imp token new once with atc-cloud’s limits, and passes imp’s notice through', async () => {
+test('it runs impz token new once with atc-cloud’s limits, and passes imp’s notice through', async () => {
   const ctx = await setupTest();
 
   await createStubImpDocker(ctx.bin, {
     stdout: 'imp_fixture_minted_token\n',
-    stderr: 'imp: token atc-cloud made; impd shows its secret only this once\n',
+    stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
   });
 
@@ -71,17 +71,17 @@ test('it runs imp token new once with atc-cloud’s limits, and passes imp’s n
   expect(result.stdout.toString()).toBe('');
 
   expect(result.stderr.toString()).toBe(
-    'imp: token atc-cloud made; impd shows its secret only this once\n',
+    'impz: token atc-cloud made; impd shows its secret only this once\n',
   );
 
   expect(calls).toBe(
-    '["docker","exec","imp-host","imp","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]\n',
+    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]\n',
   );
 });
 
 test.each([
   ['the mint prints more than one line', 'imp_fixture_minted_token\nsecond line\n', 0],
-  ['imp token new fails', '', 1],
+  ['impz token new fails', '', 1],
 ])('it saves no token when %s', async (_label: string, stdout: string, exitCode: number) => {
   const ctx = await setupTest();
 

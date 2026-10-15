@@ -18,7 +18,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
 
   const docker = await createStubImpDocker(ctx.dir, {
     stdout: 'imp_fixture_minted_token\n',
-    stderr: 'imp: token atc-cloud made; impd shows its secret only this once\n',
+    stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
   });
 
@@ -26,7 +26,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
     docker,
     'exec',
     'imp-host',
-    'imp',
+    'impz',
     'token',
     'new',
     'atc-cloud',
@@ -41,22 +41,22 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
   expect(result).toStrictEqual({
     exitCode: 0,
     stdout: Buffer.from('imp_fixture_minted_token\n'),
-    stderr: Buffer.from('imp: token atc-cloud made; impd shows its secret only this once\n'),
+    stderr: Buffer.from('impz: token atc-cloud made; impd shows its secret only this once\n'),
     timedOut: false,
   });
 
   const calls = await readFile(join(ctx.dir, 'docker-calls'), 'utf8');
 
   expect(calls).toBe(
-    '["docker","exec","imp-host","imp","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]\n',
+    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]\n',
   );
 });
 
 test('it ends any other call with exit 97', async () => {
   const ctx = await setupTest();
   const docker = await createStubImpDocker(ctx.dir, { stdout: '', stderr: '', exitCode: 0 });
-  const result = await runProcess([docker, 'exec', 'imp-host', 'imp', 'token', 'rm', 'atc-cloud']);
+  const result = await runProcess([docker, 'exec', 'imp-host', 'impz', 'token', 'rm', 'atc-cloud']);
 
   expect(result.exitCode).toBe(97);
-  expect(result.stderr.toString()).toBe('unexpected: exec imp-host imp token rm atc-cloud\n');
+  expect(result.stderr.toString()).toBe('unexpected: exec imp-host impz token rm atc-cloud\n');
 });

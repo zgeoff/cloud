@@ -85,7 +85,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
   expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
 
   expect(ctx.err.join('')).toBe(
-    `building agent-${short} from ${sha}; imp image build shows no progress off a terminal\n` +
+    `building agent-${short} from ${sha}; impz image build shows no progress off a terminal\n` +
       `checking agent-${short} on a fresh imp, agent-check-${short}\n` +
       `agent-check-${short}\n` +
       '== 0 failed\n',
@@ -100,13 +100,13 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
   expect(imp.imps).toStrictEqual([]);
 
   expect(impCalls.map((call) => call.argv)).toStrictEqual([
-    ['imp', 'image', 'ls', '--json'],
-    ['imp', 'ls', '--json'],
-    ['imp', 'image', 'build', join(src, 'images/agent'), '--name', `agent-${short}`],
-    ['imp', 'image', 'ls', '--json'],
-    ['imp', 'new', `agent-check-${short}`, '--image', `agent-${short}`],
+    ['impz', 'image', 'ls', '--json'],
+    ['impz', 'ls', '--json'],
+    ['impz', 'image', 'build', join(src, 'images/agent'), '--name', `agent-${short}`],
+    ['impz', 'image', 'ls', '--json'],
+    ['impz', 'new', `agent-check-${short}`, '--image', `agent-${short}`],
     ['bun', join(src, 'scripts/check-agent-image.ts'), '--imp', `agent-check-${short}`],
-    ['imp', 'rm', `agent-check-${short}`],
+    ['impz', 'rm', `agent-check-${short}`],
   ]);
 
   expect(src).toStartWith(join(tmpdir(), 'agent-image-build-'));
@@ -205,13 +205,13 @@ test('it removes the image and the imp when the check fails', async () => {
     registerCleanup: () => () => {},
   });
 
-  const impCalls = stub.calls.filter((call) => call.argv[0] === 'imp');
+  const impCalls = stub.calls.filter((call) => call.argv[0] === 'impz');
 
   expect(exitCode).toBe(1);
   expect(ctx.out).toStrictEqual([`agent-${short} check failed; removed the image\n`]);
 
   expect(ctx.err.join('')).toBe(
-    `building agent-${short} from ${sha}; imp image build shows no progress off a terminal\n` +
+    `building agent-${short} from ${sha}; impz image build shows no progress off a terminal\n` +
       `checking agent-${short} on a fresh imp, agent-check-${short}\n` +
       `agent-check-${short}\n` +
       '== 2 failed\n',
@@ -221,8 +221,8 @@ test('it removes the image and the imp when the check fails', async () => {
   expect(imp.imps).toStrictEqual([]);
 
   expect(impCalls.slice(-2).map((call) => call.argv)).toStrictEqual([
-    ['imp', 'rm', `agent-check-${short}`],
-    ['imp', 'image', 'rm', `agent-${short}`],
+    ['impz', 'rm', `agent-check-${short}`],
+    ['impz', 'image', 'rm', `agent-${short}`],
   ]);
 });
 
@@ -312,9 +312,9 @@ test('it fails without an imp when the build fails', async () => {
   expect(ctx.out).toStrictEqual([]);
 
   expect(ctx.err.join('')).toBe(
-    `building agent-${short} from ${sha}; imp image build shows no progress off a terminal\n` +
+    `building agent-${short} from ${sha}; impz image build shows no progress off a terminal\n` +
       'imp: BUILD_FAILED: the build exited 1\n' +
-      `imp image build failed for agent-${short}\n`,
+      `impz image build failed for agent-${short}\n`,
   );
 
   expect(imp.images).toStrictEqual([]);
@@ -369,7 +369,7 @@ test('it leaves the image to an interrupt from the build on, newest of the steps
   expect(exitCode).toBe(0);
 
   expect(interrupt.calls.map((call) => call.argv)).toStrictEqual([
-    ['imp', 'image', 'rm', `agent-${short}`],
+    ['impz', 'image', 'rm', `agent-${short}`],
   ]);
 });
 
@@ -412,8 +412,8 @@ test('it fails when the build outlives AGENT_IMAGE_BUILD_TIMEOUT, and gives the 
   expect(build?.options.timeoutMs).toBe(1_200_000);
 
   expect(ctx.err.join('')).toBe(
-    `building agent-${short} from ${sha}; imp image build shows no progress off a terminal\n` +
-      `imp image build did not finish within 20m; impd may still finish agent-${short}, so read imp image ls before a retry\n`,
+    `building agent-${short} from ${sha}; impz image build shows no progress off a terminal\n` +
+      `impz image build did not finish within 20m; impd may still finish agent-${short}, so read impz image ls before a retry\n`,
   );
 
   expect(imp.images).toStrictEqual([]);
@@ -498,7 +498,7 @@ test('it refuses a commit that is not on main, before any imp call', async () =>
     `${sha} is not on origin/main: build only a commit that main holds\n`,
   ]);
 
-  expect(stub.calls.filter((call) => call.argv[0] === 'imp')).toStrictEqual([]);
+  expect(stub.calls.filter((call) => call.argv[0] === 'impz')).toStrictEqual([]);
 });
 
 test('it refuses an image name that is taken', async () => {
@@ -533,12 +533,12 @@ test('it refuses an image name that is taken', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.err).toStrictEqual([
-    `image agent-${short} already exists: remove it with imp image rm, or build another commit\n`,
+    `image agent-${short} already exists: remove it with impz image rm, or build another commit\n`,
   ]);
 
   expect(
-    stub.calls.filter((call) => call.argv[0] === 'imp').map((call) => call.argv),
-  ).toStrictEqual([['imp', 'image', 'ls', '--json']]);
+    stub.calls.filter((call) => call.argv[0] === 'impz').map((call) => call.argv),
+  ).toStrictEqual([['impz', 'image', 'ls', '--json']]);
 
   expect(imp.images).toStrictEqual([{ name: `agent-${short}`, digest: 'imp-build-1' }]);
 });
@@ -579,14 +579,14 @@ test('it refuses a check imp name that is taken', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.err).toStrictEqual([
-    `imp agent-check-${short} already exists: remove it with imp rm first\n`,
+    `imp agent-check-${short} already exists: remove it with impz rm first\n`,
   ]);
 
   expect(
-    stub.calls.filter((call) => call.argv[0] === 'imp').map((call) => call.argv),
+    stub.calls.filter((call) => call.argv[0] === 'impz').map((call) => call.argv),
   ).toStrictEqual([
-    ['imp', 'image', 'ls', '--json'],
-    ['imp', 'ls', '--json'],
+    ['impz', 'image', 'ls', '--json'],
+    ['impz', 'ls', '--json'],
   ]);
 });
 

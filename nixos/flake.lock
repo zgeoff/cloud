@@ -30,14 +30,14 @@
         "lastModified": 1792088328,
         "narHash": "sha256-T6CMMiCkAhMBU7XaPnBd48qVxe2PHOXI6M0UXykiyhQ=",
         "owner": "zgeoff",
-        "repo": "imp",
+        "repo": "impz",
         "rev": "6a456b986f9073c9946d5fc27a5b8c01d31a6673",
         "type": "github"
       },
       "original": {
         "owner": "zgeoff",
         "ref": "6a456b98",
-        "repo": "imp",
+        "repo": "impz",
         "type": "github"
       }
     },

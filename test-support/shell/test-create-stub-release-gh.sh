@@ -26,10 +26,10 @@ it_lists_the_release_tags_the_test_wrote() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  mkdir -p "$tree/releases/imp"
-  printf '%s\n' v1.0.1 v1.0.0 > "$tree/releases/imp/tags"
+  mkdir -p "$tree/releases/impz"
+  printf '%s\n' v1.0.1 v1.0.0 > "$tree/releases/impz/tags"
 
-  "${case_env[@]}" gh release list -R zgeoff/imp --exclude-drafts --exclude-pre-releases --limit 30 \
+  "${case_env[@]}" gh release list -R zgeoff/impz --exclude-drafts --exclude-pre-releases --limit 30 \
     --json tagName --jq '.[].tagName' > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -37,7 +37,7 @@ v1.0.1
 v1.0.0
 EOF
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["gh","release","list","-R","zgeoff/imp","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]'
+  diff - "$tree/calls" <<< '["gh","release","list","-R","zgeoff/impz","--exclude-drafts","--exclude-pre-releases","--limit","30","--json","tagName","--jq",".[].tagName"]'
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
     exit 1
@@ -50,7 +50,7 @@ it_lists_no_release_when_the_test_wrote_no_tags() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  "${case_env[@]}" gh release list -R zgeoff/imp --exclude-drafts --exclude-pre-releases --limit 30 \
+  "${case_env[@]}" gh release list -R zgeoff/impz --exclude-drafts --exclude-pre-releases --limit 30 \
     --json tagName --jq '.[].tagName' > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -144,14 +144,14 @@ it_prints_the_commit_of_a_tag() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  mkdir -p "$tree/releases/imp/v1.0.1"
-  echo c5bea94080fdde9e21e9720295c1ca727302662e > "$tree/releases/imp/v1.0.1/commit"
+  mkdir -p "$tree/releases/impz/v1.0.1"
+  echo c5bea94080fdde9e21e9720295c1ca727302662e > "$tree/releases/impz/v1.0.1/commit"
 
-  "${case_env[@]}" gh api repos/zgeoff/imp/commits/v1.0.1 --jq .sha > "$tree/out" 2> "$tree/err" || status=$?
+  "${case_env[@]}" gh api repos/zgeoff/impz/commits/v1.0.1 --jq .sha > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'c5bea94080fdde9e21e9720295c1ca727302662e'
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["gh","api","repos/zgeoff/imp/commits/v1.0.1","--jq",".sha"]'
+  diff - "$tree/calls" <<< '["gh","api","repos/zgeoff/impz/commits/v1.0.1","--jq",".sha"]'
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
     exit 1
@@ -164,7 +164,7 @@ it_answers_the_commit_of_a_missing_tag_with_the_apis_422() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
-  "${case_env[@]}" gh api repos/zgeoff/imp/commits/v9.9.9 --jq .sha > "$tree/out" 2> "$tree/err" || status=$?
+  "${case_env[@]}" gh api repos/zgeoff/impz/commits/v9.9.9 --jq .sha > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - <(
     cat "$tree/out"

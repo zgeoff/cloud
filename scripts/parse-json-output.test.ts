@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { parseJSONOutput } from './parse-json-output.ts';
 
 test('it parses a tool’s JSON answer', () => {
-  expect(parseJSONOutput('{"features":{"grantableTokens":true}}\n', 'imp info')).toStrictEqual({
+  expect(parseJSONOutput('{"features":{"grantableTokens":true}}\n', 'impz info')).toStrictEqual({
     features: { grantableTokens: true },
   });
 });

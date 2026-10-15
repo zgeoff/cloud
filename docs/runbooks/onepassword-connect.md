@@ -27,7 +27,7 @@ Send the token on stdin. Never put it on a command line.
 
 ```sh
 op read op://cloud/onepassword-connect-token/credential \
-  | imp secret add op-connect --kind custom --hosts op-connect.imp.internal \
+  | impz secret add op-connect --kind custom --hosts op-connect.imp.internal \
       --header authorization --scheme bearer --upstream http://172.17.0.1:18081
 ```
 

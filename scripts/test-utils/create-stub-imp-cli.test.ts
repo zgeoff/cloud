@@ -21,14 +21,14 @@ test('it keeps the imps that one call creates for the next call, and logs each a
   });
 
   await runProcess([
-    join(imp.bin, 'imp'),
+    join(imp.bin, 'impz'),
     'new',
     'agent-check-abc1234',
     '--image',
     'agent-abc1234',
   ]);
 
-  const listed = await runProcess([join(imp.bin, 'imp'), 'ls', '--json']);
+  const listed = await runProcess([join(imp.bin, 'impz'), 'ls', '--json']);
 
   expect(listed).toStrictEqual({
     exitCode: 0,
@@ -54,12 +54,12 @@ test('it keeps the imps that one call creates for the next call, and logs each a
 test('it answers a failing call with buildStubImp’s exit code and stderr', async () => {
   const ctx = await setupTest();
   const imp = await createStubImpCLI(ctx.dir, { images: [] });
-  const result = await runProcess([join(imp.bin, 'imp'), 'rm', 'agent-check-abc1234']);
+  const result = await runProcess([join(imp.bin, 'impz'), 'rm', 'agent-check-abc1234']);
 
   expect(result).toStrictEqual({
     exitCode: 1,
     stdout: Buffer.from(''),
-    stderr: Buffer.from('imp: NOT_FOUND: imp agent-check-abc1234 not found\n'),
+    stderr: Buffer.from('impz: NOT_FOUND: imp agent-check-abc1234 not found\n'),
     timedOut: false,
   });
 });
@@ -67,12 +67,12 @@ test('it answers a failing call with buildStubImp’s exit code and stderr', asy
 test('it fails a call it does not model with exit 97', async () => {
   const ctx = await setupTest();
   const imp = await createStubImpCLI(ctx.dir, { images: [] });
-  const result = await runProcess([join(imp.bin, 'imp'), 'exec', 'agent-check-abc1234']);
+  const result = await runProcess([join(imp.bin, 'impz'), 'exec', 'agent-check-abc1234']);
 
   expect(result).toStrictEqual({
     exitCode: 97,
     stdout: Buffer.from(''),
-    stderr: Buffer.from('unexpected: ["imp","exec","agent-check-abc1234"]\n'),
+    stderr: Buffer.from('unexpected: ["impz","exec","agent-check-abc1234"]\n'),
     timedOut: false,
   });
 });

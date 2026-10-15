@@ -4,7 +4,7 @@ import { buildMockCredentialsHostScenario } from './test-utils/build-mock-creden
 import { buildStubCredentialsHost } from './test-utils/build-stub-credentials-host.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
-test('it reads impd’s tokens through imp’s CLI in imp-host', async () => {
+test('it reads impd’s tokens through the impz CLI in imp-host', async () => {
   const host = buildMockCredentialsHostScenario();
   const stub = buildStubRunner(buildStubCredentialsHost(host).handle);
 
@@ -24,7 +24,7 @@ test('it reads impd’s tokens through imp’s CLI in imp-host', async () => {
       'docker',
       'exec',
       'imp-host',
-      'imp',
+      'impz',
       'token',
       'ls',
       '--json',
@@ -53,5 +53,5 @@ test('it stops when imp prints something other than JSON', () => {
       { run: stub.run, printOut: () => {}, printErr: () => {}, host: 'root@geoffcloud' },
       'secret',
     ),
-  ).rejects.toMatchObject({ exitCode: 1, message: 'no JSON from imp secret ls' });
+  ).rejects.toMatchObject({ exitCode: 1, message: 'no JSON from impz secret ls' });
 });

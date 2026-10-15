@@ -67,7 +67,7 @@ test('it exits 120 for a missing saved token, as the real check script does', as
   expect(real.exitCode).toBe(120);
 });
 
-test('it adds glm from the line on stdin and prints it with droppedGrants, as imp secret add does', async () => {
+test('it adds glm from the line on stdin and prints it with droppedGrants, as impz secret add does', async () => {
   const host = buildStubCredentialsHost(buildMockCredentialsHostScenario({ secrets: [] }));
   const stub = buildStubRunner(host.handle);
 
@@ -77,7 +77,7 @@ test('it adds glm from the line on stdin and prints it with droppedGrants, as im
       '-o',
       'BatchMode=yes',
       'root@geoffcloud',
-      ...'docker exec -i imp-host imp secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json'.split(
+      ...'docker exec -i imp-host impz secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json'.split(
         ' ',
       ),
     ],
@@ -113,7 +113,7 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
   );
 
   expect(result.stderr.toString()).toBe(
-    'imp: token atc-cloud made; impd shows its secret only this once\n',
+    'impz: token atc-cloud made; impd shows its secret only this once\n',
   );
 
   expect(scenario.files).toStrictEqual({
@@ -140,7 +140,7 @@ test('it fails docker exec as docker does when imp-host is stopped', async () =>
     'docker',
     'exec',
     'imp-host',
-    'imp',
+    'impz',
     'info',
     '--json',
   ]);

@@ -1,4 +1,4 @@
-// An impd token as `imp token ls --json` prints it, after imp 1.0.0's TokenSchema
+// An impd token as `impz token ls --json` prints it, after imp 1.0.0's TokenSchema
 // (packages/api/src/token-schema.ts): the atc-cloud token that install-atc-gateway-credentials
 // mints, by default. Its values are fixed: the script compares them, so none is arbitrary.
 export interface MockImpToken {

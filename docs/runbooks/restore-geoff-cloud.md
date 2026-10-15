@@ -18,28 +18,28 @@ check the result.
 
 ## 1. Restore imps from restic
 
-impd backs up every imp to R2 about every 6 hours. `imp backup ls` lists the backups, and
+impd backs up every imp to R2 about every 6 hours. `impz backup ls` lists the backups, and
 `last check` shows the last `restic check`.
 
 1. List the backups:
 
    ```sh
-   docker exec imp-host imp backup ls
+   docker exec imp-host impz backup ls
    ```
 
 2. Restore one imp, the newest backup at or before a time, or every imp:
 
    ```sh
-   docker exec imp-host imp backup restore <name>
-   docker exec imp-host imp backup restore <name> --at 2026-10-03T07:40:00Z
-   docker exec imp-host imp backup restore <name> --as <name>-restored
-   docker exec imp-host imp backup restore --all          # empty host
-   docker exec imp-host imp backup restore --all --merge  # host with imps
+   docker exec imp-host impz backup restore <name>
+   docker exec imp-host impz backup restore <name> --at 2026-10-03T07:40:00Z
+   docker exec imp-host impz backup restore <name> --as <name>-restored
+   docker exec imp-host impz backup restore --all          # empty host
+   docker exec imp-host impz backup restore --all --merge  # host with imps
    ```
 
-   A restored imp is stopped. Start it with `imp start <name>`.
+   A restored imp is stopped. Start it with `impz start <name>`.
 
-3. Check: `imp ls` shows the imp, and the impd log shows `backup: restored <name> from <snapshot>`.
+3. Check: `impz ls` shows the imp, and the impd log shows `backup: restored <name> from <snapshot>`.
    Loki has the same line under `{job="journal", unit="imp-host.service"}`.
 
 Tested 2026-10-03 07:40 UTC with a test imp: backup `51815d88`, restored, then booted from the boot
@@ -50,7 +50,7 @@ template.
 Every imp upgrade takes a copy first with `bash scripts/copy-impd-db.sh <label>`. The copy is one
 `imp.sqlite` file in `/root/imp-db-backups/<label>-<UTC time>/`, with `COPY-INFO` beside it: `path`,
 `sizeBytes`, `lastMigration`, `impVersion`, `createdAt` and `integrity`, the names
-`imp db copy --json` returns (imp #171), plus `image`, which impd cannot know. Copies from before
+`impz db copy --json` returns (imp #171), plus `image`, which impd cannot know. Copies from before
 those names say `imp` and `migration`; the restore script reads both. `restore-impd-db` puts a copy
 back. The host's NixOS config puts it and the copy's host side on the host's PATH, with the sqlite3
 of the flake's pinned nixpkgs, so a fix to either reaches the host only with a host switch.
@@ -58,12 +58,12 @@ of the flake's pinned nixpkgs, so a fix to either reaches the host only with a h
 **CAUTION:** A restore discards every change impd made after the copy. It is one-way: impd runs
 migrations forward only, and an older binary refuses a newer database. Disks and checkpoints made
 after the copy stay on the pool as orphans: impd may log them at start, keeps them, and
-`imp gc --dry-run` lists them. That log is expected, not a failure. Those imps leave `imp ls` until
-someone repairs them by hand. Tokens follow the database too: a token minted after the copy stops
-working, and a token revoked after it works again. The root `token` file, `broker/` and `tls/` are
-not in the database and stay valid. Re-mint any token minted after the copy, such as `atc-cloud`.
-Copies taken by `tar` of a running impd, before the copy script, have no `COPY-INFO` and may be
-torn; the restore script refuses them.
+`impz gc --dry-run` lists them. That log is expected, not a failure. Those imps leave `impz ls`
+until someone repairs them by hand. Tokens follow the database too: a token minted after the copy
+stops working, and a token revoked after it works again. The root `token` file, `broker/` and `tls/`
+are not in the database and stay valid. Re-mint any token minted after the copy, such as
+`atc-cloud`. Copies taken by `tar` of a running impd, before the copy script, have no `COPY-INFO`
+and may be torn; the restore script refuses them.
 
 **CAUTION:** Never switch generations while impd's database and image disagree. Do not rely on a
 switch to leave imp-host stopped: in the VM rehearsal a clean switch left a stopped imp-host
@@ -109,11 +109,11 @@ stopped, and switch after.
    secret value that no database row names, so a copy older than a secret loses that secret's value,
    and the grants that used it break. The script saves the stopped secret values first, in
    `secrets/` of the saved directory (root-only, never printed); re-add any secret the copy lacks
-   with `imp secret add`, reading the value from that file or from its source. Until imp ships
-   `imp db copy` and its documented restore (imp #171), this runbook is the recovery contract.
+   with `impz secret add`, reading the value from that file or from its source. Until imp ships
+   `impz db copy` and its documented restore (imp #171), this runbook is the recovery contract.
 
-4. Check: `docker exec imp-host imp info` shows the copy's version, `imp ls` matches the time of the
-   copy, and `https://imps.geoff.cloud/health` returns 200.
+4. Check: `docker exec imp-host impz info` shows the copy's version, `impz ls` matches the time of
+   the copy, and `https://imps.geoff.cloud/health` returns 200.
 
 **Reboot window.** If the host reboots during step 3, imp-host starts on the current generation,
 against whatever the dataset holds then. Do not assume nothing changed: check the script's output
@@ -190,7 +190,7 @@ ssh root@geoffcloud nixos-rebuild switch --rollback
 Exception: imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0
 generation needs no database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1
 fixes (imp #196): a crafted imported image can overwrite host files. Before rolling back to 0.29.0,
-stop all image imports and builds (`imp image add`, `imp image build`, templates from a new image,
+stop all image imports and builds (`impz image add`, `impz image build`, templates from a new image,
 BuildKit), and keep them stopped until a fixed imp runs again.
 
 A rollback from 0.30.0 needs a database restore: 0.30.0 adds the migration

@@ -44,8 +44,8 @@ test('it lists the directory an imp copy sends, and answers the copy and the exe
 
   await writeFile(join(ctx.dir, 'gitleaks'), '');
 
-  const copy = await stub.run(['imp', 'cp', ctx.dir, 'agent:/run/agent-image-check']);
-  const exec = await stub.run(['imp', 'exec', 'agent', '--', 'bash', '-s']);
+  const copy = await stub.run(['impz', 'cp', ctx.dir, 'agent:/run/agent-image-check']);
+  const exec = await stub.run(['impz', 'exec', 'agent', '--', 'bash', '-s']);
 
   expect(copy.exitCode).toBe(0);
   expect(exec.stdout.toString()).toBe('== 0 failed\n');
@@ -58,7 +58,7 @@ test('it answers the imp copy with the scenario’s copy failure', async () => {
   const guest = buildStubAgentImageGuest({ guest: {}, copy: { exitCode: 3, stderr: 'no imp\n' } });
   const stub = buildStubRunner(guest.handler);
 
-  const result = await stub.run(['imp', 'cp', ctx.dir, 'gone:/run/agent-image-check']);
+  const result = await stub.run(['impz', 'cp', ctx.dir, 'gone:/run/agent-image-check']);
 
   expect(result).toStrictEqual({
     exitCode: 3,

@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
@@ -25,7 +25,7 @@ export async function runAgentImageCheck(
   io: Readonly<InterruptibleIO>,
   target: Readonly<AgentImageCheck>,
 ): Promise<boolean> {
-  // registered before `imp new`, since impd can create the imp after an interrupt stops the CLI,
+  // registered before `impz new`, since impd can create the imp after an interrupt stops the CLI,
   // and the caller found its name free
   const dropCleanup = io.registerCleanup((cleanupIO) => removeCheckImp(cleanupIO, target.check));
 
@@ -37,7 +37,7 @@ export async function runAgentImageCheck(
 }
 
 async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImageCheck>) {
-  const created = await runOrExit(io, ['imp', 'new', target.check, '--image', target.image]);
+  const created = await runOrExit(io, ['impz', 'new', target.check, '--image', target.image]);
 
   printErrText(io, created.stdout.toString());
 
@@ -47,7 +47,12 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
     ? ['bun', script, '--imp', target.check]
     : ['bash', join(target.src, 'scripts/check-agent-image.sh'), '--imp', target.check];
 
-  const result = await io.run(argv, { cwd: target.work, timeoutMs: checkTimeoutMs });
+  const env = {
+    ...process.env,
+    PATH: `${createImpShim(target.work)}:${process.env['PATH'] ?? ''}`,
+  };
+
+  const result = await io.run(argv, { cwd: target.work, timeoutMs: checkTimeoutMs, env });
 
   printErrText(io, `${result.stdout.toString()}${result.stderr.toString()}`);
 
@@ -56,8 +61,21 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
   return result.exitCode === 0 && !result.timedOut;
 }
 
+// A commit from before imp's CLI became impz has a check that calls `imp`: the shim on its PATH
+// hands each call to impz. Returns the shim's directory, inside the work directory.
+function createImpShim(work: string): string {
+  const dir = join(work, 'imp-shim');
+  const shim = join(dir, 'imp');
+
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(shim, '#!/bin/sh\nexec impz "$@"\n');
+  chmodSync(shim, 0o755);
+
+  return dir;
+}
+
 async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {
-  const removed = await runOrExit(io, ['imp', 'rm', check]);
+  const removed = await runOrExit(io, ['impz', 'rm', check]);
 
   printErrText(io, removed.stdout.toString());
 }

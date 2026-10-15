@@ -73,9 +73,9 @@ async function setupGuest(options: Readonly<CheckAgentImageOptions>, target: Tar
     return ['docker', 'run', '--rm', '-i', '-v', mount, target.name, 'bash', '-s'];
   }
 
-  await runOrExit(options, ['imp', 'cp', dir, `${target.name}:/run/agent-image-check`]);
+  await runOrExit(options, ['impz', 'cp', dir, `${target.name}:/run/agent-image-check`]);
 
-  return ['imp', 'exec', target.name, '--', 'bash', '-s'];
+  return ['impz', 'exec', target.name, '--', 'bash', '-s'];
 }
 
 if (import.meta.main) {

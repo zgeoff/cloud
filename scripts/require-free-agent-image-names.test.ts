@@ -31,7 +31,7 @@ test('it refuses an image name the host holds', () => {
   ).rejects.toMatchObject({
     exitCode: 1,
     message:
-      'image agent-abc1234 already exists: remove it with imp image rm, or build another commit',
+      'image agent-abc1234 already exists: remove it with impz image rm, or build another commit',
   });
 });
 
@@ -50,6 +50,6 @@ test('it refuses a check imp name the host holds', () => {
     ),
   ).rejects.toMatchObject({
     exitCode: 1,
-    message: 'imp agent-check-abc1234 already exists: remove it with imp rm first',
+    message: 'imp agent-check-abc1234 already exists: remove it with impz rm first',
   });
 });

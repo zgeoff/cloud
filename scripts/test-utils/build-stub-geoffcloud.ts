@@ -18,7 +18,7 @@ export interface StubGeoffcloudScenario {
   // what the sandbox's page fetch prints
   readonly page: string;
 
-  // imp new's exit code
+  // impz new's exit code
   readonly createExitCode: number;
 }
 
@@ -74,15 +74,15 @@ const reads: Record<string, (scenario: StubGeoffcloudScenario) => string> = {
     scenario.serviceAddress,
 };
 
-// the probe as the host's shell gets it, and as it reaches the sandbox's bash through imp exec
+// the probe as the host's shell gets it, and as it reaches the sandbox's bash through impz exec
 const hostProbe =
   /^timeout 5 bash -c 'exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)' 2>\/dev\/null; echo probe-exit:\$\?$/u;
 
 const sandboxProbe =
-  /^docker exec imp-host imp exec \S+ -- bash -c 'timeout 5 bash -c '\\''exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)'\\'' 2>\/dev\/null; echo probe-exit:\$\?'$/u;
+  /^docker exec imp-host impz exec \S+ -- bash -c 'timeout 5 bash -c '\\''exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)'\\'' 2>\/dev\/null; echo probe-exit:\$\?'$/u;
 
 const pageFetch =
-  /^docker exec imp-host imp exec \S+ -- bash -c '\/usr\/local\/bin\/bun -e '\\''const page = await fetch\("https:\/\/example\.com\/"\); .*'\\'''$/u;
+  /^docker exec imp-host impz exec \S+ -- bash -c '\/usr\/local\/bin\/bun -e '\\''const page = await fetch\("https:\/\/example\.com\/"\); .*'\\'''$/u;
 
 function buildAnswer(state: StubState, command: string): RemoteResult {
   const read = reads[command];
@@ -91,7 +91,7 @@ function buildAnswer(state: StubState, command: string): RemoteResult {
     return { exitCode: 0, stdout: read(state.scenario), stderr: '' };
   }
 
-  const imp = /^docker exec imp-host imp (?<verb>new|exec|rm) (?<name>\S+)/u.exec(command)?.groups;
+  const imp = /^docker exec imp-host impz (?<verb>new|exec|rm) (?<name>\S+)/u.exec(command)?.groups;
 
   if (imp === undefined) {
     return buildProbeAnswer(state.scenario.hostReaches, hostProbe.exec(command)?.groups, command);
@@ -126,7 +126,7 @@ function buildImpAnswer(state: StubState, call: ImpCall): RemoteResult {
   }
 
   if (!state.sandboxes.has(call.name)) {
-    return { exitCode: 1, stdout: '', stderr: `imp: no imp named ${call.name}\n` };
+    return { exitCode: 1, stdout: '', stderr: `impz: no imp named ${call.name}\n` };
   }
 
   if (call.verb === 'rm') {
@@ -153,7 +153,7 @@ function buildCreateAnswer(state: StubState, call: ImpCall): RemoteResult {
     return {
       exitCode: state.scenario.createExitCode,
       stdout: '',
-      stderr: 'imp: no image by that name\n',
+      stderr: 'impz: no image by that name\n',
     };
   }
 

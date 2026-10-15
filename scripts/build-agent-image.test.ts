@@ -91,7 +91,7 @@ test.each([
       exitCode: code,
       stdout: '',
       stderr:
-        `building agent-${short} from ${sha}; imp image build shows no progress off a terminal\n` +
+        `building agent-${short} from ${sha}; impz image build shows no progress off a terminal\n` +
         `checking agent-${short} on a fresh imp, agent-check-${short}\n` +
         `agent-check-${short}\n` +
         `stopped by ${signal}; cleaning up\n`,

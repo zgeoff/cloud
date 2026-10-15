@@ -32,7 +32,7 @@ export async function installATCImpToken(
   if (token !== undefined || hasFile) {
     throw new ExitError(
       1,
-      `only one exists (token: ${token !== undefined}, host file: ${hasFile}). impd shows a token once,\nso run 'imp token rm atc-cloud' in imp-host and remove ${file}, then rerun`,
+      `only one exists (token: ${token !== undefined}, host file: ${hasFile}). impd shows a token once,\nso run 'impz token rm atc-cloud' in imp-host and remove ${file}, then rerun`,
     );
   }
 
@@ -96,7 +96,7 @@ async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: st
   if (verdict === 'bad') {
     throw new ExitError(
       1,
-      `${file} does not authenticate to impd as the token atc-cloud (empty, more\nthan one line, stale or another token). impd shows a token once, so remove\n${file} and run 'imp token rm atc-cloud' in imp-host, then rerun to mint\na new one`,
+      `${file} does not authenticate to impd as the token atc-cloud (empty, more\nthan one line, stale or another token). impd shows a token once, so remove\n${file} and run 'impz token rm atc-cloud' in imp-host, then rerun to mint\na new one`,
     );
   }
 

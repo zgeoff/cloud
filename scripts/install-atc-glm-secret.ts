@@ -30,7 +30,7 @@ export async function installATCGLMSecret(
   const key = await readZAIKey(context);
   const added = await runOnHost(context, glmAddCommand, Buffer.from(`${key}\n`));
 
-  printSecret(context, parseJSONOutput(added, 'imp secret add'));
+  printSecret(context, parseJSONOutput(added, 'impz secret add'));
 }
 
 function printSecret(context: Readonly<ATCCredentialsContext>, secret: unknown) {
@@ -71,7 +71,7 @@ const glmAddCommand = [
   'exec',
   '-i',
   'imp-host',
-  'imp',
+  'impz',
   'secret',
   'add',
   'glm',

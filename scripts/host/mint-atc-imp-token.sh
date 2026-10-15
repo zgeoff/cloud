@@ -15,7 +15,7 @@ mint_atc_imp_token() {
   temp="$(mktemp "$dir/.imp-token.XXXXXX")"
   trap 'rm -f "$temp"' EXIT
   # docker exec without -i leaves stdin alone, which holds the rest of this script
-  docker exec imp-host imp token new atc-cloud --scope manage --imps 'harness-*' \
+  docker exec imp-host impz token new atc-cloud --scope manage --imps 'harness-*' \
     --grantable glm > "$temp"
   test "$(wc -l < "$temp")" -eq 1
   chmod 0400 "$temp"

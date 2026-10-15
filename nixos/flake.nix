@@ -7,9 +7,9 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # imp's host module (zgeoff/imp docs/guides/nixos.md); pinned by flake.lock
+    # imp's host module (zgeoff/impz docs/guides/nixos.md); pinned by flake.lock
     imp = {
-      url = "github:zgeoff/imp/6a456b98";
+      url = "github:zgeoff/impz/6a456b98";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

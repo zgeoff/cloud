@@ -18,13 +18,13 @@ export async function requireFreeAgentImageNames(
   if (findRecord(images, 'name', names.image) !== undefined) {
     throw new ExitError(
       1,
-      `image ${names.image} already exists: remove it with imp image rm, or build another commit`,
+      `image ${names.image} already exists: remove it with impz image rm, or build another commit`,
     );
   }
 
   const imps = await readImpJSON(io, ['ls', '--json']);
 
   if (findRecord(imps, 'name', names.check) !== undefined) {
-    throw new ExitError(1, `imp ${names.check} already exists: remove it with imp rm first`);
+    throw new ExitError(1, `imp ${names.check} already exists: remove it with impz rm first`);
   }
 }

@@ -7,7 +7,7 @@ export async function readImpJSON(
   io: Readonly<ScriptIO>,
   args: readonly string[],
 ): Promise<unknown> {
-  const result = await runOrExit(io, ['imp', ...args]);
+  const result = await runOrExit(io, ['impz', ...args]);
 
-  return parseJSONOutput(result.stdout.toString(), `imp ${args.join(' ')}`);
+  return parseJSONOutput(result.stdout.toString(), `impz ${args.join(' ')}`);
 }

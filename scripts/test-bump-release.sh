@@ -125,7 +125,7 @@ it_opens_an_imp_patch_bump_that_merges_on_its_own() {
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:6666666666666666666666666666666666666666666666666666666666666666' > "$tree/seed/images/agent/Dockerfile"
   cat > "$tree/seed/nixos/flake.nix" << 'EOF'
     imp = {
-      url = "github:zgeoff/imp/4211437b";
+      url = "github:zgeoff/impz/4211437b";
     };
 EOF
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/seed/nixos/flake.lock"
@@ -134,8 +134,8 @@ EOF
   "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
   "${case_env[@]}" git -C "$tree/seed" push -q origin main
   "${case_env[@]}" git clone -q "$tree/origin.git" "$tree/clone"
-  mkdir -p "$tree/releases/imp/v1.0.1" "$tree/images"
-  echo c5bea94080fdde9e21e9720295c1ca727302662e > "$tree/releases/imp/v1.0.1/commit"
+  mkdir -p "$tree/releases/impz/v1.0.1" "$tree/images"
+  echo c5bea94080fdde9e21e9720295c1ca727302662e > "$tree/releases/impz/v1.0.1/commit"
   echo '{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","digest":"sha256:8888888888888888888888888888888888888888888888888888888888888888","size":1}' > "$tree/images/ghcr.io_zgeoff_imp-host:1.0.1.json"
   echo '{"mediaType":"application/vnd.docker.distribution.manifest.v2+json","digest":"sha256:9999999999999999999999999999999999999999999999999999999999999999","size":1}' > "$tree/images/ghcr.io_zgeoff_imp-base:1.0.1.json"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
@@ -156,11 +156,11 @@ EOF
   diff /dev/null "$tree/err"
   diff - <("${case_env[@]}" git --git-dir="$tree/origin.git" show release-check/imp:nixos/flake.nix) << 'EOF'
     imp = {
-      url = "github:zgeoff/imp/c5bea940";
+      url = "github:zgeoff/impz/c5bea940";
     };
 EOF
   diff - "$tree/body" << 'EOF'
-Bumps imp to [1.0.1](https://github.com/zgeoff/imp/releases/tag/v1.0.1). The release check opened this pull request.
+Bumps imp to [1.0.1](https://github.com/zgeoff/impz/releases/tag/v1.0.1). The release check opened this pull request.
 
 | Pin | From | To |
 | --- | --- | --- |
@@ -173,7 +173,7 @@ After the merge: Copy impd's database, then switch the host, as `docs/runbooks/w
 EOF
   sed "s|$tree/tmp/tmp\.[A-Za-z0-9]*|<work>|g; s|$tree/clone|<clone>|g" "$tree/calls" > "$tree/calls.masked"
   diff - "$tree/calls.masked" << EOF
-["gh","api","repos/zgeoff/imp/commits/v1.0.1","--jq",".sha"]
+["gh","api","repos/zgeoff/impz/commits/v1.0.1","--jq",".sha"]
 ["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-host:1.0.1","--format","{{json .Manifest}}"]
 ["docker","buildx","imagetools","inspect","ghcr.io/zgeoff/imp-base:1.0.1","--format","{{json .Manifest}}"]
 ["docker","run","--rm","-v","<clone>/nixos:/src","-w","/src","-e","NIX_CONFIG","$NIX_IMAGE","sh","-c","nix --extra-experimental-features 'nix-command flakes' flake lock && chown $(id -u):$(id -g) flake.lock"]

@@ -5,7 +5,7 @@ import { toShellArg } from '../to-shell-arg.ts';
 import type { StubImpScenario } from './build-stub-imp.ts';
 import { buildStubImp } from './build-stub-imp.ts';
 
-// Writes <dir>/bin/imp, an executable stand-in for the imp CLI, for a test that runs a whole
+// Writes <dir>/bin/impz, an executable stand-in for the impz CLI, for a test that runs a whole
 // script as a child process. Each call runs buildStubImp's answers over a state file in <dir>, so
 // the images and imps outlive the call, and logs its argv as a JSON line to <dir>/imp-calls.
 export interface StubImpCLI {
@@ -15,7 +15,7 @@ export interface StubImpCLI {
   // the images and imps as the calls left them
   readonly readState: () => Promise<Required<Pick<StubImpScenario, 'images' | 'imps'>>>;
 
-  // each call's argv after `imp`, in order
+  // each call's argv after `impz`, in order
   readonly readCalls: () => Promise<readonly (readonly string[])[]>;
 }
 
@@ -36,7 +36,7 @@ export STUB_IMP_STATE=${toShellArg(state)} STUB_IMP_CALLS=${toShellArg(calls)}
 exec bun ${toShellArg(import.meta.path)} "$@"
 `;
 
-  await writeFile(join(bin, 'imp'), script, { mode: 0o755 });
+  await writeFile(join(bin, 'impz'), script, { mode: 0o755 });
 
   return {
     bin,
@@ -103,7 +103,7 @@ function toText(value: unknown) {
   return value;
 }
 
-// the CLI that <dir>/bin/imp runs: one call over the state file
+// the CLI that <dir>/bin/impz runs: one call over the state file
 async function runStubImpCall(argv: readonly string[]) {
   const statePath = process.env['STUB_IMP_STATE'] ?? '';
 
@@ -114,7 +114,7 @@ async function runStubImpCall(argv: readonly string[]) {
   const imp = buildStubImp(parseState(text));
 
   // buildStubImp answers every imp call, so the answer is never undefined
-  const answer = await imp.handler({ argv: ['imp', ...argv], stdin: '', options: {} });
+  const answer = await imp.handler({ argv: ['impz', ...argv], stdin: '', options: {} });
 
   await writeFile(statePath, JSON.stringify({ images: imp.images, imps: imp.imps }));
 

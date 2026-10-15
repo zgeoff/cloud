@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # The guest half of check-agent-image.ts, which runs it as `bash -s` inside a running copy of the
-# agent image: in an imp through `imp exec`, or in `docker run`. check-agent-image.ts sends it
+# agent image: in an imp through `impz exec`, or in `docker run`. check-agent-image.ts sends it
 # after a prelude that assigns every `ARG <NAME>_VERSION=` pin of images/agent/Dockerfile and
 # check_mode (imp or docker), and copies the gitleaks binary and its config to
 # /run/agent-image-check first. It prints one line per check, names only and never a value, and
@@ -154,7 +154,7 @@ if [[ "$(jq -c '[.argv, .user, .restart]' "$swap" 2> /dev/null)" == '[["/usr/loc
 else
   fail swap "$swap is missing or does not run /usr/local/sbin/setup-swap once as root, or a tool it runs is missing"
 fi
-# the swapfile size the service picks, in MiB, for the free space on / that `imp logs <name> swap`
+# the swapfile size the service picks, in MiB, for the free space on / that `impz logs <name> swap`
 # printed at the first boot of a fresh imp from this image: 1434 MiB on a 4096 MiB test disk, which
 # gets no swapfile, and 28215 MiB on a 32 GiB agent disk, which gets the full 2048 MiB
 check_swap_size() {

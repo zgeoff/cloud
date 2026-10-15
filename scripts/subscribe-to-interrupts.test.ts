@@ -100,7 +100,7 @@ test('it starts no command of the script after an interrupt', async () => {
   const ctx = setupTest({ run: stub.run });
 
   ctx.signals.emit('SIGTERM');
-  void ctx.trap.run(['imp', 'image', 'rm', 'agent-abc1234']);
+  void ctx.trap.run(['impz', 'image', 'rm', 'agent-abc1234']);
 
   await ctx.exited;
 
@@ -129,7 +129,7 @@ test('it never hands the script the result of a command that ends after an inter
   });
 
   void (async () => {
-    await ctx.trap.run(['imp', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
+    await ctx.trap.run(['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234']);
 
     settled();
   })();
@@ -266,7 +266,7 @@ async function waitForExit(pid: number) {
   return !isAlive(pid);
 }
 
-// The command's Bash starts a grandchild that holds the captured pipes, as an `imp exec` or a
+// The command's Bash starts a grandchild that holds the captured pipes, as an `impz exec` or a
 // `curl` in an older commit's check does. The grandchild runs prelude, then writes its pid.
 async function runGrandchildCommand(run: Runner, prelude: string) {
   const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
@@ -352,12 +352,14 @@ test('it gives each step a runner that still runs commands after the interrupt',
   const stub = buildStubRunner(() => ({}));
   const ctx = setupTest({ run: stub.run });
 
-  ctx.trap.registerCleanup((io) => io.run(['imp', 'rm', 'agent-check-abc1234']));
+  ctx.trap.registerCleanup((io) => io.run(['impz', 'rm', 'agent-check-abc1234']));
   ctx.signals.emit('SIGINT');
 
   await ctx.exited;
 
-  expect(stub.calls.map((call) => call.argv)).toStrictEqual([['imp', 'rm', 'agent-check-abc1234']]);
+  expect(stub.calls.map((call) => call.argv)).toStrictEqual([
+    ['impz', 'rm', 'agent-check-abc1234'],
+  ]);
 });
 
 test('it prints why a step failed and still runs the steps before it', async () => {
@@ -434,7 +436,7 @@ test('it hands the script a command’s result when no signal comes', async () =
   const stub = buildStubRunner(() => ({ stdout: '[]\n' }));
   const ctx = setupTest({ run: stub.run });
 
-  const result = await ctx.trap.run(['imp', 'ls', '--json']);
+  const result = await ctx.trap.run(['impz', 'ls', '--json']);
 
   expect(result).toStrictEqual({
     exitCode: 0,
