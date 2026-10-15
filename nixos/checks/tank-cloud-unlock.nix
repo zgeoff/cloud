@@ -1,8 +1,8 @@
 # The boot unlock of tank/cloud (modules/tank-cloud.nix) in a NixOS VM, across real reboots: a
 # ZFS pool on an empty disk, imported at boot as geoffcloud imports tank, and the datasets made
 # with the commands of docs/runbooks/tank-cloud.md and a throwaway key. Stand-ins named k3s,
-# imp-host and atc-daemon need the datasets that geoffcloud's own services.tank-cloud.requiredBy
-# gives them, and each writes a marker into every dataset it needs when it starts, so a start on
+# imp-host, atc-daemon and preview need the datasets that geoffcloud's own
+# services.tank-cloud.requiredBy gives them, and each writes a marker into every dataset it needs when it starts, so a start on
 # the root disk's empty mount points would leave a file there. The subtests are one journey and
 # run in order: datasets made, a reboot that mounts them, a reboot with the key file gone, and the
 # key restored without a trailing newline, as `op read --no-newline` writes it.
@@ -138,7 +138,7 @@ pkgs.testers.runNixOSTest {
             machine.succeed(f"echo before-the-key-was-lost > {path}/data")
         listing = {path: machine.succeed(f"ls -A {path}").split() for path in mount_points}
         assert listing == {
-            "${mountPoint "host-secrets"}": ["atc-daemon-started", "data", "imp-host-started"],
+            "${mountPoint "host-secrets"}": ["atc-daemon-started", "data", "imp-host-started", "preview-started"],
             "${mountPoint "imp-db-backups"}": ["data"],
             "${mountPoint "rancher"}": ["data", "k3s-started", "lost+found"],
         }, f"the datasets hold {listing}"
