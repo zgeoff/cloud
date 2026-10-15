@@ -1,27 +1,35 @@
 import type { Output } from '@pulumi/pulumi';
 import { exposure } from '@zgeoff/cloud-topology';
 
-// a public hostname the tunnel serves from a workload in k3s
+// a public hostname the tunnel serves, from a workload in k3s or a listener on the host, and the
+// one path it lets through when it lets through only one: a Go regular expression that cloudflared
+// matches anywhere in the request path, so it needs both anchors
 export interface TunnelRoute {
   readonly hostname: string;
-  readonly service: Output<string>;
+  readonly service: string | Output<string>;
+  readonly path?: string;
 }
 
 interface TunnelIngress {
   readonly hostname?: string;
+  readonly path?: string;
   readonly service: string | Output<string>;
 }
 
-// The tunnel's ingress rules: each route's hostname to its service, then the catch-all 404, last
-// since cloudflared takes the first rule that matches. A hostname without a public entry in the
-// exposure registry, a reserved one included, fails the preview instead of going public.
-export function buildTunnelIngresses(atcRoute: TunnelRoute | undefined): TunnelIngress[] {
-  if (atcRoute !== undefined) {
-    requirePublicTunnelHostname(atcRoute.hostname);
+// The tunnel's ingress rules, then the catch-all 404, last since cloudflared takes the first rule
+// that matches; a route's hostname on another path falls through to it. A hostname without a
+// public entry in the exposure registry fails the preview instead of going public.
+export function buildTunnelIngresses(routes: readonly TunnelRoute[]): TunnelIngress[] {
+  for (const route of routes) {
+    requirePublicTunnelHostname(route.hostname);
   }
 
   return [
-    ...(atcRoute === undefined ? [] : [{ hostname: atcRoute.hostname, service: atcRoute.service }]),
+    ...routes.map((route) => ({
+      hostname: route.hostname,
+      ...(route.path === undefined ? {} : { path: route.path }),
+      service: route.service,
+    })),
     { service: 'http_status:404' },
   ];
 }

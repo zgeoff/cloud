@@ -68,13 +68,21 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
 
    Expect `previews: links on 100.69.47.33:8417, webhook on 100.69.47.33:8418`.
 
-6. Add the public route in a reviewed Pulumi change: a tunnel hostname whose origin is
-   `http://100.69.47.33:8418`, with its `tunnel-hostname` entry in the exposure registry and its
-   reason in the pull request. Only the path `/webhook` needs to pass.
+6. Check the public route, which the Pulumi program declares: `preview-webhook.geoff.cloud` passes
+   only the path `/webhook` to the webhook listener. Once the apply has run, an unsigned call gets
+   the service's refusal, and any other path gets the tunnel's 404:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://preview-webhook.geoff.cloud/webhook
+   curl -s -o /dev/null -w '%{http_code}\n' https://preview-webhook.geoff.cloud/
+   ```
+
+   Expect `401`, then `404`.
 
 7. Add a webhook to each opted-in repository, or once to the owner's account for every repository:
-   the payload URL `https://<webhook_hostname>/webhook`, content type `application/json`, the secret
-   from step 4, and the "Pull requests" event alone. Expect GitHub's ping delivery to get a 204.
+   the payload URL `https://preview-webhook.geoff.cloud/webhook`, which the stack exports as
+   `previewWebhookURL`, content type `application/json`, the secret from step 4, and the "Pull
+   requests" event alone. Expect GitHub's ping delivery to get a 204.
 
 ## Opt a repository in
 
