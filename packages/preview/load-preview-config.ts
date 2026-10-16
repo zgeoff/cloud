@@ -47,7 +47,7 @@ export async function loadPreviewConfig(
       idleMs: requireInteger(env, 'PREVIEW_IDLE_MINUTES', '30') * 60_000,
       impDomain: requireValue(env, 'PREVIEW_IMP_DOMAIN'),
       impImage: requireValue(env, 'PREVIEW_IMP_IMAGE'),
-      impMemoryMib: requireInteger(env, 'PREVIEW_IMP_MEMORY_MIB', '4096'),
+      impMemoryMib: requireInteger(env, 'PREVIEW_IMP_MEMORY_MIB', '2048'),
       impGitHubSecret: env['PREVIEW_IMP_GITHUB_SECRET'] ?? null,
       buildTimeoutMs: requireInteger(env, 'PREVIEW_BUILD_TIMEOUT_SECONDS', '1800') * 1000,
       healthTimeoutMs: requireInteger(env, 'PREVIEW_HEALTH_TIMEOUT_SECONDS', '600') * 1000,

@@ -98,7 +98,7 @@ let
               PREVIEW_IMPD_URL = "http://127.0.0.1:7070";
               PREVIEW_IMP_DOMAIN = "imps.example.org";
               PREVIEW_IMP_IMAGE = "pv-base";
-              PREVIEW_IMP_MEMORY_MIB = "4096";
+              PREVIEW_IMP_MEMORY_MIB = "2048";
               PREVIEW_IMP_GITHUB_SECRET = "gh";
               PREVIEW_DATABASE = "/var/lib/preview/previews.sqlite";
               HOME = "/var/lib/preview";
