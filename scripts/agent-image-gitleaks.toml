@@ -29,7 +29,9 @@ description = "auto-mode's bundled secret-scanner rules: a rule's own pattern, n
 # gitleaks' `dir` walker skips a file whole when a global entry's paths match it,
 # whatever the condition. Both conditions must hold, so this prefix anywhere else, and
 # any other finding in these files, still fail the check, as
-# scripts/test-agent-image-gitleaks.sh proves. The files come from the auto-mode
+# scripts/test-agent-image-gitleaks.sh proves. The rule's regex is the bare prefix, so
+# its match is the same for a whole short-lived key, and this entry hides such a key in
+# these two files too. The files come from the auto-mode
 # tarball the Dockerfile pins by sum; review this entry again at each auto-mode bump.
 condition = "AND"
 targetRules = ["aws-amazon-bedrock-api-key-short-lived"]
