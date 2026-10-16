@@ -67,9 +67,11 @@ The check prints one line per item and exits non-zero on any failure:
 - **Versions**: each tool answers with the version the Dockerfile pins, and each Ubuntu package is
   installed at its pinned version.
 
-`bun run test:agent-image` runs the same check on a local Docker build, before the host build. A
-finding in an upstream file that holds no credential goes into `scripts/agent-image-gitleaks.toml`
-with its reason, narrowed to that file or folder.
+`bun run test:agent-image` runs the same check on a local Docker build, before the host build. It
+then runs `scripts/test-agent-image-gitleaks.sh`, which scans planted files with the image's
+gitleaks to prove what the allowlist exempts and what it still reports. A finding in an upstream
+file that holds no credential goes into `scripts/agent-image-gitleaks.toml` with its reason,
+narrowed to that file or folder.
 
 ## Switch the `cloud` target
 
@@ -200,10 +202,11 @@ curl -fsSL -o /tmp/auto-mode.tgz "https://registry.npmjs.org/auto-mode/-/auto-mo
 bash scripts/pin-auto-mode.sh "$VERSION" /tmp/auto-mode.tgz "$(npm view "auto-mode@$VERSION" dist.integrity)"
 ```
 
-The image's gitleaks allowlist (`scripts/agent-image-gitleaks.toml`) names the file in the auto-mode
-tarball that holds its secret-scanner rules. The image check on the bump pull request fails when a
-release moves those rules or ships another finding, and the bump then waits for a person to review
-the allowlist entry.
+The image's gitleaks allowlist (`scripts/agent-image-gitleaks.toml`) names the two files in the
+auto-mode tarball that hold its secret-scanner rules, and exempts only the short-lived Bedrock
+rule's pattern source in them. The image check on the bump pull request fails when a release moves
+those rules or ships another finding, and the bump then waits for a person to review the allowlist
+entry.
 
 ## Update
 
