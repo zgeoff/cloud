@@ -17,7 +17,7 @@ let
   stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
 
-  # the service's settings with impImage and impImageRef as given, for the preview-image cases
+  # the service's settings with impImage and impRegistryImage as given, for the preview-image cases
   buildImageSystem =
     imageSettings:
     buildModuleSystem ../modules/preview.nix {
@@ -39,7 +39,7 @@ let
   imageScript =
     lib.getExe
       (buildImageSystem {
-        impImageRef = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+        impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
       }).config.services.preview.imageScript;
 
   cases = [
@@ -60,7 +60,7 @@ let
               ];
               impdURL = "http://127.0.0.1:7070";
               impDomain = "imps.example.org";
-              impImageRef = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               impGitHubSecret = "gh";
               webhookSecretFile = "/run/fixture/webhook-secret";
               githubTokenFile = "/run/fixture/github-token";
@@ -169,7 +169,7 @@ let
               repos = [ "acme/greenhouse" ];
               impdURL = "http://127.0.0.1:7070";
               impDomain = "imps.example.org";
-              impImageRef = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               webhookSecretFile = "/run/fixture/webhook-secret";
               githubTokenFile = "/run/fixture/github-token";
               impTokenFile = "/run/fixture/imp-token";
@@ -187,7 +187,7 @@ let
       script =
         let
           system = buildImageSystem {
-            impImageRef = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+            impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
           };
           service = system.config.systemd.services.preview-image;
         in
@@ -243,7 +243,7 @@ let
             inherit
               ((buildImageSystem {
                 impImage = "pv-sandbox";
-                impImageRef = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+                impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               }).config.systemd.services
               )
               preview
@@ -262,7 +262,7 @@ let
         assert_equals false ${
           lib.boolToString
             (builtins.tryEval
-              (buildImageSystem { impImageRef = "ghcr.io/example/imp-base:1.2.3"; })
+              (buildImageSystem { impRegistryImage = "ghcr.io/example/imp-base:1.2.3"; })
               .config.systemd.services.preview-image.environment.PREVIEW_IMAGE_REF
             ).success
         } "whether it evaluated"

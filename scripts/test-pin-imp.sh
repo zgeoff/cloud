@@ -50,7 +50,7 @@ EOF
     image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";
   };
   services.preview = {
-    impImageRef = "ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";
   };
 EOF
   cat > "$tree/repo/images/agent/Dockerfile" << 'EOF'
@@ -76,7 +76,7 @@ EOF
     image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";
   };
   services.preview = {
-    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444";
   };
 EOF
   diff - "$tree/repo/images/agent/Dockerfile" << 'EOF'
@@ -108,7 +108,7 @@ it_hands_the_github_token_to_the_lock_without_printing_it() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
@@ -142,7 +142,7 @@ it_adds_the_github_token_after_the_callers_nix_config() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
@@ -170,7 +170,7 @@ it_hands_the_lock_no_nix_config_without_a_github_token() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
@@ -202,7 +202,7 @@ it_keeps_a_newer_imp_base_and_pins_the_host() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -p "$tree/repo/images/agent/Dockerfile" "$tree/before"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
@@ -217,7 +217,7 @@ it_keeps_a_newer_imp_base_and_pins_the_host() {
   diff "$tree/flake.lock" "$tree/repo/nixos/flake.lock"
   diff - "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" << 'EOF'
     image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";
-    impImageRef = "ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";
 EOF
   diff - "$tree/out" << 'EOF'
 imp-base 1.1.0 is pinned, which is newer than 1.0.1
@@ -239,7 +239,7 @@ it_runs_no_lock_when_imp_host_already_holds_the_release() {
   echo '      url = "github:zgeoff/impz/c5bea940";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -p "$tree/repo/nixos/flake.nix" "$tree/before-flake"
   cp -p "$tree/repo/nixos/flake.lock" "$tree/before-lock"
@@ -253,7 +253,7 @@ it_runs_no_lock_when_imp_host_already_holds_the_release() {
   cmp "$tree/before-lock" "$tree/repo/nixos/flake.lock"
   diff - "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" << 'EOF'
     image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";
-    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444";
 EOF
   diff - "$tree/repo/images/agent/Dockerfile" <<< 'FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444'
   [ ! -e "$tree/calls" ] || {
@@ -279,7 +279,7 @@ it_refuses_a_lock_that_names_another_commit() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -p "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" "$tree/before"
   echo '{"nodes":{"imp":{"locked":{"rev":"9999999999999999999999999999999999999999"}}}}' > "$tree/flake.lock"
@@ -307,7 +307,7 @@ it_fails_when_the_lock_fails() {
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   cp -p "$tree/repo/nixos/flake.lock" "$tree/before-lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   cp -p "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" "$tree/before-config"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
 
@@ -335,7 +335,7 @@ it_refuses_the_release_pinned_with_another_digest_without_writing() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -pr "$tree/repo" "$tree/before"
 
@@ -365,7 +365,7 @@ it_refuses_imp_base_pins_that_disagree_without_writing() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
-  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:0.9.0@sha256:5555555555555555555555555555555555555555555555555555555555555555";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:0.9.0@sha256:5555555555555555555555555555555555555555555555555555555555555555";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -pr "$tree/repo" "$tree/before"
 

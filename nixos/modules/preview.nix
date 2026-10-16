@@ -96,13 +96,13 @@ in
       type = lib.types.str;
       default = "pv-base";
       description = ''
-        The impd image each preview imp boots, which the preview-image unit adds from impImageRef.
-        It is a name of the service's own, apart from impd's default image (base), which
-        `impz new` boots and an operator may point elsewhere.
+        The impd image each preview imp boots, which the preview-image unit adds from
+        impRegistryImage. It is a name of the service's own, apart from impd's default image
+        (base), which `impz new` boots and an operator may point elsewhere.
       '';
     };
 
-    impImageRef = lib.mkOption {
+    impRegistryImage = lib.mkOption {
       type = lib.types.strMatching "[^@ ]+@sha256:[0-9a-f]{64}";
       example = "ghcr.io/zgeoff/imp-base:1.2.3@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
       description = ''
@@ -164,7 +164,7 @@ in
       requires = [ "imp-host.service" ];
       environment = {
         PREVIEW_IMAGE_NAME = cfg.impImage;
-        PREVIEW_IMAGE_REF = cfg.impImageRef;
+        PREVIEW_IMAGE_REF = cfg.impRegistryImage;
       };
       serviceConfig = {
         Type = "oneshot";

@@ -265,7 +265,7 @@ in
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";
     # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
-    impImageRef = "ghcr.io/zgeoff/imp-base:2.0.3@sha256:2c199f2491b1036b5a16e59a75bd523d3d334cc2133920fda6a0e828d6c2e154";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:2.0.3@sha256:2c199f2491b1036b5a16e59a75bd523d3d334cc2133920fda6a0e828d6c2e154";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubTokenFile = "/var/lib/tank-cloud/host-secrets/preview/github-token";
     impTokenFile = "/var/lib/tank-cloud/host-secrets/preview/imp-token";

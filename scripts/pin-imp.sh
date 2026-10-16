@@ -2,7 +2,7 @@
 # Pin an imp release: the imp input in nixos/flake.nix and nixos/flake.lock together with the
 # imp-host image in nixos/hosts/geoffcloud/configuration.nix, because the module and the image move
 # together, and the imp-base image, both where images/agent/Dockerfile builds on it and where the
-# host's preview service boots its imps from it (services.preview.impImageRef). Run it from the
+# host's preview service boots its imps from it (services.preview.impRegistryImage). Run it from the
 # root of a zgeoff/cloud checkout, with docker. The release check runs it with the release tag's
 # commit and the two images' digests (scripts/bump-release.sh):
 #
@@ -97,7 +97,7 @@ write() {
 
 host_pattern='^    image = "ghcr\.io/zgeoff/imp-host:([^@"]+)@(sha256:[0-9a-f]{64})";$'
 base_pattern='^FROM ghcr\.io/zgeoff/imp-base:([^@ ]+)@(sha256:[0-9a-f]{64})$'
-preview_pattern='^    impImageRef = "ghcr\.io/zgeoff/imp-base:([^@"]+)@(sha256:[0-9a-f]{64})";$'
+preview_pattern='^    impRegistryImage = "ghcr\.io/zgeoff/imp-base:([^@"]+)@(sha256:[0-9a-f]{64})";$'
 input_pattern='^      url = "github:zgeoff/impz/([0-9a-f]+)";$'
 host_pin="$(read_pin "$config" "$host_pattern")"
 base_pin="$(read_pin "$dockerfile" "$base_pattern")"
@@ -143,6 +143,6 @@ if [ "$pin_host" = true ]; then
 fi
 if [ "$pin_base" = true ]; then
   write "$dockerfile" "s|^(FROM ghcr\\.io/zgeoff/imp-base:)[^@ ]+@sha256:[0-9a-f]{64}\$|\\1$version@$base_digest|"
-  write "$config" "s|^(    impImageRef = \"ghcr\\.io/zgeoff/imp-base:)[^@\"]+@sha256:[0-9a-f]{64}(\";)\$|\\1$version@$base_digest\\2|"
+  write "$config" "s|^(    impRegistryImage = \"ghcr\\.io/zgeoff/imp-base:)[^@\"]+@sha256:[0-9a-f]{64}(\";)\$|\\1$version@$base_digest\\2|"
   echo "pinned imp-base $version: $base_digest"
 fi
