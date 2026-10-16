@@ -13,7 +13,8 @@
 # planReclaimStep (zfs-reclaim.ts). Last, it reboots into the encrypted dataset with its key and
 # then without it. The stand-in imp-host is busybox that only sleeps (build-stub-imp-host-image.nix),
 # loaded from its archive in place of a pull, so the writer stands in for impd's database writes.
-# The test utilities pass their own check (test-utils-check.nix) before the VM runs. It needs KVM: run `bun run test:nixos tank-imp-encrypt`.
+# The test utilities pass their own check (test-utils-check.nix) before the VM runs. It needs
+# KVM: run `bun run test:nixos tank-imp-encrypt`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
