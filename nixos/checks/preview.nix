@@ -195,7 +195,10 @@ let
           jq -S . > expected <<'EOF'
           ${builtins.toJSON {
             description = "the preview imps' image in impd";
-            wantedBy = [ "multi-user.target" ];
+            wantedBy = [
+              "multi-user.target"
+              "imp-host.service"
+            ];
             after = [ "imp-host.service" ];
             requires = [ "imp-host.service" ];
             restartIfChanged = true;

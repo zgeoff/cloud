@@ -151,11 +151,15 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    # A oneshot that each switch restarts when the reference changes, and that restarts with
-    # imp-host, so impd holds the pinned image before the service boots a preview from it
+    # A oneshot that each switch restarts when the reference changes, so impd holds the pinned
+    # image before the service boots a preview from it. A stop of imp-host stops it (requires),
+    # and each start of imp-host starts it again (wantedBy), so it runs after every imp-host start.
     systemd.services.preview-image = {
       description = "the preview imps' image in impd";
-      wantedBy = [ "multi-user.target" ];
+      wantedBy = [
+        "multi-user.target"
+        "imp-host.service"
+      ];
       after = [ "imp-host.service" ];
       requires = [ "imp-host.service" ];
       environment = {
