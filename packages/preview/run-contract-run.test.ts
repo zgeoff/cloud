@@ -471,6 +471,7 @@ test('it keeps the result settling when GitHub refuses the final status', async 
   // GitHub's answer to a status while it is down, for every status but the pending ones
   server.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, async (info) => {
+      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's status request shape
       const payload = (await info.request.clone().json()) as { readonly state: string };
 
       return payload.state === 'pending'
