@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for check-nixie-ready.sh: it passes once nixie's /health/ready reports every part ready,
+# Test for check-nixie-ready.sh: it passes once nixie health reports every part ready,
 # pausing 10 s after each try that is not, ends a try that hangs after 20 s, and after 30 tries
 # fails naming each part that is not ready with nixie's reason, or the last error when no report
 # came back. ssh is the NixOS host stand-in (create-stub-nixos-ssh.sh), which answers the kubectl
@@ -21,7 +21,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-timeout
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-nixie-ready.sh"
-exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '"'"'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"'"'"]'
+exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health"]'
 ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}}}'
 unready='{"status":"unready","parts":{"store":{"isReady":true},"imp_host":{"isReady":false,"reason":"impd 4.0.0 refuses imp client 3.2.1"},"model":{"isReady":false,"reason":"the check took longer than 2000 ms"}}}'
 
@@ -176,6 +176,32 @@ it_counts_a_try_that_the_kill_after_the_deadline_ends_as_a_hang() {
   diff /dev/null "$tree/calls"
   diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","-k","5","20"] + .' <<< "$exec_call")")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_rejects_a_ready_report_from_a_try_that_then_hangs() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  # a timeout that runs the command, so its report prints, then ends the try as the TERM at 20 s does
+  cat > "$tree/bin/timeout" << 'STUB'
+#!/usr/bin/env bash
+shift 3
+"$@" || true
+exit 124
+STUB
+  chmod +x "$tree/bin/timeout"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_NIXIE_REPORTS="$ready" bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'nixie is not ready after 30 tries: no report from nixie-0: the try took longer than 20 s'
+  diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1

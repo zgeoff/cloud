@@ -5,9 +5,9 @@
 #
 #   bash scripts/check-nixie-ready.sh <host>
 #
-# It asks nixie-0's own server, through kubectl exec over ssh, as docs/runbooks/nixie.md does by
-# hand; 8080 is nixieAPIPort (infra/cluster/build-nixie-spec.ts). nixie answers 200 with every part
-# ready and 503 otherwise, with each part's report in the body either way. nixie retries its start
+# It runs nixie's documented `nixie health` command in nixie-0 through kubectl exec over ssh, as
+# docs/runbooks/nixie.md does by hand. The command prints the server's readiness report either way,
+# with each part's report, and exits 0 only when every part is ready. nixie retries its start
 # and impd restarts with the switch, so it tries 30 times, each try ended after 20 s, with a 10 s
 # pause after each try that is not ready, then fails (exit 1) and names each part that is not
 # ready with nixie's reason, or the last error when no report came back. It prints the ready parts
@@ -20,18 +20,23 @@ if [ "$#" -ne 1 ]; then
 fi
 host="$1"
 tries=30
-fetch='console.log(await (await fetch("http://127.0.0.1:8080/health/ready")).text())'
+err="$(mktemp)"
+trap 'rm -f "$err"' EXIT
 
-# read_report: prints nixie's report body, or fails with the output of a try that got none. A try
-# that hangs, such as a stalled ssh or exec stream, ends after 20 s, or 25 s for one that ignores
-# TERM, so the 30 tries stay bounded.
+# read_report: prints what nixie health printed, its report when one came back, and leaves the
+# try's errors in $err. A try that hangs, such as a stalled ssh or exec stream, ends after 20 s, or
+# 25 s for one that ignores TERM, so the 30 tries stay bounded, and it fails, whatever it printed
+# first. nixie health exits 1 when a part is not ready, so past a hang the report decides, not the
+# exit code.
 read_report() {
   local status=0
-  timeout -k 5 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '$fetch'" 2>&1 ||
+  timeout -k 5 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health" 2> "$err" ||
     status=$?
   # 124 when the TERM at 20 s ends the try, 137 when the KILL 5 s later must
-  if [ "$status" = 124 ] || [ "$status" = 137 ]; then echo "the try took longer than 20 s"; fi
-  return "$status"
+  if [ "$status" = 124 ] || [ "$status" = 137 ]; then
+    echo "the try took longer than 20 s" >> "$err"
+    return 1
+  fi
 }
 
 problem=""
@@ -45,7 +50,9 @@ for try in $(seq 1 "$tries"); do
       | "\(.key): \(.value.reason // "not ready")"] | join("; ")' <<< "$report")"
     if [ -z "$problem" ]; then problem="status $(jq -c .status <<< "$report")"; fi
   else
-    problem="no report from nixie-0: $(tail -n 1 <<< "$report")"
+    detail="$(tail -n 1 "$err")"
+    if [ -z "$detail" ]; then detail="$(tail -n 1 <<< "$report")"; fi
+    problem="no report from nixie-0: $detail"
   fi
   if [ "$try" -lt "$tries" ]; then sleep 10; fi
 done

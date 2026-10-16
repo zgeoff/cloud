@@ -60,7 +60,7 @@ interface StubState {
 }
 
 const reads: Record<string, (scenario: StubGeoffcloudScenario) => string> = {
-  'k3s kubectl -n nixie exec nixie-0 -c nixie -- cat /app/sandbox-manifest.json': (scenario) =>
+  'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sandbox-manifest': (scenario) =>
     scenario.manifest,
   'getent ahosts imps.geoff.cloud': (scenario) =>
     scenario.impdAddresses

@@ -46,16 +46,19 @@ journal.
 nixie's token cannot add an image or a secret, so add them as impd's root before the first deploy,
 after a release that changes nixie's sandbox images, and after a model credential rotation.
 
-1. Add each sandbox image under the name nixie derives, `nixie-<kind>-<first 12 hex of the digest>`.
-   The nixie image lists the images in its sandbox manifest:
+1. Add each sandbox image under the name nixie gives it, which
+   [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md)
+   defines. The nixie image's `nixie sandbox-manifest` command prints each image's ref and name:
 
    ```bash
-   docker run --rm --entrypoint cat "$NIXIE_IMAGE" /app/sandbox-manifest.json \
-     | jq -r 'to_entries[] | "\(.value) nixie-\(.key)-\(.value | split("@sha256:")[1][0:12])"' \
+   docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest \
+     | jq -r '.[] | "\(.ref) \(.name)"' \
      | while read -r ref name; do host_imp image add "$ref" --name "$name" < /dev/null; done
    ```
 
-2. Add a model secret for each profile in `config.yaml`, under the name nixie derives,
+2. Add a model secret for each profile in `config.yaml`, under the name
+   [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
+   defines:
    `model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`.
    Every profile uses the same credential, so the names differ only by profile:
 
@@ -134,11 +137,10 @@ Expect `["deployment_key","impd_token","model_credentials"]`. A new host key goe
 4. Check readiness from the host:
 
    ```bash
-   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- \
-     bun -e 'console.log(await (await fetch("http://127.0.0.1:8080/health/ready")).text())'
+   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health
    ```
 
-   Expect every part ready. The log line `writer.started` in
+   Expect every part ready and exit 0. The log line `writer.started` in
    `k3s kubectl -n nixie logs nixie-0 -c nixie` shows the database opened, with its schema version.
 
 5. Check the route from a tailnet device: `curl -sS https://nixie.geoff.cloud/health/live`. Expect
@@ -199,22 +201,23 @@ check prints the name of an imp it could not remove: remove it with
 nixie signs a device in with a one-time code:
 
 ```bash
-ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- bun /app/main.js enrol-code
+ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie enrol-code
 ```
 
 Open `https://nixie.geoff.cloud` on the device and enter the code before it expires.
 
 ## Reset nixie's data
 
-The reset wipes nixie's state so that a test starts again from an empty database. It stops nixie,
-deletes `nixie.db` and `keys.db` with their WAL and SHM files from the data volume, starts nixie
-again, and prints a fresh enrolment code.
+The reset empties nixie so that a test starts again with no history. It runs nixie's own
+`nixie reset --keep-sessions --yes`
+([nixie's host commands](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/host-commands.md#the-reset)),
+which destroys every sandbox, removes every record and memory, and keeps every signed-in device
+signed in. nixie then exits and the kubelet starts it again.
 
-**CAUTION:** A reset cannot be undone. It deletes every record and key in nixie and signs out every
-device, and the reset itself keeps no copy. Run a backup first, as
+**CAUTION:** Only a restore from a backup undoes a reset. Run a backup first, as
 [nixie's backup](./nixie-backup.md#back-up-now) describes, if any of the data matters.
 
-1. List what the reset deletes. The dry run reads the volume and changes nothing:
+1. List what the reset keeps. The dry run asks nixie for its device sessions and changes nothing:
 
    ```bash
    bun run nixie:reset --dry-run
@@ -226,15 +229,16 @@ device, and the reset itself keeps no copy. Run a backup first, as
    bun run nixie:reset --confirm
    ```
 
-   Expect the steps to run in order and the last line to be
-   `reset done: enter the code above at https://nixie.geoff.cloud`, after the enrolment code.
+   Expect nixie's answer,
+   `nixie removed the log up to sequence <n> at <time> and kept <k> device sessions signed in.`,
+   then a last line that starts with `reset done`.
 
-3. Enrol each device again: open `https://nixie.geoff.cloud` and enter the code before it expires.
-   Every other device needs a code of its own, as [Enrol a device](#enrol-a-device) describes.
+3. Check that nixie started again: `bash scripts/check-nixie-ready.sh root@geoffcloud`. Expect
+   `== nixie ready:` and every part.
 
-Without a flag the script refuses and reaches nothing. A step that fails stops the reset and leaves
-the later steps unrun, so nixie can stay at 0 replicas. Fix the cause and run the reset again: every
-step is safe to repeat.
+Without a flag the script refuses and reaches nothing. A failed reset prints nixie's answer, and
+nixie's log holds the reason. Fix the cause and run the reset again: a second reset finishes the
+work of one that stopped part way.
 
 ## Keep nixie's data out of copies
 
@@ -336,4 +340,3 @@ an apply would renew it.
 | the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
 | the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
 | TLS error on the name                             | the certificate expired                  | `bun run up`                                    |
-| no `nixie-0` pod after a reset                    | the reset stopped after it scaled to 0   | `bun run nixie:reset --confirm` again           |
