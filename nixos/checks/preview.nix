@@ -183,7 +183,7 @@ let
         '';
     }
     {
-      title = "it sets the contract run's repositories, model secret and time limit once contractRepos lists a repository";
+      title = "it sets the repositories, model secret and time limit of the contract run once contractRepos lists a repository";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
@@ -234,7 +234,7 @@ let
         '';
     }
     {
-      title = "it leaves the contract run's settings out when contractRepos is empty";
+      title = "it leaves the settings of the contract run out when contractRepos is empty";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {

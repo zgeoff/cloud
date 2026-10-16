@@ -4,7 +4,7 @@ import { runContractSuite } from './run-contract-suite.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
 // The commit status context that each run sets on its head commit
-export const contractStatusContext = 'sdk-contract';
+const contractStatusContext = 'sdk-contract';
 
 // One try at a claimed run of the SDK contract suite: with a free preview slot, it runs the suite
 // in a new imp at the head commit, removes the imp, and sets the commit status to the result.
