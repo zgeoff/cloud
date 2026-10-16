@@ -32,7 +32,7 @@ test('it reads the settings from the environment and the secrets from the creden
       idleMs: 1_800_000,
       impDomain: 'imps.example.test',
       impImage: 'base',
-      impMemoryMib: 4096,
+      impMemoryMib: 2048,
       impGitHubSecret: 'gh',
       healthTimeoutMs: 600_000,
       healthPollMs: 2000,

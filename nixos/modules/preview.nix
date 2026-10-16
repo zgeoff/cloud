@@ -120,7 +120,7 @@ in
 
     impMemoryMib = lib.mkOption {
       type = lib.types.ints.positive;
-      default = 4096;
+      default = 2048;
       description = "Each preview imp's memory.";
     };
 
