@@ -33,7 +33,7 @@
     "test:nixos": "bash scripts/run-nixos-checks.sh",
     "ci:write-deploy-env": "bash scripts/write-deploy-env.sh",
     "ci:check-prod-plan": "bun scripts/check-prod-plan.ts",
-    "test:agent-image": "docker build -t cloud/agent-image images/agent && bun scripts/check-agent-image.ts --docker cloud/agent-image",
+    "test:agent-image": "docker build -t cloud/agent-image images/agent && bun scripts/check-agent-image.ts --docker cloud/agent-image && bash scripts/run-shell-suites.sh agent-image",
     "typecheck": "bun run sdk:build && tsc -p tsconfig.json --noEmit && tsc -p workers/health-check/tsconfig.json --noEmit",
     "format": "oxfmt . && format-codemod --quiet .",
     "format:check": "oxfmt --check . && format-codemod --check --quiet .",

@@ -23,12 +23,19 @@ paths = [
 
 [[allowlists]]
 description = "auto-mode's bundled secret-scanner rules: a rule's own pattern, not a credential"
-# auto-mode ships gitleaks-style detection rules as data, and the short-lived Bedrock
-# key rule's pattern source is the fixed prefix that the rule matches. Both conditions
-# must hold, so this prefix anywhere else, and any other finding in the file, still
-# fail the check. The file comes from the auto-mode tarball the Dockerfile pins by sum;
-# review this entry again at each auto-mode bump.
+# auto-mode ships gitleaks-style detection rules as data, in its classify-edit bundle
+# and in dist/secret-rules.json, and the short-lived Bedrock key rule's pattern source
+# is the fixed prefix that the rule matches. The entry targets that one rule, because
+# gitleaks' `dir` walker skips a file whole when a global entry's paths match it,
+# whatever the condition. Both conditions must hold, so this prefix anywhere else, and
+# any other finding in these files, still fail the check, as
+# scripts/test-agent-image-gitleaks.sh proves. The files come from the auto-mode
+# tarball the Dockerfile pins by sum; review this entry again at each auto-mode bump.
 condition = "AND"
-paths = ['''^/opt/auto-mode/dist/classify-edit-[A-Za-z0-9_-]+\.js$''']
+targetRules = ["aws-amazon-bedrock-api-key-short-lived"]
+paths = [
+  '''^/opt/auto-mode/dist/classify-edit-[A-Za-z0-9_-]+\.js$''',
+  '''^/opt/auto-mode/dist/secret-rules\.json$''',
+]
 regexTarget = "match"
 regexes = ['''^bedrock-api-key-YmVkcm9jay5hbWF6b25hd3MuY29t$''']
