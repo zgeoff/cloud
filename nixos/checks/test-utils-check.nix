@@ -22,6 +22,7 @@ let
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
+  stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
 
   cases = [
     {
@@ -1186,6 +1187,151 @@ let
         assert_equals 1 "$pause" "the start loop's pause"
         assert_equals 1 "$pauses" "the script's pauses through IMPD_START_SLEEP"
         assert_equals 0 "$direct" "the script's pauses by name"
+      '';
+    }
+    {
+      title = "it buildStubSleep holds to preview-image: its wait for impd pauses through the pause it is given";
+      script = ''
+        sleep_cmd=$(grep -cxF 'pause="''${SLEEP:-sleep}"' ${../modules/preview-image.sh} || true)
+        pause=$(grep -cxF '  "$pause" 2' ${../modules/preview-image.sh} || true)
+        pauses=$(grep -cF '"$pause"' ${../modules/preview-image.sh} || true)
+        # a pause by name, outside a comment, would pass the stand-in by
+        direct=$(grep -cE '^[^#]*(^|[ ;&|(])sleep ' ${../modules/preview-image.sh} || true)
+
+        assert_equals 1 "$sleep_cmd" "the script's sleep"
+        assert_equals 1 "$pause" "the wait's pause"
+        assert_equals 1 "$pauses" "the script's pauses through SLEEP"
+        assert_equals 0 "$direct" "the script's pauses by name"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker prints impd's images for an image list, and records the call";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image ls --json > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal - out <<'EOF'
+        [
+          {
+            "id": "img-1",
+            "name": "base",
+            "ref": "ghcr.io/example/base:1.0.0",
+            "digest": "imp-build-aa",
+            "source": "oci",
+            "createdAt": "2026-02-03T04:05:06.000Z",
+            "sizeBytes": 12
+          }
+        ]
+        EOF
+        assert_files_equal /dev/null err
+        assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker points a name at the added ref in place of the image of that name, and prints the image";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12},{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","source":"oci"}' "$(jq -c '{name, ref, source}' out)" "the printed image"
+        assert_files_equal /dev/null err
+        assert_equals '[["base","ghcr.io/example/base:1.0.0"],["pv-base","ghcr.io/example/base:1.0.0"]]' \
+          "$(jq -c 'map([.name, .ref])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails the calls its unreachable count names as docker fails a missing container, then answers";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unreachable
+
+        first_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image ls --json > first.out 2> first.err || first_status=$?
+        second_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image ls --json > second.out 2> second.err || second_status=$?
+
+        assert_equals 1 "$first_status" "the first call's exit status"
+        assert_files_equal /dev/null first.out
+        assert_equals "Error response from daemon: No such container: imp-host" "$(cat first.err)" "the first call's error"
+        assert_equals 0 "$second_status" "the second call's exit status"
+        assert_equals '[]' "$(cat second.out)" "the second call's output"
+        assert_files_equal /dev/null second.err
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails the next add with its add-error as impz fails a call, and adds nothing";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 'image ghcr.io/example/base:1.0.0: pull failed' > impd/add-error
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "impz: image ghcr.io/example/base:1.0.0: pull failed" "$(cat err)" "the error"
+        assert_equals '[]' "$(cat impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker records another call and fails it as unexpected";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image rm 'two words' > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: exec imp-host impz image rm two words" "$(cat err)" "the error"
+        assert_equals '["exec","imp-host","impz","image","rm","two words"]' "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker refuses to run without impd's state directory";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubImpHostDocker} exec imp-host impz image ls --json > out 2> err || status=$?
+
+        assert_equals 2 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "docker-answering-impz: set IMPD_STATE to the directory that holds impd's images" "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker holds to preview-image: it reaches impd only through the docker it is given, with the two calls the stand-in answers";
+      script = ''
+        docker_cmd=$(grep -cxF 'docker="''${DOCKER:-docker}"' ${../modules/preview-image.sh} || true)
+        list=$(grep -cxF 'until images=$("$docker" exec imp-host impz image ls --json 2> "$err"); do' ${../modules/preview-image.sh} || true)
+        add=$(grep -cxF '"$docker" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        calls=$(grep -cF '"$docker"' ${../modules/preview-image.sh} || true)
+        # a docker call by name, outside a comment, would pass the stand-in by
+        direct=$(grep -cE '^[^#]*(^|[ ;&|($])docker ' ${../modules/preview-image.sh} || true)
+
+        assert_equals 1 "$docker_cmd" "the script's docker"
+        assert_equals 1 "$list" "the script's image list"
+        assert_equals 1 "$add" "the script's image add"
+        assert_equals 2 "$calls" "the script's calls through DOCKER"
+        assert_equals 0 "$direct" "the script's calls of docker by name"
       '';
     }
   ];
