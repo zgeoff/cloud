@@ -12,10 +12,12 @@ repository.
 
 ## Size the scratch VM
 
-On-demand (hourly) Onidel VMs stop at 2 vCPU, 4 GB of RAM and a 40 GB disk. A larger create returns
-`http 403` with `{"err":"ONDEMAND_VM_COST_LIMIT"}`, whatever the account's credit. The database copy
-and hq fit in 40 GB. A snapshot of geoffcloud's `vda` needs a disk at least as large as the
-snapshot, and the root disk is 240 GB, so a snapshot restore needs a monthly VM (see
+Onidel's on-demand (hourly) tier caps a VM at 2 vCPU, 4 GB of RAM and a 40 GB disk, as the account
+owner confirmed with Onidel. A create with a 240 GB disk returned `http 403` with
+`{"err":"ONDEMAND_VM_COST_LIMIT"}`, and the refusal stayed after prepaid credit was added; a create
+at 2 vCPU, 4 GB and 40 GB succeeded. The database copy and hq fit in 40 GB. A snapshot of
+geoffcloud's `vda` needs a disk at least as large as the snapshot, and the root disk is 240 GB, so a
+snapshot restore needs a monthly VM (see
 [Restore a root-disk snapshot](#restore-a-root-disk-snapshot)).
 
 1. Create the VM with Debian 12, hourly, in Sydney: `POST /vm` with `cpu` 2, `ram` 4096, `disk` 40
