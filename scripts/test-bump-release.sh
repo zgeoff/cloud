@@ -130,6 +130,7 @@ it_opens_an_imp_patch_bump_that_merges_on_its_own() {
 EOF
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/seed/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:7777777777777777777777777777777777777777777777777777777777777777";' > "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impImageRef = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:6666666666666666666666666666666666666666666666666666666666666666";' >> "$tree/seed/nixos/hosts/geoffcloud/configuration.nix"
   "${case_env[@]}" git -C "$tree/seed" add -A
   "${case_env[@]}" git -C "$tree/seed" commit -qm 'add the pins'
   "${case_env[@]}" git -C "$tree/seed" push -q origin main
