@@ -143,11 +143,13 @@ async function checkWokenStack(deps: PreviewDeps, preview: Preview): Promise<boo
     return false;
   }
 
-  return waitForHealthy(deps, {
+  const health = await waitForHealthy(deps, {
     imp: preview.imp,
     contract: parsePreviewContract(compose),
     windowMs: wakeGraceMs,
   });
+
+  return health.healthy;
 }
 
 // a boot never rejects: it records its own failure

@@ -167,6 +167,9 @@ test('it keeps both previews running when two slots fit them', async () => {
 
   composeFiles.set('acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'services: {}\n');
 
+  // the app listens on the imp's own address, so impd's proxy reaches it
+  ctx.impd.apps.set('pv-0a1b2c3d-18', { address: '0.0.0.0', port: 8080 });
+
   const handler = makeLinkHandler({
     settings: {
       baseURL: 'http://geoffcloud:8417',
@@ -213,6 +216,8 @@ test('it answers a first open with the booting page and boots the head commit', 
     'acme/greenhouse@bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     'x-preview:\n  port: 3000\n  health: /healthz\nservices: {}\n',
   );
+
+  ctx.impd.apps.set('pv-0a1b2c3d-18', { address: '0.0.0.0', port: 3000 });
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/18'));
 
@@ -307,28 +312,15 @@ test('it wakes a sleeping ready preview, checks its health and redirects to its 
     grants: ['gh'],
   });
 
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
 
   expect(response.status).toBe(302);
   expect(response.headers.get('location')).toBe('https://pv-0a1b2c3d-17.imps.example.test/');
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
-
-  expect(ctx.impd.commands).toStrictEqual([
-    {
-      imp: 'pv-0a1b2c3d-17',
-      argv: [
-        'curl',
-        '--fail',
-        '--silent',
-        '--output',
-        '/dev/null',
-        '--max-time',
-        '5',
-        'http://127.0.0.1:8080/healthz',
-      ],
-      require: [],
-    },
-  ]);
+  expect(ctx.impd.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-17.imps.example.test/healthz']);
+  expect(ctx.impd.commands).toStrictEqual([]);
 });
 
 test('it boots a woken preview again when its stack never answers', async () => {
@@ -362,8 +354,7 @@ test('it boots a woken preview again when its stack never answers', async () => 
     grants: ['gh'],
   });
 
-  // a cold boot left the stack down: no probe answers until a build runs
-  ctx.impd.answerCommand = (command) => ({ code: command.argv[0] === 'curl' ? 7 : 0 });
+  // a cold boot left the stack down, so no app answers impd's proxy
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
 
@@ -407,6 +398,7 @@ test('it rebuilds a ready preview once a push moved its head', async () => {
   });
 
   composeFiles.set('acme/greenhouse@cccccccccccccccccccccccccccccccccccccccc', 'services: {}\n');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
 
   const response = await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17'));
 
@@ -477,6 +469,7 @@ test('it boots a failed preview again when the retry link opens', async () => {
   });
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
 
   await ctx.handler(new Request('http://geoffcloud:8417/acme/greenhouse/17?retry=1'));
   await Promise.all(ctx.pendingBoots);

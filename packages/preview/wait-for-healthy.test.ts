@@ -3,12 +3,14 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { HttpResponse, http } from 'msw';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
+import { server } from './mocks/node.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 import { waitForHealthy } from './wait-for-healthy.ts';
@@ -63,7 +65,7 @@ async function setupTest() {
   return { deps, impd };
 }
 
-test('it resolves true at the first probe the health path answers', async () => {
+test("it resolves healthy at the first probe through impd's proxy that the health path answers", async () => {
   const ctx = await setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
@@ -77,33 +79,25 @@ test('it resolves true at the first probe the health path answers', async () => 
     grants: ['gh'],
   });
 
-  const healthy = await waitForHealthy(ctx.deps, {
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 3000 });
+
+  const health = await waitForHealthy(ctx.deps, {
     imp: 'pv-0a1b2c3d-17',
     contract: { port: 3000, healthPath: '/healthz' },
     windowMs: 3000,
   });
 
-  expect(healthy).toBeTrue();
+  expect(health).toStrictEqual({
+    healthy: true,
+    url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
+    lastAnswer: null,
+  });
 
-  expect(ctx.impd.commands).toStrictEqual([
-    {
-      imp: 'pv-0a1b2c3d-17',
-      argv: [
-        'curl',
-        '--fail',
-        '--silent',
-        '--output',
-        '/dev/null',
-        '--max-time',
-        '5',
-        'http://127.0.0.1:3000/healthz',
-      ],
-      require: [],
-    },
-  ]);
+  expect(ctx.impd.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-17.imps.example.test/healthz']);
+  expect(ctx.impd.commands).toStrictEqual([]);
 });
 
-test('it resolves false after the probes that fit in the window all fail', async () => {
+test("it resolves unhealthy with the proxy's last answer when the app listens on the guest's loopback alone", async () => {
   const ctx = await setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
@@ -117,14 +111,61 @@ test('it resolves false after the probes that fit in the window all fail', async
     grants: ['gh'],
   });
 
-  ctx.impd.answerCommand = () => ({ code: 7 });
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '127.0.0.1', port: 3000 });
 
-  const healthy = await waitForHealthy(ctx.deps, {
+  const health = await waitForHealthy(ctx.deps, {
     imp: 'pv-0a1b2c3d-17',
     contract: { port: 3000, healthPath: '/healthz' },
     windowMs: 3000,
   });
 
-  expect(healthy).toBeFalse();
-  expect(ctx.impd.commands).toHaveLength(3);
+  expect(health).toStrictEqual({
+    healthy: false,
+    url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
+    lastAnswer: '502 Nothing answers in the imp',
+  });
+
+  expect(ctx.impd.proxied).toBeArrayOfSize(3);
+});
+
+test("it resolves unhealthy with the error when the imp's name never answers", async () => {
+  const ctx = await setupTest();
+
+  server.use(
+    http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () => HttpResponse.error()),
+  );
+
+  const health = await waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 1000,
+  });
+
+  expect(health).toStrictEqual({
+    healthy: false,
+    url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
+    lastAnswer: 'Failed to fetch',
+  });
+});
+
+test('it counts a redirect from the health path as healthy, as curl --fail did', async () => {
+  const ctx = await setupTest();
+
+  server.use(
+    http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () =>
+      HttpResponse.redirect('https://pv-0a1b2c3d-17.imps.example.test/login', 302),
+    ),
+  );
+
+  const health = await waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 1000,
+  });
+
+  expect(health).toStrictEqual({
+    healthy: true,
+    url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
+    lastAnswer: null,
+  });
 });
