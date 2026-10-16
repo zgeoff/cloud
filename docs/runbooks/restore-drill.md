@@ -71,15 +71,20 @@ runs the whole stream with `bash -s`. `printf %q` quotes each value, and nothing
   printf 'export AWS_SECRET_ACCESS_KEY=%q\n' "$(op read op://cloud/r2-nixie-backup/secret-access-key)"
   printf 'export RESTIC_REPOSITORY=%q\n' "s3:$(op read op://cloud/r2-nixie-backup/endpoint)/geoff-cloud-nixie/hq"
   cat <<'STEPS'
+set -euo pipefail
 export AWS_DEFAULT_REGION=auto
 restic --no-lock snapshots --latest 1
 restic --no-lock restore latest --target /root/restore/hq
-sqlite3 -readonly "$(find /root/restore/hq -name hq.db | head -1)" 'PRAGMA integrity_check;'
+db=$(find /root/restore/hq -name hq.db -type f | head -1)
+test -s "$db" || { echo "no restored hq.db" >&2; exit 1; }
+sqlite3 -readonly "$db" 'PRAGMA integrity_check;'
 STEPS
 } | ssh root@<scratch_vm> 'bash -s'
 ```
 
-Expect restic's `Summary: Restored <n> files/dirs`, and `ok` from the integrity check.
+Expect restic's `Summary: Restored <n> files/dirs`, and `ok` from the integrity check. The steps
+stop at the first failure, and on a missing or empty `hq.db` they print `no restored hq.db` and exit
+1, because `sqlite3` on an empty filename prints `ok`.
 
 ## Restore a root-disk snapshot
 
