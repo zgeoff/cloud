@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Pin an imp release: the imp input in nixos/flake.nix and nixos/flake.lock together with the
 # imp-host image in nixos/hosts/geoffcloud/configuration.nix, because the module and the image move
-# together, and the imp-base image that images/agent/Dockerfile builds on. Run it from the root of
-# a zgeoff/cloud checkout, with docker. The release check runs it with the release tag's commit and
-# the two images' digests (scripts/bump-release.sh):
+# together, and the imp-base image, both where images/agent/Dockerfile builds on it and where the
+# host's preview service boots its imps from it (services.preview.impRegistryImage). Run it from the
+# root of a zgeoff/cloud checkout, with docker. The release check runs it with the release tag's
+# commit and the two images' digests (scripts/bump-release.sh):
 #
 #   bash scripts/pin-imp.sh <version> <commit> <imp-host digest> <imp-base digest>
 #
@@ -14,10 +15,11 @@
 # then locks it, in the Nix image that scripts/nix-image.sh pins; the lock must name the
 # commit. The rules follow pin-agent-atc.sh's for each image on its own: an image that already
 # holds <version> and its digest, or a newer version, stays as it is, and one that holds <version>
-# with another digest fails, because a release's images never change. It checks both images
-# before it writes, so a failed image check changes nothing. A failed lock leaves flake.nix
-# rewritten, and a lock of another commit leaves flake.lock rewritten too; open-release-bump-pr.sh
-# then pushes nothing, and the release check resets the tree before its next bump.
+# with another digest fails, because a release's images never change. The two imp-base pins move
+# together, so pins that disagree fail too. It checks both images before it writes, so a failed
+# image check changes nothing. A failed lock leaves flake.nix rewritten, and a lock of another
+# commit leaves flake.lock rewritten too; open-release-bump-pr.sh then pushes nothing, and the
+# release check resets the tree before its next bump.
 set -euo pipefail
 
 if [ "$#" -ne 4 ]; then
@@ -95,9 +97,15 @@ write() {
 
 host_pattern='^    image = "ghcr\.io/zgeoff/imp-host:([^@"]+)@(sha256:[0-9a-f]{64})";$'
 base_pattern='^FROM ghcr\.io/zgeoff/imp-base:([^@ ]+)@(sha256:[0-9a-f]{64})$'
+preview_pattern='^    impRegistryImage = "ghcr\.io/zgeoff/imp-base:([^@"]+)@(sha256:[0-9a-f]{64})";$'
 input_pattern='^      url = "github:zgeoff/impz/([0-9a-f]+)";$'
 host_pin="$(read_pin "$config" "$host_pattern")"
 base_pin="$(read_pin "$dockerfile" "$base_pattern")"
+preview_pin="$(read_pin "$config" "$preview_pattern")"
+if [ "$preview_pin" != "$base_pin" ]; then
+  echo "$config pins imp-base ${preview_pin/ /@} for previews, but $dockerfile pins ${base_pin/ /@}: pin both at one release" >&2
+  exit 1
+fi
 count="$(grep -cE "$input_pattern" "$flake" || true)"
 if [ "$count" != 1 ]; then
   echo "$flake has $count lines that match '$input_pattern', want 1" >&2
@@ -135,5 +143,6 @@ if [ "$pin_host" = true ]; then
 fi
 if [ "$pin_base" = true ]; then
   write "$dockerfile" "s|^(FROM ghcr\\.io/zgeoff/imp-base:)[^@ ]+@sha256:[0-9a-f]{64}\$|\\1$version@$base_digest|"
+  write "$config" "s|^(    impRegistryImage = \"ghcr\\.io/zgeoff/imp-base:)[^@\"]+@sha256:[0-9a-f]{64}(\";)\$|\\1$version@$base_digest\\2|"
   echo "pinned imp-base $version: $base_digest"
 fi

@@ -2,7 +2,8 @@
 # to that pull request's code, running in its own imp. It listens twice: the link listener on
 # the tailnet, and the webhook listener that cloudflared's pod dials for GitHub's deliveries.
 # The unit starts only once its three secret files exist, so a switch before they are staged
-# skips it instead of failing.
+# skips it instead of failing. The preview-image unit adds the image each preview imp boots to
+# impd, from a reference pinned by digest, so a switch never leaves the service without it.
 {
   config,
   lib,
@@ -16,6 +17,16 @@ let
     cfg.githubTokenFile
     cfg.impTokenFile
   ];
+
+  addImage = pkgs.writeShellApplication {
+    name = "preview-image";
+    runtimeInputs = [
+      pkgs.coreutils
+      pkgs.jq
+      config.virtualisation.docker.package
+    ];
+    text = builtins.readFile ./preview-image.sh;
+  };
 in
 {
   options.services.preview = {
@@ -83,8 +94,28 @@ in
 
     impImage = lib.mkOption {
       type = lib.types.str;
-      default = "base";
-      description = "The impd image each preview imp boots, which must hold dockerd, git and curl.";
+      default = "pv-base";
+      description = ''
+        The impd image each preview imp boots, which the preview-image unit adds from
+        impRegistryImage. It is a name of the service's own, apart from impd's default image
+        (base), which `impz new` boots and an operator may point elsewhere.
+      '';
+    };
+
+    impRegistryImage = lib.mkOption {
+      type = lib.types.strMatching "[^@ ]+@sha256:[0-9a-f]{64}";
+      example = "ghcr.io/zgeoff/imp-base:1.2.3@sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+      description = ''
+        The registry reference, pinned by digest, that the preview-image unit adds to impd as
+        impImage. The image must hold dockerd, git and curl, as imp-base does.
+      '';
+    };
+
+    imageScript = lib.mkOption {
+      type = lib.types.package;
+      default = addImage;
+      readOnly = true;
+      description = "The preview-image unit's script, exposed for the flake check.";
     };
 
     impMemoryMib = lib.mkOption {
@@ -120,14 +151,44 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    # A oneshot that each switch restarts when the reference changes, so impd holds the pinned
+    # image before the service boots a preview from it. A stop of imp-host stops it (requires),
+    # and each start of imp-host starts it again (wantedBy), so it runs after every imp-host start.
+    systemd.services.preview-image = {
+      description = "the preview imps' image in impd";
+      wantedBy = [
+        "multi-user.target"
+        "imp-host.service"
+      ];
+      after = [ "imp-host.service" ];
+      requires = [ "imp-host.service" ];
+      environment = {
+        PREVIEW_IMAGE_NAME = cfg.impImage;
+        PREVIEW_IMAGE_REF = cfg.impRegistryImage;
+      };
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = lib.getExe addImage;
+        # impd's first add pulls its builder image before the add pulls this one
+        TimeoutStartSec = "20min";
+        NoNewPrivileges = true;
+        PrivateTmp = true;
+      };
+    };
+
     systemd.services.preview = {
       description = "preview service";
       wantedBy = [ "multi-user.target" ];
       after = [
         "network-online.target"
         "tailscaled.service"
+        "preview-image.service"
       ];
-      wants = [ "network-online.target" ];
+      wants = [
+        "network-online.target"
+        "preview-image.service"
+      ];
       unitConfig.ConditionPathExists = secretFiles;
       environment = {
         PREVIEW_LINK_LISTEN = cfg.linkListen;

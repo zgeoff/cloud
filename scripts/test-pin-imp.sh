@@ -2,7 +2,8 @@
 # Test for pin-imp.sh: in a case tree that holds nixos/flake.nix, nixos/flake.lock, the host's
 # configuration.nix and the agent image's Dockerfile, it moves the imp input to the release
 # commit's first 8 hex digits, locks it with `nix flake lock` in the Nix image that scripts/nix-image.sh pins, and
-# pins imp-host and imp-base to the release's tag and digests, and nothing else. The lock gets
+# pins imp-host and imp-base to the release's tag and digests, and nothing else. imp-base has two
+# pins, the Dockerfile's and the host preview service's, and pins that disagree fail. The lock gets
 # NIX_GITHUB_TOKEN as a github.com access token after the caller's NIX_CONFIG, never in an argv
 # or the output, and no NIX_CONFIG at all without the token. It keeps an image
 # that already holds the release or a newer one, and runs no lock when imp-host stays. It refuses a
@@ -48,6 +49,9 @@ EOF
   services.imp = {
     image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";
   };
+  services.preview = {
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";
+  };
 EOF
   cat > "$tree/repo/images/agent/Dockerfile" << 'EOF'
 FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222
@@ -70,6 +74,9 @@ EOF
   diff - "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" << 'EOF'
   services.imp = {
     image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";
+  };
+  services.preview = {
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444";
   };
 EOF
   diff - "$tree/repo/images/agent/Dockerfile" << 'EOF'
@@ -101,6 +108,7 @@ it_hands_the_github_token_to_the_lock_without_printing_it() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
@@ -134,6 +142,7 @@ it_adds_the_github_token_after_the_callers_nix_config() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
@@ -161,6 +170,7 @@ it_hands_the_lock_no_nix_config_without_a_github_token() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
 
@@ -192,6 +202,7 @@ it_keeps_a_newer_imp_base_and_pins_the_host() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -p "$tree/repo/images/agent/Dockerfile" "$tree/before"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/flake.lock"
@@ -204,7 +215,10 @@ it_keeps_a_newer_imp_base_and_pins_the_host() {
   cmp "$tree/before" "$tree/repo/images/agent/Dockerfile"
   diff - "$tree/repo/nixos/flake.nix" <<< '      url = "github:zgeoff/impz/c5bea940";'
   diff "$tree/flake.lock" "$tree/repo/nixos/flake.lock"
-  diff - "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" <<< '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";'
+  diff - "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" << 'EOF'
+    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.1.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";
+EOF
   diff - "$tree/out" << 'EOF'
 imp-base 1.1.0 is pinned, which is newer than 1.0.1
 pinned imp 1.0.1 in nixos/flake.nix and nixos/flake.lock: c5bea94080fdde9e21e9720295c1ca727302662e
@@ -225,15 +239,22 @@ it_runs_no_lock_when_imp_host_already_holds_the_release() {
   echo '      url = "github:zgeoff/impz/c5bea940";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"c5bea94080fdde9e21e9720295c1ca727302662e"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:0.33.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
-  cp -pr "$tree/repo/nixos" "$tree/before"
+  cp -p "$tree/repo/nixos/flake.nix" "$tree/before-flake"
+  cp -p "$tree/repo/nixos/flake.lock" "$tree/before-lock"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
     bash "$script" 1.0.1 c5bea94080fdde9e21e9720295c1ca727302662e \
     sha256:3333333333333333333333333333333333333333333333333333333333333333 \
     sha256:4444444444444444444444444444444444444444444444444444444444444444) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff -r "$tree/before" "$tree/repo/nixos"
+  cmp "$tree/before-flake" "$tree/repo/nixos/flake.nix"
+  cmp "$tree/before-lock" "$tree/repo/nixos/flake.lock"
+  diff - "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" << 'EOF'
+    image = "ghcr.io/zgeoff/imp-host:1.0.1@sha256:3333333333333333333333333333333333333333333333333333333333333333";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444";
+EOF
   diff - "$tree/repo/images/agent/Dockerfile" <<< 'FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:4444444444444444444444444444444444444444444444444444444444444444'
   [ ! -e "$tree/calls" ] || {
     echo "docker ran: $(cat "$tree/calls")" >&2
@@ -258,6 +279,7 @@ it_refuses_a_lock_that_names_another_commit() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -p "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" "$tree/before"
   echo '{"nodes":{"imp":{"locked":{"rev":"9999999999999999999999999999999999999999"}}}}' > "$tree/flake.lock"
@@ -285,6 +307,7 @@ it_fails_when_the_lock_fails() {
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   cp -p "$tree/repo/nixos/flake.lock" "$tree/before-lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   cp -p "$tree/repo/nixos/hosts/geoffcloud/configuration.nix" "$tree/before-config"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
 
@@ -312,6 +335,7 @@ it_refuses_the_release_pinned_with_another_digest_without_writing() {
   echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
   echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
   echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
   echo 'FROM ghcr.io/zgeoff/imp-base:1.0.1@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
   cp -pr "$tree/repo" "$tree/before"
 
@@ -327,6 +351,36 @@ it_refuses_the_release_pinned_with_another_digest_without_writing() {
   }
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'imp-base 1.0.1 is pinned with sha256:2222222222222222222222222222222222222222222222222222222222222222, but the registry lists sha256:4444444444444444444444444444444444444444444444444444444444444444'
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_refuses_imp_base_pins_that_disagree_without_writing() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '      url = "github:zgeoff/impz/4211437b";' > "$tree/repo/nixos/flake.nix"
+  echo '{"nodes":{"imp":{"locked":{"rev":"4211437b337cc691e4e7a24785ec7cc21db6dfc3"}}}}' > "$tree/repo/nixos/flake.lock"
+  echo '    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111";' > "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo '    impRegistryImage = "ghcr.io/zgeoff/imp-base:0.9.0@sha256:5555555555555555555555555555555555555555555555555555555555555555";' >> "$tree/repo/nixos/hosts/geoffcloud/configuration.nix"
+  echo 'FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222' > "$tree/repo/images/agent/Dockerfile"
+  cp -pr "$tree/repo" "$tree/before"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    bash "$script" 1.0.1 c5bea94080fdde9e21e9720295c1ca727302662e \
+    sha256:3333333333333333333333333333333333333333333333333333333333333333 \
+    sha256:4444444444444444444444444444444444444444444444444444444444444444) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff -r "$tree/before" "$tree/repo"
+  [ ! -e "$tree/calls" ] || {
+    echo "docker ran: $(cat "$tree/calls")" >&2
+    exit 1
+  }
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'nixos/hosts/geoffcloud/configuration.nix pins imp-base 0.9.0@sha256:5555555555555555555555555555555555555555555555555555555555555555 for previews, but images/agent/Dockerfile pins 1.0.0@sha256:2222222222222222222222222222222222222222222222222222222222222222: pin both at one release'
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1
