@@ -164,6 +164,63 @@ test('it runs a guest command over the exec protocol and wakes the imp', async (
   expect(impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
 });
 
+test('it holds a command open without an exit until its imp is destroyed', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-sdk-0123456789abcdef', {
+    name: 'pv-sdk-0123456789abcdef',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  impd.answerCommand = () => ({ code: null, hold: true });
+
+  const socket = new NativeWebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
+    headers: { authorization: `Bearer ${impd.token}` },
+  });
+
+  const messages: string[] = [];
+  const started = Promise.withResolvers<void>();
+  const closed = Promise.withResolvers<void>();
+
+  socket.addEventListener('close', () => {
+    closed.resolve();
+  });
+
+  socket.addEventListener('open', () => {
+    socket.send(
+      JSON.stringify({
+        type: 'start',
+        name: 'pv-sdk-0123456789abcdef',
+        argv: ['sleep', 'infinity'],
+        tty: false,
+      }),
+    );
+  });
+
+  socket.addEventListener('message', (event) => {
+    messages.push(String(event.data));
+    started.resolve();
+  });
+
+  await started.promise;
+
+  await fetch(`${impd.url}/rpc/imps/destroy`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-sdk-0123456789abcdef' } }),
+  });
+
+  await closed.promise;
+
+  expect(messages).toStrictEqual(['{"type":"started","pid":4242}']);
+});
+
 test("it serves impd's wake proxy under its domain through MSW", async () => {
   const impd = startStubImpd();
 

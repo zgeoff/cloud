@@ -1,4 +1,4 @@
-/* oxlint-disable import/max-dependencies */
+/* oxlint-disable import/max-dependencies, max-lines-per-function */
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -46,12 +46,14 @@ async function setupTest() {
       // one second between probes
       healthPollMs: 1000,
       buildTimeoutMs: 1_800_000,
+      contract: null,
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
+    pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
     now: () => new Date(clock.now),
     sleep: (ms) => {

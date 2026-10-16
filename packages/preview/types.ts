@@ -30,6 +30,22 @@ export interface PreviewSettings {
   // how long a boot waits for the health path to answer
   readonly healthTimeoutMs: number;
   readonly healthPollMs: number;
+
+  // the SDK contract run, or null when no repository has one
+  readonly contract: ContractSettings | null;
+}
+
+export interface ContractSettings {
+  // owner/name of each repository whose pull requests run the SDK contract suite when they change
+  // the Agent SDK's pin
+  readonly repos: ReadonlySet<string>;
+
+  // the impd secret that carries the model credential, which the broker adds to each request the
+  // suite sends to the model's API
+  readonly modelSecret: string;
+
+  // how long one run may take, from the start of its guest command to its last test
+  readonly timeoutMs: number;
 }
 
 export interface PreviewDeps {
@@ -41,6 +57,9 @@ export interface PreviewDeps {
 
   // the boots in flight, which a caller awaits to know the service is idle
   readonly pendingBoots: Set<Promise<void>>;
+
+  // the SDK contract runs in flight, apart from the boots, because the link waits on a boot alone
+  readonly pendingRuns: Set<Promise<void>>;
 
   // runs the slot rule and the start of an imp as one step, one open at a time
   readonly withSlotLock: <T>(run: () => Promise<T>) => Promise<T>;

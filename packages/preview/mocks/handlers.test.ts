@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { githubAPIURL } from './github-api-url.ts';
-import { composeFiles, issueComments } from './github-state.ts';
+import { commitStatuses, composeFiles, issueComments, pullRequestFiles } from './github-state.ts';
 
 test('it serves a stored compose file base64-encoded, as GitHub contents API does', async () => {
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
@@ -78,6 +78,80 @@ test("it refuses an edit of another user's comment with 403", async () => {
   });
 
   expect(response.status).toBe(403);
+});
+
+test("it pages one pull request's changed files, as GitHub's files API does", async () => {
+  pullRequestFiles.set('acme/greenhouse#17', [
+    { filename: 'package.json', patch: '@@ -1 +1 @@\n-a\n+b' },
+    { filename: 'bun.lock' },
+  ]);
+
+  pullRequestFiles.set('acme/greenhouse#18', [{ filename: 'README.md', patch: '@@' }]);
+
+  const response = await fetch(
+    `${githubAPIURL}/repos/acme/greenhouse/pulls/17/files?per_page=1&page=2`,
+  );
+
+  const result = await response.json();
+
+  expect(result).toStrictEqual([{ filename: 'bun.lock' }]);
+});
+
+test('it lists no changed files for a pull request it holds none for', async () => {
+  const response = await fetch(`${githubAPIURL}/repos/acme/greenhouse/pulls/17/files`);
+  const result = await response.json();
+
+  expect(result).toStrictEqual([]);
+});
+
+test('it stores a posted commit status and answers 201', async () => {
+  const response = await fetch(
+    `${githubAPIURL}/repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ state: 'pending', context: 'sdk-contract', description: 'Running' }),
+    },
+  );
+
+  expect(response.status).toBe(201);
+
+  expect(commitStatuses).toStrictEqual([
+    {
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      state: 'pending',
+      context: 'sdk-contract',
+      description: 'Running',
+    },
+  ]);
+});
+
+test('it refuses a commit status whose description runs past 140 characters with 422', async () => {
+  const response = await fetch(
+    `${githubAPIURL}/repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        state: 'failure',
+        context: 'sdk-contract',
+        description: 'x'.repeat(141),
+      }),
+    },
+  );
+
+  expect(response.status).toBe(422);
+});
+
+test('it refuses a commit status in a state GitHub does not define with 422', async () => {
+  const response = await fetch(
+    `${githubAPIURL}/repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ state: 'passed', context: 'sdk-contract', description: 'Running' }),
+    },
+  );
+
+  expect(response.status).toBe(422);
 });
 
 test('it answers 404 for an edit of a comment it does not hold', async () => {

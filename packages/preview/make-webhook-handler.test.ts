@@ -11,7 +11,12 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
-import { composeFiles, issueComments } from './mocks/github-state.ts';
+import {
+  commitStatuses,
+  composeFiles,
+  issueComments,
+  pullRequestFiles,
+} from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
@@ -47,6 +52,13 @@ async function setupTest() {
       healthTimeoutMs: 60_000,
       healthPollMs: 1000,
       buildTimeoutMs: 1_800_000,
+
+      // the listed repository whose pull requests run the SDK contract suite on an SDK pin change
+      contract: {
+        repos: new Set(['acme/greenhouse']),
+        modelSecret: 'model-haiku',
+        timeoutMs: 600_000,
+      },
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
@@ -55,9 +67,12 @@ async function setupTest() {
     // the secret every delivery below is signed with, or deliberately not
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
+    pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
     now: () => new Date('2026-10-15T09:00:00Z'),
-    sleep: async () => {},
+
+    // a contract run's deadline never passes, so each run ends with its guest command
+    sleep: () => Promise.withResolvers<void>().promise,
     log: () => {},
   };
 
@@ -753,6 +768,241 @@ test('it answers a ping with no change', async () => {
 
   expect(response.status).toBe(204);
   expect(issueComments).toStrictEqual([]);
+});
+
+test('it runs the SDK contract suite once for a pull request that changes the SDK pin', async () => {
+  const ctx = await setupTest();
+
+  pullRequestFiles.set('acme/greenhouse#21', [
+    {
+      filename: 'package.json',
+      patch:
+        '@@ -20 +20 @@\n-      "@anthropic-ai/claude-agent-sdk": "0.3.290",\n+      "@anthropic-ai/claude-agent-sdk": "0.3.301",',
+    },
+  ]);
+
+  ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
+
+  const body = JSON.stringify({
+    action: 'opened',
+    number: 21,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'cccccccccccccccccccccccccccccccccccccccc',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  const response = await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  await Promise.all(ctx.deps.pendingRuns);
+
+  expect(response.status).toBe(204);
+
+  expect(commitStatuses).toStrictEqual([
+    {
+      repo: 'acme/greenhouse',
+      sha: 'cccccccccccccccccccccccccccccccccccccccc',
+      state: 'pending',
+      context: 'sdk-contract',
+      description: 'Running the SDK contract suite',
+    },
+    {
+      repo: 'acme/greenhouse',
+      sha: 'cccccccccccccccccccccccccccccccccccccccc',
+      state: 'success',
+      context: 'sdk-contract',
+      description: '18 pass, 0 fail',
+    },
+  ]);
+
+  expect(ctx.impd.commands).toHaveLength(1);
+});
+
+test('it runs no SDK contract suite for a pull request that leaves the SDK pin alone', async () => {
+  const ctx = await setupTest();
+
+  pullRequestFiles.set('acme/greenhouse#21', [
+    {
+      filename: 'package.json',
+      patch: '@@ -21 +21 @@\n-      "@babel/core": "8.0.6",\n+      "@babel/core": "8.0.7",',
+    },
+  ]);
+
+  const body = JSON.stringify({
+    action: 'opened',
+    number: 21,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'cccccccccccccccccccccccccccccccccccccccc',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  await Promise.all(ctx.deps.pendingRuns);
+
+  expect(commitStatuses).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual([]);
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+    }),
+  ).toBeNull();
+});
+
+test('it starts no second SDK contract run for a second delivery of the same head commit', async () => {
+  const ctx = await setupTest();
+
+  pullRequestFiles.set('acme/greenhouse#21', [{ filename: 'bun.lock' }]);
+
+  ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
+
+  const opened = JSON.stringify({
+    action: 'opened',
+    number: 21,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'cccccccccccccccccccccccccccccccccccccccc',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(opened).digest('hex')}`,
+      },
+      body: opened,
+    }),
+  );
+
+  await Promise.all(ctx.deps.pendingRuns);
+
+  const reopened = JSON.stringify({
+    action: 'reopened',
+    number: 21,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'cccccccccccccccccccccccccccccccccccccccc',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(reopened).digest('hex')}`,
+      },
+      body: reopened,
+    }),
+  );
+
+  await Promise.all(ctx.deps.pendingRuns);
+
+  expect(ctx.impd.commands).toHaveLength(1);
+  expect(commitStatuses.map((status) => status.state)).toStrictEqual(['pending', 'success']);
+});
+
+test('it runs no SDK contract suite for a pull request from a fork', async () => {
+  const ctx = await setupTest();
+
+  pullRequestFiles.set('acme/greenhouse#21', [{ filename: 'bun.lock' }]);
+
+  const body = JSON.stringify({
+    action: 'opened',
+    number: 21,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: 'cccccccccccccccccccccccccccccccccccccccc',
+        repo: { full_name: 'stranger/greenhouse' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  await Promise.all(ctx.deps.pendingRuns);
+
+  expect(commitStatuses).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual([]);
+});
+
+test('it runs no SDK contract suite for a listed repository that the contract settings leave out', async () => {
+  const ctx = await setupTest();
+
+  pullRequestFiles.set('nursery/seedlings#21', [{ filename: 'bun.lock' }]);
+
+  const body = JSON.stringify({
+    action: 'opened',
+    number: 21,
+    repository: { full_name: 'nursery/seedlings' },
+    pull_request: {
+      head: {
+        sha: 'cccccccccccccccccccccccccccccccccccccccc',
+        repo: { full_name: 'nursery/seedlings' },
+      },
+    },
+  });
+
+  await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  await Promise.all(ctx.deps.pendingRuns);
+
+  expect(commitStatuses).toStrictEqual([]);
+  expect(ctx.impd.calls).toStrictEqual([]);
 });
 
 test('it answers 404 on any path but /webhook', async () => {

@@ -43,6 +43,16 @@ test('it counts a running preview with no recorded use as idle', () => {
   ).toStrictEqual(['pv-0a1b2c3d-17']);
 });
 
+test("it never sleeps a contract run's imp, which the wake proxy never sees in use", () => {
+  expect(
+    planIdleSleeps(
+      [{ name: 'pv-sdk-0123456789abcdef', state: 'running', lastActiveAt: null }],
+      1_800_000,
+      new Date('2026-10-15T09:00:00Z'),
+    ),
+  ).toStrictEqual([]);
+});
+
 test('it leaves a preview that already sleeps alone', () => {
   expect(
     planIdleSleeps(

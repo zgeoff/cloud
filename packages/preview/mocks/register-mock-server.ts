@@ -1,5 +1,5 @@
 import { afterAll, afterEach } from 'bun:test';
-import { composeFiles, issueComments } from './github-state.ts';
+import { commitStatuses, composeFiles, issueComments, pullRequestFiles } from './github-state.ts';
 import { NativeWebSocket } from './native-web-socket.ts';
 import { server } from './node.ts';
 
@@ -20,8 +20,10 @@ server.listen({ onUnhandledRequest: 'error' });
 afterEach(() => {
   server.resetHandlers();
   composeFiles.clear();
+  pullRequestFiles.clear();
 
   issueComments.length = 0;
+  commitStatuses.length = 0;
 
   const unhandled = unhandledRequests.splice(0);
 

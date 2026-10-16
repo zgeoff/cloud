@@ -183,6 +183,116 @@ let
         '';
     }
     {
+      title = "it sets the contract run's repositories, model secret and time limit once contractRepos lists a repository";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              contractRepos = [
+                "acme/greenhouse"
+                "nursery/*"
+              ];
+              contractModelSecret = "preview-model";
+              contractTimeoutMinutes = 15;
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubTokenFile = "/run/fixture/github-token";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+          environment = system.config.systemd.services.preview.environment;
+        in
+        ''
+          jq -S . > expected <<'EOF'
+          ${builtins.toJSON {
+            PREVIEW_CONTRACT_REPOS = "acme/greenhouse,nursery/*";
+            PREVIEW_CONTRACT_MODEL_SECRET = "preview-model";
+            PREVIEW_CONTRACT_TIMEOUT_MINUTES = "15";
+          }}
+          EOF
+
+          jq -S . > actual <<'EOF'
+          ${builtins.toJSON {
+            inherit (environment)
+              PREVIEW_CONTRACT_REPOS
+              PREVIEW_CONTRACT_MODEL_SECRET
+              PREVIEW_CONTRACT_TIMEOUT_MINUTES
+              ;
+          }}
+          EOF
+
+          assert_files_equal expected actual
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
+      title = "it leaves the contract run's settings out when contractRepos is empty";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              contractModelSecret = "preview-model";
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubTokenFile = "/run/fixture/github-token";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+          names = builtins.attrNames system.config.systemd.services.preview.environment;
+        in
+        ''
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_CONTRACT_") names))} "the contract run's variables"
+        '';
+    }
+    {
+      title = "it refuses contractRepos without contractModelSecret";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              contractRepos = [ "acme/greenhouse" ];
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubTokenFile = "/run/fixture/github-token";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.preview.contractModelSecret must name the model secret when contractRepos lists a repository."
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
       title = "it adds the pinned image to impd once imp-host runs, at each switch that changes the pin and each imp-host restart, before the service starts";
       script =
         let
@@ -411,10 +521,13 @@ let
       script = ''
         cat > expected <<'EOF'
         ./apply-slot-evictions.ts
+        ./build-contract-imp-name.ts
+        ./build-contract-status.ts
         ./build-github-client.ts
         ./build-imp-name.ts
         ./build-impd-client.ts
         ./create-preview-store.ts
+        ./has-sdk-pin-change.ts
         ./load-preview-config.ts
         ./main.ts
         ./make-link-handler.ts
@@ -426,8 +539,11 @@ let
         ./plan-slot-evictions.ts
         ./render-preview-comment.ts
         ./render-preview-page.ts
+        ./run-contract-retries.ts
+        ./run-contract-run.ts
         ./run-idle-sweep.ts
         ./run-preview-boot.ts
+        ./start-contract-run.ts
         ./start-preview-service.ts
         ./types.ts
         ./verify-webhook-signature.ts

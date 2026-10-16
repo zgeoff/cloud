@@ -37,6 +37,7 @@ test('it reads the settings from the environment and the secrets from the creden
       healthTimeoutMs: 600_000,
       healthPollMs: 2000,
       buildTimeoutMs: 1_800_000,
+      contract: null,
     },
     linkListener: { hostname: '100.64.0.10', port: 8417 },
     webhookListener: { hostname: '100.64.0.10', port: 8418 },
@@ -127,6 +128,97 @@ test('it rejects a listener without a port', () => {
       () => Promise.resolve('a-secret'),
     ),
   ).rejects.toThrowWithMessage(Error, '100.64.0.10 is not host:port');
+});
+
+test('it reads the SDK contract settings when the environment names a contract repository', async () => {
+  const config = await loadPreviewConfig(
+    {
+      CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+      PREVIEW_REPOS: 'acme/greenhouse',
+      PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+      PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+      PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+      PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+      PREVIEW_IMP_DOMAIN: 'imps.example.test',
+      PREVIEW_IMP_IMAGE: 'base',
+      PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+      PREVIEW_CONTRACT_REPOS: 'acme/greenhouse, nursery/*',
+      PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
+      PREVIEW_CONTRACT_TIMEOUT_MINUTES: '15',
+    },
+    () => Promise.resolve('a-secret'),
+  );
+
+  expect(config.settings.contract).toStrictEqual({
+    repos: new Set(['acme/greenhouse', 'nursery/*']),
+    modelSecret: 'model-haiku',
+    timeoutMs: 900_000,
+  });
+});
+
+test('it gives an SDK contract run ten minutes by default', async () => {
+  const config = await loadPreviewConfig(
+    {
+      CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+      PREVIEW_REPOS: 'acme/greenhouse',
+      PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+      PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+      PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+      PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+      PREVIEW_IMP_DOMAIN: 'imps.example.test',
+      PREVIEW_IMP_IMAGE: 'base',
+      PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+      PREVIEW_CONTRACT_REPOS: 'acme/greenhouse',
+      PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
+    },
+    () => Promise.resolve('a-secret'),
+  );
+
+  expect(config.settings.contract?.timeoutMs).toBe(600_000);
+});
+
+test('it rejects contract repositories without a model secret', () => {
+  expect(
+    loadPreviewConfig(
+      {
+        CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+        PREVIEW_REPOS: 'acme/greenhouse',
+        PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+        PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+        PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+        PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+        PREVIEW_IMP_DOMAIN: 'imps.example.test',
+        PREVIEW_IMP_IMAGE: 'base',
+        PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+        PREVIEW_CONTRACT_REPOS: 'acme/greenhouse',
+      },
+      () => Promise.resolve('a-secret'),
+    ),
+  ).rejects.toThrowWithMessage(Error, 'PREVIEW_CONTRACT_MODEL_SECRET is not set');
+});
+
+test('it rejects a contract repository that is not owner/name', () => {
+  expect(
+    loadPreviewConfig(
+      {
+        CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+        PREVIEW_REPOS: 'acme/greenhouse',
+        PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+        PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+        PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+        PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+        PREVIEW_IMP_DOMAIN: 'imps.example.test',
+        PREVIEW_IMP_IMAGE: 'base',
+        PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+        PREVIEW_CONTRACT_REPOS: 'greenhouse',
+        PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
+      },
+      () => Promise.resolve('a-secret'),
+    ),
+  ).rejects.toThrowWithMessage(
+    Error,
+    'PREVIEW_CONTRACT_REPOS names greenhouse, which is not owner/name or owner/*',
+  );
 });
 
 test('it rejects a missing setting', () => {
