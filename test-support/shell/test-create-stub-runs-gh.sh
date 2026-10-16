@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test for create-stub-runs-gh.sh: the gh stand-in logs each call, prints the runs a case names
 # or, with none named, one run for the HEAD of the repository it runs in, answers with the error
-# and exit a case names, and fails closed on any other call. No gh runs here; the exit codes come
+# and exit a case names, prints a nixie bun.lock with or without the imp client a case names or
+# answers its read with an error, and fails closed on any other call. No gh runs here; the exit codes come
 # from gh's manual, as the stand-in's header records.
 #
 #   bash test-support/shell/test-create-stub-runs-gh.sh
@@ -119,6 +120,82 @@ it_exits_1_for_an_error_the_case_gives_no_exit_for() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'gh: Not Found (HTTP 404)'
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs"]'
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_prints_a_nixie_lock_with_the_imp_client_the_case_names() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_NIXIE_IMP_CLIENT=3.2.1 \
+    gh api -H 'Accept: application/vnd.github.raw' 'repos/zgeoff/nixie/contents/bun.lock?ref=v0.31.4') \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+{
+  "lockfileVersion": 1,
+  "catalog": {
+    "@zgeoff/imp-client": "3.2.1",
+  },
+  "packages": {
+    "@zgeoff/imp-client": ["@zgeoff/imp-client@3.2.1", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-stub"],
+    "zod": ["zod@4.4.3", "", {}, "sha512-stub"],
+  }
+}
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/nixie/contents/bun.lock?ref=v0.31.4"]'
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_a_nixie_lock_without_the_imp_client_when_the_case_names_none() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" \
+    gh api -H 'Accept: application/vnd.github.raw' 'repos/zgeoff/nixie/contents/bun.lock?ref=v0.31.4') \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+{
+  "lockfileVersion": 1,
+  "packages": {
+    "zod": ["zod@4.4.3", "", {}, "sha512-stub"],
+  }
+}
+EOF
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_answers_the_nixie_lock_read_with_the_error_the_case_names() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_NIXIE_LOCK_ERROR='gh: Not Found (HTTP 404)' \
+    gh api -H 'Accept: application/vnd.github.raw' 'repos/zgeoff/nixie/contents/bun.lock?ref=v0.31.4') \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'gh: Not Found (HTTP 404)'
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the four
+# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the six
 # remote commands of a switch, fails closed on anything else, and hands a loopback call to
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
@@ -163,6 +163,100 @@ it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
 CALLS
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_the_named_nixie_images_then_the_later_ones_for_the_nixie_query() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  for query in first second; do
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+      STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_LATER_IMAGES=ghcr.io/zgeoff/nixie:0.32.0 \
+      ssh -o BatchMode=yes root@geoffcloud \
+      "k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'" \
+      > "$tree/out-$query" 2>> "$tree/err" || status=$?
+  done
+
+  printf '%s' ghcr.io/zgeoff/nixie:0.31.4 | cmp - "$tree/out-first"
+  printf '%s' ghcr.io/zgeoff/nixie:0.32.0 | cmp - "$tree/out-second"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+CALLS
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_nothing_for_the_nixie_query_when_no_nixie_pod_is_named() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  cmp /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_one_nixie_report_per_readiness_call_and_repeats_the_last() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  for call in first second third; do
+    env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+      STUB_NIXIE_REPORTS=$'{"status":"unready"}\n{"status":"ready"}' \
+      ssh -o BatchMode=yes root@geoffcloud \
+      "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'" \
+      > "$tree/out-$call" 2>> "$tree/err" || status=$?
+  done
+
+  diff - "$tree/out-first" <<< '{"status":"unready"}'
+  diff - "$tree/out-second" <<< '{"status":"ready"}'
+  diff - "$tree/out-third" <<< '{"status":"ready"}'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
+CALLS
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_fails_the_readiness_call_as_kubectl_does_when_no_report_is_named() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'Error from server (NotFound): pods "nixie-0" not found'
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
     exit 1
   }
 }

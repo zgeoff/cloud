@@ -8,7 +8,10 @@
 # A switch first needs a green NixOS checks run that covers the commit; with none, it stops
 # before the build and names the command that starts one. It also stops, before the build and
 # again before the activation, when the commit's atc daemon pin and a running atc gateway pod's
-# image differ in atc major version, since atc breaks its daemon protocol only in a major release.
+# image differ in atc major version, since atc breaks its daemon protocol only in a major release,
+# and when the running nixie's imp client refuses the commit's impd major (check-nixie-impd-major.sh).
+# After the activation it waits for nixie's /health/ready to report every part ready
+# (check-nixie-ready.sh), and fails with each part that is not, since nixie needs impd to start.
 # The switch runs only after the build
 # exits 0: a failed build stops the script before
 # anything reaches the host. The build reads a `git archive` snapshot of the checked commit,
@@ -83,6 +86,19 @@ require_gateway_major() {
   bash "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$snapshot/nixos/packages/atc.nix" $images
 }
 
+# nixie talks to impd with an imp client that refuses another impd major, so a switch takes only an
+# impd that each running nixie pod speaks (scripts/check-nixie-impd-major.sh). It reads the pods,
+# runs at the same two points, and fails on an ssh, kubectl or gh failure, as the gateway check does.
+require_nixie_impd_major() {
+  local images
+  images="$(ssh -o BatchMode=yes "$host" \
+    "k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'")"
+  # kubectl's jsonpath joins the pods' images with spaces, and an image reference holds none
+  # shellcheck disable=SC2086
+  bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-impd-major.sh" \
+    "$snapshot/nixos/hosts/geoffcloud/configuration.nix" $images
+}
+
 verified_commit=""
 require_clean_main
 commit="$verified_commit"
@@ -102,6 +118,7 @@ if [[ "$mode" == switch ]]; then
   fi
   echo "== checked by $checked_by"
   require_gateway_major
+  require_nixie_impd_major
 fi
 echo "== build ${commit:0:7}"
 
@@ -129,6 +146,7 @@ docker run --rm --network host -v geoffcloud-nix-store:/nix \
 # as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a boot after a failed activation still picks the
 # new system, then switch-to-configuration in its own unit, so it survives a dropped SSH
 require_gateway_major
+require_nixie_impd_major
 echo "== switch $host"
 ssh -o BatchMode=yes "$host" "nix-env -p /nix/var/nix/profiles/system --set '$built' \
   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER \
@@ -142,3 +160,4 @@ if [[ "$current" != "$built" ]]; then
 fi
 echo "== $host runs $current"
 ssh -o BatchMode=yes "$host" systemctl --failed --no-legend --plain
+bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$host"
