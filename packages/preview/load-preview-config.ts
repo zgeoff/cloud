@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { PreviewSettings } from './types.ts';
+import type { ContractSettings, PreviewSettings } from './types.ts';
 
 interface Listener {
   readonly hostname: string;
@@ -42,7 +42,7 @@ export async function loadPreviewConfig(
   return {
     settings: {
       baseURL: requireValue(env, 'PREVIEW_BASE_URL').replace(/\/+$/u, ''),
-      repos: parseRepos(requireValue(env, 'PREVIEW_REPOS')),
+      repos: parseRepos(requireValue(env, 'PREVIEW_REPOS'), 'PREVIEW_REPOS'),
       slots: requireInteger(env, 'PREVIEW_SLOTS', '1'),
       idleMs: requireInteger(env, 'PREVIEW_IDLE_MINUTES', '30') * 60_000,
       impDomain: requireValue(env, 'PREVIEW_IMP_DOMAIN'),
@@ -52,6 +52,7 @@ export async function loadPreviewConfig(
       buildTimeoutMs: requireInteger(env, 'PREVIEW_BUILD_TIMEOUT_SECONDS', '1800') * 1000,
       healthTimeoutMs: requireInteger(env, 'PREVIEW_HEALTH_TIMEOUT_SECONDS', '600') * 1000,
       healthPollMs: 2000,
+      contract: parseContractSettings(env),
     },
     linkListener: parseListener(requireValue(env, 'PREVIEW_LINK_LISTEN')),
     webhookListener: parseListener(requireValue(env, 'PREVIEW_WEBHOOK_LISTEN')),
@@ -100,7 +101,25 @@ function parseListener(address: string): Listener {
   return { hostname, port: Number(match?.groups?.['port']) };
 }
 
-function parseRepos(list: string): ReadonlySet<string> {
+// The SDK contract run is on once PREVIEW_CONTRACT_REPOS names a repository, and then it needs the
+// model secret, since a run without it would only fail
+function parseContractSettings(
+  env: Readonly<Record<string, string | undefined>>,
+): ContractSettings | null {
+  const repos = parseRepos(env['PREVIEW_CONTRACT_REPOS'] ?? '', 'PREVIEW_CONTRACT_REPOS');
+
+  if (repos.size === 0) {
+    return null;
+  }
+
+  return {
+    repos,
+    modelSecret: requireValue(env, 'PREVIEW_CONTRACT_MODEL_SECRET'),
+    timeoutMs: requireInteger(env, 'PREVIEW_CONTRACT_TIMEOUT_MINUTES', '10') * 60_000,
+  };
+}
+
+function parseRepos(list: string, name: string): ReadonlySet<string> {
   const repos = list
     .split(',')
     .map((repo) => repo.trim())
@@ -109,7 +128,7 @@ function parseRepos(list: string): ReadonlySet<string> {
   const invalidRepo = repos.find((repo) => !/^[\w.-]+\/(?:[\w.-]+|\*)$/u.test(repo));
 
   if (invalidRepo !== undefined) {
-    throw new Error(`PREVIEW_REPOS names ${invalidRepo}, which is not owner/name or owner/*`);
+    throw new Error(`${name} names ${invalidRepo}, which is not owner/name or owner/*`);
   }
 
   return new Set(repos);

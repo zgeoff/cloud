@@ -226,3 +226,217 @@ test('it returns null for a pull request it has not seen', async () => {
 
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 99 })).toBeNull();
 });
+
+test('#claimContractRun records a queued run for a head commit and reports the claim', async () => {
+  const ctx = await setupTest();
+
+  const claimed = ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  expect(claimed).toBeTrue();
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+  ).toStrictEqual({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+    phase: 'queued',
+    detail: null,
+    outcome: null,
+  });
+});
+
+test("#updateContractPhase records a settling run's result beside its phase", async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' },
+  );
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+  ).toMatchObject({ phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' });
+});
+
+test('#claimContractRun refuses a second claim of one head commit and keeps the first run', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'passed', detail: '18 pass, 0 fail' },
+  );
+
+  const claimed = ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  expect(claimed).toBeFalse();
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('passed');
+});
+
+test('#updateContractPhase refuses a change from a phase the run is not in', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  const moved = ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['running'],
+    { phase: 'passed' },
+  );
+
+  expect(moved).toBeFalse();
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('queued');
+});
+
+test('#collectContractRuns lists the runs at the given phases, oldest claim first', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    number: 18,
+    imp: 'pv-sdk-bbbbbbbbbbbbbbbb',
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-aaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+    number: 19,
+    imp: 'pv-sdk-cccccccccccccccc',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'waiting', detail: 'Waiting for a free preview slot' },
+  );
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'cccccccccccccccccccccccccccccccccccccccc' },
+    ['queued'],
+    { phase: 'running' },
+  );
+
+  const runs = ctx.store.collectContractRuns(['queued', 'waiting']);
+
+  expect(runs.map((run) => run.headSHA)).toStrictEqual([
+    'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  ]);
+});
+
+test('#updateInterruptedContractRuns queues again the runs a stopped process left running', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-aaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'running' },
+  );
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    number: 18,
+    imp: 'pv-sdk-bbbbbbbbbbbbbbbb',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    ['queued'],
+    { phase: 'failed', detail: '15 pass, 3 fail' },
+  );
+
+  const requeued = ctx.store.updateInterruptedContractRuns();
+
+  expect(requeued).toBe(1);
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('queued');
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    })?.phase,
+  ).toBe('failed');
+});
+
+test('#findContractRun returns null for a head commit it has not seen', async () => {
+  const ctx = await setupTest();
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+  ).toBeNull();
+});

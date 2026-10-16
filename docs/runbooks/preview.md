@@ -25,18 +25,31 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
    read-only on the opted-in repositories and no other permission:
    `op read op://cloud/<github_item>/credential | host_imp secret add gh --kind github`.
 
-2. Mint the service's impd token, which manages only the imps named `pv-*` and grants only `gh`, and
-   write it to the host's encrypted secrets dataset without printing it:
+2. Add the model secret that each SDK contract run's imp is granted, `preview-model`, from the model
+   credential that nixie uses:
 
    ```bash
-   ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && docker exec imp-host imp token new preview --scope manage --imps "pv-*" --grantable gh | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
+   op read op://cloud/nixie-model-credential/credential | host_imp secret add preview-model \
+     --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
    ```
 
-   Expect `ok`.
+   Expect `host_imp secret ls` to list `preview-model` with the host `api.anthropic.com`. After a
+   model credential rotation, run the same command with `--replace`.
 
-3. Make a fine-grained GitHub token for the service, scoped to the opted-in repositories, with
-   Contents read and Pull requests read and write. The service reads `preview/compose.yaml` and
-   writes one comment per pull request with it. Store it in the 1Password item
+3. Mint the service's impd token, which manages only the imps named `pv-*` and grants only `gh` and
+   `preview-model`, and write it to the host's encrypted secrets dataset without printing it:
+
+   ```bash
+   ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && docker exec imp-host imp token new preview --scope manage --imps "pv-*" --grantable gh,preview-model | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
+   ```
+
+   Expect `ok`. A token minted before the contract run grants `gh` alone. Point it at both secrets
+   with `host_imp token set preview --grantable gh,preview-model < /dev/null`.
+
+4. Make a fine-grained GitHub token for the service, scoped to the opted-in repositories, with
+   Contents read, Pull requests read and write, and Commit statuses read and write. The service
+   reads `preview/compose.yaml` and each pull request's changed files, writes one comment per pull
+   request, and sets the `sdk-contract` status with it. Store it in the 1Password item
    `preview-github-token` of the `cloud` vault, then send it to the host on SSH's standard input:
 
    ```bash
@@ -48,7 +61,7 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
    The host keeps the old file when the read sends nothing, and the command prints `ok` only after
    it replaces the file.
 
-4. Make the webhook secret, store it, and send it the same way:
+5. Make the webhook secret, store it, and send it the same way:
 
    ```bash
    op item create --vault cloud --category password --title preview-webhook-secret \
@@ -58,7 +71,7 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
        && mv webhook-secret.new webhook-secret && echo ok'
    ```
 
-5. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:
+6. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:
    `bash scripts/switch-geoffcloud.sh`. Then start the unit, which the switch skipped while its
    secrets were missing, and read its first line:
 
@@ -68,7 +81,7 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
 
    Expect `previews: links on 100.69.47.33:8417, webhook on 100.69.47.33:8418`.
 
-6. Check the public route, which the Pulumi program declares: `preview-webhook.geoff.cloud` passes
+7. Check the public route, which the Pulumi program declares: `preview-webhook.geoff.cloud` passes
    only the path `/webhook` to the webhook listener. Once the apply has run, an unsigned call gets
    the service's refusal, and any other path gets the tunnel's 404:
 
@@ -79,9 +92,9 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
 
    Expect `401`, then `404`.
 
-7. Add a webhook to each opted-in repository, or once to the owner's account for every repository:
+8. Add a webhook to each opted-in repository, or once to the owner's account for every repository:
    the payload URL `https://preview-webhook.geoff.cloud/webhook`, which the stack exports as
-   `previewWebhookURL`, content type `application/json`, the secret from step 4, and the "Pull
+   `previewWebhookURL`, content type `application/json`, the secret from step 5, and the "Pull
    requests" event alone. Expect GitHub's ping delivery to get a 204.
 
 ## Opt a repository in
@@ -126,6 +139,37 @@ services:
 The seed loads data written for the preview, never a copy of production data. Each boot starts the
 stack on empty volumes, so the seed runs once per build. A preview of a push builds the new commit's
 `preview/compose.yaml`, so a pull request can change its own preview.
+
+## Run the SDK contract suite on a pull request
+
+A repository runs its SDK contract suite on each pull request that changes the Agent SDK's pin once
+the host's `services.preview.contractRepos` lists it and the service's webhook reaches it. The suite
+runs `NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract` at the head commit, so the repository needs
+that folder and a `bun.lock`. Each run's imp installs Bun's pinned build, so a repository that moves
+its package manager to another Bun release needs the pin in the service's contract run moved with
+it.
+
+Check a run live once the setup and a host switch are done:
+
+1. Open a pull request in a contract repository that changes the SDK's version in `package.json` or
+   `bun.lock`. Expect the head commit's `sdk-contract` status to read
+   `Running the SDK contract suite` within a minute, and `host_imp ls` to show one `pv-sdk-<hash>`
+   imp.
+2. Wait for the run to end, about 5 minutes. Expect the status to turn success or failure with the
+   suite's counts, such as `18 pass, 0 fail`, and `host_imp ls` to show no `pv-sdk-` imp.
+3. Push a commit that leaves the pin alone. Expect the new head to get no `sdk-contract` status.
+
+A run that waits reads `Waiting for a free preview slot`, and the service tries it again each minute
+until a preview sleeps or goes. The journal holds the tail of each run's output:
+
+```bash
+ssh root@geoffcloud journalctl -u preview -n 100 --no-pager
+```
+
+An error status that reads `The run's imp did not start` ends with impd's refusal: a refused grant
+means the token lacks `preview-model` in its grantable list. A run that fails before the suite
+reports broke in the install or the fetch, such as a `bun.lock` that `bun install --frozen-lockfile`
+refuses.
 
 ## Check a preview live
 

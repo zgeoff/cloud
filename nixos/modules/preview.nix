@@ -134,6 +134,33 @@ in
       '';
     };
 
+    contractRepos = lib.mkOption {
+      type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\\*)");
+      default = [ ];
+      example = [ "acme/greenhouse" ];
+      description = ''
+        The repositories whose pull requests run the Agent SDK contract suite, in an imp with the
+        model secret's grant, when they change the SDK's pin, as owner/name or owner/*. Each one
+        needs the service's webhook. Empty turns the run off.
+      '';
+    };
+
+    contractModelSecret = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "preview-model";
+      description = ''
+        The impd secret, for the model API's host, that each contract run's imp is granted. The
+        service's impd token must list it with --grantable.
+      '';
+    };
+
+    contractTimeoutMinutes = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 10;
+      description = "How long one contract run may take before it fails.";
+    };
+
     webhookSecretFile = lib.mkOption {
       type = lib.types.str;
       description = "A root-only file holding the GitHub webhook's secret.";
@@ -151,6 +178,13 @@ in
   };
 
   config = lib.mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.contractRepos == [ ] || cfg.contractModelSecret != null;
+        message = "services.preview.contractModelSecret must name the model secret when contractRepos lists a repository.";
+      }
+    ];
+
     # A oneshot that each switch restarts when the reference changes, so impd holds the pinned
     # image before the service boots a preview from it. A stop of imp-host stops it (requires),
     # and each start of imp-host starts it again (wantedBy), so it runs after every imp-host start.
@@ -208,6 +242,11 @@ in
       }
       // lib.optionalAttrs (cfg.impGitHubSecret != null) {
         PREVIEW_IMP_GITHUB_SECRET = cfg.impGitHubSecret;
+      }
+      // lib.optionalAttrs (cfg.contractRepos != [ ]) {
+        PREVIEW_CONTRACT_REPOS = lib.concatStringsSep "," cfg.contractRepos;
+        PREVIEW_CONTRACT_MODEL_SECRET = toString cfg.contractModelSecret;
+        PREVIEW_CONTRACT_TIMEOUT_MINUTES = toString cfg.contractTimeoutMinutes;
       };
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/preview-service";

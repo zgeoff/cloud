@@ -5,6 +5,7 @@ import type { PreviewConfig } from './load-preview-config.ts';
 import { makeLinkHandler } from './make-link-handler.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
+import { runContractRetries } from './run-contract-retries.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
 import type { PreviewDeps } from './types.ts';
 
@@ -16,6 +17,9 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
   // a boot runs only inside the process that started it, so none survives a restart
   const interrupted = store.updateInterruptedBoots();
 
+  // so does a contract run, which the first retry starts over
+  const requeued = store.updateInterruptedContractRuns();
+
   const deps: PreviewDeps = {
     settings: config.settings,
     store,
@@ -23,6 +27,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     github: buildGitHubClient('https://api.github.com', config.githubToken),
     webhookSecret: config.webhookSecret,
     pendingBoots: new Set(),
+    pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
     now: () => new Date(),
     sleep: (ms) => Bun.sleep(ms),
@@ -36,9 +41,10 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
 
   const sweep = setInterval(() => {
     void runIdleSweep(deps);
+    runContractRetries(deps);
   }, config.sweepIntervalMs);
 
-  deps.log(`previews: ${interrupted} boots failed by the last stop`);
+  deps.log(`previews: the last stop failed ${interrupted} boots and requeued ${requeued} runs`);
 
   deps.log(
     `previews: links on ${config.linkListener.hostname}:${config.linkListener.port}, webhook on ${config.webhookListener.hostname}:${config.webhookListener.port}`,
@@ -49,7 +55,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
       clearInterval(sweep);
 
       await Promise.all([linkServer.stop(), webhookServer.stop()]);
-      await Promise.allSettled(deps.pendingBoots);
+      await Promise.allSettled([...deps.pendingBoots, ...deps.pendingRuns]);
 
       store.close();
     },

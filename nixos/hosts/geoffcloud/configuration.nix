@@ -264,6 +264,9 @@ in
     impdURL = impdLoopbackURL;
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";
+    # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite
+    contractRepos = [ "zgeoff/nixie" ];
+    contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
     impRegistryImage = "ghcr.io/zgeoff/imp-base:2.0.8@sha256:86ae5f10d10a20880dda6bd91cfaefbe61950b395fe5c6b1cc6f79a3a88c552c";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";

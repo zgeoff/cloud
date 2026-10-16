@@ -1,8 +1,11 @@
+import { buildContractImpName } from './build-contract-imp-name.ts';
 import { buildImpName } from './build-imp-name.ts';
+import { hasSDKPinChange } from './has-sdk-pin-change.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import type { PullRequestEvent } from './parse-pull-request-event.ts';
 import { parsePullRequestEvent } from './parse-pull-request-event.ts';
 import { renderPreviewComment } from './render-preview-comment.ts';
+import { startContractRun } from './start-contract-run.ts';
 import type { PreviewDeps } from './types.ts';
 import { verifyWebhookSignature } from './verify-webhook-signature.ts';
 
@@ -30,14 +33,22 @@ export function makeWebhookHandler(deps: PreviewDeps): (request: Request) => Pro
         ? parsePullRequestEvent(JSON.parse(new TextDecoder().decode(body)))
         : null;
 
-    if (event !== null && shouldPreview(deps, event)) {
-      await withDeliveryLock(() =>
-        event.action === 'close' ? removePreview(deps, event) : updatePreviewHead(deps, event),
-      );
+    if (event !== null) {
+      await withDeliveryLock(() => applyPullRequestEvent(deps, event));
     }
 
     return new Response(null, { status: 204 });
   };
+}
+
+async function applyPullRequestEvent(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
+  if (shouldPreview(deps, event)) {
+    await (event.action === 'close' ? removePreview(deps, event) : updatePreviewHead(deps, event));
+  }
+
+  if (shouldCheckContract(deps, event)) {
+    await claimContractRun(deps, event);
+  }
 }
 
 // A fork's code would run in an imp that holds the broker's GitHub credential, so a pull request
@@ -48,6 +59,45 @@ function shouldPreview(deps: PreviewDeps, event: PullRequestEvent): boolean {
   const listed = deps.settings.repos.has(event.repo) || deps.settings.repos.has(`${owner}/*`);
 
   return listed && !event.fromFork;
+}
+
+// The SDK contract suite runs with the broker's model credential, so a pull request from a fork
+// never runs it, and neither does one in a repository the contract settings do not list
+function shouldCheckContract(deps: PreviewDeps, event: PullRequestEvent): boolean {
+  const repos = deps.settings.contract?.repos;
+
+  if (repos === undefined || event.action === 'close' || event.fromFork) {
+    return false;
+  }
+
+  const owner = event.repo.split('/')[0] ?? '';
+
+  return repos.has(event.repo) || repos.has(`${owner}/*`);
+}
+
+// opened, reopened or synchronize: a pull request that changes the Agent SDK's pin claims one run
+// of the SDK contract suite for its head commit. A later delivery for the same commit, such as a
+// reopen or GitHub's redelivery, finds the run claimed and starts nothing.
+async function claimContractRun(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
+  const files = await deps.github.readPullRequestFiles(event.repo, event.number);
+
+  if (!hasSDKPinChange(files)) {
+    return;
+  }
+
+  const key = { repo: event.repo, headSHA: event.headSHA };
+
+  const claimed = deps.store.claimContractRun({
+    ...key,
+    number: event.number,
+    imp: buildContractImpName(event.repo, event.headSHA),
+  });
+
+  if (claimed) {
+    deps.log(`${event.repo}#${event.number}: an SDK contract run for ${event.headSHA}`);
+
+    startContractRun(deps, key);
+  }
 }
 
 // opened, reopened or synchronize: a head commit with preview/compose.yaml gets the link. Only an

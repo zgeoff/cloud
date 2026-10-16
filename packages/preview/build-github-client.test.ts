@@ -2,7 +2,12 @@ import { expect, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient, previewCommentMarker } from './build-github-client.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
-import { composeFiles, issueComments } from './mocks/github-state.ts';
+import {
+  commitStatuses,
+  composeFiles,
+  issueComments,
+  pullRequestFiles,
+} from './mocks/github-state.ts';
 import { server } from './mocks/node.ts';
 
 test('#readComposeFile reads preview/compose.yaml at the commit', async () => {
@@ -123,4 +128,57 @@ test('#updatePreviewComment edits the marked comment past the first page of comm
   expect(issueComments.find((comment) => comment.id === 101)?.body).toBe(
     `${previewCommentMarker}\nsecond`,
   );
+});
+
+test('#readPullRequestFiles reads every changed file past the first page, with null for a diff GitHub left out', async () => {
+  pullRequestFiles.set('acme/greenhouse#17', [
+    ...Array.from({ length: 100 }, (_, index) => ({
+      filename: `src/file-${index}.ts`,
+      patch: '@@ -1 +1 @@',
+    })),
+    { filename: 'bun.lock' },
+  ]);
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  const result = await client.readPullRequestFiles('acme/greenhouse', 17);
+
+  expect(result).toHaveLength(101);
+  expect(result.at(-1)).toStrictEqual({ path: 'bun.lock', patch: null });
+});
+
+test('#updateCommitStatus posts the state, the context and the description on the commit', async () => {
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  await client.updateCommitStatus({
+    repo: 'acme/greenhouse',
+    sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    context: 'sdk-contract',
+    state: 'success',
+    description: '18 pass, 0 fail',
+  });
+
+  expect(commitStatuses).toStrictEqual([
+    {
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      state: 'success',
+      context: 'sdk-contract',
+      description: '18 pass, 0 fail',
+    },
+  ]);
+});
+
+test('#updateCommitStatus cuts a description to the 140 characters GitHub accepts', async () => {
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  await client.updateCommitStatus({
+    repo: 'acme/greenhouse',
+    sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    context: 'sdk-contract',
+    state: 'failure',
+    description: 'x'.repeat(200),
+  });
+
+  expect(commitStatuses.at(0)?.description).toBe('x'.repeat(140));
 });

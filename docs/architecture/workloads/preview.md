@@ -5,7 +5,9 @@ change live without touching production. The preview service, a NixOS service on
 comment on each pull request of an opted-in repository with a tailnet link. Opening the link boots
 the pull request's head commit from its `preview/` folder, or wakes the imp that already runs it,
 and closing the pull request destroys the imp. The service knows nothing about any project: a
-repository opts in with a Compose file, a seed step that loads invented data, and a health path.
+repository opts in with a Compose file, a seed step that loads invented data, and a health path. A
+pull request that changes the Agent SDK's pin in a repository the service lists for it also gets a
+commit status from a run of that repository's SDK contract suite, in an imp of its own.
 [imp on the host](../host/imp.md) covers impd, which runs each preview's imp, and
 [the preview runbook](../../runbooks/preview.md) gives the steps to set the service up, opt a
 repository in and check it live.
@@ -20,7 +22,7 @@ flowchart LR
     LK
     DB[("previews")]
   end
-  WH -->|"comment"| GH
+  WH -->|"comment, status"| GH
   LK -->|"loopback"| IMPD["impd"]
   IMPD --> P["preview imp"]
   LK -.->|"redirect"| D
@@ -142,9 +144,48 @@ impd confines the service's token to the imps whose names start with the preview
 rule and the sweep never sleep another imp, and a mistake in the service cannot reach the agents'
 imps.
 
+## The SDK contract run
+
+The SDK contract suite checks the behaviours a repository relies on against the model, so it needs
+the model credential, and the run keeps that credential out of GitHub. The suite runs in an imp that
+impd grants the model secret, and the guest holds only a placeholder where the CLI reads its
+credential. The broker replaces the placeholder's header with the credential on each request to the
+model's API. A pull request from a fork never runs the suite, for the reason it gets no preview.
+
+On an opened, reopened or synchronize delivery from a repository the contract settings list, the
+service reads the pull request's changed files. A changed line of a `package.json` or a `bun.lock`
+that holds the SDK's package name claims a run for the head commit. GitHub leaves out the diff of a
+file too large to show, and such a manifest counts as a change, because a needless run costs less
+than a missed one. The previews file holds one record per repository and head commit, so a commit
+runs the suite once however many deliveries name it, and each push to a new head runs it again.
+
+1. Under the slot lock, the service counts the running imps. A run never puts a preview to sleep,
+   because the owner may be using it, so with every slot taken the run waits. Its `sdk-contract`
+   status turns pending with that reason, and the sweep's timer tries the run again on each pass.
+2. With a slot free, the service starts a new imp from the preview image, grants it the model secret
+   and the GitHub secret, and sets the status to pending.
+3. A guest command installs Bun's pinned build, checked against its sha256, since imp's base image
+   lacks Bun. It fetches the head commit, installs the dependencies from the lockfile, and runs the
+   suite. impd starts the command only when the broker reaches the guest.
+4. The service records the result, removes the imp, and then sets the status to success or failure
+   with the suite's pass and fail counts. A failure to start the imp sets an error status instead.
+   The record keeps the result until impd removes the imp and GitHub takes the status, and the
+   sweep's timer retries either step that fails. A leftover imp therefore never holds a slot for
+   good, and a status never stays pending after its run ends.
+
+The guest's `timeout` bounds the whole run, and a deadline on the host backs it for a guest that
+never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A
+run's imp holds a slot like a preview's, but neither the slot rule nor the idle sweep puts it to
+sleep, because its suite would stop halfway, so a preview that opens meanwhile runs beside it. A run
+that a stopped service left behind starts over at the next start's first retry, on a fresh imp. A
+service started without contract settings runs no suite, so the retry ends each run it still holds
+with an error status and removes its imp.
+
 ## State
 
 The previews file holds no secret and nothing a preview needs to run, and it has no backup. Losing
 it loses the record of each pull request, so a link answers that it knows no preview until the pull
 request's next push records it again. A closed pull request's imp still goes, because the imp's name
-derives from the repository and the pull request number, not from the record.
+derives from the repository and the pull request number, not from the record. Losing the file also
+loses the record of each contract run, so the next delivery for a head commit that ran before runs
+its suite again.

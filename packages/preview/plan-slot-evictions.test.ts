@@ -61,3 +61,30 @@ test('it counts only running previews against the slots', () => {
     ),
   ).toStrictEqual([]);
 });
+
+test("it never sleeps a contract run's imp, though it holds a slot", () => {
+  expect(
+    planSlotEvictions(
+      [
+        { name: 'pv-sdk-0123456789abcdef', state: 'running', lastActiveAt: null },
+        {
+          name: 'pv-0a1b2c3d-17',
+          state: 'running',
+          lastActiveAt: new Date('2026-10-15T08:00:00Z'),
+        },
+      ],
+      2,
+      'pv-0a1b2c3d-18',
+    ),
+  ).toStrictEqual(['pv-0a1b2c3d-17']);
+});
+
+test("it sleeps nothing when a contract run's imp holds the only slot", () => {
+  expect(
+    planSlotEvictions(
+      [{ name: 'pv-sdk-0123456789abcdef', state: 'running', lastActiveAt: null }],
+      1,
+      'pv-0a1b2c3d-18',
+    ),
+  ).toStrictEqual([]);
+});

@@ -1,11 +1,17 @@
 /* oxlint-disable typescript/no-unsafe-type-assertion -- each body is GitHub's documented request shape */
 import { HttpResponse, http } from 'msw';
 import { githubAPIURL } from './github-api-url.ts';
-import { composeFiles, issueComments, tokenLogin } from './github-state.ts';
+import {
+  commitStatuses,
+  composeFiles,
+  issueComments,
+  pullRequestFiles,
+  tokenLogin,
+} from './github-state.ts';
 
 // GitHub's REST endpoints that the service calls (docs.github.com/en/rest: repos/contents,
-// issues/comments, users/users), with GitHub's status codes and the fields the service reads; a
-// missing file or comment is a 404
+// issues/comments, users/users, pulls/pulls#list-pull-requests-files, commits/statuses), with
+// GitHub's status codes and the fields the service reads; a missing file or comment is a 404
 export const handlers = [
   http.get(`${githubAPIURL}/user`, () => HttpResponse.json({ login: tokenLogin, type: 'User' })),
   http.get(`${githubAPIURL}/repos/:owner/:name/contents/preview/compose.yaml`, (info) => {
@@ -71,5 +77,45 @@ export const handlers = [
     comment.body = payload.body;
 
     return HttpResponse.json({ id: comment.id, body: comment.body });
+  }),
+  http.get(`${githubAPIURL}/repos/:owner/:name/pulls/:number/files`, (info) => {
+    const url = new URL(info.request.url);
+
+    const perPage = Number(url.searchParams.get('per_page') ?? '30');
+    const page = Number(url.searchParams.get('page') ?? '1');
+    const key = `${String(info.params['owner'])}/${String(info.params['name'])}#${String(info.params['number'])}`;
+    const files = (pullRequestFiles.get(key) ?? []).slice((page - 1) * perPage, page * perPage);
+
+    return HttpResponse.json(files);
+  }),
+  http.post(`${githubAPIURL}/repos/:owner/:name/statuses/:sha`, async (info) => {
+    const payload = (await info.request.json()) as {
+      readonly state: string;
+      readonly context?: string;
+      readonly description?: string;
+    };
+
+    // GitHub answers 422 for a state outside its four and a description past 140 characters
+    if (
+      !['error', 'failure', 'pending', 'success'].includes(payload.state) ||
+      (payload.description ?? '').length > 140
+    ) {
+      return HttpResponse.json({ message: 'Validation Failed', status: '422' }, { status: 422 });
+    }
+
+    const status = {
+      repo: `${String(info.params['owner'])}/${String(info.params['name'])}`,
+      sha: String(info.params['sha']),
+      state: payload.state,
+      context: payload.context ?? 'default',
+      description: payload.description ?? '',
+    };
+
+    commitStatuses.push(status);
+
+    return HttpResponse.json(
+      { state: status.state, context: status.context, description: status.description },
+      { status: 201 },
+    );
   }),
 ];

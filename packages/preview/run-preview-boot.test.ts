@@ -49,12 +49,14 @@ async function setupTest() {
 
       // half an hour bounds the build, the first argument of its timeout
       buildTimeoutMs: 1_800_000,
+      contract: null,
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
+    pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
     now: () => new Date(clock.now),
     sleep: (ms) => {

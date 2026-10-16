@@ -26,6 +26,36 @@ export interface PhaseChange {
   readonly detail?: string;
 }
 
+// queued: claimed and not yet started; waiting: the preview slots were full, and the commit status
+// says so; running: the suite runs in its imp; settling: the result waits for the imp's removal and
+// its commit status; passed and failed: the commit status holds the result
+type ContractPhase = 'queued' | 'waiting' | 'running' | 'settling' | 'passed' | 'failed';
+
+// the state of the commit status that a run's result sets
+export type ContractOutcome = 'success' | 'failure' | 'error';
+
+export interface ContractRunKey {
+  // owner/name of the repository the pull request targets
+  readonly repo: string;
+  readonly headSHA: string;
+}
+
+export interface ContractRun extends ContractRunKey {
+  readonly number: number;
+  readonly imp: string;
+  readonly phase: ContractPhase;
+  readonly detail: string | null;
+
+  // the result's status, from settling on
+  readonly outcome: ContractOutcome | null;
+}
+
+interface ContractPhaseChange {
+  readonly phase: ContractPhase;
+  readonly detail?: string;
+  readonly outcome?: ContractOutcome;
+}
+
 interface PreviewHead extends PreviewKey {
   readonly imp: string;
   readonly headSHA: string;
@@ -48,6 +78,25 @@ export interface PreviewStore {
   // fails every boot a stopped process left in `booting`, so its next open retries it; returns
   // how many it failed
   readonly updateInterruptedBoots: () => number;
+
+  // records a queued run of the SDK contract suite for a head commit, and reports whether this
+  // call recorded it, so a commit runs the suite once however many deliveries name it
+  readonly claimContractRun: (run: Omit<ContractRun, 'phase' | 'detail' | 'outcome'>) => boolean;
+  readonly findContractRun: (key: ContractRunKey) => ContractRun | null;
+
+  // the runs at one of `phases`, oldest claim first
+  readonly collectContractRuns: (phases: readonly ContractPhase[]) => ContractRun[];
+
+  // moves the run to `to` only while it stands at one of `from`, and reports whether it moved
+  readonly updateContractPhase: (
+    key: ContractRunKey,
+    from: readonly ContractPhase[],
+    to: ContractPhaseChange,
+  ) => boolean;
+
+  // queues again every run a stopped process left in `running`, so the next retry starts it over;
+  // returns how many it queued
+  readonly updateInterruptedContractRuns: () => number;
   readonly close: () => void;
 }
 
@@ -77,6 +126,7 @@ export function createPreviewStore(path: string): PreviewStore {
   const db = new Database(path, { create: true, strict: true });
 
   createPreviewsTable(db);
+  createContractRunsTable(db);
 
   const select = db.query<PreviewRow, [string, number]>(
     'SELECT * FROM previews WHERE repo = ?1 AND number = ?2',
@@ -113,6 +163,7 @@ export function createPreviewStore(path: string): PreviewStore {
       return result.changes === 1;
     },
     updateInterruptedBoots: () => updateInterruptedBoots(db),
+    ...buildContractRunMethods(db),
     close: () => {
       db.close();
     },
@@ -140,6 +191,89 @@ function createPreviewsTable(db: Database): void {
     detail TEXT,
     PRIMARY KEY (repo, number)
   ) STRICT`);
+}
+
+function createContractRunsTable(db: Database): void {
+  db.run(`CREATE TABLE IF NOT EXISTS contract_runs (
+    repo TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    imp TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    detail TEXT,
+    outcome TEXT,
+    PRIMARY KEY (repo, head_sha)
+  ) STRICT`);
+}
+
+interface ContractRunRow {
+  readonly repo: string;
+  readonly head_sha: string;
+  readonly number: number;
+  readonly imp: string;
+  readonly phase: ContractPhase;
+  readonly detail: string | null;
+  readonly outcome: ContractOutcome | null;
+}
+
+type ContractRunMethods = Pick<
+  PreviewStore,
+  | 'claimContractRun'
+  | 'findContractRun'
+  | 'collectContractRuns'
+  | 'updateContractPhase'
+  | 'updateInterruptedContractRuns'
+>;
+
+function buildContractRunMethods(db: Database): ContractRunMethods {
+  const claim = db.query(`INSERT INTO contract_runs (repo, head_sha, number, imp, phase)
+    VALUES (?1, ?2, ?3, ?4, 'queued') ON CONFLICT (repo, head_sha) DO NOTHING`);
+
+  const select = db.query<ContractRunRow, [string, string]>(
+    'SELECT * FROM contract_runs WHERE repo = ?1 AND head_sha = ?2',
+  );
+
+  const selectByPhase = db.query<ContractRunRow, [string]>(
+    'SELECT * FROM contract_runs WHERE phase IN (SELECT value FROM json_each(?1)) ORDER BY rowid',
+  );
+
+  const update = db.query(`UPDATE contract_runs SET phase = ?3, detail = ?4, outcome = ?5
+    WHERE repo = ?1 AND head_sha = ?2 AND phase IN (SELECT value FROM json_each(?6))`);
+
+  return {
+    claimContractRun: (run) => claim.run(run.repo, run.headSHA, run.number, run.imp).changes === 1,
+    findContractRun: (key) => {
+      const row = select.get(key.repo, key.headSHA);
+
+      return row === null ? null : toContractRun(row);
+    },
+    collectContractRuns: (phases) =>
+      selectByPhase.all(JSON.stringify(phases)).map((row) => toContractRun(row)),
+    updateContractPhase: (key, from, to) => {
+      const detail = to.detail ?? null;
+      const outcome = to.outcome ?? null;
+
+      return (
+        update.run(key.repo, key.headSHA, to.phase, detail, outcome, JSON.stringify(from))
+          .changes === 1
+      );
+    },
+    updateInterruptedContractRuns: () =>
+      db.run(`UPDATE contract_runs SET phase = 'queued', detail = NULL WHERE phase = 'running'`)
+        .changes,
+  };
+}
+
+function toContractRun(row: ContractRunRow): ContractRun {
+  return {
+    repo: row.repo,
+    headSHA: row.head_sha,
+    number: row.number,
+    imp: row.imp,
+    phase: row.phase,
+    detail: row.detail,
+    outcome: row.outcome,
+  };
 }
 
 function toPreview(row: PreviewRow): Preview {

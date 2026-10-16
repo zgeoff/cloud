@@ -5,6 +5,26 @@ export interface GitHubClient {
 
   // posts the pull request's preview comment, or edits it in place once one exists
   readonly updatePreviewComment: (comment: PreviewComment) => Promise<void>;
+
+  // every file the pull request changes, with its diff, which GitHub leaves out of a file whose
+  // diff is too large to show
+  readonly readPullRequestFiles: (repo: string, number: number) => Promise<PullRequestFile[]>;
+
+  // sets the state of one commit status context on a commit
+  readonly updateCommitStatus: (status: CommitStatus) => Promise<void>;
+}
+
+export interface PullRequestFile {
+  readonly path: string;
+  readonly patch: string | null;
+}
+
+interface CommitStatus {
+  readonly repo: string;
+  readonly sha: string;
+  readonly context: string;
+  readonly state: 'pending' | 'success' | 'failure' | 'error';
+  readonly description: string;
 }
 
 interface PreviewComment {
@@ -53,6 +73,8 @@ export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
           })
         : send({ path: `/repos/${comment.repo}/issues/comments/${id}`, method: 'PATCH', body }));
     },
+    readPullRequestFiles: (repo, number) => readPullRequestFiles(send, repo, number),
+    updateCommitStatus: (status) => sendCommitStatus(send, status),
   };
 }
 
@@ -134,4 +156,48 @@ async function readTokenLogin(
   const user = (await response.json()) as { readonly login: string };
 
   return user.login;
+}
+
+// GitHub refuses a status whose description runs past 140 characters
+async function sendCommitStatus(
+  send: (request: GitHubRequest) => Promise<Response>,
+  status: CommitStatus,
+): Promise<void> {
+  const description = status.description.slice(0, 140);
+
+  await send({
+    path: `/repos/${status.repo}/statuses/${status.sha}`,
+    method: 'POST',
+    body: JSON.stringify({ state: status.state, context: status.context, description }),
+  });
+}
+
+interface PullRequestFileEntry {
+  readonly filename: string;
+  readonly patch?: string;
+}
+
+// Pages through the pull request's files, a hundred at a time, until a short page
+async function readPullRequestFiles(
+  send: (request: GitHubRequest) => Promise<Response>,
+  repo: string,
+  number: number,
+): Promise<PullRequestFile[]> {
+  const files: PullRequestFile[] = [];
+
+  for (let page = 1; ; page += 1) {
+    const path = `/repos/${repo}/pulls/${number}/files?per_page=100&page=${page}`;
+
+    // oxlint-disable-next-line no-await-in-loop -- each page follows the one before it
+    const response = await send({ path });
+
+    // oxlint-disable-next-line no-await-in-loop, typescript/no-unsafe-type-assertion -- the same page, in GitHub's pull request files shape
+    const entries = (await response.json()) as readonly PullRequestFileEntry[];
+
+    files.push(...entries.map((entry) => ({ path: entry.filename, patch: entry.patch ?? null })));
+
+    if (entries.length < 100) {
+      return files;
+    }
+  }
 }

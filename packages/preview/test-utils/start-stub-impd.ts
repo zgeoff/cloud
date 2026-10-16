@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines-per-function, max-statements, typescript/no-unsafe-type-assertion */
+/* oxlint-disable max-lines, max-lines-per-function, max-statements, typescript/no-unsafe-type-assertion */
 import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { http, passthrough } from 'msw';
@@ -29,6 +29,7 @@ interface StubCommand {
 interface StubCommandAnswer {
   readonly code: number | null;
   readonly stdout?: string;
+  readonly hold?: boolean;
 }
 
 export interface StubImpd {
@@ -46,6 +47,10 @@ export interface StubImpd {
   // every procedure call, as `<router>/<procedure> <name>`, in order
   readonly calls: string[];
   readonly commands: StubCommand[];
+
+  // the sockets of held commands, by imp: a held command never exits, and the destroy of its imp
+  // closes its socket without an exit, as the end of the guest ends the exec
+  readonly held: Map<string, ServerWebSocket<ExecSocketData>[]>;
   answerCommand: (command: StubCommand) => StubCommandAnswer;
 }
 
@@ -65,6 +70,7 @@ export function startStubImpd(): StubImpd {
     proxied: [],
     calls: [],
     commands: [],
+    held: new Map(),
     answerCommand: () => ({ code: 0 }),
   };
 
@@ -177,6 +183,10 @@ function buildProcedureResponse(
     case 'imps/destroy': {
       stub.imps.delete(name);
 
+      for (const socket of stub.held.get(name) ?? []) {
+        socket.close();
+      }
+
       return buildRPCResult({});
     }
 
@@ -274,6 +284,12 @@ function runStubCommand(
 
     frame.set(text, 1);
     socket.send(frame);
+  }
+
+  if (answer.hold === true) {
+    stub.held.set(imp.name, [...(stub.held.get(imp.name) ?? []), socket]);
+
+    return;
   }
 
   socket.send(
