@@ -3,8 +3,9 @@
 A restore drill proves that geoff.cloud's backups restore on a machine other than geoffcloud, and
 measures how long each restore takes. It runs on one scratch Onidel VM, which only reads the backups
 and is destroyed at the end, pass or fail. [Restore geoff.cloud](./restore-geoff-cloud.md) gives the
-restores on the live host; this runbook rehearses three of them away from it: an impd database copy,
-hq from its off-PC backup, and a root-disk snapshot.
+restores on the live host; this runbook rehearses an impd database copy and hq from its off-PC
+backup away from it. A root-disk snapshot restore is described but **untested**: no drill has run
+one.
 
 **CAUTION:** Every step reads geoffcloud, its snapshots and the backup repositories, and never
 writes to them. Use `--no-lock` on every restic command, because a lock is a write to the
@@ -46,20 +47,36 @@ snapshot restore needs a monthly VM (see
    sqlite3 -readonly imp.sqlite 'SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1;'
    ```
 
-   Expect `ok`, and the migration in the `lastMigration` line of `COPY-INFO`. The copy's `sha256sum`
-   matches the host's file.
+   Expect `ok`, and the migration in the `lastMigration` line of `COPY-INFO`.
+
+3. Compare the copy's checksum with the host's file. Expect the same hash from both:
+
+   ```bash
+   ssh root@geoffcloud sha256sum /root/imp-db-backups/<copy>/imp.sqlite
+   ssh root@<scratch_vm> sha256sum /root/restore/impd/<copy>/imp.sqlite
+   ```
 
 ## Restore hq from its off-PC backup
 
 hq backs up to its own restic repository at the `hq/` prefix of nixie's R2 bucket. The vault item
 `hq-restic` holds its password, and `r2-nixie-backup` holds the R2 key that reads it; the
 `r2-backups` key gets `Access Denied` there. Send the four values to the VM on SSH's stdin, never on
-a command line, then restore the newest snapshot on the scratch VM:
+a command line: the workstation writes them as `export` lines ahead of the restore steps, and the VM
+runs the whole stream with `bash -s`. `printf %q` quotes each value, and nothing prints it.
 
 ```bash
+{
+  printf 'export RESTIC_PASSWORD=%q\n' "$(op read op://cloud/hq-restic/password)"
+  printf 'export AWS_ACCESS_KEY_ID=%q\n' "$(op read op://cloud/r2-nixie-backup/access-key-id)"
+  printf 'export AWS_SECRET_ACCESS_KEY=%q\n' "$(op read op://cloud/r2-nixie-backup/secret-access-key)"
+  printf 'export RESTIC_REPOSITORY=%q\n' "s3:$(op read op://cloud/r2-nixie-backup/endpoint)/geoff-cloud-nixie/hq"
+  cat <<'STEPS'
+export AWS_DEFAULT_REGION=auto
 restic --no-lock snapshots --latest 1
-restic --no-lock restore <snapshot_id> --target /root/restore/hq
-sqlite3 -readonly <restored hq.db> 'PRAGMA integrity_check;'
+restic --no-lock restore latest --target /root/restore/hq
+sqlite3 -readonly "$(find /root/restore/hq -name hq.db | head -1)" 'PRAGMA integrity_check;'
+STEPS
+} | ssh root@<scratch_vm> 'bash -s'
 ```
 
 Expect restic's `Summary: Restored <n> files/dirs`, and `ok` from the integrity check.
@@ -73,8 +90,11 @@ file format and size are not documented.
 
 **CAUTION:** A VM restored from geoffcloud's snapshot boots as geoffcloud: the same static address,
 Tailscale identity, cloudflared tunnel and k3s backup jobs. In Melbourne it could share the live
-host's network and claim its address. Restore it in another location, where that address has no
-route, so no connection from the clone completes.
+host's network and claim its address, so restore it in another location. **Untested:** whether the
+clone's outbound traffic stays contained there. Its static address has no route back to it, so a
+reply should go to the live host, but no drill has checked that. Contain a clone before its services
+reach the network: disable Tailscale, cloudflared and k3s on the restored disk from a rescue boot
+first.
 
 ## Destroy the VM
 
