@@ -1205,7 +1205,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker prints impd's images for an image list, and records the call";
+      title = "it buildStubImpHostDocker prints the impd images for an image list, and records the call";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
@@ -1305,7 +1305,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker refuses to run without impd's state directory";
+      title = "it buildStubImpHostDocker refuses to run without the impd state directory";
       script = ''
         mkdir home tmp
 

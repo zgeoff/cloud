@@ -266,7 +266,7 @@ let
       '';
     }
     {
-      title = "it adds the pinned image under the preview imps' image name when impd holds no image of that name, and leaves impd's other images alone";
+      title = "it adds the pinned image under the preview image name when impd holds no image of that name, and leaves the other impd images alone";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/imp-base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
@@ -362,7 +362,7 @@ let
       '';
     }
     {
-      title = "it fails with docker's last error when impd does not answer in its tries";
+      title = "it fails with the last docker error when impd does not answer in its tries";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -385,7 +385,7 @@ let
       '';
     }
     {
-      title = "it fails with impz's error when the add fails";
+      title = "it fails with the impz error when the add fails";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
