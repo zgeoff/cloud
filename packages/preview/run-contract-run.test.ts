@@ -3,6 +3,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { HttpResponse, http } from 'msw';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -10,6 +11,7 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { commitStatuses } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
+import { server } from './mocks/node.ts';
 import { runContractRun } from './run-contract-run.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
@@ -413,10 +415,27 @@ test('it posts an error status when impd refuses to start the imp', async () => 
     imp: 'pv-sdk-0123456789abcdef',
   });
 
-  await runContractRun(
-    { ...ctx.deps, impd: buildImpdClient(ctx.impd.url, 'imp_wrong.token', NativeWebSocket) },
-    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  // impd's oRPC error body for a create that its memory budget refuses
+  server.use(
+    http.post(`${ctx.impd.url}/rpc/imps/create`, () =>
+      HttpResponse.json(
+        {
+          json: {
+            defined: true,
+            code: 'INSUFFICIENT_MEMORY',
+            status: 507,
+            message: 'the memory budget is spent',
+          },
+        },
+        { status: 507 },
+      ),
+    ),
   );
+
+  await runContractRun(ctx.deps, {
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
 
   expect(commitStatuses).toStrictEqual([
     {
@@ -424,7 +443,142 @@ test('it posts an error status when impd refuses to start the imp', async () => 
       sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       state: 'error',
       context: 'sdk-contract',
-      description: "The run's imp did not start: impd UNAUTHORIZED: missing or wrong token",
+      description:
+        "The run's imp did not start: impd INSUFFICIENT_MEMORY: the memory budget is spent",
+    },
+  ]);
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('failed');
+});
+
+test('it keeps the result settling when GitHub refuses the final status', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
+
+  // GitHub's answer to a status while it is down, for every status but the pending ones
+  server.use(
+    http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, async (info) => {
+      const payload = (await info.request.clone().json()) as { readonly state: string };
+
+      return payload.state === 'pending'
+        ? undefined
+        : HttpResponse.json({ message: 'Server Error' }, { status: 502 });
+    }),
+  );
+
+  await runContractRun(ctx.deps, {
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+  ).toMatchObject({ phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' });
+
+  expect(commitStatuses.map((status) => status.state)).toStrictEqual(['pending']);
+});
+
+test('it keeps the result settling and the status unset when impd fails to remove the imp', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+    name: 'pv-sdk-0123456789abcdef',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 8080,
+    image: 'pv-base',
+    memoryMib: 4096,
+    backup: false,
+    grants: ['model-haiku', 'gh'],
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' },
+  );
+
+  await runContractRun(
+    { ...ctx.deps, impd: buildImpdClient(ctx.impd.url, 'imp_wrong.token', NativeWebSocket) },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
+
+  expect(ctx.impd.imps.has('pv-sdk-0123456789abcdef')).toBeTrue();
+  expect(commitStatuses).toStrictEqual([]);
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('settling');
+});
+
+test('it settles a settling run on its next try: removes the imp, posts the stored result, and ends it', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+    name: 'pv-sdk-0123456789abcdef',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 8080,
+    image: 'pv-base',
+    memoryMib: 4096,
+    backup: false,
+    grants: ['model-haiku', 'gh'],
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' },
+  );
+
+  await runContractRun(ctx.deps, {
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  expect(ctx.impd.imps.has('pv-sdk-0123456789abcdef')).toBeFalse();
+  expect(ctx.impd.commands).toStrictEqual([]);
+
+  expect(commitStatuses).toStrictEqual([
+    {
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      state: 'failure',
+      context: 'sdk-contract',
+      description: '15 pass, 3 fail',
     },
   ]);
 

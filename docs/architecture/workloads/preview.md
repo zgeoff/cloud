@@ -167,8 +167,11 @@ runs the suite once however many deliveries name it, and each push to a new head
 3. A guest command installs Bun's pinned build, checked against its sha256, since imp's base image
    lacks Bun. It fetches the head commit, installs the dependencies from the lockfile, and runs the
    suite. impd starts the command only when the broker reaches the guest.
-4. The service removes the imp, then sets the status to success or failure with the suite's pass and
-   fail counts. A failure to start the imp sets an error status instead.
+4. The service records the result, removes the imp, and then sets the status to success or failure
+   with the suite's pass and fail counts. A failure to start the imp sets an error status instead.
+   The record keeps the result until impd removes the imp and GitHub takes the status, and the
+   sweep's timer retries either step that fails. A leftover imp therefore never holds a slot for
+   good, and a status never stays pending after its run ends.
 
 The guest's `timeout` bounds the whole run, and a deadline on the host backs it for a guest that
 never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A

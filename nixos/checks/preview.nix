@@ -541,6 +541,7 @@ let
         ./render-preview-page.ts
         ./run-contract-retries.ts
         ./run-contract-run.ts
+        ./run-contract-suite.ts
         ./run-idle-sweep.ts
         ./run-preview-boot.ts
         ./start-contract-run.ts

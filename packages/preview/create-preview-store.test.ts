@@ -251,7 +251,32 @@ test('#claimContractRun records a queued run for a head commit and reports the c
     imp: 'pv-sdk-0123456789abcdef',
     phase: 'queued',
     detail: null,
+    outcome: null,
   });
+});
+
+test("#updateContractPhase records a settling run's result beside its phase", async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' },
+  );
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+  ).toMatchObject({ phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' });
 });
 
 test('#claimContractRun refuses a second claim of one head commit and keeps the first run', async () => {

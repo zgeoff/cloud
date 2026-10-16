@@ -1,17 +1,20 @@
 import { buildContractStatus } from './build-contract-status.ts';
-import type { ContractRun, ContractRunKey } from './create-preview-store.ts';
+import type { ContractOutcome, ContractRun, ContractRunKey } from './create-preview-store.ts';
+import { runContractSuite } from './run-contract-suite.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
 // The commit status context that each run sets on its head commit
 export const contractStatusContext = 'sdk-contract';
 
 // One try at a claimed run of the SDK contract suite: with a free preview slot, it runs the suite
-// in a new imp at the head commit, sets the commit status to the result, and removes the imp.
+// in a new imp at the head commit, removes the imp, and sets the commit status to the result.
 // With every slot taken, the run waits, and the next retry tries it again.
 export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
   const contract = deps.settings.contract;
 
-  if (contract === null) {
+  if (contract === null || deps.store.findContractRun(key)?.phase === 'settling') {
+    await trySettleContractRun(deps, key);
+
     return;
   }
 
@@ -29,26 +32,56 @@ export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Pr
 }
 
 interface Status {
-  readonly state: 'pending' | 'success' | 'failure' | 'error';
+  readonly state: 'pending' | ContractOutcome;
   readonly description: string;
 }
 
-// The imp goes before the status says the run ended, so a run whose status reads done holds no imp
+// The result waits in the store until the imp is gone and GitHub holds the status, so a refused
+// removal or status leaves the run settling, and the next retry settles it again
 async function applyContractStatus(
   deps: PreviewDeps,
   run: ContractRun,
-  status: Status,
+  status: Status & { readonly state: ContractOutcome },
 ): Promise<void> {
-  await tryRemoveImp(deps, run.imp);
-
   deps.store.updateContractPhase(run, ['queued', 'waiting', 'running'], {
-    phase: status.state === 'success' ? 'passed' : 'failed',
+    phase: 'settling',
     detail: status.description,
+    outcome: status.state,
   });
 
-  await sendContractStatus(deps, run, status);
+  await trySettleContractRun(deps, run);
+}
 
-  deps.log(`${run.repo}@${run.headSHA}: the SDK contract run ended: ${status.description}`);
+// The imp goes before the status says the run ended, so a run whose status reads done holds no imp
+async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
+  const run = deps.store.findContractRun(key);
+
+  if (run?.phase !== 'settling' || run.outcome === null) {
+    return;
+  }
+
+  const ended = {
+    phase: run.outcome === 'success' ? 'passed' : 'failed',
+    detail: run.detail ?? '',
+    outcome: run.outcome,
+  } as const;
+
+  try {
+    await removeContractImp(deps, run.imp);
+
+    await deps.github.updateCommitStatus({
+      repo: run.repo,
+      sha: run.headSHA,
+      context: contractStatusContext,
+      state: run.outcome,
+      description: ended.detail,
+    });
+
+    deps.store.updateContractPhase(run, ['settling'], ended);
+    deps.log(`${run.repo}@${run.headSHA}: the SDK contract run ended: ${ended.detail}`);
+  } catch (error) {
+    deps.log(`${run.repo}@${run.headSHA}: the next retry settles the run: ${String(error)}`);
+  }
 }
 
 // The run's imp, started, or null when the run is not this try's to start or every slot is taken.
@@ -152,115 +185,14 @@ async function createContractImp(
   }
 }
 
-// Bun's linux-x64 build from its npm package, because imp's base image has tar but no unzip for the
-// release zip. It is the version the suite's repository names as its package manager, and the
-// sha256 is the tarball's own, which matches npm's published integrity.
-const bunURL = 'https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.2.tgz';
-const bunSHA256 = '0c75e0b94e9d56cece77abb7d03e9995b47b79506df5dcca3046eeb888db5934';
+async function removeContractImp(deps: PreviewDeps, imp: string): Promise<void> {
+  const existing = await deps.impd.findImp(imp);
 
-// The guest script takes the repository and the commit as arguments, never inside its text. Each
-// run's imp is new, so the script installs Bun and the dependencies every time.
-const contractScript = `set -eu
-mkdir -p /opt/bun/bin /srv/sdk-contract
-curl -fsSL -o /opt/bun/bun.tgz ${bunURL}
-echo "${bunSHA256}  /opt/bun/bun.tgz" | sha256sum -c - >/dev/null
-tar -xzf /opt/bun/bun.tgz -C /opt/bun/bin --strip-components=2 package/bin/bun
-export PATH="/opt/bun/bin:$PATH"
-cd /srv/sdk-contract
-git init -q
-git remote add origin "https://github.com/$1.git"
-git fetch -q --depth 1 origin "$2"
-git checkout -q --force FETCH_HEAD
-bun install --frozen-lockfile
-NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract
-`;
-
-// The guest holds this where the CLI reads its credential, and the model secret's grant replaces
-// the authorization header on each request to the model's API
-const modelPlaceholder = 'imp-broker-placeholder';
-
-// How long past the guest's own bound the host waits: the guest's kill after its bound, and the
-// time impd takes to report the exit
-const deadlineGraceMs = 90_000;
-
-interface CommandResult {
-  readonly code: number | null;
-  readonly output: string;
+  await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
 }
 
-// The guest's `timeout` bounds the run, and the host's deadline backs it for a guest that never
-// reports an exit. The run's imp goes after either, which ends the command's socket.
-async function runContractSuite(
-  deps: PreviewDeps,
-  contract: ContractSettings,
-  run: ContractRun,
-): Promise<CommandResult | null> {
-  const seconds = String(Math.ceil(contract.timeoutMs / 1000));
-
-  const argv = [
-    'timeout',
-    '--kill-after=30',
-    seconds,
-    'env',
-    `ANTHROPIC_AUTH_TOKEN=${modelPlaceholder}`,
-  ];
-
-  const result = await Promise.race([
-    tryRunGuestCommand(deps, run.imp, [
-      ...argv,
-      'sh',
-      '-c',
-      contractScript,
-      'sdk-contract',
-      run.repo,
-      run.headSHA,
-    ]),
-    waitForDeadline(deps, contract.timeoutMs + deadlineGraceMs),
-  ]);
-
-  if (result !== null) {
-    deps.log(
-      `${run.repo}@${run.headSHA}: the SDK contract suite's output:\n${result.output.slice(-4000)}`,
-    );
-  }
-
-  return result;
-}
-
-// impd refuses to start the command unless the broker reaches the guest, so the suite never runs
-// without its model route. An exec that breaks reads as a command that a signal ended.
-async function tryRunGuestCommand(
-  deps: PreviewDeps,
-  imp: string,
-  argv: readonly string[],
-): Promise<CommandResult> {
-  try {
-    return await deps.impd.runCommand(imp, argv, { requireBroker: true });
-  } catch (error) {
-    return {
-      code: null,
-      output: `the exec failed: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-async function waitForDeadline(deps: PreviewDeps, ms: number): Promise<null> {
-  await deps.sleep(ms);
-
-  return null;
-}
-
-async function tryRemoveImp(deps: PreviewDeps, imp: string): Promise<void> {
-  try {
-    const existing = await deps.impd.findImp(imp);
-
-    await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
-  } catch (error) {
-    deps.log(`${imp}: the run's imp was not removed: ${String(error)}`);
-  }
-}
-
-// A status that GitHub refuses is logged, and the run goes on, since the suite's result stands
+// A pending status that GitHub refuses is logged, and the run goes on, since the result's status
+// replaces it
 async function sendContractStatus(
   deps: PreviewDeps,
   run: ContractRun,

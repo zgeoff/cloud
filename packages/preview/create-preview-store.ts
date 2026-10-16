@@ -27,8 +27,12 @@ export interface PhaseChange {
 }
 
 // queued: claimed and not yet started; waiting: the preview slots were full, and the commit status
-// says so; running: the suite runs in its imp; passed and failed: the commit status holds the result
-type ContractPhase = 'queued' | 'waiting' | 'running' | 'passed' | 'failed';
+// says so; running: the suite runs in its imp; settling: the result waits for the imp's removal and
+// its commit status; passed and failed: the commit status holds the result
+type ContractPhase = 'queued' | 'waiting' | 'running' | 'settling' | 'passed' | 'failed';
+
+// the state of the commit status that a run's result sets
+export type ContractOutcome = 'success' | 'failure' | 'error';
 
 export interface ContractRunKey {
   // owner/name of the repository the pull request targets
@@ -41,11 +45,15 @@ export interface ContractRun extends ContractRunKey {
   readonly imp: string;
   readonly phase: ContractPhase;
   readonly detail: string | null;
+
+  // the result's status, from settling on
+  readonly outcome: ContractOutcome | null;
 }
 
 interface ContractPhaseChange {
   readonly phase: ContractPhase;
   readonly detail?: string;
+  readonly outcome?: ContractOutcome;
 }
 
 interface PreviewHead extends PreviewKey {
@@ -73,7 +81,7 @@ export interface PreviewStore {
 
   // records a queued run of the SDK contract suite for a head commit, and reports whether this
   // call recorded it, so a commit runs the suite once however many deliveries name it
-  readonly claimContractRun: (run: Omit<ContractRun, 'phase' | 'detail'>) => boolean;
+  readonly claimContractRun: (run: Omit<ContractRun, 'phase' | 'detail' | 'outcome'>) => boolean;
   readonly findContractRun: (key: ContractRunKey) => ContractRun | null;
 
   // the runs at one of `phases`, oldest claim first
@@ -193,6 +201,7 @@ function createContractRunsTable(db: Database): void {
     imp TEXT NOT NULL,
     phase TEXT NOT NULL,
     detail TEXT,
+    outcome TEXT,
     PRIMARY KEY (repo, head_sha)
   ) STRICT`);
 }
@@ -204,6 +213,7 @@ interface ContractRunRow {
   readonly imp: string;
   readonly phase: ContractPhase;
   readonly detail: string | null;
+  readonly outcome: ContractOutcome | null;
 }
 
 type ContractRunMethods = Pick<
@@ -227,8 +237,8 @@ function buildContractRunMethods(db: Database): ContractRunMethods {
     'SELECT * FROM contract_runs WHERE phase IN (SELECT value FROM json_each(?1)) ORDER BY rowid',
   );
 
-  const update = db.query(`UPDATE contract_runs SET phase = ?3, detail = ?4
-    WHERE repo = ?1 AND head_sha = ?2 AND phase IN (SELECT value FROM json_each(?5))`);
+  const update = db.query(`UPDATE contract_runs SET phase = ?3, detail = ?4, outcome = ?5
+    WHERE repo = ?1 AND head_sha = ?2 AND phase IN (SELECT value FROM json_each(?6))`);
 
   return {
     claimContractRun: (run) => claim.run(run.repo, run.headSHA, run.number, run.imp).changes === 1,
@@ -239,9 +249,15 @@ function buildContractRunMethods(db: Database): ContractRunMethods {
     },
     collectContractRuns: (phases) =>
       selectByPhase.all(JSON.stringify(phases)).map((row) => toContractRun(row)),
-    updateContractPhase: (key, from, to) =>
-      update.run(key.repo, key.headSHA, to.phase, to.detail ?? null, JSON.stringify(from))
-        .changes === 1,
+    updateContractPhase: (key, from, to) => {
+      const detail = to.detail ?? null;
+      const outcome = to.outcome ?? null;
+
+      return (
+        update.run(key.repo, key.headSHA, to.phase, detail, outcome, JSON.stringify(from))
+          .changes === 1
+      );
+    },
     updateInterruptedContractRuns: () =>
       db.run(`UPDATE contract_runs SET phase = 'queued', detail = NULL WHERE phase = 'running'`)
         .changes,
@@ -256,6 +272,7 @@ function toContractRun(row: ContractRunRow): ContractRun {
     imp: row.imp,
     phase: row.phase,
     detail: row.detail,
+    outcome: row.outcome,
   };
 }
 
