@@ -456,6 +456,53 @@ test('it posts an error status when impd refuses to start the imp', async () => 
   ).toBe('failed');
 });
 
+test('it ends a queued run with an error and removes its imp once the contract settings are gone', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
+    name: 'pv-sdk-0123456789abcdef',
+    state: 'running',
+    lastActiveAt: null,
+    httpPort: 8080,
+    image: 'pv-base',
+    memoryMib: 4096,
+    backup: false,
+    grants: ['model-haiku', 'gh'],
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  await runContractRun(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, contract: null } },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
+
+  expect(ctx.impd.imps.has('pv-sdk-0123456789abcdef')).toBeFalse();
+  expect(ctx.impd.commands).toStrictEqual([]);
+
+  expect(commitStatuses).toStrictEqual([
+    {
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      state: 'error',
+      context: 'sdk-contract',
+      description: 'The SDK contract run is off on this service',
+    },
+  ]);
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('failed');
+});
+
 test('it keeps the result settling when GitHub refuses the final status', async () => {
   const ctx = await setupTest();
 

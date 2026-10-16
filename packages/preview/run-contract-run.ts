@@ -13,7 +13,7 @@ export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Pr
   const contract = deps.settings.contract;
 
   if (contract === null || deps.store.findContractRun(key)?.phase === 'settling') {
-    await trySettleContractRun(deps, key);
+    await (contract === null ? stopContractRun(deps, key) : trySettleContractRun(deps, key));
 
     return;
   }
@@ -29,6 +29,18 @@ export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Pr
   const result = await runContractSuite(deps, contract, run);
 
   await applyContractStatus(deps, run, buildContractStatus(result, contract.timeoutMs));
+}
+
+// A service whose contract settings are gone runs no suite, so a run it still holds, such as one a
+// stop left queued, ends with an error status, and its imp goes like any settled run's
+async function stopContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
+  deps.store.updateContractPhase(key, ['queued', 'waiting', 'running'], {
+    phase: 'settling',
+    detail: 'The SDK contract run is off on this service',
+    outcome: 'error',
+  });
+
+  await trySettleContractRun(deps, key);
 }
 
 interface Status {

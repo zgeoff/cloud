@@ -177,7 +177,9 @@ The guest's `timeout` bounds the whole run, and a deadline on the host backs it 
 never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A
 run's imp holds a slot like a preview's, but neither the slot rule nor the idle sweep puts it to
 sleep, because its suite would stop halfway, so a preview that opens meanwhile runs beside it. A run
-that a stopped service left behind starts over at the next start's first retry, on a fresh imp.
+that a stopped service left behind starts over at the next start's first retry, on a fresh imp. A
+service started without contract settings runs no suite, so the retry ends each run it still holds
+with an error status and removes its imp.
 
 ## State
 
