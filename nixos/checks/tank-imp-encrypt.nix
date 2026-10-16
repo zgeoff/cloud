@@ -13,7 +13,8 @@
 # planReclaimStep (zfs-reclaim.ts). Last, it reboots into the encrypted dataset with its key and
 # then without it. The stand-in imp-host is busybox that only sleeps (build-stub-imp-host-image.nix),
 # loaded from its archive in place of a pull, so the writer stands in for impd's database writes.
-# It needs KVM: run `bun run test:nixos tank-imp-encrypt`.
+# The test utilities pass their own check (test-utils-check.nix) before the VM runs. It needs
+# KVM: run `bun run test:nixos tank-imp-encrypt`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -21,6 +22,7 @@ let
   # 64 hex characters, as keyformat=hex needs; a fixed value, never the host's key
   throwawayKey = lib.strings.replicate 8 "0f1e2d3c";
   image = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "2.1.0";
+  testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
 in
 pkgs.testers.runNixOSTest {
   name = "tank-imp-encrypt";
@@ -81,6 +83,8 @@ pkgs.testers.runNixOSTest {
     };
 
   testScript = ''
+    # the shared test utilities pass their own tests before any subtest relies on them:
+    # ${testUtilsCheck}
     key = "${throwawayKey}"
     key_url = "file:///var/lib/zfs-keys/tank.key"
     plain = "/run/booted-system/specialisation/plain/bin/switch-to-configuration test"
@@ -408,12 +412,15 @@ pkgs.testers.runNixOSTest {
         left = machine.succeed("zfs list -H -t snapshot -o name -r tank/imp | grep -c '@encrypt-' || true").strip()
         assert left == "0", f"{left} migration snapshots are left"
         steps = run_reclaim("tank/imp")
-        assert steps == [
-            ("promote", "<root>/disks/d4"),
+        # the order of independent steps is not fixed; d4 is the clone of r1@base, so only
+        # d4's promote must come before r1's destroy
+        assert sorted(steps) == [
             ("destroy", "<root>/retired/r1"),
             ("destroy", "<root>/retired/r2"),
             ("destroy", "<root>/retired/r4"),
+            ("promote", "<root>/disks/d4"),
         ], f"the reclaim ran {steps}"
+        assert steps.index(("promote", "<root>/disks/d4")) < steps.index(("destroy", "<root>/retired/r1")), f"the reclaim ran {steps}"
         retired = machine.succeed("zfs list -H -r -o name tank/imp/retired").split()
         assert retired == ["tank/imp/retired"], f"retired holds {retired}"
         snapshots = machine.succeed("zfs list -H -t snapshot -o name -r tank/imp").split()
