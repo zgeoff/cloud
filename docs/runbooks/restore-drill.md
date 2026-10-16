@@ -90,7 +90,12 @@ Drill of 2026-10-16, on a Debian 12.12 VM in Sydney, 2 vCPU, 4 GB, 40 GB:
 | ------------------ | ------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------- |
 | impd database copy | `imp-1.6.0-pre-2.0.3-20261015T214524`, 2 MB | 1.24 s  | checksum matches, `integrity_check` ok, 23 tables, newest migration `032_add_imp_oops_boot_id` |
 | hq                 | restic snapshot `f337c714`                  | 15.76 s | 3804 files and directories, 1.920 GiB, `hq.db` `integrity_check` ok, 28 tables                 |
-| root-disk snapshot | `pre-tank-cloud`, 240 GB                    | none    | not run: an hourly VM stops at 40 GB                                                           |
+| root-disk snapshot | `pre-tank-cloud`, 240 GB                    | none    | not run                                                                                        |
+
+The root-disk snapshot restore did not run. An on-demand VM caps at 40 GB and the snapshot is 240
+GB, and the owner chose neither a monthly VM nor the snapshot download. The encryption of `tank/imp`
+and the moves onto `tank/cloud` and an encrypted zvol each keep their old copy until their checks
+pass, so none of them rolls back from a root-disk snapshot.
 
 The VM lived from 11:14:22Z to 11:17:38Z, under one hourly block at A$0.0213. After the delete,
 `GET /vm/<vm_id>` returned `http 404` and `GET /vm` listed geoffcloud only.
