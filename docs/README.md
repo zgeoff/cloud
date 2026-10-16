@@ -51,6 +51,8 @@ call, the path of a change, the topology and the data.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.
+- [Restore drill](./runbooks/restore-drill.md): restore impd's database and hq on a scratch VM, with
+  their measured times, and the untested root-disk snapshot restore.
 - [atc gateway backup and restore](./runbooks/atc-gateway-backup-restore.md): back up and restore
   the gateway's state.
 - [The GHCR pull token](./runbooks/ghcr-pull-token.md): rotate the token k3s pulls the private

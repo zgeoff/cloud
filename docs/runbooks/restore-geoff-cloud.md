@@ -164,6 +164,9 @@ each subtest can leave. Run them on a machine with Docker and KVM:
 bun run test:nixos impd-restore impd-restore-saved-failures impd-restore-seams impd-restore-reset
 ```
 
+Restored away from the host, 2026-10-16: the copy `imp-1.6.0-pre-2.0.3-20261015T214524` opened on a
+scratch VM in 1.24 s ([the restore drill](./restore-drill.md#results)).
+
 Checked read-only on geoffcloud, 2026-10-04: the image the script reads from a generation's
 `imp-host.service` and the one `docker inspect` reports for the running imp-host are the same
 digest-pinned string (`imp-host:0.29.0@sha256:4e6f0cf6…`), and so is the `image` line of the copy
@@ -206,7 +209,9 @@ changes, restore the matching database copy too (section 2).
 
 ## 4. Recover the root disk
 
-**Untested.** No snapshot restore or reinstall has been rehearsed since geoffcloud went live.
+**Untested.** No snapshot restore or reinstall has been rehearsed since geoffcloud went live. A
+snapshot of the 240 GB root disk needs a VM with a disk at least that large, which an hourly Onidel
+VM cannot have ([the restore drill](./restore-drill.md#restore-a-root-disk-snapshot)).
 
 **CAUTION:** A snapshot restores `vda` only. impd's database lives on `vdb`, so a snapshot from
 before an imp upgrade brings back an older image beside a newer database, and impd refuses to start.
