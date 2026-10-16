@@ -111,8 +111,8 @@ cutover. The send runs as a transient unit, so a dropped SSH session does not st
 
 ## Cut over
 
-Every imp sleeps during the cutover, for about 5 to 15 minutes. Put the imps to sleep first, so each
-one keeps its memory.
+Every imp sleeps during the cutover, which stops imp-host for a few minutes. Put the imps to sleep
+first, so each one keeps its memory.
 
 1. From this machine, record the imps again, as in [Before you start](#before-you-start), into
    `.scratch/imps-cutover.json`, and copy impd's database once more, as in step 1 there. The copy
@@ -207,9 +207,9 @@ Run each check. If one fails, [roll back](#roll-back).
 
    Expect no output.
 
-3. Wake one imp with `impz wake <imp>`, and run a backup with `impz backup run`, both in the
-   imp-host container. Expect the imp awake in `impz ls`, and the backup run to end without an
-   error.
+3. In the imp-host container, create a test imp with `impz new`, and run a backup with
+   `impz backup run`. Expect the test imp `running`, its disk under `tank/imp`'s encryption root,
+   and the backup run to exit 0.
 
 ## End the migration
 
@@ -223,7 +223,7 @@ Run each check. If one fails, [roll back](#roll-back).
 
    Expect `0`.
 
-2. Create a test imp, remove it with `impz rm`, and list the retired datasets:
+2. Remove the test imp with `impz rm`, and list the retired datasets:
 
    ```bash
    zfs list -H -r -o name tank/imp/retired
@@ -274,13 +274,8 @@ The check needs KVM, and boots one VM:
 bun run test:nixos tank-imp-encrypt
 ```
 
-On a pool with geoffcloud's properties, it builds the dataset tree impd builds, with the commands
-impd runs: images with `@base`, disks cloned from them, checkpoints, a fork marked for deferred
-destroy, and an image retired while a disk needs it. It runs the first send while a writer changes
-the database, impd's own changes between the sends, the cutover, a rollback and a second cutover,
-and the end of the migration snapshots. On the encrypted copy it runs impd's clone, fork, promote, a
-move's send and receive, a backup's read-only clone, and the reclaim of a removed imp, with a port
-of impd's reclaim planner. It reboots with imp-dataset-key on, then without the key file.
+The check's header comment lists the scenario: impd's dataset tree, both sends, the cutover, a
+rollback, impd's own flows on the encrypted copy, and reboots with and without the key.
 
 Run of 2026-10-17, with nixpkgs and imp as `nixos/flake.lock` pins them: every subtest passed, and
 the test script took 151 s. Three of its results set the steps of this runbook:
@@ -291,3 +286,11 @@ the test script took 151 s. Three of its results set the steps of this runbook:
   cutover marked them again. Each one then went with its last clone.
 - impd's reclaim planner skipped each retired dataset until the migration snapshots went, then freed
   every one of them.
+
+## Results on geoffcloud
+
+The encryption of 2026-10-17, with impd 2.0.3, sent 101 filesystems of about 69 GB in 4 min 51 s
+while impd ran. The cutover's increment took 69 s, and imp-host stayed stopped for 1 min 42 s. All
+110 filesystems then sat under the encryption root, the trees and properties matched the plain copy,
+and no snapshot needed its deferred-destroy mark again. After the migration snapshots went, the
+reclaim freed the 6 datasets they had held in `tank/imp/retired`.
