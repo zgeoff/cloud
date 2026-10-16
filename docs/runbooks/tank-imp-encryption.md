@@ -250,7 +250,10 @@ systemctl start imp-docker-proxy imp-host
 
 To cut over again later, start at [Cut over](#cut-over) with the next snapshot name, sending
 `-I @encrypt-2 tank/imp@encrypt-3` with the same `-F -x encryption`. `-F` drops what impd wrote to
-the copy while it ran.
+the copy while it ran. That increment needs `@encrypt-2` on both copies, so it works only before
+[End the migration](#end-the-migration). After that step the copies share no snapshot: destroy the
+encrypted one with `zfs destroy -r tank/imp-new`, destroy the plain one's migration snapshots, and
+start again from [Send the first copy](#send-the-first-copy).
 
 ## After a reboot before the switch
 
