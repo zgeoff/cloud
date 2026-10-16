@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Test for create-stub-timeout.sh: the timeout stand-in runs the command after the duration and
-# passes its exit code back, logs its argv only when a case names a log, exits 124 without running
-# the command when a case expires it, as coreutils' timeout does for an ended command, and fails
-# closed on a call without a duration. The 124 case also pins that code against the real timeout.
+# passes its exit code back, logs its argv only when a case names a log, exits 124 or 137 without
+# running the command when a case expires it, as coreutils' timeout does for a command its TERM or
+# its KILL ends, and fails closed on a call without a duration. Those two cases also pin each code
+# against the real timeout.
 #
 #   bash test-support/shell/test-create-stub-timeout.sh
 # shellcheck source-path=SCRIPTDIR
@@ -25,11 +26,11 @@ it_runs_the_command_and_passes_its_exit_code_back() {
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TIMEOUT_LOG="$tree/calls" \
-    timeout 20 bash -c 'echo ran; exit 3' > "$tree/out" 2> "$tree/err" || status=$?
+    timeout -k 5 20 bash -c 'echo ran; exit 3' > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'ran'
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["timeout","20","bash","-c","echo ran; exit 3"]'
+  diff - "$tree/calls" <<< '["timeout","-k","5","20","bash","-c","echo ran; exit 3"]'
   [ "$status" = 3 ] || {
     echo "exit $status, want 3" >&2
     exit 1
@@ -67,7 +68,7 @@ it_exits_124_without_running_the_command_when_expired_as_the_real_timeout_does()
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TIMEOUT_LOG="$tree/calls" \
-    STUB_TIMEOUT_EXPIRE=1 timeout 20 bash -c "touch '$tree/ran'" > "$tree/out" 2> "$tree/err" || status=$?
+    STUB_TIMEOUT_EXPIRE=124 timeout 20 bash -c "touch '$tree/ran'" > "$tree/out" 2> "$tree/err" || status=$?
   /usr/bin/timeout 0.1 sleep 5 || real=$?
 
   diff /dev/null "$tree/out"
@@ -82,6 +83,32 @@ it_exits_124_without_running_the_command_when_expired_as_the_real_timeout_does()
   }
   [ "$status" = 124 ] || {
     echo "exit $status, want 124" >&2
+    exit 1
+  }
+}
+
+it_exits_137_without_running_the_command_when_expired_past_the_kill_as_the_real_timeout_does() {
+  local status=0 real=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_TIMEOUT_EXPIRE=137 timeout -k 5 20 bash -c "touch '$tree/ran'" > "$tree/out" 2> "$tree/err" || status=$?
+  /usr/bin/timeout -k 0.2 0.1 bash -c "trap '' TERM; exec sleep 5" || real=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  [ ! -e "$tree/ran" ] || {
+    echo "it ran the command" >&2
+    exit 1
+  }
+  [ "$real" = 137 ] || {
+    echo "the real timeout exited $real, want 137" >&2
+    exit 1
+  }
+  [ "$status" = 137 ] || {
+    echo "exit $status, want 137" >&2
     exit 1
   }
 }

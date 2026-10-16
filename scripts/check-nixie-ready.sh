@@ -23,12 +23,14 @@ tries=30
 fetch='console.log(await (await fetch("http://127.0.0.1:8080/health/ready")).text())'
 
 # read_report: prints nixie's report body, or fails with the output of a try that got none. A try
-# that hangs, such as a stalled ssh or exec stream, ends after 20 s, so the 30 tries stay bounded.
+# that hangs, such as a stalled ssh or exec stream, ends after 20 s, or 25 s for one that ignores
+# TERM, so the 30 tries stay bounded.
 read_report() {
   local status=0
-  timeout 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '$fetch'" 2>&1 ||
+  timeout -k 5 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '$fetch'" 2>&1 ||
     status=$?
-  if [ "$status" = 124 ]; then echo "the try took longer than 20 s"; fi
+  # 124 when the TERM at 20 s ends the try, 137 when the KILL 5 s later must
+  if [ "$status" = 124 ] || [ "$status" = 137 ]; then echo "the try took longer than 20 s"; fi
   return "$status"
 }
 

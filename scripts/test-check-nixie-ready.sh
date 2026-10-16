@@ -147,13 +147,34 @@ it_ends_each_try_after_20_seconds_and_fails_naming_the_hang() {
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    STUB_TIMEOUT_LOG="$tree/timeouts" STUB_TIMEOUT_EXPIRE=1 STUB_NIXIE_REPORTS="$ready" \
+    STUB_TIMEOUT_LOG="$tree/timeouts" STUB_TIMEOUT_EXPIRE=124 STUB_NIXIE_REPORTS="$ready" \
     bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'nixie is not ready after 30 tries: no report from nixie-0: the try took longer than 20 s'
   diff /dev/null "$tree/calls"
-  diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","20"] + .' <<< "$exec_call")")"
+  diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","-k","5","20"] + .' <<< "$exec_call")")"
+  diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_counts_a_try_that_the_kill_after_the_deadline_ends_as_a_hang() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TIMEOUT_LOG="$tree/timeouts" STUB_TIMEOUT_EXPIRE=137 STUB_NIXIE_REPORTS="$ready" \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'nixie is not ready after 30 tries: no report from nixie-0: the try took longer than 20 s'
+  diff /dev/null "$tree/calls"
+  diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","-k","5","20"] + .' <<< "$exec_call")")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
