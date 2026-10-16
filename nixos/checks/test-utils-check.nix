@@ -536,6 +536,29 @@ let
         stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
       in
       {
+        title = "it buildStubImpHostImage saves the layout image, its command and layers, as an archive tagged with the image name and tag";
+        script = ''
+          tar -xOf ${stubImage.archive} manifest.json > archive-manifest
+          blobs=${stubImage.layout}/blobs/sha256
+          manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
+
+          assert_equals '["ghcr.io/zgeoff/imp-host:0.28.0"]' "$(jq -c '.[0].RepoTags' archive-manifest)" "the archive's tags"
+          assert_equals 1 "$(jq 'length' archive-manifest)" "the archive's images"
+          # the same command and layers; skopeo drops the archive config's empty Env and its
+          # preferLocalBuild, which nothing reads
+          tar -xOf ${stubImage.archive} "$(jq -r '.[0].Config' archive-manifest)" \
+            | jq -S '{cmd: .config.Cmd, layers: .rootfs.diff_ids}' > archive-config
+          jq -S '{cmd: .config.Cmd, layers: .rootfs.diff_ids}' \
+            "$blobs/$(jq -r '.config.digest | ltrimstr("sha256:")' "$manifest")" > layout-config
+          assert_files_equal layout-config archive-config
+        '';
+      }
+    )
+    (
+      let
+        stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
+      in
+      {
         title = "it buildStubImpHostImage sleeps as imp-host, its imp-docker-proxy only opens the socket, and its impz info prints the version";
         script = ''
           blobs=${stubImage.layout}/blobs/sha256

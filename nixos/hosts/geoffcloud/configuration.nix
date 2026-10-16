@@ -229,6 +229,11 @@ in
     };
   };
 
+  # tank/imp, an encryption root keyed by the same file (modules/imp-dataset-key.nix,
+  # docs/runbooks/tank-imp-encryption.md): its key loads at boot, and imp-host stays stopped
+  # while it is missing, plain or locked
+  services.imp-dataset-key.enable = true;
+
   # atc's daemon for the atc gateway (docs/architecture/workloads/atc-gateway.md). The token
   # files are root-only and staged by scripts/install-atc-gateway-credentials.ts; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
