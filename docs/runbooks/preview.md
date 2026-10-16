@@ -166,3 +166,8 @@ grantable secret. A boot that times out reached `docker compose up` but never go
 health path: run
 `host_imp exec pv-<hash>-<number> -- docker compose -f /srv/preview/preview/compose.yaml ps` to see
 which service stopped.
+
+A boot whose failure says the port did not answer through impd's proxy built and started its stack,
+but nothing listens on the imp's own address. The failure quotes the proxy's last answer, such as
+`502 Nothing answers in the imp`. Publish the port on every address of the guest (`'8080:8080'`,
+never `'127.0.0.1:8080:8080'`), and make the app listen on `0.0.0.0` inside its container.

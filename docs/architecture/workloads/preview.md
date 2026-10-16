@@ -108,7 +108,10 @@ A boot runs after the link answers, so a slow build never holds a request open.
    `docker compose up` from `preview/`, waiting for each service. The fetch runs only when impd
    confirms the broker reaches it, so a private repository clones with the broker's credential and
    no key sits in the guest.
-4. The service probes the health path from inside the guest until it answers or the boot times out.
+4. The service probes the health path through the imp's own HTTPS name until it answers or the boot
+   times out. The probe takes the route of impd's proxy, which reaches the app on the imp's own
+   address and never on the guest's loopback, so an app that listens on the loopback alone fails its
+   boot instead of passing the probe and answering 502 after the redirect.
 
 A rebuild discards the old volumes, so every build seeds its data afresh, and the seed never needs
 to know whether it ran before.

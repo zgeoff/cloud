@@ -163,3 +163,30 @@ test('it runs a guest command over the exec protocol and wakes the imp', async (
 
   expect(impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
 });
+
+test("it serves impd's wake proxy under its domain through MSW", async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'sleeping',
+    lastActiveAt: null,
+    httpPort: 3000,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 3000 });
+
+  const response = await fetch('https://pv-0a1b2c3d-17.imps.example.test/healthz');
+
+  expect({ status: response.status, body: await response.text() }).toStrictEqual({
+    status: 200,
+    body: 'ok\n',
+  });
+
+  expect(impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+  expect(impd.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-17.imps.example.test/healthz']);
+});

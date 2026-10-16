@@ -3,6 +3,8 @@ import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { http, passthrough } from 'msw';
 import { server as mockServer } from '../mocks/node.ts';
+import type { StubApp } from './build-stub-proxy-response.ts';
+import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
 
 // impd's API on a loopback port over real HTTP and WebSocket: the preview service's oRPC procedures
 // in imp 1.4.4's {"json": …} envelope, and zgeoff/imp's exec-protocol.ts /exec. Tests seed imps and
@@ -34,6 +36,13 @@ export interface StubImpd {
   readonly token: string;
   readonly imps: Map<string, StubImp>;
 
+  // the domain of impd's wake proxy, which the service's impDomain setting names
+  readonly impDomain: string;
+  readonly apps: Map<string, StubApp>;
+
+  // every request through the wake proxy, as `<method> <url>`, in order
+  readonly proxied: string[];
+
   // every procedure call, as `<router>/<procedure> <name>`, in order
   readonly calls: string[];
   readonly commands: StubCommand[];
@@ -51,6 +60,9 @@ export function startStubImpd(): StubImpd {
     url: '',
     token,
     imps: new Map(),
+    impDomain: 'imps.example.test',
+    apps: new Map(),
+    proxied: [],
     calls: [],
     commands: [],
     answerCommand: () => ({ code: 0 }),
@@ -91,7 +103,10 @@ export function startStubImpd(): StubImpd {
   const url = `http://127.0.0.1:${server.port}`;
 
   // the service's fetch to the stub is real loopback traffic, which MSW lets through
-  mockServer.use(http.all(`${url}/*`, () => passthrough()));
+  mockServer.use(
+    http.all(`${url}/*`, () => passthrough()),
+    http.all(`https://*.${stub.impDomain}/*`, (info) => buildStubProxyResponse(stub, info.request)),
+  );
 
   return Object.assign(stub, { url });
 }

@@ -3,7 +3,8 @@ import type { PhaseChange, Preview } from './create-preview-store.ts';
 import type { PreviewContract } from './parse-preview-contract.ts';
 import { parsePreviewContract } from './parse-preview-contract.ts';
 import type { PreviewDeps } from './types.ts';
-import { buildHealthURL, waitForHealthy } from './wait-for-healthy.ts';
+import type { HealthResult } from './wait-for-healthy.ts';
+import { waitForHealthy } from './wait-for-healthy.ts';
 
 // Boots a preview of the pull request's head commit, or rebuilds the imp that runs an older one,
 // and leaves it `ready` or `failed`. A preview that left `booting` meanwhile, because its pull
@@ -169,16 +170,26 @@ async function waitForHealth(
   preview: Preview,
   contract: PreviewContract,
 ): Promise<PhaseChange> {
-  const healthy = await waitForHealthy(deps, {
+  const health = await waitForHealthy(deps, {
     imp: preview.imp,
     contract,
     windowMs: deps.settings.healthTimeoutMs,
   });
 
-  return healthy
+  return health.healthy
     ? { phase: 'ready', builtSHA: preview.headSHA }
     : {
         phase: 'failed',
-        detail: `${buildHealthURL(contract)} did not answer before the boot timed out`,
+        detail: formatUnreachablePort(contract, health),
       };
+}
+
+// impd's proxy reaches the app on the imp's own address, never on the guest's loopback, so the
+// detail says where the app must listen
+function formatUnreachablePort(contract: PreviewContract, health: HealthResult): string {
+  return [
+    `port ${contract.port} did not answer ${health.url} through impd's proxy before the boot timed out.`,
+    `impd's proxy last answered: ${health.lastAnswer ?? 'nothing'}`,
+    `The app must listen on 0.0.0.0:${contract.port} in the imp, not on 127.0.0.1 alone.`,
+  ].join('\n');
 }

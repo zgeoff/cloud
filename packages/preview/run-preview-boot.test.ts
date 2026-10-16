@@ -85,6 +85,9 @@ test('it creates the imp with the contract port and the grant, then builds and p
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
+  // the app listens on the imp's own address, so impd's proxy reaches it
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 3000 });
+
   await runPreviewBoot(ctx.deps, {
     repo: 'acme/greenhouse',
     number: 17,
@@ -122,22 +125,9 @@ test('it creates the imp with the contract port and the grant, then builds and p
       ],
       require: ['broker'],
     },
-    {
-      imp: 'pv-0a1b2c3d-17',
-      argv: [
-        'curl',
-        '--fail',
-        '--silent',
-        '--output',
-        '/dev/null',
-        '--max-time',
-        '5',
-        'http://127.0.0.1:3000/healthz',
-      ],
-      require: [],
-    },
   ]);
 
+  expect(ctx.impd.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-17.imps.example.test/healthz']);
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
 });
 
@@ -224,10 +214,13 @@ test('it leaves a newer head waiting, not failed, when the older head it booted 
   });
 });
 
-test('it fails the boot when the health path never answers', async () => {
+test("it fails the boot, naming the port, when the app listens on the guest's loopback alone", async () => {
   const ctx = await setupTest();
 
-  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+  composeFiles.set(
+    'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    'x-preview:\n  port: 3000\n  health: /healthz\nservices: {}\n',
+  );
 
   ctx.store.upsertHead({
     repo: 'acme/greenhouse',
@@ -238,7 +231,8 @@ test('it fails the boot when the health path never answers', async () => {
 
   ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
 
-  ctx.impd.answerCommand = (command) => ({ code: command.argv[0] === 'curl' ? 7 : 0 });
+  // the build succeeds and the app answers inside the guest, but on 127.0.0.1 only
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '127.0.0.1', port: 3000 });
 
   await runPreviewBoot(ctx.deps, {
     repo: 'acme/greenhouse',
@@ -250,12 +244,21 @@ test('it fails the boot when the health path never answers', async () => {
     detail: null,
   });
 
-  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toMatchObject({
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })).toStrictEqual({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
     phase: 'failed',
-    detail: 'http://127.0.0.1:8080/ did not answer before the boot timed out',
+    detail: [
+      "port 3000 did not answer https://pv-0a1b2c3d-17.imps.example.test/healthz through impd's proxy before the boot timed out.",
+      "impd's proxy last answered: 502 Nothing answers in the imp: pv-0a1b2c3d-17 is awake, but nothing answered on port 3000 (Unable to connect. Is the computer able to access the url?).",
+      'The app must listen on 0.0.0.0:3000 in the imp, not on 127.0.0.1 alone.',
+    ].join('\n'),
   });
 
-  expect(ctx.impd.commands.filter((command) => command.argv[0] === 'curl')).toBeArrayOfSize(3);
+  expect(ctx.impd.proxied).toBeArrayOfSize(3);
 });
 
 test('it rebuilds an existing imp in place and takes the port of the new commit', async () => {
