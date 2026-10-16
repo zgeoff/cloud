@@ -163,7 +163,9 @@ it_fails_closed_with_exit_97_on_any_other_call() {
 
 it_hands_a_logged_call_to_the_real_docker_which_fails_without_a_daemon_at_its_socket() {
   local status=0
-  tree="$(mktemp -d)"
+  # under /tmp, not $TMPDIR: the real docker meets a socket in this tree, and a socket path
+  # past 107 bytes, the most sun_path holds, makes docker 29.7.2 panic or print another error
+  tree="$(mktemp -d -p /tmp)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
 
@@ -244,7 +246,9 @@ it_never_hands_a_call_to_the_real_docker_for_a_socket_that_climbs_out_of_the_cas
 
 it_hands_a_call_to_the_real_docker_with_the_socket_path_normalised() {
   local status=0
-  tree="$(mktemp -d)"
+  # under /tmp, not $TMPDIR: the real docker meets a socket in this tree, and a socket path
+  # past 107 bytes, the most sun_path holds, makes docker 29.7.2 panic or print another error
+  tree="$(mktemp -d -p /tmp)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   mkdir "$tree/sub"
@@ -287,7 +291,9 @@ it_never_hands_a_call_to_the_real_docker_for_a_tcp_host() {
 
 it_hands_a_call_to_the_system_docker_not_one_on_the_callers_PATH() {
   local status=0
-  tree="$(mktemp -d)"
+  # under /tmp, not $TMPDIR: the real docker meets a socket in this tree, and a socket path
+  # past 107 bytes, the most sun_path holds, makes docker 29.7.2 panic or print another error
+  tree="$(mktemp -d -p /tmp)"
   trap 'rm -rf "$tree"' EXIT
   mkdir "$tree/bin" "$tree/fake" "$tree/home" "$tree/tmp"
   printf '#!/usr/bin/env bash\necho fake docker\n' > "$tree/fake/docker"

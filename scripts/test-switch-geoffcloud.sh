@@ -1113,7 +1113,9 @@ EOF
 # and 28 adds a help line and exits 125, so the case accepts either stderr with its status.
 it_never_switches_when_docker_cannot_reach_its_daemon() {
   local commit status=0
-  tree="$(mktemp -d)"
+  # under /tmp, not $TMPDIR: the real docker meets a socket in this tree, and a socket path
+  # past 107 bytes, the most sun_path holds, makes docker 29.7.2 panic or print another error
+  tree="$(mktemp -d -p /tmp)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
