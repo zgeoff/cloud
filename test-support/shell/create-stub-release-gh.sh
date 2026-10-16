@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_release_gh <bin>: writes <bin>/gh, a stand-in for the GitHub CLI calls that the
 # release check scripts make (find-release-bumps.sh, bump-release.sh, open-release-bump-pr.sh and
-# merge-release-bump.sh), and that enable-atc-pin-auto-merge.sh makes. It logs each call's argv as a JSON line to STUB_TREE/calls, and the
+# merge-release-bump.sh) make. It logs each call's argv as a JSON line to STUB_TREE/calls, and the
 # GH_TOKEN it ran with as a line to STUB_TREE/tokens ("unset" when missing). A test states the
 # releases as files under STUB_TREE/releases/<repo>/, where a tag's directory is the tag with each
 # "/" as "_" (@zgeoff/atc@1.2.3 is @zgeoff_atc@1.2.3):

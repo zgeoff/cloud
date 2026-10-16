@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Open or update the pull request that bumps one dependency to a release, the way
-# open-atc-pin-pr.sh does for the agent image's atc pin. Run it from the root of a zgeoff/cloud
-# clone whose origin is zgeoff/cloud, with gh signed in to a token that may push to it, open pull
-# requests and label them, and a git identity for the commit. scripts/bump-release.sh runs it:
+# Open or update the pull request that bumps one dependency to a release. Run it from the root of a
+# zgeoff/cloud clone whose origin is zgeoff/cloud, with gh signed in to a token that may push to
+# it, open pull requests and label them, and a git identity for the commit.
+# scripts/bump-release.sh runs it:
 #
 #   bash scripts/open-release-bump-pr.sh <dependency> <version> <body file> <labels file> \
 #     <pin command>...
@@ -23,8 +23,9 @@
 # main changes another pin in a file the bump changes: the script rebuilds the open pull request's
 # branch and keeps its needs-review, with no auto-merge beside it, and leaves a closed pull
 # request for the branch's head closed, with no push, until a later release or until the branch
-# is deleted. Pull requests from forks never count. Unlike open-atc-pin-pr.sh it keeps no newer pin on the branch: the release check runs one
-# job at a time and always pins the newest release, so a newer branch means a withdrawn release.
+# is deleted. Pull requests from forks never count. It keeps no newer pin on the branch: the
+# release check runs one job at a time and always pins the newest release, so a newer branch means
+# a withdrawn release.
 set -euo pipefail
 # comm needs the C collation that sort uses here
 export LC_ALL=C

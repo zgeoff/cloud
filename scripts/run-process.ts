@@ -1,6 +1,6 @@
 // The operator scripts run every subprocess through a Runner, so a test injects a stand-in and no
-// script builds a shell command line here. It imports nothing outside Bun: atc's release job and
-// the agent image's git archive run scripts from a clone without node_modules.
+// script builds a shell command line here. It imports nothing outside Bun: the agent image's git
+// archive runs scripts from a clone without node_modules.
 
 // RunOptions carries stdin as a Buffer, which has no readonly form
 /* oxlint-disable typescript/prefer-readonly-parameter-types */

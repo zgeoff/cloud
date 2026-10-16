@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Pin an atc release in the agent image: set images/agent/Dockerfile's ARG ATC_VERSION to
 # <version> and ARG ATC_SHA256 to atc-linux-x64's sum in that release's SHA256SUMS, and change
-# nothing else. Run it from the root of a zgeoff/cloud checkout. atc's release job runs it with
-# the SHA256SUMS it just published; a person runs it after downloading that file:
+# nothing else. Run it from the root of a zgeoff/cloud checkout. pin-atc.sh runs it for the
+# release check; a person runs it after downloading the release's SHA256SUMS:
 #
 #   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -D /tmp/atc-sums
 #   bash scripts/pin-agent-atc.sh "$VERSION" /tmp/atc-sums/SHA256SUMS
