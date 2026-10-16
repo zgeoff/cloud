@@ -75,8 +75,8 @@ ENV DISABLE_UPDATES=1
 # own binary in. The sum is atc-linux-x64's line in the release's SHA256SUMS:
 #   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -p atc-linux-x64
 #   sha256sum -c --ignore-missing SHA256SUMS
-ARG ATC_VERSION=4.10.0
-ARG ATC_SHA256=369416c240eb2c69bafdef54c2861c944011da09ecb82dbc044d7cbed8544e55
+ARG ATC_VERSION=4.11.0
+ARG ATC_SHA256=bcb6dd867fa46b1ce96d7ec85e0f501690c25d8b22d330153a89f48135e8aaba
 RUN curl -fsSL -o /usr/local/bin/atc \
       "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
