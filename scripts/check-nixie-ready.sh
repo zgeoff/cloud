@@ -8,9 +8,10 @@
 # It asks nixie-0's own server, through kubectl exec over ssh, as docs/runbooks/nixie.md does by
 # hand; 8080 is nixieAPIPort (infra/cluster/build-nixie-spec.ts). nixie answers 200 with every part
 # ready and 503 otherwise, with each part's report in the body either way. nixie retries its start
-# and impd restarts with the switch, so it tries 30 times with a 10 s pause after each try that is
-# not ready, then fails (exit 1) and names each part that is not ready with nixie's reason, or the
-# last error when no report came back. It prints the ready parts when it passes.
+# and impd restarts with the switch, so it tries 30 times, each try ended after 20 s, with a 10 s
+# pause after each try that is not ready, then fails (exit 1) and names each part that is not
+# ready with nixie's reason, or the last error when no report came back. It prints the ready parts
+# when it passes.
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -21,9 +22,14 @@ host="$1"
 tries=30
 fetch='console.log(await (await fetch("http://127.0.0.1:8080/health/ready")).text())'
 
-# read_report: prints nixie's report body, or fails with the output of a try that got none
+# read_report: prints nixie's report body, or fails with the output of a try that got none. A try
+# that hangs, such as a stalled ssh or exec stream, ends after 20 s, so the 30 tries stay bounded.
 read_report() {
-  ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '$fetch'" 2>&1
+  local status=0
+  timeout 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '$fetch'" 2>&1 ||
+    status=$?
+  if [ "$status" = 124 ]; then echo "the try took longer than 20 s"; fi
+  return "$status"
 }
 
 problem=""
