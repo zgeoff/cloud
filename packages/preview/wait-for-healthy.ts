@@ -47,7 +47,7 @@ function buildHealthURL(impDomain: string, imp: string, contract: PreviewContrac
 }
 
 // null for a 2xx or 3xx answer, which `curl --fail` passed in the guest; otherwise the status and
-// the start of the body, or why no answer came
+// the body's readable text, or why no answer came
 async function tryReadHealth(url: string): Promise<string | null> {
   try {
     const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
@@ -58,12 +58,32 @@ async function tryReadHealth(url: string): Promise<string | null> {
       return null;
     }
 
-    const text = await response.text();
+    const body = await response.text();
 
-    const body = text.trim().slice(0, 200);
-
-    return body === '' ? String(response.status) : `${response.status} ${body}`;
+    return formatAnswer(response, body).slice(0, 400);
   } catch (error) {
     return error instanceof Error ? error.message : String(error);
   }
+}
+
+// impd's proxy answers with an HTML page whose heading holds the status and whose paragraph holds
+// the cause, so the page's text lines join into one line; any other body follows its status
+function formatAnswer(response: Response, body: string): string {
+  if (!(response.headers.get('content-type') ?? '').startsWith('text/html')) {
+    const text = body.trim().replaceAll(/\s+/gu, ' ');
+
+    return text === '' ? String(response.status) : `${response.status} ${text}`;
+  }
+
+  return body
+    .replaceAll(/<title>[^<]*<\/title>/giu, '')
+    .replaceAll(/<[^>]*>/gu, '\n')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAll('&quot;', '"')
+    .replaceAll('&amp;', '&')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
+    .join(': ');
 }

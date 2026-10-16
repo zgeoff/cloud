@@ -122,7 +122,8 @@ test("it resolves unhealthy with the proxy's last answer when the app listens on
   expect(health).toStrictEqual({
     healthy: false,
     url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
-    lastAnswer: '502 Nothing answers in the imp',
+    lastAnswer:
+      '502 Nothing answers in the imp: pv-0a1b2c3d-17 is awake, but nothing answered on port 3000 (Unable to connect. Is the computer able to access the url?).',
   });
 
   expect(ctx.impd.proxied).toBeArrayOfSize(3);
@@ -167,5 +168,27 @@ test('it counts a redirect from the health path as healthy, as curl --fail did',
     healthy: true,
     url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
     lastAnswer: null,
+  });
+});
+
+test('it keeps the status and the text of a plain answer that is not healthy', async () => {
+  const ctx = await setupTest();
+
+  server.use(
+    http.get('https://pv-0a1b2c3d-17.imps.example.test/healthz', () =>
+      HttpResponse.text('  still seeding\n  the invented orders\n', { status: 503 }),
+    ),
+  );
+
+  const health = await waitForHealthy(ctx.deps, {
+    imp: 'pv-0a1b2c3d-17',
+    contract: { port: 3000, healthPath: '/healthz' },
+    windowMs: 1000,
+  });
+
+  expect(health).toStrictEqual({
+    healthy: false,
+    url: 'https://pv-0a1b2c3d-17.imps.example.test/healthz',
+    lastAnswer: '503 still seeding the invented orders',
   });
 });

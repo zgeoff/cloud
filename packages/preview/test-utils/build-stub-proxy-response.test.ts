@@ -52,9 +52,21 @@ test.each([
     new Request('https://pv-0a1b2c3d-17.imps.example.test/healthz'),
   );
 
-  expect({ status: response.status, body: await response.text() }).toStrictEqual({
+  expect({
+    status: response.status,
+    contentType: response.headers.get('content-type'),
+    body: await response.text(),
+  }).toStrictEqual({
     status: 502,
-    body: 'Nothing answers in the imp\n',
+    contentType: 'text/html; charset=utf-8',
+    body: [
+      '<!doctype html>',
+      '<title>Nothing answers in the imp</title>',
+      '<body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem">',
+      '<h1>502 Nothing answers in the imp</h1>',
+      '<p>pv-0a1b2c3d-17 is awake, but nothing answered on port 3000 (Unable to connect. Is the computer able to access the url?).</p>',
+      '</body>',
+    ].join('\n'),
   });
 });
 
@@ -68,7 +80,14 @@ test('it answers 404 for an imp it does not hold', async () => {
 
   expect({ status: response.status, body: await response.text() }).toStrictEqual({
     status: 404,
-    body: 'no such imp\n',
+    body: [
+      '<!doctype html>',
+      '<title>No such imp</title>',
+      '<body style="font-family:system-ui,sans-serif;max-width:40rem;margin:4rem auto;padding:0 1rem">',
+      '<h1>404 No such imp</h1>',
+      '<p>There is no imp named pv-0a1b2c3d-18.</p>',
+      '</body>',
+    ].join('\n'),
   });
 
   expect(ctx.proxy.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-18.imps.example.test/']);

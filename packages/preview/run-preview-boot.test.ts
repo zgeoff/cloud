@@ -253,7 +253,7 @@ test("it fails the boot, naming the port, when the app listens on the guest's lo
     phase: 'failed',
     detail: [
       "port 3000 did not answer https://pv-0a1b2c3d-17.imps.example.test/healthz through impd's proxy before the boot timed out.",
-      'Its last answer: 502 Nothing answers in the imp.',
+      "impd's proxy last answered: 502 Nothing answers in the imp: pv-0a1b2c3d-17 is awake, but nothing answered on port 3000 (Unable to connect. Is the computer able to access the url?).",
       'The app must listen on 0.0.0.0:3000 in the imp, not on 127.0.0.1 alone.',
     ].join('\n'),
   });

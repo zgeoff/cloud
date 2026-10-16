@@ -189,7 +189,7 @@ async function waitForHealth(
 function formatUnreachablePort(contract: PreviewContract, health: HealthResult): string {
   return [
     `port ${contract.port} did not answer ${health.url} through impd's proxy before the boot timed out.`,
-    `Its last answer: ${health.lastAnswer ?? 'none'}.`,
+    `impd's proxy last answered: ${health.lastAnswer ?? 'nothing'}`,
     `The app must listen on 0.0.0.0:${contract.port} in the imp, not on 127.0.0.1 alone.`,
   ].join('\n');
 }
