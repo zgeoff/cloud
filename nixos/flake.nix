@@ -34,6 +34,7 @@
           ./modules/onepassword-connect-relay.nix
           ./modules/preview.nix
           ./modules/tank-cloud.nix
+          ./modules/imp-dataset-key.nix
           ./hosts/geoffcloud/configuration.nix
           ./hosts/geoffcloud/disko.nix
         ];
@@ -83,6 +84,9 @@
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.impd-restore-reset = import ./checks/impd-restore-reset.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.tank-imp-encrypt = import ./checks/tank-imp-encrypt.nix {
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.tank-cloud-unlock = import ./checks/tank-cloud-unlock.nix {
