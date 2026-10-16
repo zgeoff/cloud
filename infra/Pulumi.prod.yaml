@@ -20,3 +20,5 @@ config:
     image: ghcr.io/zgeoff/nixie:0.28.0@sha256:61dac2ebd9ecf4c9cbe269b7689b960b17464b8a85ce394e1ca15d440edd8ebd
     webImage: ghcr.io/zgeoff/nixie-web:0.28.0@sha256:e7b71769279c61638dedae25f2dc2d6d7df34c1d1dec46f6529c23ad6bf19c4d
     hostname: nixie.geoff.cloud
+  geoff-cloud:atcGatewayOwnerEmail:
+    secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=

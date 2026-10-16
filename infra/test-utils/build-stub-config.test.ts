@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
-import { RunError } from '@pulumi/pulumi';
+import { RunError, isSecret } from '@pulumi/pulumi';
 import { buildStubConfig } from './build-stub-config.ts';
+import { resolveOutput } from './resolve-output.ts';
 
 test('it returns the raw string from get', () => {
   expect(buildStubConfig({ cluster: 'managed' }).get('cluster')).toBe('managed');
@@ -56,4 +57,24 @@ test("it throws Config's error, naming the full key, from getObject on a value t
     RunError,
     "Configuration 'geoff-cloud:atcGateway' value 'not json' is not a valid JSON object",
   );
+});
+
+test('it returns the raw string as a secret from getSecret', async () => {
+  const value = buildStubConfig({ atcGatewayOwnerEmail: 'owner@example.test' }).getSecret(
+    'atcGatewayOwnerEmail',
+  );
+
+  if (value === undefined) {
+    throw new Error('expected a secret value');
+  }
+
+  const isMarkedSecret = await isSecret(value);
+  const resolved = await resolveOutput(value);
+
+  expect(isMarkedSecret).toBeTrue();
+  expect(resolved).toBe('owner@example.test');
+});
+
+test('it reads an unset key as undefined from getSecret', () => {
+  expect(buildStubConfig({}).getSecret('atcGatewayOwnerEmail')).toBeUndefined();
 });

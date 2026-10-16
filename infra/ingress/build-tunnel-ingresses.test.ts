@@ -55,3 +55,28 @@ test('it refuses a hostname that the exposure registry does not list', () => {
 test('it holds only the 404 catch-all without a route', () => {
   expect(buildTunnelIngresses([])).toStrictEqual([{ service: 'http_status:404' }]);
 });
+
+test('it makes cloudflared require the Access token on a route that names an Access application', () => {
+  const service = output('http://atc-gateway.atc.svc.cluster.local:8414');
+  const teamName = output('example-team');
+  const audience = output('0123456789abcdef');
+
+  expect(
+    buildTunnelIngresses([
+      buildMockTunnelRoute({
+        hostname: 'atc.geoff.cloud',
+        service,
+        path: '^/login$',
+        access: { teamName, audience },
+      }),
+    ]),
+  ).toStrictEqual([
+    {
+      hostname: 'atc.geoff.cloud',
+      path: '^/login$',
+      service,
+      originRequest: { access: { required: true, teamName, audTags: [audience] } },
+    },
+    { service: 'http_status:404' },
+  ]);
+});

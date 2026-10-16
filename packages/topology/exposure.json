@@ -93,7 +93,7 @@
       "kind": "tunnel-hostname",
       "hostname": "atc.geoff.cloud",
       "scope": "public",
-      "reason": "The atc gateway's MCP and OAuth endpoints for remote MCP clients; the gateway authenticates every call itself"
+      "reason": "The atc gateway's MCP and OAuth endpoints for remote MCP clients; the gateway authenticates every call itself, and an owner-only Cloudflare Access login fronts its sign-in pages"
     },
     {
       "name": "preview-webhook-route",
