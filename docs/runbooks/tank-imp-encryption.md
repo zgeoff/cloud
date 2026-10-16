@@ -115,7 +115,8 @@ Every imp sleeps during the cutover, for about 5 to 15 minutes. Put the imps to 
 one keeps its memory.
 
 1. From this machine, record the imps again, as in [Before you start](#before-you-start), into
-   `.scratch/imps-cutover.json`.
+   `.scratch/imps-cutover.json`, and copy impd's database once more, as in step 1 there. The copy
+   runs inside the imp-host container, so it comes before the stop, while impd is quiet.
 2. Stop imp-host and its Docker proxy, and check that no imp-host container is left. impd mounts
    `tank/imp` inside the container, so the host's own mount table never lists it:
 
