@@ -25,20 +25,23 @@ trap 'rm -f "$err"' EXIT
 
 # read_report: prints what nixie health printed, its report when one came back, and leaves the
 # try's errors in $err. A try that hangs, such as a stalled ssh or exec stream, ends after 20 s, or
-# 25 s for one that ignores TERM, so the 30 tries stay bounded. nixie health exits 1 when a part is
-# not ready, so the report decides, not the exit code.
+# 25 s for one that ignores TERM, so the 30 tries stay bounded, and it fails, whatever it printed
+# first. nixie health exits 1 when a part is not ready, so past a hang the report decides, not the
+# exit code.
 read_report() {
   local status=0
   timeout -k 5 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health" 2> "$err" ||
     status=$?
   # 124 when the TERM at 20 s ends the try, 137 when the KILL 5 s later must
-  if [ "$status" = 124 ] || [ "$status" = 137 ]; then echo "the try took longer than 20 s" >> "$err"; fi
+  if [ "$status" = 124 ] || [ "$status" = 137 ]; then
+    echo "the try took longer than 20 s" >> "$err"
+    return 1
+  fi
 }
 
 problem=""
 for try in $(seq 1 "$tries"); do
-  report="$(read_report)"
-  if jq -e '.parts | type == "object"' <<< "$report" > /dev/null 2>&1; then
+  if report="$(read_report)" && jq -e '.parts | type == "object"' <<< "$report" > /dev/null 2>&1; then
     if jq -e '.status == "ready" and ([.parts[] | .isReady == true] | all)' <<< "$report" > /dev/null; then
       echo "== nixie ready: $(jq -r '.parts | keys_unsorted | join(", ")' <<< "$report")"
       exit 0

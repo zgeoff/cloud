@@ -182,6 +182,32 @@ it_counts_a_try_that_the_kill_after_the_deadline_ends_as_a_hang() {
   }
 }
 
+it_rejects_a_ready_report_from_a_try_that_then_hangs() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  # a timeout that runs the command, so its report prints, then ends the try as the TERM at 20 s does
+  cat > "$tree/bin/timeout" << 'STUB'
+#!/usr/bin/env bash
+shift 3
+"$@" || true
+exit 124
+STUB
+  chmod +x "$tree/bin/timeout"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_NIXIE_REPORTS="$ready" bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'nixie is not ready after 30 tries: no report from nixie-0: the try took longer than 20 s'
+  diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
 it_prints_its_usage_without_a_host() {
   local status=0
   tree="$(mktemp -d)"
