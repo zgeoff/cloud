@@ -105,14 +105,24 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
    For an atc major bump, publish the atc-gateway images and merge the pull request that pins their
    digests, let the `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate
    too.
-4. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
+4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
+   nixie pod's `@zgeoff/imp-client` refuses, or that finds no nixie pod, because nixie then retries
+   its start without end while every host check passes. It reads the client's version from the
+   `bun.lock` of the pod's nixie release on GitHub, and accepts impd 2 beside a 1.x client from
+   nixie 0.28.0 on, as nixie itself does. It checks again before the activation. For an impd major
+   bump, deploy a nixie release whose client speaks the new major first. `--build-only` skips this
+   gate too.
+5. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-5. It copies the built store path to the host with `nix copy`, sets the system profile to it and
+6. It copies the built store path to the host with `nix copy`, sets the system profile to it and
    runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
    is not evaluated again.
-6. It fails unless the host's `/run/current-system` is the built path, then prints
+7. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
+8. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
+   part that is not ready and nixie's reason for it, since a host that switches cleanly can still
+   leave nixie unable to start.
 
 `bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gates with stub
 `gh`, `docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show

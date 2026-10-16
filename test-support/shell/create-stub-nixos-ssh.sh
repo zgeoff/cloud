@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the four remote commands the switch runs:
+# answers the six remote commands the switch runs:
 #
 # - the kubectl query for the atc gateway pods' images: prints STUB_GATEWAY_IMAGES (images
 #   separated by spaces, as jsonpath joins an `[*]` list) with no newline, as kubectl's jsonpath
@@ -10,6 +10,13 @@
 #   stderr for that empty match, which the switch would pass through. From the
 #   second query on it prints STUB_GATEWAY_LATER_IMAGES instead, when that is set, so a case
 #   can roll the gateway out between the switch's two checks;
+# - the kubectl query for the nixie pods' images: prints STUB_NIXIE_IMAGES the same way, and
+#   from the second query on STUB_NIXIE_LATER_IMAGES instead, when that is set;
+# - the kubectl exec into nixie-0 that fetches /health/ready: prints line <n> of
+#   STUB_NIXIE_REPORTS for the n-th call, and its last line for every call after, each a report
+#   body as nixie's server sends it. With STUB_NIXIE_REPORTS unset, it fails as kubectl does for
+#   a pod that does not exist: "Error from server (NotFound): pods "nixie-0" not found" on
+#   stderr and exit 1;
 # - the profile set and switch-to-configuration: prints nothing, or with
 #   STUB_ACTIVATE_FAILED_UNITS (unit names separated by spaces) fails as
 #   switch-to-configuration-ng does when units failed: "warning: the following units
@@ -85,6 +92,23 @@ case "${*:4}" in
     else
       printf '%s' "${STUB_GATEWAY_IMAGES:-}"
     fi
+    ;;
+  "k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'")
+    queries="$(grep -cF 'k3s kubectl -n nixie get pods -l app=nixie' "$STUB_LOG")"
+    if [ "$queries" -gt 1 ] && [ -n "${STUB_NIXIE_LATER_IMAGES+set}" ]; then
+      printf '%s' "$STUB_NIXIE_LATER_IMAGES"
+    else
+      printf '%s' "${STUB_NIXIE_IMAGES:-}"
+    fi
+    ;;
+  "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'")
+    if [ -z "${STUB_NIXIE_REPORTS+set}" ]; then
+      echo 'Error from server (NotFound): pods "nixie-0" not found' >&2
+      exit 1
+    fi
+    calls="$(grep -cF 'k3s kubectl -n nixie exec nixie-0' "$STUB_LOG")"
+    total="$(printf '%s\n' "$STUB_NIXIE_REPORTS" | wc -l)"
+    printf '%s\n' "$STUB_NIXIE_REPORTS" | sed -n "$((calls < total ? calls : total))p"
     ;;
   "nix-env -p /nix/var/nix/profiles/system --set "*"/bin/switch-to-configuration' switch")
     if [ -n "${STUB_ACTIVATE_FAILED_UNITS:-}" ]; then
