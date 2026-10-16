@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for check-nixie-ready.sh: it passes once nixie's /health/ready reports every part ready,
+# Test for check-nixie-ready.sh: it passes once nixie health reports every part ready,
 # pausing 10 s after each try that is not, ends a try that hangs after 20 s, and after 30 tries
 # fails naming each part that is not ready with nixie's reason, or the last error when no report
 # came back. ssh is the NixOS host stand-in (create-stub-nixos-ssh.sh), which answers the kubectl
@@ -21,7 +21,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-timeout
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-nixie-ready.sh"
-exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '"'"'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"'"'"]'
+exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health"]'
 ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}}}'
 unready='{"status":"unready","parts":{"store":{"isReady":true},"imp_host":{"isReady":false,"reason":"impd 4.0.0 refuses imp client 3.2.1"},"model":{"isReady":false,"reason":"the check took longer than 2000 ms"}}}'
 

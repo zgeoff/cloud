@@ -1,20 +1,13 @@
 import { findJSONField } from './find-json-field.ts';
 
-// Finds the name impd holds nixie's fetch image under, from nixie's sandbox manifest: nixie names
-// each sandbox image nixie-<kind>-<first 12 hex of the digest>
+// Finds the name impd holds nixie's fetch image under, from what nixie sandbox-manifest prints: each
+// sandbox kind with its image's ref and the name nixie gives the image in impd
 export function findFetchImage(manifestText: string): string | undefined {
-  const ref = findFetchRef(manifestText);
-  const digest = /@sha256:(?<hex>[\da-f]{64})$/u.exec(ref ?? '')?.groups?.['hex'];
-
-  return digest === undefined ? undefined : `nixie-fetch-${digest.slice(0, 12)}`;
-}
-
-function findFetchRef(text: string): string | undefined {
   try {
-    const manifest: unknown = JSON.parse(text);
-    const ref = findJSONField(manifest, 'fetch');
+    const manifest: unknown = JSON.parse(manifestText);
+    const name = findJSONField(findJSONField(manifest, 'fetch'), 'name');
 
-    return typeof ref === 'string' ? ref : undefined;
+    return typeof name === 'string' && /^nixie-fetch-[\da-f]{12}$/u.test(name) ? name : undefined;
   } catch {
     return undefined;
   }

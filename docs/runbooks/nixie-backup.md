@@ -90,10 +90,11 @@ migrations and integrity check, and listens, but never turns ready.
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n nixie logs nixie-restore-check | grep -E '"(writer.started|http.listening)"'
-   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-restore-check -- bun /app/main.js health --live && echo live
+   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-restore-check -- nixie health --live && echo live
    ```
 
-   Expect a `writer.started` line with the schema version, an `http.listening` line, and `live`.
+   Expect a `writer.started` line with the schema version, an `http.listening` line, the liveness
+   report, and `live`.
 
 4. Remove the scratch nixie, its ConfigMap, the claim, and the restore Job:
 
