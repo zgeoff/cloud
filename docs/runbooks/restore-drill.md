@@ -36,9 +36,10 @@ snapshot, and the root disk is 240 GB, so a snapshot restore needs a monthly VM 
      | ssh root@<scratch_vm> 'mkdir -p /root/restore/impd && tar -C /root/restore/impd -xf -'
    ```
 
-2. Open it read-only, and compare it with its `COPY-INFO`:
+2. On the scratch VM, open it read-only, and compare it with its `COPY-INFO`:
 
    ```bash
+   cd /root/restore/impd/<copy>
    sqlite3 -readonly imp.sqlite 'PRAGMA integrity_check;'
    sqlite3 -readonly imp.sqlite 'SELECT name FROM kysely_migration ORDER BY name DESC LIMIT 1;'
    ```
@@ -51,7 +52,7 @@ snapshot, and the root disk is 240 GB, so a snapshot restore needs a monthly VM 
 hq backs up to its own restic repository at the `hq/` prefix of nixie's R2 bucket. The vault item
 `hq-restic` holds its password, and `r2-nixie-backup` holds the R2 key that reads it; the
 `r2-backups` key gets `Access Denied` there. Send the four values to the VM on SSH's stdin, never on
-a command line, then restore the newest snapshot:
+a command line, then restore the newest snapshot on the scratch VM:
 
 ```bash
 restic --no-lock snapshots --latest 1
