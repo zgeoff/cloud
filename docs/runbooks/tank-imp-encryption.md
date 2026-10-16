@@ -107,7 +107,7 @@ cutover. The send runs as a transient unit, so a dropped SSH session does not st
    ```
 
    Expect one count of `available` and one of `tank/imp-new`, each equal to the number of
-   filesystems under `tank/imp`.
+   filesystems under `tank/imp-new`. `tank/imp` can hold more by now, because impd keeps working.
 
 ## Cut over
 
@@ -116,14 +116,16 @@ one keeps its memory.
 
 1. From this machine, record the imps again, as in [Before you start](#before-you-start), into
    `.scratch/imps-cutover.json`.
-2. Stop imp-host, and check that nothing holds a `tank/imp` dataset mounted:
+2. Stop imp-host and its Docker proxy, and check that no imp-host container is left. impd mounts
+   `tank/imp` inside the container, so the host's own mount table never lists it:
 
    ```bash
-   systemctl stop imp-host
+   systemctl stop imp-host imp-docker-proxy
+   docker ps -aq --filter name=imp-host
    findmnt -rn -o SOURCE | grep -E '^tank/imp(/|$)'
    ```
 
-   Expect no line.
+   Expect no line from either command.
 
 3. Send the changes since the first copy. `-I` sends every snapshot taken in between, such as a new
    checkpoint, `-F` makes the copy match by destroying what impd destroyed in the meantime, and
@@ -131,8 +133,13 @@ one keeps its memory.
 
    ```bash
    zfs snapshot -r tank/imp@encrypt-2
-   zfs send -R -I @encrypt-1 tank/imp@encrypt-2 | zfs recv -u -F -x encryption tank/imp-new
+   systemd-run --unit tank-imp-encrypt-2 -p Type=oneshot -p RemainAfterExit=yes \
+     bash -o pipefail -c 'zfs send -R -I @encrypt-1 tank/imp@encrypt-2 | zfs recv -u -F -x encryption tank/imp-new'
+   systemctl show -p ActiveState,Result tank-imp-encrypt-2
    ```
+
+   `systemd-run` returns once the send ends, and the unit finishes it if SSH drops first. Expect
+   `ActiveState=active` and `Result=success`.
 
 4. Check the copy's encryption again, as after the first send. Expect `tank/imp-new` as the
    encryption root of every filesystem. A plain one means the receive missed `-x encryption`:
@@ -142,7 +149,7 @@ one keeps its memory.
 
    ```bash
    for root in tank/imp tank/imp-new; do
-     zfs list -H -r -t filesystem,snapshot -s name -o name,origin "$root" | sed "s#$root\([/@]\)#<root>\1#g" > "/root/tree-${root#tank/}"
+     zfs list -H -r -t filesystem,snapshot -s name -o name,origin "$root" | sed -E "s#$root([/@[:space:]]|\$)#<root>\1#g" > "/root/tree-${root#tank/}"
    done
    diff /root/tree-imp /root/tree-imp-new && echo same
    zfs get -H -r -t snapshot -o name,value defer_destroy tank/imp | awk '$2 == "on" { print $1 }' > /root/deferred
@@ -169,7 +176,7 @@ one keeps its memory.
 8. Start imp-host, then check impd from this machine:
 
    ```bash
-   systemctl start imp-host
+   systemctl start imp-docker-proxy imp-host
    ```
 
    ```bash
@@ -234,10 +241,10 @@ Run it while `tank/imp-old` exists and before the switch that turns imp-dataset-
 unit refuses a plain `tank/imp`.
 
 ```bash
-systemctl stop imp-host
+systemctl stop imp-host imp-docker-proxy
 zfs rename tank/imp tank/imp-new
 zfs rename tank/imp-old tank/imp
-systemctl start imp-host
+systemctl start imp-docker-proxy imp-host
 ```
 
 To cut over again later, start at [Cut over](#cut-over) with the next snapshot name, sending
