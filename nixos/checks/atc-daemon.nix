@@ -467,7 +467,7 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the broker's claude, github, linear and op-connect profiles";
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker";
       script = ''
         jq -S . > expected <<'EOF'
         {
