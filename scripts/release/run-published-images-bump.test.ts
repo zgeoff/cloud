@@ -108,7 +108,7 @@ test('it opens a gateway minor bump that merges on its own, at the digests the r
       '',
     ],
     [
-      'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 7.2.0 --body-file - --label update:minor,auto-merge',
+      'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 7.2.0+3.1.0-r1 --body-file - --label update:minor,auto-merge',
       `Pins the atc-gateway-images at [7.2.0](https://github.com/zgeoff/atc/releases/tag/%40zgeoff/atc%407.2.0) to the digests [its run](https://github.com/zgeoff/cloud/actions/runs/4417) published. The publish workflow opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| the atc-gateway image (\`infra/Pulumi.prod.yaml\`) | 7.1.0 | 7.2.0 |\n| the atc-gateway backup image (\`infra/Pulumi.prod.yaml\`) | 3.1.0-r1 | unchanged |\n\nIt merges on its own once every check on its head passes.\n\nAfter the merge: The \`Deploy prod\` workflow applies the stack config once CI passes on main, unless its guard holds the plan (\`docs/runbooks/prod-apply.md\`). For an atc major release, switch the host after the gateway runs it (\`docs/runbooks/workflows.md\`).\n`,
     ],
   ]);
@@ -144,7 +144,7 @@ test('it opens a gateway major bump that waits for review', async () => {
   expect(status).toBe(0);
 
   expect(stub.calls.map((call) => call.argv.join(' ')).at(-1)).toBe(
-    'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 8.0.0 --body-file - --label update:major,needs-review',
+    'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 8.0.0+3.1.0-r1 --body-file - --label update:major,needs-review',
   );
 
   expect(stub.calls.at(-1)?.stdin).toBe(
@@ -196,11 +196,89 @@ test('it opens a backup image bump that waits for review, since no release versi
   ]);
 
   expect(stub.calls.map((call) => call.argv.join(' ')).at(-1)).toBe(
-    'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 7.1.0 --body-file - --label needs-review',
+    'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 7.1.0+3.1.0-r2 --body-file - --label needs-review',
   );
 
   expect(stub.calls.at(-1)?.stdin).toBe(
     `Pins the atc-gateway-images at [7.1.0](https://github.com/zgeoff/atc/releases/tag/%40zgeoff/atc%407.1.0) to the digests the publish workflow published. The publish workflow opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| the atc-gateway image (\`infra/Pulumi.prod.yaml\`) | 7.1.0 | unchanged |\n| the atc-gateway backup image (\`infra/Pulumi.prod.yaml\`) | 3.1.0-r1 | 3.1.0-r2 |\n\nIt waits for a review, because:\n\n- it moves no release version, so no update type rates the change.\n\nAfter the merge: The \`Deploy prod\` workflow applies the stack config once CI passes on main, unless its guard holds the plan (\`docs/runbooks/prod-apply.md\`). For an atc major release, switch the host after the gateway runs it (\`docs/runbooks/workflows.md\`).\n`,
+  );
+});
+
+test('it opens a new backup revision after a person closed the one before it', async () => {
+  const ctx = setupTest();
+
+  const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
+    'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=3.1.0-r1\n',
+    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+  });
+
+  await checkout.git(['-C', checkout.seed, 'switch', '-qc', 'release-check/atc-gateway-images']);
+
+  await Bun.write(
+    `${checkout.seed}/infra/Pulumi.prod.yaml`,
+    `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}\n`,
+  );
+
+  await checkout.git([
+    '-C',
+    checkout.seed,
+    'commit',
+    '-qam',
+    'chore(atc-gateway-images): bump atc-gateway-images to 7.1.0+3.1.0-r2',
+  ]);
+
+  await checkout.git([
+    '-C',
+    checkout.seed,
+    'push',
+    '-q',
+    'origin',
+    'release-check/atc-gateway-images',
+  ]);
+
+  await checkout.git(['-C', checkout.seed, 'switch', '-q', 'main']);
+
+  await Bun.write(
+    `${checkout.seed}/images/atc-gateway/versions.env`,
+    'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=3.1.0-r3\n',
+  );
+
+  await checkout.git(['-C', checkout.seed, 'commit', '-qam', 'cut backup revision r3']);
+  await checkout.git(['-C', checkout.seed, 'push', '-q', 'origin', 'main']);
+  await checkout.git(['-C', checkout.clone, 'pull', '-q', 'origin', 'main']);
+
+  const rejected = await checkout.git([
+    `--git-dir=${checkout.origin}`,
+    'rev-parse',
+    'release-check/atc-gateway-images',
+  ]);
+
+  const docker = buildStubReleaseDocker({
+    manifests: {
+      'ghcr.io/zgeoff/atc-gateway:7.1.0': `sha256:${'1'.repeat(64)}`,
+      'ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r3': `sha256:${'5'.repeat(64)}`,
+    },
+  });
+
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      closedPRs: [{ headRefOid: rejected, isCrossRepository: false, number: 31 }],
+    }),
+    docker.handle,
+    buildRealProgramHandler(['git'], checkout.env),
+  );
+
+  const status = await runPublishedImagesBump(
+    { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
+    ['atc-gateway-images'],
+  );
+
+  expect(status).toBe(0);
+  expect(ctx.printErr.mock.calls).toStrictEqual([]);
+
+  expect(stub.calls.map((call) => call.argv.join(' ')).at(-1)).toBe(
+    'gh pr create --repo zgeoff/cloud --base main --head release-check/atc-gateway-images --title chore(atc-gateway-images): bump atc-gateway-images to 7.1.0+3.1.0-r3 --body-file - --label needs-review',
   );
 });
 

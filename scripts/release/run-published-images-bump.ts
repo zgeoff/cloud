@@ -58,9 +58,13 @@ export async function runPublishedImagesBump(
     return 1;
   }
 
+  // the commit title, which keys a person's hold or rejection, names every image's tag, so a
+  // rejected backup revision never holds back the next one at the same gateway version
+  const release = images.map((image) => bump.values.tags?.[image.image] ?? '').join('+');
+
   return openReleaseBumpPR(context, {
     dependency: record.name,
-    version: bump.version,
+    version: release,
     labels: bump.labels,
     body: renderPublishedImagesBody({
       record,
