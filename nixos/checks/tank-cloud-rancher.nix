@@ -9,7 +9,8 @@
 # It then switches to the base config with switch-to-configuration test as the owner's switch does,
 # and checks that k3s stays stopped on the empty zvol. It runs scripts/host/move-rancher.sh copy and
 # checks the same cluster CA, node password, Secret and volume on the zvol, runs remove-old, and
-# reboots with the pool's disk late, so k3s starts on the zvol only after the import.
+# reboots with the pool's disk late, past systemd's default 90 s wait for a device, which the VM
+# keeps as geoffcloud does, so k3s starts on the zvol only after the import.
 # The pod's image is a local one, as nixpkgs' own k3s test builds it, so the VM pulls nothing. It
 # needs KVM: run `bun run test:nixos tank-cloud-rancher`.
 { nixpkgs, geoffcloud }:
@@ -96,6 +97,8 @@ pkgs.testers.runNixOSTest {
         virtualisation.diskSize = 6144;
         virtualisation.memorySize = 3072;
         virtualisation.cores = 2;
+        # geoffcloud waits systemd's default 90 s for a device; a NixOS test VM waits 300 s
+        systemd.settings.Manager.DefaultDeviceTimeoutSec = lib.mkForce 90;
 
         services.tank-cloud = {
           enable = true;
@@ -346,7 +349,7 @@ pkgs.testers.runNixOSTest {
         assert machine.succeed(f"stat -c '%h %i' {volume}/one").split()[0] == "2"
         assert machine.succeed(f"stat -c %i {volume}/one") == machine.succeed(f"stat -c %i {volume}/two")
         assert machine.succeed(f"getfattr --only-values -n trusted.fixture {volume}/one") == "kept"
-        assert "user:65534:r--" in machine.succeed(f"getfacl -p {volume}/acl")
+        assert "user:65534:r--" in machine.succeed(f"getfacl -n -p {volume}/acl")
         assert machine.succeed(f"stat -c '%u:%g %a' {volume}/owned").strip() == "1234:5678 640"
 
 
@@ -362,8 +365,10 @@ pkgs.testers.runNixOSTest {
         removed = machine.succeed(move.format("remove-old"))
         lines = removed.splitlines()
 
-        assert len(lines) == 2, removed
+        assert len(lines) == 3, removed
         assert lines[0].startswith("removed /var/lib/rancher: ") and lines[1].startswith("removed /etc/rancher: "), removed
+        # main's mount point, empty on the root disk once the switch unmounted the zvol there
+        assert lines[2] == "removed /var/lib/tank-cloud/rancher", removed
         assert root_disk("/var/lib/rancher") == []
         assert root_disk("/etc/rancher") == []
         assert cluster() == before_move
@@ -390,6 +395,8 @@ pkgs.testers.runNixOSTest {
         ]
         assert order == sorted(order), f"the units started in the order {order}"
         assert order[0] > 90_000_000, f"the import finished {order[0]} us after the boot, before the default device timeout"
+        timeouts = machine.succeed("systemctl show -p JobRunningTimeoutUSec --value dev-zvol-tank-cloud-rancher.device dev-vda.device").split("\n\n")
+        assert [t.strip() for t in timeouts] == ["5min", "1min 30s"], f"the devices wait {timeouts}"
         assert source("/var/lib/rancher") == f"{zvol()} ext4"
         assert source("/etc/rancher") == f"{zvol()}[/etc-rancher] ext4"
         assert cluster() == before_move

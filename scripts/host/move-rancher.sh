@@ -158,7 +158,7 @@ write_manifest() {
 # every xattr of the tree's entries, ACLs and security labels included, one sorted line per name
 write_xattrs() {
   local dir="$1" out="$2"
-  (cd "$dir" && find . -print0 | xargs -0 -r getfattr -P -d -m - -e hex --) > "$work_dir/xattrs" || return 1
+  (cd "$dir" && find . -print0 | xargs -0 -r getfattr -h -d -m - -e hex --) > "$work_dir/xattrs" || return 1
   LC_ALL=C awk '/^# file: / { file = substr($0, 9); next } /=/ { print file "\t" $0 }' "$work_dir/xattrs" |
     LC_ALL=C sort > "$out"
 }
