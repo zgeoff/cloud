@@ -22,12 +22,7 @@
       "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },
-  "ignoreDependencies": [
-    "@stylistic/eslint-plugin",
-    "@swc/core",
-    "@zgeoff/oxlint-config",
-    "typescript-5"
-  ],
+  "ignoreDependencies": ["@stylistic/eslint-plugin", "@swc/core", "@zgeoff/oxlint-config"],
   "ignoreBinaries": ["go", "gofmt", "op", "pulumi"],
   "ignore": [".claude/**"],
   "ignoreWorkspaces": ["sdk/*"]

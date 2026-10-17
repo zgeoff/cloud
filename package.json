@@ -91,7 +91,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.0",
     "@faker-js/faker": "10.6.0",
-    "@orpc/client": "1.15.4",
+    "@orpc/client": "1.15.5",
     "@stylistic/eslint-plugin": "5.10.0",
     "@swc/core": "1.16.13",
     "@tsconfig/strictest": "2.0.8",

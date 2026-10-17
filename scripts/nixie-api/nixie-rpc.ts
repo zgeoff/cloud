@@ -17,10 +17,11 @@ export type NixieProcedure = ToProcedure<keyof paths>;
 
 type Operation<Procedure extends NixieProcedure> = paths[`/${Procedure}`]['post'];
 
-export type NixieInput<Procedure extends NixieProcedure> =
-  Operation<Procedure>['requestBody'] extends { content: { 'application/json': infer Input } }
-    ? Input
-    : undefined;
+type NixieInput<Procedure extends NixieProcedure> = Operation<Procedure>['requestBody'] extends {
+  content: { 'application/json': infer Input };
+}
+  ? Input
+  : undefined;
 
 // what a call answers on success; a stream's answer has no JSON output
 export type NixieOutput<Procedure extends NixieProcedure> =
