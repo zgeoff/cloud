@@ -7,7 +7,8 @@
 # - The system lags when the host's $CURRENT_SYSTEM resolves to a store path that no line of
 #   $STATE_DIR/switches names, or when that line's commit is older than the green one and a file
 #   the system is built from (nixos/ outside its checks, packages/topology/, packages/preview/)
-#   changed between the two. scripts/switch-geoffcloud.sh appends "<commit> <store path>" to that
+#   changed between the two, or when GitHub no longer holds that commit.
+#   scripts/switch-geoffcloud.sh appends "<commit> <store path>" to that
 #   file before each activation.
 # - imp lags when the version that `impz info` in the imp-host container prints is not the
 #   imp-host image's tag in nixos/hosts/geoffcloud/configuration.nix at the green commit, or when
@@ -42,14 +43,27 @@ if [ -z "$running_commit" ]; then
 elif [ "$running_commit" = "$green" ]; then
   system_lags=0
 else
-  comparison=$(curl "${curl_args[@]}" "$GITHUB_API_URL/repos/$REPO/compare/$running_commit...$green")
-  # GitHub lists at most 300 files, so a longer list may hide a system file
-  system_lags=$(jq -r '
-    if .status == "behind" or .status == "identical" then 0
-    elif (.files | length) >= 300 then 1
-    elif any(.files[] | .filename, (.previous_filename // empty);
-      test("^(nixos/|packages/topology/|packages/preview/)") and (test("^nixos/checks/") | not)) then 1
-    else 0 end' <<< "$comparison")
+  comparison=$(mktemp)
+  trap 'rm -f "$comparison"' EXIT
+  code=$(curl -sS --max-time 30 -o "$comparison" -w '%{http_code}' \
+    "$GITHUB_API_URL/repos/$REPO/compare/$running_commit...$green")
+  case "$code" in
+    # GitHub lists at most 300 files, so a longer list may hide a system file
+    200)
+      system_lags=$(jq -r '
+        if .status == "behind" or .status == "identical" then 0
+        elif (.files | length) >= 300 then 1
+        elif any(.files[] | .filename, (.previous_filename // empty);
+          test("^(nixos/|packages/topology/|packages/preview/)") and (test("^nixos/checks/") | not)) then 1
+        else 0 end' "$comparison")
+      ;;
+    # GitHub no longer holds the recorded commit, so nothing shows the system is current
+    404) system_lags=1 ;;
+    *)
+      echo "host-build-lag: GitHub answered $code to the comparison of $running_commit with $green" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 config=$(curl "${curl_args[@]}" "$GITHUB_RAW_URL/$REPO/$green/nixos/hosts/geoffcloud/configuration.nix")

@@ -403,6 +403,54 @@ let
       '';
     }
     {
+      title = "it counts the system as lagging when GitHub no longer holds the commit of its switch";
+      script = ''
+        ${setupTest}
+        ${writeGitHub null}
+        mkdir -p store/aaaa-nixos-system-geoffcloud
+        ln -s "$PWD/store/aaaa-nixos-system-geoffcloud" current-system
+        echo "${running} $PWD/store/aaaa-nixos-system-geoffcloud" > state/switches
+        echo 2.3.0 > impd/version
+
+        run_check
+
+        assert_equals 0 "$status" "the check's exit status"
+        assert_files_equal /dev/null stdout
+        assert_files_equal /dev/null stderr
+        assert_files_equal - requests <<'EOF'
+        ${runsRequest}
+        ${comparePath}
+        ${configPath}
+        EOF
+        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud" "$(cut -d' ' -f1 state/system-lag)" "the system the lag state names"
+        assert_missing state/imp-lag "imp's lag state"
+        assert_equals "" "$(ls -A tmp)" "the check's temp directory"
+      '';
+    }
+    {
+      title = "it fails and writes nothing when GitHub answers the comparison with another status";
+      script = ''
+        ${setupTest}
+        ${writeGitHub null}
+        # http.server redirects a directory's path without its trailing slash, with 301
+        mkdir -p "www${comparePath}"
+        mkdir -p store/aaaa-nixos-system-geoffcloud
+        ln -s "$PWD/store/aaaa-nixos-system-geoffcloud" current-system
+        echo "${running} $PWD/store/aaaa-nixos-system-geoffcloud" > state/switches
+        echo 2.3.0 > impd/version
+
+        run_check
+
+        assert_equals 1 "$status" "the check's exit status"
+        assert_files_equal /dev/null stdout
+        assert_equals "host-build-lag: GitHub answered 301 to the comparison of ${running} with ${green}" \
+          "$(cat stderr)" "the check's stderr"
+        assert_equals "" "$(ls -A out)" "the textfile directory"
+        assert_equals switches "$(ls -A state)" "the state directory"
+        assert_equals "" "$(ls -A tmp)" "the check's temp directory"
+      '';
+    }
+    {
       title = "it counts imp as lagging when imp-host does not answer";
       script = ''
         ${setupTest}
