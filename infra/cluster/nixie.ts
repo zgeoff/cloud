@@ -5,6 +5,7 @@ import { ConfigMap, Namespace, Secret, Service } from '@pulumi/kubernetes/core/v
 import type { Output } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
 import type { NixieInputs } from '../inputs/index.ts';
+import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
 import {
   buildNixieSpec,
   definitionsDeployKeyKey,
@@ -110,17 +111,9 @@ interface ServiceShape {
 }
 
 function createService(cluster: Provider, namespace: Output<string>, shape: ServiceShape): Service {
-  return new Service(
-    shape.name,
-    {
-      metadata: { name: shape.name, namespace },
-      spec: {
-        selector: shape.labels,
-        ports: [{ name: 'http', port: shape.port, targetPort: 'http' }],
-      },
-    },
-    { provider: cluster },
-  );
+  return new Service(shape.name, buildNixieServiceArgs({ ...shape, namespace }), {
+    provider: cluster,
+  });
 }
 
 interface StatefulSetShape {

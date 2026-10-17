@@ -9,8 +9,8 @@
 #
 # It reads VERDICT (the apply job's verdict, empty when that job never ran), EVENT
 # (github.event_name) and RUN_URL (the run's page), and op reads its token from
-# OP_SERVICE_ACCOUNT_TOKEN. An env file with no ALERT_WEBHOOK_URL fails (exit 1) before op
-# runs. A missing or extra argument is a usage error (exit 2).
+# OP_SERVICE_ACCOUNT_TOKEN. An env file with no ALERT_WEBHOOK_URL, or an empty token, fails
+# (exit 1) before op runs. A missing or extra argument is a usage error (exit 2).
 #
 #   VERDICT=<verdict> EVENT=<event> RUN_URL=<url> bash scripts/alert-prod-apply.sh <env file>
 set -euo pipefail
@@ -30,6 +30,12 @@ fi
 reference="$(sed -n 's/^ALERT_WEBHOOK_URL=//p' "$file")"
 if [ -z "$reference" ]; then
   echo "alert-prod-apply: $file sets no ALERT_WEBHOOK_URL" >&2
+  exit 1
+fi
+# op answers an empty token with only "error initializing client: ", as on the prod environment's
+# first runs, before its secret was set
+if [ -z "${OP_SERVICE_ACCOUNT_TOKEN:-}" ]; then
+  echo "alert-prod-apply: OP_SERVICE_ACCOUNT_TOKEN is empty; set the prod environment's secret to the deploy account's token" >&2
   exit 1
 fi
 url="$(op read --no-newline "$reference")"

@@ -177,15 +177,21 @@ jobs:
           DEPLOYED: ${{ steps.queued.outputs.deployed }}
         run: bun run ci:check-out-deployed-revision
 
-      # a failure here holds the apply rather than failing the run, so the plan still shows
+      # a failure here holds the apply rather than failing the run, so the plan still shows. Each
+      # Pulumi step reads GITHUB_TOKEN, which Pulumi sends when it downloads a plugin from GitHub,
+      # because GitHub limits the runners' shared address to 60 calls an hour without it. The drift
+      # checks and the preview run again after an ACME server's 5xx or a failed plugin download
+      # (retry-transient-pulumi.sh); the apply never does.
       - name: Check drift from the deployed revision
         id: drift
         if: steps.queued.outputs.apply == 'true'
         continue-on-error: true
-        working-directory: ${{ runner.temp }}/deployed
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: bun run drift -- --suppress-outputs
+          GITHUB_TOKEN: ${{ github.token }}
+          DEPLOYED_DIR: ${{ runner.temp }}/deployed
+        run:
+          bun run ci:retry-transient-pulumi -C "$DEPLOYED_DIR" bun run drift -- --suppress-outputs
 
       # the digest stays on the runner: the guard prints each held step's op and URN, never a
       # resource's state
@@ -194,6 +200,7 @@ jobs:
         if: steps.queued.outputs.apply == 'true'
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
           DRIFT: ${{ steps.drift.outcome }}
         run: bun run --silent ci:preview-and-guard-prod
 
@@ -209,13 +216,15 @@ jobs:
           github.event_name == 'workflow_dispatch')
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: bun run up -- --yes --refresh --skip-preview --suppress-outputs
 
       - name: Check drift after the apply
         if: steps.queued.outputs.apply == 'true'
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-        run: bun run drift -- --suppress-outputs
+          GITHUB_TOKEN: ${{ github.token }}
+        run: bun run ci:retry-transient-pulumi bun run drift -- --suppress-outputs
 
       # force=false refuses a move that is not forward along main
       - name: Move deployed/prod

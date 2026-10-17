@@ -128,8 +128,13 @@ person repairs the stack.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
-Pulumi's update plans would close that gap, but they are experimental, and a plan they reject stops
-the apply partway, which leaves the stack half changed.
+
+The drift checks and the preview run again when they fail on an error that a later try can pass: a
+server error from Let's Encrypt while the ACME provider refreshes nixie's certificate, or a failed
+plugin download. A preview changes nothing, so a second try is safe. The apply never runs twice,
+because a failed apply can leave the stack half changed. Pulumi's update plans would close that gap,
+but they are experimental, and a plan they reject stops the apply partway, which leaves the stack
+half changed.
 
 One apply runs at a time, and GitHub never cancels one in progress, because a cancelled apply leaves
 the stack half changed. The queue holds only the apply step, which a run reaches after its decision,

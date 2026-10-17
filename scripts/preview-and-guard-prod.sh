@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # The prod apply job's preview and guard: it builds the SDK, previews the prod stack with a
 # refresh into $RUNNER_TEMP/plan.json, and runs the guard (check-prod-plan.ts) on that plan and
-# DRIFT, the outcome of the drift check from the deployed revision. The guard's text goes to
-# stdout and to $GITHUB_STEP_SUMMARY, and its verdict to $GITHUB_OUTPUT: verdict=apply when it
-# passes the plan (exit 0), verdict=hold when it holds it (exit 3).
+# DRIFT, the outcome of the drift check from the deployed revision. The preview runs through
+# retry-transient-pulumi.sh, which runs it again after an ACME server's 5xx or a failed plugin
+# download. The guard's text goes to stdout and to $GITHUB_STEP_SUMMARY, and its verdict to
+# $GITHUB_OUTPUT: verdict=apply when it passes the plan (exit 0), verdict=hold when it holds it
+# (exit 3).
 #
 # The plan digest stays on the runner: the guard prints each held step's op and URN, never a
 # resource's state. A failed SDK build fails the run with its status before the preview. A failed
@@ -16,6 +18,7 @@
 # It also reads GITHUB_OUTPUT and GITHUB_STEP_SUMMARY, and passes its environment, the deploy
 # vault's OP_SERVICE_ACCOUNT_TOKEN among it, to the preview. It runs in the job's checkout.
 set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 for name in RUNNER_TEMP DRIFT GITHUB_OUTPUT GITHUB_STEP_SUMMARY; do
   if [ -z "${!name:-}" ]; then
@@ -26,7 +29,8 @@ done
 
 bun run sdk:build
 preview=0
-bun run --silent preview -- --refresh --json > "$RUNNER_TEMP/plan.json" || preview=$?
+bash "$here/retry-transient-pulumi.sh" --out "$RUNNER_TEMP/plan.json" \
+  bun run --silent preview -- --refresh --json || preview=$?
 guard=0
 bun run --silent ci:check-prod-plan "$RUNNER_TEMP/plan.json" "$DRIFT" > "$RUNNER_TEMP/guard.txt" || guard=$?
 tee -a "$GITHUB_STEP_SUMMARY" < "$RUNNER_TEMP/guard.txt"
