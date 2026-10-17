@@ -204,6 +204,21 @@ test.each([
   ['another scope', buildMockImpToken({ scope: 'admin' })],
   ['other imps', buildMockImpToken({ imps: ['*'] })],
   ['another grantable list', buildMockImpToken({ grantable: [] })],
+  ['glm alone as its grantable list', buildMockImpToken({ grantable: ['glm'] })],
+  [
+    'an extra grantable secret',
+    buildMockImpToken({
+      grantable: [
+        'claude-setup-token',
+        'github-imp-agents',
+        'glm',
+        'linear-imp-agents',
+        'op-connect',
+        'preview-model',
+      ],
+    }),
+  ],
+  ['a grantable string instead of a list', { ...buildMockImpToken(), grantable: 'glm' }],
 ])(
   'it stops without a check when atc-cloud exists with %s',
   async (_label: string, token: unknown) => {
