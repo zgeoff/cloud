@@ -122,7 +122,13 @@ k3s, imp-host and the atc daemon stay stopped. The datasets keep their data.
    with a trailing newline.
 
 2. Mount the datasets and start the services:
-   `ssh root@geoffcloud systemctl start tank-cloud.target k3s imp-host atc-daemon`. The target
-   requires every mount and every bind, and each mount loads the key again. The services alone would
-   mount only the datasets they need, and leave `imp-db-backups` unmounted.
+
+   ```bash
+   ssh root@geoffcloud systemctl start tank-cloud.target k3s imp-host atc-daemon imp-host-dns-token.path
+   ```
+
+   The target requires every mount and every bind, and each mount loads the key again. The services
+   alone would mount only the datasets they need, and leave `imp-db-backups` unmounted. The DNS
+   token's path unit needs the imp-host secrets bind, so it stays stopped until you start it too.
+
 3. Check as in [Switch and check](#switch-and-check).

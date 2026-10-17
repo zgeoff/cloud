@@ -102,7 +102,8 @@ are back, which restarts k3s's pods and puts every awake imp to sleep.
    ```
 
    Expect `active` four times. When one is not,
-   `systemctl start tank-cloud.target k3s imp-host atc-daemon` mounts everything and starts them.
+   `systemctl start tank-cloud.target k3s imp-host atc-daemon imp-host-dns-token.path` mounts
+   everything and starts them.
 
 ## Check
 
