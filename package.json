@@ -96,7 +96,7 @@
     "@zgeoff/bun-test-extended": "0.1.0",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/format-codemod": "0.1.0",
-    "@zgeoff/oxlint-config": "0.2.4",
+    "@zgeoff/oxlint-config": "0.2.5",
     "dependency-cruiser": "18.5.0",
     "knip": "6.24.0",
     "lefthook": "2.1.10",
