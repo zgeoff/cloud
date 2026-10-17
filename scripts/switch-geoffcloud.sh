@@ -144,11 +144,14 @@ docker run --rm --network host -v geoffcloud-nix-store:/nix \
   -c nix --extra-experimental-features nix-command copy --to "ssh://$host" "$built"
 
 # as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a boot after a failed activation still picks the
-# new system, then switch-to-configuration in its own unit, so it survives a dropped SSH
+# new system, then switch-to-configuration in its own unit, so it survives a dropped SSH. Between
+# them it records which commit the system was built from, which the host's build lag check
+# (nixos/modules/host-build-lag.sh) reads, because the store path does not hold the commit.
 require_gateway_major
 require_nixie_impd_major
 echo "== switch $host"
 ssh -o BatchMode=yes "$host" "nix-env -p /nix/var/nix/profiles/system --set '$built' \
+  && mkdir -p /var/lib/host-build-lag && echo '$commit $built' >> /var/lib/host-build-lag/switches \
   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER \
     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet \
     --service-type=exec --unit=switch-geoffcloud '$built/bin/switch-to-configuration' switch"

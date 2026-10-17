@@ -47,6 +47,9 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 - impd's health over HTTPS on the tailnet;
 - nixie's conversation turns, which fail without changing nixie's readiness status, so only the
   advisory part of nixie's readiness report shows them;
+- how long the host has run an older system or imp than the latest green build of `main`, which a
+  host timer compares with GitHub every hour, and the age of its last check, because a merged change
+  to the host waits for a person to switch it;
 - each atc daemon's reachability, at the severity the stack config sets per daemon, so the PC
   daemon, whose host sleeps, warns while the cloud daemon pages;
 - the tunnel's connections, summed over both cloudflared replicas, because the tunnel serves while
