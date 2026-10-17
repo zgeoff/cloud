@@ -7,20 +7,22 @@ schedule and on dispatch. Its check job compares each dependency's newest releas
 merges a bump that may merge on its own once its checks pass. A merged nixie bump changes the stack
 config, so the `Deploy prod` workflow applies it to prod with no person involved, unless its guard
 holds the plan ([the prod apply job](./prod-apply.md)). The same holds for the later pull request
-that pins the atc-gateway images an atc bump publishes. A host switch and an agent image rebuild
-stay with a person, and each pull request's body lists the steps its merge leaves. An atc major
-release reaches the host's atc daemon only after the atc gateway runs that major, because the host
-switch refuses a skew ([Switch the host](./workflows.md#switch-the-host)). An atc release reaches a
+that pins the atc-gateway images an atc bump publishes
+([The atc-gateway images](#the-atc-gateway-images)). A host switch and an agent image rebuild stay
+with a person, and each pull request's body lists the steps its merge leaves. An atc major release
+reaches the host's atc daemon only after the atc gateway runs that major, because the host switch
+refuses a skew ([Switch the host](./workflows.md#switch-the-host)). An atc release reaches a
 daemon's `cloud` target only in the order that
 [the agent image runbook](./agent-image.md#roll-out-an-atc-release) gives: the image first, then the
 daemon.
 
-| Dependency | Branch                    | Pins                                                                        |
-| ---------- | ------------------------- | --------------------------------------------------------------------------- |
-| atc        | `release-check/atc`       | the agent image, the host's atc daemon, the atc-gateway images' release     |
-| imp        | `release-check/imp`       | imp's NixOS module and its lock with the imp-host image, the imp-base image |
-| nixie      | `release-check/nixie`     | the nixie and nixie-web images in the stack config                          |
-| auto-mode  | `release-check/auto-mode` | the auto-mode tarball in the agent image                                    |
+| Dependency         | Branch                             | Pins                                                                        |
+| ------------------ | ---------------------------------- | --------------------------------------------------------------------------- |
+| atc                | `release-check/atc`                | the agent image, the host's atc daemon, the atc-gateway images' release     |
+| imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image |
+| nixie              | `release-check/nixie`              | the nixie and nixie-web images in the stack config                          |
+| auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                    |
+| atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                       |
 
 The release registry in `scripts/release/` holds one record per dependency: its repository, its tag
 form, what its releases publish, and each pin's lines in the files. The bump reads each value it
@@ -46,6 +48,32 @@ still serves the pinned digest. The atc-gateway packages on GHCR are private, so
 them with a GitHub token that can read packages: CI hands it the workflow's token, and on a PC it
 takes the token that `gh auth token` prints, which needs the `read:packages` scope
 (`gh auth refresh -s read:packages`).
+
+## The atc-gateway images
+
+This repository builds and publishes the atc-gateway images itself, so their digests exist only
+after a merge. The registry record `atc-gateway-images` holds their pins in the stack config, and
+the release check never reads it. Instead, the `atc-gateway images` workflow runs on each push to
+`main` that changes `images/atc-gateway/versions.env`, such as a merged atc bump:
+
+1. Its decide job compares the push with the commit before it. A pull request skips the job, and the
+   publish job refuses any ref other than `main`, so a pull request never publishes.
+2. Its publish job builds both images at the pins, pushes each tag that GHCR lacks, and reads both
+   tags' digests from GHCR.
+3. As the release check app, it opens or updates `release-check/atc-gateway-images`, which pins
+   those digests and the pin table.
+4. The merge workflow merges it by the rules in
+   [When a bump merges on its own](#when-a-bump-merges-on-its-own), and the `Deploy prod` workflow
+   applies it.
+
+The gateway image's tag is the atc release, so its pull request takes the release check's labels. A
+pull request that moves only the backup image's tag moves no release version, so it waits for a
+review. A manual run on `main` with `push: true` publishes and opens the pull request too, which
+repairs a run that failed after its push:
+
+```bash
+gh workflow run atc-gateway-images.yml --ref main -f push=true
+```
 
 ## When a bump merges on its own
 

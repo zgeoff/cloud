@@ -7,17 +7,29 @@ type ReleaseSource =
   | { readonly kind: 'sha256sums' }
   | { readonly kind: 'image-digests'; readonly images: readonly string[] }
   | { readonly kind: 'release-notes' }
-  | { readonly kind: 'npm-tarball'; readonly packageName: string };
+  | { readonly kind: 'npm-tarball'; readonly packageName: string }
+  | { readonly kind: 'published-images'; readonly images: readonly PublishedImage[] };
+
+// An image this repository's own workflow publishes, at the tag that one line of a pin file names
+// in its tag group. The workflow that publishes the images opens their pull request, so the release
+// check never reads a published-images record, and the first image's tag is the bump's version.
+export interface PublishedImage {
+  readonly image: string;
+  readonly file: string;
+  readonly pattern: string;
+}
 
 // A version is read and compared. A tag or a commit moves with the version and is never read. A
 // sum, a digest or a tarball sum is the release's own value, which a pin at its version must hold.
+// An image tag is the tag a published image carries, which moves with that image's digest.
 export type PinPart =
   | { readonly kind: 'version' }
   | { readonly kind: 'tag' }
   | { readonly kind: 'commit'; readonly length: number }
   | { readonly kind: 'sum'; readonly asset: string | PinAssetLine }
   | { readonly kind: 'digest'; readonly image: string }
-  | { readonly kind: 'tarball-sum' };
+  | { readonly kind: 'tarball-sum' }
+  | { readonly kind: 'image-tag'; readonly image: string };
 
 // the line of a pin file that names the asset whose sum another line pins
 export interface PinAssetLine {
@@ -141,7 +153,58 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
       },
     ],
     rollout:
-      'Rebuild the agent image (`docs/runbooks/agent-image.md`) and publish the atc-gateway images. The `Deploy prod` workflow applies the pull request that pins their digests once it merges (`docs/runbooks/prod-apply.md`). Then switch the host (`docs/runbooks/workflows.md`), which refuses while the deployed gateway runs another atc major than the daemon pin.',
+      'Rebuild the agent image (`docs/runbooks/agent-image.md`). The atc-gateway images workflow publishes the gateway images and opens the pull request that pins their digests, which the `Deploy prod` workflow applies once it merges (`docs/runbooks/prod-apply.md`). Then switch the host (`docs/runbooks/workflows.md`), which refuses while the deployed gateway runs another atc major than the daemon pin.',
+  },
+  {
+    name: 'atc-gateway-images',
+    repo: 'zgeoff/atc',
+    tagPrefix: '@zgeoff/atc@',
+    source: {
+      kind: 'published-images',
+      images: [
+        {
+          image: 'atc-gateway',
+          file: 'images/atc-gateway/versions.env',
+          pattern: String.raw`^GATEWAY_IMAGE_TAG=(?<tag>\d+\.\d+\.\d+)$`,
+        },
+        {
+          image: 'atc-gateway-backup',
+          file: 'images/atc-gateway/versions.env',
+          pattern: String.raw`^BACKUP_IMAGE_TAG=(?<tag>[\w.-]+)$`,
+        },
+      ],
+    },
+    pins: [
+      {
+        id: 'atc-gateway-image',
+        title: 'the atc-gateway image (`infra/Pulumi.prod.yaml`)',
+        lines: [
+          {
+            file: 'infra/Pulumi.prod.yaml',
+            pattern: String.raw`^ +image: ghcr\.io\/zgeoff\/atc-gateway:(?<version>\d+\.\d+\.\d+)@(?<digest>sha256:[0-9a-f]{64})$`,
+            parts: { version, digest: { kind: 'digest', image: 'atc-gateway' } },
+          },
+        ],
+      },
+
+      // the backup image's tag has its own revision, so the pin has no release version
+      {
+        id: 'atc-gateway-backup-image',
+        title: 'the atc-gateway backup image (`infra/Pulumi.prod.yaml`)',
+        lines: [
+          {
+            file: 'infra/Pulumi.prod.yaml',
+            pattern: String.raw`^ +backupImage: ghcr\.io\/zgeoff\/atc-gateway-backup:(?<tag>[\w.-]+)@(?<digest>sha256:[0-9a-f]{64})$`,
+            parts: {
+              tag: { kind: 'image-tag', image: 'atc-gateway-backup' },
+              digest: { kind: 'digest', image: 'atc-gateway-backup' },
+            },
+          },
+        ],
+      },
+    ],
+    rollout:
+      'The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). For an atc major release, switch the host after the gateway runs it (`docs/runbooks/workflows.md`).',
   },
   {
     name: 'imp',

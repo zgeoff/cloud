@@ -97,7 +97,7 @@ test('it refuses to write a table when a pin line is missing', async () => {
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
-      `${String.raw`check-release-pins: infra/Pulumi.prod.yaml has 0 lines that match '^ +image: ghcr\.io\/zgeoff\/nixie:(?<version>\d+\.\d+\.\d+)@(?<digest>sha256:[0-9a-f]{64})$', want 1`}\n`,
+      `${String.raw`check-release-pins: infra/Pulumi.prod.yaml has 0 lines that match '^ +image: ghcr\.io\/zgeoff\/atc-gateway:(?<version>\d+\.\d+\.\d+)@(?<digest>sha256:[0-9a-f]{64})$', want 1`}\n`,
     ],
   ]);
 });

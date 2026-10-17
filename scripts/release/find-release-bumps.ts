@@ -10,6 +10,12 @@ import { readReleaseTags } from './read-release-tags.ts';
 import type { ReleaseRecord } from './release-registry.ts';
 import { releaseRegistry } from './release-registry.ts';
 
+// the records whose pins follow another repository's releases; the workflow that publishes a
+// published-images record's images opens its pull request instead
+const checkedRecords = releaseRegistry.filter(
+  (record) => record.source.kind !== 'published-images',
+);
+
 // One line for each registry record whose newest release, among the latest 30 that are not drafts
 // or prereleases, is newer than one of its pins: `<dependency> <newest> <pinned>...`. Every pin is
 // read first, so a broken pin fails before any release is read.
@@ -25,7 +31,7 @@ export async function findReleaseBumps(
 
   const lines: string[] = [];
 
-  for (const [index, record] of releaseRegistry.entries()) {
+  for (const [index, record] of checkedRecords.entries()) {
     const line = await findRecordBump(run, record, pins[index] ?? []);
 
     if (line instanceof Error) {
@@ -38,11 +44,11 @@ export async function findReleaseBumps(
   return lines;
 }
 
-// each record's pinned versions, in the registry's order
+// each checked record's pinned versions, in the registry's order
 async function loadAllPinnedVersions(root: string) {
   const pins: (readonly string[])[] = [];
 
-  for (const record of releaseRegistry) {
+  for (const record of checkedRecords) {
     const files = await loadFiles(root, collectPinFiles(record));
 
     const pinned = findPinnedVersions(record, files);

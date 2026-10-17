@@ -34,9 +34,11 @@ it, so the alert for a daemon fires when the gateway could not reach it either
 ## The gateway pod
 
 The gateway is atc's released binary in a distroless image that this repo builds. CI builds the
-image from the pinned release after checking the release's checksum, and publishes it only on a
-manual run, without replacing a tag that already exists; the stack config names each image by
-digest, so a deploy runs exactly the image that was checked.
+image from the pinned release after checking the release's checksum. Only `main` publishes it: a
+push that changes the image pins, or a manual run on `main`, and neither replaces a tag that already
+exists. The stack config names each image by digest, so a deploy runs exactly the image that was
+checked. After a publish, the workflow opens a pull request that pins the new digests, which merges
+and applies as a release bump does ([the release check](../../runbooks/release-check.md)).
 
 The gateway's image and the backup image are private packages on GHCR, so k3s pulls them with a pull
 Secret in each namespace that runs one: the gateway's own and nixie's, whose backup runs in the same

@@ -1,4 +1,4 @@
-import { findJSONField } from '../find-json-field.ts';
+import { readImageDigest } from './read-image-digest.ts';
 import type { ReleaseRead, ReleaseReadResult } from './read-release-values.ts';
 import { runChecked } from './run-checked.ts';
 
@@ -33,7 +33,7 @@ async function readDigests(read: ReleaseRead, images: readonly string[]) {
   const digests: Record<string, string> = {};
 
   for (const image of images) {
-    const digest = await readDigest(read, image);
+    const digest = await readImageDigest(read.run, `ghcr.io/zgeoff/${image}:${read.version}`);
 
     if (digest instanceof Error) {
       return digest;
@@ -43,36 +43,4 @@ async function readDigests(read: ReleaseRead, images: readonly string[]) {
   }
 
   return digests;
-}
-
-async function readDigest(read: ReleaseRead, image: string) {
-  const manifest = await runChecked(read.run, [
-    'docker',
-    'buildx',
-    'imagetools',
-    'inspect',
-    `ghcr.io/zgeoff/${image}:${read.version}`,
-    '--format',
-    '{{json .Manifest}}',
-  ]);
-
-  if (manifest instanceof Error) {
-    return manifest;
-  }
-
-  const digest = findJSONField(tryParseJSON(manifest), 'digest');
-
-  return typeof digest === 'string' && /^sha256:[0-9a-f]{64}$/u.test(digest)
-    ? digest
-    : new Error(`ghcr.io/zgeoff/${image}:${read.version} names no sha256 digest`);
-}
-
-function tryParseJSON(text: string): unknown {
-  try {
-    const value: unknown = JSON.parse(text);
-
-    return value;
-  } catch {
-    return null;
-  }
 }

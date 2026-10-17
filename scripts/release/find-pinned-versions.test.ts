@@ -45,7 +45,12 @@ test('it fails on a pin file the checkout lacks', () => {
   );
 });
 
-test.each(releaseRegistry.map((record) => [record.name, record] as const))(
+// the release check reads every record but a published-images one, whose workflow pins it
+const checkedRecords = releaseRegistry.filter(
+  (record) => record.source.kind !== 'published-images',
+);
+
+test.each(checkedRecords.map((record) => [record.name, record] as const))(
   'it finds a release version for every %s pin in the real checkout',
   async (_name, record) => {
     const checkout = join(import.meta.dir, '../..');

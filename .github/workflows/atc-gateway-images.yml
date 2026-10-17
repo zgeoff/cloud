@@ -1,7 +1,12 @@
 name: atc-gateway images
 
-# Runs the fixture test on every change to the images. Publishing to GHCR happens
-# only on a manual run with push: true, an operator step that needs approval.
+# Runs the fixture test on every change to the images. Only main publishes to GHCR: a push to
+# main that changes images/atc-gateway/versions.env, or a manual run on main with push: true
+# (scripts/release/decide-gateway-publish.ts). A pull request never publishes: the decide job
+# skips on one, and the publish job also refuses any ref but main. After the push, the publish job
+# opens the pull request that pins the new digests in infra/Pulumi.prod.yaml, as the release check
+# app, so CI runs on it; the release bump merge workflow merges it by its rules, and the Deploy
+# prod workflow applies it (docs/runbooks/release-check.md).
 on:
   push:
     branches: [main]
@@ -56,14 +61,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: bun run test:atc-gateway-fixture
 
-  publish:
-    needs: fixture
-    if: github.event_name == 'workflow_dispatch' && inputs.push
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: write
+  decide:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -73,7 +76,70 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      - name: Decide whether to publish
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          REF: ${{ github.ref }}
+          PUSH_INPUT: ${{ inputs.push }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: bun run --silent ci:decide-atc-gateway-publish
+
+  publish:
+    needs: [fixture, decide]
+    if: >-
+      github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
+      needs.decide.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # one publish at a time; a newer push waits, and replaces any older one still waiting, since
+    # its commit holds every earlier pin change
+    concurrency:
+      group: atc-gateway-publish
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Mint the release check app token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_CHECK_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_CHECK_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      # the full history of main, so the pull request step can compare its branch with the merge base
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      # also signs docker in to ghcr.io, which the pull request step reads the digests from
       - name: Build and push
         env:
           GH_TOKEN: ${{ github.token }}
         run: bun run ci:publish-atc-gateway-images
+
+      # commits as the app's bot user, so the release bump merge accepts the commit
+      - name: Set the git identity
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: bun run --silent ci:set-release-bot-identity "$SLUG"
+
+      - name: Open or update the pull request that pins the digests
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+        run: bun run --silent ci:pin-atc-gateway-images

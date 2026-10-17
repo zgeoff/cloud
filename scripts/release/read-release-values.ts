@@ -52,6 +52,11 @@ export async function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadR
     case 'npm-tarball': {
       return readNPMTarballValues(read, source.packageName);
     }
+    case 'published-images': {
+      return new Error(
+        `${read.record.name} pins images this repository publishes: the workflow that publishes them opens its pull request`,
+      );
+    }
 
     // the type check refuses a kind with no case, so only a registry built outside it lands here
     default: {

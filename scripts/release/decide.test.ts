@@ -98,6 +98,74 @@ test('it merges a nixie bump once the nixie backup fixture passed', () => {
   });
 });
 
+test('it merges a gateway image bump once the nixie backup fixture passed', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 14,
+    authorLogin: 'app/cloud-release-check',
+    head: '5555555555555555555555555555555555555555',
+    labels: ['update:minor', 'auto-merge'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
+    commits: [
+      {
+        oid: '5555555555555555555555555555555555555555',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'nixie backup', name: 'fixture', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
+  });
+
+  expect(
+    decide({
+      branch: 'release-check/atc-gateway-images',
+      appLogin: 'app/cloud-release-check',
+      pr,
+    }),
+  ).toStrictEqual({
+    action: 'merge',
+    number: 14,
+    head: '5555555555555555555555555555555555555555',
+  });
+});
+
+test('it holds a gateway image bump that changes the image pins file', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 15,
+    authorLogin: 'app/cloud-release-check',
+    head: '6666666666666666666666666666666666666666',
+    labels: ['update:minor', 'auto-merge'],
+    files: [
+      'images/atc-gateway/versions.env',
+      'infra/Pulumi.prod.yaml',
+      'scripts/release/release-pins.json',
+    ],
+    commits: [
+      {
+        oid: '6666666666666666666666666666666666666666',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'nixie backup', name: 'fixture', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
+  });
+
+  expect(
+    decide({
+      branch: 'release-check/atc-gateway-images',
+      appLogin: 'app/cloud-release-check',
+      pr,
+    }),
+  ).toStrictEqual({
+    action: 'hold',
+    number: 15,
+    reason: 'it changes images/atc-gateway/versions.env, which no pin of its dependency writes',
+  });
+});
+
 test('it merges an auto-mode bump that changes only the agent image', () => {
   const pr = buildMockBumpPullRequest({
     number: 8,
