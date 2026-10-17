@@ -13,6 +13,13 @@ datasets: you create them once with the commands below, before the first switch 
 enables it. The `tank-cloud-unlock` check boots a VM through those commands, a reboot, a reboot
 without the key and a restored key.
 
+The secret files of imp-host and the atc daemon and impd's database copies keep their paths and live
+on these datasets: the module bind-mounts a directory of `host-secrets` at
+`/var/lib/imp-host/secrets` and `/var/lib/atc-daemon-secrets`, and the root of `imp-db-backups` at
+`/root/imp-db-backups`. A bind is `nofail` and requires its dataset's mount, so without the key it
+is not made, and the path stays the empty directory on `vda`.
+[Move the host secrets](./move-host-secrets.md) moves the files and removes the old copies.
+
 ## Create the datasets
 
 **CAUTION:** A switch to a config that enables `services.tank-cloud` while `tank/cloud` does not
@@ -115,7 +122,13 @@ k3s, imp-host and the atc daemon stay stopped. The datasets keep their data.
    with a trailing newline.
 
 2. Mount the datasets and start the services:
-   `ssh root@geoffcloud systemctl start tank-cloud.target k3s imp-host atc-daemon`. The target
-   requires every mount, and each mount loads the key again. The services alone would mount only the
-   datasets they need, and leave `imp-db-backups` unmounted.
+
+   ```bash
+   ssh root@geoffcloud systemctl start tank-cloud.target k3s imp-host atc-daemon imp-host-dns-token.path
+   ```
+
+   The target requires every mount and every bind, and each mount loads the key again. The services
+   alone would mount only the datasets they need, and leave `imp-db-backups` unmounted. The DNS
+   token's path unit needs the imp-host secrets bind, so it stays stopped until you start it too.
+
 3. Check as in [Switch and check](#switch-and-check).

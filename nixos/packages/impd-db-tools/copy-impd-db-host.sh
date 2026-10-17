@@ -19,6 +19,13 @@ if [[ ! "$label" =~ ^[A-Za-z0-9._-]+$ ]]; then
 fi
 static="$STATIC_SQLITE3"
 sqlite="${SQLITE3:-sqlite3}"
+# on geoffcloud the directory is a bind mount of tank/cloud/imp-db-backups; with the mount gone
+# (a failed key or mount), a copy would land in the clear on the root disk, and the bind would
+# hide it later. The restore rehearsal VMs have no mount and set the variable.
+if [ -z "${COPY_IMPD_DB_ALLOW_UNMOUNTED:-}" ] && ! mountpoint -q /root/imp-db-backups; then
+  echo "/root/imp-db-backups is not a mount point; nothing copied" >&2
+  exit 1
+fi
 # /root exists, so -m sets the mode of the one directory this creates
 # shellcheck disable=SC2174
 mkdir -p -m 0700 /root/imp-db-backups

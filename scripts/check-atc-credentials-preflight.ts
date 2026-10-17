@@ -74,7 +74,13 @@ async function hasDaemonTokenItem(context: Readonly<ATCCredentialsContext>) {
 async function readHostFiles(context: Readonly<ATCCredentialsContext>) {
   const dir = toShellArg(context.dir);
 
-  await runOnHost(context, [`install -d -m 0700 -o root -g root ${dir}`]);
+  // the directory is a bind mount of tank/cloud; with it gone, a credential would land in the
+  // clear on the root disk and the bind would hide it later
+  const refusal = toShellArg(`${context.dir} is not a mount point; nothing written`);
+
+  await runOnHost(context, [
+    `mountpoint -q ${dir} || { echo ${refusal} >&2; exit 1; }; install -d -m 0700 -o root -g root ${dir}`,
+  ]);
 
   const listing = await runOnHost(context, [`ls ${dir}`]);
 

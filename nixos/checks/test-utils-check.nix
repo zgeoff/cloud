@@ -23,6 +23,10 @@ let
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
   stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubOpRead = import ./test-utils/build-stub-op-read.nix { inherit pkgs; } {
+    "op://vault/item/field" = "a value with spaces";
+    "op://vault/item/other" = "other";
+  };
 
   cases = [
     {
@@ -1355,6 +1359,49 @@ let
         assert_equals 1 "$add" "the script's image add"
         assert_equals 2 "$calls" "the script's calls through DOCKER"
         assert_equals 0 "$direct" "the script's calls of docker by name"
+      '';
+    }
+    {
+      title = "it buildStubOpRead prints the value of a reference with no newline added, as op read --no-newline does";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="${stubOpRead}/bin:$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          op read --no-newline op://vault/item/field > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal /dev/null err
+        printf '%s' 'a value with spaces' > expected
+        assert_files_equal expected out
+      '';
+    }
+    {
+      title = "it buildStubOpRead fails a reference it does not hold as op fails an unknown item";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="${stubOpRead}/bin:$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          op read --no-newline op://vault/item/missing > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "[ERROR] 2026/10/07 12:00:00 could not read secret op://vault/item/missing" "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubOpRead fails a read without --no-newline as unexpected";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="${stubOpRead}/bin:$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
+          op read op://vault/item/field > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: read op://vault/item/field" "$(cat err)" "the error"
       '';
     }
   ];

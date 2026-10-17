@@ -5,8 +5,8 @@
 #   bash scripts/run-nixos-checks.sh            # every check in checks.x86_64-linux
 #   bash scripts/run-nixos-checks.sh atc-daemon # one check, by its name there
 #
-# impd-restore, every other check named impd-restore-*, tank-cloud-unlock and tank-imp-encrypt
-# boot a NixOS VM, so they need KVM:
+# impd-restore, every other check named impd-restore-*, tank-cloud-unlock, tank-cloud-host-secrets
+# and tank-imp-encrypt boot a NixOS VM, so they need KVM:
 # unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and writable, the
 # script builds every other check it was asked for and then fails, naming those checks. Each such
 # check itself fails if QEMU still falls back to emulation. A container for each check evaluates it to
@@ -81,7 +81,7 @@ missing_kvm=()
 installables=()
 for check in "${checks[@]}"; do
   case "$check" in
-    impd-restore | impd-restore-* | tank-cloud-unlock | tank-imp-encrypt)
+    impd-restore | impd-restore-* | tank-cloud-unlock | tank-cloud-host-secrets | tank-imp-encrypt)
       # QEMU opens the device read-write, and falls back to emulation when it cannot
       if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
         missing_kvm+=("$check")

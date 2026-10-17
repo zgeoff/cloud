@@ -22,13 +22,20 @@ ref="${IMP_DNS_TOKEN_REF:-op://cloud/imp-dns-cloudflare/credential}"
 email_ref="${IMP_ACME_EMAIL_REF:-op://cloud/imp-dns-cloudflare/acme-email}"
 env_file="${IMP_ENV_FILE:-/var/lib/imp-host/secrets/imp-host.env}"
 token_file="${IMP_DNS_TOKEN_FILE:-/var/lib/imp-host/secrets/dns-api-token}"
+# the bind mount of tank/cloud that must hold both files; with it gone, the files would land
+# in the clear on the root disk and the bind would hide them later. Empty skips the check.
+secrets_mount="${IMP_SECRETS_MOUNT-/var/lib/imp-host/secrets}"
 
-# runs on the host; reads the token, then the email, from stdin; takes the env file and the
-# token file paths as $1 and $2
+# runs on the host; reads the token, then the email, from stdin; takes the env file, the
+# token file and the required mount point (or "") as $1, $2 and $3
 # shellcheck disable=SC2016 # expanded on the host, not here
 remote='set -euo pipefail
 env_file=$1
 token_file=$2
+if [ -n "$3" ] && ! mountpoint -q "$3"; then
+  echo "$3 is not a mount point; nothing changed" >&2
+  exit 1
+fi
 IFS= read -r token
 IFS= read -r email
 umask 077
@@ -60,8 +67,8 @@ fi
 
 if [ "$host" = local ]; then
   # test mode: run the host side here, against IMP_ENV_FILE
-  printf '%s\n%s\n' "$token" "$email" | bash -c "$remote" _ "$env_file" "$token_file"
+  printf '%s\n%s\n' "$token" "$email" | bash -c "$remote" _ "$env_file" "$token_file" "$secrets_mount"
 else
-  printf '%s\n%s\n' "$token" "$email" | ssh -o BatchMode=yes "$host" "bash -c $(printf '%q' "$remote") _ $(printf '%q' "$env_file") $(printf '%q' "$token_file")"
+  printf '%s\n%s\n' "$token" "$email" | ssh -o BatchMode=yes "$host" "bash -c $(printf '%q' "$remote") _ $(printf '%q' "$env_file") $(printf '%q' "$token_file") $(printf '%q' "$secrets_mount")"
 fi
 unset token email

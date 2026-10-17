@@ -8,7 +8,9 @@
 # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file there), the
 # scripts that run them and pin their image (run-nixos-checks.sh and nix-image.sh), the scripts
 # that decide when they run (this script, find-nixos-check-run.sh and decide-nixos-checks.sh),
-# the script that opens KVM to them (open-kvm.sh), .bun-version, the workflow itself, and the
+# the script that opens KVM to them (open-kvm.sh), the scripts that tank-cloud-host-secrets runs in
+# its VM (host/move-host-secrets.sh, install-imp-dns-token.sh and host/write-atc-gateway-token.sh),
+# .bun-version, the workflow itself, and the
 # preview service's source (packages/preview/), which the host's package copies. A rename
 # counts both its old and new path. The root package.json is no input, although its test:nixos
 # script runs the checks: it changes with every dependency bump, and a bump would otherwise
@@ -57,6 +59,8 @@ while IFS= read -r -d '' path; do
       test-support/shell/wait-for.sh | \
       scripts/run-nixos-checks.sh | scripts/nix-image.sh | scripts/needs-nixos-checks.sh | \
       scripts/find-nixos-check-run.sh | scripts/decide-nixos-checks.sh | scripts/open-kvm.sh | \
+      scripts/host/move-host-secrets.sh | scripts/install-imp-dns-token.sh | \
+      scripts/host/write-atc-gateway-token.sh | \
       .bun-version | .github/workflows/nixos-checks.yml)
       echo true
       exit 0

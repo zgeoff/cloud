@@ -56,6 +56,12 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
    warns.
 
+   The pool `tank` keeps `tank/cloud`, which holds the live copies of the imp files and of the atc
+   daemon's tokens ([Move the host secrets](./move-host-secrets.md)). The install puts the staged
+   imp files on `vda` in the clear, and a bind mount from `tank/cloud` shadows them without removing
+   them. Step 8 moves them into `tank/cloud` or deletes them, and the reinstall is not complete
+   before it.
+
    Stage the key of the encryption root `tank/cloud` too. `--no-newline` keeps the file at exactly
    the key's 64 hex characters, so the length check catches a wrong item before the install:
 
@@ -107,7 +113,53 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    allows, so the tailnet is its only SSH path. If the host does not join the tailnet, reach it
    through the Onidel noVNC console.
 
-8. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
+8. Clear the staged imp files off `vda`, which Onidel snapshots. On the host, check the bind:
+
+   ```sh
+   findmnt -n -o SOURCE,FSTYPE --mountpoint /var/lib/imp-host/secrets
+   ```
+
+   With `tank/cloud/host-secrets[/imp-host] zfs`, the pool held the live copies and the bind shadows
+   the staged ones: delete them through a bind of `/` that shows the root disk, and keep what the
+   pool holds:
+
+   ```sh
+   d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d" &&
+     rm -f "$d"/var/lib/imp-host/secrets/* &&
+     ls -A "$d"/var/lib/imp-host/secrets &&   # expect no output
+     umount "$d" && rmdir "$d" && echo removed
+   ```
+
+   Expect `removed`. The `&&` chain stops before the `rm` when `mktemp` or the bind fails, since an
+   empty `$d` would make the `rm` delete the live files on the pool.
+
+   With no output from `findmnt`, the pool lacks `host-secrets/imp-host` and the bind failed, so
+   imp-host stays stopped. Copy the staged files into the encrypted dataset, mount the binds, and
+   delete the staged copies the same way:
+
+   **CAUTION:** The staged files are the host's only local copies. Delete them only after the copy
+   succeeds and matches, as the `&&` chain below does: a failed `cp -a`, such as on a full pool,
+   then stops the block and keeps them. The chain starts with `mountpoint -q`, so it never copies
+   the files onto the empty mount point on the root disk while the dataset is not mounted.
+
+   ```sh
+   mountpoint -q /var/lib/tank-cloud/host-secrets &&
+     install -d -m 0700 /var/lib/tank-cloud/host-secrets/imp-host /var/lib/tank-cloud/host-secrets/atc-daemon &&
+     cp -a /var/lib/imp-host/secrets/. /var/lib/tank-cloud/host-secrets/imp-host/ &&
+     diff -r /var/lib/imp-host/secrets /var/lib/tank-cloud/host-secrets/imp-host > /dev/null &&
+     systemctl start tank-cloud.target imp-host &&
+     findmnt -n -o SOURCE,FSTYPE --mountpoint /var/lib/imp-host/secrets &&
+     d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d" &&
+     rm -f "$d"/var/lib/imp-host/secrets/* &&
+     umount "$d" && rmdir "$d" && echo removed
+   ```
+
+   Expect `tank/cloud/host-secrets[/imp-host] zfs`, then `removed`. Without `removed`, the block
+   stopped at the failed step, and the staged copies stay on the root disk. Run
+   `bash scripts/install-imp-dns-token.sh` from this machine to restore the DNS token, which the
+   reinstall does not stage. The script refuses to write while the bind is not mounted.
+
+9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
 
 ## Connect Pulumi to k3s
 

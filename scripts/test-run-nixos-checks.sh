@@ -285,6 +285,29 @@ EOF
   }
 }
 
+it_fails_naming_tank_cloud_host_secrets_and_builds_nothing_when_kvm_is_missing() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
+    KVM_DEVICE="$tree/no-kvm" \
+    bash "$script" tank-cloud-host-secrets > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; tank-cloud-host-secrets needs KVM"
+  diff - "$tree/calls" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+EOF
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
 it_fails_naming_tank_imp_encrypt_and_builds_nothing_when_kvm_is_missing() {
   local status=0
   tree="$(mktemp -d)"

@@ -1,11 +1,13 @@
 # The boot unlock of tank/cloud (modules/tank-cloud.nix) in a NixOS VM, across real reboots: a
 # ZFS pool on an empty disk, imported at boot as geoffcloud imports tank, and the datasets made
-# with the commands of docs/runbooks/tank-cloud.md and a throwaway key. Stand-ins named k3s,
-# imp-host, atc-daemon and preview need the datasets that geoffcloud's own
-# services.tank-cloud.requiredBy gives them, and each writes a marker into every dataset it needs when it starts, so a start on
-# the root disk's empty mount points would leave a file there. The subtests are one journey and
-# run in order: datasets made, a reboot that mounts them, a reboot with the key file gone, and the
-# key restored without a trailing newline, as `op read --no-newline` writes it.
+# with the commands of docs/runbooks/tank-cloud.md and a throwaway key, and the bind mounts of
+# geoffcloud's own services.tank-cloud.binds on directories made on the datasets, as the move of
+# the host secrets makes them (docs/runbooks/move-host-secrets.md). A stand-in for each service in
+# geoffcloud's own services.tank-cloud.requiredBy needs the datasets and binds that it names, and
+# writes a marker into every one of them when it starts, so a start on the root disk's empty mount
+# points would leave a file there. The subtests are one journey and run in order: datasets made, a
+# reboot that mounts them and the binds, a reboot with the key file gone, and the key restored
+# without a trailing newline, as `op read --no-newline` writes it.
 # It needs KVM: run `bun run test:nixos tank-cloud-unlock`.
 { nixpkgs, geoffcloud }:
 let
@@ -14,7 +16,11 @@ let
   # 64 hex characters, as keyformat=hex needs; a fixed value, never the host's key
   throwawayKey = lib.strings.replicate 8 "0f1e2d3c";
   requiredBy = geoffcloud.config.services.tank-cloud.requiredBy;
+  binds = geoffcloud.config.services.tank-cloud.binds;
   mountPoint = dataset: "/var/lib/tank-cloud/${dataset}";
+  # a requiredBy name is a dataset or a bind; either gives the path to write into
+  pathOf = name: if binds ? ${name} then binds.${name}.path else mountPoint name;
+  bindPaths = lib.mapAttrsToList (_: bind: bind.path) binds;
 in
 pkgs.testers.runNixOSTest {
   name = "tank-cloud-unlock";
@@ -37,7 +43,7 @@ pkgs.testers.runNixOSTest {
 
       services.tank-cloud = {
         enable = true;
-        inherit requiredBy;
+        inherit binds requiredBy;
       };
       # the VM mounts virtualisation.fileSystems in place of fileSystems
       virtualisation.fileSystems = config.services.tank-cloud.fileSystems;
@@ -70,7 +76,7 @@ pkgs.testers.runNixOSTest {
         description = "stand-in ${name}";
         wantedBy = [ "multi-user.target" ];
         script = ''
-          for path in ${lib.escapeShellArgs (map mountPoint needed)}; do
+          for path in ${lib.escapeShellArgs (map pathOf needed)}; do
             echo started > "$path/${name}-started"
           done
           exec sleep infinity
@@ -82,6 +88,12 @@ pkgs.testers.runNixOSTest {
     key = "${throwawayKey}"
     services = ${builtins.toJSON (lib.attrNames requiredBy)}
     mount_points = ["${mountPoint "host-secrets"}", "${mountPoint "imp-db-backups"}", "${mountPoint "rancher"}"]
+    bind_paths = ${builtins.toJSON bindPaths}
+    bind_mounts = [
+        "tank/cloud/host-secrets[/atc-daemon] zfs",
+        "tank/cloud/host-secrets[/imp-host] zfs",
+        "tank/cloud/imp-db-backups zfs",
+    ]
 
 
     def assert_unlocked():
@@ -90,6 +102,8 @@ pkgs.testers.runNixOSTest {
         zvol = machine.succeed("readlink -f /dev/zvol/tank/cloud/rancher").strip()
         mounts = [machine.succeed(f"findmnt -rn -o SOURCE,FSTYPE --mountpoint {path}").strip() for path in mount_points]
         assert mounts == ["tank/cloud/host-secrets zfs", "tank/cloud/imp-db-backups zfs", f"{zvol} ext4"], f"the mounts are {mounts}"
+        binds = [machine.succeed(f"findmnt -rn -o SOURCE,FSTYPE --mountpoint {path}").strip() for path in bind_paths]
+        assert binds == bind_mounts, f"the binds are {binds}"
 
 
     machine.wait_for_unit("multi-user.target")
@@ -121,6 +135,15 @@ pkgs.testers.runNixOSTest {
     machine.succeed("zfs create -s -V 64G tank/cloud/rancher")
     machine.succeed("udevadm settle")
     machine.succeed("mkfs.ext4 -q -L rancher /dev/zvol/tank/cloud/rancher")
+    # the directories the binds mount, made on the datasets as the move's seed step makes them; the
+    # datasets are mounted for this, and the next boot mounts them again
+    machine.succeed("systemctl start tank-cloud-key.service")
+    for dataset in ["host-secrets", "imp-db-backups"]:
+        machine.succeed(f"install -d /var/lib/tank-cloud/{dataset} && mount /var/lib/tank-cloud/{dataset}")
+    machine.succeed("install -d -m 0700 /var/lib/tank-cloud/host-secrets/imp-host /var/lib/tank-cloud/host-secrets/atc-daemon")
+    machine.succeed("umount /var/lib/tank-cloud/host-secrets /var/lib/tank-cloud/imp-db-backups")
+    # the bind paths on the root disk, empty, as they stay once the move has removed the old copies
+    machine.succeed(f"install -d -m 0700 {' '.join(bind_paths)}")
 
 
     with subtest("it unlocks and mounts every tank/cloud dataset at boot, and starts the services that need them"):
@@ -136,11 +159,14 @@ pkgs.testers.runNixOSTest {
         # data the restored key must find again
         for path in mount_points:
             machine.succeed(f"echo before-the-key-was-lost > {path}/data")
-        listing = {path: machine.succeed(f"ls -A {path}").split() for path in mount_points}
+        listing = {path: machine.succeed(f"ls -A {path}").split() for path in mount_points + bind_paths}
         assert listing == {
-            "${mountPoint "host-secrets"}": ["atc-daemon-started", "data", "imp-host-started", "preview-started"],
+            "${mountPoint "host-secrets"}": ["atc-daemon", "data", "imp-host", "imp-host-started", "preview-started"],
             "${mountPoint "imp-db-backups"}": ["data"],
             "${mountPoint "rancher"}": ["data", "k3s-started", "lost+found"],
+            "/var/lib/atc-daemon-secrets": ["atc-daemon-started"],
+            "/var/lib/imp-host/secrets": ["imp-host-dns-token-started", "imp-host-started"],
+            "/root/imp-db-backups": ["data"],
         }, f"the datasets hold {listing}"
 
 
@@ -162,8 +188,12 @@ pkgs.testers.runNixOSTest {
         assert keystatus == "unavailable", f"the key is {keystatus}"
         states = machine.succeed(f"systemctl show -p ActiveState --value {' '.join(services)}").split()
         assert states == ["inactive"] * len(services), f"the services are {states}"
-        for path in mount_points:
+        for path in mount_points + bind_paths:
             machine.fail(f"mountpoint -q {path}")
+        # the bind paths on the root disk stay empty: nothing wrote into them
+        for path in bind_paths:
+            left = machine.succeed(f"ls -A {path}")
+            assert left == "", f"{path} on the root disk holds {left!r}"
         # the empty mount points on the root disk, and nothing under them
         left = machine.succeed("find /var/lib/tank-cloud -mindepth 1 | sort").split()
         assert left == mount_points, f"the root disk holds {left}"
