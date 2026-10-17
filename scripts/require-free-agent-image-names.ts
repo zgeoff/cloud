@@ -1,6 +1,6 @@
 import { ExitError } from './exit-error.ts';
 import { findRecord } from './find-record.ts';
-import { readImpJSON } from './read-imp-json.ts';
+import { formatImpCommand, loadImpJSON } from './imp-cli.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 
 export interface AgentImageNames {
@@ -13,18 +13,21 @@ export async function requireFreeAgentImageNames(
   io: Readonly<ScriptIO>,
   names: AgentImageNames,
 ): Promise<void> {
-  const images = await readImpJSON(io, ['image', 'ls', '--json']);
+  const images = await loadImpJSON(io, ['image', 'ls']);
 
   if (findRecord(images, 'name', names.image) !== undefined) {
     throw new ExitError(
       1,
-      `image ${names.image} already exists: remove it with impz image rm, or build another commit`,
+      `image ${names.image} already exists: remove it with ${formatImpCommand(['image', 'rm'])}, or build another commit`,
     );
   }
 
-  const imps = await readImpJSON(io, ['ls', '--json']);
+  const imps = await loadImpJSON(io, ['ls']);
 
   if (findRecord(imps, 'name', names.check) !== undefined) {
-    throw new ExitError(1, `imp ${names.check} already exists: remove it with impz rm first`);
+    throw new ExitError(
+      1,
+      `imp ${names.check} already exists: remove it with ${formatImpCommand(['rm'])} first`,
+    );
   }
 }

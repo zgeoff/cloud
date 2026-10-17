@@ -1,6 +1,8 @@
 # nixie's deployment configuration, mounted read-only at /etc/nixie/config.yaml from a ConfigMap
 # (infra/nixie.ts). nixie reads it once at start and refuses an unknown key. It holds no secret:
-# `deployment:<name>` names an entry in the sops file beside it.
+# `deployment:<name>` names an entry in the sops file beside it. infra adds the `imp` section,
+# impd's URL and the host's addresses, from packages/topology
+# (infra/shared/build-nixie-imp-config.ts).
 server:
   data_dir: /data
   hostname: 0.0.0.0
@@ -34,23 +36,6 @@ models:
     conversation: opus
     memory-writer: haiku
     checker: sonnet
-imp:
-  # impd's API on its own tailnet node; the pod reaches it through the host's node (tag:cloud)
-  url: https://imps.geoff.cloud
-  # impd's own IMP_HOST_ADDRESSES, which imp's module reads from the host's interfaces: public
-  # egress needs them, and the web fetch tool refuses them
-  host_addresses:
-    - 104.250.100.18/24
-    - 2401:a4a0:4:17f::1/64
-    - 172.17.0.1/16
-    - 100.69.47.33/32
-    - fd7a:115c:a1e0::ca36:2f22/128
-    - 10.42.0.0/32
-    - 10.42.0.1/24
-  # k3s's pod and service ranges, which imp's module drops from imp-host's bridge as well
-  egress_deny:
-    - 10.42.0.0/16
-    - 10.43.0.0/16
 definitions:
   source:
     kind: path

@@ -44,13 +44,13 @@ test('it reads what exists, in this order, and checks the secrets mount and crea
   expect(tools.calls.map((call) => call.argv.join(' '))).toStrictEqual([
     'op vault get cloud --format json',
     'sh -c command -v atc-key > /dev/null',
-    'ssh -o BatchMode=yes root@geoffcloud true',
-    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz info --json',
-    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz secret ls --json',
-    'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz token ls --json',
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'true'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' 'imp-host' 'impz' 'info' '--json'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'",
     'op item list --vault cloud --format json',
-    "ssh -o BatchMode=yes root@geoffcloud mountpoint -q '/var/lib/atc-daemon-secrets' || { echo '/var/lib/atc-daemon-secrets is not a mount point; nothing written' >&2; exit 1; }; install -d -m 0700 -o root -g root '/var/lib/atc-daemon-secrets'",
-    "ssh -o BatchMode=yes root@geoffcloud ls '/var/lib/atc-daemon-secrets'",
+    `ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-c' 'mountpoint -q "$1" || { echo "$1 is not a mount point; nothing written" >&2; exit 1; }; install -d -m 0700 -o root -g root "$1"' 'bash' '/var/lib/atc-daemon-secrets'`,
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'ls' '/var/lib/atc-daemon-secrets'",
   ]);
 });
 
@@ -152,12 +152,9 @@ test.each([
   });
 
   expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([
-    'docker',
-    'exec',
-    'imp-host',
-    'impz',
-    'info',
-    '--json',
+    'ConnectTimeout=15',
+    'root@geoffcloud',
+    "'docker' 'exec' 'imp-host' 'impz' 'info' '--json'",
   ]);
 });
 
@@ -192,23 +189,19 @@ test('it stops before any change when impd lacks a secret that atc-cloud may gra
   });
 
   expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([
-    'docker',
-    'exec',
-    'imp-host',
-    'impz',
-    'secret',
-    'ls',
-    '--json',
+    'ConnectTimeout=15',
+    'root@geoffcloud',
+    "'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
   ]);
 });
 
 test.each([
-  ['impz info', 'info', 'info'],
-  ['impz secret ls', 'secret-ls', 'secret'],
-  ['impz token ls', 'token-ls', 'token'],
+  ['impz info', 'info', "'docker' 'exec' 'imp-host' 'impz' 'info' '--json'"],
+  ['impz secret ls', 'secret-ls', "'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'"],
+  ['impz token ls', 'token-ls', "'docker' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'"],
 ] as const)(
   'it stops with docker’s message when %s fails',
-  async (_label: string, stoppedAt: 'info' | 'secret-ls' | 'token-ls', verb: string) => {
+  async (_label: string, stoppedAt: 'info' | 'secret-ls' | 'token-ls', line: string) => {
     const tools = buildStubCredentialTools({
       op: { vaults: { cloud: {} } },
       atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
@@ -218,7 +211,7 @@ test.each([
     const ctx = await setupTest({ run: tools.run });
 
     expect(checkATCCredentialsPreflight(ctx.context)).rejects.toMatchObject({ exitCode: 1 });
-    expect(tools.calls.at(-1)?.argv[8]).toBe(verb);
+    expect(tools.calls.at(-1)?.argv[6]).toBe(line);
 
     expect(ctx.err.join('')).toBe(
       'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n',

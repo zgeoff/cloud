@@ -27,7 +27,7 @@ test('it takes the production host, vault, item, directory and impd port by defa
     run: ctx.run,
     printOut: expect.toBeFunction(),
     printErr: expect.toBeFunction(),
-    host: 'root@geoffcloud',
+    host: 'geoffcloud',
     vault: 'cloud',
     item: 'atc-daemon-token',
     dir: '/var/lib/atc-daemon-secrets',
@@ -43,7 +43,7 @@ test('it takes each setting the environment names', async () => {
     run: ctx.run,
     env: {
       OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture_env',
-      ATC_CREDENTIALS_HOST: 'root@canary',
+      ATC_CREDENTIALS_HOST: 'canary',
       ATC_CREDENTIALS_VAULT: 'staging',
       ATC_DAEMON_TOKEN_ITEM: 'canary-token',
       ATC_CREDENTIALS_DIR: '/srv/atc secrets',
@@ -54,7 +54,7 @@ test('it takes each setting the environment names', async () => {
   });
 
   expect(context).toMatchObject({
-    host: 'root@canary',
+    host: 'canary',
     vault: 'staging',
     item: 'canary-token',
     dir: '/srv/atc secrets',

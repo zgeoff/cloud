@@ -31,10 +31,16 @@ test('it saves the bearer as the real write script does', async () => {
   const stub = buildStubRunner(host.handle);
 
   await stub.run(
-    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', `bash -s -- ${toShellArg(ctx.dir)}`],
-    {
-      stdin,
-    },
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
+      'root@geoffcloud',
+      `'bash' '-s' '--' ${toShellArg(ctx.dir)}`,
+    ],
+    { stdin },
   );
 
   await runProcess(['bash', '-s', '--', ctx.dir], { stdin, env: ctx.env });
@@ -55,11 +61,21 @@ test('it exits 120 for a missing saved token, as the real check script does', as
   const stub = buildStubRunner(host.handle);
 
   const modelled = await stub.run(
-    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', `bash -s -- ${toShellArg(ctx.dir)} '7070'`],
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
+      'root@geoffcloud',
+      `'bash' '-s' '--' ${toShellArg(ctx.dir)} '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'`,
+    ],
     { stdin: script },
   );
 
-  const real = await runProcess(['bash', '-s', '--', ctx.dir, '7070'], {
+  const cli = ['docker', 'exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz'];
+
+  const real = await runProcess(['bash', '-s', '--', ctx.dir, '7070', ...cli], {
     stdin: script,
     env: ctx.env,
   });
@@ -77,10 +93,10 @@ test('it adds glm from the line on stdin and prints it with droppedGrants, as im
       'ssh',
       '-o',
       'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
       'root@geoffcloud',
-      ...'docker exec -i imp-host impz secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json'.split(
-        ' ',
-      ),
+      "'docker' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
     ],
     { stdin: Buffer.from('zai_fixture_key\n') },
   );
@@ -109,7 +125,15 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
   const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
 
   const result = await stub.run(
-    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', "bash -s -- '/var/lib/atc-daemon-secrets'"],
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
+      'root@geoffcloud',
+      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
+    ],
     { stdin: script },
   );
 
@@ -146,7 +170,15 @@ test('it fails the mint as impd does, writing no file, when a secret atc-cloud m
   const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
 
   const result = await stub.run(
-    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', "bash -s -- '/var/lib/atc-daemon-secrets'"],
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
+      'root@geoffcloud',
+      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
+    ],
     { stdin: script },
   );
 
@@ -165,13 +197,10 @@ test('it fails docker exec as docker does when imp-host is stopped', async () =>
     'ssh',
     '-o',
     'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=15',
     'root@geoffcloud',
-    'docker',
-    'exec',
-    'imp-host',
-    'impz',
-    'info',
-    '--json',
+    "'docker' 'exec' 'imp-host' 'impz' 'info' '--json'",
   ]);
 
   expect(result.exitCode).toBe(1);
@@ -194,8 +223,10 @@ test('it stats the secrets directory and its files as stat -c prints them, and f
     'ssh',
     '-o',
     'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=15',
     'root@geoffcloud',
-    "stat -c '%n %U %a %s bytes' '/var/lib/atc-daemon-secrets' '/var/lib/atc-daemon-secrets/gateway-token' '/var/lib/atc-daemon-secrets/imp-token'",
+    "'stat' '-c' '%n %U %a %s bytes' '/var/lib/atc-daemon-secrets' '/var/lib/atc-daemon-secrets/gateway-token' '/var/lib/atc-daemon-secrets/imp-token'",
   ]);
 
   expect(result).toStrictEqual({
@@ -213,8 +244,23 @@ test('it stats the secrets directory and its files as stat -c prints them, and f
 test('it refuses a call to another host, or without BatchMode', async () => {
   const stub = buildStubRunner(buildStubCredentialsHost(buildMockCredentialsHostScenario()).handle);
 
-  const other = await stub.run(['ssh', '-o', 'BatchMode=yes', 'root@elsewhere', 'true']);
-  const interactive = await stub.run(['ssh', 'root@geoffcloud', 'true']);
+  const other = await stub.run([
+    'ssh',
+    '-o',
+    'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=15',
+    'root@elsewhere',
+    "'true'",
+  ]);
+
+  const interactive = await stub.run([
+    'ssh',
+    '-o',
+    'ConnectTimeout=15',
+    'root@geoffcloud',
+    "'true'",
+  ]);
 
   expect(other.exitCode).toBe(97);
   expect(interactive.exitCode).toBe(97);
@@ -225,7 +271,15 @@ test('it fails every call with ssh’s 255 when the host is unreachable', async 
     buildStubCredentialsHost(buildMockCredentialsHostScenario({ unreachable: true })).handle,
   );
 
-  const result = await stub.run(['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', 'true']);
+  const result = await stub.run([
+    'ssh',
+    '-o',
+    'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=15',
+    'root@geoffcloud',
+    "'true'",
+  ]);
 
   expect(result.exitCode).toBe(255);
 

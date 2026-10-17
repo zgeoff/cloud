@@ -1,4 +1,5 @@
 import { findJSONField } from './find-json-field.ts';
+import type { NixieOutput } from './nixie-api/nixie-rpc.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
 
@@ -60,9 +61,8 @@ async function countPages(
     : { ok: true, value: count };
 }
 
-interface Page {
-  readonly hasEarlier: boolean;
-  readonly readAtSequence: number;
+// the fields a page reads from nixie's answer keep the contract's names and types
+interface Page extends Pick<NixieOutput<'conversation/read'>, 'hasEarlier' | 'readAtSequence'> {
   readonly records: number;
 
   // the first record's sequence, which the next page ends before

@@ -1,6 +1,7 @@
 import type { NixieSession, RecordCount } from './count-nixie-records.ts';
 import { countNixieRecords } from './count-nixie-records.ts';
 import { findJSONField } from './find-json-field.ts';
+import type { NixieOutput } from './nixie-api/nixie-rpc.ts';
 import type { StreamReport } from './read-nixie-stream.ts';
 import { readNixieStream } from './read-nixie-stream.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
@@ -96,8 +97,9 @@ async function createCheckSession(
   return { url: options.url, token: enrolled.value.token, sessionID: enrolled.value.sessionID };
 }
 
-// a session the check can call with: its ID, and the bearer token that enrol returns once
-function parseEnrolment(output: unknown) {
+// a session the check can call with: its ID, and the bearer token that enrol returns once, which
+// the contract leaves optional because a cookie enrolment answers none
+function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>> | undefined {
   const sessionID = findJSONField(output, 'sessionID');
   const token = findJSONField(output, 'token');
 

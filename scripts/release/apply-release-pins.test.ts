@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildStubNixieAPIContract } from '../test-utils/build-stub-nixie-api-contract.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { getReleaseRecord } from '../test-utils/get-release-record.ts';
@@ -19,6 +20,8 @@ async function setupTest() {
       'nixos/packages',
       'images/agent',
       'images/atc-gateway',
+      'infra',
+      'scripts/nixie-api',
       'scripts/release',
     ].map((dir) => mkdir(join(root, dir), { recursive: true })),
   );
@@ -683,6 +686,100 @@ test('it pins an atc release in the real pin files and keeps every other line', 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
     'pinned atc-agent 99.0.0\npinned atc-daemon 99.0.0\npinned atc-gateway 99.0.0\n',
   );
+});
+
+test('it regenerates the nixie contract for the release tag after the pins', async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'scripts/nixie-api/openapi.json': '{"info":{"version":"v0.7.0"}}\n',
+    'scripts/nixie-api/openapi.d.ts': '// nixie v0.7.0\n',
+    'scripts/release/release-pins.json': '{}\n',
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const stub = buildStubRunner(buildStubNixieAPIContract({}));
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('nixie'),
+    version: '0.7.2',
+    values: {
+      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+    },
+    root: ctx.root,
+    run: stub.run,
+    env: { GH_TOKEN: 'ghs_exampletoken' },
+    printOut: ctx.printOut,
+  });
+
+  const tree = await Promise.all(
+    [
+      'infra/Pulumi.prod.yaml',
+      'scripts/nixie-api/openapi.json',
+      'scripts/nixie-api/openapi.d.ts',
+    ].map((path) => readFile(join(ctx.root, path), 'utf8')),
+  );
+
+  expect(applied).toBeUndefined();
+
+  expect(tree).toStrictEqual([
+    `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.2@sha256:${'d'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.2@sha256:${'e'.repeat(64)}\n`,
+    '{"info":{"version":"v0.7.2"}}\n',
+    '// nixie v0.7.2\n',
+  ]);
+
+  expect(stub.calls).toStrictEqual([
+    {
+      argv: ['bun', join(ctx.root, 'scripts/nixie-api/write-nixie-api-contract.ts'), 'v0.7.2'],
+      stdin: '',
+      options: { cwd: ctx.root, env: { GH_TOKEN: 'ghs_exampletoken' } },
+    },
+  ]);
+});
+
+test('it puts the pins and the pin table back when the contract fails to generate', async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'scripts/nixie-api/openapi.json': '{"info":{"version":"v0.7.0"}}\n',
+    'scripts/nixie-api/openapi.d.ts': '// nixie v0.7.0\n',
+    'scripts/release/release-pins.json': '{}\n',
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const stub = buildStubRunner(buildStubNixieAPIContract({ error: 'gh: Not Found (HTTP 404)' }));
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('nixie'),
+    version: '0.7.2',
+    values: {
+      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+    },
+    root: ctx.root,
+    run: stub.run,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  const tree = await Promise.all(
+    Object.keys(files).map((path) => readFile(join(ctx.root, path), 'utf8')),
+  );
+
+  expect(applied).toStrictEqual(new Error('gh: Not Found (HTTP 404)'));
+  expect(tree).toStrictEqual(Object.values(files));
+  expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
 test('it refuses a checkout that lacks a pin file', async () => {

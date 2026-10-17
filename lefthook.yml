@@ -15,10 +15,11 @@ pre-commit:
       stage_fixed: true
     - name: format-codemod
       glob: '*.ts'
-      # the generated SDK is in .formatignore; with only SDK files staged,
-      # format-codemod would exit 2 on "no files matched"
+      # the generated SDK and nixie's API types are in .formatignore; with
+      # only those staged, format-codemod would exit 2 on "no files matched"
       exclude:
         - 'sdk/**'
+        - 'scripts/nixie-api/openapi.d.ts'
       run: node_modules/.bin/format-codemod --quiet {staged_files}
       stage_fixed: true
     - name: gofmt

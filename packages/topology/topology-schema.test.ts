@@ -7,6 +7,8 @@ test('it accepts a complete topology as given', () => {
       id: '0f289413-258f-4115-ac81-252000998fe0',
       publicIPv4: '104.250.100.18',
       publicIPv6: '2401:a4a0:4:17f::1',
+      publicIPv4PrefixLength: 24,
+      publicIPv6PrefixLength: 64,
     },
     tailnet: {
       cidr: '100.64.0.0/10',
@@ -18,7 +20,7 @@ test('it accepts a complete topology as given', () => {
         impE2E: 'tag:imp-e2e',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33' },
+        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -26,6 +28,7 @@ test('it accepts a complete topology as given', () => {
     k3s: {
       podCIDR: '10.42.0.0/16',
       serviceCIDR: '10.43.0.0/16',
+      nodePodCIDR: '10.42.0.0/24',
       apiPort: 6443,
       grafanaNodePort: 30_300,
     },
@@ -45,6 +48,8 @@ test('it rejects a key that the schema does not name', () => {
       id: '0f289413-258f-4115-ac81-252000998fe0',
       publicIPv4: '104.250.100.18',
       publicIPv6: '2401:a4a0:4:17f::1',
+      publicIPv4PrefixLength: 24,
+      publicIPv6PrefixLength: 64,
     },
     tailnet: {
       cidr: '100.64.0.0/10',
@@ -56,7 +61,7 @@ test('it rejects a key that the schema does not name', () => {
         impE2E: 'tag:imp-e2e',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33' },
+        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -64,6 +69,7 @@ test('it rejects a key that the schema does not name', () => {
     k3s: {
       podCIDR: '10.42.0.0/16',
       serviceCIDR: '10.43.0.0/16',
+      nodePodCIDR: '10.42.0.0/24',
       apiPort: 6443,
       grafanaNodePort: 30_300,
     },
@@ -83,6 +89,8 @@ test('it rejects a port outside 1 to 65535', () => {
       id: '0f289413-258f-4115-ac81-252000998fe0',
       publicIPv4: '104.250.100.18',
       publicIPv6: '2401:a4a0:4:17f::1',
+      publicIPv4PrefixLength: 24,
+      publicIPv6PrefixLength: 64,
     },
     tailnet: {
       cidr: '100.64.0.0/10',
@@ -94,7 +102,7 @@ test('it rejects a port outside 1 to 65535', () => {
         impE2E: 'tag:imp-e2e',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33' },
+        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -102,6 +110,7 @@ test('it rejects a port outside 1 to 65535', () => {
     k3s: {
       podCIDR: '10.42.0.0/16',
       serviceCIDR: '10.43.0.0/16',
+      nodePodCIDR: '10.42.0.0/24',
       apiPort: 6443,
       grafanaNodePort: 30_300,
     },
@@ -121,6 +130,8 @@ test('it rejects a tag without the tag: prefix', () => {
       id: '0f289413-258f-4115-ac81-252000998fe0',
       publicIPv4: '104.250.100.18',
       publicIPv6: '2401:a4a0:4:17f::1',
+      publicIPv4PrefixLength: 24,
+      publicIPv6PrefixLength: 64,
     },
     tailnet: {
       cidr: '100.64.0.0/10',
@@ -132,7 +143,7 @@ test('it rejects a tag without the tag: prefix', () => {
         impE2E: 'tag:imp-e2e',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33' },
+        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -140,6 +151,7 @@ test('it rejects a tag without the tag: prefix', () => {
     k3s: {
       podCIDR: '10.42.0.0/16',
       serviceCIDR: '10.43.0.0/16',
+      nodePodCIDR: '10.42.0.0/24',
       apiPort: 6443,
       grafanaNodePort: 30_300,
     },
@@ -159,6 +171,8 @@ test('it rejects a CIDR without its prefix length', () => {
       id: '0f289413-258f-4115-ac81-252000998fe0',
       publicIPv4: '104.250.100.18',
       publicIPv6: '2401:a4a0:4:17f::1',
+      publicIPv4PrefixLength: 24,
+      publicIPv6PrefixLength: 64,
     },
     tailnet: {
       cidr: '100.64.0.0/10',
@@ -170,7 +184,7 @@ test('it rejects a CIDR without its prefix length', () => {
         impE2E: 'tag:imp-e2e',
       },
       nodes: {
-        geoffcloud: { address: '100.69.47.33' },
+        geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
         homePC: { address: '100.67.122.120' },
         imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
       },
@@ -178,6 +192,7 @@ test('it rejects a CIDR without its prefix length', () => {
     k3s: {
       podCIDR: '10.42.0.0',
       serviceCIDR: '10.43.0.0/16',
+      nodePodCIDR: '10.42.0.0/24',
       apiPort: 6443,
       grafanaNodePort: 30_300,
     },

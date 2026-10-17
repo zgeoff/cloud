@@ -74,11 +74,15 @@ migrations and integrity check, and listens, but never turns ready.
 
    Expect both `integrity_check ok` lines in the Job's log.
 
-2. Start the scratch nixie, with the live pod's image and Secret. ssh joins its arguments into one
-   remote command, so each command quotes the whole of it, JSONPath included:
+2. Start the scratch nixie, with the live pod's config, image and Secret. The config is the live
+   ConfigMap's, because infra adds its `imp` section from `packages/topology`, with impd's URL
+   pointed at a dead port. ssh joins its arguments into one remote command, so each command quotes
+   the whole of it, JSONPath included:
 
    ```bash
-   sed 's#url: https://imps.geoff.cloud#url: http://127.0.0.1:1#' deploy/nixie/config.yaml \
+   config=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.volumes[?(@.name==\"config\")].configMap.name}"')
+   ssh root@geoffcloud "k3s kubectl -n nixie get configmap $config -o 'jsonpath={.data.config\.yaml}'" \
+     | sed 's#"url":"https://imps.geoff.cloud"#"url":"http://127.0.0.1:1"#' \
      | ssh root@geoffcloud k3s kubectl -n nixie create configmap nixie-restore-check --from-file=config.yaml=/dev/stdin
    image=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.containers[?(@.name==\"nixie\")].image}"')
    secrets=$(ssh root@geoffcloud 'k3s kubectl -n nixie get pod nixie-0 -o "jsonpath={.spec.volumes[?(@.name==\"secrets\")].secret.secretName}"')

@@ -4,7 +4,10 @@ import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
 import { ConfigMap, Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
+import { topology } from '@zgeoff/cloud-topology';
 import type { NixieInputs } from '../inputs/index.ts';
+import { buildNixieImpConfig } from '../shared/build-nixie-imp-config.ts';
+import { renderNixieConfig } from '../shared/render-nixie-config.ts';
 import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
 import {
   buildNixieSpec,
@@ -147,11 +150,13 @@ const deployDir = new URL('../../deploy/nixie/', import.meta.url);
 // The ConfigMap and the Secrets have no fixed name: Pulumi names each and replaces it on a change,
 // so the StatefulSet rolls and nixie reads the change at its next start.
 function createConfig(cluster: Provider, namespace: Output<string>): Output<string> {
+  const text = readFileSync(new URL('config.yaml', deployDir), 'utf8');
+
   const config = new ConfigMap(
     'nixie-config',
     {
       metadata: { namespace },
-      data: { [nixieConfigKey]: readFileSync(new URL('config.yaml', deployDir), 'utf8') },
+      data: { [nixieConfigKey]: renderNixieConfig(text, buildNixieImpConfig(topology)) },
     },
     { provider: cluster },
   );

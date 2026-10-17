@@ -48,6 +48,8 @@ test('it accepts registry ports that equal their constants', () => {
           id: '0f289413-258f-4115-ac81-252000998fe0',
           publicIPv4: '104.250.100.18',
           publicIPv6: '2401:a4a0:4:17f::1',
+          publicIPv4PrefixLength: 24,
+          publicIPv6PrefixLength: 64,
         },
         tailnet: {
           cidr: '100.64.0.0/10',
@@ -59,7 +61,7 @@ test('it accepts registry ports that equal their constants', () => {
             impE2E: 'tag:imp-e2e',
           },
           nodes: {
-            geoffcloud: { address: '100.69.47.33' },
+            geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
             homePC: { address: '100.67.122.120' },
             imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
           },
@@ -67,6 +69,7 @@ test('it accepts registry ports that equal their constants', () => {
         k3s: {
           podCIDR: '10.42.0.0/16',
           serviceCIDR: '10.43.0.0/16',
+          nodePodCIDR: '10.42.0.0/24',
           apiPort: 6443,
           grafanaNodePort: 30_300,
         },
@@ -119,6 +122,8 @@ test('it names every registry port that differs from its constant, and a missing
           id: '0f289413-258f-4115-ac81-252000998fe0',
           publicIPv4: '104.250.100.18',
           publicIPv6: '2401:a4a0:4:17f::1',
+          publicIPv4PrefixLength: 24,
+          publicIPv6PrefixLength: 64,
         },
         tailnet: {
           cidr: '100.64.0.0/10',
@@ -130,7 +135,7 @@ test('it names every registry port that differs from its constant, and a missing
             impE2E: 'tag:imp-e2e',
           },
           nodes: {
-            geoffcloud: { address: '100.69.47.33' },
+            geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
             homePC: { address: '100.67.122.120' },
             imp: { hostname: 'imp-geoffcloud', address: '100.75.9.119' },
           },
@@ -138,6 +143,7 @@ test('it names every registry port that differs from its constant, and a missing
         k3s: {
           podCIDR: '10.42.0.0/16',
           serviceCIDR: '10.43.0.0/16',
+          nodePodCIDR: '10.42.0.0/24',
           apiPort: 6443,
           grafanaNodePort: 30_300,
         },

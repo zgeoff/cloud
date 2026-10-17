@@ -68,7 +68,12 @@ test('it reports a call that reaches no server', async () => {
     url: 'http://127.0.0.1:1',
     token: null,
     procedure: 'sessions/enrol',
-    input: {},
+    input: {
+      clientActionID: '0d7f5c1e-2b4a-4c8e-9f31-6a2d8b0e4c57',
+      code: 'ABCD-2345',
+      deviceName: 'deploy check',
+      tokenDelivery: 'bearer',
+    },
     parse: (output) => output,
   });
 

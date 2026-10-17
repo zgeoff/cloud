@@ -17,10 +17,13 @@ async function setupTest() {
   return { dir, script, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: dir } };
 }
 
-test('it prints 200 and ready for an impd that is ready', async () => {
+test('it prints the status and then impd’s body for an impd that is ready', async () => {
   const ctx = await setupTest();
 
-  const impd = startStubImpd('imp_fixture_good');
+  const impd = startStubImpd('imp_fixture_good', {
+    status: 200,
+    body: '{"status":"ok","ready":true,"warnings":[]}',
+  });
 
   const result = await runProcess(['bash', '-s', '--', String(impd.port)], {
     stdin: ctx.script,
@@ -29,7 +32,7 @@ test('it prints 200 and ready for an impd that is ready', async () => {
 
   expect(result).toStrictEqual({
     exitCode: 0,
-    stdout: Buffer.from('200 1\n'),
+    stdout: Buffer.from('200\n{"status":"ok","ready":true,"warnings":[]}'),
     stderr: Buffer.from(''),
     timedOut: false,
   });
@@ -39,7 +42,7 @@ test('it prints 200 and ready for an impd that is ready', async () => {
   ]);
 });
 
-test('it prints the status and not ready for an impd that is not ready', async () => {
+test('it prints the status and then impd’s body for an impd that is not ready', async () => {
   const ctx = await setupTest();
 
   const impd = startStubImpd('imp_fixture_good', { status: 503, body: '{"ready":false}' });
@@ -49,16 +52,29 @@ test('it prints the status and not ready for an impd that is not ready', async (
     env: ctx.env,
   });
 
-  expect(result.stdout.toString()).toBe('503 0\n');
+  expect(result.stdout.toString()).toBe('503\n{"ready":false}');
 });
 
-test('it prints 000 when nothing answers on the port', async () => {
+test('it prints no more than 64 KiB of the body', async () => {
+  const ctx = await setupTest();
+
+  const impd = startStubImpd('imp_fixture_good', { status: 200, body: 'x'.repeat(70_000) });
+
+  const result = await runProcess(['bash', '-s', '--', String(impd.port)], {
+    stdin: ctx.script,
+    env: ctx.env,
+  });
+
+  expect(result.stdout.toString()).toBe(`200\n${'x'.repeat(65_536)}`);
+});
+
+test('it prints 000 and no body when nothing answers on the port', async () => {
   const ctx = await setupTest();
   const result = await runProcess(['bash', '-s', '--', '1'], { stdin: ctx.script, env: ctx.env });
 
   expect(result).toStrictEqual({
     exitCode: 0,
-    stdout: Buffer.from('000 0\n'),
+    stdout: Buffer.from('000\n'),
     stderr: Buffer.from(''),
     timedOut: false,
   });
@@ -76,7 +92,7 @@ test('it keeps a proxy variable and a .curlrc off its request', async () => {
     env: { ...ctx.env, http_proxy: 'http://127.0.0.1:1', ALL_PROXY: 'http://127.0.0.1:1' },
   });
 
-  expect(result.stdout.toString()).toBe('200 1\n');
+  expect(result.stdout.toString()).toBe('200\n{"ready":true}');
 });
 
 test('its control: the same .curlrc and proxy variable send a plain curl off loopback', async () => {

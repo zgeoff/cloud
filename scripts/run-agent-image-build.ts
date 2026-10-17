@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
-import { readImpJSON } from './read-imp-json.ts';
+import { buildImpArgv, formatImpCommand, loadImpJSON } from './imp-cli.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
 
@@ -29,7 +29,7 @@ export interface BuiltAgentImage {
 }
 
 // Builds the image from a git archive of the commit, so the clone's working tree never reaches it.
-// impz image build prints no progress off a terminal, so the build runs quietly.
+// imp's image build prints no progress off a terminal, so the build runs quietly.
 export async function runAgentImageBuild(
   io: Readonly<ScriptIO>,
   build: Readonly<AgentImageBuild>,
@@ -38,7 +38,7 @@ export async function runAgentImageBuild(
 
   await runImpBuild(io, build, src);
 
-  const images = await readImpJSON(io, ['image', 'ls', '--json']);
+  const images = await loadImpJSON(io, ['image', 'ls']);
 
   const digest = findJSONField(findRecord(images, 'name', build.image), 'digest');
 
@@ -61,11 +61,13 @@ async function createImageSource(io: Readonly<ScriptIO>, build: Readonly<AgentIm
 // impd can still finish a build that outlives the timeout, so the message says to read imp image
 // ls before a retry
 async function runImpBuild(io: Readonly<ScriptIO>, build: Readonly<AgentImageBuild>, src: string) {
+  const command = formatImpCommand(['image', 'build']);
+
   io.printErr(
-    `building ${build.image} from ${build.sha}; impz image build shows no progress off a terminal\n`,
+    `building ${build.image} from ${build.sha}; ${command} shows no progress off a terminal\n`,
   );
 
-  const argv = ['impz', 'image', 'build', join(src, 'images/agent'), '--name', build.image];
+  const argv = buildImpArgv(['image', 'build', join(src, 'images/agent'), '--name', build.image]);
 
   const result = await io.run(argv, { timeoutMs: build.timeoutMs });
 
@@ -78,11 +80,11 @@ async function runImpBuild(io: Readonly<ScriptIO>, build: Readonly<AgentImageBui
   if (result.timedOut) {
     throw new ExitError(
       1,
-      `impz image build did not finish within ${build.timeout}; impd may still finish ${build.image}, so read impz image ls before a retry`,
+      `${command} did not finish within ${build.timeout}; impd may still finish ${build.image}, so read ${formatImpCommand(['image', 'ls'])} before a retry`,
     );
   }
 
   if (result.exitCode !== 0) {
-    throw new ExitError(1, `impz image build failed for ${build.image}`);
+    throw new ExitError(1, `${command} failed for ${build.image}`);
   }
 }

@@ -75,8 +75,17 @@ export interface ReleaseRecord {
   // in the order the bump line lists their versions
   readonly pins: readonly Pin[];
 
+  // files that a script in the checkout writes from the release, which a bump runs after its pins
+  readonly generated?: GeneratedFiles;
+
   // the bump pull request's "After the merge:" text, as Markdown
   readonly rollout: string;
+}
+
+// the script runs with bun and takes the release's tag as its one argument
+interface GeneratedFiles {
+  readonly script: string;
+  readonly files: readonly string[];
 }
 
 const version = { kind: 'version' } as const;
@@ -286,6 +295,12 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
         ],
       },
     ],
+
+    // the contract the scripts' nixie calls type-check against
+    generated: {
+      script: 'scripts/nixie-api/write-nixie-api-contract.ts',
+      files: ['scripts/nixie-api/openapi.d.ts', 'scripts/nixie-api/openapi.json'],
+    },
     rollout:
       'The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).',
   },

@@ -51,9 +51,10 @@ definitions seed, impd, the conversation imp and the disk.
 ## Configuration and definitions
 
 nixie reads its settings from `deploy/nixie/config.yaml`, which Pulumi turns into a ConfigMap
-mounted at the path nixie reads. The ConfigMap and both Secrets have no fixed name, so a change to
-any of them replaces it, and the StatefulSet rolls onto the new name. nixie reads each file once at
-start, so a roll is how a change reaches it.
+mounted at the path nixie reads. Pulumi adds the `imp` section, impd's URL and the host's addresses,
+from `packages/topology`, so the file holds no copy of them. The ConfigMap and both Secrets have no
+fixed name, so a change to any of them replaces it, and the StatefulSet rolls onto the new name.
+nixie reads each file once at start, so a roll is how a change reaches it.
 
 nixie reads its definitions, the persona and the rules in the private repo
 `zgeoff/nixie-definitions`, from a directory. A git-sync sidecar clones that repo over SSH into a

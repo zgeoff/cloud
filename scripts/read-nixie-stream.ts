@@ -1,4 +1,4 @@
-import { buildNixieHeaders } from './build-nixie-headers.ts';
+import { encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
 import type { RPCResult } from './send-nixie-rpc.ts';
 
 export interface StreamHold {
@@ -61,12 +61,19 @@ interface StreamSource {
 async function startStream(hold: Readonly<StreamHold>): Promise<RPCResult<StreamSource>> {
   const stopping = new AbortController();
 
-  const response = await fetch(new URL('/rpc/log/follow', hold.url), {
-    method: 'POST',
-    headers: buildNixieHeaders(hold.token),
-    body: JSON.stringify({ json: { afterSequence: hold.afterSequence, thread: 'conversation' } }),
+  // the request goes through the adapter, and the body is read here, because the check counts the
+  // keepalive comments that oRPC's own stream reader drops
+  const request = await encodeNixieRequest({
+    url: hold.url,
+    token: hold.token,
+    procedure: 'log/follow',
+    input: { afterSequence: hold.afterSequence, thread: 'conversation' },
     signal: stopping.signal,
-  }).catch((error: unknown) => new Error(`log/follow failed: ${String(error)}`));
+  });
+
+  const response = await fetch(request).catch(
+    (error: unknown) => new Error(`log/follow failed: ${String(error)}`),
+  );
 
   if (response instanceof Error) {
     return { ok: false, error: response.message };

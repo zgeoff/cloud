@@ -1,5 +1,6 @@
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { buildImpArgv, impCLI } from './imp-cli.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
 import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
@@ -25,7 +26,7 @@ export async function runAgentImageCheck(
   io: Readonly<InterruptibleIO>,
   target: Readonly<AgentImageCheck>,
 ): Promise<boolean> {
-  // registered before `impz new`, since impd can create the imp after an interrupt stops the CLI,
+  // registered before the CLI's `new`, since impd can create the imp after an interrupt stops the CLI,
   // and the caller found its name free
   const dropCleanup = io.registerCleanup((cleanupIO) => removeCheckImp(cleanupIO, target.check));
 
@@ -37,7 +38,7 @@ export async function runAgentImageCheck(
 }
 
 async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImageCheck>) {
-  const created = await runOrExit(io, ['impz', 'new', target.check, '--image', target.image]);
+  const created = await runOrExit(io, buildImpArgv(['new', target.check, '--image', target.image]));
 
   printErrText(io, created.stdout.toString());
 
@@ -61,21 +62,21 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
   return result.exitCode === 0 && !result.timedOut;
 }
 
-// A commit from before imp's CLI became impz has a check that calls `imp`: the shim on its PATH
-// hands each call to impz. Returns the shim's directory, inside the work directory.
+// A commit from before imp's CLI took its new name has a check that calls `imp`: the shim on its
+// PATH hands each call to the CLI. Returns the shim's directory, inside the work directory.
 function createImpShim(work: string): string {
   const dir = join(work, 'imp-shim');
   const shim = join(dir, 'imp');
 
   mkdirSync(dir, { recursive: true });
-  writeFileSync(shim, '#!/bin/sh\nexec impz "$@"\n');
+  writeFileSync(shim, `#!/bin/sh\nexec ${impCLI} "$@"\n`);
   chmodSync(shim, 0o755);
 
   return dir;
 }
 
 async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {
-  const removed = await runOrExit(io, ['impz', 'rm', check]);
+  const removed = await runOrExit(io, buildImpArgv(['rm', check]));
 
   printErrText(io, removed.stdout.toString());
 }

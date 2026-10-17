@@ -9,9 +9,8 @@ async function setupTest() {
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 
-  // the directories of the three files it reads, which every checkout has
+  // the directories of the two files it reads, which every checkout has
   await mkdir(join(root, 'infra'));
-  await mkdir(join(root, 'deploy', 'nixie'), { recursive: true });
   await mkdir(join(root, '.github', 'workflows'), { recursive: true });
 
   const printOut = mock<(text: string) => void>();
@@ -35,15 +34,6 @@ test('it passes when every copy agrees with the constants', async () => {
   );
 
   await writeFile(
-    join(ctx.root, 'deploy', 'nixie', 'config.yaml'),
-    `imp:
-  url: https://imps.geoff.cloud
-  host_addresses: [104.250.100.18/24, 2401:a4a0:4:17f::1/64, 172.17.0.1/16, 100.69.47.33/32, 10.42.0.1/24]
-  egress_deny: [10.42.0.0/16, 10.43.0.0/16]
-`,
-  );
-
-  await writeFile(
     join(ctx.root, '.github', 'workflows', 'deploy-prod.yml'),
     `jobs:
   build: { steps: [{ uses: actions/checkout@v6 }] }
@@ -60,7 +50,7 @@ test('it passes when every copy agrees with the constants', async () => {
   expect(exitCode).toBe(0);
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
-    'check-topology: 9 copies agree with packages/topology\n',
+    'check-topology: 3 copies agree with packages/topology\n',
   );
 
   expect(ctx.printErr).not.toHaveBeenCalled();
@@ -76,15 +66,6 @@ test('it fails a stack config daemon address that differs from the constants', a
     daemons:
       geoffcloud: { address: 100.69.47.33:8415 }
       home-pc: { address: 100.67.122.121:8415 }
-`,
-  );
-
-  await writeFile(
-    join(ctx.root, 'deploy', 'nixie', 'config.yaml'),
-    `imp:
-  url: https://imps.geoff.cloud
-  host_addresses: [104.250.100.18/24, 2401:a4a0:4:17f::1/64, 172.17.0.1/16, 100.69.47.33/32]
-  egress_deny: [10.42.0.0/16, 10.43.0.0/16]
 `,
   );
 
@@ -110,50 +91,6 @@ test('it fails a stack config daemon address that differs from the constants', a
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
-test("it fails nixie's config when its host addresses and egress ranges differ from the constants", async () => {
-  const ctx = await setupTest();
-
-  await writeFile(
-    join(ctx.root, 'infra', 'Pulumi.prod.yaml'),
-    `config:
-  geoff-cloud:atcGateway:
-    daemons:
-      geoffcloud: { address: 100.69.47.33:8415 }
-      home-pc: { address: 100.67.122.120:8415 }
-`,
-  );
-
-  await writeFile(
-    join(ctx.root, 'deploy', 'nixie', 'config.yaml'),
-    `imp:
-  url: https://imps.geoff.cloud
-  host_addresses: [104.250.100.19/24, 2401:a4a0:4:17f::1/64, 172.17.0.1/16]
-  egress_deny: [10.42.0.0/16]
-`,
-  );
-
-  await writeFile(
-    join(ctx.root, '.github', 'workflows', 'deploy-prod.yml'),
-    `jobs:
-  apply: { steps: [{ uses: tailscale/github-action@d1b6cd2, with: { tags: tag:cloud-deploy } }] }
-`,
-  );
-
-  const exitCode = await checkTopology({
-    args: [ctx.root],
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
-  });
-
-  expect(exitCode).toBe(1);
-
-  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'check-topology: deploy/nixie/config.yaml: imp.host_addresses[0] is "104.250.100.19", but packages/topology gives "104.250.100.18"\n' +
-      'check-topology: deploy/nixie/config.yaml: imp.host_addresses[3] is nothing, but packages/topology gives "100.69.47.33"\n' +
-      'check-topology: deploy/nixie/config.yaml: imp.egress_deny is ["10.42.0.0/16"], but packages/topology gives ["10.42.0.0/16","10.43.0.0/16"]\n',
-  );
-});
-
 test("it fails the deploy workflow's tailnet tag when it differs from the constants", async () => {
   const ctx = await setupTest();
 
@@ -164,15 +101,6 @@ test("it fails the deploy workflow's tailnet tag when it differs from the consta
     daemons:
       geoffcloud: { address: 100.69.47.33:8415 }
       home-pc: { address: 100.67.122.120:8415 }
-`,
-  );
-
-  await writeFile(
-    join(ctx.root, 'deploy', 'nixie', 'config.yaml'),
-    `imp:
-  url: https://imps.geoff.cloud
-  host_addresses: [104.250.100.18/24, 2401:a4a0:4:17f::1/64, 172.17.0.1/16, 100.69.47.33/32]
-  egress_deny: [10.42.0.0/16, 10.43.0.0/16]
 `,
   );
 
@@ -209,13 +137,6 @@ test('it fails a file it cannot read before it compares any copy', async () => {
 `,
   );
 
-  await writeFile(
-    join(ctx.root, '.github', 'workflows', 'deploy-prod.yml'),
-    `jobs:
-  apply: { steps: [{ uses: tailscale/github-action@d1b6cd2, with: { tags: tag:cloud-deploy } }] }
-`,
-  );
-
   const exitCode = await checkTopology({
     args: [ctx.root],
     printOut: ctx.printOut,
@@ -225,7 +146,7 @@ test('it fails a file it cannot read before it compares any copy', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'check-topology: cannot read deploy/nixie/config.yaml\n',
+    'check-topology: cannot read .github/workflows/deploy-prod.yml\n',
   );
 
   expect(ctx.printOut).not.toHaveBeenCalled();
@@ -240,15 +161,6 @@ test('it fails a copy that its file lacks', async () => {
   geoff-cloud:atcGateway:
     daemons:
       geoffcloud: { address: 100.69.47.33:8415 }
-`,
-  );
-
-  await writeFile(
-    join(ctx.root, 'deploy', 'nixie', 'config.yaml'),
-    `imp:
-  url: https://imps.geoff.cloud
-  host_addresses: [104.250.100.18/24, 2401:a4a0:4:17f::1/64, 172.17.0.1/16, 100.69.47.33/32]
-  egress_deny: [10.42.0.0/16, 10.43.0.0/16]
 `,
   );
 

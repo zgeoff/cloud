@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildHostImpArgv } from '../imp-cli.ts';
 import { runProcess } from '../run-process.ts';
 import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
 
@@ -34,7 +35,7 @@ test('it mints atc-cloud straight into a root-only imp-token in one rename', asy
     exitCode: 0,
   });
 
-  const result = await runProcess(['bash', '-s', '--', ctx.secrets], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, ...buildHostImpArgv([])], {
     stdin: ctx.script,
     env: ctx.env,
   });
@@ -61,7 +62,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
     exitCode: 0,
   });
 
-  const result = await runProcess(['bash', '-s', '--', ctx.secrets], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, ...buildHostImpArgv([])], {
     stdin: ctx.script,
     env: ctx.env,
   });
@@ -87,7 +88,7 @@ test.each([
 
   await createStubImpDocker(ctx.bin, { stdout, stderr: '', exitCode });
 
-  const result = await runProcess(['bash', '-s', '--', ctx.secrets], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, ...buildHostImpArgv([])], {
     stdin: ctx.script,
     env: ctx.env,
   });
@@ -95,6 +96,24 @@ test.each([
   expect(result.exitCode).toBe(1);
 
   const files = await readdir(ctx.secrets);
+
+  expect(files).toStrictEqual([]);
+});
+
+test('it stops with a usage error and saves no token when no CLI argv follows the directory', async () => {
+  const ctx = await setupTest();
+
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets], {
+    stdin: ctx.script,
+    env: ctx.env,
+  });
+
+  const files = await readdir(ctx.secrets);
+
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'usage: mint-atc-imp-token.sh <dir> <imp CLI argv>...\n',
+  });
 
   expect(files).toStrictEqual([]);
 });

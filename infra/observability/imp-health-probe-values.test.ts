@@ -1,8 +1,9 @@
 import { expect, test } from 'bun:test';
-import invariant from 'tiny-invariant';
 import { impHealthProbeValues } from './imp-health-probe-values.ts';
 
-test("it probes imp's /health over verified TLS every 30s, failing unless the body says impd is ready", () => {
+// test-imp-health-probe.sh runs the module in the pinned blackbox exporter against impd's ready
+// and not-ready bodies, since only the exporter evaluates its CEL expression
+test("it probes imp's /health over verified TLS every 30s, failing unless the JSON body says impd is ready", () => {
   expect(impHealthProbeValues).toStrictEqual({
     podSecurityContext: { seccompProfile: { type: 'RuntimeDefault' } },
     resources: { requests: { cpu: '10m', memory: '16Mi' }, limits: { memory: '64Mi' } },
@@ -15,7 +16,7 @@ test("it probes imp's /health over verified TLS every 30s, failing unless the bo
             preferred_ip_protocol: 'ip4',
             valid_status_codes: [200],
             fail_if_not_ssl: true,
-            fail_if_body_not_matches_regexp: [String.raw`"ready":\s*true`],
+            fail_if_body_json_not_matches_cel: 'body.ready == true',
           },
         },
       },
@@ -26,19 +27,4 @@ test("it probes imp's /health over verified TLS every 30s, failing unless the bo
       targets: [{ name: 'imp-health', url: 'https://imps.geoff.cloud/health' }],
     },
   });
-});
-
-// impd's /health body as its daemon serves it: `{ status: 'ok', ready: deps.isReady() }`
-// as JSON (zgeoff/impz packages/daemon/src/build-app.ts at 51df459d)
-test.each([
-  ['{"status":"ok","ready":true}', true],
-  ['{"status":"ok","ready":false}', false],
-  ['{"status":"ok"}', false],
-])('it matches the body %s as ready: %p', (body, ready) => {
-  const [pattern] =
-    impHealthProbeValues.config.modules.imp_health.http.fail_if_body_not_matches_regexp;
-
-  invariant(pattern !== undefined, 'expected a body pattern');
-
-  expect(new RegExp(pattern, 'u').test(body)).toBe(ready);
 });

@@ -22,7 +22,15 @@ test.each([
       'scripts/release/release-pins.json',
     ],
   ],
-  ['release-check/nixie', ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json']],
+  [
+    'release-check/nixie',
+    [
+      'infra/Pulumi.prod.yaml',
+      'scripts/nixie-api/openapi.d.ts',
+      'scripts/nixie-api/openapi.json',
+      'scripts/release/release-pins.json',
+    ],
+  ],
   ['release-check/auto-mode', ['images/agent/Dockerfile', 'scripts/release/release-pins.json']],
 ])('it lists the files that a bump from %s writes', (branch: string, files: readonly string[]) => {
   const record = findReleaseRecord(branch);

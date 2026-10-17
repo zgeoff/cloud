@@ -2,12 +2,25 @@ import type { ATCCredentialsPreflight } from './check-atc-credentials-preflight.
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
+import { loadHostImpJSON } from './imp-cli.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
-import { parseJSONOutput } from './parse-json-output.ts';
-import { runOnHost } from './run-on-host.ts';
 import { runOrExit } from './run-or-exit.ts';
 
 const glmRules = [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }];
+
+const glmAddArgs = [
+  'secret',
+  'add',
+  'glm',
+  '--kind',
+  'custom',
+  '--hosts',
+  'api.z.ai',
+  '--header',
+  'authorization',
+  '--scheme',
+  'bearer',
+];
 
 // Adds impd's secret glm from `atc-key zai` on this machine: impd's broker sets
 // `authorization: Bearer <key>` on requests to api.z.ai only. The key reaches imp on stdin.
@@ -28,9 +41,9 @@ export async function installATCGLMSecret(
   }
 
   const key = await readZAIKey(context);
-  const added = await runOnHost(context, glmAddCommand, Buffer.from(`${key}\n`));
+  const added = await loadHostImpJSON(context, glmAddArgs, Buffer.from(`${key}\n`));
 
-  printSecret(context, parseJSONOutput(added, 'impz secret add'));
+  printSecret(context, added);
 }
 
 function printSecret(context: Readonly<ATCCredentialsContext>, secret: unknown) {
@@ -65,23 +78,3 @@ async function readZAIKey(context: Readonly<ATCCredentialsContext>) {
 
   return key;
 }
-
-const glmAddCommand = [
-  'docker',
-  'exec',
-  '-i',
-  'imp-host',
-  'impz',
-  'secret',
-  'add',
-  'glm',
-  '--kind',
-  'custom',
-  '--hosts',
-  'api.z.ai',
-  '--header',
-  'authorization',
-  '--scheme',
-  'bearer',
-  '--json',
-];

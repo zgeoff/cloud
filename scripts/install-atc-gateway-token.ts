@@ -5,9 +5,8 @@ import { findJSONField } from './find-json-field.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { parseJSONOutput } from './parse-json-output.ts';
 import { readHostScript } from './read-host-script.ts';
-import { runOnHost } from './run-on-host.ts';
+import { runOnHost } from './run-host-check.ts';
 import { runOp } from './run-op.ts';
-import { toShellArg } from './to-shell-arg.ts';
 
 // Mints the atc daemon's bearer here, 48 random bytes as base64url, into the 1Password item (the
 // gateway's copy) and a root-only file on the host (the daemon's LoadCredential source). A rerun
@@ -20,7 +19,7 @@ export async function installATCGatewayToken(
   const hasFile = preflight.hostFiles.includes('gateway-token');
 
   context.printOut(
-    `\n== 2/3 daemon bearer: 1Password ${context.vault}/${context.item} and ${context.host}:${file}\n`,
+    `\n== 2/3 daemon bearer: 1Password ${context.vault}/${context.item} and root@${context.host}:${file}\n`,
   );
 
   if (preflight.hasItem && hasFile) {
@@ -47,9 +46,7 @@ function readItem(context: Readonly<ATCCredentialsContext>) {
 }
 
 async function readHostSum(context: Readonly<ATCCredentialsContext>) {
-  const line = await runOnHost(context, [
-    `sha256sum ${toShellArg(`${context.dir}/gateway-token`)}`,
-  ]);
+  const line = await runOnHost(context, ['sha256sum', `${context.dir}/gateway-token`]);
 
   return line.split(' ')[0] ?? '';
 }
@@ -76,7 +73,7 @@ async function createGatewayToken(context: Readonly<ATCCredentialsContext>) {
 
   const stdin = Buffer.concat([script, Buffer.from(`${bearer}\n`)]);
 
-  await runOnHost(context, [`bash -s -- ${toShellArg(context.dir)}`], stdin);
+  await runOnHost(context, ['bash', '-s', '--', context.dir], stdin);
   await requireCopiesOf(context, bearer);
 
   context.printOut('ok: the 1Password item and the host file match\n');

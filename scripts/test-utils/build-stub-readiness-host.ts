@@ -21,7 +21,7 @@ export interface StubReadinessHostScenario {
   readonly deployments: Readonly<Record<string, number>>;
   readonly isDaemonActive: boolean;
 
-  // what read-impd-health.sh prints: the status, a space, and 1 when impd is ready
+  // what read-impd-health.sh prints: the status on its first line, and impd's body after it
   readonly impdHealth: string;
 
   // the status the probe pod's curl prints
@@ -104,7 +104,7 @@ const hostCommands: readonly (readonly [string, HostCommand])[] = [
     'systemctl is-active --quiet atc-daemon',
     (scenario) => (scenario.isDaemonActive ? {} : { exitCode: 3 }),
   ],
-  ['bash -s -- *', (scenario) => ({ stdout: `${scenario.impdHealth}\n` })],
+  ['bash -s -- *', (scenario) => ({ stdout: scenario.impdHealth })],
   [
     'k3s kubectl -n atc run readiness-probe --rm -i --restart=Never --quiet --image=curlimages/curl:8.16.0 -- curl -s -o /dev/null -w %{http_code} -H * *',
     (scenario) => ({ stdout: scenario.probeCode }),

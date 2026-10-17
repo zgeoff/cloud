@@ -67,13 +67,13 @@ in
       ipv4.addresses = [
         {
           address = topology.vm.publicIPv4;
-          prefixLength = 24;
+          prefixLength = topology.vm.publicIPv4PrefixLength;
         }
       ];
       ipv6.addresses = [
         {
           address = topology.vm.publicIPv6;
-          prefixLength = 64;
+          prefixLength = topology.vm.publicIPv6PrefixLength;
         }
       ];
     };

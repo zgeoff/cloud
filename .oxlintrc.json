@@ -8,7 +8,7 @@
   "rules": {
     "zgeoff/function-verb": ["error", { "verbs": ["decide", "install", "open", "switch"] }]
   },
-  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
+  "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", "scripts/nixie-api/openapi.d.ts"],
   "overrides": [
     {
       "files": ["infra/**/*.ts", "workers/**/*.ts"],

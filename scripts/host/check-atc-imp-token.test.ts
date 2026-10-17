@@ -2,79 +2,142 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { buildHostImpArgv } from '../imp-cli.ts';
 import { runProcess } from '../run-process.ts';
-import { startStubImpd } from '../test-utils/start-stub-impd.ts';
+import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
 
-// The script runs as the host gets it, with real bash reading it on stdin, and real curl asks the
-// impd stand-in on loopback
+// The script runs as the host gets it, with real bash reading it on stdin; docker is a stand-in
+// first on PATH, which answers imp's CLI's whoami and logs the argv and environment it got
 async function setupTest() {
   const dir = await mkdtemp(join(tmpdir(), 'check-atc-imp-token-'));
 
   onTestFinished(() => rm(dir, { recursive: true, force: true }));
 
+  const bin = join(dir, 'bin');
+  const secrets = join(dir, 'secrets');
+
+  await mkdir(bin);
+  await mkdir(secrets);
+
   const script = await readFile(new URL('check-atc-imp-token.sh', import.meta.url));
 
-  return { dir, script, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: dir } };
+  const env = { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, HOME: dir };
+  const cli = buildHostImpArgv([], { env: ['IMP_TOKEN', 'IMP_URL'] });
+
+  return { bin, secrets, script, env, cli };
 }
 
-const identity =
-  '{"json":{"kind":"token","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}';
-
-test('it sends the saved token alone to impd’s whoami and prints the answer and its status', async () => {
+test('it asks impd who the saved token is through the CLI, with the token in docker’s environment alone', async () => {
   const ctx = await setupTest();
 
-  const impd = startStubImpd('imp_fixture_good');
+  await createStubImpDocker(
+    ctx.bin,
+    { stdout: '{"kind":"token","name":"atc-cloud"}\n', stderr: '', exitCode: 0 },
+    ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
+  );
 
-  await writeFile(join(ctx.dir, 'imp-token'), 'imp_fixture_good\n');
+  await writeFile(join(ctx.secrets, 'imp-token'), 'imp_fixture_good\n');
 
-  const result = await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, '7070', ...ctx.cli], {
     stdin: ctx.script,
     env: ctx.env,
   });
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe(`${identity}\n200`);
-  expect(result.stderr.toString()).toBe('');
+  const calls = await readFile(join(ctx.bin, 'docker-calls'), 'utf8');
+  const env = await readFile(join(ctx.bin, 'docker-env'), 'utf8');
 
-  expect(impd.requests).toStrictEqual([
+  expect(result).toStrictEqual({
+    exitCode: 0,
+    stdout: Buffer.from('{"kind":"token","name":"atc-cloud"}\n'),
+    stderr: Buffer.from(''),
+    timedOut: false,
+  });
+
+  expect(calls).toBe(
+    '["docker","exec","-e","IMP_TOKEN","-e","IMP_URL","imp-host","impz","token","whoami","--json"]\n',
+  );
+
+  expect(env).toBe('{"IMP_TOKEN":"imp_fixture_good","IMP_URL":"http://127.0.0.1:7070"}\n');
+});
+
+test('it hands on a saved token without a trailing newline as it is', async () => {
+  const ctx = await setupTest();
+
+  await createStubImpDocker(
+    ctx.bin,
+    { stdout: '{"kind":"token","name":"atc-cloud"}\n', stderr: '', exitCode: 0 },
+    ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
+  );
+
+  await writeFile(join(ctx.secrets, 'imp-token'), 'imp_fixture_good');
+
+  await runProcess(['bash', '-s', '--', ctx.secrets, '7070', ...ctx.cli], {
+    stdin: ctx.script,
+    env: ctx.env,
+  });
+
+  const env = await readFile(join(ctx.bin, 'docker-env'), 'utf8');
+
+  expect(env).toBe('{"IMP_TOKEN":"imp_fixture_good","IMP_URL":"http://127.0.0.1:7070"}\n');
+});
+
+// imp 2.4.1's CLI prints one line for impd's 401 when IMP_URL is set, and exits 1
+// (packages/cli/src/run-action.ts)
+test('it exits 122 with nothing printed for a token impd refuses', async () => {
+  const ctx = await setupTest();
+
+  await createStubImpDocker(
+    ctx.bin,
     {
-      method: 'POST',
-      target: '/rpc/tokens/whoami',
-      authorization: 'Bearer imp_fixture_good',
-      body: '{"json":{}}',
+      stdout: '',
+      stderr:
+        'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>\n',
+      exitCode: 1,
     },
-  ]);
-});
+    ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
+  );
 
-test('it accepts a saved token without a trailing newline', async () => {
-  const ctx = await setupTest();
+  await writeFile(join(ctx.secrets, 'imp-token'), 'imp_fixture_stale\n');
 
-  const impd = startStubImpd('imp_fixture_good');
-
-  await writeFile(join(ctx.dir, 'imp-token'), 'imp_fixture_good');
-
-  const result = await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, '7070', ...ctx.cli], {
     stdin: ctx.script,
     env: ctx.env,
   });
 
-  expect(result.stdout.toString()).toBe(`${identity}\n200`);
+  expect(result).toStrictEqual({
+    exitCode: 122,
+    stdout: Buffer.from(''),
+    stderr: Buffer.from(''),
+    timedOut: false,
+  });
 });
 
-test('it prints impd’s 401 for a stale saved token', async () => {
+test('it exits with the CLI’s code and passes its line through for any other failure', async () => {
   const ctx = await setupTest();
 
-  const impd = startStubImpd('imp_fixture_good');
+  await createStubImpDocker(
+    ctx.bin,
+    {
+      stdout: '',
+      stderr: 'impz: Unable to connect. Is the computer able to access the url?\n',
+      exitCode: 1,
+    },
+    ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
+  );
 
-  await writeFile(join(ctx.dir, 'imp-token'), 'imp_fixture_stale\n');
+  await writeFile(join(ctx.secrets, 'imp-token'), 'imp_fixture_good\n');
 
-  const result = await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, '1', ...ctx.cli], {
     stdin: ctx.script,
     env: ctx.env,
   });
 
-  expect(result.exitCode).toBe(0);
-  expect(result.stdout.toString()).toBe('{"error":"unauthorized"}\n401');
+  expect(result).toStrictEqual({
+    exitCode: 1,
+    stdout: Buffer.from(''),
+    stderr: Buffer.from('impz: Unable to connect. Is the computer able to access the url?\n'),
+    timedOut: false,
+  });
 });
 
 test.each([
@@ -89,18 +152,19 @@ test.each([
   async (_label: string, content: string) => {
     const ctx = await setupTest();
 
-    const impd = startStubImpd('imp_fixture_good');
+    await createStubImpDocker(ctx.bin, { stdout: '', stderr: '', exitCode: 0 });
+    await writeFile(join(ctx.secrets, 'imp-token'), content);
 
-    await writeFile(join(ctx.dir, 'imp-token'), content);
-
-    const result = await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
+    const result = await runProcess(['bash', '-s', '--', ctx.secrets, '7070', ...ctx.cli], {
       stdin: ctx.script,
       env: ctx.env,
     });
 
+    const called = await Bun.file(join(ctx.bin, 'docker-calls')).exists();
+
     expect(result.exitCode).toBe(121);
     expect(result.stdout.toString()).toBe('');
-    expect(impd.requests).toStrictEqual([]);
+    expect(called).toBe(false);
   },
 );
 
@@ -110,118 +174,35 @@ test.each([
 ])('it exits 120 without asking impd for %s', async (_label: string, directory: boolean) => {
   const ctx = await setupTest();
 
-  const impd = startStubImpd('imp_fixture_good');
+  await createStubImpDocker(ctx.bin, { stdout: '', stderr: '', exitCode: 0 });
 
   if (directory) {
-    await mkdir(join(ctx.dir, 'imp-token'));
+    await mkdir(join(ctx.secrets, 'imp-token'));
   }
 
-  const result = await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, '7070', ...ctx.cli], {
     stdin: ctx.script,
     env: ctx.env,
   });
+
+  const called = await Bun.file(join(ctx.bin, 'docker-calls')).exists();
 
   expect(result.exitCode).toBe(120);
-  expect(impd.requests).toStrictEqual([]);
+  expect(called).toBe(false);
 });
 
-test('it exits with curl’s code when impd refuses the connection', async () => {
+test('it stops with a usage error when no CLI argv follows the port', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'imp-token'), 'imp_fixture_good\n');
+  await writeFile(join(ctx.secrets, 'imp-token'), 'imp_fixture_good\n');
 
-  // nothing listens on port 1
-  const result = await runProcess(['bash', '-s', '--', ctx.dir, '1'], {
+  const result = await runProcess(['bash', '-s', '--', ctx.secrets, '7070'], {
     stdin: ctx.script,
     env: ctx.env,
   });
 
-  expect(result.exitCode).toBe(7);
-  expect(result.stdout.toString()).toBe('\n000');
-
-  // curl 8.5.0 (Ubuntu 24.04) and 8.22.0 word the refusal differently; both exit 7. The connect
-  // time is masked, since it changes between runs.
-  expect(result.stderr.toString().replace(/ after \d+ ms: /u, ' after N ms: ')).toBeOneOf([
-    "curl: (7) Failed to connect to 127.0.0.1 port 1 after N ms: Couldn't connect to server\n",
-    'curl: (7) Failed to connect to 127.0.0.1:1 after N ms: Could not connect to server\n',
-  ]);
-});
-
-test('it keeps the request on loopback under a hostile curl config and proxy variables', async () => {
-  const ctx = await setupTest();
-
-  const impd = startStubImpd('imp_fixture_good');
-  const proxy = startStubImpd('imp_fixture_good');
-  const proxyURL = `http://127.0.0.1:${proxy.port}`;
-
-  await writeFile(join(ctx.dir, 'imp-token'), 'imp_fixture_good\n');
-
-  await writeFile(
-    join(ctx.dir, '.curlrc'),
-    `proxy = "${proxyURL}"\nheader = "Authorization: Bearer imp_fixture_curlrc"\n`,
-  );
-
-  const result = await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
-    stdin: ctx.script,
-    env: {
-      ...ctx.env,
-      http_proxy: proxyURL,
-      HTTP_PROXY: proxyURL,
-      all_proxy: proxyURL,
-      ALL_PROXY: proxyURL,
-    },
+  expect({ exitCode: result.exitCode, stderr: result.stderr.toString() }).toStrictEqual({
+    exitCode: 2,
+    stderr: 'usage: check-atc-imp-token.sh <dir> <impd port> <imp CLI argv>...\n',
   });
-
-  expect(result.stdout.toString()).toBe(`${identity}\n200`);
-  expect(proxy.requests).toStrictEqual([]);
-
-  expect(impd.requests.map((request) => request.authorization)).toStrictEqual([
-    'Bearer imp_fixture_good',
-  ]);
-});
-
-test('it writes no trace under a curl config that asks for one', async () => {
-  const ctx = await setupTest();
-
-  const impd = startStubImpd('imp_fixture_good');
-
-  await writeFile(join(ctx.dir, 'imp-token'), 'imp_fixture_good\n');
-  await writeFile(join(ctx.dir, '.curlrc'), `trace-ascii = "${ctx.dir}/trace"\n`);
-
-  await runProcess(['bash', '-s', '--', ctx.dir, String(impd.port)], {
-    stdin: ctx.script,
-    env: ctx.env,
-  });
-
-  const traced = await Bun.file(join(ctx.dir, 'trace')).exists();
-
-  expect(traced).toBe(false);
-});
-
-test('it sends a plain curl through the same hostile config to the proxy, which the check above defeats', async () => {
-  const ctx = await setupTest();
-
-  const impd = startStubImpd('imp_fixture_good');
-  const proxy = startStubImpd('imp_fixture_good');
-  const proxyURL = `http://127.0.0.1:${proxy.port}`;
-
-  await writeFile(
-    join(ctx.dir, '.curlrc'),
-    `proxy = "${proxyURL}"\ntrace-ascii = "${ctx.dir}/trace"\n`,
-  );
-
-  await runProcess(
-    ['curl', '-sS', '--data', '{"json":{}}', `http://127.0.0.1:${impd.port}/rpc/tokens/whoami`],
-    {
-      env: { ...ctx.env, http_proxy: proxyURL },
-    },
-  );
-
-  expect(proxy.requests.map((request) => request.target)).toStrictEqual([
-    `http://127.0.0.1:${impd.port}/rpc/tokens/whoami`,
-  ]);
-
-  const traced = await Bun.file(join(ctx.dir, 'trace')).exists();
-
-  expect(traced).toBe(true);
 });

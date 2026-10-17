@@ -36,7 +36,7 @@ impd_major="${BASH_REMATCH[1]}"
 
 # accepts_impd_major <nixie version> <client version>: exits 0 when that nixie speaks impd_major.
 # nixie takes impd's major from its client, except that nixie 0.28.0 and later accept impd 2 with
-# a 1.x client: impd 2 renamed imp to impz and kept impd 1.6's wire API (RENAMED_IMPD in nixie's
+# a 1.x client: impd 2 renamed imp's CLI and kept impd 1.6's wire API (RENAMED_IMPD in nixie's
 # adapters/sandbox-imp/src/build-imp-port.ts, absent at v0.27.2).
 accepts_impd_major() {
   local client_major="${2%%.*}"

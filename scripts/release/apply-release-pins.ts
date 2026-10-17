@@ -76,7 +76,8 @@ function planTableWrite(
   return { ...plan, files: { ...plan.files, [pinTableFile]: table } };
 }
 
-// a failed lock puts every pin file and lock file back, so no pin moves without its lock
+// a failed lock or generator puts every pin file, lock file and generated file back, so no pin
+// moves without its lock and the files generated from its release
 async function writeLockedPins(
   options: Readonly<ApplyReleasePinsOptions>,
   files: Readonly<Record<string, string>>,
@@ -86,15 +87,46 @@ async function writeLockedPins(
 
   const locked = await runLocks(options, plan.written);
 
+  // the files generated from a release move only with a pin, as a lock does
+  const generated =
+    locked instanceof Error || plan.written.length === 0 ? locked : await runGenerator(options);
+
   const lockFiles = plan.written.flatMap((pin) =>
     pin.lock === undefined ? [] : [pin.lock.lockFile],
   );
 
-  if (locked instanceof Error) {
-    await writePinFiles(options.root, files, [...Object.keys(plan.files), ...lockFiles]);
+  // a generated file that the checkout lacked has no contents to put back
+  const generatedFiles = (options.record.generated?.files ?? []).filter((path) => path in files);
+
+  if (generated instanceof Error) {
+    await writePinFiles(options.root, files, [
+      ...Object.keys(plan.files),
+      ...lockFiles,
+      ...generatedFiles,
+    ]);
   }
 
-  return locked;
+  return generated;
+}
+
+// the release's tag reaches the record's generator, which writes its files in the checkout
+async function runGenerator(
+  options: Readonly<ApplyReleasePinsOptions>,
+): Promise<Error | undefined> {
+  const generator = options.record.generated;
+
+  if (generator === undefined) {
+    return undefined;
+  }
+
+  const tag = `${options.record.tagPrefix}${options.version}`;
+
+  const ran = await runChecked(options.run, ['bun', join(options.root, generator.script), tag], {
+    cwd: options.root,
+    env: options.env,
+  });
+
+  return ran instanceof Error ? ran : undefined;
 }
 
 async function runLocks(

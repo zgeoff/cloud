@@ -5,10 +5,9 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ExitError } from './exit-error.ts';
 import { findRecord } from './find-record.ts';
+import { loadImpJSON } from './imp-cli.ts';
 import { loadCloudTarget } from './load-cloud-target.ts';
-import { parseJSONOutput } from './parse-json-output.ts';
 import type { ScriptIO } from './run-or-exit.ts';
-import { runOrExit } from './run-or-exit.ts';
 import { runProcess } from './run-process.ts';
 import { withExitCode } from './with-exit-code.ts';
 import { writeCloudTargetImage } from './write-cloud-target-image.ts';
@@ -66,9 +65,7 @@ function parseArgs(args: readonly string[], home: string): readonly [string, str
 }
 
 async function requireImpImage(io: Readonly<ScriptIO>, image: string) {
-  const result = await runOrExit(io, ['impz', 'image', 'ls', '--json']);
-
-  const images = parseJSONOutput(result.stdout.toString(), 'impz image ls');
+  const images = await loadImpJSON(io, ['image', 'ls']);
 
   if (findRecord(images, 'name', image) === undefined) {
     throw new ExitError(
