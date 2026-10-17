@@ -31,11 +31,16 @@ setup_test() {
   create_stub_release_gh "$tree/bin"
   create_stub_release_docker "$tree/bin"
   create_stub_release_curl "$tree/bin"
+  # no auto maintenance in any repository of the case: a commit's, a fetch's or a push's detached
+  # repack could still write into it while the case's trap removes it. A push to a local origin
+  # drops the GIT_CONFIG_* variables, so the origin carries the setting in its own config.
   case_env=(env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp"
     STUB_TREE="$tree" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
     GIT_AUTHOR_NAME=test GIT_AUTHOR_EMAIL=test@example.invalid
-    GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.invalid)
+    GIT_COMMITTER_NAME=test GIT_COMMITTER_EMAIL=test@example.invalid
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=maintenance.auto GIT_CONFIG_VALUE_0=false)
   "${case_env[@]}" git init -q --bare -b main "$tree/origin.git"
+  "${case_env[@]}" git -C "$tree/origin.git" config maintenance.auto false
   "${case_env[@]}" git -C "$tree/seed" init -q -b main
   "${case_env[@]}" git -C "$tree/seed" remote add origin "$tree/origin.git"
 }

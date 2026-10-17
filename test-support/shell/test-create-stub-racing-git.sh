@@ -135,6 +135,10 @@ setup_test() {
   mkdir "$tree/bin" "$tree/home" "$tree/tmp"
   git init -q --bare -b main "$tree/origin.git"
   git clone -q "$tree/origin.git" "$tree/clone" 2> /dev/null
+  # no auto maintenance: a commit's, a fetch's or a push's detached repack could still write into
+  # a repository while the case's trap removes it
+  git -C "$tree/origin.git" config maintenance.auto false
+  git -C "$tree/clone" config maintenance.auto false
   git -C "$tree/clone" commit -q --allow-empty -m init
   git -C "$tree/clone" push -q origin main
   create_stub_racing_git "$tree/bin" "$(command -v git)" "$tree/clone" "$tree/calls"

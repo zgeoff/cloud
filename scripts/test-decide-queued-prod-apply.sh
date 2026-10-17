@@ -165,6 +165,9 @@ setup_test() {
   : > "$tree/output"
   : > "$tree/summary"
   git -C "$tree/repo" init -q -b main
+  # no auto maintenance: a commit's detached repack could still write into the repository while
+  # the case's trap removes it
+  git -C "$tree/repo" config maintenance.auto false
   # boot data: an empty root commit, so HEAD resolves
   git -C "$tree/repo" commit -q --allow-empty -m 'start the history'
 }

@@ -931,6 +931,7 @@ it_never_builds_when_origin_main_has_moved_on() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   git clone -q "$tree/origin.git" "$tree/other"
+  git -C "$tree/other" config maintenance.auto false
   git -C "$tree/other" commit -q --allow-empty -m elsewhere
   git -C "$tree/other" push -q origin main
 
@@ -1535,6 +1536,10 @@ setup_test() {
   require_remote_tool_stubs "$tree/bin"
   git init -q --bare -b main "$tree/origin.git"
   git clone -q "$tree/origin.git" "$tree/clone" 2> /dev/null
+  # no auto maintenance: a commit's, a fetch's or a push's detached repack could still write into
+  # a repository while the case's trap removes it
+  git -C "$tree/origin.git" config maintenance.auto false
+  git -C "$tree/clone" config maintenance.auto false
   git -C "$tree/clone" commit -q --allow-empty -m init
   git -C "$tree/clone" push -q origin main
   mkdir "$tree/clone/scripts"

@@ -39,6 +39,24 @@ test('it runs git without the user’s global config', async () => {
   ]);
 });
 
+test('it turns off auto maintenance in the origin, the seed and a clone', async () => {
+  const ctx = await setupTest();
+  const repo = await createGitOrigin(ctx.dir);
+
+  const clone = join(ctx.dir, 'clone');
+
+  await repo.git(['clone', '-q', repo.origin, clone]);
+
+  // the origin's own config, which a push to it reads without the GIT_CONFIG_* variables
+  const settings = await Promise.all([
+    repo.git(['-C', repo.origin, 'config', '--local', '--get', 'maintenance.auto']),
+    repo.git(['-C', repo.seed, 'config', '--get', 'maintenance.auto']),
+    repo.git(['-C', clone, 'config', '--get', 'maintenance.auto']),
+  ]);
+
+  expect(settings).toStrictEqual(['false', 'false', 'false']);
+});
+
 test('it throws with git’s message when a git call fails', async () => {
   const ctx = await setupTest();
   const repo = await createGitOrigin(ctx.dir);
