@@ -112,8 +112,16 @@ stopped, and switch after.
    with `impz secret add`, reading the value from that file or from its source. Until imp ships
    `impz db copy` and its documented restore (imp #171), this runbook is the recovery contract.
 
-4. Check: `docker exec imp-host impz info` shows the copy's version, `impz ls` matches the time of
-   the copy, and `https://imps.geoff.cloud/health` returns 200.
+4. Check the restored impd. `impz` is imp's CLI from its rename on, and an image from before the
+   rename has only `imp`, so each command runs whichever CLI the container has:
+
+   ```sh
+   docker exec imp-host sh -c 'if command -v impz > /dev/null; then impz info; else imp info; fi'
+   docker exec imp-host sh -c 'if command -v impz > /dev/null; then impz ls; else imp ls; fi'
+   ```
+
+   Expect `info` to show the copy's `impVersion` from `COPY-INFO`, `ls` to match the time of the
+   copy, and `https://imps.geoff.cloud/health` to return 200.
 
 **Reboot window.** If the host reboots during step 3, imp-host starts on the current generation,
 against whatever the dataset holds then. Do not assume nothing changed: check the script's output
