@@ -51,7 +51,7 @@ test('it moves an image tag pin with no version to the published tag and digest'
       'atc-gateway-image already pins 7.1.0',
       `pinned atc-gateway-backup-image 3.1.0-r2 sha256:${'4'.repeat(64)}`,
     ],
-    written: [getRecord('atc-gateway-images').pins[1]],
+    written: getRecord('atc-gateway-images').pins.slice(1),
   });
 });
 

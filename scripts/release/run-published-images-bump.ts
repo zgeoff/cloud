@@ -94,25 +94,30 @@ async function readBump(
 
   const values = await readValues(context, files, images);
 
-  const version = values instanceof Error ? '' : (values.tags?.[images[0]?.image ?? ''] ?? '');
-  const held = collectPinValues(record, files);
-
-  if (values instanceof Error || held instanceof Error) {
-    return values instanceof Error ? values : held;
+  if (values instanceof Error) {
+    return values;
   }
 
+  const version = values.tags?.[images[0]?.image ?? ''] ?? '';
+  const held = collectPinValues(record, files);
   const plan = planPinEdits({ record, version, values, files });
 
-  const planned =
-    plan instanceof Error ? plan : collectPinValues(record, { ...files, ...plan.files });
-
-  const labels = planLabels(version, record, held);
-
-  if (planned instanceof Error || labels instanceof Error) {
-    return planned instanceof Error ? planned : labels;
+  if (held instanceof Error) {
+    return held;
   }
 
-  return { version, values, labels, held, planned };
+  if (plan instanceof Error) {
+    return plan;
+  }
+
+  const planned = collectPinValues(record, { ...files, ...plan.files });
+  const labels = planLabels(version, record, held);
+
+  if (planned instanceof Error) {
+    return planned;
+  }
+
+  return labels instanceof Error ? labels : { version, values, labels, held, planned };
 }
 
 async function readValues(
@@ -126,19 +131,19 @@ async function readValues(
   for (const image of images) {
     const match = findPinMatch(files, image);
 
-    const digest =
-      match instanceof Error
-        ? match
-        : await readImageDigest(
-            context.run,
-            `ghcr.io/zgeoff/${image.image}:${match.groups['tag'] ?? ''}`,
-          );
-
-    if (match instanceof Error || digest instanceof Error) {
-      return match instanceof Error ? match : digest;
+    if (match instanceof Error) {
+      return match;
     }
 
-    tags[image.image] = match.groups['tag'] ?? '';
+    const tag = match.groups['tag'] ?? '';
+
+    const digest = await readImageDigest(context.run, `ghcr.io/zgeoff/${image.image}:${tag}`);
+
+    if (digest instanceof Error) {
+      return digest;
+    }
+
+    tags[image.image] = tag;
     digests[image.image] = digest;
   }
 
