@@ -157,9 +157,11 @@ async function setupTest() {
 
   // no auto maintenance in either repository: a commit's or a push's detached repack could still
   // write into it while the test's cleanup removes it
-  await $`git init --quiet --bare --template= --initial-branch=main ${upstream} && git -C ${upstream} config maintenance.auto false && git clone --quiet --template= ${upstream} ${repo}`
+  await $`git init --quiet --bare --template= --initial-branch=main ${upstream} && git clone --quiet --template= ${upstream} ${repo}`
     .env(env)
     .quiet();
+
+  await $`git config maintenance.auto false`.env(env).cwd(upstream).quiet();
 
   await $`git config user.name cloud && git config user.email cloud@example.com && git config commit.gpgsign false && git config tag.gpgsign false && git config maintenance.auto false`
     .env(env)
