@@ -87,16 +87,22 @@ with its claim and Secret and in its image.
 
 The cloud daemon is a NixOS service on the host, running an unpatched atc release that the flake
 pins by checksum. It stays byte-identical to the release because an imp target copies the daemon's
-own binary into each guest. It listens on the host's tailnet address, and systemd hands it two
-tokens as credentials: the bearer the gateway must present, and the impd token it uses itself.
-systemd copies both when the service starts, so a rotated token reaches the daemon only after a
-restart; a reload rereads the old copy. The bearer comes from one 1Password item that both the
-gateway's Secret and the host's file take, and the daemon's file holds one token or two, so a
-rotation needs no outage: add the new token to the host's file beside the old one and restart the
-daemon, apply so the gateway rolls onto the new token, then remove the old one and restart again.
+own binary into a guest whose image ships another atc release. It listens on the host's tailnet
+address, and systemd hands it two tokens as credentials: the bearer the gateway must present, and
+the impd token it uses itself. systemd copies both when the service starts, so a rotated token
+reaches the daemon only after a restart; a reload rereads the old copy. The bearer comes from one
+1Password item that both the gateway's Secret and the host's file take, and the daemon's file holds
+one token or two, so a rotation needs no outage: add the new token to the host's file beside the old
+one and restart the daemon, apply so the gateway rolls onto the new token, then remove the old one
+and restart again.
 
 The daemon has one execution target, impd on the host's loopback, and names every imp it creates
 with a fixed prefix. Its impd token can create, wake and destroy only imps with that prefix, so a
 compromised daemon cannot touch any other imp. The daemon's config lists each gateway client it
 serves, with the targets that client may use, and refuses a client it does not list, so it never
 falls back to running a session on the host itself.
+
+The target boots each imp from the [agent image](../../runbooks/agent-image.md), and the session
+hooks run the image's own atc while it matches the daemon's release, so a spawn uploads no binary.
+The daemon offers Claude and Codex with no brokered credentials, so no session it starts signs in
+through impd's broker.

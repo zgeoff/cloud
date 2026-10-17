@@ -280,7 +280,9 @@ in
   # atc's daemon for the atc gateway (docs/architecture/workloads/atc-gateway.md). The token
   # files are root-only and staged by scripts/install-atc-gateway-credentials.ts; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
-  # the targets it may reach; a client not listed here is refused every request.
+  # the targets it may reach; a client not listed here is refused every request. The target
+  # and the agents match the home-pc daemon's `cloud` target, less its brokered auth: no
+  # authProfiles, so no session here signs in through impd's broker.
   services.atc-daemon = {
     enable = true;
     package = atc;
@@ -292,8 +294,16 @@ in
       url = impdLoopbackURL;
       tokenFile = "/run/credentials/atc-daemon.service/imp-token";
       impPrefix = "harness-";
+      # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
+      # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
+      image = "agent-dd6b98c";
+      guestATC = "/usr/local/bin/atc";
     };
     defaultTarget = "geoffcloud";
+    agents = {
+      claude = { };
+      codex = { };
+    };
     principals = {
       # ChatGPT's connector, added 2026-10-04
       "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];

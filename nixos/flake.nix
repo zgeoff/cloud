@@ -61,7 +61,10 @@
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
-      checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix { inherit nixpkgs imp; };
+      checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
       checks.x86_64-linux.cloud-host-firewall = import ./checks/cloud-host-firewall.nix {
         inherit nixpkgs imp;
       };

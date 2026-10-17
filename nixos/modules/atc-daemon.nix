@@ -14,14 +14,15 @@ let
   json = pkgs.formats.json { };
   home = "/var/lib/atc-daemon";
 
-  # atc reads $HOME/.config/atc/config.json; this daemon sets only its targets and
-  # principals there
+  # atc reads $HOME/.config/atc/config.json; this daemon sets only its targets, principals and
+  # agents there
   configFile = json.generate "atc-daemon-config.json" (
     {
       inherit (cfg) targets;
       principals = lib.mapAttrs (_: principal: { inherit (principal) targets; }) cfg.principals;
     }
     // lib.optionalAttrs (cfg.defaultTarget != null) { inherit (cfg) defaultTarget; }
+    // lib.optionalAttrs (cfg.agents != null) { inherit (cfg) agents; }
   );
 
   # links the store's config where atc looks; atc writes a default config only when
@@ -107,6 +108,19 @@ in
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = "The target a spawn without one runs on; null leaves it to atc.";
+    };
+
+    agents = lib.mkOption {
+      type = lib.types.nullOr (lib.types.attrsOf json.type);
+      default = null;
+      example = {
+        claude = { };
+        codex = { };
+      };
+      description = ''
+        The agents atc offers, keyed by agent id, each as config.json's `agents` takes it. null
+        leaves the key out, for atc's default; `{ }` offers no agent, so every spawn fails.
+      '';
     };
 
     principals = lib.mkOption {

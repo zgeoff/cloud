@@ -1,10 +1,14 @@
 # Evaluates services.atc-daemon apart from any host's config, with the pinned atc release, and
-# checks the service, the config.json it links and the module's assertions. Each case evaluates
-# its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
-# directory, under test-support/shell/run-cases.sh, which reports each case and fails the check
-# when any case fails.
+# checks the service, the config.json it links and the module's assertions; one case reads the
+# config.json that geoffcloud's own config links instead. Each other case evaluates its own config
+# through test-utils/build-module-system.nix. Each runs on its own, in a fresh directory, under
+# test-support/shell/run-cases.sh, which reports each case and fails the check when any case fails.
 # Run: bun run test:nixos atc-daemon
-{ nixpkgs, imp }:
+{
+  nixpkgs,
+  imp,
+  geoffcloud,
+}:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
@@ -110,7 +114,7 @@ let
         '';
     }
     {
-      title = "it links a config.json of the targets, principals and default target where atc reads it";
+      title = "it links a config.json of the targets, principals, default target and agents where atc reads it";
       script =
         let
           system = buildModuleSystem ../modules/atc-daemon.nix {
@@ -128,6 +132,13 @@ let
               };
               defaultTarget = "geoffcloud";
               principals.fixture-client.targets = [ "geoffcloud" ];
+              agents = {
+                claude = { };
+                codex.args = [
+                  "--model"
+                  "gpt-5"
+                ];
+              };
             };
           };
         in
@@ -141,6 +152,7 @@ let
           EOF
           jq -S . > expected <<'EOF'
           {
+            "agents": { "claude": {}, "codex": { "args": ["--model", "gpt-5"] } },
             "defaultTarget": "geoffcloud",
             "principals": { "fixture-client": { "targets": ["geoffcloud"] } },
             "targets": {
@@ -229,7 +241,7 @@ let
         '';
     }
     {
-      title = "it leaves defaultTarget out of config.json, and fails no assertion, when it is null";
+      title = "it leaves defaultTarget and agents out of config.json, and fails no assertion, when they are null";
       script =
         let
           system = buildModuleSystem ../modules/atc-daemon.nix {
@@ -401,6 +413,33 @@ let
             )
           } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
+    }
+    {
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and offers claude and codex with no brokered auth";
+      script = ''
+        jq -S . > expected <<'EOF'
+        {
+          "agents": { "claude": {}, "codex": {} },
+          "defaultTarget": "geoffcloud",
+          "principals": { "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] } },
+          "targets": {
+            "geoffcloud": {
+              "guestATC": "/usr/local/bin/atc",
+              "image": "agent-dd6b98c",
+              "impPrefix": "harness-",
+              "provider": "imp",
+              "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
+              "url": "http://127.0.0.1:7070"
+            }
+          }
+        }
+        EOF
+
+        config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${geoffcloud.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre})
+        jq -S . "$config" > actual
+
+        assert_files_equal expected actual
+      '';
     }
     {
       title = "it adds no service, user or group, and fails no assertion, when it is off";
