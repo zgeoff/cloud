@@ -313,6 +313,23 @@ test("it alerts on nixie's failing turns from the nixie-turns probe, after the i
           annotations: { summary: 'impd health probe has not reported for over 5 minutes.' },
         },
         {
+          alert: 'HostBehindLatestBuild',
+          expr: 'host_build_lag_seconds > 86400',
+          for: '0m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'geoffcloud has run an older {{ $labels.part }} than the latest green main build for over 24 hours; switch the host.',
+          },
+        },
+        {
+          alert: 'HostBuildLagStale',
+          expr: 'time() - host_build_lag_last_check_timestamp_seconds > 10800 or absent(host_build_lag_last_check_timestamp_seconds)',
+          for: '5m',
+          labels: { severity: 'warning' },
+          annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
+        },
+        {
           alert: 'TargetDown',
           expr: 'up == 0',
           for: '5m',
