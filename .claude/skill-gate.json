@@ -1,7 +1,7 @@
 {
   "ignore": ["node_modules/", "dist/"],
   "gates": [
-    { "match": "**/*.{ts,tsx}", "skills": ["code-style"] },
+    { "match": "**/*.{ts,tsx}", "skills": ["code-style", "project-code-style"] },
     { "match": "**/*.test.ts", "skills": ["testing", "project-testing"] },
     { "match": "**/*_test.go", "skills": ["testing", "project-testing"] },
     { "match": "**/test-*.sh", "skills": ["testing", "project-testing"] },
