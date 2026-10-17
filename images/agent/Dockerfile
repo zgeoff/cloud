@@ -190,8 +190,8 @@ RUN curl -fsSL -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. scripts/pin-auto-mode.sh checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=1.0.1
-ARG AUTO_MODE_SHA256=3b2ad6a31b911adf207311185fc2fcdfed9534d6c72673945a6b854790005af9
+ARG AUTO_MODE_VERSION=2.0.0
+ARG AUTO_MODE_SHA256=1ebdd145c73a3e2a5de018bf9db8788633434ccf49e03a9e5c1b24107cae7986
 RUN curl -fsSL -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
