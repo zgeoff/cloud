@@ -124,11 +124,14 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    pool holds:
 
    ```sh
-   d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d"
-   rm -f "$d"/var/lib/imp-host/secrets/*
-   ls -A "$d"/var/lib/imp-host/secrets   # expect no output
-   umount "$d" && rmdir "$d"
+   d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d" &&
+     rm -f "$d"/var/lib/imp-host/secrets/* &&
+     ls -A "$d"/var/lib/imp-host/secrets &&   # expect no output
+     umount "$d" && rmdir "$d" && echo removed
    ```
+
+   Expect `removed`. The `&&` chain stops before the `rm` when `mktemp` or the bind fails, since an
+   empty `$d` would make the `rm` delete the live files on the pool.
 
    With no output from `findmnt`, the pool lacks `host-secrets/imp-host` and the bind failed, so
    imp-host stays stopped. Copy the staged files into the encrypted dataset, mount the binds, and
@@ -136,10 +139,12 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    **CAUTION:** The staged files are the host's only local copies. Delete them only after the copy
    succeeds and matches, as the `&&` chain below does: a failed `cp -a`, such as on a full pool,
-   then stops the block and keeps them.
+   then stops the block and keeps them. The chain starts with `mountpoint -q`, so it never copies
+   the files onto the empty mount point on the root disk while the dataset is not mounted.
 
    ```sh
-   install -d -m 0700 /var/lib/tank-cloud/host-secrets/imp-host /var/lib/tank-cloud/host-secrets/atc-daemon &&
+   mountpoint -q /var/lib/tank-cloud/host-secrets &&
+     install -d -m 0700 /var/lib/tank-cloud/host-secrets/imp-host /var/lib/tank-cloud/host-secrets/atc-daemon &&
      cp -a /var/lib/imp-host/secrets/. /var/lib/tank-cloud/host-secrets/imp-host/ &&
      diff -r /var/lib/imp-host/secrets /var/lib/tank-cloud/host-secrets/imp-host > /dev/null &&
      systemctl start tank-cloud.target imp-host &&
