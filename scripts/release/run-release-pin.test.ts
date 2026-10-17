@@ -1,5 +1,3 @@
-// a pin test states every pin file and the pin table it writes, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, mock, test } from 'bun:test';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';

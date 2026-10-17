@@ -1,5 +1,3 @@
-// a check test writes every pin file and the table it compares them with, so its body is long
-/* oxlint-disable max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
