@@ -1,3 +1,4 @@
+import { atcCloudGrantable as grantable } from './atc-cloud-grantable.ts';
 import type { ATCCredentialsPreflight } from './check-atc-credentials-preflight.ts';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
@@ -8,19 +9,9 @@ import { readHostScript } from './read-host-script.ts';
 import { runOnHost } from './run-on-host.ts';
 import { toShellArg } from './to-shell-arg.ts';
 
-// the secrets atc-cloud may grant: glm, and those that the daemon's auth profiles name in
-// nixos/hosts/geoffcloud/configuration.nix; scripts/host/mint-atc-imp-token.sh mints with them
-const grantable = [
-  'glm',
-  'claude-setup-token',
-  'github-imp-agents',
-  'linear-imp-agents',
-  'op-connect',
-];
-
-// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant the secrets above) on the
-// host, straight into a root-only file there, so it never reaches this machine. impd shows a token once, so a
-// rerun skips a token and file that match and stops at a lone one or a bad file.
+// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant atcCloudGrantable) on the
+// host, straight into a root-only file there, so it never reaches this machine. impd shows a token
+// once, so a rerun skips a token and file that match and stops at a lone one or a bad file.
 export async function installATCImpToken(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,

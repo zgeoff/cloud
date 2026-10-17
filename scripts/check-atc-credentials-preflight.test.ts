@@ -3,6 +3,7 @@ import { checkATCCredentialsPreflight } from './check-atc-credentials-preflight.
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
 import type { Runner } from './run-process.ts';
 import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
+import { buildMockImpSecret } from './test-utils/build-mock-imp-secret.ts';
 import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
 
 interface SetupConfig {
@@ -156,6 +157,47 @@ test.each([
     'imp-host',
     'impz',
     'info',
+    '--json',
+  ]);
+});
+
+test('it stops before any change when impd lacks a secret that atc-cloud may grant', async () => {
+  const tools = buildStubCredentialTools({
+    op: { vaults: { cloud: {} } },
+    atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
+    host: buildMockCredentialsHostScenario({
+      secrets: [
+        {
+          ...buildMockImpSecret({
+            name: 'claude-setup-token',
+            rules: [{ host: 'api.anthropic.com', header: 'authorization', scheme: 'bearer' }],
+          }),
+        },
+        {
+          ...buildMockImpSecret({
+            name: 'op-connect',
+            rules: [{ host: 'op-connect.imp.internal', header: 'authorization', scheme: 'bearer' }],
+          }),
+        },
+      ],
+    }),
+  });
+
+  const ctx = await setupTest({ run: tools.run });
+
+  expect(checkATCCredentialsPreflight(ctx.context)).rejects.toMatchObject({
+    exitCode: 1,
+    message:
+      "impd lacks github-imp-agents, linear-imp-agents, which atc-cloud may grant; add each with\n'impz secret add' in imp-host, then rerun. Nothing changed",
+  });
+
+  expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([
+    'docker',
+    'exec',
+    'imp-host',
+    'impz',
+    'secret',
+    'ls',
     '--json',
   ]);
 });

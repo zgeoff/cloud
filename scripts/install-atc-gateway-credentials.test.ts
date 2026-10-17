@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { installATCGatewayCredentials } from './install-atc-gateway-credentials.ts';
 import { readHostScript } from './read-host-script.ts';
+import { buildMockATCProfileSecrets } from './test-utils/build-mock-atc-profile-secrets.ts';
 import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
 import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
 
@@ -73,7 +74,7 @@ test('it installs all three and keeps every secret out of every argv, sending ea
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
     host: buildMockCredentialsHostScenario({
-      secrets: [],
+      secrets: buildMockATCProfileSecrets(),
       tokens: [],
       files: {},
       minted: 'imp_fixture_minted_token\n',
@@ -111,7 +112,11 @@ test('it hands op the service account token in its environment alone', async () 
   const tools = buildStubCredentialTools({
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
-    host: buildMockCredentialsHostScenario({ secrets: [], tokens: [], files: {} }),
+    host: buildMockCredentialsHostScenario({
+      secrets: buildMockATCProfileSecrets(),
+      tokens: [],
+      files: {},
+    }),
   });
 
   await installATCGatewayCredentials({
@@ -137,7 +142,7 @@ test('it prints no secret on stdout or stderr', async () => {
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
     host: buildMockCredentialsHostScenario({
-      secrets: [],
+      secrets: buildMockATCProfileSecrets(),
       tokens: [],
       files: {},
       minted: 'imp_fixture_minted_token\n',

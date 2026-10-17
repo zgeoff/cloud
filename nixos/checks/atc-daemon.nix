@@ -467,6 +467,49 @@ let
         '';
     }
     {
+      title = "it names an MCP server whose auth profile is not defined, though the agent selects only defined ones";
+      script =
+        let
+          system = buildModuleSystem ../modules/atc-daemon.nix {
+            services.atc-daemon = {
+              enable = true;
+              package = pkgs.callPackage ../packages/atc.nix { };
+              listen = "100.64.0.1:8415";
+              tokenFile = "/run/fixture/gateway-token";
+              impTokenFile = "/run/fixture/imp-token";
+              targets.geoffcloud = {
+                provider = "imp";
+                url = "http://127.0.0.1:7070";
+                tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+                impPrefix = "harness-";
+              };
+              defaultTarget = "geoffcloud";
+              principals.fixture-client.targets = [ "geoffcloud" ];
+              authProfiles.github = {
+                secret = "fixture-github";
+                kind = "github";
+              };
+              agents.claude.auth = {
+                profiles = [ "github" ];
+                mcpServers.linear = {
+                  url = "https://mcp.linear.app/mcp";
+                  profile = "linear";
+                };
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: claude mcpServers.linear -> linear"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
       title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker";
       script = ''
         jq -S . > expected <<'EOF'

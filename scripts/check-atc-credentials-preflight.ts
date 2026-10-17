@@ -1,3 +1,4 @@
+import { atcCloudGrantable } from './atc-cloud-grantable.ts';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
@@ -27,6 +28,9 @@ export async function checkATCCredentialsPreflight(
   await requireGrantableTokens(context);
 
   const secrets = await readImpList(context, 'secret');
+
+  requireGrantableSecrets(secrets);
+
   const tokens = await readImpList(context, 'token');
   const hasItem = await hasDaemonTokenItem(context);
   const hostFiles = await readHostFiles(context);
@@ -60,6 +64,21 @@ async function requireGrantableTokens(context: Readonly<ATCCredentialsContext>) 
 
   if (findJSONField(features, 'grantableTokens') !== true) {
     throw new ExitError(1, 'impd lacks grantableTokens; nothing changed');
+  }
+}
+
+// impd refuses to mint atc-cloud while a secret it may grant is missing, so every one must exist
+// before the run writes a credential. glm is the exception: the run adds it itself.
+function requireGrantableSecrets(secrets: unknown) {
+  const missing = atcCloudGrantable.filter(
+    (name) => name !== 'glm' && findRecord(secrets, 'name', name) === undefined,
+  );
+
+  if (missing.length > 0) {
+    throw new ExitError(
+      1,
+      `impd lacks ${missing.join(', ')}, which atc-cloud may grant; add each with\n'impz secret add' in imp-host, then rerun. Nothing changed`,
+    );
   }
 }
 

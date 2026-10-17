@@ -34,12 +34,24 @@ let
     ln -sfn ${configFile} ${home}/.config/atc/config.json
   '';
 
-  # each auth profile an agent selects that the config does not define
+  # each auth profile that an agent or one of its MCP servers selects and the config does not
+  # define
   unknownProfiles = lib.concatLists (
     lib.mapAttrsToList (
       id: agent:
-      map (profile: "${id} -> ${profile}") (
-        lib.filter (profile: !(cfg.authProfiles ? ${profile})) (agent.auth.profiles or [ ])
+      let
+        selected =
+          map (profile: {
+            from = id;
+            inherit profile;
+          }) (agent.auth.profiles or [ ])
+          ++ lib.mapAttrsToList (server: options: {
+            from = "${id} mcpServers.${server}";
+            profile = options.profile or "";
+          }) (agent.auth.mcpServers or { });
+      in
+      map (each: "${each.from} -> ${each.profile}") (
+        lib.filter (each: !(cfg.authProfiles ? ${each.profile})) selected
       )
     ) (if cfg.agents == null then { } else cfg.agents)
   );
