@@ -287,6 +287,8 @@ pkgs.testers.runNixOSTest {
         machine.succeed(f"setfattr -n trusted.fixture -v kept {volume}/one")
         machine.succeed(f"echo acl > {volume}/acl && setfacl -m u:65534:r {volume}/acl")
         machine.succeed(f"echo owned > {volume}/owned && chown 1234:5678 {volume}/owned && chmod 0640 {volume}/owned")
+        # and the root's own xattr and mode, which the zvol's root takes from the staging copy
+        machine.succeed("setfattr -n user.fixture -v root-kept /var/lib/rancher && chmod 0750 /var/lib/rancher")
         before_move = cluster()
 
 
@@ -351,6 +353,8 @@ pkgs.testers.runNixOSTest {
         assert machine.succeed(f"getfattr --only-values -n trusted.fixture {volume}/one") == "kept"
         assert "user:65534:r--" in machine.succeed(f"getfacl -n -p {volume}/acl")
         assert machine.succeed(f"stat -c '%u:%g %a' {volume}/owned").strip() == "1234:5678 640"
+        assert machine.succeed("getfattr --only-values -n user.fixture /var/lib/rancher") == "root-kept"
+        assert machine.succeed("stat -c %a /var/lib/rancher").strip() == "750"
 
 
     with subtest("it refuses a second copy once k3s has run on the zvol"):

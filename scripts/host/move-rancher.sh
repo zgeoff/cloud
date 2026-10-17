@@ -184,6 +184,18 @@ compare_tree() {
   echo "match $name: $(($(tr -cd '\0' < "$work_dir/old.manifest" | wc -c) - 1)) entries, $(wc -l < "$work_dir/old.xattrs") xattrs"
 }
 
+# gives the zvol's root the mode, owner, xattrs and ACLs of the old /var/lib/rancher, which the
+# staging directory held, and checks them
+copy_root_attributes() {
+  local old="$1" new="$2"
+  chmod --reference="$old" "$new"
+  chown --reference="$old" "$new"
+  (cd "$old" && getfattr -h -d -m - -e hex .) > "$work_dir/root.old"
+  (cd "$new" && setfattr -h --restore="$work_dir/root.old")
+  (cd "$new" && getfattr -h -d -m - -e hex .) > "$work_dir/root.new"
+  [ "$(stat -c '%a %u:%g' "$old")" = "$(stat -c '%a %u:%g' "$new")" ] && cmp -s "$work_dir/root.old" "$work_dir/root.new"
+}
+
 copy() {
   local reserved size old_data old_etc leftovers needed available entry
   require_mounts
@@ -234,8 +246,7 @@ copy() {
   find "$staging" -mindepth 1 -maxdepth 1 ! -name k3s -exec mv -t "$data" {} +
   mv "$staging/k3s" "$data/k3s"
   rmdir "$staging"
-  chmod --reference="$old_data" "$data"
-  chown --reference="$old_data" "$data"
+  copy_root_attributes "$old_data" "$data" || die "refusing to start k3s: $data does not have the old root's mode, owner and xattrs"
   sync -f "$data"
   systemctl reset-failed k3s.service || true
   systemctl start k3s.service
