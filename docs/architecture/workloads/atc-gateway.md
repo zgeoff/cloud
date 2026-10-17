@@ -104,5 +104,9 @@ falls back to running a session on the host itself.
 
 The target boots each imp from the [agent image](../../runbooks/agent-image.md), and the session
 hooks run the image's own atc while it matches the daemon's release, so a spawn uploads no binary.
-The daemon offers Claude and Codex with no brokered credentials, so no session it starts signs in
-through impd's broker.
+The daemon offers Claude and Codex. A Claude session signs in through impd's credential broker with
+the same profiles as the home-pc daemon's `cloud` target: the Claude subscription, GitHub, Linear's
+MCP server and 1Password Connect. The profiles name impd's secrets, never their values, so a
+rotation in impd reaches both daemons, while a renamed or added profile changes both daemons'
+configs. The daemon's impd token lists each of those secrets as grantable, so the token, not the
+config, bounds what a session can reach. A Codex session has no brokered sign-in.

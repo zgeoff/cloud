@@ -280,9 +280,10 @@ in
   # atc's daemon for the atc gateway (docs/architecture/workloads/atc-gateway.md). The token
   # files are root-only and staged by scripts/install-atc-gateway-credentials.ts; systemd passes them in as
   # credentials. principals lists each gateway client ID (`atc-gateway clients list`) with
-  # the targets it may reach; a client not listed here is refused every request. The target
-  # and the agents match the home-pc daemon's `cloud` target, less its brokered auth: no
-  # authProfiles, so no session here signs in through impd's broker.
+  # the targets it may reach; a client not listed here is refused every request. The target,
+  # the agents and the auth profiles match the home-pc daemon's `cloud` target. The profiles name
+  # the same impd secrets as home-pc's, so a renamed or added profile changes both daemons'
+  # configs, and the daemon's impd token must list each secret as grantable.
   services.atc-daemon = {
     enable = true;
     package = atc;
@@ -300,8 +301,49 @@ in
       guestATC = "/usr/local/bin/atc";
     };
     defaultTarget = "geoffcloud";
+    authProfiles = {
+      claude = {
+        secret = "claude-setup-token";
+        host = "api.anthropic.com";
+        header = "authorization";
+        scheme = "bearer";
+      };
+      github = {
+        secret = "github-imp-agents";
+        kind = "github";
+      };
+      linear = {
+        secret = "linear-imp-agents";
+        host = "mcp.linear.app";
+        header = "authorization";
+        scheme = "bearer";
+      };
+      op-connect = {
+        secret = "op-connect";
+        host = "op-connect.imp.internal";
+        header = "authorization";
+        scheme = "bearer";
+        env = {
+          OP_CONNECT_HOST = "https://op-connect.imp.internal";
+          OP_CONNECT_TOKEN = "imp-broker-placeholder";
+        };
+      };
+    };
     agents = {
-      claude = { };
+      claude.auth = {
+        profiles = [
+          "claude"
+          "github"
+          "linear"
+          "op-connect"
+        ];
+        mcpServers.linear = {
+          url = "https://mcp.linear.app/mcp";
+          profile = "linear";
+        };
+      };
+      # atc refuses a Codex auth without an oauth profile for chatgpt.com, which this daemon
+      # does not have, so Codex runs with no brokered sign-in
       codex = { };
     };
     principals = {

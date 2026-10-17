@@ -14,8 +14,8 @@ let
   json = pkgs.formats.json { };
   home = "/var/lib/atc-daemon";
 
-  # atc reads $HOME/.config/atc/config.json; this daemon sets only its targets, principals and
-  # agents there
+  # atc reads $HOME/.config/atc/config.json; this daemon sets only its targets, principals,
+  # agents and auth profiles there
   configFile = json.generate "atc-daemon-config.json" (
     {
       inherit (cfg) targets;
@@ -23,6 +23,7 @@ let
     }
     // lib.optionalAttrs (cfg.defaultTarget != null) { inherit (cfg) defaultTarget; }
     // lib.optionalAttrs (cfg.agents != null) { inherit (cfg) agents; }
+    // lib.optionalAttrs (cfg.authProfiles != { }) { inherit (cfg) authProfiles; }
   );
 
   # links the store's config where atc looks; atc writes a default config only when
@@ -32,6 +33,16 @@ let
     mkdir -p ${home}/.config/atc
     ln -sfn ${configFile} ${home}/.config/atc/config.json
   '';
+
+  # each auth profile an agent selects that the config does not define
+  unknownProfiles = lib.concatLists (
+    lib.mapAttrsToList (
+      id: agent:
+      map (profile: "${id} -> ${profile}") (
+        lib.filter (profile: !(cfg.authProfiles ? ${profile})) (agent.auth.profiles or [ ])
+      )
+    ) (if cfg.agents == null then { } else cfg.agents)
+  );
 
   # each grant that names a target the config does not define
   unknownGrants = lib.concatLists (
@@ -123,6 +134,23 @@ in
       '';
     };
 
+    authProfiles = lib.mkOption {
+      type = lib.types.attrsOf json.type;
+      default = { };
+      example = {
+        github = {
+          secret = "github-imp-agents";
+          kind = "github";
+        };
+      };
+      description = ''
+        The credential profiles an agent's `auth` selects, keyed by profile name, as config.json's
+        `authProfiles` takes them. Each names a secret that impd holds, never its value, and impd's
+        broker adds the credential on the way out of the imp. The daemon's impd token must list each
+        secret as grantable. `{ }` leaves the key out.
+      '';
+    };
+
     principals = lib.mkOption {
       type = lib.types.attrsOf (
         lib.types.submodule {
@@ -148,6 +176,10 @@ in
       {
         assertion = unknownGrants == [ ];
         message = "services.atc-daemon.principals grants targets that services.atc-daemon.targets does not define: ${lib.concatStringsSep ", " unknownGrants}";
+      }
+      {
+        assertion = unknownProfiles == [ ];
+        message = "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: ${lib.concatStringsSep ", " unknownProfiles}";
       }
       {
         assertion = cfg.defaultTarget == null || cfg.targets ? ${cfg.defaultTarget};

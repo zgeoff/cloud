@@ -114,7 +114,7 @@ let
         '';
     }
     {
-      title = "it links a config.json of the targets, principals, default target and agents where atc reads it";
+      title = "it links a config.json of the targets, principals, default target, agents and auth profiles where atc reads it";
       script =
         let
           system = buildModuleSystem ../modules/atc-daemon.nix {
@@ -132,8 +132,12 @@ let
               };
               defaultTarget = "geoffcloud";
               principals.fixture-client.targets = [ "geoffcloud" ];
+              authProfiles.github = {
+                secret = "fixture-github";
+                kind = "github";
+              };
               agents = {
-                claude = { };
+                claude.auth.profiles = [ "github" ];
                 codex.args = [
                   "--model"
                   "gpt-5"
@@ -152,7 +156,11 @@ let
           EOF
           jq -S . > expected <<'EOF'
           {
-            "agents": { "claude": {}, "codex": { "args": ["--model", "gpt-5"] } },
+            "agents": {
+              "claude": { "auth": { "profiles": ["github"] } },
+              "codex": { "args": ["--model", "gpt-5"] }
+            },
+            "authProfiles": { "github": { "kind": "github", "secret": "fixture-github" } },
             "defaultTarget": "geoffcloud",
             "principals": { "fixture-client": { "targets": ["geoffcloud"] } },
             "targets": {
@@ -241,7 +249,7 @@ let
         '';
     }
     {
-      title = "it leaves defaultTarget and agents out of config.json, and fails no assertion, when they are null";
+      title = "it leaves defaultTarget, agents and authProfiles out of config.json, and fails no assertion, when they are unset";
       script =
         let
           system = buildModuleSystem ../modules/atc-daemon.nix {
@@ -415,11 +423,88 @@ let
         '';
     }
     {
-      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and offers claude and codex with no brokered auth";
+      title = "it names every auth profile an agent selects that is not defined";
+      script =
+        let
+          system = buildModuleSystem ../modules/atc-daemon.nix {
+            services.atc-daemon = {
+              enable = true;
+              package = pkgs.callPackage ../packages/atc.nix { };
+              listen = "100.64.0.1:8415";
+              tokenFile = "/run/fixture/gateway-token";
+              impTokenFile = "/run/fixture/imp-token";
+              targets.geoffcloud = {
+                provider = "imp";
+                url = "http://127.0.0.1:7070";
+                tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+                impPrefix = "harness-";
+              };
+              defaultTarget = "geoffcloud";
+              principals.fixture-client.targets = [ "geoffcloud" ];
+              authProfiles.github = {
+                secret = "fixture-github";
+                kind = "github";
+              };
+              agents = {
+                claude.auth.profiles = [
+                  "github"
+                  "claude"
+                ];
+                codex.auth.profiles = [ "codex" ];
+                grok = { };
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: claude -> claude, codex -> codex"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the broker's claude, github, linear and op-connect profiles";
       script = ''
         jq -S . > expected <<'EOF'
         {
-          "agents": { "claude": {}, "codex": {} },
+          "agents": {
+            "claude": {
+              "auth": {
+                "mcpServers": { "linear": { "profile": "linear", "url": "https://mcp.linear.app/mcp" } },
+                "profiles": ["claude", "github", "linear", "op-connect"]
+              }
+            },
+            "codex": {}
+          },
+          "authProfiles": {
+            "claude": {
+              "header": "authorization",
+              "host": "api.anthropic.com",
+              "scheme": "bearer",
+              "secret": "claude-setup-token"
+            },
+            "github": { "kind": "github", "secret": "github-imp-agents" },
+            "linear": {
+              "header": "authorization",
+              "host": "mcp.linear.app",
+              "scheme": "bearer",
+              "secret": "linear-imp-agents"
+            },
+            "op-connect": {
+              "env": {
+                "OP_CONNECT_HOST": "https://op-connect.imp.internal",
+                "OP_CONNECT_TOKEN": "imp-broker-placeholder"
+              },
+              "header": "authorization",
+              "host": "op-connect.imp.internal",
+              "scheme": "bearer",
+              "secret": "op-connect"
+            }
+          },
           "defaultTarget": "geoffcloud",
           "principals": { "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] } },
           "targets": {
