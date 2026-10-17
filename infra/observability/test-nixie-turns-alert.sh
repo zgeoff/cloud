@@ -46,6 +46,9 @@ setup_test() {
     await Bun.write(tree + '/config/blackbox.json', JSON.stringify(buildNixieTurnsProbeValues(url).config));
     await Bun.write(tree + '/config/rules.json', JSON.stringify({ groups: buildAlertRules({ nixieReadinessURL: url }) }));
   ")
+  # pulled here, so a cold image cache never writes its progress into a case's compared output
+  docker pull -q "$blackbox_image" > /dev/null
+  docker pull -q "$prometheus_image" > /dev/null
   python3 -m http.server --bind 127.0.0.1 --directory "$tree/www" "$web_port" > "$tree/www.log" 2>&1 &
   server_pid=$!
   container="nixie-turns-exporter-$run_id-$BASHPID"
