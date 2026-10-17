@@ -135,6 +135,11 @@ jobs:
         if: steps.decide-full.outputs.full == 'true'
         run: bun run test:scripts
 
+      # the pinned blackbox exporter and promtool in Docker, against the probe and the rules the
+      # repo builds, so a body with failing turns fires NixieTurnsFailing and a clear one does not
+      - name: Test Alert Rules
+        run: bun run test:alert-rules
+
       - name: Dead Code
         run: bun run deadcode
 
