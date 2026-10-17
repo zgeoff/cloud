@@ -24,6 +24,10 @@ export interface PreviewSettings {
   // null clones without a credential, which reaches public repositories only
   readonly impGitHubSecret: string | null;
 
+  // the impd secret, for the model API's host, that the service grants each preview imp, so the
+  // stack's model calls go through the broker; null leaves the stack without a model route
+  readonly impModelSecret: string | null;
+
   // how long the build, the checkout and `docker compose up`, may run before the boot fails
   readonly buildTimeoutMs: number;
 

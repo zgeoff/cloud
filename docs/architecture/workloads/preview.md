@@ -109,14 +109,18 @@ previews and the agents run one release of imp's base image.
 1. The service reads the head commit's Compose file again, since the head may have moved, and takes
    the app's port and health path from its `x-preview` block, a top-level key that Compose ignores.
 2. A new imp gets that port as impd's HTTP port and no backup. An imp from an earlier build keeps
-   its disk and takes the new commit's port. Either way, the boot adds the grant of the broker's
-   GitHub secret when the imp lacks it, so an imp whose grant failed gets it on the next boot.
+   its disk and takes the new commit's port. Either way, the boot adds the grants of the broker's
+   GitHub secret and model secret when the imp lacks them, so an imp whose grant failed gets it on
+   the next boot.
 3. A guest command installs Docker Compose's pinned release binary, checked against its sha256, when
    the image lacks the Compose plugin, as imp's base image does. It then fetches the head commit
    into a checkout in the imp, takes down the stack of the previous build with its volumes, and runs
    `docker compose up` from `preview/`, waiting for each service. The fetch runs only when impd
    confirms the broker reaches it, so a private repository clones with the broker's credential and
-   no key sits in the guest.
+   no key sits in the guest. When the commit has `preview/compose.broker.yaml`, the guest command
+   adds it to `docker compose up` and passes it the broker's proxy and CA bundle, which impd sets on
+   the command. The stack's model calls then go out through the broker, which adds the model
+   secret's credential.
 4. The service probes the health path through the imp's own HTTPS name until it answers or the boot
    times out. The probe takes the route of impd's proxy, which reaches the app on the imp's own
    address and never on the guest's loopback, so an app that listens on the loopback alone fails its

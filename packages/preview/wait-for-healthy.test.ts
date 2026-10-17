@@ -40,6 +40,7 @@ async function setupTest() {
       impImage: 'base',
       impMemoryMib: 2048,
       impGitHubSecret: 'gh',
+      impModelSecret: null,
       healthTimeoutMs: 60_000,
 
       // one second between probes

@@ -312,6 +312,8 @@ in
     impdURL = impdLoopbackURL;
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";
+    # nixie's preview stack sends its model calls through the broker with this grant
+    impModelSecret = "preview-model";
     # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
