@@ -1,10 +1,10 @@
 name: release bump merge
 
 # Merges a release check pull request (release-check/<dependency>, opened by the release check
-# workflow) once it may merge on its own: scripts/merge-release-bump.sh holds the rules. It runs
+# workflow) once it may merge on its own: scripts/release/decide.ts holds the rules. It runs
 # each time a workflow that checks such a pull request finishes, so the last check to finish
 # merges it, and each time such a pull request gets the auto-merge label, so a label put back after
-# its checks finished still merges it (scripts/decide-release-bump-merge.sh). A run for any other
+# its checks finished still merges it (scripts/release/find-event-branch.ts). A run for any other
 # branch, label or event is skipped, which bills nothing.
 #
 # pull_request_target runs this workflow and checks out main, never the pull request's head, so
