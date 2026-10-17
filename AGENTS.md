@@ -8,12 +8,13 @@ workload. `docs/architecture/overview.md` describes the system, and Linear holds
 
 The rules a task needs are not repeated here. Load the skill for the work before starting it.
 
-| Skill             | Load before                                                                             |
-| ----------------- | --------------------------------------------------------------------------------------- |
-| `code-style`      | writing, reviewing, or renaming any TypeScript — the function-verb taxonomy lives there |
-| `testing`         | designing, writing, or reviewing tests                                                  |
-| `project-testing` | the same, beside `testing` — where each suite runs and cloud's stand-ins                |
-| `docs-writing`    | writing or editing any committed prose: `docs/`, READMEs, this file, skills             |
+| Skill                | Load before                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `code-style`         | writing, reviewing, or renaming any TypeScript — the shared function-verb taxonomy |
+| `project-code-style` | the same, beside `code-style` — cloud's own verbs                                  |
+| `testing`            | designing, writing, or reviewing tests                                             |
+| `project-testing`    | the same, beside `testing` — where each suite runs and cloud's stand-ins           |
+| `docs-writing`       | writing or editing any committed prose: `docs/`, READMEs, this file, skills        |
 
 ## Operations
 
