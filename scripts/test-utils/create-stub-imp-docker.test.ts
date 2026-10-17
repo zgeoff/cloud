@@ -35,7 +35,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
     '--imps',
     'harness-*',
     '--grantable',
-    'glm',
+    'glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect',
   ]);
 
   expect(result).toStrictEqual({
@@ -48,7 +48,7 @@ test('it answers the atc-cloud mint as the scenario says, and logs the call', as
   const calls = await readFile(join(ctx.dir, 'docker-calls'), 'utf8');
 
   expect(calls).toBe(
-    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]\n',
+    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect"]\n',
   );
 });
 

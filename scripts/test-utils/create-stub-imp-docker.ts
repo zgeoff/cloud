@@ -21,7 +21,7 @@ export async function createStubImpDocker(
   // when it fails (packages/cli/src/commands/tokens.ts and run-action.ts at 4211437b)
   const script = `#!/usr/bin/env bash
 printf '%s\\0' docker "$@" | jq -cRs 'split("\\u0000")[:-1]' >> ${toShellArg(join(bin, 'docker-calls'))}
-if [ "$*" != "exec imp-host impz token new atc-cloud --scope manage --imps harness-* --grantable glm" ]; then
+if [ "$*" != "exec imp-host impz token new atc-cloud --scope manage --imps harness-* --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect" ]; then
   echo "unexpected: $*" >&2
   exit 97
 fi

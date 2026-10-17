@@ -1,10 +1,14 @@
 # Evaluates services.atc-daemon apart from any host's config, with the pinned atc release, and
-# checks the service, the config.json it links and the module's assertions. Each case evaluates
-# its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
-# directory, under test-support/shell/run-cases.sh, which reports each case and fails the check
-# when any case fails.
+# checks the service, the config.json it links and the module's assertions; one case reads the
+# config.json that geoffcloud's own config links instead. Each other case evaluates its own config
+# through test-utils/build-module-system.nix. Each runs on its own, in a fresh directory, under
+# test-support/shell/run-cases.sh, which reports each case and fails the check when any case fails.
 # Run: bun run test:nixos atc-daemon
-{ nixpkgs, imp }:
+{
+  nixpkgs,
+  imp,
+  geoffcloud,
+}:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = nixpkgs.lib;
@@ -110,7 +114,7 @@ let
         '';
     }
     {
-      title = "it links a config.json of the targets, principals and default target where atc reads it";
+      title = "it links a config.json of the targets, principals, default target, agents and auth profiles where atc reads it";
       script =
         let
           system = buildModuleSystem ../modules/atc-daemon.nix {
@@ -128,6 +132,17 @@ let
               };
               defaultTarget = "geoffcloud";
               principals.fixture-client.targets = [ "geoffcloud" ];
+              authProfiles.github = {
+                secret = "fixture-github";
+                kind = "github";
+              };
+              agents = {
+                claude.auth.profiles = [ "github" ];
+                codex.args = [
+                  "--model"
+                  "gpt-5"
+                ];
+              };
             };
           };
         in
@@ -141,6 +156,11 @@ let
           EOF
           jq -S . > expected <<'EOF'
           {
+            "agents": {
+              "claude": { "auth": { "profiles": ["github"] } },
+              "codex": { "args": ["--model", "gpt-5"] }
+            },
+            "authProfiles": { "github": { "kind": "github", "secret": "fixture-github" } },
             "defaultTarget": "geoffcloud",
             "principals": { "fixture-client": { "targets": ["geoffcloud"] } },
             "targets": {
@@ -229,7 +249,7 @@ let
         '';
     }
     {
-      title = "it leaves defaultTarget out of config.json, and fails no assertion, when it is null";
+      title = "it leaves defaultTarget, agents and authProfiles out of config.json, and fails no assertion, when they are unset";
       script =
         let
           system = buildModuleSystem ../modules/atc-daemon.nix {
@@ -401,6 +421,153 @@ let
             )
           } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
+    }
+    {
+      title = "it names every auth profile an agent selects that is not defined";
+      script =
+        let
+          system = buildModuleSystem ../modules/atc-daemon.nix {
+            services.atc-daemon = {
+              enable = true;
+              package = pkgs.callPackage ../packages/atc.nix { };
+              listen = "100.64.0.1:8415";
+              tokenFile = "/run/fixture/gateway-token";
+              impTokenFile = "/run/fixture/imp-token";
+              targets.geoffcloud = {
+                provider = "imp";
+                url = "http://127.0.0.1:7070";
+                tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+                impPrefix = "harness-";
+              };
+              defaultTarget = "geoffcloud";
+              principals.fixture-client.targets = [ "geoffcloud" ];
+              authProfiles.github = {
+                secret = "fixture-github";
+                kind = "github";
+              };
+              agents = {
+                claude.auth.profiles = [
+                  "github"
+                  "claude"
+                ];
+                codex.auth.profiles = [ "codex" ];
+                grok = { };
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: claude -> claude, codex -> codex"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
+      title = "it names an MCP server whose auth profile is not defined, though the agent selects only defined ones";
+      script =
+        let
+          system = buildModuleSystem ../modules/atc-daemon.nix {
+            services.atc-daemon = {
+              enable = true;
+              package = pkgs.callPackage ../packages/atc.nix { };
+              listen = "100.64.0.1:8415";
+              tokenFile = "/run/fixture/gateway-token";
+              impTokenFile = "/run/fixture/imp-token";
+              targets.geoffcloud = {
+                provider = "imp";
+                url = "http://127.0.0.1:7070";
+                tokenFile = "/run/credentials/atc-daemon.service/imp-token";
+                impPrefix = "harness-";
+              };
+              defaultTarget = "geoffcloud";
+              principals.fixture-client.targets = [ "geoffcloud" ];
+              authProfiles.github = {
+                secret = "fixture-github";
+                kind = "github";
+              };
+              agents.claude.auth = {
+                profiles = [ "github" ];
+                mcpServers.linear = {
+                  url = "https://mcp.linear.app/mcp";
+                  profile = "linear";
+                };
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.atc-daemon.agents select auth profiles that services.atc-daemon.authProfiles does not define: claude mcpServers.linear -> linear"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
+      title = "it links geoffcloud a config.json whose target names the agent image and its atc, and whose claude signs in through the claude, github, linear and op-connect profiles of the broker";
+      script = ''
+        jq -S . > expected <<'EOF'
+        {
+          "agents": {
+            "claude": {
+              "auth": {
+                "mcpServers": { "linear": { "profile": "linear", "url": "https://mcp.linear.app/mcp" } },
+                "profiles": ["claude", "github", "linear", "op-connect"]
+              }
+            },
+            "codex": {}
+          },
+          "authProfiles": {
+            "claude": {
+              "header": "authorization",
+              "host": "api.anthropic.com",
+              "scheme": "bearer",
+              "secret": "claude-setup-token"
+            },
+            "github": { "kind": "github", "secret": "github-imp-agents" },
+            "linear": {
+              "header": "authorization",
+              "host": "mcp.linear.app",
+              "scheme": "bearer",
+              "secret": "linear-imp-agents"
+            },
+            "op-connect": {
+              "env": {
+                "OP_CONNECT_HOST": "https://op-connect.imp.internal",
+                "OP_CONNECT_TOKEN": "imp-broker-placeholder"
+              },
+              "header": "authorization",
+              "host": "op-connect.imp.internal",
+              "scheme": "bearer",
+              "secret": "op-connect"
+            }
+          },
+          "defaultTarget": "geoffcloud",
+          "principals": { "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] } },
+          "targets": {
+            "geoffcloud": {
+              "guestATC": "/usr/local/bin/atc",
+              "image": "agent-503513c",
+              "impPrefix": "harness-",
+              "provider": "imp",
+              "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
+              "url": "http://127.0.0.1:7070"
+            }
+          }
+        }
+        EOF
+
+        config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${geoffcloud.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre})
+        jq -S . "$config" > actual
+
+        assert_files_equal expected actual
+      '';
     }
     {
       title = "it adds no service, user or group, and fails no assertion, when it is off";

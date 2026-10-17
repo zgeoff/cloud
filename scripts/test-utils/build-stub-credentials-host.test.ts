@@ -6,6 +6,7 @@ import { readHostScript } from '../read-host-script.ts';
 import { runProcess } from '../run-process.ts';
 import { toShellArg } from '../to-shell-arg.ts';
 import { buildMockCredentialsHostScenario } from './build-mock-credentials-host-scenario.ts';
+import { buildMockImpSecret } from './build-mock-imp-secret.ts';
 import { buildStubCredentialsHost } from './build-stub-credentials-host.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
@@ -123,8 +124,36 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
   expect(scenario.tokens).toPartiallyContain({
     name: 'atc-cloud',
     scope: 'manage',
-    grantable: ['glm'],
+    grantable: [
+      'claude-setup-token',
+      'github-imp-agents',
+      'glm',
+      'linear-imp-agents',
+      'op-connect',
+    ],
   });
+});
+
+test('it fails the mint as impd does, writing no file, when a secret atc-cloud may grant is missing', async () => {
+  const script = await readHostScript('mint-atc-imp-token.sh');
+
+  const scenario = buildMockCredentialsHostScenario({
+    secrets: [{ ...buildMockImpSecret() }],
+    tokens: [],
+    files: {},
+  });
+
+  const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
+
+  const result = await stub.run(
+    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', "bash -s -- '/var/lib/atc-daemon-secrets'"],
+    { stdin: script },
+  );
+
+  expect(result.exitCode).toBe(1);
+  expect(result.stderr.toString()).toBe('impz: NOT_FOUND: secret claude-setup-token not found\n');
+  expect(scenario.files).toStrictEqual({});
+  expect(scenario.tokens).toStrictEqual([]);
 });
 
 test('it fails docker exec as docker does when imp-host is stopped', async () => {

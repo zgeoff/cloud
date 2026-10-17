@@ -3,7 +3,8 @@
 #
 #   ssh root@geoffcloud bash -s -- <dir>
 #
-# It mints impd's token atc-cloud (scope manage, imps harness-*, may grant glm) straight into
+# It mints impd's token atc-cloud (scope manage, imps harness-*, may grant glm and the secrets of
+# the daemon's auth profiles in nixos/hosts/geoffcloud/configuration.nix) straight into
 # <dir>/imp-token, mode 0400, in one rename, so the token never leaves the host. A mint that
 # prints anything but one line, or fails, leaves no file behind.
 set -euo pipefail
@@ -16,7 +17,7 @@ mint_atc_imp_token() {
   trap 'rm -f "$temp"' EXIT
   # docker exec without -i leaves stdin alone, which holds the rest of this script
   docker exec imp-host impz token new atc-cloud --scope manage --imps 'harness-*' \
-    --grantable glm > "$temp"
+    --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect > "$temp"
   test "$(wc -l < "$temp")" -eq 1
   chmod 0400 "$temp"
   mv -T "$temp" "$dir/imp-token"

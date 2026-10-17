@@ -1,3 +1,4 @@
+import { atcCloudGrantable as grantable } from './atc-cloud-grantable.ts';
 import type { ATCCredentialsPreflight } from './check-atc-credentials-preflight.ts';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
@@ -8,9 +9,9 @@ import { readHostScript } from './read-host-script.ts';
 import { runOnHost } from './run-on-host.ts';
 import { toShellArg } from './to-shell-arg.ts';
 
-// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant glm) on the host, straight
-// into a root-only file there, so it never reaches this machine. impd shows a token once, so a
-// rerun skips a token and file that match and stops at a lone one or a bad file.
+// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant atcCloudGrantable) on the
+// host, straight into a root-only file there, so it never reaches this machine. impd shows a token
+// once, so a rerun skips a token and file that match and stops at a lone one or a bad file.
 export async function installATCImpToken(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,
@@ -20,7 +21,7 @@ export async function installATCImpToken(
   const hasFile = preflight.hostFiles.includes('imp-token');
 
   context.printOut(
-    `\n== 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to ${context.host}:${file}\n`,
+    `\n== 3/3 impd token atc-cloud (manage, harness-*, grantable ${grantable.join(',')}) to ${context.host}:${file}\n`,
   );
 
   if (token !== undefined && hasFile) {
@@ -60,16 +61,20 @@ async function checkSavedToken(
 }
 
 function requireTokenLimits(token: unknown) {
-  const limits = [
-    findJSONField(token, 'scope'),
-    findJSONField(token, 'imps'),
-    findJSONField(token, 'grantable'),
-  ];
+  const tokenGrantable = findJSONField(token, 'grantable');
 
-  if (!Bun.deepEquals(limits, ['manage', ['harness-*'], ['glm']])) {
+  // impd's order of the grantable list is its own, so the check compares the lists as sets
+  const hasGrantable =
+    Array.isArray(tokenGrantable) &&
+    tokenGrantable.length === grantable.length &&
+    grantable.every((secret) => tokenGrantable.includes(secret));
+
+  const limits = [findJSONField(token, 'scope'), findJSONField(token, 'imps')];
+
+  if (!hasGrantable || !Bun.deepEquals(limits, ['manage', ['harness-*']])) {
     throw new ExitError(
       1,
-      'atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun',
+      `atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'impz token set atc-cloud --grantable ${grantable.join(',')}' in imp-host, then rerun`,
     );
   }
 }

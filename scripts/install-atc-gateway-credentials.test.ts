@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { installATCGatewayCredentials } from './install-atc-gateway-credentials.ts';
 import { readHostScript } from './read-host-script.ts';
+import { buildMockATCProfileSecrets } from './test-utils/build-mock-atc-profile-secrets.ts';
 import { buildMockCredentialsHostScenario } from './test-utils/build-mock-credentials-host-scenario.ts';
 import { buildStubCredentialTools } from './test-utils/build-stub-credential-tools.ts';
 
@@ -54,12 +55,12 @@ skip: glm exists with the expected rules
 == 2/3 daemon bearer: 1Password cloud/atc-daemon-token and root@geoffcloud:/var/lib/atc-daemon-secrets/gateway-token
 skip: both exist and match
 
-== 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token
+== 3/3 impd token atc-cloud (manage, harness-*, grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token
 skip: both exist, atc-cloud has the expected limits, and the file authenticates as it
 
 == check
 {"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[]}
-{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}
+{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["claude-setup-token","github-imp-agents","glm","linear-imp-agents","op-connect"]}
 /var/lib/atc-daemon-secrets root 700 4096 bytes
 /var/lib/atc-daemon-secrets/gateway-token root 400 15 bytes
 /var/lib/atc-daemon-secrets/imp-token root 400 18 bytes
@@ -73,7 +74,7 @@ test('it installs all three and keeps every secret out of every argv, sending ea
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
     host: buildMockCredentialsHostScenario({
-      secrets: [],
+      secrets: buildMockATCProfileSecrets(),
       tokens: [],
       files: {},
       minted: 'imp_fixture_minted_token\n',
@@ -111,7 +112,11 @@ test('it hands op the service account token in its environment alone', async () 
   const tools = buildStubCredentialTools({
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
-    host: buildMockCredentialsHostScenario({ secrets: [], tokens: [], files: {} }),
+    host: buildMockCredentialsHostScenario({
+      secrets: buildMockATCProfileSecrets(),
+      tokens: [],
+      files: {},
+    }),
   });
 
   await installATCGatewayCredentials({
@@ -137,7 +142,7 @@ test('it prints no secret on stdout or stderr', async () => {
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
     host: buildMockCredentialsHostScenario({
-      secrets: [],
+      secrets: buildMockATCProfileSecrets(),
       tokens: [],
       files: {},
       minted: 'imp_fixture_minted_token\n',

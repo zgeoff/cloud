@@ -233,6 +233,15 @@ function writeGatewayToken(state: HostState, rest: string) {
   return {};
 }
 
+// the --grantable list of scripts/host/mint-atc-imp-token.sh, in its order
+const mintGrantable = [
+  'glm',
+  'claude-setup-token',
+  'github-imp-agents',
+  'linear-imp-agents',
+  'op-connect',
+];
+
 // imp 1.0.0 prints the new token's secret alone on stdout, after its notice on stderr
 // (packages/cli/src/commands/tokens.ts); the script saves only a mint of exactly one line
 function createImpToken(state: HostState) {
@@ -240,12 +249,28 @@ function createImpToken(state: HostState) {
     return { exitCode: 1, stderr: `${state.scenario.mintError}\n` };
   }
 
+  const missing = mintGrantable.find(
+    (name) => !state.scenario.secrets.some((secret) => secret['name'] === name),
+  );
+
+  // impd's tokens.create fails with NOT_FOUND for a grantable name no secret has
+  // (packages/daemon/src/auth/token-store.ts), and the CLI prints it as one line, exit 1
+  if (missing !== undefined) {
+    return { exitCode: 1, stderr: `impz: NOT_FOUND: secret ${missing} not found\n` };
+  }
+
   state.scenario.tokens.push({
     name: 'atc-cloud',
     scope: 'manage',
     imps: ['harness-*'],
     sshKeys: [],
-    grantable: ['glm'],
+    grantable: [
+      'claude-setup-token',
+      'github-imp-agents',
+      'glm',
+      'linear-imp-agents',
+      'op-connect',
+    ],
     createdAt: '2026-10-07T12:00:00.000Z',
   });
 

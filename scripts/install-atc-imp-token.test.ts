@@ -59,7 +59,7 @@ test('it skips a token with the expected limits whose saved file authenticates a
   });
 
   expect(ctx.out.join('')).toBe(
-    '\n== 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token\nskip: both exist, atc-cloud has the expected limits, and the file authenticates as it\n',
+    '\n== 3/3 impd token atc-cloud (manage, harness-*, grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token\nskip: both exist, atc-cloud has the expected limits, and the file authenticates as it\n',
   );
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
@@ -204,6 +204,21 @@ test.each([
   ['another scope', buildMockImpToken({ scope: 'admin' })],
   ['other imps', buildMockImpToken({ imps: ['*'] })],
   ['another grantable list', buildMockImpToken({ grantable: [] })],
+  ['glm alone as its grantable list', buildMockImpToken({ grantable: ['glm'] })],
+  [
+    'an extra grantable secret',
+    buildMockImpToken({
+      grantable: [
+        'claude-setup-token',
+        'github-imp-agents',
+        'glm',
+        'linear-imp-agents',
+        'op-connect',
+        'preview-model',
+      ],
+    }),
+  ],
+  ['a grantable string instead of a list', { ...buildMockImpToken(), grantable: 'glm' }],
 ])(
   'it stops without a check when atc-cloud exists with %s',
   async (_label: string, token: unknown) => {
@@ -228,7 +243,7 @@ test.each([
     ).rejects.toMatchObject({
       exitCode: 1,
       message:
-        'atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun',
+        "atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'impz token set atc-cloud --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect' in imp-host, then rerun",
     });
 
     expect(tools.calls).toStrictEqual([]);

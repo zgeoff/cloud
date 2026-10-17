@@ -15,6 +15,37 @@ test('it builds a default credentials host scenario', () => {
         imps: [],
         createdAt: '2026-10-07T12:00:00.000Z',
       },
+      {
+        name: 'claude-setup-token',
+        kind: 'custom',
+        rules: [{ host: 'api.anthropic.com', header: 'authorization', scheme: 'bearer' }],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
+      {
+        name: 'github-imp-agents',
+        kind: 'github',
+        rules: [
+          { host: 'github.com', header: 'authorization', scheme: 'basic' },
+          { host: 'api.github.com', header: 'authorization', scheme: 'bearer' },
+        ],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
+      {
+        name: 'linear-imp-agents',
+        kind: 'custom',
+        rules: [{ host: 'mcp.linear.app', header: 'authorization', scheme: 'bearer' }],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
+      {
+        name: 'op-connect',
+        kind: 'custom',
+        rules: [{ host: 'op-connect.imp.internal', header: 'authorization', scheme: 'bearer' }],
+        imps: [],
+        createdAt: '2026-10-07T12:00:00.000Z',
+      },
     ],
     tokens: [
       {
@@ -22,7 +53,13 @@ test('it builds a default credentials host scenario', () => {
         scope: 'manage',
         imps: ['harness-*'],
         sshKeys: [],
-        grantable: ['glm'],
+        grantable: [
+          'claude-setup-token',
+          'github-imp-agents',
+          'glm',
+          'linear-imp-agents',
+          'op-connect',
+        ],
         createdAt: '2026-10-07T12:00:00.000Z',
       },
     ],
@@ -52,6 +89,6 @@ test('it builds fresh state on each call, so one test’s changes never reach an
 
   first.files['extra'] = { content: '', mode: '600' };
 
-  expect(second.secrets).toHaveLength(1);
+  expect(second.secrets).toHaveLength(5);
   expect(Object.keys(second.files)).toStrictEqual(['gateway-token', 'imp-token']);
 });
