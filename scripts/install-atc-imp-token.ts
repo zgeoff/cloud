@@ -73,13 +73,14 @@ function requireTokenLimits(token: unknown) {
   const tokenGrantable = findJSONField(token, 'grantable');
 
   // impd's order of the grantable list is its own, so the check compares the lists as sets
-  const limits = [
-    findJSONField(token, 'scope'),
-    findJSONField(token, 'imps'),
-    Array.isArray(tokenGrantable) ? tokenGrantable.toSorted() : tokenGrantable,
-  ];
+  const hasGrantable =
+    Array.isArray(tokenGrantable) &&
+    tokenGrantable.length === grantable.length &&
+    grantable.every((secret) => tokenGrantable.includes(secret));
 
-  if (!Bun.deepEquals(limits, ['manage', ['harness-*'], grantable.toSorted()])) {
+  const limits = [findJSONField(token, 'scope'), findJSONField(token, 'imps')];
+
+  if (!hasGrantable || !Bun.deepEquals(limits, ['manage', ['harness-*']])) {
     throw new ExitError(
       1,
       `atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'impz token set atc-cloud --grantable ${grantable.join(',')}' in imp-host, then rerun`,
