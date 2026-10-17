@@ -1,6 +1,7 @@
 import { expect, mock, test } from 'bun:test';
 import { server } from '../mocks/node.ts';
 import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
+import { buildStubNixieAPIContract } from '../test-utils/build-stub-nixie-api-contract.ts';
 import { buildStubNPMRegistry } from '../test-utils/build-stub-npm-registry.ts';
 import { buildStubReleaseDocker } from '../test-utils/build-stub-release-docker.ts';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
@@ -240,9 +241,12 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   const checkout = await createCloudCheckout({
     'scripts/release/release-pins.json': '{}\n',
     'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'scripts/nixie-api/openapi.json': '{"info":{"version":"v0.7.0"}}\n',
+    'scripts/nixie-api/openapi.d.ts': '// nixie v0.7.0\n',
   });
 
   const stub = buildStubRunner(
+    buildStubNixieAPIContract({}),
     buildStubReleaseGH({
       releases: {
         'zgeoff/nixie': [
@@ -271,6 +275,20 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ['nixie', '0.7.2', '0.7.0', '0.7.0'],
   );
 
+  const stat = await checkout.git([
+    `--git-dir=${checkout.origin}`,
+    'diff',
+    '--stat=200',
+    'main',
+    'release-check/nixie',
+  ]);
+
+  const contract = await checkout.git([
+    `--git-dir=${checkout.origin}`,
+    'show',
+    'release-check/nixie:scripts/nixie-api/openapi.json',
+  ]);
+
   expect(status).toBe(0);
 
   expect(ctx.printOut.mock.calls).toStrictEqual([
@@ -279,6 +297,12 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   ]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
+
+  expect(stat).toBe(
+    'infra/Pulumi.prod.yaml            |  4 ++--\n scripts/nixie-api/openapi.d.ts    |  2 +-\n scripts/nixie-api/openapi.json    |  2 +-\n scripts/release/release-pins.json | 11 ++++++++++-\n 4 files changed, 14 insertions(+), 5 deletions(-)',
+  );
+
+  expect(contract).toBe('{"info":{"version":"v0.7.2"}}');
 
   expect(
     stub.calls
@@ -292,6 +316,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
     ['gh release view v0.7.0 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.2 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.1 -R zgeoff/nixie --json body', ''],
+    [`bun ${checkout.clone}/scripts/nixie-api/write-nixie-api-contract.ts v0.7.2`, ''],
     [
       'gh pr list --repo zgeoff/cloud --head release-check/nixie --state open --json number,url,autoMergeRequest,labels,headRefOid,isCrossRepository',
       '',

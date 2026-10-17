@@ -9,5 +9,7 @@ export function collectPinFiles(record: ReleaseRecord): readonly string[] {
     ...(pin.lock === undefined ? [] : [pin.lock.lockFile]),
   ]);
 
-  return [...new Set([...files, pinTableFile])].toSorted();
+  const generated = record.generated?.files ?? [];
+
+  return [...new Set([...files, ...generated, pinTableFile])].toSorted();
 }

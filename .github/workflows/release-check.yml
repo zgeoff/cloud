@@ -74,6 +74,10 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      # a nixie bump regenerates nixie's contract types, which need openapi-typescript
+      - name: Install
+        run: bun install --frozen-lockfile
+
       # commits as the app's bot user, whose noreply address carries the bot's user id
       - name: Set the git identity
         env:
@@ -83,9 +87,11 @@ jobs:
 
       # every line runs, so one dependency's failure leaves the others' pull requests current;
       # any failure fails the job once all have run. The imp pin's nix lock sends NIX_GITHUB_TOKEN to
-      # api.github.com, so the runner IP's anonymous rate limit cannot fail it (apply-release-pins.ts)
+      # api.github.com, so the runner IP's anonymous rate limit cannot fail it (apply-release-pins.ts).
+      # LEFTHOOK=0 skips the hooks that the install's prepare script installed, for the bump commits.
       - name: Open or update the bump pull requests
         env:
+          LEFTHOOK: '0'
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           NIX_GITHUB_TOKEN: ${{ github.token }}
           GH_TELEMETRY: '0'
