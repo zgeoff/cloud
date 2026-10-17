@@ -6,7 +6,7 @@
     "es2024": true
   },
   "rules": {
-    "zgeoff/function-verb": ["error", { "verbs": ["install", "open", "switch"] }]
+    "zgeoff/function-verb": ["error", { "verbs": ["decide", "install", "open", "switch"] }]
   },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**"],
   "overrides": [

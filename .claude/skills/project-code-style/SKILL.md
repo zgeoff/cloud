@@ -1,8 +1,8 @@
 ---
 name: project-code-style
 description:
-  cloud's own function verbs on top of the shared code-style skill — install, open, and switch, and
-  how each differs from the shared verbs beside it. Load it beside the code-style skill before
+  cloud's own function verbs on top of the shared code-style skill — decide, install, open, and
+  switch, and how each differs from the shared verbs beside it. Load it beside the code-style skill before
   writing, reviewing, or renaming any TypeScript in cloud.
 ---
 
@@ -13,11 +13,14 @@ cloud adds to them, and never relaxes a rule there.
 
 ## Project verbs
 
-cloud adds these verbs to the shared taxonomy. Each sits close to a shared effectful verb, so each
-carries the meaning that tells it apart. A new verb goes here and into the `verbs` option of
+cloud adds these verbs to the shared taxonomy. Each sits close to a shared verb, so each carries
+the meaning that tells it apart: `decide` is a pure producer, and the others are effectful. A new verb goes here and into the `verbs` option of
 `zgeoff/function-verb` in [`.oxlintrc.json`](../../../.oxlintrc.json) in the same PR, and
 `check-project-verbs.sh` fails when the two lists differ.
 
+- `decide`: picks one outcome of a closed set, with its reason, from the facts it is given, as
+  opposed to `pick`, which selects among known alternatives and gives no reason, and `plan`, which
+  computes an action to perform. [`decide`](../../../scripts/release/decide.ts) is one.
 - `install`: puts a credential or artifact where its consumer reads it, skipping each part that
   already exists, as opposed to `create`, which brings a new resource into existence, and `write`,
   which persists what it is given.
