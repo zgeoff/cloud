@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import { impHealthProbeValues } from './imp-health-probe-values.ts';
 
 test("it probes imp's /health over verified TLS every 30s, failing unless the body says impd is ready", () => {
@@ -37,9 +38,7 @@ test.each([
   const [pattern] =
     impHealthProbeValues.config.modules.imp_health.http.fail_if_body_not_matches_regexp;
 
-  if (pattern === undefined) {
-    throw new Error('expected a body pattern');
-  }
+  invariant(pattern !== undefined, 'expected a body pattern');
 
   expect(new RegExp(pattern, 'u').test(body)).toBe(ready);
 });

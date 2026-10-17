@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
 import { buildStubConfig } from '../test-utils/build-stub-config.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
@@ -41,9 +42,7 @@ test('it marks the Connect credentials secret', () => {
     ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
   });
 
-  if (inputs === undefined) {
-    throw new Error('expected the cluster inputs');
-  }
+  invariant(inputs !== undefined, 'expected the cluster inputs');
 
   expect(isSecret(inputs.onePasswordConnectCredentials)).resolves.toBeTrue();
 });
@@ -54,9 +53,7 @@ test('it carries the Connect credentials file as given', () => {
     ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
   });
 
-  if (inputs === undefined) {
-    throw new Error('expected the cluster inputs');
-  }
+  invariant(inputs !== undefined, 'expected the cluster inputs');
 
   expect(resolveOutput(inputs.onePasswordConnectCredentials)).resolves.toBe('{"verifier":{}}');
 });

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret, output } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { buildHealthCheckBindings } from './build-health-check-bindings.ts';
 
@@ -38,9 +39,7 @@ test('it marks the alert webhook binding secret', () => {
 
   const alert = bindings.find((binding) => binding.name === 'ALERT_URL');
 
-  if (alert?.type !== 'secret_text') {
-    throw new Error('expected the ALERT_URL binding');
-  }
+  invariant(alert?.type === 'secret_text', 'expected the ALERT_URL binding');
 
   expect(isSecret(alert.text)).resolves.toBeTrue();
 });
@@ -54,9 +53,7 @@ test('it binds the alert webhook URL as given', () => {
 
   const alert = bindings.find((binding) => binding.name === 'ALERT_URL');
 
-  if (alert?.type !== 'secret_text') {
-    throw new Error('expected the ALERT_URL binding');
-  }
+  invariant(alert?.type === 'secret_text', 'expected the ALERT_URL binding');
 
   expect(resolveOutput(alert.text)).resolves.toBe('https://discord.com/api/webhooks/1/abc');
 });

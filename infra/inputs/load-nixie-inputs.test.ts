@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret, secret } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildStubConfig } from '../test-utils/build-stub-config.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { loadNixieInputs } from './load-nixie-inputs.ts';
@@ -101,9 +102,7 @@ test.each([
     },
   );
 
-  if (inputs.nixie === undefined) {
-    throw new Error('expected the nixie inputs');
-  }
+  invariant(inputs.nixie !== undefined, 'expected the nixie inputs');
 
   const isMarkedSecret = await isSecret(inputs.nixie.secrets[name]);
   const value = await resolveOutput(inputs.nixie.secrets[name]);
@@ -336,9 +335,7 @@ test.each([
     },
   );
 
-  if (inputs.nixie?.backup === undefined) {
-    throw new Error('expected the nixie backup inputs');
-  }
+  invariant(inputs.nixie?.backup !== undefined, 'expected the nixie backup inputs');
 
   const isMarkedSecret = await isSecret(inputs.nixie.backup.secrets[name]);
   const value = await resolveOutput(inputs.nixie.backup.secrets[name]);

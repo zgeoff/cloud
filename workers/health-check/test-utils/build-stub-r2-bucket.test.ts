@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import { buildStubR2Bucket } from './build-stub-r2-bucket.ts';
 
 test('it reads a key never put as null', () => {
@@ -40,9 +41,7 @@ test('it reads back the text of a value it was given', async () => {
 test('it marks the body used once it is read', async () => {
   const stored = await buildStubR2Bucket({ 'state:atc': 'up' }).get('state:atc');
 
-  if (stored === null) {
-    throw new Error('expected the stored object');
-  }
+  invariant(stored !== null, 'expected the stored object');
 
   await stored.text();
 
@@ -88,9 +87,7 @@ test('it gives each put a new version', async () => {
   const first = await bucket.put('state:atc', 'up');
   const second = await bucket.put('state:atc', 'up');
 
-  if (first === null || second === null) {
-    throw new Error('expected both stored objects');
-  }
+  invariant(first !== null && second !== null, 'expected both stored objects');
 
   expect(second.version).not.toBe(first.version);
 });
