@@ -118,15 +118,16 @@ are back, which restarts k3s's pods and puts every awake imp to sleep.
    Expect `tank/cloud/host-secrets[/imp-host] zfs`, `tank/cloud/host-secrets[/atc-daemon] zfs` and
    `tank/cloud/imp-db-backups zfs`.
 
-2. Check that imp-host staged its secrets from the files on tank/cloud, and that impd still reads
-   the backup password:
+2. Check that imp-host staged its secrets from the files on tank/cloud, and that a backup runs with
+   the staged password:
 
    ```bash
    journalctl -u imp-host --since '-10 min' --no-pager | grep 'is missing or empty'
+   docker exec imp-host impz backup run
    docker exec imp-host impz backup ls
    ```
 
-   Expect no line from the `grep`, and a list of backups without a password error.
+   Expect no line from the `grep`, a backup run that exits 0, and the new backup last in the list.
 
 3. From this machine, check the atc gateway against the daemon:
 
@@ -145,16 +146,20 @@ are back, which restarts k3s's pods and puts every awake imp to sleep.
 
    Expect `integrity ok` in the copy's output, then `tank/cloud/imp-db-backups`.
 
-5. Check that the two install scripts write to the new mounts. `scripts/install-imp-dns-token.sh`
-   and `scripts/install-atc-gateway-credentials.ts` keep their paths, and each refuses to write
-   while its path is not a mount point, as does `copy-impd-db-host`. After one run of each, check:
+5. Check that the files the two install scripts write sit on the new mounts.
+   `scripts/install-imp-dns-token.sh` and `scripts/install-atc-gateway-credentials.ts` keep their
+   paths, and each refuses to write while its path is not a mount point, as does
+   `copy-impd-db-host`. A run of either is not needed for the check:
 
    ```bash
-   findmnt -n -o SOURCE -T /var/lib/imp-host/secrets/dns-api-token
-   findmnt -n -o SOURCE -T /var/lib/atc-daemon-secrets/gateway-token
+   for file in /var/lib/imp-host/secrets/dns-api-token /var/lib/imp-host/secrets/imp-host.env \
+     /var/lib/atc-daemon-secrets/gateway-token /var/lib/atc-daemon-secrets/imp-token; do
+     findmnt -n -o SOURCE -T "$file"
+   done
    ```
 
-   Expect `tank/cloud/host-secrets[/imp-host]` and `tank/cloud/host-secrets[/atc-daemon]`.
+   Expect `tank/cloud/host-secrets[/imp-host]` twice, then `tank/cloud/host-secrets[/atc-daemon]`
+   twice.
 
 ## Remove the old copies
 

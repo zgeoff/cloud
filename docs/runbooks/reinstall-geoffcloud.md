@@ -134,19 +134,25 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    imp-host stays stopped. Copy the staged files into the encrypted dataset, mount the binds, and
    delete the staged copies the same way:
 
+   **CAUTION:** The staged files are the host's only local copies. Delete them only after the copy
+   succeeds and matches, as the `&&` chain below does: a failed `cp -a`, such as on a full pool,
+   then stops the block and keeps them.
+
    ```sh
-   install -d -m 0700 /var/lib/tank-cloud/host-secrets/imp-host /var/lib/tank-cloud/host-secrets/atc-daemon
-   cp -a /var/lib/imp-host/secrets/. /var/lib/tank-cloud/host-secrets/imp-host/
-   d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d"
-   rm -f "$d"/var/lib/imp-host/secrets/*
-   umount "$d" && rmdir "$d"
-   systemctl start tank-cloud.target imp-host
-   findmnt -n -o SOURCE,FSTYPE --mountpoint /var/lib/imp-host/secrets
+   install -d -m 0700 /var/lib/tank-cloud/host-secrets/imp-host /var/lib/tank-cloud/host-secrets/atc-daemon &&
+     cp -a /var/lib/imp-host/secrets/. /var/lib/tank-cloud/host-secrets/imp-host/ &&
+     diff -r /var/lib/imp-host/secrets /var/lib/tank-cloud/host-secrets/imp-host > /dev/null &&
+     systemctl start tank-cloud.target imp-host &&
+     findmnt -n -o SOURCE,FSTYPE --mountpoint /var/lib/imp-host/secrets &&
+     d=$(mktemp -d /run/staged.XXXXXX) && mount --bind / "$d" &&
+     rm -f "$d"/var/lib/imp-host/secrets/* &&
+     umount "$d" && rmdir "$d" && echo removed
    ```
 
-   Expect `tank/cloud/host-secrets/imp-host zfs`. Run `bash scripts/install-imp-dns-token.sh` from
-   this machine to restore the DNS token, which the reinstall does not stage. The script refuses to
-   write while the bind is not mounted.
+   Expect `tank/cloud/host-secrets[/imp-host] zfs`, then `removed`. Without `removed`, the block
+   stopped at the failed step, and the staged copies stay on the root disk. Run
+   `bash scripts/install-imp-dns-token.sh` from this machine to restore the DNS token, which the
+   reinstall does not stage. The script refuses to write while the bind is not mounted.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
 
