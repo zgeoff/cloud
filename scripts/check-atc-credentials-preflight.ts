@@ -2,7 +2,7 @@ import { atcCloudGrantable } from './atc-cloud-grantable.ts';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
-import { loadHostImpJSON } from './imp-cli.ts';
+import { formatImpCommand, loadHostImpJSON } from './imp-cli.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { parseJSONOutput } from './parse-json-output.ts';
 import { runOnHost } from './run-host-check.ts';
@@ -76,7 +76,7 @@ function requireGrantableSecrets(secrets: unknown) {
   if (missing.length > 0) {
     throw new ExitError(
       1,
-      `impd lacks ${missing.join(', ')}, which atc-cloud may grant; add each with\n'impz secret add' in imp-host, then rerun. Nothing changed`,
+      `impd lacks ${missing.join(', ')}, which atc-cloud may grant; add each with\n'${formatImpCommand(['secret', 'add'])}' in imp-host, then rerun. Nothing changed`,
     );
   }
 }

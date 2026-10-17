@@ -189,13 +189,9 @@ test('it stops before any change when impd lacks a secret that atc-cloud may gra
   });
 
   expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([
-    'docker',
-    'exec',
-    'imp-host',
-    'impz',
-    'secret',
-    'ls',
-    '--json',
+    'ConnectTimeout=15',
+    'root@geoffcloud',
+    "'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
   ]);
 });
 

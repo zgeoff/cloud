@@ -170,7 +170,15 @@ test('it fails the mint as impd does, writing no file, when a secret atc-cloud m
   const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
 
   const result = await stub.run(
-    ['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', "bash -s -- '/var/lib/atc-daemon-secrets'"],
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
+      'root@geoffcloud',
+      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
+    ],
     { stdin: script },
   );
 

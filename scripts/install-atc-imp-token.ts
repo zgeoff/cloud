@@ -75,7 +75,7 @@ function requireTokenLimits(token: unknown) {
   if (!hasGrantable || !Bun.deepEquals(limits, ['manage', ['harness-*']])) {
     throw new ExitError(
       1,
-      `atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'impz token set atc-cloud --grantable ${grantable.join(',')}' in imp-host, then rerun`,
+      `atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'${formatImpCommand(['token', 'set', 'atc-cloud', '--grantable', grantable.join(',')])}' in imp-host, then rerun`,
     );
   }
 }
