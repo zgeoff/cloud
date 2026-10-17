@@ -750,7 +750,7 @@ let
           assert_files_equal /dev/null stdout
           # bash names the probe and the line of its mktemp call, counted from the lines
           # writeShellApplication puts before the script
-          assert_equals "${probe}: line 26: TEXTFILE_DIR: unbound variable" "$(cat stderr)" "the probe's stderr"
+          assert_equals "${probe}: line 27: TEXTFILE_DIR: unbound variable" "$(cat stderr)" "the probe's stderr"
           assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
           assert_equals "" "$(ls -A out)" "the textfile directory"
         '';
