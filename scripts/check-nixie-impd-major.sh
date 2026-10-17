@@ -5,8 +5,8 @@
 #
 #   bash scripts/check-nixie-impd-major.sh <configuration.nix> [<nixie image>...]
 #
-# The impd release is the imp-host image's tag, which pin-imp.sh moves with the imp module. nixie
-# talks to impd through @zgeoff/imp-client, whose checkServer refuses an impd of another major
+# The impd release is the imp-host image's tag, which the imp release bump moves with the imp
+# module. nixie talks to impd through @zgeoff/imp-client, whose checkServer refuses an impd of another major
 # release, and nixie's start then retries for ever while the host reports healthy. The image bundles
 # the client, so the check reads its version from bun.lock at the nixie release's tag, through gh.
 # It prints one line and exits 0 when every nixie pod accepts the impd major. It exits 1 when one
@@ -26,7 +26,7 @@ if [ ! -f "$config" ]; then
   echo "$config is missing, so the switch has no impd pin to compare" >&2
   exit 1
 fi
-# the one services.imp.image line, as pin-imp.sh writes it
+# the one services.imp.image line, as the imp release bump writes it
 impd="$(sed -nE "s/^ +image = \"ghcr\.io\/zgeoff\/imp-host:($version)@sha256:[0-9a-f]{64}\";\$/\\1/p" "$config")"
 if [[ ! "$impd" =~ ^$version$ ]]; then
   echo "$config pins no imp-host release image" >&2

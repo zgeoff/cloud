@@ -11,7 +11,7 @@ type ReleaseSource =
 
 // A version is read and compared. A tag or a commit moves with the version and is never read. A
 // sum, a digest or a tarball sum is the release's own value, which a pin at its version must hold.
-type PinPart =
+export type PinPart =
   | { readonly kind: 'version' }
   | { readonly kind: 'tag' }
   | { readonly kind: 'commit'; readonly length: number }
@@ -20,7 +20,7 @@ type PinPart =
   | { readonly kind: 'tarball-sum' };
 
 // the line of a pin file that names the asset whose sum another line pins
-interface PinAssetLine {
+export interface PinAssetLine {
   readonly file: string;
   readonly pattern: string;
 }
@@ -28,7 +28,7 @@ interface PinAssetLine {
 // Exactly one line of the file must match the pattern, a regular expression's source that is
 // matched with the u flag; each named group is the part of that name. A source, unlike a RegExp,
 // is readonly all the way down.
-interface PinLine {
+export interface PinLine {
   readonly file: string;
   readonly pattern: string;
   readonly parts: Readonly<Record<string, PinPart>>;
@@ -36,14 +36,14 @@ interface PinLine {
 
 // `nix flake lock` in the flake's directory after the pin's lines are written, which must then
 // lock the input at the pinned commit
-interface PinLock {
+export interface PinLock {
   readonly kind: 'nix-flake-lock';
   readonly flake: string;
   readonly input: string;
   readonly lockFile: string;
 }
 
-interface Pin {
+export interface Pin {
   readonly id: string;
 
   // the pin's row in the bump pull request's table, as Markdown
