@@ -12,11 +12,10 @@
 # its VM (host/move-host-secrets.sh, install-imp-dns-token.sh and host/write-atc-gateway-token.sh),
 # .bun-version, the workflow itself, the
 # preview service's source (packages/preview/), which the host's package copies, and bun.lock,
-# from which that package fetches the service's dependencies. A rename
-# counts both its old and new path. The root package.json is no input, although its test:nixos
-# script runs the checks: it changes with every dependency bump, and a bump would otherwise
-# re-run the VM rehearsals. An edit to test:nixos runs at the next change to an input, or on a
-# dispatch.
+# from which that package fetches the service's dependencies, so every dependency bump runs the
+# checks. A rename counts both its old and new path. The root package.json is no input, although
+# its test:nixos script runs the checks: a change to it alone, such as a script edit, runs at the
+# next change to an input, or on a dispatch.
 #
 # A base of all zeros, as a push that creates a branch reports, has nothing to compare with, so
 # it prints "true", and so does a base that is not an ancestor of <head>, such as main before a
