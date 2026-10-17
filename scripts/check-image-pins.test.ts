@@ -21,6 +21,7 @@ async function setupTest() {
       'deploy/nixie',
       'nixos/hosts/geoffcloud',
       'scripts',
+      'infra/observability',
     ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
 
@@ -33,6 +34,7 @@ async function setupTest() {
       'deploy/nixie/restore-job.yaml',
       'nixos/hosts/geoffcloud/configuration.nix',
       'scripts/nix-image.sh',
+      'infra/observability/test-nixie-turns-alert.sh',
     ].map((file) => writeFile(join(root, file), '')),
   );
 

@@ -27,6 +27,7 @@
     "test:preview": "cd packages/preview && bun test",
     "test:related": "bun scripts/run-related-tests.ts",
     "test:scripts": "bash scripts/run-shell-suites.sh",
+    "test:alert-rules": "bash scripts/run-shell-suites.sh alert-rules",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-shell-suites.sh nixie-backup-fixture",
     "login:ghcr": "bun scripts/login-ghcr.ts",
