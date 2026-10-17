@@ -1,5 +1,3 @@
-// the recorded requests are a mutable list by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { onTestFinished } from 'bun:test';
 
 // Stands in for impd's tokens.whoami and /health on an ephemeral loopback port, for real curl to

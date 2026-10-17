@@ -1,5 +1,3 @@
-// the scenario's state is mutable by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import type { StubATCKeyScenario } from './build-stub-atc-key.ts';
 import { buildStubATCKey } from './build-stub-atc-key.ts';
 import type {

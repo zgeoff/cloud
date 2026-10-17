@@ -1,6 +1,3 @@
-// a test asks each of the host's commands once and asserts every answer on its own, so its body
-// is long
-/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, test } from 'bun:test';
 import { runProcess } from '../run-process.ts';
 import { toShellArg } from '../to-shell-arg.ts';

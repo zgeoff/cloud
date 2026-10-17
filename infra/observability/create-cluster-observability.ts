@@ -1,5 +1,3 @@
-// the observability stack wires its charts, monitors and dashboards here, one import each
-/* oxlint-disable import/max-dependencies */
 import type { Provider } from '@pulumi/kubernetes';
 import { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';

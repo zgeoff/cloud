@@ -1,5 +1,3 @@
-// RunOptions carries stdin as a Buffer, which has no readonly form
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import type { RunOptions, RunResult, Runner } from './run-process.ts';
 import { toShellArg } from './to-shell-arg.ts';
 

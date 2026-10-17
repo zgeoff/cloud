@@ -1,5 +1,3 @@
-// the test asserts the whole Job as one literal, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { buildRestoreJob } from './build-restore-job.ts';
 

@@ -43,7 +43,6 @@ export async function checkATCGatewayReadiness(
   let failures = 0;
 
   for (const check of checks) {
-    // oxlint-disable-next-line no-await-in-loop -- each check prints its lines before the next runs
     const lines = [await check()].flat();
 
     failures += printLines(options, lines);

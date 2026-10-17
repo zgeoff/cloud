@@ -42,7 +42,6 @@ export async function runRelatedTests(paths: readonly string[], cwd: string): Pr
     findPackageDir(test, cwd),
   )) {
     // one run at a time: the runs share the tree and its ports
-    // oxlint-disable-next-line no-await-in-loop
     const exitCode = await runTests(cwd, packageDir, packageTests);
 
     if (exitCode !== 0) {

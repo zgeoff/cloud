@@ -1,5 +1,3 @@
-// the stream's state is mutable by design, and an AbortSignal has no readonly form
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
 
 // An open stream of nixie's stand-in API, in the server-sent events oRPC 1.15.4 writes: an empty

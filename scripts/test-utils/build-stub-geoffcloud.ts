@@ -1,5 +1,3 @@
-// the stand-in's sandboxes are a mutable set by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 // Stands in for root's shell on geoffcloud at the fetch sandbox check's commands. It runs no probe:
 // a probe of an address the scenario lets that side reach prints `probe-exit:0`, and any other
 // times out with 124, as a dropped connection does. It tracks the sandboxes imp creates.

@@ -1,5 +1,3 @@
-// the stand-in's state is mutable by design, and a Request has no readonly form
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { onTestFinished } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { findJSONField } from '../find-json-field.ts';

@@ -1,5 +1,3 @@
-// RunOptions carries stdin as a Buffer, which has no readonly form
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { constants } from 'node:os';
 import { ExitError } from './exit-error.ts';
 import type { ScriptIO } from './run-or-exit.ts';
@@ -161,7 +159,6 @@ async function runCleanup(cleanup: Readonly<Cleanup>, signal: Interrupt) {
   await waitForCommands(cleanup);
 
   for (let step = cleanup.steps.pop(); step !== undefined; step = cleanup.steps.pop()) {
-    // oxlint-disable-next-line no-await-in-loop -- each step undoes what the steps after it built on
     await tryCleanupStep(cleanup.io, step);
   }
 

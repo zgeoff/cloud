@@ -1,5 +1,3 @@
-// each test asserts every call, output and check-directory listing on its own, so its body is long
-/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { existsSync } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';

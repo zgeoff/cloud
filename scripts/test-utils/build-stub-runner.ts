@@ -1,5 +1,3 @@
-// the recorded calls are a mutable list by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import type { RunOptions, RunResult, Runner } from '../run-process.ts';
 
 // Stands in for runProcess. It records every call, then hands it to each handler in turn; the
@@ -57,7 +55,6 @@ export function buildStubRunner(...handlers: readonly StubHandler[]): StubRunner
 
 async function findAnswer(handlers: readonly StubHandler[], call: StubCall) {
   for (const handler of handlers) {
-    // oxlint-disable-next-line no-await-in-loop -- the first handler that answers wins, in order
     const answer = await handler(call);
 
     if (answer !== undefined) {

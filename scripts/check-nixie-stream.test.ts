@@ -1,5 +1,3 @@
-// each test states its stand-in and the whole output inline, so its body is long
-/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, mock, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { checkNixieStream } from './check-nixie-stream.ts';

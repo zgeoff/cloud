@@ -1,6 +1,3 @@
-// each test commits its image to a real origin and runs the whole script as a child process, so
-// its body is long
-/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

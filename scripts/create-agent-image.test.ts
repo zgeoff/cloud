@@ -1,6 +1,3 @@
-// each test commits its own image to a real origin and asserts every output on its own, so its
-// body is long
-/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { access, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

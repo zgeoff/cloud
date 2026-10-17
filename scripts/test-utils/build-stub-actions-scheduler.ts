@@ -1,5 +1,3 @@
-// the scheduler's runs and concurrency groups are mutable state by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { buildStubConcurrencyGroup } from './build-stub-concurrency-group.ts';
 import type { StubConcurrencyGroup } from './build-stub-concurrency-group.ts';
 import { isActionsConditionMet } from './is-actions-condition-met.ts';

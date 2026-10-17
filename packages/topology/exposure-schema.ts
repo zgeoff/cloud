@@ -113,7 +113,6 @@ function collectHostPortIssues(entry: HostPort): readonly HostPortIssue[] {
 
 // adds an issue for each entry whose name another entry holds, and for each entry whose fields
 // disagree with each other
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- zod owns the context
 function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
   const names = exposure.entries.map((entry) => entry.name);
 

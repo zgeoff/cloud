@@ -1,5 +1,3 @@
-// the vaults are mutable state by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { findJSONField } from '../find-json-field.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 

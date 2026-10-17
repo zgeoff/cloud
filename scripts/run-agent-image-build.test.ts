@@ -1,6 +1,3 @@
-// the test commits its own source to a real repository and asserts each result on its own, so
-// its body is long
-/* oxlint-disable max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

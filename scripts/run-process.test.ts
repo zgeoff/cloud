@@ -172,11 +172,9 @@ async function removeDescendant(dir: string, pidFile: string) {
 // polls until the program has written the file, which the test reads as its start
 async function waitForFile(path: string) {
   for (let text = ''; text === ''; ) {
-    // oxlint-disable-next-line no-await-in-loop -- each poll waits for the one before it
     text = await readFile(path, 'utf8').catch(() => '');
 
     if (text === '') {
-      // oxlint-disable-next-line no-await-in-loop -- the pause sits between two polls
       await Bun.sleep(10);
     }
   }

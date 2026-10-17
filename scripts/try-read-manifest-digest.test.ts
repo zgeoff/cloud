@@ -1,5 +1,3 @@
-// MSW's resolver info carries a Request, which has no readonly form
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { expect, test } from 'bun:test';
 import { HttpResponse, http, passthrough } from 'msw';
 import { server } from './mocks/node.ts';

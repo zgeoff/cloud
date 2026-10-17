@@ -2,8 +2,6 @@
 // script builds a shell command line here. It imports nothing outside Bun: the agent image's git
 // archive runs scripts from a clone without node_modules.
 
-// RunOptions carries stdin as a Buffer, which has no readonly form
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 export interface RunOptions {
   // the whole of the child's stdin; without it, the child reads /dev/null
   readonly stdin?: Buffer;
@@ -184,7 +182,6 @@ async function readPipe(pipe: ReadableStream<Uint8Array>, release: AbortSignal) 
   subscribeToAbort(release, onRelease);
 
   try {
-    // oxlint-disable-next-line no-await-in-loop -- each read waits for the chunk after the last
     for (let read = await reader.read(); !read.done; read = await reader.read()) {
       chunks.push(read.value);
     }

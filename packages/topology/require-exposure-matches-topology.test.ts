@@ -1,5 +1,3 @@
-// each test passes a whole registry and a whole topology as literals, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { requireExposureMatchesTopology } from './require-exposure-matches-topology.ts';
 

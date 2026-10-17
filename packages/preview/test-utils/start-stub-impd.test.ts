@@ -1,4 +1,4 @@
-/* oxlint-disable max-lines-per-function, max-statements, typescript/no-unsafe-type-assertion */
+/* oxlint-disable typescript/no-unsafe-type-assertion */
 import { expect, test } from 'bun:test';
 import { NativeWebSocket } from '../mocks/native-web-socket.ts';
 import { startStubImpd } from './start-stub-impd.ts';

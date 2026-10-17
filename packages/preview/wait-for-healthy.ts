@@ -26,7 +26,6 @@ export async function waitForHealthy(deps: PreviewDeps, wait: HealthWait): Promi
   const state: { lastAnswer: string | null } = { lastAnswer: null };
 
   while (deps.now().getTime() < deadline) {
-    // oxlint-disable-next-line no-await-in-loop -- each probe waits for the pause before it
     const answer = await tryReadHealth(url);
 
     if (answer === null) {
@@ -35,7 +34,6 @@ export async function waitForHealthy(deps: PreviewDeps, wait: HealthWait): Promi
 
     state.lastAnswer = answer;
 
-    // oxlint-disable-next-line no-await-in-loop -- the pause sits between two probes
     await deps.sleep(deps.settings.healthPollMs);
   }
 
