@@ -121,9 +121,22 @@ pkgs.testers.runNixOSTest {
         script = "exec sleep infinity";
       };
       # as geoffcloud: a path unit left running across the switch would keep its watch on the
-      # directory the bind shadows
-      systemd.paths.imp-host-dns-token.unitConfig.RequiresMountsFor =
-        geoffcloud.config.systemd.paths.imp-host-dns-token.unitConfig.RequiresMountsFor;
+      # directory the bind shadows, and its default dependencies would make an ordering cycle
+      # with the bind
+      systemd.paths.imp-host-dns-token = {
+        unitConfig = {
+          inherit (geoffcloud.config.systemd.paths.imp-host-dns-token.unitConfig)
+            DefaultDependencies
+            RequiresMountsFor
+            ;
+        };
+        inherit (geoffcloud.config.systemd.paths.imp-host-dns-token)
+          requires
+          after
+          conflicts
+          before
+          ;
+      };
       # the VM mounts virtualisation.fileSystems in place of fileSystems
       virtualisation.fileSystems = config.services.tank-cloud.fileSystems;
 
@@ -135,7 +148,16 @@ pkgs.testers.runNixOSTest {
           imp-host = [ "host-secrets" ];
           atc-daemon = [ "host-secrets" ];
         };
-        systemd.paths.imp-host-dns-token.unitConfig.RequiresMountsFor = lib.mkForce [ ];
+        systemd.paths.imp-host-dns-token = {
+          unitConfig = {
+            DefaultDependencies = lib.mkForce true;
+            RequiresMountsFor = lib.mkForce [ ];
+          };
+          requires = lib.mkForce [ ];
+          after = lib.mkForce [ ];
+          conflicts = lib.mkForce [ ];
+          before = lib.mkForce [ ];
+        };
       };
 
       # the pool, made once on the empty disk before its first import; zpool create leaves a
@@ -191,6 +213,13 @@ pkgs.testers.runNixOSTest {
         return machine.execute(f"mountpoint -q {path}")[0] == 0
 
 
+    def assert_no_ordering_cycle():
+        """systemd breaks an ordering cycle by deleting one of its jobs, and which one can differ
+        from boot to boot, so a cycle fails a unit only at times: the journal names every one"""
+        cycles = machine.succeed("journalctl -b -q --no-pager --grep 'ordering cycle' || true").strip()
+        assert cycles == "", f"the boot has an ordering cycle: {cycles}"
+
+
     machine.wait_for_unit("multi-user.target")
 
 
@@ -198,6 +227,7 @@ pkgs.testers.runNixOSTest {
         virt = machine.succeed("systemd-detect-virt").strip()
 
         assert virt == "kvm", f"the VM runs under {virt!r}: QEMU fell back from KVM"
+        assert_no_ordering_cycle()
 
 
     # the rancher mount's wait for its device is still queued; cancel it, so the zvol that
@@ -259,6 +289,7 @@ pkgs.testers.runNixOSTest {
     with subtest("it mounts the binds when the owner's switch runs, and imp-host and the atc daemon read the files from tank/cloud"):
         machine.succeed("date '+%Y-%m-%d %H:%M:%S' > /tmp/switched-at")
         machine.succeed(after)
+        assert_no_ordering_cycle()
         found = mounts()
 
         assert found == [
@@ -356,6 +387,7 @@ pkgs.testers.runNixOSTest {
         machine.shutdown()
         machine.start()
         machine.wait_for_unit("multi-user.target")
+        assert_no_ordering_cycle()
         machine.wait_for_unit("imp-host.service")
         machine.wait_for_unit("atc-daemon.service")
 

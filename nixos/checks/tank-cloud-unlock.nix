@@ -106,6 +106,13 @@ pkgs.testers.runNixOSTest {
         assert binds == bind_mounts, f"the binds are {binds}"
 
 
+    def assert_no_ordering_cycle():
+        """systemd breaks an ordering cycle by deleting one of its jobs, and which one can differ
+        from boot to boot, so a cycle fails a unit only at times: the journal names every one"""
+        cycles = machine.succeed("journalctl -b -q --no-pager --grep 'ordering cycle' || true").strip()
+        assert cycles == "", f"the boot has an ordering cycle: {cycles}"
+
+
     machine.wait_for_unit("multi-user.target")
 
 
@@ -113,6 +120,7 @@ pkgs.testers.runNixOSTest {
         virt = machine.succeed("systemd-detect-virt").strip()
 
         assert virt == "kvm", f"the VM runs under {virt!r}: QEMU fell back from KVM"
+        assert_no_ordering_cycle()
 
 
     # with no datasets yet, the rancher mount's wait for its device is still queued; cancel it, so
@@ -150,6 +158,7 @@ pkgs.testers.runNixOSTest {
         machine.shutdown()
         machine.start()
         machine.wait_for_unit("multi-user.target")
+        assert_no_ordering_cycle()
         for service in services:
             machine.wait_for_unit(f"{service}.service")
 
@@ -175,6 +184,7 @@ pkgs.testers.runNixOSTest {
         machine.shutdown()
         machine.start()
         machine.wait_for_unit("multi-user.target")
+        assert_no_ordering_cycle()
         machine.wait_for_unit("sshd.service")
         machine.wait_for_open_port(22)
 
