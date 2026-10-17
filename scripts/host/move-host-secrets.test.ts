@@ -1,6 +1,6 @@
 /* oxlint-disable max-statements, max-lines-per-function */
 import { expect, onTestFinished, test } from 'bun:test';
-import { chmod, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from '../run-process.ts';
@@ -217,6 +217,50 @@ test('it reports a changed mode, a changed content and a missing file by path an
       '',
     ].join('\n'),
   );
+});
+
+test('it reports a changed symlink target as a content difference', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'var/lib/imp-host/secrets'), { recursive: true });
+  await mkdir(join(ctx.dir, 'var/lib/atc-daemon-secrets'), { recursive: true });
+  await mkdir(join(ctx.dir, 'root/imp-db-backups'), { recursive: true });
+  await symlink('token-a', join(ctx.dir, 'var/lib/atc-daemon-secrets/current'));
+
+  await ctx.run('seed');
+
+  await rm(join(ctx.dir, 'var/lib/tank-cloud/host-secrets/atc-daemon/current'));
+  await symlink('token-b', join(ctx.dir, 'var/lib/tank-cloud/host-secrets/atc-daemon/current'));
+
+  const result = await ctx.run('compare');
+
+  expect(result.exitCode).toBe(1);
+
+  expect(result.stdout.toString()).toContain(
+    'MISMATCH /var/lib/atc-daemon-secrets:\n  ./current: content differs\n',
+  );
+});
+
+test('it fails the comparison when a tree cannot be read in full', async () => {
+  const ctx = await setupTest();
+
+  await mkdir(join(ctx.dir, 'var/lib/imp-host/secrets/locked'), { recursive: true });
+  await mkdir(join(ctx.dir, 'var/lib/atc-daemon-secrets'), { recursive: true });
+  await mkdir(join(ctx.dir, 'root/imp-db-backups'), { recursive: true });
+
+  await ctx.run('seed');
+
+  await chmod(join(ctx.dir, 'var/lib/imp-host/secrets/locked'), 0o000);
+
+  const result = await ctx.run('compare');
+
+  await chmod(join(ctx.dir, 'var/lib/imp-host/secrets/locked'), 0o700);
+
+  // root reads a mode 000 directory, so the case holds only for an unprivileged user
+  if (process.getuid?.() !== 0) {
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain('cannot read the tree of /var/lib/imp-host/secrets');
+  }
 });
 
 test('it refuses to remove the old copies while an old path is not a mount point, and deletes nothing', async () => {

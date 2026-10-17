@@ -56,33 +56,27 @@ ensure_bind() {
   fi
 }
 
-# prints the directory that holds the old tree: the old path, or its view through the bind once
-# the old path is a mount point
-locate_old() {
-  local old="$1"
-  if mountpoint -q "$root$old"; then
-    ensure_bind
-    echo "$bind_dir$old"
-  else
-    echo "$root$old"
-  fi
-}
-
-# one NUL-separated record of five fields per entry: path, type, mode, owner:group, size
-# for a regular file, then the sha256 for it; "-" fills the fields a directory or link lacks
+# one tab-separated line per entry: path, type, mode, owner:group, size, then the sha256 for a
+# regular file or for a link's target; "-" fills the fields a directory lacks. Returns 1 when
+# find or sha256sum fails, so that a tree that cannot be read in full never yields a manifest.
 write_manifest() {
-  local dir="$1" out="$2" path type mode owner size sum
+  local dir="$1" out="$2" path type mode owner size target sum
+  local listing="$work_dir/listing"
+  (cd "$dir" && find . -printf '%p\0%y\0%m\0%u:%g\0%s\0%l\0') > "$listing" || return 1
   : > "$out"
   while IFS= read -r -d '' path && IFS= read -r -d '' type && IFS= read -r -d '' mode &&
-    IFS= read -r -d '' owner && IFS= read -r -d '' size; do
+    IFS= read -r -d '' owner && IFS= read -r -d '' size && IFS= read -r -d '' target; do
     sum="-"
     if [ "$type" = f ]; then
-      sum="$(sha256sum -- "$dir/$path" | cut -d' ' -f1)"
+      sum="$(sha256sum -- "$dir/$path" | cut -d' ' -f1)" || return 1
+    elif [ "$type" = l ]; then
+      sum="$(printf '%s' "$target" | sha256sum | cut -d' ' -f1)" || return 1
+      size="-"
     else
       size="-"
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$type" "$mode" "$owner" "$size" "$sum" >> "$out"
-  done < <(cd "$dir" && find . -printf '%p\0%y\0%m\0%u:%g\0%s\0')
+  done < "$listing"
 }
 
 # prints the fields of two entries that differ, one name per line
@@ -102,11 +96,18 @@ compare_pair() {
   local old="$1" source="$2" old_dir
   local -A old_entries=() new_entries=()
   local path rest key lines=() only_new=0 count=0 root_line
-  old_dir="$(locate_old "$old")"
+  # the old tree is the old path, or its view through the bind once the old path is a mount point;
+  # the bind is made here, not in a command substitution, so the exit trap sees bind_dir
+  if mountpoint -q "$root$old"; then
+    ensure_bind
+    old_dir="$bind_dir$old"
+  else
+    old_dir="$root$old"
+  fi
   [ -d "$old_dir" ] || die "$old is not a directory"
   [ -d "$root$source" ] || die "$source is not a directory"
-  write_manifest "$old_dir" "$work_dir/old"
-  write_manifest "$root$source" "$work_dir/new"
+  write_manifest "$old_dir" "$work_dir/old" || die "cannot read the tree of $old in full"
+  write_manifest "$root$source" "$work_dir/new" || die "cannot read the tree of $source in full"
   while IFS=$'\t' read -r path rest; do old_entries["$path"]="$rest"; done < "$work_dir/old"
   while IFS=$'\t' read -r path rest; do new_entries["$path"]="$rest"; done < "$work_dir/new"
   while IFS= read -r path; do
