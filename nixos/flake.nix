@@ -46,8 +46,8 @@
       # check reads ../test-support/shell (checks/test-utils/build-shell-lib-source.nix), so they
       # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
-      # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock boots a VM of its
-      # own, and needs KVM too
+      # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock and tank-cloud-host-secrets boot
+      # a VM of their own, and need KVM too
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -91,6 +91,10 @@
       };
       checks.x86_64-linux.tank-cloud-unlock = import ./checks/tank-cloud-unlock.nix {
         inherit nixpkgs;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.tank-cloud-host-secrets = import ./checks/tank-cloud-host-secrets.nix {
+        inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
     };

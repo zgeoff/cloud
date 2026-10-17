@@ -246,7 +246,8 @@ because every check reads `test-support/shell/`. It builds in a `nixos/nix` cont
 
 - A check reads only the shell helpers that `nixos/checks/test-utils/build-shell-lib-source.nix`
   selects, and `scripts/needs-nixos-checks.sh` lists the same files. A helper a check starts to
-  read joins both lists. The checks read nothing else outside `nixos/` but `packages/topology/`.
+  read joins both lists. The checks read nothing else outside `nixos/` but `packages/topology/` and the host scripts that
+  `tank-cloud-host-secrets` runs in its VM.
 
 - `geoffcloud-eval` evaluates the host's system derivation and builds nothing of the host, so a
   change that breaks the host config fails CI instead of the switch.

@@ -49,6 +49,8 @@ call, the path of a change, the topology and the data.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
+- [Move the host secrets](./runbooks/move-host-secrets.md): put the secret files and impd's database
+  copies on tank/cloud, and remove the old copies.
 - [Encrypt tank/imp](./runbooks/tank-imp-encryption.md): move impd's dataset into an encrypted copy
   under the same name, and roll it back.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host

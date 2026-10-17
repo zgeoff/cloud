@@ -56,6 +56,11 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
    warns.
 
+   The pool `tank` keeps `tank/cloud`, which holds the live copies of the imp files and of the atc
+   daemon's tokens ([Move the host secrets](./move-host-secrets.md)). On the installed host, a bind
+   mount shadows each staged file with the copy on `tank/cloud`. The staged files are the ones that
+   a pool without those copies needs.
+
    Stage the key of the encryption root `tank/cloud` too. `--no-newline` keeps the file at exactly
    the key's 64 hex characters, so the length check catches a wrong item before the install:
 
