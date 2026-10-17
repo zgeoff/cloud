@@ -59,7 +59,7 @@ test('it skips a token with the expected limits whose saved file authenticates a
   });
 
   expect(ctx.out.join('')).toBe(
-    '\n== 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token\nskip: both exist, atc-cloud has the expected limits, and the file authenticates as it\n',
+    '\n== 3/3 impd token atc-cloud (manage, harness-*, grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect) to root@geoffcloud:/var/lib/atc-daemon-secrets/imp-token\nskip: both exist, atc-cloud has the expected limits, and the file authenticates as it\n',
   );
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
@@ -228,7 +228,7 @@ test.each([
     ).rejects.toMatchObject({
       exitCode: 1,
       message:
-        'atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun',
+        "atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'impz token set atc-cloud --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect' in imp-host, then rerun",
     });
 
     expect(tools.calls).toStrictEqual([]);

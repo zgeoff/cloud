@@ -75,7 +75,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
   );
 
   expect(calls).toBe(
-    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm"]\n',
+    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect"]\n',
   );
 });
 

@@ -8,8 +8,18 @@ import { readHostScript } from './read-host-script.ts';
 import { runOnHost } from './run-on-host.ts';
 import { toShellArg } from './to-shell-arg.ts';
 
-// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant glm) on the host, straight
-// into a root-only file there, so it never reaches this machine. impd shows a token once, so a
+// the secrets atc-cloud may grant: glm, and those that the daemon's auth profiles name in
+// nixos/hosts/geoffcloud/configuration.nix; scripts/host/mint-atc-imp-token.sh mints with them
+const grantable = [
+  'glm',
+  'claude-setup-token',
+  'github-imp-agents',
+  'linear-imp-agents',
+  'op-connect',
+];
+
+// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant the secrets above) on the
+// host, straight into a root-only file there, so it never reaches this machine. impd shows a token once, so a
 // rerun skips a token and file that match and stops at a lone one or a bad file.
 export async function installATCImpToken(
   context: Readonly<ATCCredentialsContext>,
@@ -20,7 +30,7 @@ export async function installATCImpToken(
   const hasFile = preflight.hostFiles.includes('imp-token');
 
   context.printOut(
-    `\n== 3/3 impd token atc-cloud (manage, harness-*, grantable glm) to ${context.host}:${file}\n`,
+    `\n== 3/3 impd token atc-cloud (manage, harness-*, grantable ${grantable.join(',')}) to ${context.host}:${file}\n`,
   );
 
   if (token !== undefined && hasFile) {
@@ -60,16 +70,19 @@ async function checkSavedToken(
 }
 
 function requireTokenLimits(token: unknown) {
+  const tokenGrantable = findJSONField(token, 'grantable');
+
+  // impd's order of the grantable list is its own, so the check compares the lists as sets
   const limits = [
     findJSONField(token, 'scope'),
     findJSONField(token, 'imps'),
-    findJSONField(token, 'grantable'),
+    Array.isArray(tokenGrantable) ? tokenGrantable.toSorted() : tokenGrantable,
   ];
 
-  if (!Bun.deepEquals(limits, ['manage', ['harness-*'], ['glm']])) {
+  if (!Bun.deepEquals(limits, ['manage', ['harness-*'], grantable.toSorted()])) {
     throw new ExitError(
       1,
-      'atc-cloud exists with another scope, imps or grantable list; fix it by hand, then rerun',
+      `atc-cloud exists with another scope, imps or grantable list; fix it by hand, such as with\n'impz token set atc-cloud --grantable ${grantable.join(',')}' in imp-host, then rerun`,
     );
   }
 }

@@ -245,7 +245,13 @@ function createImpToken(state: HostState) {
     scope: 'manage',
     imps: ['harness-*'],
     sshKeys: [],
-    grantable: ['glm'],
+    grantable: [
+      'claude-setup-token',
+      'github-imp-agents',
+      'glm',
+      'linear-imp-agents',
+      'op-connect',
+    ],
     createdAt: '2026-10-07T12:00:00.000Z',
   });
 

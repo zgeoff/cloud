@@ -123,7 +123,13 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
   expect(scenario.tokens).toPartiallyContain({
     name: 'atc-cloud',
     scope: 'manage',
-    grantable: ['glm'],
+    grantable: [
+      'claude-setup-token',
+      'github-imp-agents',
+      'glm',
+      'linear-imp-agents',
+      'op-connect',
+    ],
   });
 });
 

@@ -43,7 +43,7 @@ test('it prints glm’s and atc-cloud’s names and limits, and each file’s ow
   expect(ctx.out.join('')).toBe(`
 == check
 {"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[]}
-{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}
+{"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["claude-setup-token","github-imp-agents","glm","linear-imp-agents","op-connect"]}
 /var/lib/atc-daemon-secrets root 700 4096 bytes
 /var/lib/atc-daemon-secrets/gateway-token root 400 15 bytes
 /var/lib/atc-daemon-secrets/imp-token root 400 18 bytes
