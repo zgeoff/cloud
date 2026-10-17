@@ -112,6 +112,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run check:image-pins
 
+      # each release registry pin in the checkout holds what the pin table holds
+      - name: Release pins
+        run: bun run check:release-pins
+
       # each restore Job's YAML is its backup pod builder's output
       - name: Restore jobs
         run: bun run check:restore-job

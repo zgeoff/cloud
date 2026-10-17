@@ -5,7 +5,12 @@ import { findReleaseRecord } from './find-release-record.ts';
 test.each([
   [
     'release-check/atc',
-    ['images/agent/Dockerfile', 'images/atc-gateway/versions.env', 'nixos/packages/atc.nix'],
+    [
+      'images/agent/Dockerfile',
+      'images/atc-gateway/versions.env',
+      'nixos/packages/atc.nix',
+      'scripts/release/release-pins.json',
+    ],
   ],
   [
     'release-check/imp',
@@ -14,10 +19,11 @@ test.each([
       'nixos/flake.lock',
       'nixos/flake.nix',
       'nixos/hosts/geoffcloud/configuration.nix',
+      'scripts/release/release-pins.json',
     ],
   ],
-  ['release-check/nixie', ['infra/Pulumi.prod.yaml']],
-  ['release-check/auto-mode', ['images/agent/Dockerfile']],
+  ['release-check/nixie', ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json']],
+  ['release-check/auto-mode', ['images/agent/Dockerfile', 'scripts/release/release-pins.json']],
 ])('it lists the files that a bump from %s writes', (branch: string, files: readonly string[]) => {
   const record = findReleaseRecord(branch);
 
@@ -56,5 +62,5 @@ test('it lists a file once and its lock file beside its lines', () => {
       ],
       rollout: 'nothing',
     }),
-  ).toStrictEqual(['a/flake.lock', 'b/pins.txt']);
+  ).toStrictEqual(['a/flake.lock', 'b/pins.txt', 'scripts/release/release-pins.json']);
 });

@@ -1,5 +1,6 @@
 import { collectPinFiles } from './collect-pin-files.ts';
 import { findReleaseRecord } from './find-release-record.ts';
+import { pinTableFile } from './pin-table-file.ts';
 
 interface BumpCommit {
   readonly oid: string;
@@ -94,12 +95,16 @@ function findLabelHoldReason(pr: BumpPullRequest) {
     : undefined;
 }
 
+// A bump that leaves out the pin table predates it: its ci check passed before the table's check
+// existed, and only the next release check run, which rebuilds the branch, writes the table.
 function findFileHoldReason(pr: BumpPullRequest, pinFiles: readonly string[]) {
   const outside = pr.files.filter((file) => !pinFiles.includes(file)).toSorted();
 
-  return outside.length > 0
-    ? `it changes ${outside.join(' ')}, which no pin of its dependency writes`
-    : undefined;
+  if (outside.length > 0) {
+    return `it changes ${outside.join(' ')}, which no pin of its dependency writes`;
+  }
+
+  return pr.files.includes(pinTableFile) ? undefined : `it does not update ${pinTableFile}`;
 }
 
 const passed = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);

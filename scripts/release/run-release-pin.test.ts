@@ -15,6 +15,15 @@ test('it pins a release in the checkout it runs from', async () => {
   const ctx = setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': `${JSON.stringify(
+      {
+        'atc-agent': { version: '4.2.0', sum: '1'.repeat(64) },
+        'atc-daemon': { version: '4.2.0', sum: '1'.repeat(64) },
+        'atc-gateway': { version: '4.2.0', sum: '3'.repeat(64), tag: '4.2.0' },
+      },
+      null,
+      2,
+    )}\n`,
     'images/agent/Dockerfile': `ARG ATC_VERSION=4.2.0\nARG ATC_SHA256=${'1'.repeat(64)}\n`,
     'nixos/packages/atc.nix': `  version = "4.2.0";\n  sha256 = "${'1'.repeat(64)}";\n`,
     'images/atc-gateway/versions.env': `ATC_RELEASE=@zgeoff/atc@4.2.0\nATC_ASSET=atc-gateway-linux-x64\nATC_ASSET_SHA256=${'3'.repeat(64)}\nGATEWAY_IMAGE_TAG=4.2.0\n`,
@@ -56,7 +65,7 @@ test('it pins a release in the checkout it runs from', async () => {
       .filter((line) => /^[+-][^+-]/u.test(line))
       .join('\n'),
   ).toBe(
-    `-ARG ATC_VERSION=4.2.0\n-ARG ATC_SHA256=${'1'.repeat(64)}\n+ARG ATC_VERSION=4.3.0\n+ARG ATC_SHA256=${'4'.repeat(64)}\n-ATC_RELEASE=@zgeoff/atc@4.2.0\n+ATC_RELEASE=@zgeoff/atc@4.3.0\n-ATC_ASSET_SHA256=${'3'.repeat(64)}\n-GATEWAY_IMAGE_TAG=4.2.0\n+ATC_ASSET_SHA256=${'5'.repeat(64)}\n+GATEWAY_IMAGE_TAG=4.3.0\n-  version = "4.2.0";\n-  sha256 = "${'1'.repeat(64)}";\n+  version = "4.3.0";\n+  sha256 = "${'4'.repeat(64)}";`,
+    `-ARG ATC_VERSION=4.2.0\n-ARG ATC_SHA256=${'1'.repeat(64)}\n+ARG ATC_VERSION=4.3.0\n+ARG ATC_SHA256=${'4'.repeat(64)}\n-ATC_RELEASE=@zgeoff/atc@4.2.0\n+ATC_RELEASE=@zgeoff/atc@4.3.0\n-ATC_ASSET_SHA256=${'3'.repeat(64)}\n-GATEWAY_IMAGE_TAG=4.2.0\n+ATC_ASSET_SHA256=${'5'.repeat(64)}\n+GATEWAY_IMAGE_TAG=4.3.0\n-  version = "4.2.0";\n-  sha256 = "${'1'.repeat(64)}";\n+  version = "4.3.0";\n+  sha256 = "${'4'.repeat(64)}";\n-    "version": "4.2.0",\n-    "sum": "${'1'.repeat(64)}"\n+    "version": "4.3.0",\n+    "sum": "${'4'.repeat(64)}"\n-    "version": "4.2.0",\n-    "sum": "${'1'.repeat(64)}"\n+    "version": "4.3.0",\n+    "sum": "${'4'.repeat(64)}"\n-    "version": "4.2.0",\n-    "sum": "${'3'.repeat(64)}",\n-    "tag": "4.2.0"\n+    "version": "4.3.0",\n+    "sum": "${'5'.repeat(64)}",\n+    "tag": "4.3.0"`,
   );
 });
 
@@ -64,6 +73,7 @@ test('it fails with the release error and changes no pin', async () => {
   const ctx = setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'images/agent/Dockerfile': `ARG ATC_VERSION=4.2.0\nARG ATC_SHA256=${'1'.repeat(64)}\n`,
     'nixos/packages/atc.nix': `  version = "4.2.0";\n  sha256 = "${'1'.repeat(64)}";\n`,
     'images/atc-gateway/versions.env': `ATC_RELEASE=@zgeoff/atc@4.2.0\nATC_ASSET=atc-gateway-linux-x64\nATC_ASSET_SHA256=${'3'.repeat(64)}\nGATEWAY_IMAGE_TAG=4.2.0\n`,
