@@ -93,14 +93,16 @@
       "kind": "tunnel-hostname",
       "hostname": "atc.geoff.cloud",
       "scope": "public",
-      "reason": "The atc gateway's MCP and OAuth endpoints for remote MCP clients; the gateway authenticates every call itself, and an owner-only Cloudflare Access login fronts its sign-in pages"
+      "reason": "The atc gateway's MCP and OAuth endpoints for remote MCP clients",
+      "auth": "The gateway's own OAuth 2.1 server authenticates every MCP call, and an owner-only Cloudflare Access login fronts its sign-in pages"
     },
     {
       "name": "preview-webhook-route",
       "kind": "tunnel-hostname",
       "hostname": "preview-webhook.geoff.cloud",
       "scope": "public",
-      "reason": "GitHub's pull_request webhooks for the preview service, POST /webhook only; the service refuses every call without a valid signature"
+      "reason": "GitHub's pull_request webhooks for the preview service, POST /webhook only",
+      "auth": "GitHub's webhook signature: the preview service refuses every delivery without a valid one"
     },
     {
       "name": "imp",

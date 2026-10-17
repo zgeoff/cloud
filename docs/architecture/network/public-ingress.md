@@ -51,6 +51,10 @@ which an Access login in front of them would break. Cloudflare Access therefore 
 whole hostname. It fronts only the pages that the owner's browser loads to sign in and approve a
 client, which no MCP client calls.
 
+Each public route's registry entry names its auth layer, and the Pulumi program fails on a public
+entry without one ([the exposure registry](./firewalls.md#the-exposure-registry)), so a new route
+states who authenticates its calls before it can go public.
+
 ### The gateway's route boundary
 
 The atc gateway's routes split by caller. The split follows the route table of atc's MCP HTTP
@@ -109,7 +113,8 @@ tailnet policy, and the gateway still answers it only for its public host name.
 A new public route is the exception in this estate. A service stays on the host or the tailnet
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
 catch-all and a proxied record for its hostname, reviewed in the same preview. The hostname needs a
-public entry in the [exposure registry](./firewalls.md#the-exposure-registry), and the Pulumi
-program refuses a route to any other hostname. `imp.geoff.cloud` has a reserved entry, held free for
-imp's own public endpoint, and impd's tailnet names under `imps.geoff.cloud` never pass through the
-tunnel ([imp on the host](../host/imp.md#dns-and-certificates)).
+public entry in the [exposure registry](./firewalls.md#the-exposure-registry) that names its auth
+layer, and the Pulumi program refuses a route to any other hostname. `imp.geoff.cloud` has a
+reserved entry, held free for imp's own public endpoint, and impd's tailnet names under
+`imps.geoff.cloud` never pass through the tunnel
+([imp on the host](../host/imp.md#dns-and-certificates)).

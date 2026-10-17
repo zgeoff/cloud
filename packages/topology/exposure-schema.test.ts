@@ -49,6 +49,7 @@ test('it accepts one entry of each kind as given', () => {
         hostname: 'atc.example.org',
         scope: 'public',
         reason: 'the gateway',
+        auth: 'an OAuth server',
       },
       {
         name: 'funnel',
@@ -56,6 +57,7 @@ test('it accepts one entry of each kind as given', () => {
         attr: 'funnel',
         scope: 'public',
         reason: 'funnel',
+        auth: 'a bearer token',
       },
       {
         name: 'worker',
@@ -207,6 +209,39 @@ test.each([
       reason: 'ssh',
     },
     'admission',
+  ],
+  [
+    'a public tunnel hostname without an auth layer',
+    {
+      name: 'files',
+      kind: 'tunnel-hostname',
+      hostname: 'files.example.org',
+      scope: 'public',
+      reason: 'file sharing',
+    },
+    'auth',
+  ],
+  [
+    'a public tailnet capability without an auth layer',
+    { name: 'funnel', kind: 'tailnet-capability', attr: 'funnel', scope: 'public', reason: 'f' },
+    'auth',
+  ],
+  [
+    'a public worker URL without an auth layer',
+    { name: 'worker', kind: 'worker-url', script: 'upload', scope: 'public', reason: 'uploads' },
+    'auth',
+  ],
+  [
+    'a reserved tunnel hostname with an auth layer',
+    {
+      name: 'mcp',
+      kind: 'tunnel-hostname',
+      hostname: 'mcp.example.org',
+      scope: 'reserved',
+      reason: 'held',
+      auth: 'an OAuth server',
+    },
+    'auth',
   ],
   [
     'a reserved host port',

@@ -62,7 +62,10 @@ approved runs each host switch.
 
 ## Topology
 
-The VM holds three kinds of workload, each placed where its needs put it.
+The VM holds three kinds of workload, and one placement rule decides where each runs. Host-level
+work, which needs the kernel, the disks or the host's own network, runs on NixOS or beside it on the
+host. A containerised app runs on k3s, because a Helm chart or a manifest describes it there and
+Pulumi deploys it with the rest of the estate.
 
 ```mermaid
 flowchart TB
@@ -128,8 +131,8 @@ its imps rely on impd's own backups.
 ## Cross-cutting
 
 - **Public by exception.** A new service stays on the host or on the tailnet. A public route needs
-  its own reason in its PR, and the tunnel is the only way in
-  ([public ingress](./network/public-ingress.md)).
+  its own reason in its PR and an auth layer named in the exposure registry, and the tunnel is the
+  only way in ([public ingress](./network/public-ingress.md)).
 - **Secrets never in the repo.** The repo is public. Every secret reaches its user through
   1Password, Pulumi's encrypted state or a root-only file on the host, and never through a command
   line, because the host's journal records each SSH command line ([secrets](./secrets.md)).

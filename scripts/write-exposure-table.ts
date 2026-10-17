@@ -94,7 +94,7 @@ async function applyPage(
   return 0;
 }
 
-const header = ['Name', 'Kind', 'Exposes', 'Scope', 'Reason', 'Ticket'];
+const header = ['Name', 'Kind', 'Exposes', 'Scope', 'Reason', 'Auth', 'Ticket'];
 
 // A table with each column padded to its widest cell, as oxfmt lays a Markdown table out, so the
 // formatter leaves the written page as it is
@@ -121,9 +121,15 @@ function renderRow(entry: ExposureEntry): readonly string[] {
     entry.kind,
     formatExposes(entry),
     entry.scope,
-    entry.reason.replaceAll('|', String.raw`\|`),
+    formatCell(entry.reason),
+    entry.kind === 'host-port' ? '' : formatCell(entry.auth ?? ''),
     entry.ticket ?? '',
   ];
+}
+
+// a pipe would end the cell, so it stays escaped
+function formatCell(text: string): string {
+  return text.replaceAll('|', String.raw`\|`);
 }
 
 function formatExposes(entry: ExposureEntry): string {

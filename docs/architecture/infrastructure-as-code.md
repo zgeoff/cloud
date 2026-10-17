@@ -36,6 +36,11 @@ the VM's second disk was added by hand and the provider never sees it. The VM it
 hand and imported, and almost every input replaces it, so the program protects it and keeps it on a
 delete: a typo in its inputs fails the preview instead of destroying the host.
 
+The provider is frozen: it takes version bumps of its dependencies and nothing else, so it gains no
+resource and no API call. It covers the one VM and its firewall, which rarely change, and whether
+the estate needs a second VM decides what the provider must grow into. Replacing the provider waits
+on that decision too.
+
 The program writes one value back outside Pulumi. imp's reusable tailnet key, which imp's dev
 instances join by, is minted by Pulumi and copied into its 1Password item on each new key, so the
 item always holds the live key.

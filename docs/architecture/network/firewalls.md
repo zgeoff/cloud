@@ -92,6 +92,15 @@ through Docker's forwarding, so it needs a public entry as well. A port range or
 input rule cannot be matched with an entry, so the check fails on either. A tailnet capability entry
 and a Worker URL entry each record a decision that no code reads.
 
+Each public route, which is a public entry of any kind but a host port, names its auth layer: the
+part that authenticates each call it carries, such as the workload's own OAuth server or a webhook's
+signature. A route that goes public later reuses an auth layer that another entry holds where one
+fits, instead of inventing its own. The registry's schema refuses a public route without an auth
+layer, and any other entry that names one. The topology package parses the registry when it loads,
+so the Pulumi program fails before it plans a resource, and so does every script that reads the
+registry. A public host port names its edge rule instead, because Onidel's edge firewall and the
+host's own firewall decide who reaches it.
+
 ## NodePorts
 
 kube-proxy routes a NodePort through forwarding rather than input, so the input firewall never sees
