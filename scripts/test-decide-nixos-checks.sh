@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test for decide-nixos-checks.sh: against a real git repository in the case tree and a gh
-# stand-in (test-support/shell/create-stub-runs-gh.sh) that lists the green runs, it writes
+# stand-in (test-support/shell/create-stub-gh.sh) that replays the green runs each case records,
+# as the lines the call's --jq filter prints ("<head sha> <run url>" per run), it writes
 # needed=true for any event but schedule without asking gh, needed=false with the summary line for
 # a nightly run on a covered commit, needed=true for a nightly run on a commit no run covers, and
 # fails with gh's error and writes nothing when gh fails. Each case runs the script under `env -i`
@@ -13,7 +14,7 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks.sh"
 
@@ -31,7 +32,7 @@ it_needs_the_checks_for_a_dispatch_without_asking_gh() {
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -54,7 +55,7 @@ it_needs_the_checks_for_a_pull_request_without_asking_gh() {
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_EVENT_NAME=pull_request GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -75,10 +76,14 @@ it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
+  jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_RUNS="$commit https://github.com/zgeoff/cloud/actions/runs/7" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -101,9 +106,15 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
+  # no green run: the --jq filter prints nothing
+  jq -cn '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]}' \
+    > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" STUB_RUNS='' \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -126,10 +137,16 @@ it_fails_with_the_gh_error_and_writes_nothing_when_gh_fails() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
+  # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 1 for a failed
+  # command, such as an API error
+  jq -cn '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stderr: "HTTP 503: Service Unavailable\n", exit: 1}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_GH_ERROR='HTTP 503: Service Unavailable' STUB_GH_EXIT=1 \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -151,7 +168,7 @@ it_fails_without_a_github_output_file() {
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_STEP_SUMMARY="$tree/summary" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -175,7 +192,7 @@ setup_test() {
   # boot data: the runner creates both files before a step runs
   : > "$tree/output"
   : > "$tree/summary"
-  create_stub_runs_gh "$tree/bin"
+  create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
   git -C "$tree/repo" init -q -b main
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it

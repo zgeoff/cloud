@@ -57,9 +57,10 @@ stateDiagram-v2
   [*] --> waiting: opened
   waiting --> booting: link opened
   booting --> ready: health path answers
-  booting --> failed: build or probe fails
+  booting --> failed: build or probe fails, or the service stops
   booting --> waiting: an older head fails after a push
   failed --> booting: retry
+  failed --> waiting: a push moves the head
   ready --> booting: link opened after a push
   waiting --> ended: closed
   booting --> ended: closed
@@ -67,6 +68,10 @@ stateDiagram-v2
   failed --> ended: closed
   ended --> waiting: reopened
 ```
+
+The store holds these moves in one transition table. One store function writes every phase change,
+and it refuses a move the table lacks, so the webhook, the link, a settling boot and the startup
+sweep of interrupted boots all follow the same rule.
 
 - **opened, reopened or synchronize.** The service reads `preview/compose.yaml` at the head commit.
   A commit without the file has not opted in, and the service does nothing. Otherwise it records the

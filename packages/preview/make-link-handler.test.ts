@@ -82,7 +82,9 @@ test('it sleeps the running preview when a second one opens with one slot', asyn
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'ready',
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
@@ -254,7 +256,9 @@ test('it answers a ready preview with a waiting page while another preview boots
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'ready',
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
@@ -301,7 +305,9 @@ test('it wakes a sleeping ready preview, checks its health and redirects to its 
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'ready',
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
@@ -343,7 +349,9 @@ test('it boots a woken preview again when its stack never answers', async () => 
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'ready',
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
@@ -379,7 +387,9 @@ test('it rebuilds a ready preview once a push moved its head', async () => {
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'ready',
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
@@ -445,7 +455,9 @@ test('it shows a failed boot with a retry link and boots nothing', async () => {
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'failed',
     detail: 'the build exited 1:\nseed: relation "plants" already exists',
   });
@@ -468,7 +480,9 @@ test('it boots a failed preview again when the retry link opens', async () => {
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'failed',
     detail: 'the build exited 1',
   });
@@ -494,7 +508,9 @@ test('it shows the failure page and boots nothing more when the booting page rel
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'failed',
     detail: 'the build exited 1:\nseed: relation "plants" already exists',
   });

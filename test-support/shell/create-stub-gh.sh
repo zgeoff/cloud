@@ -1,24 +1,70 @@
 # shellcheck shell=bash
-# create_stub_gh <bin>: writes <bin>/gh, a stand-in for the GitHub CLI that
-# fetch-atc-release.sh calls. It logs each call's argv as a JSON line to STUB_TREE/calls,
-# and the opt-out variables it ran with as the line
-# "GH_TELEMETRY=<v> DO_NOT_TRACK=<v> GH_NO_UPDATE_NOTIFIER=<v>" ("unset" for a missing one)
-# to STUB_TREE/gh-env, so a test reads what a caller passed gh without gh reaching any
-# host. `gh release download …` answers as the real gh does for a release the repository
-# lacks: "release not found" on stderr and exit 1, the answer
-# test-start-stub-github-api.sh pins against the real gh. Any other call ends with exit 97
-# and "unexpected: <argv>" on stderr.
+# create_stub_gh <bin> <log> <responses>: writes <bin>/gh, a stand-in for the GitHub CLI that
+# answers each call from recorded responses. The absolute paths of <log> and <responses> go into
+# the script when it is written, so a suite that shares one call log between several stand-ins
+# passes that log here and keeps the calls in the order they ran.
+#
+# Each call appends its argv, "gh" first, as one JSON line to <log>. It then reads <responses>, a
+# JSON Lines file, at call time, so a case may write or replace it after this setup. Each line
+# records one response:
+#
+#   {"argv": [...], "stdout": "...", "stderr": "...", "exit": N, "env": {...},
+#    "downloads": {...}, "stdout_file": "..."}
+#
+# - argv, the only required field, matches the call's argv, "gh" first, element for element and in
+#   length. A null element matches any one argument, such as a temp path the caller makes;
+# - env names variables that must hold exactly the given values in the call's environment, or the
+#   line does not match;
+# - downloads maps an asset name to a source file, which the stand-in copies into the directory
+#   that follows -D in the argv, as `gh release download -D` does;
+# - stdout and stderr print as given, then stdout_file's bytes print on stdout, and the call exits
+#   with exit, 0 by default.
+#
+# The first line that matches answers. A call that no line matches, or a missing <responses>,
+# ends with "unexpected: <argv>" on stderr and exit 97.
 create_stub_gh() {
-  local bin="$1"
-  cat > "$bin/gh" << 'STUB'
-#!/usr/bin/env bash
-printf '%s\0' gh "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_TREE/calls"
-printf 'GH_TELEMETRY=%s DO_NOT_TRACK=%s GH_NO_UPDATE_NOTIFIER=%s\n' "${GH_TELEMETRY-unset}" \
-  "${DO_NOT_TRACK-unset}" "${GH_NO_UPDATE_NOTIFIER-unset}" >> "$STUB_TREE/gh-env"
-case "$*" in
-  "release download "*) echo "release not found" >&2; exit 1 ;;
-  *) echo "unexpected: $*" >&2; exit 97 ;;
-esac
+  local bin="$1" log responses
+  log="$(realpath -m "$2")"
+  responses="$(realpath -m "$3")"
+  {
+    echo '#!/usr/bin/env bash'
+    echo 'set -euo pipefail'
+    printf 'log=%q\nresponses=%q\n' "$log" "$responses"
+    cat << 'STUB'
+argv="$(printf '%s\0' gh "$@" | jq -cRs 'split("\u0000")[:-1]')"
+printf '%s\n' "$argv" >> "$log"
+response=
+if [ -f "$responses" ]; then
+  response="$(jq -cn --argjson argv "$argv" 'first(inputs | select(. as $r
+    | ($r.argv | length) == ($argv | length)
+    and all(range($argv | length); $r.argv[.] == null or $r.argv[.] == $argv[.])
+    and all(($r.env // {}) | to_entries[]; $ENV[.key] == .value)))' "$responses")"
+fi
+if [ -z "$response" ]; then
+  echo "unexpected: $*" >&2
+  exit 97
+fi
+if jq -e 'has("downloads")' <<< "$response" > /dev/null; then
+  dir=
+  while [ "$#" -gt 1 ]; do
+    if [ "$1" = -D ]; then dir="$2"; fi
+    shift
+  done
+  if [ -z "$dir" ]; then
+    echo "gh stand-in: the response has downloads but the call has no -D" >&2
+    exit 97
+  fi
+  jq -j '.downloads | to_entries[] | "\(.key)\u0000\(.value)\u0000"' <<< "$response" |
+    while IFS= read -r -d '' name && IFS= read -r -d '' source; do
+      cp "$source" "$dir/$name"
+    done
+fi
+jq -j '.stdout // ""' <<< "$response"
+jq -j '.stderr // ""' <<< "$response" >&2
+file="$(jq -r '.stdout_file // ""' <<< "$response")"
+if [ -n "$file" ]; then cat "$file"; fi
+exit "$(jq -r '.exit // 0' <<< "$response")"
 STUB
+  } > "$bin/gh"
   chmod +x "$bin/gh"
 }

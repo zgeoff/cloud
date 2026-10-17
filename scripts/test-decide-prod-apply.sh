@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Test for decide-prod-apply.sh: against a real git repository in the case tree, with origin/main
 # and the deployed/prod tag set by each case, and a gh stand-in for find-ci-run.sh
-# (test-support/shell/create-stub-ci-runs-gh.sh), it decides whether a CI run's commit or a
-# dispatched main tip needs the prod apply, writes the decision to the step output file, says in
-# the step summary when nothing applies, and refuses a dispatch off main's tip, a dispatch with
+# (test-support/shell/create-stub-gh.sh) that replays the runs each case records, it decides
+# whether a CI run's commit or a dispatched main tip needs the prod apply, writes the decision to
+# the step output file, says in the step summary when nothing applies, and refuses a dispatch off main's tip, a dispatch with
 # no green CI run, a commit off main, a missing tag and a tag that has left main. Each case runs
 # the script under `env -i` with git's global and system config off, and compares its whole
 # stdout, stderr, step output, step summary and gh call log.
@@ -18,7 +18,7 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-ci-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-prod-apply.sh"
 
@@ -42,7 +42,7 @@ it_decides_an_apply_of_the_ci_run_s_commit_when_it_changes_a_pulumi_input() {
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_run RUN_HEAD="$head" DISPATCH_REF=refs/heads/main DISPATCH_SHA="$head" DISPATCH_REVISION= \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -75,7 +75,7 @@ it_decides_no_apply_and_says_so_when_no_pulumi_input_changed() {
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_run RUN_HEAD="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -106,11 +106,15 @@ it_applies_main_s_tip_on_a_dispatch_after_a_green_ci_run_on_it() {
   git -C "$tree/repo" commit -qm 'change a manifest'
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+  # the lines find-ci-run.sh's --jq filter prints: one run URL per green run
+  jq -cn --arg head "$head" '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+    "-f", "head_sha=\($head)", "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+    "--jq", ".workflow_runs[] | select(.head_sha == \"\($head)\" and .event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .html_url"],
+    stdout: "https://github.com/zgeoff/cloud/actions/runs/7\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
-    STUB_RUNS='https://github.com/zgeoff/cloud/actions/runs/7' \
     EVENT=workflow_dispatch RUN_HEAD= DISPATCH_REF=refs/heads/main DISPATCH_SHA="$head" DISPATCH_REVISION="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -136,11 +140,15 @@ it_refuses_a_dispatch_on_a_branch_other_than_main() {
   git -C "$tree/repo" tag deployed/prod
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+  # a green run on the commit, so only the branch refuses the dispatch
+  jq -cn --arg head "$head" '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+    "-f", "head_sha=\($head)", "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+    "--jq", ".workflow_runs[] | select(.head_sha == \"\($head)\" and .event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .html_url"],
+    stdout: "https://github.com/zgeoff/cloud/actions/runs/7\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
-    STUB_RUNS='https://github.com/zgeoff/cloud/actions/runs/7' \
     EVENT=workflow_dispatch DISPATCH_REF=refs/heads/feature DISPATCH_SHA="$head" DISPATCH_REVISION="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -165,11 +173,15 @@ it_refuses_a_dispatch_whose_revision_is_not_main_s_tip() {
   git -C "$tree/repo" commit -q --allow-empty -m 'move main on'
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+  # a green run on the tip, so only the revision refuses the dispatch
+  jq -cn --arg head "$head" '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+    "-f", "head_sha=\($head)", "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+    "--jq", ".workflow_runs[] | select(.head_sha == \"\($head)\" and .event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .html_url"],
+    stdout: "https://github.com/zgeoff/cloud/actions/runs/7\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
-    STUB_RUNS='https://github.com/zgeoff/cloud/actions/runs/7' \
     EVENT=workflow_dispatch DISPATCH_REF=refs/heads/main DISPATCH_SHA="$head" DISPATCH_REVISION="$older" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -193,9 +205,14 @@ it_refuses_a_dispatch_with_no_green_ci_run_on_main_s_tip() {
   git -C "$tree/repo" commit -q --allow-empty -m 'move main on'
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+  # no green run: the --jq filter prints nothing
+  jq -cn --arg head "$head" '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+    "-f", "head_sha=\($head)", "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+    "--jq", ".workflow_runs[] | select(.head_sha == \"\($head)\" and .event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .html_url"]}' \
+    > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_dispatch DISPATCH_REF=refs/heads/main DISPATCH_SHA="$head" DISPATCH_REVISION="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -220,11 +237,16 @@ it_fails_with_gh_s_error_and_exit_when_the_ci_run_lookup_fails() {
   git -C "$tree/repo" commit -q --allow-empty -m 'move main on'
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+  # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
+  # authentication
+  jq -cn --arg head "$head" '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+    "-f", "head_sha=\($head)", "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+    "--jq", ".workflow_runs[] | select(.head_sha == \"\($head)\" and .event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .html_url"],
+    stderr: "To get started with GitHub CLI, please run:  gh auth login\n", exit: 4}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
-    STUB_GH_ERROR='To get started with GitHub CLI, please run:  gh auth login' STUB_GH_EXIT=4 \
     EVENT=workflow_dispatch DISPATCH_REF=refs/heads/main DISPATCH_SHA="$head" DISPATCH_REVISION="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -251,7 +273,7 @@ it_refuses_a_ci_run_s_commit_that_is_not_on_main() {
   side="$(git -C "$tree/repo" rev-parse HEAD)"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_run RUN_HEAD="$side" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -276,7 +298,7 @@ it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_run RUN_HEAD="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -307,7 +329,7 @@ it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_run RUN_HEAD="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -333,7 +355,7 @@ it_refuses_to_run_without_the_step_output_file() {
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_STEP_SUMMARY="$tree/summary" \
     EVENT=workflow_run RUN_HEAD="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -355,7 +377,7 @@ setup_test() {
   : > "$tree/calls"
   : > "$tree/output"
   : > "$tree/summary"
-  create_stub_ci_runs_gh "$tree/bin"
+  create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
   git -C "$tree/repo" init -q -b main
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it
