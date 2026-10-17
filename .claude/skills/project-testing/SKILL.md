@@ -46,6 +46,7 @@ provider and the NixOS checks each have a reference.
 | The health-check Worker's tests                    | `bun run test:health-check`         | `CI` → `ci`                               |
 | Go tests in `provider/`                            | `bun run provider:check`            | `CI` → `ci`, if `provider/` changed       |
 | Shell suites and `test-support/shell/` tests       | `bun run test:scripts`              | `CI` → `ci`, unless only Markdown changed |
+| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules` | `CI` → `ci` |
 | Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture`  | `atc-gateway images` → `fixture`          |
 | nixie's backup script in its pinned image (Docker) | `bun run test:nixie-backup-fixture` | `nixie backup` → `fixture`                |
 | The agent image's gitleaks allowlist (Docker)      | `bun run test:agent-image`          | `agent image` → `check`                   |

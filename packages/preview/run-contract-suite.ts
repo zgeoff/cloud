@@ -14,10 +14,19 @@ export async function runContractSuite(
   contract: ContractSettings,
   run: ContractRun,
 ): Promise<CommandResult | null> {
+  const exec = new AbortController();
+
   const result = await Promise.race([
-    tryRunGuestCommand(deps, run.imp, buildContractArgv(contract, run)),
+    tryRunGuestCommand(deps, {
+      imp: run.imp,
+      argv: buildContractArgv(contract, run),
+      signal: exec.signal,
+    }),
     waitForDeadline(deps, contract.timeoutMs + deadlineGraceMs),
   ]);
+
+  // a command the deadline outran stops, so its exec never outlives the run
+  exec.abort();
 
   if (result !== null) {
     deps.log(
@@ -71,15 +80,23 @@ function buildContractArgv(contract: ContractSettings, run: ContractRun): string
   ];
 }
 
+interface GuestCommand {
+  readonly imp: string;
+  readonly argv: readonly string[];
+  readonly signal: AbortSignal;
+}
+
 // impd refuses to start the command unless the broker reaches the guest, so the suite never runs
 // without its model route. An exec that breaks reads as a command that a signal ended.
 async function tryRunGuestCommand(
   deps: PreviewDeps,
-  imp: string,
-  argv: readonly string[],
+  command: GuestCommand,
 ): Promise<CommandResult> {
   try {
-    return await deps.impd.runCommand(imp, argv, { requireBroker: true });
+    return await deps.impd.runCommand(command.imp, command.argv, {
+      requireBroker: true,
+      signal: command.signal,
+    });
   } catch (error) {
     return {
       code: null,

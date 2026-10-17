@@ -1,7 +1,8 @@
 # Evaluates services.preview apart from any host's config and checks the units it defines, runs
 # the preview-image unit's script against a stand-in docker that answers for impd
 # (test-utils/build-stub-imp-host-docker.nix) and a stand-in sleep (test-utils/build-stub-sleep.nix),
-# and builds the package to check that it carries the service's modules and none of its tests.
+# and builds the package to check that it carries the service's modules and none of its tests,
+# and that its typed impd client loads from the dependencies it carries.
 # Each case runs on its own, in a fresh directory, under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos preview
 { nixpkgs, imp }:
@@ -551,10 +552,26 @@ let
         ./wait-for-healthy.ts
         EOF
 
-        src=$(sed -n 's|^exec bun run \(/nix/store/[^ ]*\)/main\.ts$|\1|p' ${package}/bin/preview-service)
-        (cd "$src" && find . -type f | LC_ALL=C sort) > actual
+        src=$(sed -n 's|^exec bun --no-install run \(/nix/store/[^ ]*\)/main\.ts$|\1|p' ${package}/bin/preview-service)
+        (cd "$src" && find . -path ./node_modules -prune -o -type f -print | LC_ALL=C sort) > actual
 
         assert_files_equal expected actual
+      '';
+    }
+    {
+      title = "it loads the typed impd client and its dependencies from the package, with installs off";
+      script = ''
+        src=$(sed -n 's|^exec bun --no-install run \(/nix/store/[^ ]*\)/main\.ts$|\1|p' ${package}/bin/preview-service)
+        cat > load.ts <<EOF
+        import { buildImpdClient } from '$src/build-impd-client.ts';
+
+        console.log(Object.keys(buildImpdClient('http://127.0.0.1:1', 'imp_check.token')).join(' '));
+        EOF
+
+        HOME="$PWD" ${pkgs.bun}/bin/bun --no-install run load.ts > out 2> err
+
+        assert_equals "createImp findImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant runCommand" "$(cat out)" "the client's calls"
+        assert_equals "" "$(cat err)" "bun's errors"
       '';
     }
   ];

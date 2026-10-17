@@ -41,6 +41,8 @@ in
     enable = true;
     url = "${impdLoopbackURL}/health";
   };
+  # how long the host has run an older system or imp than the latest green main build
+  services.host-build-lag.enable = true;
   networking.hostName = "geoffcloud";
   # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
   # so NixOS imports tank without -f

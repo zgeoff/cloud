@@ -1,3 +1,5 @@
+import type { ExecHandle, Imp, ImpClient } from '@impz/client';
+import { ExecError, ORPCError, createImpClient } from '@impz/client';
 import type { ImpActivity } from './plan-slot-evictions.ts';
 
 interface ImpCreateOptions {
@@ -19,6 +21,9 @@ interface CommandOptions {
   // impd refuses to start the command unless the broker's proxy and CA reach it, so a clone never
   // runs without the broker's GitHub credential
   readonly requireBroker?: boolean;
+
+  // stops the command, and the exec's setup before it, once aborted
+  readonly signal?: AbortSignal;
 }
 
 // The impd calls the service makes, each confined by impd to the imps its token names
@@ -38,106 +43,92 @@ export interface ImpdClient {
   ) => Promise<CommandResult>;
 }
 
-// An impd error, with the code its contract defines, such as NOT_FOUND or LEASED
+// The service's calls, made through imp's typed client, so a change to impd's contract fails the
+// type check here
+export function buildImpdClient(
+  baseURL: string,
+  token: string,
+  webSocket: typeof WebSocket = globalThis.WebSocket,
+): ImpdClient {
+  const Socket = webSocket;
+  const client = createImpClient({ url: baseURL, token, connect: (url) => new Socket(url) });
+
+  return {
+    createImp: (options) =>
+      withImpdErrors(async () => {
+        const imp = await client.imps.create({ ...options, backup: false });
+
+        return toImpActivity(imp);
+      }),
+    findImp: (name) => findImpActivity(client, name),
+    readImps: () =>
+      withImpdErrors(async () => {
+        const imps = await client.imps.list({});
+
+        return imps.map((imp) => toImpActivity(imp));
+      }),
+    sleepImp: (name) =>
+      withImpdErrors(async () => {
+        await client.imps.sleep({ name });
+      }),
+    wakeImp: (name) =>
+      withImpdErrors(async () => {
+        await client.imps.wake({ name });
+      }),
+    updateHTTPPort: (name, httpPort) =>
+      withImpdErrors(async () => {
+        await client.imps.update({ name, httpPort });
+      }),
+    removeImp: (name) =>
+      withImpdErrors(async () => {
+        await client.imps.destroy({ name });
+      }),
+    installGrant: (name, secret) => withImpdErrors(() => installImpGrant(client, name, secret)),
+    runCommand: (name, argv, options = {}) =>
+      withImpdErrors(async () => {
+        const require = options.requireBroker === true ? { require: ['broker'] as const } : {};
+        const signal = options.signal === undefined ? {} : { signal: options.signal };
+
+        const handle = await client.openExec(name, argv, { ...require, ...signal });
+
+        return readCommandResult(handle);
+      }),
+  };
+}
+
+// An impd error, with the code its contract defines, such as NOT_FOUND or LEASED, in its message,
+// so a log line or a commit status names it
 class ImpdError extends Error {
   readonly code: string;
 
-  constructor(code: string, message: string) {
-    super(`impd ${code}: ${message}`);
+  constructor(code: string, message: string, cause: unknown) {
+    super(`impd ${code}: ${message}`, { cause });
 
     this.name = 'ImpdError';
     this.code = code;
   }
 }
 
-// impd's API (zgeoff/imp docs/architecture/control/api.md) is oRPC: a POST to
-// /rpc/<router>/<procedure> with the input in a {"json": …} envelope. The service speaks it
-// without imp's client package, so it runs with no dependency beyond Bun.
-export function buildImpdClient(
-  baseURL: string,
-  token: string,
-  webSocket: typeof WebSocket = globalThis.WebSocket,
-): ImpdClient {
-  const sendRPC = (procedure: string, input: unknown): Promise<unknown> =>
-    sendImpdRPC({ baseURL, token, procedure, input });
+// Rethrows the client's errors, an oRPC call's and an exec's, as an ImpdError
+async function withImpdErrors<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof ORPCError || error instanceof ExecError) {
+      throw new ImpdError(String(error.code), error.message, error);
+    }
 
-  return {
-    createImp: async (options) => {
-      const imp = await sendRPC('imps/create', { ...options, backup: false });
+    throw error;
+  }
+}
+
+async function findImpActivity(client: ImpClient, name: string): Promise<ImpActivity | null> {
+  try {
+    return await withImpdErrors(async () => {
+      const imp = await client.imps.get({ name });
 
       return toImpActivity(imp);
-    },
-    findImp: (name) => findImpActivity(sendRPC, name),
-    readImps: async () => {
-      const imps = await sendRPC('imps/list', {});
-
-      return Array.isArray(imps) ? imps.map((imp) => toImpActivity(imp)) : [];
-    },
-    sleepImp: async (name) => {
-      await sendRPC('imps/sleep', { name });
-    },
-    wakeImp: async (name) => {
-      await sendRPC('imps/wake', { name });
-    },
-    updateHTTPPort: async (name, httpPort) => {
-      await sendRPC('imps/update', { name, httpPort });
-    },
-    removeImp: async (name) => {
-      await sendRPC('imps/destroy', { name });
-    },
-    installGrant: (name, secret) => installImpGrant(sendRPC, name, secret),
-    runCommand: (name, argv, options = {}) => {
-      const require = options.requireBroker === true ? { require: ['broker'] } : {};
-
-      return runExec(
-        { baseURL, token, webSocket },
-        { type: 'start', name, argv, tty: false, ...require },
-      );
-    },
-  };
-}
-
-interface ImpdRPC {
-  readonly baseURL: string;
-  readonly token: string;
-  readonly procedure: string;
-  readonly input: unknown;
-}
-
-interface RPCErrorBody {
-  readonly code?: unknown;
-  readonly message?: unknown;
-}
-
-async function sendImpdRPC(rpc: ImpdRPC): Promise<unknown> {
-  const response = await fetch(`${rpc.baseURL}/rpc/${rpc.procedure}`, {
-    method: 'POST',
-    headers: { authorization: `Bearer ${rpc.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ json: rpc.input }),
-  });
-
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- oRPC's response envelope
-  const body = (await response.json()) as { readonly json?: unknown };
-
-  if (response.ok) {
-    return body.json;
-  }
-
-  const error = (body.json ?? {}) as RPCErrorBody;
-  const code = typeof error.code === 'string' ? error.code : `HTTP ${response.status}`;
-  const message = typeof error.message === 'string' ? error.message : response.statusText;
-
-  throw new ImpdError(code, message);
-}
-
-async function findImpActivity(
-  sendRPC: (procedure: string, input: unknown) => Promise<unknown>,
-  name: string,
-): Promise<ImpActivity | null> {
-  try {
-    const imp = await sendRPC('imps/get', { name });
-
-    return toImpActivity(imp);
+    });
   } catch (error) {
     if (error instanceof ImpdError && error.code === 'NOT_FOUND') {
       return null;
@@ -147,116 +138,45 @@ async function findImpActivity(
   }
 }
 
-interface ImpRecord {
-  readonly name: string;
-  readonly state: ImpActivity['state'];
-  readonly lastActiveAt?: string | null;
-}
-
-// impd's imp record carries far more; lastActiveAt is a Date in the contract, which oRPC sends as
-// an ISO string
-function toImpActivity(value: unknown): ImpActivity {
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- impd's ImpSchema, a superset
-  const imp = value as ImpRecord;
-  const lastActiveAt = typeof imp.lastActiveAt === 'string' ? new Date(imp.lastActiveAt) : null;
-
-  return { name: imp.name, state: imp.state, lastActiveAt };
+// impd's imp record carries far more than the service reads
+function toImpActivity(imp: Imp): ImpActivity {
+  return { name: imp.name, state: imp.state, lastActiveAt: imp.lastActiveAt };
 }
 
 // Adds the grant only when the imp lacks it, so a boot can repair an imp whose grant never landed
-async function installImpGrant(
-  sendRPC: (procedure: string, input: unknown) => Promise<unknown>,
-  name: string,
-  secret: string,
-): Promise<void> {
-  const granted = await sendRPC('grants/list', { name });
+async function installImpGrant(client: ImpClient, name: string, secret: string): Promise<void> {
+  const granted = await client.grants.list({ name });
 
-  if (Array.isArray(granted) && granted.includes(secret)) {
+  if (granted.includes(secret)) {
     return;
   }
 
-  await sendRPC('grants/add', { name, secret });
+  await client.grants.add({ name, secret });
 }
 
-interface ExecServerMessage {
-  readonly type: string;
-  readonly code?: number | string | null;
-  readonly message?: string;
+// The command's stdin closes once impd reports it started. Both streams push to one list of
+// texts, so the output keeps the order in which impd sent it.
+async function readCommandResult(handle: ExecHandle): Promise<CommandResult> {
+  const texts: string[] = [];
+
+  const reads = Promise.all([
+    readStreamTexts(handle.stdout, texts),
+    readStreamTexts(handle.stderr, texts),
+  ]);
+
+  await handle.closeStdin();
+
+  const [exit] = await Promise.all([handle.exit, reads]);
+
+  return { code: exit.code, output: texts.join('') };
 }
 
-interface ExecTarget {
-  readonly baseURL: string;
-  readonly token: string;
-  readonly webSocket: typeof WebSocket;
-}
-
-// impd's /exec WebSocket (zgeoff/imp packages/api/src/protocols/exec-protocol.ts): a JSON
-// `start`, then binary frames of one channel byte and the bytes, then an `exit` or an `error`.
-// The command's stdin closes once impd reports it started.
-function runExec(impd: ExecTarget, start: object): Promise<CommandResult> {
-  const result = Promise.withResolvers<CommandResult>();
-  const Socket = impd.webSocket;
-
-  const socket = new Socket(`${impd.baseURL.replace(/^http/u, 'ws')}/exec`, {
-    headers: { authorization: `Bearer ${impd.token}` },
-  });
-
+async function readStreamTexts(stream: ReadableStream<Uint8Array>, texts: string[]): Promise<void> {
   const decoder = new TextDecoder();
 
-  const state = { output: '' };
-
-  socket.binaryType = 'arraybuffer';
-
-  socket.addEventListener('open', () => {
-    socket.send(JSON.stringify(start));
-  });
-
-  socket.addEventListener('message', (event) => {
-    if (typeof event.data !== 'string') {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- binaryType is arraybuffer
-      state.output += toFrameText(decoder, event.data as ArrayBuffer);
-
-      return;
-    }
-
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- impd's exec server messages
-    const message = JSON.parse(event.data) as ExecServerMessage;
-
-    if (message.type === 'started') {
-      socket.send(JSON.stringify({ type: 'stdin_eof' }));
-
-      return;
-    }
-
-    if (message.type === 'exit' || message.type === 'error') {
-      emitExecResult(result, message, state.output);
-
-      socket.close();
-    }
-  });
-
-  // a promise that already settled ignores this reject
-  socket.addEventListener('close', () => {
-    result.reject(new ImpdError('EXEC_CLOSED', 'the exec socket closed before the command exited'));
-  });
-
-  return result.promise;
-}
-
-// impd's `exit` carries a null code when a signal ended the command
-function emitExecResult(
-  result: PromiseWithResolvers<CommandResult>,
-  message: ExecServerMessage,
-  output: string,
-): void {
-  if (message.type === 'exit') {
-    result.resolve({ code: typeof message.code === 'number' ? message.code : null, output });
-  } else {
-    result.reject(new ImpdError(String(message.code ?? 'EXEC_ERROR'), message.message ?? ''));
+  for await (const chunk of stream) {
+    texts.push(decoder.decode(chunk, { stream: true }));
   }
-}
 
-// a binary frame is one channel byte, stdout or stderr, then the bytes
-function toFrameText(decoder: TextDecoder, frame: ArrayBuffer): string {
-  return decoder.decode(new Uint8Array(frame).subarray(1), { stream: true });
+  texts.push(decoder.decode());
 }

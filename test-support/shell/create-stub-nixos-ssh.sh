@@ -17,7 +17,7 @@
 #   body as nixie's server sends it. With STUB_NIXIE_REPORTS unset, it fails as kubectl does for
 #   a pod that does not exist: "Error from server (NotFound): pods "nixie-0" not found" on
 #   stderr and exit 1;
-# - the profile set and switch-to-configuration: prints nothing, or with
+# - the profile set, the switch record and switch-to-configuration: prints nothing, or with
 #   STUB_ACTIVATE_FAILED_UNITS (unit names separated by spaces) fails as
 #   switch-to-configuration-ng does when units failed: "warning: the following units
 #   failed: <units>" on stderr, the units sorted by their lower-case names and joined with

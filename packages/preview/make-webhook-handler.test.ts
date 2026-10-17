@@ -664,7 +664,7 @@ test('it removes the imp and says the preview ended when the pull request closes
   ctx.impd.imps.set('pv-0bcd7c17-17', {
     name: 'pv-0bcd7c17-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -715,7 +715,7 @@ test('it removes the imp of a closed pull request it holds no record of, and pos
   ctx.impd.imps.set('pv-0bcd7c17-17', {
     name: 'pv-0bcd7c17-17',
     state: 'sleeping',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,

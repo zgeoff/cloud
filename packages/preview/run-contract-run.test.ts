@@ -378,7 +378,7 @@ test('it removes an imp that a stopped service left behind and runs on a new one
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -399,7 +399,7 @@ test('it removes an imp that a stopped service left behind and runs on a new one
   });
 
   expect(ctx.impd.calls.slice(0, 3)).toStrictEqual([
-    'imps/list undefined',
+    'imps/list',
     'imps/destroy pv-sdk-0123456789abcdef',
     'imps/create pv-sdk-0123456789abcdef',
   ]);
@@ -462,7 +462,7 @@ test('it ends a queued run with an error and removes its imp once the contract s
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -548,7 +548,7 @@ test('it keeps the result settling and the status unset when impd fails to remov
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,
@@ -591,7 +591,7 @@ test('it settles a settling run on its next try: removes the imp, posts the stor
   ctx.impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'pv-base',
     memoryMib: 4096,

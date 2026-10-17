@@ -2,6 +2,7 @@ import { topology } from '@zgeoff/cloud-topology';
 import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
+import { nixieTurnsProbeTarget } from './nixie-turns-probe-target.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
 interface AlertRule {
@@ -17,26 +18,34 @@ interface AlertRuleGroup {
   readonly rules: readonly AlertRule[];
 }
 
-interface AlertRuleInputs {
+export interface AlertRuleInputs {
   // the gateway's daemons, set only while the stack config sets atcGateway
   readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
+
+  // nixie's in-cluster readiness URL, set only while the stack config sets nixie
+  readonly nixieReadinessURL?: string | undefined;
 }
 
 // geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
 // rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
-// branch, except ImpdLocalHealthDown, TargetDown and ContainerOOMKilled, which stay silent without theirs.
+// branch, except ImpdLocalHealthDown, HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
+
+  const nixieRules =
+    inputs.nixieReadinessURL === undefined ? [] : [buildNixieTurnsRule(inputs.nixieReadinessURL)];
 
   return [
     {
       name: 'geoff-cloud',
       rules: [
         ...impdRules,
+        ...hostBuildLagRules,
         targetDownRule,
         cloudflaredRule,
         ...atcRules,
         impHealthRule,
+        ...nixieRules,
         oomKilledRule,
       ],
     },
@@ -61,6 +70,28 @@ const impdRules: readonly AlertRule[] = [
     for: '2m',
     labels: { severity: 'warning' },
     annotations: { summary: 'impd health probe has not reported for over 5 minutes.' },
+  },
+];
+
+// The hourly host build lag check (nixos/modules/host-build-lag.nix): a merged change to the host
+// waits for a person to switch it. Three missed checks, or no check metric, fire the stale rule.
+const hostBuildLagRules: readonly AlertRule[] = [
+  {
+    alert: 'HostBehindLatestBuild',
+    expr: 'host_build_lag_seconds > 86400',
+    for: '0m',
+    labels: { severity: 'warning' },
+    annotations: {
+      summary:
+        'geoffcloud has run an older {{ $labels.part }} than the latest green main build for over 24 hours; switch the host.',
+    },
+  },
+  {
+    alert: 'HostBuildLagStale',
+    expr: 'time() - host_build_lag_last_check_timestamp_seconds > 10800 or absent(host_build_lag_last_check_timestamp_seconds)',
+    for: '5m',
+    labels: { severity: 'warning' },
+    annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
   },
 ];
 
@@ -132,6 +163,23 @@ function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
     labels: { severity: daemon.alertSeverity },
     annotations: {
       summary: `atc's daemon at ${daemon.address} is unreachable from the cluster.`,
+    },
+  };
+}
+
+// nixie's turns keep failing, its readiness report is unreachable or lacks the turns part, or the
+// probe reports nothing. Failing turns leave nixie's readiness status and pod ready, so the chart's
+// KubePodNotReady misses them; only this probe of the body's advisory part sees them.
+function buildNixieTurnsRule(readinessURL: string): AlertRule {
+  const series = `probe_success{target="${nixieTurnsProbeTarget}"}`;
+
+  return {
+    alert: 'NixieTurnsFailing',
+    expr: `${series} == 0 or absent(${series})`,
+    for: '5m',
+    labels: { severity: 'critical' },
+    annotations: {
+      summary: `nixie's turns keep failing, or ${readinessURL} does not report them passing.`,
     },
   };
 }

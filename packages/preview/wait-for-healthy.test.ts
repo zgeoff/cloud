@@ -73,7 +73,7 @@ test("it resolves healthy at the first probe through impd's proxy that the healt
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
@@ -105,7 +105,7 @@ test("it resolves unhealthy with the proxy's last answer when the app listens on
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,

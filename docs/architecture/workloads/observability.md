@@ -18,9 +18,10 @@ The stack runs in the `observability` namespace:
   logs to the journal through its container's unit, so impd's logs reach Loki the same way. Alloy
   drops the gateway's OAuth approval lines before they reach Loki, because each holds the code that
   approves a client's sign-in, so it stays in the pod's own log, which only a cluster admin reads.
-- **Two blackbox exporters** run the probes that need a network path: one opens a TCP connection to
-  each atc daemon on the gateway's path to it, and one fetches impd's health over HTTPS on the
-  tailnet and requires a valid certificate and a ready answer.
+- **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
+  to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
+  tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness
+  report through its Service and requires the report's conversation turns part to pass.
 
 Grafana's admin password is a secret Pulumi generates, and Grafana's NodePort answers only on the
 tailnet. Its dashboards are provisioned from code. Metrics and logs sit on cluster volumes with no
@@ -44,6 +45,11 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 
 - impd's loopback health, and the age of its last probe;
 - impd's health over HTTPS on the tailnet;
+- nixie's conversation turns, which fail without changing nixie's readiness status, so only the
+  advisory part of nixie's readiness report shows them;
+- how long the host has run an older system or imp than the latest green build of `main`, which a
+  host timer compares with GitHub every hour, and the age of its last check, because a merged change
+  to the host waits for a person to switch it;
 - each atc daemon's reachability, at the severity the stack config sets per daemon, so the PC
   daemon, whose host sleeps, warns while the cloud daemon pages;
 - the tunnel's connections, summed over both cloudflared replicas, because the tunnel serves while

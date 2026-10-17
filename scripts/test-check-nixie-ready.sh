@@ -23,6 +23,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-nixie-ready.sh"
 exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '"'"'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"'"'"]'
 ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}}}'
+# nixie's report while its turns keep failing: an advisory part, with the status ready
+ready_failing_turns='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}},"advisory":{"conversation_turns":{"isReady":false,"reason":"the last 3 turns failed"}}}'
 unready='{"status":"unready","parts":{"store":{"isReady":true},"imp_host":{"isReady":false,"reason":"impd 4.0.0 refuses imp client 3.2.1"},"model":{"isReady":false,"reason":"the check took longer than 2000 ms"}}}'
 
 # setup_test <tree>: the ssh stand-in and its guard, the timeout stand-in, and the fake clock
@@ -52,6 +54,31 @@ it_passes_at_once_when_every_part_is_ready() {
     STUB_NIXIE_REPORTS="$ready" bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '== nixie ready: store, imp_host, model'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "$exec_call"
+  [ ! -e "$tree/clock/pauses" ] || {
+    echo "it paused: $(cat "$tree/clock/pauses")" >&2
+    exit 1
+  }
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_passes_naming_each_advisory_part_that_is_not_ready() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_NIXIE_REPORTS="$ready_failing_turns" bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+== nixie ready: store, imp_host, model
+== nixie advisory not ready: conversation_turns: the last 3 turns failed
+EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "$exec_call"
   [ ! -e "$tree/clock/pauses" ] || {

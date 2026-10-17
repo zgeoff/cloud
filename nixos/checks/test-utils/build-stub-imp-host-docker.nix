@@ -1,6 +1,7 @@
-# A stand-in docker for the preview-image script (nixos/modules/preview-image.sh): it answers the
-# script's two impd calls through `docker exec imp-host impz` from a state directory, $IMPD_STATE,
-# and records each call's argv as one JSON line in $IMPD_STATE/calls.
+# A stand-in docker for the preview-image script (nixos/modules/preview-image.sh) and the host build
+# lag check (nixos/modules/host-build-lag.sh): it answers their impd calls through
+# `docker exec imp-host impz` from a state directory, $IMPD_STATE, and records each call's argv as
+# one JSON line in $IMPD_STATE/calls.
 #
 #   DOCKER=<this> IMPD_STATE=/tmp/impd preview-image
 #
@@ -8,12 +9,14 @@
 #   - images.json, impd's images as `impz image ls --json` prints them: an array of objects;
 #   - unreachable, optional: a count of calls still to fail, each as docker fails an exec while
 #     the imp-host container does not exist, which the stand-in counts down;
-#   - add-error, optional: a message the next `image add` fails with, as impz fails a call.
+#   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
+#   - version, optional: the imp version that `impz info` prints.
 #
 # `exec imp-host impz image ls --json` prints images.json, pretty-printed. `exec imp-host impz
 # image add <ref> --name <name> --json` points <name> at <ref> in images.json, in place of any
-# image of that name, and prints the image. Any other call fails with "unexpected: <argv>" and
-# status 97. Without $IMPD_STATE it exits 2.
+# image of that name, and prints the image. `exec imp-host impz info`, with a version file, prints
+# the first line of `impz info`, the version, its label padded to 12 characters, and no other line.
+# Any other call fails with "unexpected: <argv>" and status 97. Without $IMPD_STATE it exits 2.
 #
 # What it assumes of docker and impd, from zgeoff/impz at the flake's imp input
 # (packages/cli/src/commands/image.ts, packages/cli/src/run-action.ts and
@@ -48,6 +51,10 @@ pkgs.lib.getExe (
       fi
       if [ "$*" = "exec imp-host impz image ls --json" ]; then
         jq . "$IMPD_STATE/images.json"
+        exit 0
+      fi
+      if [ "$*" = "exec imp-host impz info" ] && [ -s "$IMPD_STATE/version" ]; then
+        printf 'version     %s\n' "$(cat "$IMPD_STATE/version")"
         exit 0
       fi
       if [ "$#" -eq 9 ] && [ "$1 $2 $3 $4 $5" = "exec imp-host impz image add" ] &&

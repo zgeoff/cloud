@@ -103,7 +103,7 @@ test('it creates the imp with the contract port and the grant, then builds and p
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')).toStrictEqual({
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: expect.toSatisfy((value: string) => !Number.isNaN(Date.parse(value))),
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
@@ -283,7 +283,7 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -303,9 +303,11 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
 
   expect(ctx.impd.calls).toStrictEqual([
     'imps/get pv-0a1b2c3d-17',
-    'imps/list undefined',
+    'imps/list',
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
+    'exec/ticket pv-0a1b2c3d-17',
+    'system/info',
   ]);
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.httpPort).toBe(4000);
@@ -331,7 +333,7 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
@@ -351,10 +353,12 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
 
   expect(ctx.impd.calls).toStrictEqual([
     'imps/get pv-0a1b2c3d-17',
-    'imps/list undefined',
+    'imps/list',
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
     'grants/add pv-0a1b2c3d-17',
+    'exec/ticket pv-0a1b2c3d-17',
+    'system/info',
   ]);
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh']);

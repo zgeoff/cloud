@@ -6,13 +6,15 @@ import { server as mockServer } from '../mocks/node.ts';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
 
-// impd's API on a loopback port over real HTTP and WebSocket: the preview service's oRPC procedures
-// in imp 1.4.4's {"json": …} envelope, and zgeoff/imp's exec-protocol.ts /exec. Tests seed imps and
-// answer guest commands through `answerCommand`; any other procedure fails with a 500.
+// impd's API on loopback, as zgeoff/impz v2.3.0 serves @impz/client 2.3.0: oRPC procedures
+// with each Date in `meta`, and /exec opened by a single-use exec.ticket or the bearer token. Tests
+// seed imps and answer guest commands; any other procedure fails with a 500.
 interface StubImp {
   readonly name: string;
   state: 'creating' | 'running' | 'sleeping' | 'stopped' | 'error';
-  lastActiveAt: string | null;
+
+  // an ISO time; impd sets it when it creates the imp, so it is never empty
+  lastActiveAt: string;
   httpPort: number;
   readonly image: string;
   readonly memoryMib: number;
@@ -29,6 +31,7 @@ interface StubCommand {
 interface StubCommandAnswer {
   readonly code: number | null;
   readonly stdout?: string;
+  readonly stderr?: string;
   readonly hold?: boolean;
 }
 
@@ -44,7 +47,8 @@ export interface StubImpd {
   // every request through the wake proxy, as `<method> <url>`, in order
   readonly proxied: string[];
 
-  // every procedure call, as `<router>/<procedure> <name>`, in order
+  // every procedure call, as `<router>/<procedure> <name>`, or the procedure alone for one that
+  // names no imp, in order
   readonly calls: string[];
   readonly commands: StubCommand[];
 
@@ -52,11 +56,18 @@ export interface StubImpd {
   // closes its socket without an exit, as the end of the guest ends the exec
   readonly held: Map<string, ServerWebSocket<ExecSocketData>[]>;
   answerCommand: (command: StubCommand) => StubCommandAnswer;
+
+  // live exec tickets, each to the imp it was issued for; a ticket redeems once
+  readonly tickets: Map<string, string>;
 }
 
+// the imp a redeemed ticket opens, or null for a socket the bearer token opened, which may open any
 interface ExecSocketData {
-  readonly authorized: boolean;
+  readonly ticketImp: string | null;
 }
+
+// the version system.info reports: the impd the host pins
+const stubImpdVersion = '2.3.0';
 
 export function startStubImpd(): StubImpd {
   const token = 'imp_stubpreview.stub-secret';
@@ -72,6 +83,7 @@ export function startStubImpd(): StubImpd {
     commands: [],
     held: new Map(),
     answerCommand: () => ({ code: 0 }),
+    tickets: new Map(),
   };
 
   const server = Bun.serve<ExecSocketData>({
@@ -80,22 +92,24 @@ export function startStubImpd(): StubImpd {
     fetch: async (request, bunServer) => {
       const url = new URL(request.url);
 
-      const authorized = request.headers.get('authorization') === `Bearer ${token}`;
-
       if (url.pathname === '/exec') {
-        return bunServer.upgrade(request, { data: { authorized } })
-          ? undefined
-          : new Response('not a WebSocket\n', { status: 400 });
+        return createExecSocket(stub, request, bunServer);
       }
 
-      if (!authorized) {
+      if (request.headers.get('authorization') !== `Bearer ${token}`) {
         return buildRPCError(401, 'UNAUTHORIZED', 'missing or wrong token');
       }
 
       const procedure = url.pathname.replace(/^\/rpc\//u, '');
-      const body = (await request.json()) as { readonly json: Record<string, unknown> };
 
-      return buildProcedureResponse(stub, procedure, body.json);
+      // a procedure without input, such as system.info, comes with no body
+      const text = await request.text();
+
+      const body = (text === '' ? {} : JSON.parse(text)) as {
+        readonly json?: Record<string, unknown>;
+      };
+
+      return buildProcedureResponse(stub, procedure, body.json ?? {});
     },
     websocket: {
       message: (socket: ServerWebSocket<ExecSocketData>, raw) => {
@@ -117,20 +131,50 @@ export function startStubImpd(): StubImpd {
   return Object.assign(stub, { url });
 }
 
+// impd answers a refused upgrade with a 401 before any socket opens
+function createExecSocket(
+  stub: StubImpd,
+  request: Request,
+  bunServer: Bun.Server<ExecSocketData>,
+): Response | undefined {
+  const ticket = new URL(request.url).searchParams.get('ticket');
+
+  const ticketImp = ticket === null ? null : (stub.tickets.get(ticket) ?? null);
+
+  if (ticket !== null) {
+    stub.tickets.delete(ticket);
+  }
+
+  const authorized = request.headers.get('authorization') === `Bearer ${stub.token}`;
+
+  if (ticketImp === null && !authorized) {
+    return Response.json({ error: 'unauthorized' }, { status: 401 });
+  }
+
+  return bunServer.upgrade(request, { data: { ticketImp } })
+    ? undefined
+    : new Response('not a WebSocket\n', { status: 400 });
+}
+
 function buildProcedureResponse(
   stub: StubImpd,
   procedure: string,
   input: Record<string, unknown>,
 ): Response {
-  const name = String(input['name']);
+  const name = typeof input['name'] === 'string' ? input['name'] : null;
+  const call = name === null ? procedure : `${procedure} ${name}`;
 
-  stub.calls.push(`${procedure} ${name}`);
+  stub.calls.push(call);
 
-  const imp = stub.imps.get(name);
+  if (procedure === 'system/info') {
+    return buildRPCResult({ version: stubImpdVersion, features: { execRequire: true } });
+  }
 
   if (procedure === 'imps/list') {
     return buildRPCResult([...stub.imps.values()].map((each) => toImpRecord(each)));
   }
+
+  const imp = name === null ? undefined : stub.imps.get(name);
 
   if (procedure === 'imps/create') {
     if (imp !== undefined) {
@@ -138,9 +182,9 @@ function buildProcedureResponse(
     }
 
     const created: StubImp = {
-      name,
+      name: String(name),
       state: 'running',
-      lastActiveAt: null,
+      lastActiveAt: new Date().toISOString(),
       httpPort: Number(input['httpPort'] ?? 8080),
       image: String(input['image']),
       memoryMib: Number(input['memoryMib']),
@@ -148,7 +192,7 @@ function buildProcedureResponse(
       grants: [],
     };
 
-    stub.imps.set(name, created);
+    stub.imps.set(created.name, created);
 
     return buildRPCResult(toImpRecord(created));
   }
@@ -181,9 +225,9 @@ function buildProcedureResponse(
     }
 
     case 'imps/destroy': {
-      stub.imps.delete(name);
+      stub.imps.delete(imp.name);
 
-      for (const socket of stub.held.get(name) ?? []) {
+      for (const socket of stub.held.get(imp.name) ?? []) {
         socket.close();
       }
 
@@ -200,6 +244,14 @@ function buildProcedureResponse(
       return buildRPCResult({});
     }
 
+    case 'exec/ticket': {
+      const ticket = `stub-ticket.${crypto.randomUUID()}`;
+
+      stub.tickets.set(ticket, imp.name);
+
+      return buildRPCResult({ ticket, expiresAt: new Date(Date.now() + 30_000) });
+    }
+
     default: {
       return new Response(`not impd: start-stub-impd.ts has no ${procedure}\n`, { status: 500 });
     }
@@ -214,12 +266,42 @@ function toImpRecord(imp: StubImp) {
     image: imp.image,
     state: imp.state,
     httpPort: imp.httpPort,
-    lastActiveAt: imp.lastActiveAt,
+    lastActiveAt: new Date(imp.lastActiveAt),
   };
 }
 
+// oRPC's RPC serializer: JSON with each Date as its ISO string, and `meta` naming each one's path
+// under type 1, oRPC's DATE
 function buildRPCResult(output: unknown): Response {
-  return Response.json({ json: output });
+  const meta: (string | number)[][] = [];
+  const json = encodeRPCValue(output, [], meta);
+  const body = meta.length === 0 ? { json } : { json, meta };
+
+  return Response.json(body);
+}
+
+function encodeRPCValue(
+  value: unknown,
+  path: readonly (string | number)[],
+  meta: (string | number)[][],
+): unknown {
+  if (value instanceof Date) {
+    meta.push([1, ...path]);
+
+    return value.toISOString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((each, index) => encodeRPCValue(each, [...path, index], meta));
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, each]) => [key, encodeRPCValue(each, [...path, key], meta)]),
+    );
+  }
+
+  return value;
 }
 
 // oRPC's error body: the ORPCError's JSON in the envelope, with its status as the HTTP status
@@ -243,17 +325,18 @@ function runStubCommand(
     return;
   }
 
-  if (!socket.data.authorized) {
+  const imp = stub.imps.get(message.name ?? '');
+
+  // a ticket opens only the imp it was issued for
+  if (socket.data.ticketImp !== null && socket.data.ticketImp !== message.name) {
     socket.send(
-      JSON.stringify({ type: 'error', code: 'UNAUTHORIZED', message: 'missing or wrong token' }),
+      JSON.stringify({ type: 'error', code: 'FORBIDDEN', message: 'the ticket opens another imp' }),
     );
 
     socket.close();
 
     return;
   }
-
-  const imp = stub.imps.get(message.name ?? '');
 
   if (imp === undefined) {
     socket.send(
@@ -277,13 +360,11 @@ function runStubCommand(
   socket.send(JSON.stringify({ type: 'started', pid: 4242 }));
 
   if (answer.stdout !== undefined) {
-    const text = new TextEncoder().encode(answer.stdout);
-    const frame = new Uint8Array(text.byteLength + 1);
+    socket.send(buildExecFrame(1, answer.stdout));
+  }
 
-    frame[0] = 1;
-
-    frame.set(text, 1);
-    socket.send(frame);
+  if (answer.stderr !== undefined) {
+    socket.send(buildExecFrame(2, answer.stderr));
   }
 
   if (answer.hold === true) {
@@ -301,4 +382,16 @@ function runStubCommand(
   );
 
   socket.close();
+}
+
+// a binary frame is one channel byte, 1 for stdout or 2 for stderr, then the bytes
+function buildExecFrame(channel: 1 | 2, text: string): Uint8Array {
+  const bytes = new TextEncoder().encode(text);
+  const frame = new Uint8Array(bytes.byteLength + 1);
+
+  frame[0] = channel;
+
+  frame.set(bytes, 1);
+
+  return frame;
 }

@@ -6,8 +6,8 @@ import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 import { topology } from '@zgeoff/cloud-topology';
-import type { ATCDaemonEndpoint } from '../inputs/index.ts';
 import { alloyValues } from './alloy-values.ts';
+import type { AlertRuleInputs } from './build-alert-rules.ts';
 import { createDashboards } from './create-dashboards.ts';
 import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
@@ -24,12 +24,12 @@ interface ClusterObservabilityOutputs {
 }
 
 // Prometheus, Alertmanager, Grafana, Loki, Alloy on one node (~1 GiB, #8); 30-day retention.
-// Alertmanager reaches Discord only with alertWebhookURL (#29). atcDaemons adds a TCP probe
-// plus alert per atc daemon, set only with the gateway.
+// Alertmanager reaches Discord only with alertWebhookURL (#29). monitors adds the probes and
+// alerts for the atc daemons and nixie, each set only with its workload.
 export function createClusterObservability(
   cluster: Provider,
   alertWebhookURL: string | undefined,
-  atcDaemons: readonly ATCDaemonEndpoint[] | undefined,
+  monitors: AlertRuleInputs,
 ): ClusterObservabilityOutputs {
   const opts = { provider: cluster };
 
@@ -55,7 +55,7 @@ export function createClusterObservability(
   );
 
   createLogShipper(ns, [logs, metrics], cluster);
-  createMonitors(ns, atcDaemons, { provider: cluster, dependsOn: [metrics] });
+  createMonitors(ns, monitors, { provider: cluster, dependsOn: [metrics] });
   createDashboards(ns, cluster);
 
   return {
