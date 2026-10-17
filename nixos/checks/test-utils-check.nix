@@ -1332,6 +1332,36 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostDocker prints the version line of impz info from its version file, and records the call";
+      script = ''
+        mkdir home tmp impd
+        echo 4.5.6 > impd/version
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz info > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals 'version     4.5.6' "$(cat out)" "the printed info"
+        assert_files_equal /dev/null err
+        assert_equals '["exec","imp-host","impz","info"]' "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails impz info as unexpected without a version file";
+      script = ''
+        mkdir home tmp impd
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz info > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: exec imp-host impz info" "$(cat err)" "the error"
+      '';
+    }
+    {
       title = "it buildStubImpHostDocker refuses to run without the impd state directory";
       script = ''
         mkdir home tmp

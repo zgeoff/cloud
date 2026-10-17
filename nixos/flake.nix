@@ -29,6 +29,7 @@
           disko.nixosModules.disko
           imp.nixosModules.imp
           ./modules/impd-local-health.nix
+          ./modules/host-build-lag.nix
           ./modules/atc-daemon.nix
           ./modules/cloud-host-firewall.nix
           ./modules/onepassword-connect-relay.nix
@@ -74,6 +75,9 @@
         inherit imp;
       };
       checks.x86_64-linux.impd-local-health = import ./checks/impd-local-health.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.host-build-lag = import ./checks/host-build-lag.nix {
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.impd-restore = import ./checks/impd-restore.nix { inherit nixpkgs imp; };

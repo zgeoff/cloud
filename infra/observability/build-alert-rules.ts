@@ -28,7 +28,7 @@ export interface AlertRuleInputs {
 
 // geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
 // rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
-// branch, except ImpdLocalHealthDown, TargetDown and ContainerOOMKilled, which stay silent without theirs.
+// branch, except ImpdLocalHealthDown, HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -40,6 +40,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
       name: 'geoff-cloud',
       rules: [
         ...impdRules,
+        ...hostBuildLagRules,
         targetDownRule,
         cloudflaredRule,
         ...atcRules,
@@ -69,6 +70,28 @@ const impdRules: readonly AlertRule[] = [
     for: '2m',
     labels: { severity: 'warning' },
     annotations: { summary: 'impd health probe has not reported for over 5 minutes.' },
+  },
+];
+
+// The hourly host build lag check (nixos/modules/host-build-lag.nix): a merged change to the host
+// waits for a person to switch it. Three missed checks, or no check metric, fire the stale rule.
+const hostBuildLagRules: readonly AlertRule[] = [
+  {
+    alert: 'HostBehindLatestBuild',
+    expr: 'host_build_lag_seconds > 86400',
+    for: '0m',
+    labels: { severity: 'warning' },
+    annotations: {
+      summary:
+        'geoffcloud has run an older {{ $labels.part }} than the latest green main build for over 24 hours; switch the host.',
+    },
+  },
+  {
+    alert: 'HostBuildLagStale',
+    expr: 'time() - host_build_lag_last_check_timestamp_seconds > 10800 or absent(host_build_lag_last_check_timestamp_seconds)',
+    for: '5m',
+    labels: { severity: 'warning' },
+    annotations: { summary: 'The host build lag check has not reported for over 3 hours.' },
   },
 ];
 

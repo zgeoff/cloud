@@ -117,13 +117,20 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
    reaches the host.
 6. It copies the built store path to the host with `nix copy`, sets the system profile to it and
    runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
-   is not evaluated again.
+   is not evaluated again. Before the activation it appends the commit and the store path to
+   `/var/lib/host-build-lag/switches` on the host, because the store path does not name the commit
+   it was built from.
 7. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
 8. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
    part that is not ready and nixie's reason for it, since a host that switches cleanly can still
    leave nixie unable to start. It prints each advisory part that is not ready, such as
    `conversation_turns`, and passes, because nixie answers while its turns fail.
+
+A timer on the host checks every hour whether it runs an older system or imp than the latest green
+NixOS checks run on `main`, and after a day of that the `HostBehindLatestBuild` alert fires, as
+[the troubleshooting runbook](./troubleshooting.md#hostbehindlatestbuild-or-hostbuildlagstale-fires)
+describes. A switch clears it.
 
 `bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gates with stub
 `gh`, `docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show
@@ -178,16 +185,23 @@ To switch before the nightly run covers the commit:
 
 ## Upgrade imp
 
-imp is pinned in two places, and both move together:
+imp is pinned in three places, and `scripts/pin-imp.sh` moves all three together:
 
-| Pin                  | File                                                                                  |
-| -------------------- | ------------------------------------------------------------------------------------- |
-| imp's NixOS module   | the `imp` input in `nixos/flake.nix`, and `nixos/flake.lock`                          |
-| the `imp-host` image | `services.imp.image` in `nixos/hosts/geoffcloud/configuration.nix`, by tag and digest |
+| Pin                  | File                                                                                                                   |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| imp's NixOS module   | the `imp` input in `nixos/flake.nix`, and `nixos/flake.lock`                                                           |
+| the `imp-host` image | `services.imp.image` in `nixos/hosts/geoffcloud/configuration.nix`, by tag and digest                                  |
+| the `imp-base` image | the `FROM` in `images/agent/Dockerfile`, and `services.preview.impRegistryImage` in the host config, by tag and digest |
 
-1. Update both pins in a PR. Read imp's release notes for migrations and new host settings. The
-   [release check](./release-check.md) opens this PR for each new imp release, with the imp-base pin
-   of the agent image.
+The [release check](./release-check.md) opens the bump pull request for each new imp release on the
+`release-check/imp` branch, with all three pins moved. The `release bump merge` workflow merges it
+once its checks pass, the NixOS checks included, unless its labels hold it for a person, as
+[When a bump merges on its own](./release-check.md#when-a-bump-merges-on-its-own) describes. The
+merge changes nothing on the host. The steps after it stay with a person, and the pull request's
+body lists them:
+
+1. Read imp's release notes for migrations and new host settings: before you merge a bump labelled
+   `needs-review`, or after the merge for one that merged on its own.
 2. Copy impd's database. Never tar the live files:
 
    ```sh
@@ -201,6 +215,10 @@ imp is pinned in two places, and both move together:
 4. Check: `ssh root@geoffcloud docker exec imp-host impz info` shows the new version,
    `https://imps.geoff.cloud/health` answers 200 from the tailnet, and the `imp` dashboard in
    Grafana shows impd's logs.
+5. Rebuild the agent image on the new imp-base, as [the agent image runbook](./agent-image.md)
+   describes.
+
+A merged bump that waits a day for the switch fires the `HostBehindLatestBuild` alert.
 
 impd's database lives in `tank/imp`, which has a legacy mountpoint inside imp-host. The host's
 `/var/lib/imp` is empty.
