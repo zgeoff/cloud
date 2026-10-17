@@ -28,6 +28,12 @@ export async function createGitOrigin(dir: string): Promise<GitOrigin> {
     GIT_AUTHOR_EMAIL: 'test@example.invalid',
     GIT_COMMITTER_NAME: 'test',
     GIT_COMMITTER_EMAIL: 'test@example.invalid',
+
+    // no auto maintenance: a commit's or a fetch's detached repack could still write into a
+    // repository while the test's cleanup removes it
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'maintenance.auto',
+    GIT_CONFIG_VALUE_0: 'false',
   };
 
   const git = makeGit(env);
@@ -36,6 +42,10 @@ export async function createGitOrigin(dir: string): Promise<GitOrigin> {
 
   await mkdir(home, { recursive: true });
   await git(['init', '-q', '--bare', '-b', 'main', origin]);
+
+  // a push to a local origin drops the GIT_CONFIG_* variables, so the origin keeps the setting in
+  // its own config
+  await git(['-C', origin, 'config', 'maintenance.auto', 'false']);
   await git(['init', '-q', '-b', 'main', seed]);
   await git(['-C', seed, 'remote', 'add', 'origin', origin]);
 

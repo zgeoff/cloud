@@ -102,6 +102,10 @@ setup_test() {
   create_stub_bump_release "$tree/scripts"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     git -C "$tree/repo" init -q -b main
+  # no auto maintenance: a commit's detached repack could still write into the repository while
+  # the case's trap removes it
+  env -i PATH=/usr/bin:/bin HOME="$tree/home" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    git -C "$tree/repo" config maintenance.auto false
   # boot data: a tracked file the stand-in can leave changed
   echo pinned > "$tree/repo/pinned.txt"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
