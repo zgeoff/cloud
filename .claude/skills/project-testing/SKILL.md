@@ -201,11 +201,6 @@ journey sits in `e2e/`, one file per journey. Each shared rule takes its shell f
 - A case checks its exit status exactly, with
   `[ "$status" = N ] || { echo "exit $status, want N" >&2; exit 1; }` or `assert_equals`; both are
   exact.
-- Each git repository that a test creates, a bare origin included, sets `maintenance.auto false`
-  in its own config, in a shell suite and a TypeScript test alike. Otherwise a commit, a fetch or a
-  push starts git's detached maintenance, whose repack can still write into the repository while
-  the case's cleanup removes it, and the case fails at random. A push to a local origin drops the
-  `GIT_CONFIG_*` variables, so a setting passed in the environment never reaches the origin.
 - A stand-in lives in `test-support/shell/` with its own `test-<file>.sh`, never inline in a suite:
   `create-stub-<thing>.sh` writes an executable to disk, and `start-stub-<thing>.sh` runs a process.
 - A stand-in that replaces a tool logs its argv as one JSON line, matches the real tool's exit codes
