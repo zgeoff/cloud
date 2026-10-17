@@ -22,18 +22,22 @@ daemon.
 | nixie      | `release-check/nixie`     | the nixie and nixie-web images in the stack config                          |
 | auto-mode  | `release-check/auto-mode` | the auto-mode tarball in the agent image                                    |
 
-Each pin script checks what it writes against the release itself: the atc pins take their sums from
-the release's SHA256SUMS, the nixie pins take their digests from the release notes' `## Images`
-list, the imp pins take the tag's commit and the images' digests from GitHub and GHCR, and the
-auto-mode pin takes its sum from the npm tarball, which it checks against npm's integrity hash and
-the release's version. A pin script never moves a pin back to an older release. CI's image pin check
-(`bun run check:image-pins`) covers the pins a person edits too. A release tag of an image this repo
-publishes is never replaced, so the check fails a pull request whose release tag names another
-digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves when its publisher
-rebuilds the image, so for an upstream pin the check asks only that the registry still serves the
-pinned digest. The atc-gateway packages on GHCR are private, so the check reads them with a GitHub
-token that can read packages: CI hands it the workflow's token, and on a PC it takes the token that
-`gh auth token` prints, which needs the `read:packages` scope (`gh auth refresh -s read:packages`).
+The release registry in `scripts/release/` holds one record per dependency: its repository, its tag
+form, what its releases publish, and each pin's lines in the files. The bump reads each value it
+writes from the release itself: the atc pins take their sums from the release's SHA256SUMS, the
+nixie pins take their digests from the release notes' `## Images` list, the imp pins take the tag's
+commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes its sum from the
+npm tarball, which it checks against npm's integrity hash and the release's version. Before it
+writes anything, it checks every pin line of the dependency, so a pin at the release with another
+sum fails the bump and changes no file. The bump never moves a pin back to an older release. CI's
+image pin check (`bun run check:image-pins`) covers the pins a person edits too. A release tag of an
+image this repo publishes is never replaced, so the check fails a pull request whose release tag
+names another digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves when
+its publisher rebuilds the image, so for an upstream pin the check asks only that the registry still
+serves the pinned digest. The atc-gateway packages on GHCR are private, so the check reads them with
+a GitHub token that can read packages: CI hands it the workflow's token, and on a PC it takes the
+token that `gh auth token` prints, which needs the `read:packages` scope
+(`gh auth refresh -s read:packages`).
 
 ## When a bump merges on its own
 
@@ -80,6 +84,23 @@ the branch and keeps the `needs-review` label, with no `auto-merge` beside it, a
 closed pull request closed. A later release drops the hold and opens a rejected bump again, as does
 deleting its branch.
 
+## Add a dependency
+
+1. Add a record to the release registry. Its source kind decides how the bump reads a release. Each
+   pin line's pattern captures each part of the line in a named group, so the bump reads a version
+   and writes a sum or a digest with no code of the dependency's own.
+2. Run `bun run test`. The registry's tests fail when a pattern matches no line, or more than one,
+   in the checkout's files.
+
+## Pin a release by hand
+
+Run the manual pin from a clean checkout of `main`. It reads the release and writes the dependency's
+pins as a bump pull request would, and opens no pull request:
+
+```bash
+bun scripts/release/run-release-pin.ts <dependency> <version>
+```
+
 ## Set up the app
 
 The workflows act as a GitHub App installed on this repository, with these repository permissions:
@@ -102,5 +123,5 @@ gh run list --workflow release-check.yml --limit 3
 ```
 
 The run's summary lists each pin older than its newest release. A failed bump fails the job after
-the other dependencies' bumps have run; its log holds the pin script's refusal, such as a release
-whose sums differ from the pinned ones.
+the other dependencies' bumps have run; its log holds the bump's refusal, such as a release whose
+sums differ from the pinned ones.

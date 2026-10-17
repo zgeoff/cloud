@@ -187,7 +187,7 @@ RUN curl -fsSL -o /tmp/op.zip \
 
 # The auto-mode CLI and its Claude Code mod, from the npm tarball. The package
 # has no dependencies. The mod sits at the fixed path /opt/auto-mode/mods/auto-mode,
-# for --plugin-dir. The sum is the tarball's. scripts/pin-auto-mode.sh checks the
+# for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
 ARG AUTO_MODE_VERSION=2.0.0

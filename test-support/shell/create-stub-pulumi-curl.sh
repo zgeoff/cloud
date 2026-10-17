@@ -7,9 +7,9 @@
 #   directory under its own name, as -O names it.
 # - `-fsSL https://get.pulumi.com/releases/sdk/<file>` prints <file>.
 # - A file the tree lacks answers as curl 8.5.0 does for an HTTP 404 with -f: "curl: (22) The
-#   requested URL returned error: 404" on stderr, no file written, and exit 22, the answer
-#   create-stub-release-curl.sh pins; which error status get.pulumi.com sends for a missing
-#   release is not checked.
+#   requested URL returned error: 404" on stderr, no file written, and exit 22, as checked
+#   against the real npm registry on 2026-10-13; which error status get.pulumi.com sends for a
+#   missing release is not checked.
 # - Any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 create_stub_pulumi_curl() {
   local bin="$1"

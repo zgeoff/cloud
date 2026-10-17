@@ -101,14 +101,12 @@ A switch changes new imps only. An imp keeps the image it was created from.
 ## A new atc release
 
 The [release check](./release-check.md) opens the `release-check/atc` pull request for each new atc
-release. `scripts/pin-atc.sh` pins the release everywhere cloud runs atc, and its agent image pin
-runs `scripts/pin-agent-atc.sh`, which changes only `ARG ATC_VERSION` and `ARG ATC_SHA256` and takes
-the sum of `atc-linux-x64` from the release's SHA256SUMS. To pin a release by hand, run it from a
-clean checkout of `main`:
+release. It pins the release everywhere cloud runs atc. In the agent image, it changes only
+`ARG ATC_VERSION` and `ARG ATC_SHA256`, and takes the sum of `atc-linux-x64` from the release's
+SHA256SUMS. To pin a release by hand, run the manual pin from a clean checkout of `main`:
 
 ```sh
-gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -D /tmp/atc-sums
-bash scripts/pin-atc.sh "$VERSION" /tmp/atc-sums/SHA256SUMS
+bun scripts/release/run-release-pin.ts atc "$VERSION"
 ```
 
 After the pin merges, roll the release out in the order that
@@ -193,13 +191,12 @@ is the release, such as `4.5.0`.
 ## A new auto-mode release
 
 The [release check](./release-check.md) opens the `release-check/auto-mode` pull request for each
-new auto-mode release. `scripts/pin-auto-mode.sh` writes the pin from the npm tarball, after it
-checks the tarball against npm's integrity hash and the version in its `package.json`. To pin a
-release by hand, run it from a clean checkout of `main`:
+new auto-mode release. It writes the pin from the npm tarball, after it checks the tarball against
+npm's integrity hash and the version in its `package.json`. To pin a release by hand, run the manual
+pin from a clean checkout of `main`:
 
 ```sh
-curl -fsSL -o /tmp/auto-mode.tgz "https://registry.npmjs.org/auto-mode/-/auto-mode-$VERSION.tgz"
-bash scripts/pin-auto-mode.sh "$VERSION" /tmp/auto-mode.tgz "$(npm view "auto-mode@$VERSION" dist.integrity)"
+bun scripts/release/run-release-pin.ts auto-mode "$VERSION"
 ```
 
 The image's gitleaks allowlist (`scripts/agent-image-gitleaks.toml`) names the two files in the

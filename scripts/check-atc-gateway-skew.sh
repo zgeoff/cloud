@@ -27,7 +27,7 @@ if [ ! -f "$nix" ]; then
   echo "$nix is missing, so the switch has no atc daemon pin to compare" >&2
   exit 1
 fi
-# the one `version = "X.Y.Z";` line, as pin-atc.sh writes it
+# the one `version = "X.Y.Z";` line, as the atc release bump writes it
 daemon="$(sed -nE "s/^  version = \"($version)\";\$/\\1/p" "$nix")"
 if [[ ! "$daemon" =~ ^$version$ ]]; then
   echo "$nix pins no atc release version" >&2

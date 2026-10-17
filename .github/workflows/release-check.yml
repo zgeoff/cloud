@@ -2,7 +2,7 @@ name: release check
 
 # Finds new atc, imp, nixie and auto-mode releases and opens one bump pull request per dependency, so the
 # release repositories know nothing about cloud. The check job runs on the 1-core runner, reads the
-# newest releases and the pins (scripts/find-release-bumps.sh), and ends: a run that finds nothing
+# newest releases and the pins (scripts/release/release-registry.ts), and ends: a run that finds nothing
 # bills 1 minute. The bump job runs only when a pin is older than its newest release; it opens the
 # pull requests with the release check app's token, so CI runs on them, which it would not for a
 # GITHUB_TOKEN pull request. The release bump merge workflow merges the ones labelled auto-merge.
@@ -83,7 +83,7 @@ jobs:
 
       # every line runs, so one dependency's failure leaves the others' pull requests current;
       # any failure fails the job once all have run. The imp pin's nix lock sends NIX_GITHUB_TOKEN to
-      # api.github.com, so the runner IP's anonymous rate limit cannot fail it (pin-imp.sh)
+      # api.github.com, so the runner IP's anonymous rate limit cannot fail it (apply-release-pins.ts)
       - name: Open or update the bump pull requests
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
