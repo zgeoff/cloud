@@ -58,8 +58,8 @@ const composeURL =
 const composeSHA256 = '40343e21ca777173e69cff5dbafeb37c6f81f3b0d57d9e597f036e95eb63e76a';
 
 // The guest script takes the repository and the commit as arguments, never inside its text. A
-// rebuild takes the old stack down with its volumes first, so every build seeds fresh, invented
-// data from the contract's seed step.
+// rebuild takes the old stack down with its volumes first, so every build seeds fresh data. A
+// compose.broker.yaml joins with the proxy and CA bundle that impd sets on an exec with a grant.
 const bootScript = `set -eu
 if ! docker compose version >/dev/null 2>&1; then
   plugins=/usr/local/lib/docker/cli-plugins
@@ -81,7 +81,12 @@ fi
 git fetch -q --depth 1 origin "$2"
 git checkout -q --force FETCH_HEAD
 cd preview
-docker compose up --detach --build --wait
+if [ -f compose.broker.yaml ]; then
+  export BROKER_CA_FILE="\${SSL_CERT_FILE:?the broker's CA bundle did not reach the boot}"
+  docker compose -f compose.yaml -f compose.broker.yaml up --detach --build --wait
+else
+  docker compose up --detach --build --wait
+fi
 `;
 
 async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseChange> {
@@ -123,7 +128,7 @@ async function runBuild(
       preview.repo,
       preview.headSHA,
     ],
-    { requireBroker: deps.settings.impGitHubSecret !== null },
+    { requireBroker: collectGrantSecrets(deps).length > 0 },
   );
 
   if (build.code !== 0) {
@@ -137,7 +142,7 @@ async function runBuild(
 
 // Frees a slot, then starts the imp: the one from an earlier build, awake, with the port of the
 // commit it rebuilds, or a new one with the contract's port. Every boot then installs the GitHub
-// grant, so an imp whose grant failed or never came gets it on the next try.
+// and model grants, so an imp whose grant failed or never came gets it on the next try.
 async function startImpInSlot(
   deps: PreviewDeps,
   preview: Preview,
@@ -160,9 +165,17 @@ async function startImpInSlot(
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
   }
 
-  if (deps.settings.impGitHubSecret !== null) {
-    await deps.impd.installGrant(preview.imp, deps.settings.impGitHubSecret);
+  for (const secret of collectGrantSecrets(deps)) {
+    await deps.impd.installGrant(preview.imp, secret);
   }
+}
+
+// The GitHub secret lets the clone reach a private repository, and the model secret is the
+// broker's route for the stack's model calls
+function collectGrantSecrets(deps: PreviewDeps): string[] {
+  return [deps.settings.impGitHubSecret, deps.settings.impModelSecret].filter(
+    (secret) => secret !== null,
+  );
 }
 
 async function waitForHealth(

@@ -25,8 +25,8 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
    read-only on the opted-in repositories and no other permission:
    `op read op://cloud/<github_item>/credential | host_imp secret add gh --kind github`.
 
-2. Add the model secret that each SDK contract run's imp is granted, `preview-model`, from the model
-   credential that nixie uses:
+2. Add the model secret that each preview imp and each SDK contract run's imp is granted,
+   `preview-model`, from the model credential that nixie uses:
 
    ```bash
    op read op://cloud/nixie-model-credential/credential | host_imp secret add preview-model \

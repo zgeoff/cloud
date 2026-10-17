@@ -40,6 +40,7 @@ async function setupTest() {
       impImage: 'base',
       impMemoryMib: 2048,
       impGitHubSecret: 'gh',
+      impModelSecret: null,
       healthTimeoutMs: 60_000,
       healthPollMs: 1000,
       buildTimeoutMs: 1_800_000,

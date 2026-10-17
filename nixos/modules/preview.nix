@@ -134,6 +134,17 @@ in
       '';
     };
 
+    impModelSecret = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "preview-model";
+      description = ''
+        The impd secret, for the model API's host, granted to each preview imp, so a stack that
+        adds preview/compose.broker.yaml sends its model calls through the broker. Its token must
+        list it with --grantable. null leaves the previews without a model route.
+      '';
+    };
+
     contractRepos = lib.mkOption {
       type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\\*)");
       default = [ ];
@@ -242,6 +253,9 @@ in
       }
       // lib.optionalAttrs (cfg.impGitHubSecret != null) {
         PREVIEW_IMP_GITHUB_SECRET = cfg.impGitHubSecret;
+      }
+      // lib.optionalAttrs (cfg.impModelSecret != null) {
+        PREVIEW_IMP_MODEL_SECRET = cfg.impModelSecret;
       }
       // lib.optionalAttrs (cfg.contractRepos != [ ]) {
         PREVIEW_CONTRACT_REPOS = lib.concatStringsSep "," cfg.contractRepos;

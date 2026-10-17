@@ -63,6 +63,7 @@ let
               impDomain = "imps.example.org";
               impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               impGitHubSecret = "gh";
+              impModelSecret = "preview-model";
               webhookSecretFile = "/run/fixture/webhook-secret";
               githubTokenFile = "/run/fixture/github-token";
               impTokenFile = "/run/fixture/imp-token";
@@ -101,6 +102,7 @@ let
               PREVIEW_IMP_IMAGE = "pv-base";
               PREVIEW_IMP_MEMORY_MIB = "2048";
               PREVIEW_IMP_GITHUB_SECRET = "gh";
+              PREVIEW_IMP_MODEL_SECRET = "preview-model";
               PREVIEW_DATABASE = "/var/lib/preview/previews.sqlite";
               HOME = "/var/lib/preview";
               BUN_RUNTIME_TRANSPILER_CACHE_PATH = "0";
@@ -157,7 +159,7 @@ let
         '';
     }
     {
-      title = "it leaves the GitHub grant out when impGitHubSecret is null";
+      title = "it leaves the GitHub and model grants out when impGitHubSecret and impModelSecret are null";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
@@ -181,6 +183,9 @@ let
           assert_equals false ${
             lib.boolToString (system.config.systemd.services.preview.environment ? PREVIEW_IMP_GITHUB_SECRET)
           } "the grant's variable is set"
+          assert_equals false ${
+            lib.boolToString (system.config.systemd.services.preview.environment ? PREVIEW_IMP_MODEL_SECRET)
+          } "the model grant's variable is set"
         '';
     }
     {

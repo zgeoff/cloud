@@ -41,6 +41,7 @@ async function setupTest() {
       impImage: 'base',
       impMemoryMib: 2048,
       impGitHubSecret: 'gh',
+      impModelSecret: null,
 
       // three probes fit before the boot times out
       healthTimeoutMs: 3000,
@@ -130,6 +131,123 @@ test('it creates the imp with the contract port and the grant, then builds and p
 
   expect(ctx.impd.proxied).toStrictEqual(['GET https://pv-0a1b2c3d-17.imps.example.test/healthz']);
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
+});
+
+test("it starts the stack with compose.yaml and compose.broker.yaml, with the broker's CA bundle, when the commit has the broker file", async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  await runPreviewBoot(ctx.deps, {
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'booting',
+    detail: null,
+  });
+
+  expect(ctx.impd.commands).toStrictEqual([
+    {
+      imp: 'pv-0a1b2c3d-17',
+      argv: [
+        'timeout',
+        '--kill-after=30',
+        '1800',
+        'sh',
+        '-c',
+        expect.toInclude(
+          [
+            'cd preview',
+            'if [ -f compose.broker.yaml ]; then',
+            `  export BROKER_CA_FILE="\${SSL_CERT_FILE:?the broker's CA bundle did not reach the boot}"`,
+            '  docker compose -f compose.yaml -f compose.broker.yaml up --detach --build --wait',
+            'else',
+            '  docker compose up --detach --build --wait',
+            'fi',
+          ].join('\n'),
+        ),
+        'preview-boot',
+        'acme/greenhouse',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      ],
+      require: ['broker'],
+    },
+  ]);
+});
+
+test('it grants the model secret beside the GitHub secret, so the stack reaches the broker', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  await runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+});
+
+test('it requires the broker for the build when the model secret is the only grant', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  await runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impGitHubSecret: null, impModelSecret: 'preview-model' },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['preview-model']);
+  expect(ctx.impd.commands).toPartiallyContain({ imp: 'pv-0a1b2c3d-17', require: ['broker'] });
 });
 
 test('it records the tail of the build output when the build fails', async () => {
