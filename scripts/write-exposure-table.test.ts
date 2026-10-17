@@ -71,6 +71,7 @@ test('it writes one row per entry between the markers, and keeps the rest of the
         attr: 'funnel',
         scope: 'public',
         reason: 'f',
+        auth: 'signed | keyed',
         ticket: 'GEO-425',
       },
       {
@@ -94,14 +95,14 @@ The prose.
 
 <!-- exposure:start -->
 
-| Name        | Kind               | Exposes                       | Scope    | Reason            | Ticket  |
-| ----------- | ------------------ | ----------------------------- | -------- | ----------------- | ------- |
-| \`tailscale\` | host-port          | udp 41641                     | public   | direct \\| relayed |         |
-| \`relay\`     | host-port          | tcp 18081 on \`docker0\`        | host     | the relay         |         |
-| \`icmp\`      | host-port          | icmp                          | public   | ping              |         |
-| \`imp\`       | tunnel-hostname    | \`imp.example.org\`             | reserved | held              |         |
-| \`funnel\`    | tailnet-capability | node attribute \`funnel\`       | public   | f                 | GEO-425 |
-| \`worker\`    | worker-url         | \`health-check\` on workers.dev | closed   | cron              |         |
+| Name        | Kind               | Exposes                       | Scope    | Reason            | Auth            | Ticket  |
+| ----------- | ------------------ | ----------------------------- | -------- | ----------------- | --------------- | ------- |
+| \`tailscale\` | host-port          | udp 41641                     | public   | direct \\| relayed |                 |         |
+| \`relay\`     | host-port          | tcp 18081 on \`docker0\`        | host     | the relay         |                 |         |
+| \`icmp\`      | host-port          | icmp                          | public   | ping              |                 |         |
+| \`imp\`       | tunnel-hostname    | \`imp.example.org\`             | reserved | held              |                 |         |
+| \`funnel\`    | tailnet-capability | node attribute \`funnel\`       | public   | f                 | signed \\| keyed | GEO-425 |
+| \`worker\`    | worker-url         | \`health-check\` on workers.dev | closed   | cron              |                 |         |
 
 <!-- exposure:end -->
 
@@ -123,9 +124,9 @@ test('it passes the check when the page holds the table of the registry', async 
     join(ctx.root, 'docs', 'reference', 'exposure.md'),
     `<!-- exposure:start -->
 
-| Name   | Kind      | Exposes | Scope  | Reason | Ticket |
-| ------ | --------- | ------- | ------ | ------ | ------ |
-| \`icmp\` | host-port | icmp    | public | ping   |        |
+| Name   | Kind      | Exposes | Scope  | Reason | Auth | Ticket |
+| ------ | --------- | ------- | ------ | ------ | ---- | ------ |
+| \`icmp\` | host-port | icmp    | public | ping   |      |        |
 
 <!-- exposure:end -->
 `,

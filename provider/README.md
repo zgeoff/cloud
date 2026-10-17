@@ -4,6 +4,8 @@ A partial Pulumi provider for the [Onidel](https://onidel.com) cloud API, writte
 
 `spec/onidel.yaml` is Onidel's OpenAPI spec as published, and `spec/onidel.overlay.yaml` is an OpenAPI Overlay of the changes the client needs, each with its source. oapi-codegen generates the client in `internal/onidelapi` from both, for the operations its config lists. `internal/client` puts the policy on top: retries, the waits for a VM to settle, and error mapping. `internal/onidel` holds the resources, with each resource's update and replace rules beside its schema. `cmd/onidel` runs one-off actions on the same client, such as the snapshot before a risky host change.
 
+The provider is frozen: a change to it is a version bump of a dependency and nothing else, so it gains no resource and no API call. Replacing it waits on whether the estate needs a second VM ([infrastructure as code](../docs/architecture/infrastructure-as-code.md)).
+
 ## Build and regenerate
 
 From the repo root:

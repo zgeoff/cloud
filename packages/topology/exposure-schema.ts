@@ -29,23 +29,30 @@ const hostPortSchema = z.strictObject({
   admission: z.literal(true).optional(),
 });
 
+// Every kind but a host port is a route to a workload. auth names the layer that authenticates
+// each call on a public route, such as the workload's own OAuth server or a webhook signature.
+const routeFields = {
+  ...entryFields,
+  auth: z.string().min(1).max(255).optional(),
+};
+
 // a hostname the Cloudflare tunnel serves, or holds free for a later route
 const tunnelHostnameSchema = z.strictObject({
-  ...entryFields,
+  ...routeFields,
   kind: z.literal('tunnel-hostname'),
   hostname: z.hostname(),
 });
 
 // a node attribute the tailnet policy grants, such as funnel
 const tailnetCapabilitySchema = z.strictObject({
-  ...entryFields,
+  ...routeFields,
   kind: z.literal('tailnet-capability'),
   attr: z.string().min(1),
 });
 
 // a Worker's own workers.dev URL
 const workerURLSchema = z.strictObject({
-  ...entryFields,
+  ...routeFields,
   kind: z.literal('worker-url'),
   script: z.string().min(1),
 });
@@ -104,7 +111,7 @@ function collectHostPortIssues(entry: HostPort): readonly HostPortIssue[] {
   ];
 }
 
-// adds an issue for each entry whose name another entry holds, and for each host port whose fields
+// adds an issue for each entry whose name another entry holds, and for each entry whose fields
 // disagree with each other
 // oxlint-disable-next-line typescript/prefer-readonly-parameter-types -- zod owns the context
 function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
@@ -119,14 +126,33 @@ function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
       });
     }
 
-    if (entry.kind === 'host-port') {
-      for (const issue of collectHostPortIssues(entry)) {
-        context.addIssue({
-          code: 'custom',
-          path: ['entries', index, issue.field],
-          message: issue.message,
-        });
-      }
+    const issues =
+      entry.kind === 'host-port' ? collectHostPortIssues(entry) : collectRouteIssues(entry);
+
+    for (const issue of issues) {
+      context.addIssue({
+        code: 'custom',
+        path: ['entries', index, issue.field],
+        message: issue.message,
+      });
     }
   }
+}
+
+type Route = Exclude<ExposureEntry, HostPort>;
+
+interface RouteIssue {
+  readonly field: 'auth';
+  readonly message: string;
+}
+
+function collectRouteIssues(entry: Route): readonly RouteIssue[] {
+  return [
+    ...(entry.scope === 'public' && entry.auth === undefined
+      ? [{ field: 'auth' as const, message: 'a public route needs its auth layer' }]
+      : []),
+    ...(entry.scope !== 'public' && entry.auth !== undefined
+      ? [{ field: 'auth' as const, message: 'only a public route names an auth layer' }]
+      : []),
+  ];
 }
