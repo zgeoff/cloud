@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { topology } from '@zgeoff/cloud-topology';
+import invariant from 'tiny-invariant';
 import { buildNixieImpConfig } from './build-nixie-imp-config.ts';
 import { renderNixieConfig } from './render-nixie-config.ts';
 
@@ -30,6 +31,8 @@ test('it renders deploy/nixie/config.yaml as YAML holding the file’s keys and 
   const file: unknown = Bun.YAML.parse(text);
   const rendered: unknown = Bun.YAML.parse(renderNixieConfig(text, buildNixieImpConfig(topology)));
 
+  invariant(typeof file === 'object' && file !== null, 'expected the file to parse as a mapping');
+
   expect(file).not.toContainKey('imp');
-  expect(rendered).toStrictEqual({ ...(file as object), imp: buildNixieImpConfig(topology) });
+  expect(rendered).toStrictEqual({ ...file, imp: buildNixieImpConfig(topology) });
 });
