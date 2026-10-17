@@ -14,16 +14,17 @@ export function buildImpArgv(args: readonly string[]): readonly string[] {
   return [impCLI, ...args];
 }
 
-// the argv of one call to the CLI in the host's imp-host container; docker passes its stdin on
-// only with -i, which an exec that reads none must leave out, since a host script's own text can
-// sit on the same stdin
+// the argv of one call to the CLI in imp-host. docker passes stdin on only with -i, which a call
+// that reads none leaves out, since a host script's text can sit on that stdin. Each env name
+// passes docker's own value through, so a secret in it never enters the argv.
 export function buildHostImpArgv(
   args: readonly string[],
-  options: { readonly stdin?: boolean } = {},
+  options: { readonly stdin?: boolean; readonly env?: readonly string[] } = {},
 ): readonly string[] {
   const input = options.stdin === true ? ['-i'] : [];
+  const env = (options.env ?? []).flatMap((name) => ['-e', name]);
 
-  return ['docker', 'exec', ...input, 'imp-host', impCLI, ...args];
+  return ['docker', 'exec', ...input, ...env, 'imp-host', impCLI, ...args];
 }
 
 // a call as a person types it, for a message that says what to run

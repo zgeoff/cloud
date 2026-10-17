@@ -43,6 +43,24 @@ test('#buildHostImpArgv passes docker -i when the call reads stdin', () => {
   ]);
 });
 
+test('#buildHostImpArgv passes each env name to docker without a value, so docker copies its own', () => {
+  expect(
+    buildHostImpArgv(['token', 'whoami', '--json'], { env: ['IMP_TOKEN', 'IMP_URL'] }),
+  ).toStrictEqual([
+    'docker',
+    'exec',
+    '-e',
+    'IMP_TOKEN',
+    '-e',
+    'IMP_URL',
+    'imp-host',
+    'impz',
+    'token',
+    'whoami',
+    '--json',
+  ]);
+});
+
 test('#formatImpCommand writes the call as a person types it', () => {
   expect(formatImpCommand(['token', 'rm', 'atc-cloud'])).toBe('impz token rm atc-cloud');
 });

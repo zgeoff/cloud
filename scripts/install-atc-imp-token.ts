@@ -86,9 +86,14 @@ function requireTokenLimits(token: unknown) {
 async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: string) {
   const script = await readHostScript('check-atc-imp-token.sh');
 
-  const result = await runHostCheck(context, ['bash', '-s', '--', context.dir, context.impdPort], {
-    stdin: script,
-  });
+  // the script sets the two variables, and docker passes them into imp's CLI, off every argv
+  const cli = buildHostImpArgv([], { env: ['IMP_TOKEN', 'IMP_URL'] });
+
+  const result = await runHostCheck(
+    context,
+    ['bash', '-s', '--', context.dir, context.impdPort, ...cli],
+    { stdin: script },
+  );
 
   context.printErr(result.stderr.toString());
 

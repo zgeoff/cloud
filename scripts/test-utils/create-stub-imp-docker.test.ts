@@ -60,3 +60,54 @@ test('it ends any other call with exit 97', async () => {
   expect(result.exitCode).toBe(97);
   expect(result.stderr.toString()).toBe('unexpected: exec imp-host impz token rm atc-cloud\n');
 });
+
+test('it answers the call it is given, and logs the IMP_TOKEN and IMP_URL it got', async () => {
+  const ctx = await setupTest();
+
+  const docker = await createStubImpDocker(
+    ctx.dir,
+    { stdout: '{"kind":"token","name":"atc-cloud"}\n', stderr: '', exitCode: 0 },
+    ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
+  );
+
+  const result = await runProcess(
+    [
+      docker,
+      'exec',
+      '-e',
+      'IMP_TOKEN',
+      '-e',
+      'IMP_URL',
+      'imp-host',
+      'impz',
+      'token',
+      'whoami',
+      '--json',
+    ],
+    {
+      env: {
+        PATH: process.env['PATH'] ?? '/usr/bin:/bin',
+        IMP_TOKEN: 'imp_fixture_good',
+        IMP_URL: 'http://127.0.0.1:7070',
+      },
+    },
+  );
+
+  const env = await readFile(join(ctx.dir, 'docker-env'), 'utf8');
+
+  expect(result.stdout.toString()).toBe('{"kind":"token","name":"atc-cloud"}\n');
+  expect(env).toBe('{"IMP_TOKEN":"imp_fixture_good","IMP_URL":"http://127.0.0.1:7070"}\n');
+});
+
+test('it logs an unset IMP_TOKEN and IMP_URL as null', async () => {
+  const ctx = await setupTest();
+  const docker = await createStubImpDocker(ctx.dir, { stdout: '', stderr: '', exitCode: 0 });
+
+  await runProcess([docker, 'exec', 'imp-host', 'impz', 'token', 'rm', 'atc-cloud'], {
+    env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin' },
+  });
+
+  const env = await readFile(join(ctx.dir, 'docker-env'), 'utf8');
+
+  expect(env).toBe('{"IMP_TOKEN":null,"IMP_URL":null}\n');
+});

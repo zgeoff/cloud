@@ -64,7 +64,7 @@ test('it skips a token with the expected limits whose saved file authenticates a
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     [
-      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' '7070'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'",
       ctx.checkScript,
     ],
   ]);
@@ -106,15 +106,15 @@ test('it checks the saved file against the impd port and directory the environme
       '-o',
       'ConnectTimeout=15',
       'root@canary',
-      "'bash' '-s' '--' '/srv/atc secrets' '7171'",
+      "'bash' '-s' '--' '/srv/atc secrets' '7171' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'",
     ],
   ]);
 });
 
 test.each([
   ['a file atc cannot use', { exitCode: 121 }],
-  ['impd’s 401 for an unknown token', { stdout: '{"error":"unauthorized"}\n401' }],
-  ['another token', { stdout: '{"json":{"kind":"token","name":"atc-other"}}\n200' }],
+  ['impd’s 401 for an unknown token, exit 122', { exitCode: 122 }],
+  ['another token', { stdout: '{"kind":"token","name":"atc-other"}\n' }],
 ])(
   'it rejects a saved token the host check reads as %s',
   async (_label: string, tokenCheck: object) => {
@@ -148,9 +148,14 @@ a new one`,
 
 test.each([
   [
-    'impd’s 500',
-    { stdout: '{"json":{}}\n500' },
-    "impd answered HTTP 500, so /var/lib/atc-daemon-secrets/imp-token is unchecked; nothing changed.\nCheck impd on the host's 127.0.0.1:7070, then rerun",
+    'the CLI’s exit 1 for any other failure',
+    { exitCode: 1, stderr: 'impz: INTERNAL_SERVER_ERROR: Internal server error\n' },
+    "the check on the host exited 1 (imp's CLI's exit code, or 255 from ssh), so /var/lib/atc-daemon-secrets/imp-token is unchecked; nothing changed.\nCheck impd on the host's 127.0.0.1:7070, then rerun",
+  ],
+  [
+    'an answer without an identity',
+    { stdout: '{}\n' },
+    "impd answered without an identity, so /var/lib/atc-daemon-secrets/imp-token is unchecked; nothing changed.\nCheck impd on the host's 127.0.0.1:7070, then rerun",
   ],
   [
     'exit 120 for a file it cannot read',

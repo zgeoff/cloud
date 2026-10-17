@@ -212,8 +212,21 @@ function buildShellAnswer(state: HostState, line: string, stdin: string): StubAn
       stdin.startsWith(hostScripts.write) ? runHostScript(state, stdin) : undefined,
     [toLine(['bash', '-s', '--', dir, 'docker', 'exec', 'imp-host', 'impz'])]: () =>
       stdin === hostScripts.mint ? runHostScript(state, stdin) : undefined,
-    [toLine(['bash', '-s', '--', dir, state.scenario.impdPort])]: () =>
-      stdin === hostScripts.check ? checkTokenFile(state) : undefined,
+    [toLine([
+      'bash',
+      '-s',
+      '--',
+      dir,
+      state.scenario.impdPort,
+      'docker',
+      'exec',
+      '-e',
+      'IMP_TOKEN',
+      '-e',
+      'IMP_URL',
+      'imp-host',
+      'impz',
+    ])]: () => (stdin === hostScripts.check ? checkTokenFile(state) : undefined),
     [toLine(['stat', '-c', '%n %U %a %s bytes', dir, gatewayToken, impToken])]: () =>
       buildStatAnswer(state),
   };
@@ -328,9 +341,8 @@ function checkTokenFile(state: HostState): StubAnswer {
     return { exitCode: 120 };
   }
 
-  return (
-    state.scenario.tokenCheck ?? { stdout: '{"json":{"kind":"token","name":"atc-cloud"}}\n200' }
-  );
+  // what imp's CLI prints for `token whoami --json` (packages/cli/src/commands/tokens.ts)
+  return state.scenario.tokenCheck ?? { stdout: '{"kind":"token","name":"atc-cloud"}\n' };
 }
 
 function buildStatAnswer(state: HostState): StubAnswer {

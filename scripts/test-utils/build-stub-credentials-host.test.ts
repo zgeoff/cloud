@@ -68,12 +68,14 @@ test('it exits 120 for a missing saved token, as the real check script does', as
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      `'bash' '-s' '--' ${toShellArg(ctx.dir)} '7070'`,
+      `'bash' '-s' '--' ${toShellArg(ctx.dir)} '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'`,
     ],
     { stdin: script },
   );
 
-  const real = await runProcess(['bash', '-s', '--', ctx.dir, '7070'], {
+  const cli = ['docker', 'exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz'];
+
+  const real = await runProcess(['bash', '-s', '--', ctx.dir, '7070', ...cli], {
     stdin: script,
     env: ctx.env,
   });
