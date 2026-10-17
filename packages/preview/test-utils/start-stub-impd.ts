@@ -161,7 +161,7 @@ function buildProcedureResponse(
   procedure: string,
   input: Record<string, unknown>,
 ): Response {
-  const name = input['name'] === undefined ? null : String(input['name']);
+  const name = typeof input['name'] === 'string' ? input['name'] : null;
   const call = name === null ? procedure : `${procedure} ${name}`;
 
   stub.calls.push(call);
