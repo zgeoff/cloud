@@ -16,10 +16,13 @@ export async function runReleasePin(
   args: readonly string[],
 ): Promise<number> {
   const [dependency = '', version = ''] = args;
-  const record = releaseRegistry.find((each) => each.name === dependency);
+
+  // the workflow that publishes a published-images record's images pins them
+  const records = releaseRegistry.filter((each) => each.source.kind !== 'published-images');
+  const record = records.find((each) => each.name === dependency);
 
   if (args.length !== 2 || record === undefined) {
-    const names = releaseRegistry.map((each) => each.name).join('|');
+    const names = records.map((each) => each.name).join('|');
 
     context.printErr(`usage: run-release-pin.ts <${names}> <version>\n`);
 

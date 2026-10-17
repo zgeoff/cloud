@@ -102,9 +102,9 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
 3. It refuses a commit whose atc daemon pin is another atc major release than a running atc gateway
    pod's image, or that finds no gateway pod, because atc breaks the daemon protocol only in a major
    release and the daemon handshake does not catch the break. It checks again before the activation.
-   For an atc major bump, publish the atc-gateway images and merge the pull request that pins their
-   digests, let the `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate
-   too.
+   For an atc major bump, review and merge the pull request that pins the atc-gateway images'
+   digests, which the atc-gateway images workflow opens once it publishes them, let the
+   `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate too.
 4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
    nixie pod's `@zgeoff/imp-client` refuses, or that finds no nixie pod, because nixie then retries
    its start without end while every host check passes. It reads the client's version from the

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Build the atc-gateway and backup images at the pins in images/atc-gateway/versions.env and push
 # each one to GHCR unless its tag is already published: the atc-gateway images workflow's publish
-# job runs it on a manual run with push: true. It logs docker in to ghcr.io as GITHUB_ACTOR with
+# job runs it on main (scripts/release/decide-gateway-publish.ts). It logs docker in to ghcr.io as GITHUB_ACTOR with
 # GH_TOKEN on stdin, fetches and checks the pinned atc release into context/ at the repo root
 # (fetch-atc-release.sh), and builds both images. A published tag is immutable: it skips a tag the
 # registry already holds, and pushes only when the registry confirms the tag is missing; any other

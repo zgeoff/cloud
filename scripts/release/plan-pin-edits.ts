@@ -11,6 +11,9 @@ export interface ReleaseValues {
   readonly digests?: Readonly<Record<string, string>>;
   readonly commit?: string;
   readonly tarballSum?: string;
+
+  // the tag of each image this repository publishes, by image
+  readonly tags?: Readonly<Record<string, string>>;
 }
 
 export interface PinEditsInput {
@@ -105,7 +108,11 @@ interface PinState {
 }
 
 function planPinStep(state: PinState): PinStep | Error {
-  const pinned = state.held['version'] ?? '';
+  if (state.held['version'] === undefined) {
+    return planTagStep(state);
+  }
+
+  const pinned = state.held['version'];
 
   if (pinned === state.version) {
     return (
@@ -131,6 +138,17 @@ function planPinStep(state: PinState): PinStep | Error {
     note: `pinned ${state.pin.id} ${state.version}`,
     edits: planLineEdits(state),
   };
+}
+
+// A pin with no version, such as an image tag with its own revision, has no order to keep: it
+// moves to the release's values whenever they differ from the ones it holds.
+function planTagStep(state: PinState): PinStep {
+  const keys = Object.keys(state.wanted);
+  const to = keys.map((key) => state.wanted[key] ?? '').join(' ');
+
+  return keys.every((key) => state.held[key] === state.wanted[key])
+    ? { pin: state.pin, note: `${state.pin.id} already pins ${to}`, edits: [] }
+    : { pin: state.pin, note: `pinned ${state.pin.id} ${to}`, edits: planLineEdits(state) };
 }
 
 function collectMatches(pin: Pin, files: Readonly<Record<string, string>>) {
@@ -185,6 +203,9 @@ function resolvePart(part: PinPart, input: PinEditsInput): string | Error {
     }
     case 'tarball-sum': {
       return input.values.tarballSum ?? new Error('the release has no tarball sum');
+    }
+    case 'image-tag': {
+      return input.values.tags?.[part.image] ?? new Error(`the release names no ${part.image} tag`);
     }
 
     // the type check refuses a kind with no case, so only a registry built outside it lands here
@@ -295,5 +316,7 @@ function isPinnedNewer(pinned: string, version: string) {
 
 // parts of one kind and image hold one value across a pin's lines
 function toPartKey(part: PinPart) {
-  return part.kind === 'digest' ? `digest:${part.image}` : part.kind;
+  return part.kind === 'digest' || part.kind === 'image-tag'
+    ? `${part.kind}:${part.image}`
+    : part.kind;
 }

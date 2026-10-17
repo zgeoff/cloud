@@ -1,7 +1,7 @@
 name: release bump merge
 
 # Merges a release check pull request (release-check/<dependency>, opened by the release check
-# workflow) once it may merge on its own: scripts/release/decide.ts holds the rules. It runs
+# workflow, or by the atc-gateway images workflow for the images it publishes) once it may merge on its own: scripts/release/decide.ts holds the rules. It runs
 # each time a workflow that checks such a pull request finishes, so the last check to finish
 # merges it, and each time such a pull request gets the auto-merge label, so a label put back after
 # its checks finished still merges it (scripts/release/find-event-branch.ts). A run for any other

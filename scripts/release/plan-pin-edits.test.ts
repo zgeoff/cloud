@@ -27,6 +27,53 @@ test('it pins an atc release in the agent image, the daemon and the gateway', ()
   });
 });
 
+test('it moves an image tag pin with no version to the published tag and digest', () => {
+  const plan = planPinEdits({
+    record: getRecord('atc-gateway-images'),
+    version: '7.1.0',
+    values: {
+      tags: { 'atc-gateway': '7.1.0', 'atc-gateway-backup': '3.1.0-r2' },
+      digests: {
+        'atc-gateway': `sha256:${'1'.repeat(64)}`,
+        'atc-gateway-backup': `sha256:${'4'.repeat(64)}`,
+      },
+    },
+    files: {
+      'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+    },
+  });
+
+  expect(plan).toStrictEqual({
+    files: {
+      'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r2@sha256:${'4'.repeat(64)}\n`,
+    },
+    notes: [
+      'atc-gateway-image already pins 7.1.0',
+      `pinned atc-gateway-backup-image 3.1.0-r2 sha256:${'4'.repeat(64)}`,
+    ],
+    written: getRecord('atc-gateway-images').pins.slice(1),
+  });
+});
+
+test('it refuses an image tag pin without the published tag', () => {
+  expect(
+    planPinEdits({
+      record: getRecord('atc-gateway-images'),
+      version: '7.1.0',
+      values: {
+        tags: { 'atc-gateway': '7.1.0' },
+        digests: {
+          'atc-gateway': `sha256:${'1'.repeat(64)}`,
+          'atc-gateway-backup': `sha256:${'4'.repeat(64)}`,
+        },
+      },
+      files: {
+        'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+      },
+    }),
+  ).toStrictEqual(new Error('the release names no atc-gateway-backup tag'));
+});
+
 test('it keeps a newer pin and pins the other files', () => {
   const plan = planPinEdits({
     record: getRecord('atc'),

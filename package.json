@@ -82,7 +82,9 @@
     "ci:decide-provider-checks": "bash scripts/decide-provider-checks.sh",
     "ci:decide-full-checks": "bash scripts/decide-full-checks.sh",
     "ci:install-pulumi-cli": "bash scripts/install-pulumi-cli.sh",
-    "ci:publish-atc-gateway-images": "bash scripts/publish-atc-gateway-images.sh"
+    "ci:publish-atc-gateway-images": "bash scripts/publish-atc-gateway-images.sh",
+    "ci:decide-atc-gateway-publish": "bun scripts/release/run-decide-gateway-publish.ts",
+    "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images"
   },
   "devDependencies": {
     "@commitlint/cli": "21.2.0",
