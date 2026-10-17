@@ -58,10 +58,10 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    `zfs create` loads the key of a new encryption root, so the children need no `load-key`. The
    children inherit the encryption and the compression. LZ4 stores the blocks of zeros that ext4
-   writes as holes. The zvol reserves its whole size on the pool, because ext4 on a sparse zvol
-   gets write errors when the pool fills. `/var/lib/rancher` held 9 GiB when the zvol was sized,
-   and the cluster's PVCs request 41 GiB, which local-path does not enforce. Grow the zvol later
-   with `zfs set volsize` and `resize2fs`.
+   writes as holes. The zvol reserves its whole size on the pool, because ext4 on a sparse zvol gets
+   write errors when the pool fills. `/var/lib/rancher` held 9 GiB when the zvol was sized, and the
+   cluster's PVCs request 41 GiB, which local-path does not enforce. Grow the zvol later with
+   `zfs set volsize` and `resize2fs`.
 
 4. Make the ext4 filesystem on the zvol:
 
@@ -85,8 +85,8 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
 1. Switch with `bash scripts/switch-geoffcloud.sh`, as [Workflows](./workflows.md#switch-the-host)
    describes. The switch restarts k3s, imp-host and the atc daemon, because their units gain the
-   mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once
-   the zvol holds k3s's data directory `k3s`, so it never makes a new cluster on an empty zvol by
+   mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once the
+   zvol holds k3s's data directory `k3s`, so it never makes a new cluster on an empty zvol by
    accident. Move an existing cluster onto the zvol with [Move k3s's data](./move-rancher.md). For a
    new cluster, make the empty directory before the switch:
    `mount /dev/zvol/tank/cloud/rancher /mnt && install -d /mnt/k3s && umount /mnt`.

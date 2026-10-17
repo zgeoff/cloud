@@ -11,12 +11,12 @@ The sequence is a switch, a copy, a check and a removal. The switch comes first,
 `switch-geoffcloud.sh` reads nixie's pods through k3s before it activates. After the switch, the
 zvol is mounted at `/var/lib/rancher` without k3s's data directory `k3s`, and k3s's unit asserts
 that directory, so k3s fails to start instead of making a new cluster with a new CA on the empty
-zvol. The host script
-`scripts/host/move-rancher.sh` does the copy and the removal. The cluster is down from the switch to
-the end of the copy, about 10 to 20 minutes: the tunnel, Grafana, the atc gateway and nixie.
+zvol. The host script `scripts/host/move-rancher.sh` does the copy and the removal. The cluster is
+down from the switch to the end of the copy, about 10 to 20 minutes: the tunnel, Grafana, the atc
+gateway and nixie.
 
-The NixOS check `tank-cloud-rancher` rehearses every step in a VM: [Rehearse it](#rehearse-it)
-gives the run.
+The NixOS check `tank-cloud-rancher` rehearses every step in a VM: [Rehearse it](#rehearse-it) gives
+the run.
 
 ## Before you start
 
@@ -56,12 +56,11 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    bash scripts/switch-geoffcloud.sh
    ```
 
-   Expect the activation to end with `starting the following units: k3s.service` and no failed
-   unit, then the script's nixie readiness check to wait. k3s fails its assertion, because the zvol
-   holds no `k3s` directory yet, and the journal of `k3s.service` holds
-   `Assertion failed for k3s service.` Run [Copy](#copy) while the check waits. When the check
-   gives up first, the host still runs the new generation, and you run the check again after the
-   copy.
+   Expect the activation to end with `starting the following units: k3s.service` and no failed unit,
+   then the script's nixie readiness check to wait. k3s fails its assertion, because the zvol holds
+   no `k3s` directory yet, and the journal of `k3s.service` holds
+   `Assertion failed for k3s service.` Run [Copy](#copy) while the check waits. When the check gives
+   up first, the host still runs the new generation, and you run the check again after the copy.
 
 2. Check that k3s stayed stopped and that the zvol is empty:
 
@@ -94,14 +93,14 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    started k3s on tank/cloud/rancher
    ```
 
-   The script kills k3s's containerd, shims and containers, which outlive the unit, so nothing writes
-   to the old trees during the copy. It never runs `k3s-killall.sh`, which also clears Tailscale's
-   advertised routes and rewrites iptables. It refuses, and copies nothing, when either path is not
-   the zvol's mount, when the zvol is sparse, or when `/var/lib/rancher/k3s` already exists on it.
-   The copy of `/var/lib/rancher` waits in a staging directory until both trees match, and `k3s`
-   moves into place last. A `MISMATCH` stops the copy before k3s starts; read the listed entries,
-   then run the copy again. A run that stopped part-way clears what it left on the zvol before it
-   copies.
+   The script kills k3s's containerd, shims and containers, which outlive the unit, so nothing
+   writes to the old trees during the copy. It never runs `k3s-killall.sh`, which also clears
+   Tailscale's advertised routes and rewrites iptables. It refuses, and copies nothing, when either
+   path is not the zvol's mount, when the zvol is sparse, or when `/var/lib/rancher/k3s` already
+   exists on it. The copy of `/var/lib/rancher` waits in a staging directory until both trees match,
+   and `k3s` moves into place last. A `MISMATCH` stops the copy before k3s starts; read the listed
+   entries, then run the copy again. A run that stopped part-way clears what it left on the zvol
+   before it copies.
 
 2. From this machine, check nixie as the switch would have:
 
@@ -188,7 +187,7 @@ bun run test:nixos tank-cloud-rancher
 
 The check starts a real k3s server with geoffcloud's package and flags on the root disk, with a pod
 that writes into a volume directory. It switches to the config with the zvol, checks that k3s fails
-its assertion on the empty zvol, runs the copy, and checks that the cluster CA, the node password, the
-admin kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive. It then runs
-the removal, and reboots with the pool's import held back past a device's default wait, so k3s
+its assertion on the empty zvol, runs the copy, and checks that the cluster CA, the node password,
+the admin kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive. It then
+runs the removal, and reboots with the pool's import held back past a device's default wait, so k3s
 starts on the zvol only after the import.
