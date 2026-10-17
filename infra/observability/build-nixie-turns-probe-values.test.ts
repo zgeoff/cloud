@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import invariant from 'tiny-invariant';
 import { buildNixieTurnsProbeValues } from './build-nixie-turns-probe-values.ts';
 
 test("it probes nixie's readiness report every 30s, failing unless the body says the turns pass", () => {
@@ -93,9 +94,7 @@ test.each([
   const [pattern] = buildNixieTurnsProbeValues('http://nixie.test/health/ready').config.modules
     .nixie_turns.http.fail_if_body_not_matches_regexp;
 
-  if (pattern === undefined) {
-    throw new Error('expected a body pattern');
-  }
+  invariant(pattern !== undefined, 'expected a body pattern');
 
   expect(new RegExp(pattern, 'u').test(JSON.stringify(body))).toBe(isPassing);
 });

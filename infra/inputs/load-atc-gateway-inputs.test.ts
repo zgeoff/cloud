@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { Output, isSecret } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
 import { buildStubConfig } from '../test-utils/build-stub-config.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
@@ -122,9 +123,7 @@ test('it marks every daemon token secret', () => {
     },
   );
 
-  if (result.atcGateway === undefined) {
-    throw new Error('expected the gateway inputs');
-  }
+  invariant(result.atcGateway !== undefined, 'expected the gateway inputs');
 
   expect(
     Promise.all(
@@ -160,9 +159,7 @@ test('it gives each daemon the token from its own ATC_GATEWAY_TOKEN_<NAME> varia
 
   const tokens = result.atcGateway?.secrets.tokens;
 
-  if (tokens === undefined) {
-    throw new Error('expected the gateway inputs');
-  }
+  invariant(tokens !== undefined, 'expected the gateway inputs');
 
   expect(
     Promise.all(
@@ -199,9 +196,7 @@ test('it marks every backup value secret when the backup variables are set', () 
 
   const backup = result.atcGateway?.secrets.backup;
 
-  if (backup === undefined) {
-    throw new Error('expected the backup secrets');
-  }
+  invariant(backup !== undefined, 'expected the backup secrets');
 
   expect(isSecret(backup.repository)).resolves.toBeTrue();
   expect(isSecret(backup.password)).resolves.toBeTrue();
@@ -234,9 +229,7 @@ test('it carries the backup values, with the restic repository built from the R2
 
   const backup = result.atcGateway?.secrets.backup;
 
-  if (backup === undefined) {
-    throw new Error('expected the backup secrets');
-  }
+  invariant(backup !== undefined, 'expected the backup secrets');
 
   expect(resolveOutput(backup.repository)).resolves.toBe(
     's3:https://0123456789abcdef.r2.cloudflarestorage.com/atc-gateway-backups/atc-gateway',
@@ -312,9 +305,7 @@ test('it marks the pull token secret and carries it as given', async () => {
 
   const token = result.atcGateway?.secrets.pullCredential.token;
 
-  if (token === undefined) {
-    throw new Error('expected the pull credential');
-  }
+  invariant(token !== undefined, 'expected the pull credential');
 
   const isMarkedSecret = await isSecret(token);
   const value = await resolveOutput(token);
@@ -366,9 +357,7 @@ test("it carries the owner's address from the secret stack config, still marked 
 
   const ownerEmail = result.atcGateway?.secrets.ownerEmail;
 
-  if (ownerEmail === undefined) {
-    throw new Error("expected the owner's address");
-  }
+  invariant(ownerEmail !== undefined, "expected the owner's address");
 
   const isMarkedSecret = await isSecret(ownerEmail);
   const value = await resolveOutput(ownerEmail);

@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { RunError, isSecret } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildStubConfig } from './build-stub-config.ts';
 import { resolveOutput } from './resolve-output.ts';
 
@@ -64,9 +65,7 @@ test('it returns the raw string as a secret from getSecret', async () => {
     'atcGatewayOwnerEmail',
   );
 
-  if (value === undefined) {
-    throw new Error('expected a secret value');
-  }
+  invariant(value !== undefined, 'expected a secret value');
 
   const isMarkedSecret = await isSecret(value);
   const resolved = await resolveOutput(value);
