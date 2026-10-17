@@ -224,7 +224,10 @@ VM cannot have ([the restore drill](./restore-drill.md#restore-a-root-disk-snaps
 **CAUTION:** A snapshot restores `vda` only. impd's database lives on `vdb`, so a snapshot from
 before an imp upgrade brings back an older image beside a newer database, and impd refuses to start.
 Before impd starts, either switch to a generation whose image matches the database, or restore a
-database copy that matches the snapshot's image (section 2).
+database copy that matches the snapshot's image (section 2). k3s's datastore lives on `vdb` too, on
+the zvol `tank/cloud/rancher`, so a snapshot from before a k3s upgrade brings back an older k3s
+binary beside a newer datastore, which that binary may refuse or corrupt. Before k3s starts, switch
+to a generation whose k3s is at least the datastore's version.
 
 `vda` holds NixOS. `vdb` holds imp's ZFS pool and is never part of these steps.
 

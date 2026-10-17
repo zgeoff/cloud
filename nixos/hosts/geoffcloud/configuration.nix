@@ -224,7 +224,9 @@ in
   # its datasets are not mounted, instead of starting on the empty mount points on vda. The
   # secret files of imp-host and the atc daemon and impd's database copies keep their paths, but
   # live on tank/cloud: each path is a bind mount of a directory of a dataset
-  # (docs/runbooks/move-host-secrets.md).
+  # (docs/runbooks/move-host-secrets.md). k3s's data directory is the rancher zvol itself, and
+  # /etc/rancher, with the admin kubeconfig and the node password, a directory on it
+  # (docs/runbooks/move-rancher.md).
   services.tank-cloud = {
     enable = true;
     binds = {
@@ -242,9 +244,17 @@ in
         dataset = "imp-db-backups";
         path = "/root/imp-db-backups";
       };
+      etc-rancher = {
+        dataset = "rancher";
+        subdirectory = "etc-rancher";
+        path = "/etc/rancher";
+      };
     };
     requiredBy = {
-      k3s = [ "rancher" ];
+      k3s = [
+        "rancher"
+        "etc-rancher"
+      ];
       imp-host = [
         "host-secrets"
         "imp-host-secrets"
@@ -340,6 +350,12 @@ in
       "--resolv-conf=/etc/k3s-resolv.conf"
     ];
   };
+
+  # k3s on a zvol without its data directory would make a new cluster with a new CA, so the
+  # start fails instead; scripts/host/move-rancher.sh copy puts the directory there last
+  # (docs/runbooks/move-rancher.md). The bind of /etc/rancher is no guard: systemd makes a bind's
+  # missing source directory.
+  systemd.services.k3s.unitConfig.AssertPathExists = "/var/lib/rancher/k3s";
 
   environment.etc."k3s-resolv.conf".text = ''
     nameserver 1.1.1.1

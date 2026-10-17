@@ -17,7 +17,8 @@ let
   throwawayKey = lib.strings.replicate 8 "0f1e2d3c";
   requiredBy = geoffcloud.config.services.tank-cloud.requiredBy;
   binds = geoffcloud.config.services.tank-cloud.binds;
-  mountPoint = dataset: "/var/lib/tank-cloud/${dataset}";
+  mountPoint =
+    dataset: if dataset == "rancher" then "/var/lib/rancher" else "/var/lib/tank-cloud/${dataset}";
   # a requiredBy name is a dataset or a bind; either gives the path to write into
   pathOf = name: if binds ? ${name} then binds.${name}.path else mountPoint name;
   bindPaths = lib.mapAttrsToList (_: bind: bind.path) binds;
@@ -89,11 +90,16 @@ pkgs.testers.runNixOSTest {
     services = ${builtins.toJSON (lib.attrNames requiredBy)}
     mount_points = ["${mountPoint "host-secrets"}", "${mountPoint "imp-db-backups"}", "${mountPoint "rancher"}"]
     bind_paths = ${builtins.toJSON bindPaths}
-    bind_mounts = [
-        "tank/cloud/host-secrets[/atc-daemon] zfs",
-        "tank/cloud/host-secrets[/imp-host] zfs",
-        "tank/cloud/imp-db-backups zfs",
-    ]
+
+
+    def bind_mounts(zvol):
+        """each bind's source, in the order of bind_paths"""
+        return [
+            "tank/cloud/host-secrets[/atc-daemon] zfs",
+            f"{zvol}[/etc-rancher] ext4",
+            "tank/cloud/host-secrets[/imp-host] zfs",
+            "tank/cloud/imp-db-backups zfs",
+        ]
 
 
     def assert_unlocked():
@@ -103,7 +109,7 @@ pkgs.testers.runNixOSTest {
         mounts = [machine.succeed(f"findmnt -rn -o SOURCE,FSTYPE --mountpoint {path}").strip() for path in mount_points]
         assert mounts == ["tank/cloud/host-secrets zfs", "tank/cloud/imp-db-backups zfs", f"{zvol} ext4"], f"the mounts are {mounts}"
         binds = [machine.succeed(f"findmnt -rn -o SOURCE,FSTYPE --mountpoint {path}").strip() for path in bind_paths]
-        assert binds == bind_mounts, f"the binds are {binds}"
+        assert binds == bind_mounts(zvol), f"the binds are {binds}"
 
 
     def assert_no_ordering_cycle():
@@ -172,8 +178,9 @@ pkgs.testers.runNixOSTest {
         assert listing == {
             "${mountPoint "host-secrets"}": ["atc-daemon", "data", "imp-host", "imp-host-started", "preview-started"],
             "${mountPoint "imp-db-backups"}": ["data"],
-            "${mountPoint "rancher"}": ["data", "k3s-started", "lost+found"],
+            "${mountPoint "rancher"}": ["data", "etc-rancher", "k3s-started", "lost+found"],
             "/var/lib/atc-daemon-secrets": ["atc-daemon-started"],
+            "/etc/rancher": ["k3s-started"],
             "/var/lib/imp-host/secrets": ["imp-host-dns-token-started", "imp-host-started"],
             "/root/imp-db-backups": ["data"],
         }, f"the datasets hold {listing}"
@@ -200,13 +207,13 @@ pkgs.testers.runNixOSTest {
         assert states == ["inactive"] * len(services), f"the services are {states}"
         for path in mount_points + bind_paths:
             machine.fail(f"mountpoint -q {path}")
-        # the bind paths on the root disk stay empty: nothing wrote into them
-        for path in bind_paths:
+        # the bind paths and k3s's data directory on the root disk stay empty: nothing wrote into them
+        for path in bind_paths + ["${mountPoint "rancher"}"]:
             left = machine.succeed(f"ls -A {path}")
             assert left == "", f"{path} on the root disk holds {left!r}"
         # the empty mount points on the root disk, and nothing under them
         left = machine.succeed("find /var/lib/tank-cloud -mindepth 1 | sort").split()
-        assert left == mount_points, f"the root disk holds {left}"
+        assert left == mount_points[:2], f"the root disk holds {left}"
 
 
     with subtest("it loads a key restored without a trailing newline when tank-cloud.target and the services start again"):

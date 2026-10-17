@@ -3,10 +3,10 @@
 `tank/cloud` is the encryption root on geoffcloud's ZFS pool for host state that must stay out of
 the root disk's snapshots. Its key sits on `vda` at `/var/lib/zfs-keys/tank.key`, and its data sits
 on `vdb`, so neither disk alone exposes the data. The host loads the key at boot with no one present
-and mounts three children under `/var/lib/tank-cloud`: the filesystems `host-secrets` and
-`imp-db-backups`, and the sparse zvol `rancher`, which holds ext4. When the key fails to load, the
-host still boots to SSH, and k3s, imp-host and the atc daemon stay stopped, so none of them starts
-on an empty mount point on `vda`.
+and mounts its three children: the filesystems `host-secrets` and `imp-db-backups` under
+`/var/lib/tank-cloud`, and the zvol `rancher`, which holds ext4, at `/var/lib/rancher`, k3s's data
+directory. When the key fails to load, the host still boots to SSH, and k3s, imp-host and the atc
+daemon stay stopped, so none of them starts on an empty mount point on `vda`.
 
 The NixOS module `nixos/modules/tank-cloud.nix` does the unlock and the mounts. It never creates the
 datasets: you create them once with the commands below, before the first switch to a config that
@@ -18,7 +18,9 @@ on these datasets: the module bind-mounts a directory of `host-secrets` at
 `/var/lib/imp-host/secrets` and `/var/lib/atc-daemon-secrets`, and the root of `imp-db-backups` at
 `/root/imp-db-backups`. A bind is `nofail` and requires its dataset's mount, so without the key it
 is not made, and the path stays the empty directory on `vda`.
-[Move the host secrets](./move-host-secrets.md) moves the files and removes the old copies.
+[Move the host secrets](./move-host-secrets.md) moves the files and removes the old copies. The
+module also bind-mounts the zvol's directory `etc-rancher` at `/etc/rancher`, and
+[Move k3s's data](./move-rancher.md) moves k3s's data onto the zvol.
 
 ## Create the datasets
 
@@ -51,14 +53,15 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
      -o keylocation=file:///var/lib/zfs-keys/tank.key -o compression=lz4 -o mountpoint=legacy tank/cloud
    zfs create -o mountpoint=legacy tank/cloud/host-secrets
    zfs create -o mountpoint=legacy tank/cloud/imp-db-backups
-   zfs create -s -V 64G tank/cloud/rancher
+   zfs create -V 64G tank/cloud/rancher
    ```
 
    `zfs create` loads the key of a new encryption root, so the children need no `load-key`. The
    children inherit the encryption and the compression. LZ4 stores the blocks of zeros that ext4
-   writes as holes. The zvol is sparse, so its size is a cap, not a reservation: `/var/lib/rancher`
-   held 11 GB when the zvol was sized, and 64 GB leaves room for the k3s datastore, its images and
-   its volumes to grow several times over. Grow it later with `zfs set volsize` and `resize2fs`.
+   writes as holes. The zvol reserves its whole size on the pool, because ext4 on a sparse zvol gets
+   write errors when the pool fills. `/var/lib/rancher` held 9 GiB when the zvol was sized, and the
+   cluster's PVCs request 41 GiB, which local-path does not enforce. Grow the zvol later with
+   `zfs set volsize` and `resize2fs`.
 
 4. Make the ext4 filesystem on the zvol:
 
@@ -82,11 +85,15 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
 1. Switch with `bash scripts/switch-geoffcloud.sh`, as [Workflows](./workflows.md#switch-the-host)
    describes. The switch restarts k3s, imp-host and the atc daemon, because their units gain the
-   mount requirement, so imp-host's restart puts every awake imp to sleep.
+   mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once the
+   zvol holds k3s's data directory `k3s`, so it never makes a new cluster on an empty zvol by
+   accident. Move an existing cluster onto the zvol with [Move k3s's data](./move-rancher.md). For a
+   new cluster, make the empty directory before the switch:
+   `mount /dev/zvol/tank/cloud/rancher /mnt && install -d /mnt/k3s && umount /mnt`.
 2. Check the mounts and the services:
 
    ```bash
-   for path in /var/lib/tank-cloud/{host-secrets,imp-db-backups,rancher}; do
+   for path in /var/lib/tank-cloud/{host-secrets,imp-db-backups} /var/lib/rancher; do
      findmnt -n -o SOURCE,FSTYPE --mountpoint "$path"
    done
    systemctl is-active tank-cloud-key k3s imp-host atc-daemon
