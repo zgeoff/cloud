@@ -9,7 +9,7 @@ The steps use one helper, which runs imp's CLI in imp-host as impd's root. It se
 input over SSH, so a secret piped into it never reaches the host's journal:
 
 ```bash
-host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
+host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
 ```
 
 ## Set the service up
@@ -40,7 +40,7 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host imp "$@"; }
    `preview-model`, and write it to the host's encrypted secrets dataset without printing it:
 
    ```bash
-   ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && docker exec imp-host imp token new preview --scope manage --imps "pv-*" --grantable gh,preview-model | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
+   ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && docker exec imp-host impz token new preview --scope manage --imps "pv-*" --grantable gh,preview-model | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
    ```
 
    Expect `ok`. A token minted before the contract run grants `gh` alone. Point it at both secrets
