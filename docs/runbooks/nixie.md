@@ -121,7 +121,9 @@ Expect `["deployment_key","impd_token","model_credentials"]`. A new host key goe
    ```
 
    For an upgrade, set `image` and `webImage` in the stack config `nixie` to the new release's tag
-   and digest, from its release notes, in one PR.
+   and digest, from its release notes, in one PR. In the same PR, vendor the release's API contract
+   with `bun run nixie:openapi <release_tag>`, so the type check fails on a procedure that the
+   deploy checks call and the release dropped or renamed.
 
 2. Add the release's sandbox images to impd, as above.
 3. Preview, then apply:

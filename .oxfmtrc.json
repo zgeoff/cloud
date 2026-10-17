@@ -1,6 +1,12 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["bun.lock", "sdk/**", "provider/**", ".claude/**"],
+  "ignorePatterns": [
+    "bun.lock",
+    "sdk/**",
+    "provider/**",
+    ".claude/**",
+    "scripts/nixie-api/openapi.*"
+  ],
   "proseWrap": "always",
   "semi": true,
   "trailingComma": "all",
