@@ -60,9 +60,9 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    children inherit the encryption and the compression. LZ4 stores the blocks of zeros that ext4
    writes as holes. The zvol reserves its whole size on the pool, because ext4 on a sparse zvol gets
    write errors when the pool fills. `/var/lib/rancher` held 13 GB when the zvol was sized, and the
-   cluster's PVCs request 41 GiB, which local-path does not enforce. The pool had 27 GB free, so
-   20G is what a full reservation allows. Grow the zvol later with `zfs set volsize` and
-   `resize2fs`, once the pool has the space.
+   cluster's PVCs request 41 GiB, which local-path does not enforce. The pool had 27 GB free, so 20G
+   is what a full reservation allows. Grow the zvol later with `zfs set volsize` and `resize2fs`,
+   once the pool has the space.
 
 4. Make the ext4 filesystem on the zvol:
 
