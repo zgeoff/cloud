@@ -24,9 +24,10 @@ counts as an input of the NixOS checks.
 ## Copies that stay outside
 
 A few copies cannot read the file: the stack config's daemon addresses, which the atc gateway's
-registry takes as config; nixie's config file, which infra mounts as written; and the tailnet tag
-that the deploy workflow passes to an action. `bun run check:topology` compares each copy with the
-constants and fails on a mismatch. It runs in CI and before a push.
+registry takes as config, and the tailnet tag that the deploy workflow passes to an action. nixie's
+config file holds no copy, because infra builds its `imp` section from the constants.
+`bun run check:topology` compares each copy with the constants and fails on a mismatch. It runs in
+CI and before a push.
 
 Version pins are not topology: each keeps its own pin file, which its bump tooling rewrites. Other
 data that the host, infra and the scripts all read belongs in this package as its own file beside

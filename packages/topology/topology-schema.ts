@@ -3,8 +3,14 @@ import { z } from 'zod';
 const portSchema = z.int().min(1).max(65_535);
 
 // the Onidel VM: its ID, which infra adopts and the snapshot script names, and the static public
-// addresses the host sets on eth0
-const vmSchema = z.strictObject({ id: z.uuid(), publicIPv4: z.ipv4(), publicIPv6: z.ipv6() });
+// addresses the host sets on eth0, with their prefix lengths
+const vmSchema = z.strictObject({
+  id: z.uuid(),
+  publicIPv4: z.ipv4(),
+  publicIPv6: z.ipv6(),
+  publicIPv4PrefixLength: z.int().min(0).max(32),
+  publicIPv6PrefixLength: z.int().min(0).max(128),
+});
 
 // a Tailscale ACL tag, as the policy file and `tailscale up --advertise-tags` name it
 const tagSchema = z.string().regex(/^tag:[a-z][\da-z-]*$/u);
@@ -20,7 +26,8 @@ const tagsSchema = z.strictObject({
 const nodeSchema = z.strictObject({ address: z.ipv4() });
 
 const nodesSchema = z.strictObject({
-  geoffcloud: nodeSchema,
+  // the host also holds its tailnet IPv6 address on tailscale0
+  geoffcloud: z.strictObject({ address: z.ipv4(), addressIPv6: z.ipv6() }),
   homePC: nodeSchema,
   imp: z.strictObject({ hostname: z.hostname(), address: z.ipv4() }),
 });
@@ -33,11 +40,12 @@ const tailnetSchema = z.strictObject({
   nodes: nodesSchema,
 });
 
-// k3s's default ranges (the host passes no --cluster-cidr or --service-cidr), its API port, and
-// Grafana's NodePort
+// k3s's default ranges (the host passes no --cluster-cidr or --service-cidr), the one node's pod
+// subnet that flannel leases from podCIDR, its API port, and Grafana's NodePort
 const k3sSchema = z.strictObject({
   podCIDR: z.cidrv4(),
   serviceCIDR: z.cidrv4(),
+  nodePodCIDR: z.cidrv4(),
   apiPort: portSchema,
   grafanaNodePort: portSchema,
 });

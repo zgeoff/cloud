@@ -76,24 +76,6 @@ const sources: readonly Source[] = [
     ],
   },
 
-  // nixie's config file, which infra mounts byte for byte
-  {
-    file: 'deploy/nixie/config.yaml',
-    collectCopies: (config) => [
-      {
-        field: 'imp.url',
-        actual: findPath(config, ['imp', 'url']),
-        expected: `https://${topology.imp.domain}`,
-      },
-      ...collectHostAddressCopies(findPath(config, ['imp', 'host_addresses'])),
-      {
-        field: 'imp.egress_deny',
-        actual: findPath(config, ['imp', 'egress_deny']),
-        expected: [topology.k3s.podCIDR, topology.k3s.serviceCIDR],
-      },
-    ],
-  },
-
   // the deploy workflow, whose tailnet tag an action input takes as a literal
   {
     file: '.github/workflows/deploy-prod.yml',
@@ -134,27 +116,6 @@ function parseYAML(text: string): unknown {
 
 function findPath(value: unknown, keys: readonly string[]): unknown {
   return keys.reduce((field: unknown, key) => findJSONField(field, key), value);
-}
-
-// impd's IMP_HOST_ADDRESSES, each with its interface's prefix length, which the host config holds;
-// the constants hold the addresses
-function collectHostAddressCopies(entries: unknown): readonly Omit<Copy, 'file'>[] {
-  const expected = [
-    topology.vm.publicIPv4,
-    topology.vm.publicIPv6,
-    topology.docker.bridgeAddress,
-    topology.tailnet.nodes.geoffcloud.address,
-  ];
-
-  return expected.map((address, index) => {
-    const entry: unknown = Array.isArray(entries) ? entries[index] : undefined;
-
-    return {
-      field: `imp.host_addresses[${index}]`,
-      actual: typeof entry === 'string' ? entry.split('/')[0] : entry,
-      expected: address,
-    };
-  });
 }
 
 interface TailscaleStep {
