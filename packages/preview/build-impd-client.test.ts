@@ -23,7 +23,7 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
   expect(ctx.impd.imps.get('pv-0a1b2c3d-7')).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: expect.toSatisfy((value: string) => !Number.isNaN(Date.parse(value))),
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
@@ -69,6 +69,15 @@ test('#sleepImp rejects with impd error code for an imp impd does not know', () 
   expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toMatchObject({ code: 'NOT_FOUND' });
 });
 
+test('#sleepImp names impd and its error code in the message of a refusal', () => {
+  const ctx = setupTest();
+
+  expect(ctx.client.sleepImp('pv-0a1b2c3d-7')).rejects.toThrowWithMessage(
+    Error,
+    'impd NOT_FOUND: no imp named pv-0a1b2c3d-7',
+  );
+});
+
 test('#readImps rejects with UNAUTHORIZED when impd refuses the token', () => {
   const ctx = setupTest();
   const client = buildImpdClient(ctx.impd.url, 'imp_wrong.token');
@@ -82,7 +91,7 @@ test('#installGrant adds the secret to an imp that lacks it', async () => {
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -101,7 +110,7 @@ test('#installGrant leaves an imp that holds the secret without a second grant',
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -120,7 +129,7 @@ test('#runCommand returns the exit code and output of a guest command that requi
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
     name: 'pv-0a1b2c3d-7',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -139,6 +148,52 @@ test('#runCommand returns the exit code and output of a guest command that requi
   expect(ctx.impd.commands).toStrictEqual([
     { imp: 'pv-0a1b2c3d-7', argv: ['docker', 'compose', 'up'], require: ['broker'] },
   ]);
+});
+
+test('#runCommand returns the output of both streams in the order impd sent them', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  ctx.impd.answerCommand = () => ({
+    code: 1,
+    stdout: 'pulling seed\n',
+    stderr: 'seed: exited 1\n',
+  });
+
+  const result = await ctx.client.runCommand('pv-0a1b2c3d-7', ['docker', 'compose', 'up']);
+
+  expect(result).toStrictEqual({ code: 1, output: 'pulling seed\nseed: exited 1\n' });
+});
+
+test('#runCommand starts no command once its signal has aborted', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  const result = ctx.client.runCommand('pv-0a1b2c3d-7', ['true'], { signal: AbortSignal.abort() });
+
+  await expect(result).toReject();
+
+  expect(ctx.impd.calls).toStrictEqual([]);
 });
 
 test('#runCommand rejects with impd error code for an imp impd does not know', () => {

@@ -3,13 +3,24 @@ import { expect, test } from 'bun:test';
 import { NativeWebSocket } from '../mocks/native-web-socket.ts';
 import { startStubImpd } from './start-stub-impd.ts';
 
-test('it answers a procedure in the oRPC envelope', async () => {
+test('it answers a procedure in the oRPC envelope, with each date named in meta', async () => {
   const impd = startStubImpd();
 
-  const response = await fetch(`${impd.url}/rpc/imps/create`, {
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  const response = await fetch(`${impd.url}/rpc/imps/list`, {
     method: 'POST',
     headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
-    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', image: 'base', memoryMib: 2048 } }),
+    body: JSON.stringify({ json: {} }),
   });
 
   expect(response.status).toBe(200);
@@ -17,15 +28,46 @@ test('it answers a procedure in the oRPC envelope', async () => {
   const result = await response.json();
 
   expect(result).toStrictEqual({
-    json: {
-      id: 'imp-pv-0a1b2c3d-17',
-      name: 'pv-0a1b2c3d-17',
-      image: 'base',
-      state: 'running',
-      httpPort: 8080,
-      lastActiveAt: null,
-    },
+    json: [
+      {
+        id: 'imp-pv-0a1b2c3d-17',
+        name: 'pv-0a1b2c3d-17',
+        image: 'base',
+        state: 'running',
+        httpPort: 8080,
+        lastActiveAt: '2026-10-15T08:00:00.000Z',
+      },
+    ],
+    meta: [[1, 0, 'lastActiveAt']],
   });
+});
+
+test('it creates an imp active from its creation, as impd does', async () => {
+  const impd = startStubImpd();
+  const before = Date.now();
+
+  const response = await fetch(`${impd.url}/rpc/imps/create`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', image: 'base', memoryMib: 2048 } }),
+  });
+
+  const result = (await response.json()) as { readonly json: { readonly lastActiveAt: string } };
+
+  expect(new Date(result.json.lastActiveAt)).toBeBetween(new Date(before), new Date());
+});
+
+test('it reports a version and the exec requirement check from system.info, which takes no body', async () => {
+  const impd = startStubImpd();
+
+  const response = await fetch(`${impd.url}/rpc/system/info`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}` },
+  });
+
+  const result = await response.json();
+
+  expect(result).toStrictEqual({ json: { version: '2.3.0', features: { execRequire: true } } });
 });
 
 test('it lists the secrets granted to an imp, as impd grants.list does', async () => {
@@ -34,7 +76,7 @@ test('it lists the secrets granted to an imp, as impd grants.list does', async (
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -89,7 +131,7 @@ test('it fails closed on a procedure it does not model', async () => {
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -109,13 +151,106 @@ test('it fails closed on a procedure it does not model', async () => {
   expect(text).toBe('not impd: start-stub-impd.ts has no imps/expose\n');
 });
 
-test('it runs a guest command over the exec protocol and wakes the imp', async () => {
+test('it redeems an exec ticket once and refuses it with a 401 after', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  const issued = await fetch(`${impd.url}/rpc/exec/ticket`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17' } }),
+  });
+
+  const result = (await issued.json()) as { readonly json: { readonly ticket: string } };
+
+  const first = await fetch(`${impd.url}/exec?ticket=${result.json.ticket}`);
+  const second = await fetch(`${impd.url}/exec?ticket=${result.json.ticket}`);
+
+  expect(first.status).toBe(400);
+  expect(second.status).toBe(401);
+});
+
+test('it runs a guest command opened with a ticket, with both streams, and wakes the imp', async () => {
   const impd = startStubImpd();
 
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  impd.answerCommand = () => ({ code: 0, stdout: 'ok\n', stderr: 'warn\n' });
+
+  const issued = await fetch(`${impd.url}/rpc/exec/ticket`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17' } }),
+  });
+
+  const result = (await issued.json()) as { readonly json: { readonly ticket: string } };
+
+  const socket = new NativeWebSocket(
+    `${impd.url.replace('http', 'ws')}/exec?ticket=${result.json.ticket}`,
+  );
+
+  socket.binaryType = 'arraybuffer';
+
+  const messages: string[] = [];
+  const closed = Promise.withResolvers<void>();
+
+  socket.addEventListener('close', () => {
+    closed.resolve();
+  });
+
+  socket.addEventListener('open', () => {
+    socket.send(
+      JSON.stringify({ type: 'start', name: 'pv-0a1b2c3d-17', argv: ['true'], tty: false }),
+    );
+  });
+
+  socket.addEventListener('message', (event) => {
+    const message =
+      typeof event.data === 'string'
+        ? event.data
+        : `frame ${new Uint8Array(event.data as ArrayBuffer)[0]}: ${new TextDecoder().decode(new Uint8Array(event.data as ArrayBuffer).subarray(1))}`;
+
+    messages.push(message);
+  });
+
+  await closed.promise;
+
+  expect(messages).toStrictEqual([
+    '{"type":"started","pid":4242}',
+    'frame 1: ok\n',
+    'frame 2: warn\n',
+    '{"type":"exit","code":0,"signal":null}',
+  ]);
+
+  expect(impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+});
+
+test('it runs a guest command opened with the bearer token', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'sleeping',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -170,7 +305,7 @@ test('it holds a command open without an exit until its imp is destroyed', async
   impd.imps.set('pv-sdk-0123456789abcdef', {
     name: 'pv-sdk-0123456789abcdef',
     state: 'running',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 8080,
     image: 'base',
     memoryMib: 2048,
@@ -227,7 +362,7 @@ test("it serves impd's wake proxy under its domain through MSW", async () => {
   impd.imps.set('pv-0a1b2c3d-17', {
     name: 'pv-0a1b2c3d-17',
     state: 'sleeping',
-    lastActiveAt: null,
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
     httpPort: 3000,
     image: 'base',
     memoryMib: 2048,
