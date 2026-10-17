@@ -32,8 +32,11 @@ packages/preview/  the preview service: one tailnet link per pull request, runni
 workers/           Cloudflare Workers: the external health check
 images/            container images: the agent image and the atc gateway
 nixos/             the host flake
+deploy/            the manifests and config of the workloads the cluster runs, such as nixie
 patches/           Bun patches, which patchedDependencies in the root package.json applies
 scripts/           repo tooling, run through the root package.json scripts
+test-support/      the shell suites' assertions and stand-ins
+e2e/               whole-workflow suites
 docs/
   architecture/    what is built
   runbooks/        operator and contributor procedures
@@ -114,7 +117,7 @@ docs/
 - The `Deploy prod` workflow applies each merged change to a Pulumi input once CI passes on `main`,
   bracketed by drift checks. `docs/runbooks/prod-apply.md` covers its runs. Its guard holds a run
   for any of these:
-  - a delete or a replace
+  - any operation other than a create, an update or a refresh, such as a delete or a replace
   - a change to the tailnet policy, the VM, the cloud firewall, the tunnel's routes or the gateway's
     Access policy
   - a failed drift check, for a manual dispatch
@@ -123,7 +126,6 @@ docs/
   `deployed/prod` tag, `bun run preview -- --refresh` from a clean `main` that shows only the
   reviewed changes, `bun run up`, `bun run drift` again, then move the tag. Record both drift
   results.
-- No scheduled drift check runs, because Onidel offers only full-account API keys.
 
 ## Choices that need the owner
 
