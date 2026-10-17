@@ -9,7 +9,7 @@
     };
     # imp's host module (zgeoff/impz docs/guides/nixos.md); pinned by flake.lock
     imp = {
-      url = "github:zgeoff/impz/94932a6b";
+      url = "github:zgeoff/impz/fbc0cb77";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
