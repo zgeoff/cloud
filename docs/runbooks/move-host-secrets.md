@@ -215,4 +215,6 @@ configuration with the binds, and checks the mounts, the services, the staged fi
 credential. It then takes a database copy, runs the removal, runs the two install scripts' host
 halves against the new mounts, and reboots.
 
-Result of the run: to be filled in after the run on the pull request.
+Result on 2026-10-17: the check passed under KVM, with all nine subtests, beside
+`tank-cloud-unlock`, the four restore rehearsals, `impd-db-tools`, `geoffcloud-eval` and
+`test-utils`.
