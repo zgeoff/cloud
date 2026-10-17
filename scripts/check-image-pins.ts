@@ -111,6 +111,10 @@ async function loadPins(
 const referencePattern =
   /^\s*(?:from\s+(?:--platform=\S+\s+)?|(?:-\s+)?[\w-]*image\s*[:=]\s*)["']?(?<reference>[^\s"']+)/iu;
 
+// an imp image that scripts/build-agent-image.ts builds into impd, agent-<short sha>: impd holds
+// it, and no registry, so it has no digest to pin
+const agentImagePattern = /^agent-[\da-f]{7,40}$/u;
+
 // a complete pin, <name>:<tag>@sha256:<digest>, where the name may start with a registry host and
 // port; the anchors make a digest with an extra digit fail, where a substring match would hold
 const pinPattern =
@@ -145,6 +149,10 @@ function parseLine(prefix: string, file: string, line: string): Pin | string | u
     return line.includes('@sha256:')
       ? `${prefix} a digest outside an image reference: ${line.trim()}\n`
       : undefined;
+  }
+
+  if (agentImagePattern.test(reference)) {
+    return undefined;
   }
 
   const match = pinPattern.exec(reference);

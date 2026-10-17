@@ -435,6 +435,51 @@ test('it reads a quoted Nix image and a tag-only key, which is not an image refe
   );
 });
 
+test('it skips an imp agent image name, which impd holds and no registry does', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'nixos', 'hosts', 'geoffcloud', 'configuration.nix'),
+    '      image = "agent-dd6b98c";\n',
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: ctx.stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.printErr).not.toHaveBeenCalled();
+
+  expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: 0 pins hold: 0 release tags name their pinned digests, and 0 upstream digests are still served\n',
+  );
+});
+
+test('it fails an agent- name that is not a short sha, without a digest', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, 'nixos', 'hosts', 'geoffcloud', 'configuration.nix'),
+    '      image = "agent-latest";\n',
+  );
+
+  const exitCode = await checkImagePins({
+    args: [ctx.root],
+    run: ctx.stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'check-image-pins: nixos/hosts/geoffcloud/configuration.nix:1: agent-latest pins no digest\n',
+  );
+});
+
 test('it fails, naming the file, when a pin file is missing', async () => {
   const ctx = await setupTest();
 
