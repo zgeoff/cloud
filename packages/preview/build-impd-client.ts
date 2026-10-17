@@ -1,5 +1,5 @@
-import type { ExecHandle, Imp, ImpClient } from '@zgeoff/imp-client';
-import { ExecError, ORPCError, createImpClient } from '@zgeoff/imp-client';
+import type { ExecHandle, Imp, ImpClient } from '@impz/client';
+import { ExecError, ORPCError, createImpClient } from '@impz/client';
 import type { ImpActivity } from './plan-slot-evictions.ts';
 
 interface ImpCreateOptions {

@@ -67,7 +67,7 @@ test('it reports a version and the exec requirement check from system.info, whic
 
   const result = await response.json();
 
-  expect(result).toStrictEqual({ json: { version: '2.2.1', features: { execRequire: true } } });
+  expect(result).toStrictEqual({ json: { version: '2.3.0', features: { execRequire: true } } });
 });
 
 test('it lists the secrets granted to an imp, as impd grants.list does', async () => {

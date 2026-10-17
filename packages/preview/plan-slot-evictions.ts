@@ -1,4 +1,4 @@
-import type { Imp } from '@zgeoff/imp-client';
+import type { Imp } from '@impz/client';
 import { contractImpPrefix } from './build-contract-imp-name.ts';
 
 // The part of impd's record of an imp that the slot and idle rules read. impd sets lastActiveAt

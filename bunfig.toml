@@ -8,12 +8,12 @@ exact = true
 # supply-chain guard: only install versions published >= 7 days ago
 minimumReleaseAge = 604800
 
-# @zgeoff/oxlint-config and @zgeoff/imp-client, first-party packages, are pinned
+# @zgeoff/oxlint-config and @impz/client, first-party packages, are pinned
 # to releases younger than the gate; each pinned version's provenance is checked
-# before the pin, and their own dependencies stay behind the gate. imp-client
+# before the pin, and their own dependencies stay behind the gate. The client
 # releases with impd's API, so the preview service's typed client would otherwise
 # trail the impd it talks to by a week.
-minimumReleaseAgeExcludes = ["@zgeoff/oxlint-config", "@zgeoff/imp-client"]
+minimumReleaseAgeExcludes = ["@zgeoff/oxlint-config", "@impz/client"]
 
 [test]
 # The root run covers infra and scripts: it registers jest-extended matchers, seeds faker once

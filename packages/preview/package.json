@@ -4,7 +4,7 @@
   "description": "The preview service: one tailnet link per pull request to that pull request's code, running in its own imp",
   "type": "module",
   "dependencies": {
-    "@zgeoff/imp-client": "1.6.0"
+    "@impz/client": "2.3.0"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",

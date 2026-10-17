@@ -6,7 +6,7 @@ import { server as mockServer } from '../mocks/node.ts';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
 
-// impd's API on loopback, as zgeoff/impz v2.2.1 serves @zgeoff/imp-client 1.6.0: oRPC procedures
+// impd's API on loopback, as zgeoff/impz v2.3.0 serves @impz/client 2.3.0: oRPC procedures
 // with each Date in `meta`, and /exec opened by a single-use exec.ticket or the bearer token. Tests
 // seed imps and answer guest commands; any other procedure fails with a 500.
 interface StubImp {
@@ -66,8 +66,8 @@ interface ExecSocketData {
   readonly ticketImp: string | null;
 }
 
-// the version system.info reports; impd 2 kept impd 1.6's wire API
-const stubImpdVersion = '2.2.1';
+// the version system.info reports: the impd the host pins
+const stubImpdVersion = '2.3.0';
 
 export function startStubImpd(): StubImpd {
   const token = 'imp_stubpreview.stub-secret';
