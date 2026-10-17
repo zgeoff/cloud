@@ -14,7 +14,7 @@
   fetchurl,
 }:
 let
-  version = "4.11.0";
+  version = "4.11.1";
   # the release's SHA256SUMS line for atc-linux-x64
   sha256 = "bcb6dd867fa46b1ce96d7ec85e0f501690c25d8b22d330153a89f48135e8aaba";
 in
