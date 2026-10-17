@@ -11,7 +11,9 @@
 # and impd restarts with the switch, so it tries 30 times, each try ended after 20 s, with a 10 s
 # pause after each try that is not ready, then fails (exit 1) and names each part that is not
 # ready with nixie's reason, or the last error when no report came back. It prints the ready parts
-# when it passes.
+# when it passes, then each advisory part that is not ready, such as conversation_turns while
+# nixie's turns keep failing. An advisory part never fails the check, because nixie answers with
+# it failing; the NixieTurnsFailing alert (infra/observability/build-alert-rules.ts) watches it.
 set -euo pipefail
 
 if [ "$#" -ne 1 ]; then
@@ -39,6 +41,8 @@ for try in $(seq 1 "$tries"); do
   if report="$(read_report)" && jq -e '.parts | type == "object"' <<< "$report" > /dev/null 2>&1; then
     if jq -e '.status == "ready" and ([.parts[] | .isReady == true] | all)' <<< "$report" > /dev/null; then
       echo "== nixie ready: $(jq -r '.parts | keys_unsorted | join(", ")' <<< "$report")"
+      jq -r '(.advisory // {}) | to_entries[] | select(.value.isReady != true)
+        | "== nixie advisory not ready: \(.key): \(.value.reason // "not ready")"' <<< "$report"
       exit 0
     fi
     problem="$(jq -r '[.parts | to_entries[] | select(.value.isReady != true)

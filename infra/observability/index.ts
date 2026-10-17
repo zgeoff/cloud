@@ -15,6 +15,9 @@ interface ClusterObservabilityInputs {
 
   // a TCP probe plus alert per atc daemon, set only with the gateway
   readonly atcDaemons: readonly ATCDaemonEndpoint[] | undefined;
+
+  // a probe plus alert for nixie's failing turns, set only with nixie
+  readonly nixieReadinessURL: string | undefined;
 }
 
 interface ObservabilityInputs {
@@ -43,11 +46,10 @@ export async function createObservability(
   const cluster =
     inputs.cluster === undefined
       ? undefined
-      : createClusterObservability(
-          inputs.cluster.provider,
-          inputs.cluster.alertWebhookURL,
-          inputs.cluster.atcDaemons,
-        );
+      : createClusterObservability(inputs.cluster.provider, inputs.cluster.alertWebhookURL, {
+          atcDaemons: inputs.cluster.atcDaemons,
+          nixieReadinessURL: inputs.cluster.nixieReadinessURL,
+        });
 
   // ALERT_WEBHOOK_URL is optional; without it, state changes show only in the Worker's logs.
   const healthCheck = await createHealthCheck({
