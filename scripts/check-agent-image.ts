@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { buildAgentImageGuestScript } from './build-agent-image-guest-script.ts';
 import { createAgentImageCheckDir } from './create-agent-image-check-dir.ts';
 import { ExitError } from './exit-error.ts';
+import { buildImpArgv } from './imp-cli.ts';
 import { loadAgentImagePins } from './load-agent-image-pins.ts';
 import { runOrExit } from './run-or-exit.ts';
 import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
@@ -73,9 +74,9 @@ async function setupGuest(options: Readonly<CheckAgentImageOptions>, target: Tar
     return ['docker', 'run', '--rm', '-i', '-v', mount, target.name, 'bash', '-s'];
   }
 
-  await runOrExit(options, ['impz', 'cp', dir, `${target.name}:/run/agent-image-check`]);
+  await runOrExit(options, buildImpArgv(['cp', dir, `${target.name}:/run/agent-image-check`]));
 
-  return ['impz', 'exec', target.name, '--', 'bash', '-s'];
+  return buildImpArgv(['exec', target.name, '--', 'bash', '-s']);
 }
 
 if (import.meta.main) {

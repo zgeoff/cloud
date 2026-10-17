@@ -1,3 +1,4 @@
+import { buildImpArgv } from './imp-cli.ts';
 import { parseBuildAgentImageArgs } from './parse-build-agent-image-args.ts';
 import { requireFreeAgentImageNames } from './require-free-agent-image-names.ts';
 import { resolveMainCommit } from './resolve-main-commit.ts';
@@ -98,5 +99,5 @@ async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
 }
 
 async function removeImage(io: Readonly<ScriptIO>, image: string) {
-  await runOrExit(io, ['impz', 'image', 'rm', image]);
+  await runOrExit(io, buildImpArgv(['image', 'rm', image]));
 }

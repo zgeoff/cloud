@@ -2,15 +2,14 @@ import { atcCloudGrantable } from './atc-cloud-grantable.ts';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
+import { loadHostImpJSON } from './imp-cli.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { parseJSONOutput } from './parse-json-output.ts';
-import { readImpList } from './read-imp-list.ts';
-import { runOnHost } from './run-on-host.ts';
+import { runOnHost } from './run-host-check.ts';
 import { runOp } from './run-op.ts';
-import { toShellArg } from './to-shell-arg.ts';
 
 export interface ATCCredentialsPreflight {
-  // impd's secrets and tokens, as the impz CLI prints them
+  // impd's secrets and tokens, as imp's CLI prints them
   readonly secrets: unknown;
   readonly tokens: unknown;
   readonly hasItem: boolean;
@@ -27,16 +26,16 @@ export async function checkATCCredentialsPreflight(
   await requireTools(context);
   await requireGrantableTokens(context);
 
-  const secrets = await readImpList(context, 'secret');
+  const secrets = await loadHostImpJSON(context, ['secret', 'ls']);
 
   requireGrantableSecrets(secrets);
 
-  const tokens = await readImpList(context, 'token');
+  const tokens = await loadHostImpJSON(context, ['token', 'ls']);
   const hasItem = await hasDaemonTokenItem(context);
   const hostFiles = await readHostFiles(context);
 
   context.printOut(
-    `ok: 1Password vault ${context.vault}, atc-key, ssh ${context.host}, impd grantableTokens, ${context.dir}\n`,
+    `ok: 1Password vault ${context.vault}, atc-key, ssh root@${context.host}, impd grantableTokens, ${context.dir}\n`,
   );
 
   return { secrets, tokens, hasItem, hostFiles };
@@ -56,11 +55,11 @@ async function requireTools(context: Readonly<ATCCredentialsContext>) {
   await runOnHost(context, ['true']);
 }
 
-// a failing `impz info` stops here with docker's own message, so the check reads only a real answer
+// a failing `info` stops here with docker's own message, so the check reads only a real answer
 async function requireGrantableTokens(context: Readonly<ATCCredentialsContext>) {
-  const text = await runOnHost(context, ['docker', 'exec', 'imp-host', 'impz', 'info', '--json']);
+  const info = await loadHostImpJSON(context, ['info']);
 
-  const features = findJSONField(parseJSONOutput(text, 'impz info'), 'features');
+  const features = findJSONField(info, 'features');
 
   if (findJSONField(features, 'grantableTokens') !== true) {
     throw new ExitError(1, 'impd lacks grantableTokens; nothing changed');
@@ -91,17 +90,18 @@ async function hasDaemonTokenItem(context: Readonly<ATCCredentialsContext>) {
 }
 
 async function readHostFiles(context: Readonly<ATCCredentialsContext>) {
-  const dir = toShellArg(context.dir);
-
   // the directory is a bind mount of tank/cloud; with it gone, a credential would land in the
-  // clear on the root disk and the bind would hide it later
-  const refusal = toShellArg(`${context.dir} is not a mount point; nothing written`);
-
+  // clear on the root disk and the bind would hide it later. bash gets the directory as $1, so
+  // the line itself holds no path to quote.
   await runOnHost(context, [
-    `mountpoint -q ${dir} || { echo ${refusal} >&2; exit 1; }; install -d -m 0700 -o root -g root ${dir}`,
+    'bash',
+    '-c',
+    'mountpoint -q "$1" || { echo "$1 is not a mount point; nothing written" >&2; exit 1; }; install -d -m 0700 -o root -g root "$1"',
+    'bash',
+    context.dir,
   ]);
 
-  const listing = await runOnHost(context, [`ls ${dir}`]);
+  const listing = await runOnHost(context, ['ls', context.dir]);
 
   return listing.split('\n').filter((line) => line !== '');
 }

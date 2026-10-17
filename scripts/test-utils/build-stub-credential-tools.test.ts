@@ -11,7 +11,16 @@ test('it answers op, atc-key and ssh to the host from one runner, and records ev
 
   const vault = await tools.run(['op', 'vault', 'get', 'cloud', '--format', 'json']);
   const key = await tools.run(['atc-key', 'zai']);
-  const host = await tools.run(['ssh', '-o', 'BatchMode=yes', 'root@geoffcloud', 'true']);
+
+  const host = await tools.run([
+    'ssh',
+    '-o',
+    'BatchMode=yes',
+    '-o',
+    'ConnectTimeout=15',
+    'root@geoffcloud',
+    "'true'",
+  ]);
 
   expect(vault.exitCode).toBe(0);
   expect(key.stdout.toString()).toBe('zai_fixture_key\n');

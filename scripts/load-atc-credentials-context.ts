@@ -5,7 +5,7 @@ import { topology } from '@zgeoff/cloud-topology';
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { parseJSONOutput } from './parse-json-output.ts';
-import type { HostIO } from './run-on-host.ts';
+import type { HostIO } from './run-host-check.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 
 export interface ATCCredentialsContext extends HostIO {
@@ -33,7 +33,7 @@ export async function loadATCCredentialsContext(
     run: options.run,
     printOut: options.printOut,
     printErr: options.printErr,
-    host: options.env['ATC_CREDENTIALS_HOST'] ?? 'root@geoffcloud',
+    host: options.env['ATC_CREDENTIALS_HOST'] ?? 'geoffcloud',
     vault: options.env['ATC_CREDENTIALS_VAULT'] ?? 'cloud',
     item: options.env['ATC_DAEMON_TOKEN_ITEM'] ?? 'atc-daemon-token',
     dir: options.env['ATC_CREDENTIALS_DIR'] ?? '/var/lib/atc-daemon-secrets',

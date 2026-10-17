@@ -56,7 +56,7 @@ test('it skips a 1Password item and a host file that match', async () => {
 
   expect(tools.calls.map((call) => call.argv.join(' '))).toStrictEqual([
     'op read op://cloud/atc-daemon-token/credential',
-    "ssh -o BatchMode=yes root@geoffcloud sha256sum '/var/lib/atc-daemon-secrets/gateway-token'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'sha256sum' '/var/lib/atc-daemon-secrets/gateway-token'",
   ]);
 });
 
@@ -166,12 +166,12 @@ test('it sends the bearer on stdin only: in op’s item template and after the h
       }),
     ],
     [
-      "ssh -o BatchMode=yes root@geoffcloud bash -s -- '/var/lib/atc-daemon-secrets'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets'",
       `${ctx.writeScript}${bearer}\n`,
     ],
     ['op read op://cloud/atc-daemon-token/credential', ''],
     [
-      "ssh -o BatchMode=yes root@geoffcloud sha256sum '/var/lib/atc-daemon-secrets/gateway-token'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'sha256sum' '/var/lib/atc-daemon-secrets/gateway-token'",
       '',
     ],
   ]);

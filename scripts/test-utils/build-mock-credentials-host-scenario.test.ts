@@ -3,7 +3,7 @@ import { buildMockCredentialsHostScenario } from './build-mock-credentials-host-
 
 test('it builds a default credentials host scenario', () => {
   expect(buildMockCredentialsHostScenario()).toStrictEqual({
-    host: 'root@geoffcloud',
+    host: 'geoffcloud',
     dir: '/var/lib/atc-daemon-secrets',
     impdPort: '7070',
     info: { version: '0.27.0', features: { grantableTokens: true } },
@@ -74,7 +74,7 @@ test('it applies overrides on top of the defaults', () => {
   expect(
     buildMockCredentialsHostScenario({ secrets: [], files: {}, unreachable: true }),
   ).toMatchObject({
-    host: 'root@geoffcloud',
+    host: 'geoffcloud',
     secrets: [],
     files: {},
     unreachable: true,

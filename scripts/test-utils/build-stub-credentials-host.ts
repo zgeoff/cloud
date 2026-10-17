@@ -6,7 +6,7 @@ import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 // nothing: it answers as root's shell there would, from impd's state and the secrets directory's
 // files. It knows a scripts/host/ script by its text on stdin; real bash runs those in their tests.
 export interface StubCredentialsHostScenario {
-  // the ssh destination the script must name
+  // the host's tailnet name, which the script must reach as root
   readonly host: string;
   readonly dir: string;
   readonly impdPort: string;
@@ -79,38 +79,62 @@ interface HostState {
   readonly secretValues: Record<string, string>;
 }
 
+// the argv scripts/run-host-check.ts builds: a batch ssh with a connect timeout to root on the
+// host, and the remote command as one line of quoted words
 function buildSSHAnswer(state: HostState, call: StubCall) {
-  const [, option, batch, destination, ...remote] = call.argv;
+  const [, batchOption, batch, timeoutOption, timeout, destination, line, ...rest] = call.argv;
 
-  return option === '-o' && batch === 'BatchMode=yes' && destination === state.scenario.host
-    ? buildHostAnswer(state, call, remote)
-    : undefined;
+  const isHostCall =
+    batchOption === '-o' &&
+    batch === 'BatchMode=yes' &&
+    timeoutOption === '-o' &&
+    timeout === 'ConnectTimeout=15' &&
+    destination === `root@${state.scenario.host}` &&
+    rest.length === 0;
+
+  return isHostCall && line !== undefined ? buildHostAnswer(state, call, line) : undefined;
 }
 
-function buildHostAnswer(state: HostState, call: StubCall, remote: readonly string[]) {
+function buildHostAnswer(state: HostState, call: StubCall, line: string) {
   // OpenSSH's message for a refused connection, with the CR LF its log function ends a line with
   if (state.scenario.unreachable === true) {
-    const name = state.scenario.host.replace(/^.*@/u, '');
-
     return {
       exitCode: 255,
-      stderr: `ssh: connect to host ${name} port 22: Connection refused\r\n`,
+      stderr: `ssh: connect to host ${state.scenario.host} port 22: Connection refused\r\n`,
     };
   }
 
-  if (remote[0] === 'docker') {
-    return buildDockerAnswer(state, remote.slice(1).join(' '), call.stdin);
-  }
+  return buildDockerAnswer(state, line, call.stdin) ?? buildShellAnswer(state, line, call.stdin);
+}
 
-  return buildShellAnswer(state, remote.join(' '), call.stdin);
+// the line the remote shell parses into these words, each quoted as one
+function toLine(words: readonly string[]): string {
+  return words.map((word) => toShellArg(word)).join(' ');
 }
 
 // docker 29.7.2's message for an exec in a stopped container, from moby's daemon/errors.go
 const stoppedError =
   'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n';
 
-const secretAdd =
-  'exec -i imp-host impz secret add glm --kind custom --hosts api.z.ai --header authorization --scheme bearer --json';
+const secretAdd = toLine([
+  'docker',
+  'exec',
+  '-i',
+  'imp-host',
+  'impz',
+  'secret',
+  'add',
+  'glm',
+  '--kind',
+  'custom',
+  '--hosts',
+  'api.z.ai',
+  '--header',
+  'authorization',
+  '--scheme',
+  'bearer',
+  '--json',
+]);
 
 function buildDockerAnswer(state: HostState, line: string, stdin: string) {
   if (line === secretAdd) {
@@ -118,9 +142,18 @@ function buildDockerAnswer(state: HostState, line: string, stdin: string) {
   }
 
   const reads = {
-    'exec imp-host impz info --json': ['info', state.scenario.info],
-    'exec imp-host impz secret ls --json': ['secret-ls', state.scenario.secrets],
-    'exec imp-host impz token ls --json': ['token-ls', state.scenario.tokens],
+    [toLine(['docker', 'exec', 'imp-host', 'impz', 'info', '--json'])]: [
+      'info',
+      state.scenario.info,
+    ],
+    [toLine(['docker', 'exec', 'imp-host', 'impz', 'secret', 'ls', '--json'])]: [
+      'secret-ls',
+      state.scenario.secrets,
+    ],
+    [toLine(['docker', 'exec', 'imp-host', 'impz', 'token', 'ls', '--json'])]: [
+      'token-ls',
+      state.scenario.tokens,
+    ],
   } as const;
 
   const read = Object.entries(reads).find(([command]) => command === line)?.[1];
@@ -163,21 +196,25 @@ const hostScripts = {
 };
 
 function buildShellAnswer(state: HostState, line: string, stdin: string): StubAnswer | undefined {
-  const dir = toShellArg(state.scenario.dir);
-  const gatewayToken = toShellArg(`${state.scenario.dir}/gateway-token`);
-  const impToken = toShellArg(`${state.scenario.dir}/imp-token`);
-  const refusal = toShellArg(`${state.scenario.dir} is not a mount point; nothing written`);
+  const dir = state.scenario.dir;
+  const gatewayToken = `${dir}/gateway-token`;
+  const impToken = `${dir}/imp-token`;
+
+  const install =
+    'mountpoint -q "$1" || { echo "$1 is not a mount point; nothing written" >&2; exit 1; }; install -d -m 0700 -o root -g root "$1"';
 
   const answers: Record<string, () => StubAnswer | undefined> = {
-    true: () => ({}),
-    [`mountpoint -q ${dir} || { echo ${refusal} >&2; exit 1; }; install -d -m 0700 -o root -g root ${dir}`]:
-      () => buildInstallAnswer(state),
-    [`ls ${dir}`]: () => buildListAnswer(state),
-    [`sha256sum ${gatewayToken}`]: () => buildSumAnswer(state),
-    [`bash -s -- ${dir}`]: () => runHostScript(state, stdin),
-    [`bash -s -- ${dir} ${toShellArg(state.scenario.impdPort)}`]: () =>
+    [toLine(['true'])]: () => ({}),
+    [toLine(['bash', '-c', install, 'bash', dir])]: () => buildInstallAnswer(state),
+    [toLine(['ls', dir])]: () => buildListAnswer(state),
+    [toLine(['sha256sum', gatewayToken])]: () => buildSumAnswer(state),
+    [toLine(['bash', '-s', '--', dir])]: () =>
+      stdin.startsWith(hostScripts.write) ? runHostScript(state, stdin) : undefined,
+    [toLine(['bash', '-s', '--', dir, 'docker', 'exec', 'imp-host', 'impz'])]: () =>
+      stdin === hostScripts.mint ? runHostScript(state, stdin) : undefined,
+    [toLine(['bash', '-s', '--', dir, state.scenario.impdPort])]: () =>
       stdin === hostScripts.check ? checkTokenFile(state) : undefined,
-    [`stat -c '%n %U %a %s bytes' ${dir} ${gatewayToken} ${impToken}`]: () =>
+    [toLine(['stat', '-c', '%n %U %a %s bytes', dir, gatewayToken, impToken])]: () =>
       buildStatAnswer(state),
   };
 

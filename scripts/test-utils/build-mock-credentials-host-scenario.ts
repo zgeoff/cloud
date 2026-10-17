@@ -9,7 +9,7 @@ export function buildMockCredentialsHostScenario(
   overrides: Partial<StubCredentialsHostScenario> = {},
 ): StubCredentialsHostScenario {
   return {
-    host: 'root@geoffcloud',
+    host: 'geoffcloud',
     dir: '/var/lib/atc-daemon-secrets',
     impdPort: '7070',
     info: { version: '0.27.0', features: { grantableTokens: true } },

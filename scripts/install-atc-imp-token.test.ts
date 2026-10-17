@@ -64,7 +64,7 @@ test('it skips a token with the expected limits whose saved file authenticates a
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     [
-      "ssh -o BatchMode=yes root@geoffcloud bash -s -- '/var/lib/atc-daemon-secrets' '7070'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' '7070'",
       ctx.checkScript,
     ],
   ]);
@@ -75,7 +75,7 @@ test('it checks the saved file against the impd port and directory the environme
     op: { vaults: {} },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
     host: buildMockCredentialsHostScenario({
-      host: 'root@canary',
+      host: 'canary',
       dir: '/srv/atc secrets',
       impdPort: '7171',
     }),
@@ -85,7 +85,7 @@ test('it checks the saved file against the impd port and directory the environme
     run: tools.run,
     env: {
       OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture_env',
-      ATC_CREDENTIALS_HOST: 'root@canary',
+      ATC_CREDENTIALS_HOST: 'canary',
       ATC_CREDENTIALS_DIR: '/srv/atc secrets',
       ATC_IMPD_PORT: '7171',
     },
@@ -99,7 +99,15 @@ test('it checks the saved file against the impd port and directory the environme
   });
 
   expect(tools.calls.map((call) => call.argv)).toStrictEqual([
-    ['ssh', '-o', 'BatchMode=yes', 'root@canary', "bash -s -- '/srv/atc secrets' '7171'"],
+    [
+      'ssh',
+      '-o',
+      'BatchMode=yes',
+      '-o',
+      'ConnectTimeout=15',
+      'root@canary',
+      "'bash' '-s' '--' '/srv/atc secrets' '7171'",
+    ],
   ]);
 });
 
@@ -306,7 +314,7 @@ test('it mints atc-cloud on the host with the mint script on stdin when neither 
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     [
-      "ssh -o BatchMode=yes root@geoffcloud bash -s -- '/var/lib/atc-daemon-secrets'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
       ctx.mintScript,
     ],
   ]);

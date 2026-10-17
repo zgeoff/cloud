@@ -3,11 +3,11 @@ import type { ATCCredentialsPreflight } from './check-atc-credentials-preflight.
 import { ExitError } from './exit-error.ts';
 import { findJSONField } from './find-json-field.ts';
 import { findRecord } from './find-record.ts';
+import { buildHostImpArgv, formatImpCommand } from './imp-cli.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { pickImpTokenVerdict } from './pick-imp-token-verdict.ts';
 import { readHostScript } from './read-host-script.ts';
-import { runOnHost } from './run-on-host.ts';
-import { toShellArg } from './to-shell-arg.ts';
+import { runHostCheck, runOnHost } from './run-host-check.ts';
 
 // Mints impd's token atc-cloud (scope manage, imps harness-*, may grant atcCloudGrantable) on the
 // host, straight into a root-only file there, so it never reaches this machine. impd shows a token
@@ -21,7 +21,7 @@ export async function installATCImpToken(
   const hasFile = preflight.hostFiles.includes('imp-token');
 
   context.printOut(
-    `\n== 3/3 impd token atc-cloud (manage, harness-*, grantable ${grantable.join(',')}) to ${context.host}:${file}\n`,
+    `\n== 3/3 impd token atc-cloud (manage, harness-*, grantable ${grantable.join(',')}) to root@${context.host}:${file}\n`,
   );
 
   if (token !== undefined && hasFile) {
@@ -33,7 +33,7 @@ export async function installATCImpToken(
   if (token !== undefined || hasFile) {
     throw new ExitError(
       1,
-      `only one exists (token: ${token !== undefined}, host file: ${hasFile}). impd shows a token once,\nso run 'impz token rm atc-cloud' in imp-host and remove ${file}, then rerun`,
+      `only one exists (token: ${token !== undefined}, host file: ${hasFile}). impd shows a token once,\nso run '${formatImpCommand(['token', 'rm', 'atc-cloud'])}' in imp-host and remove ${file}, then rerun`,
     );
   }
 
@@ -43,7 +43,8 @@ export async function installATCImpToken(
 async function createImpToken(context: Readonly<ATCCredentialsContext>) {
   const script = await readHostScript('mint-atc-imp-token.sh');
 
-  await runOnHost(context, [`bash -s -- ${toShellArg(context.dir)}`], script);
+  // the script runs imp's CLI with the argv that follows the directory
+  await runOnHost(context, ['bash', '-s', '--', context.dir, ...buildHostImpArgv([])], script);
 }
 
 async function checkSavedToken(
@@ -85,9 +86,7 @@ function requireTokenLimits(token: unknown) {
 async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: string) {
   const script = await readHostScript('check-atc-imp-token.sh');
 
-  const remote = `bash -s -- ${toShellArg(context.dir)} ${toShellArg(context.impdPort)}`;
-
-  const result = await context.run(['ssh', '-o', 'BatchMode=yes', context.host, remote], {
+  const result = await runHostCheck(context, ['bash', '-s', '--', context.dir, context.impdPort], {
     stdin: script,
   });
 
@@ -101,7 +100,7 @@ async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: st
   if (verdict === 'bad') {
     throw new ExitError(
       1,
-      `${file} does not authenticate to impd as the token atc-cloud (empty, more\nthan one line, stale or another token). impd shows a token once, so remove\n${file} and run 'impz token rm atc-cloud' in imp-host, then rerun to mint\na new one`,
+      `${file} does not authenticate to impd as the token atc-cloud (empty, more\nthan one line, stale or another token). impd shows a token once, so remove\n${file} and run '${formatImpCommand(['token', 'rm', 'atc-cloud'])}' in imp-host, then rerun to mint\na new one`,
     );
   }
 

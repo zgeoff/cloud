@@ -3,6 +3,7 @@ import { buildTCPProbe } from './build-tcp-probe.ts';
 import { findFetchImage } from './find-fetch-image.ts';
 import type { ProbeAnswer } from './format-probe-answer.ts';
 import { formatProbeAnswer } from './format-probe-answer.ts';
+import { buildHostImpArgv, formatImpCommand } from './imp-cli.ts';
 import type { RemoteResult, SandboxTarget } from './load-sandbox-targets.ts';
 import { loadSandboxTargets } from './load-sandbox-targets.ts';
 import { parseTailnetTarget } from './parse-tailnet-target.ts';
@@ -168,9 +169,10 @@ function printProbes(
   }
 }
 
-const impCommand = 'docker exec imp-host impz';
+// the line runs as one shell line on the host, whose words hold no character to quote
+const impCommand = buildHostImpArgv([]).join(' ');
 
-// A failed create can still leave the imp, so the error names it for impz ls
+// A failed create can still leave the imp, so the error names it for the CLI's ls
 async function createSandbox(
   options: Readonly<CheckFetchSandboxOptions>,
   image: string,
@@ -181,7 +183,7 @@ async function createSandbox(
 
   if (created.exitCode !== 0) {
     options.printErr(
-      `check-nixie-fetch-sandbox: cannot create sandbox ${options.sandboxName}: ${created.stderr.trim()}; look for it with impz ls\n`,
+      `check-nixie-fetch-sandbox: cannot create sandbox ${options.sandboxName}: ${created.stderr.trim()}; look for it with ${formatImpCommand(['ls'])}\n`,
     );
 
     return false;
@@ -258,7 +260,7 @@ async function removeSandbox(options: Readonly<CheckFetchSandboxOptions>): Promi
 
   if (removed.exitCode !== 0) {
     options.printErr(
-      `check-nixie-fetch-sandbox: cannot remove sandbox ${options.sandboxName}: ${removed.stderr.trim()}; remove it with impz rm\n`,
+      `check-nixie-fetch-sandbox: cannot remove sandbox ${options.sandboxName}: ${removed.stderr.trim()}; remove it with ${formatImpCommand(['rm'])}\n`,
     );
 
     return false;
