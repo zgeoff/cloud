@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Preview } from './create-preview-store.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 
 async function setupTest() {
@@ -49,7 +50,9 @@ test('it moves the head of a ready preview and keeps the commit it built', async
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'ready',
     builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
@@ -100,7 +103,9 @@ test('it sets a failed preview waiting again and clears its failure when a push 
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'failed',
     detail: 'the health URL never answered',
   });
@@ -133,7 +138,9 @@ test('it keeps a failed preview failed when the same head arrives again', async 
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting'], {
     phase: 'failed',
     detail: 'the health URL never answered',
   });
@@ -169,6 +176,171 @@ test('it refuses a phase change from a phase the preview is not in', async () =>
 
   expect(moved).toBeFalse();
   expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ended');
+});
+
+test.each<[Preview['phase'], Preview['phase'], [Preview['phase'], Preview['phase']][]]>([
+  ['waiting', 'booting', []],
+  ['waiting', 'ended', []],
+  ['booting', 'ready', [['waiting', 'booting']]],
+  ['booting', 'failed', [['waiting', 'booting']]],
+  ['booting', 'waiting', [['waiting', 'booting']]],
+  ['booting', 'ended', [['waiting', 'booting']]],
+  [
+    'ready',
+    'booting',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'ready'],
+    ],
+  ],
+  [
+    'ready',
+    'ended',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'ready'],
+    ],
+  ],
+  [
+    'failed',
+    'booting',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'waiting',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'ended',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'failed'],
+    ],
+  ],
+  ['ended', 'waiting', [['waiting', 'ended']]],
+])('it moves a preview from %s to %s', async (from, to, path) => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  for (const [before, after] of path) {
+    ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, [before], { phase: after });
+  }
+
+  const moved = ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, [from], {
+    phase: to,
+  });
+
+  expect(moved).toBeTrue();
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe(to);
+});
+
+test.each<[Preview['phase'], Preview['phase'], [Preview['phase'], Preview['phase']][]]>([
+  ['waiting', 'waiting', []],
+  ['waiting', 'ready', []],
+  ['waiting', 'failed', []],
+  ['booting', 'booting', [['waiting', 'booting']]],
+  [
+    'ready',
+    'waiting',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'ready'],
+    ],
+  ],
+  [
+    'ready',
+    'ready',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'ready'],
+    ],
+  ],
+  [
+    'ready',
+    'failed',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'ready'],
+    ],
+  ],
+  [
+    'failed',
+    'ready',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'failed',
+    [
+      ['waiting', 'booting'],
+      ['booting', 'failed'],
+    ],
+  ],
+  ['ended', 'booting', [['waiting', 'ended']]],
+  ['ended', 'ready', [['waiting', 'ended']]],
+  ['ended', 'failed', [['waiting', 'ended']]],
+  ['ended', 'ended', [['waiting', 'ended']]],
+])(
+  'it refuses to move a preview from %s to %s, a move the phase table lacks',
+  async (from, to, path) => {
+    const ctx = await setupTest();
+
+    ctx.store.upsertHead({
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    });
+
+    for (const [before, after] of path) {
+      ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, [before], { phase: after });
+    }
+
+    expect(() =>
+      ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, [from], { phase: to }),
+    ).toThrowWithMessage(Error, `a preview cannot move from ${from} to ${to}`);
+
+    expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe(from);
+  },
+);
+
+test('it refuses a phase change when any of its from phases lacks the move', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  expect(() =>
+    ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['booting', 'ended'], {
+      phase: 'ready',
+      builtSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    }),
+  ).toThrowWithMessage(Error, 'a preview cannot move from ended to ready');
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('booting');
 });
 
 test('it keeps the previews across a reopen of the database file', async () => {
