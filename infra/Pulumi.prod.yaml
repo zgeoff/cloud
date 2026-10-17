@@ -17,8 +17,8 @@ config:
     defaultDaemon: geoffcloud
   geoff-cloud:discordAlerts: 'true'
   geoff-cloud:nixie:
-    image: ghcr.io/zgeoff/nixie:0.31.0@sha256:3f1a40c6ea052a61889fd9aaa121a52ab4441922bd7bb42bdc0321021534a336
-    webImage: ghcr.io/zgeoff/nixie-web:0.31.0@sha256:725903de2911c304d66588dc590d81e943e2addcf14196fe3b32279c8484b449
+    image: ghcr.io/zgeoff/nixie:0.32.0@sha256:d5833b0247b9ef097515f1a61c5677aeeb235e19f597ad68fcc1a9cdc3022071
+    webImage: ghcr.io/zgeoff/nixie-web:0.32.0@sha256:927300115177cc5300d502fa466cae6281581b5908c76f80e83408bdac754117
     hostname: nixie.geoff.cloud
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=
