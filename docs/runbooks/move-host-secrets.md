@@ -75,7 +75,10 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    Expect `match <path>: <n> entries, 0 only on tank/cloud` and a `root` line with the directory's
    mode and owner for each path. `MISMATCH <path>:` lists each differing entry with the field that
    differs. A `copy-impd-db.sh` copy taken between the seed and the compare is missing on
-   tank/cloud: copy that entry across by hand with `cp -a`.
+   tank/cloud: copy that entry across by hand with `cp -a`. A `differs` entry before the switch
+   means the file changed on the old path after the seed, and that path is still the live one: copy
+   it across by hand. After the switch it is the other way round
+   ([Remove the old copies](#remove-the-old-copies)).
 
 ## Switch
 
@@ -142,7 +145,8 @@ are back, which restarts k3s's pods and puts every awake imp to sleep.
    Expect `integrity ok` in the copy's output, then `tank/cloud/imp-db-backups`.
 
 5. Check that the two install scripts write to the new mounts. `scripts/install-imp-dns-token.sh`
-   and `scripts/install-atc-gateway-credentials.ts` keep their paths. After one run of each, check:
+   and `scripts/install-atc-gateway-credentials.ts` keep their paths, and each refuses to write
+   while its path is not a mount point, as does `copy-impd-db-host`. After one run of each, check:
 
    ```bash
    findmnt -n -o SOURCE -T /var/lib/imp-host/secrets/dns-api-token
@@ -169,9 +173,17 @@ and content.
    each. The script reads the old directories through a non-recursive bind mount of `/` that it
    removes when it exits. The directories stay, as the binds' mount points.
 
-2. On `MISMATCH`, nothing was deleted. Copy the named entry across by hand, from the old directory
-   as seen through `mount --bind / <directory>` into its directory on tank/cloud, with `cp -a`, and
-   run the removal again.
+2. On `MISMATCH`, nothing was deleted. Read each named entry by its field:
+
+   - `missing`: the entry exists only on the old path, such as a copy taken between the seed and the
+     switch. Copy it across by hand, from the old directory as seen through
+     `mount --bind / <directory>` into its directory on tank/cloud, with `cp -a`.
+   - `differs` (`content`, `size`, `mode` or `owner`): the file changed after the seed, so the copy
+     on tank/cloud is the live one and the copy on `vda` is stale. Never copy the old file over it,
+     since that can reinstall a revoked token. Delete the stale old entry through the same bind
+     (`rm`), and the removal no longer lists it.
+
+   Run the removal again.
 
 ## Roll back
 

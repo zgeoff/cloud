@@ -29,7 +29,7 @@ async function setupTest(config: SetupConfig) {
   return { context, out, err };
 }
 
-test('it reads what exists, in this order, and creates only the secrets directory', async () => {
+test('it reads what exists, in this order, and checks the secrets mount and creates only the secrets directory', async () => {
   const tools = buildStubCredentialTools({
     op: { vaults: { cloud: { 'atc-daemon-token': 'fixture-bearer' } } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
@@ -48,7 +48,7 @@ test('it reads what exists, in this order, and creates only the secrets director
     'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz secret ls --json',
     'ssh -o BatchMode=yes root@geoffcloud docker exec imp-host impz token ls --json',
     'op item list --vault cloud --format json',
-    "ssh -o BatchMode=yes root@geoffcloud install -d -m 0700 -o root -g root '/var/lib/atc-daemon-secrets'",
+    "ssh -o BatchMode=yes root@geoffcloud mountpoint -q '/var/lib/atc-daemon-secrets' || { echo '/var/lib/atc-daemon-secrets is not a mount point; nothing written' >&2; exit 1; }; install -d -m 0700 -o root -g root '/var/lib/atc-daemon-secrets'",
     "ssh -o BatchMode=yes root@geoffcloud ls '/var/lib/atc-daemon-secrets'",
   ]);
 });

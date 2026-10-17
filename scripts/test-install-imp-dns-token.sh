@@ -37,7 +37,7 @@ it_installs_the_token_over_ssh_stdin_and_keeps_the_other_env_lines() {
   printf '%s\n' IMP_FOO=bar IMP_ACME_EMAIL=old@example.net IMP_DNS_API_TOKEN=old-token IMP_OTHER=1 \
     > "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
     IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" bash install-imp-dns-token.sh) \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -50,7 +50,7 @@ OUT
   diff - "$tree/calls-masked" << 'CALLS'
 ["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]
 ["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c $'set -euo pipefail\\nenv_file=$1\\ntoken_file=$2\\nIFS= read -r token\\nIFS= read -r email\\numask 077\\ntmp_token=$(mktemp \"$token_file.XXXXXX\")\\ntmp_env=$(mktemp \"$env_file.XXXXXX\")\\ntrap \"rm -f \\\\\"$tmp_token\\\\\" \\\\\"$tmp_env\\\\\"\" EXIT\\nprintf \"%s\" \"$token\" > \"$tmp_token\"\\n{ grep -vE \"^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=\" \"$env_file\" || true; printf \"IMP_ACME_EMAIL=%s\\\\n\" \"$email\"; } > \"$tmp_env\"\\nunset token email\\nchmod 0400 \"$tmp_token\" \"$tmp_env\"\\nchown 0:0 \"$tmp_token\" \"$tmp_env\" 2>/dev/null || true\\nmv -f \"$tmp_token\" \"$token_file\"\\nmv -f \"$tmp_env\" \"$env_file\"\\ntrap - EXIT\\necho \"installed: token file $token_file ($(stat -c %s \"$token_file\") bytes, mode $(stat -c %a \"$token_file\")); $env_file has $(grep -c \"^IMP_ACME_EMAIL=\" \"$env_file\") email line, $(grep -c \"^IMP_DNS_API_TOKEN=\" \"$env_file\") token lines, mode $(stat -c %a \"$env_file\")\"' _ TREE/host/secrets/imp-host.env TREE/host/secrets/dns-api-token"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","bash -c $'set -euo pipefail\\nenv_file=$1\\ntoken_file=$2\\nif [ -n \"$3\" ] && ! mountpoint -q \"$3\"; then\\n  echo \"$3 is not a mount point; nothing changed\" >&2\\n  exit 1\\nfi\\nIFS= read -r token\\nIFS= read -r email\\numask 077\\ntmp_token=$(mktemp \"$token_file.XXXXXX\")\\ntmp_env=$(mktemp \"$env_file.XXXXXX\")\\ntrap \"rm -f \\\\\"$tmp_token\\\\\" \\\\\"$tmp_env\\\\\"\" EXIT\\nprintf \"%s\" \"$token\" > \"$tmp_token\"\\n{ grep -vE \"^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=\" \"$env_file\" || true; printf \"IMP_ACME_EMAIL=%s\\\\n\" \"$email\"; } > \"$tmp_env\"\\nunset token email\\nchmod 0400 \"$tmp_token\" \"$tmp_env\"\\nchown 0:0 \"$tmp_token\" \"$tmp_env\" 2>/dev/null || true\\nmv -f \"$tmp_token\" \"$token_file\"\\nmv -f \"$tmp_env\" \"$env_file\"\\ntrap - EXIT\\necho \"installed: token file $token_file ($(stat -c %s \"$token_file\") bytes, mode $(stat -c %a \"$token_file\")); $env_file has $(grep -c \"^IMP_ACME_EMAIL=\" \"$env_file\") email line, $(grep -c \"^IMP_DNS_API_TOKEN=\" \"$env_file\") token lines, mode $(stat -c %a \"$env_file\")\"' _ TREE/host/secrets/imp-host.env TREE/host/secrets/dns-api-token ''"]
 CALLS
   printf '%s' cf_test_TOKEN-0123456789abcdefghij | diff - "$tree/host/secrets/dns-api-token"
   diff - "$tree/host/secrets/imp-host.env" << 'ENV'
@@ -79,7 +79,7 @@ it_installs_here_in_local_mode_from_the_named_references() {
   printf '%s' acme@example.net > "$tree/vault/staging/dns/email"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     IMP_HOST=local IMP_DNS_TOKEN_REF=op://staging/dns/token IMP_ACME_EMAIL_REF=op://staging/dns/email \
     IMP_ENV_FILE="$tree/host/secrets/imp-host.env" IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" \
     bash install-imp-dns-token.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -120,7 +120,7 @@ it_replaces_a_token_file_it_installed_before() {
   printf '%s\n' IMP_ACME_EMAIL=acme@example.net > "$tree/host/secrets/imp-host.env"
   chmod 0400 "$tree/host/secrets/dns-api-token" "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     IMP_HOST=local IMP_ENV_FILE="$tree/host/secrets/imp-host.env" IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" \
     bash install-imp-dns-token.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -154,7 +154,7 @@ it_writes_an_env_file_with_only_the_email_line_when_none_is_there() {
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
   printf '%s' acme@example.net > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     IMP_HOST=local IMP_ENV_FILE="$tree/host/secrets/imp-host.env" IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" \
     bash install-imp-dns-token.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -188,7 +188,7 @@ it_stops_with_exit_1_and_changes_nothing_when_the_token_does_not_look_like_a_Clo
   printf '%s' acme@example.net > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
     IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" bash install-imp-dns-token.sh) \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -215,7 +215,7 @@ it_stops_with_exit_1_and_changes_nothing_when_the_email_does_not_look_like_an_em
   printf '%s' acme@localhost > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
     IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" bash install-imp-dns-token.sh) \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -243,7 +243,7 @@ it_stops_with_op_exit_1_and_changes_nothing_when_the_token_item_is_missing() {
   mkdir -p "$tree/vault/cloud"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     STUB_HOST=root@geoffcloud STUB_HOST_BIN="$tree/host-bin" IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
     IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" bash install-imp-dns-token.sh) \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -274,7 +274,7 @@ it_fails_with_exit_1_and_leaves_both_files_when_the_host_may_not_write_the_secre
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
   chmod 0500 "$tree/host/secrets"
 
-  (cd "$tree" && run_with_file_modes env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && run_with_file_modes env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     IMP_HOST=local IMP_ENV_FILE="$tree/host/secrets/imp-host.env" IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" \
     bash install-imp-dns-token.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -297,6 +297,30 @@ FILES
   }
 }
 
+it_refuses_and_writes_nothing_when_the_secrets_directory_is_not_a_mount_point() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
+  printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
+  printf '%s' acme@example.net > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    IMP_HOST=local IMP_SECRETS_MOUNT="$tree/host/secrets" IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
+    IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" bash install-imp-dns-token.sh) \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "$tree/host/secrets is not a mount point; nothing changed"
+  ls -A "$tree/host/secrets" > "$tree/files"
+  diff /dev/null "$tree/files"
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
 it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connection() {
   local status=0
   tree="$(mktemp -d)"
@@ -307,7 +331,7 @@ it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connect
   printf '%s' acme@example.net > "$tree/vault/cloud/imp-dns-cloudflare/acme-email"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
 
-  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" IMP_SECRETS_MOUNT= \
     STUB_SSH_PASS=1 IMP_HOST=ssh://root@127.0.0.1:1 IMP_ENV_FILE="$tree/host/secrets/imp-host.env" \
     IMP_DNS_TOKEN_FILE="$tree/host/secrets/dns-api-token" bash install-imp-dns-token.sh) \
     > "$tree/out" 2> "$tree/err" || status=$?
@@ -318,7 +342,7 @@ it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connect
   diff - "$tree/calls-masked" << 'CALLS'
 ["op","read","--no-newline","op://cloud/imp-dns-cloudflare/credential"]
 ["op","read","--no-newline","op://cloud/imp-dns-cloudflare/acme-email"]
-["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -c $'set -euo pipefail\\nenv_file=$1\\ntoken_file=$2\\nIFS= read -r token\\nIFS= read -r email\\numask 077\\ntmp_token=$(mktemp \"$token_file.XXXXXX\")\\ntmp_env=$(mktemp \"$env_file.XXXXXX\")\\ntrap \"rm -f \\\\\"$tmp_token\\\\\" \\\\\"$tmp_env\\\\\"\" EXIT\\nprintf \"%s\" \"$token\" > \"$tmp_token\"\\n{ grep -vE \"^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=\" \"$env_file\" || true; printf \"IMP_ACME_EMAIL=%s\\\\n\" \"$email\"; } > \"$tmp_env\"\\nunset token email\\nchmod 0400 \"$tmp_token\" \"$tmp_env\"\\nchown 0:0 \"$tmp_token\" \"$tmp_env\" 2>/dev/null || true\\nmv -f \"$tmp_token\" \"$token_file\"\\nmv -f \"$tmp_env\" \"$env_file\"\\ntrap - EXIT\\necho \"installed: token file $token_file ($(stat -c %s \"$token_file\") bytes, mode $(stat -c %a \"$token_file\")); $env_file has $(grep -c \"^IMP_ACME_EMAIL=\" \"$env_file\") email line, $(grep -c \"^IMP_DNS_API_TOKEN=\" \"$env_file\") token lines, mode $(stat -c %a \"$env_file\")\"' _ TREE/host/secrets/imp-host.env TREE/host/secrets/dns-api-token"]
+["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","bash -c $'set -euo pipefail\\nenv_file=$1\\ntoken_file=$2\\nif [ -n \"$3\" ] && ! mountpoint -q \"$3\"; then\\n  echo \"$3 is not a mount point; nothing changed\" >&2\\n  exit 1\\nfi\\nIFS= read -r token\\nIFS= read -r email\\numask 077\\ntmp_token=$(mktemp \"$token_file.XXXXXX\")\\ntmp_env=$(mktemp \"$env_file.XXXXXX\")\\ntrap \"rm -f \\\\\"$tmp_token\\\\\" \\\\\"$tmp_env\\\\\"\" EXIT\\nprintf \"%s\" \"$token\" > \"$tmp_token\"\\n{ grep -vE \"^(IMP_DNS_API_TOKEN|IMP_ACME_EMAIL)=\" \"$env_file\" || true; printf \"IMP_ACME_EMAIL=%s\\\\n\" \"$email\"; } > \"$tmp_env\"\\nunset token email\\nchmod 0400 \"$tmp_token\" \"$tmp_env\"\\nchown 0:0 \"$tmp_token\" \"$tmp_env\" 2>/dev/null || true\\nmv -f \"$tmp_token\" \"$token_file\"\\nmv -f \"$tmp_env\" \"$env_file\"\\ntrap - EXIT\\necho \"installed: token file $token_file ($(stat -c %s \"$token_file\") bytes, mode $(stat -c %a \"$token_file\")); $env_file has $(grep -c \"^IMP_ACME_EMAIL=\" \"$env_file\") email line, $(grep -c \"^IMP_DNS_API_TOKEN=\" \"$env_file\") token lines, mode $(stat -c %a \"$env_file\")\"' _ TREE/host/secrets/imp-host.env TREE/host/secrets/dns-api-token ''"]
 CALLS
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"

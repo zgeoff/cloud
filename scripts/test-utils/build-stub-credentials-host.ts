@@ -168,10 +168,12 @@ function buildShellAnswer(state: HostState, line: string, stdin: string): StubAn
   const dir = toShellArg(state.scenario.dir);
   const gatewayToken = toShellArg(`${state.scenario.dir}/gateway-token`);
   const impToken = toShellArg(`${state.scenario.dir}/imp-token`);
+  const refusal = toShellArg(`${state.scenario.dir} is not a mount point; nothing written`);
 
   const answers: Record<string, () => StubAnswer | undefined> = {
     true: () => ({}),
-    [`install -d -m 0700 -o root -g root ${dir}`]: () => buildInstallAnswer(state),
+    [`mountpoint -q ${dir} || { echo ${refusal} >&2; exit 1; }; install -d -m 0700 -o root -g root ${dir}`]:
+      () => buildInstallAnswer(state),
     [`ls ${dir}`]: () => buildListAnswer(state),
     [`sha256sum ${gatewayToken}`]: () => buildSumAnswer(state),
     [`bash -s -- ${dir}`]: () => runHostScript(state, stdin),

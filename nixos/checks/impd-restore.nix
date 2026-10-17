@@ -442,7 +442,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
-          status, out = machine.execute("copy-impd-db-host pre-0.30 2>/tmp/copy.err")
+          status, out = machine.execute("COPY_IMPD_DB_ALLOW_UNMOUNTED=1 copy-impd-db-host pre-0.30 2>/tmp/copy.err")
           after = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
           err = machine.succeed("cat /tmp/copy.err")
 
@@ -499,7 +499,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           )
           machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
           machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
-          machine.succeed("copy-impd-db-host pre-0.30")
+          machine.succeed("COPY_IMPD_DB_ALLOW_UNMOUNTED=1 copy-impd-db-host pre-0.30")
           copy = machine.succeed("ls -d /root/imp-db-backups/pre-0.30-*").strip()
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
@@ -536,7 +536,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           # imp's module runs imp-host with --rm, so a stopped imp-host leaves no container
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
-          status, out = machine.execute("copy-impd-db-host pre-0.30 2>/tmp/copy.err")
+          status, out = machine.execute("COPY_IMPD_DB_ALLOW_UNMOUNTED=1 copy-impd-db-host pre-0.30 2>/tmp/copy.err")
           err = machine.succeed("cat /tmp/copy.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
@@ -556,7 +556,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
           machine.succeed("docker cp /tmp/impd-db-seed/. imp-host:/var/lib/imp/db")
 
-          status, out = machine.execute("SQLITE3=${stubIntegritySqlite3} copy-impd-db-host pre-0.30 2>/tmp/copy.err")
+          status, out = machine.execute("COPY_IMPD_DB_ALLOW_UNMOUNTED=1 SQLITE3=${stubIntegritySqlite3} copy-impd-db-host pre-0.30 2>/tmp/copy.err")
           err = machine.succeed("cat /tmp/copy.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
