@@ -254,8 +254,21 @@ in
   };
 
   # a path unit that survives the switch keeps its inotify watch on the directory the bind
-  # shadows, so a token rotation would wait for the 5-minute timer; this restarts it with the bind
-  systemd.paths.imp-host-dns-token.unitConfig.RequiresMountsFor = [ "/var/lib/imp-host/secrets" ];
+  # shadows, so a token rotation would wait for the 5-minute timer; this restarts it with the bind.
+  # A path unit's default dependencies order it before paths.target, so before basic.target, and
+  # the bind waits for tank-cloud-key, which starts after basic.target: an ordering cycle, which
+  # systemd breaks at boot by dropping a job, at times the bind's, and imp-host then never starts.
+  # So the unit keeps only the default dependencies that order it against boot and shutdown.
+  systemd.paths.imp-host-dns-token = {
+    unitConfig = {
+      DefaultDependencies = false;
+      RequiresMountsFor = [ "/var/lib/imp-host/secrets" ];
+    };
+    requires = [ "sysinit.target" ];
+    after = [ "sysinit.target" ];
+    conflicts = [ "shutdown.target" ];
+    before = [ "shutdown.target" ];
+  };
 
   # tank/imp, an encryption root keyed by the same file (modules/imp-dataset-key.nix,
   # docs/runbooks/tank-imp-encryption.md): its key loads at boot, and imp-host stays stopped
