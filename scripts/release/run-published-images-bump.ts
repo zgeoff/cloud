@@ -16,6 +16,9 @@ import { readImageDigest } from './read-image-digest.ts';
 import type { PublishedImage, ReleaseRecord } from './release-registry.ts';
 import { releaseRegistry } from './release-registry.ts';
 import { renderPublishedImagesBody } from './render-published-images-body.ts';
+import { runChecked } from './run-checked.ts';
+import { runGitSteps } from './run-git-steps.ts';
+import { toRunOptions } from './to-run-options.ts';
 import type { BumpContext } from './types.ts';
 
 // Opens or updates release-check/<dependency>, which pins the images this repository just published:
@@ -35,6 +38,16 @@ export async function runPublishedImagesBump(
     context.printErr(`usage: run-published-images-bump.ts <${names}>\n`);
 
     return 2;
+  }
+
+  const moved = await findMovedTags(context, images);
+
+  if (moved !== undefined) {
+    const print = moved instanceof Error ? context.printErr : context.printOut;
+
+    print(`${moved.message}\n`);
+
+    return moved instanceof Error ? 1 : 0;
   }
 
   const bump = await readBump(context, record, images);
@@ -68,6 +81,83 @@ export async function runPublishedImagesBump(
         printOut: context.printOut,
       }),
   });
+}
+
+// Runs can finish out of commit order, and each one rebuilds the one branch from main, so a run
+// whose tags main no longer names leaves the branch to the newer push's run
+async function findMovedTags(
+  context: BumpContext,
+  images: readonly PublishedImage[],
+): Promise<{ readonly message: string } | Error | undefined> {
+  const paths = [...new Set(images.map((image) => image.file))];
+
+  const main = await readMainFiles(context, paths);
+  const local = await loadFiles(context.cwd, paths);
+
+  if (main instanceof Error) {
+    return main;
+  }
+
+  const published = collectTags(local, images);
+  const current = collectTags(main, images);
+
+  if (published instanceof Error) {
+    return published;
+  }
+
+  if (current instanceof Error) {
+    return current;
+  }
+
+  return JSON.stringify(published) === JSON.stringify(current)
+    ? undefined
+    : {
+        message: `main names ${Object.values(current).join(' ')}, not the published ${Object.values(published).join(' ')}: the run for main's tags pins them`,
+      };
+}
+
+// each file's contents on origin's main, fetched now
+async function readMainFiles(context: BumpContext, paths: readonly string[]) {
+  const fetched = await runGitSteps(context, [['fetch', '-q', 'origin', 'main']]);
+
+  const files: Record<string, string> = {};
+
+  if (fetched !== undefined) {
+    return fetched;
+  }
+
+  for (const path of paths) {
+    const text = await runChecked(
+      context.run,
+      ['git', 'show', `origin/main:${path}`],
+      toRunOptions(context),
+    );
+
+    if (text instanceof Error) {
+      return text;
+    }
+
+    files[path] = text;
+  }
+
+  return files;
+}
+
+// each image's tag, as the line its pattern matches names it
+function collectTags(files: Readonly<Record<string, string>>, images: readonly PublishedImage[]) {
+  const tags: Record<string, string> = {};
+
+  for (const image of images) {
+    const match = findPinMatch(files, image);
+
+    if (match instanceof Error) {
+      return match;
+    }
+
+    tags[image.image] = match.groups['tag'] ?? '';
+  }
+
+  return tags;
 }
 
 interface Bump {
@@ -125,25 +215,22 @@ async function readValues(
   files: Readonly<Record<string, string>>,
   images: readonly PublishedImage[],
 ): Promise<ReleaseValues | Error> {
-  const tags: Record<string, string> = {};
+  const tags = collectTags(files, images);
   const digests: Record<string, string> = {};
 
+  if (tags instanceof Error) {
+    return tags;
+  }
+
   for (const image of images) {
-    const match = findPinMatch(files, image);
+    const ref = `ghcr.io/zgeoff/${image.image}:${tags[image.image] ?? ''}`;
 
-    if (match instanceof Error) {
-      return match;
-    }
-
-    const tag = match.groups['tag'] ?? '';
-
-    const digest = await readImageDigest(context.run, `ghcr.io/zgeoff/${image.image}:${tag}`);
+    const digest = await readImageDigest(context.run, ref);
 
     if (digest instanceof Error) {
       return digest;
     }
 
-    tags[image.image] = tag;
     digests[image.image] = digest;
   }
 

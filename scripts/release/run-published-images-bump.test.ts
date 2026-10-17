@@ -255,7 +255,7 @@ test('it fails before any branch when a tag is not on the registry', async () =>
   });
 
   const docker = buildStubReleaseDocker({ manifests: {} });
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.handle, buildRealProgramHandler(['git'], checkout.env));
 
   const status = await runPublishedImagesBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
@@ -268,7 +268,52 @@ test('it fails before any branch when a tag is not on the registry', async () =>
     ['ERROR: ghcr.io/zgeoff/atc-gateway:7.2.0: not found\n'],
   ]);
 
-  expect(stub.calls.map((call) => call.argv[0])).toStrictEqual(['docker']);
+  expect(stub.calls.map((call) => call.argv.slice(0, 2).join(' '))).toStrictEqual([
+    'git fetch',
+    'git show',
+    'docker buildx',
+  ]);
+});
+
+test('it leaves the branch to a newer push when main names other tags than the run published', async () => {
+  const ctx = setupTest();
+
+  const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
+    'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.2.0\nBACKUP_IMAGE_TAG=3.1.0-r1\n',
+    'infra/Pulumi.prod.yaml': `    image: ghcr.io/zgeoff/atc-gateway:7.1.0@sha256:${'1'.repeat(64)}\n    backupImage: ghcr.io/zgeoff/atc-gateway-backup:3.1.0-r1@sha256:${'2'.repeat(64)}\n`,
+  });
+
+  await Bun.write(
+    `${checkout.seed}/images/atc-gateway/versions.env`,
+    'GATEWAY_IMAGE_TAG=7.3.0\nBACKUP_IMAGE_TAG=3.1.0-r1\n',
+  );
+
+  await checkout.git(['-C', checkout.seed, 'commit', '-qam', 'bump the gateway to 7.3.0']);
+  await checkout.git(['-C', checkout.seed, 'push', '-q', 'origin', 'main']);
+
+  const docker = buildStubReleaseDocker({ manifests: {} });
+  const stub = buildStubRunner(docker.handle, buildRealProgramHandler(['git'], checkout.env));
+
+  const status = await runPublishedImagesBump(
+    { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
+    ['atc-gateway-images'],
+  );
+
+  expect(status).toBe(0);
+
+  expect(ctx.printOut.mock.calls).toStrictEqual([
+    [
+      "main names 7.3.0 3.1.0-r1, not the published 7.2.0 3.1.0-r1: the run for main's tags pins them\n",
+    ],
+  ]);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([]);
+
+  expect(stub.calls.map((call) => call.argv.slice(0, 2).join(' '))).toStrictEqual([
+    'git fetch',
+    'git show',
+  ]);
 });
 
 test('it refuses a dependency that is not a published-images record', async () => {

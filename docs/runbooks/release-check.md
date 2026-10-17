@@ -66,6 +66,9 @@ the release check never reads it. Instead, the `atc-gateway images` workflow run
    [When a bump merges on its own](#when-a-bump-merges-on-its-own), and the `Deploy prod` workflow
    applies it.
 
+Two runs can finish out of order. A run whose tags differ from those in `main`'s pin file leaves the
+branch alone, and the run for the newer push pins them.
+
 The gateway image's tag is the atc release, so its pull request takes the release check's labels. A
 pull request that moves only the backup image's tag moves no release version, so it waits for a
 review. A manual run on `main` with `push: true` publishes and opens the pull request too, which
