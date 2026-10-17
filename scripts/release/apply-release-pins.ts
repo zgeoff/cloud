@@ -3,8 +3,10 @@ import { join } from 'node:path';
 import { findJSONField } from '../find-json-field.ts';
 import type { Runner } from '../run-process.ts';
 import { collectPinFiles } from './collect-pin-files.ts';
+import { pinTableFile } from './pin-table-file.ts';
 import type { PinPlan, ReleaseValues } from './plan-pin-edits.ts';
 import { planPinEdits } from './plan-pin-edits.ts';
+import { planPinTable } from './plan-pin-table.ts';
 import type { Pin, PinLock, ReleaseRecord } from './release-registry.ts';
 import { runChecked } from './run-checked.ts';
 
@@ -30,12 +32,14 @@ export async function applyReleasePins(
 ): Promise<Error | undefined> {
   const files = await loadPinFiles(options.root, options.record);
 
-  const plan = planPinEdits({
+  const edits = planPinEdits({
     record: options.record,
     version: options.version,
     values: options.values,
     files,
   });
+
+  const plan = edits instanceof Error ? edits : planTableWrite(options.record, files, edits);
 
   if (plan instanceof Error) {
     return plan;
@@ -50,6 +54,26 @@ export async function applyReleasePins(
   options.printOut(plan.notes.map((note) => `${note}\n`).join(''));
 
   return undefined;
+}
+
+// plans the pin table's new text beside the pin edits, when the record's entries change
+function planTableWrite(
+  record: ReleaseRecord,
+  files: Readonly<Record<string, string>>,
+  plan: PinPlan,
+): PinPlan | Error {
+  const current = files[pinTableFile];
+
+  const table =
+    current === undefined
+      ? new Error(`${pinTableFile} is missing: run this from the root of a zgeoff/cloud checkout`)
+      : planPinTable([record], { ...files, ...plan.files });
+
+  if (table instanceof Error || table === current) {
+    return table instanceof Error ? table : plan;
+  }
+
+  return { ...plan, files: { ...plan.files, [pinTableFile]: table } };
 }
 
 // a failed lock puts every pin file and lock file back, so no pin moves without its lock

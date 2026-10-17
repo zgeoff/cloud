@@ -1,3 +1,6 @@
+// a pin test copies the real pin files and the pin table and lists every lock call, so its
+// body is long
+/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,9 +17,13 @@ async function setupTest() {
 
   // the folders of every pin file, which a case writes or leaves out
   await Promise.all(
-    ['nixos/hosts/geoffcloud', 'nixos/packages', 'images/agent', 'images/atc-gateway'].map((dir) =>
-      mkdir(join(root, dir), { recursive: true }),
-    ),
+    [
+      'nixos/hosts/geoffcloud',
+      'nixos/packages',
+      'images/agent',
+      'images/atc-gateway',
+      'scripts/release',
+    ].map((dir) => mkdir(join(root, dir), { recursive: true })),
   );
 
   // the lock runs in the image that scripts/nix-image.sh pins, which the expected argv names
@@ -47,6 +54,8 @@ test('it pins the input, the lock and both images', async () => {
       writeFile(join(ctx.root, entry[0]), entry[1]),
     ),
   );
+
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
   const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
@@ -98,6 +107,8 @@ test('it locks the flake in the pinned Nix image and hands the lock back to the 
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
   const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
 
@@ -147,6 +158,8 @@ test('it hands the github token to the lock by its environment, never in an argv
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const docker = buildStubReleaseDocker({
     lock: `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`,
   });
@@ -191,6 +204,8 @@ test('it adds the github token after the caller nix config', async () => {
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const docker = buildStubReleaseDocker({
     lock: `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`,
   });
@@ -231,6 +246,8 @@ test('it hands the lock no nix config without a github token', async () => {
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const docker = buildStubReleaseDocker({
     lock: `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`,
   });
@@ -268,6 +285,8 @@ test('it keeps a newer imp-base and pins the host', async () => {
       writeFile(join(ctx.root, entry[0]), entry[1]),
     ),
   );
+
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
   const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
@@ -316,6 +335,8 @@ test('it runs no lock when imp-host already holds the release', async () => {
       writeFile(join(ctx.root, entry[0]), entry[1]),
     ),
   );
+
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
 
@@ -366,6 +387,8 @@ test('it refuses a lock that names another commit', async () => {
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const lock = `{"nodes":{"imp":{"locked":{"rev":"${'9'.repeat(40)}"}}}}\n`;
   const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
 
@@ -405,6 +428,8 @@ test('it fails with the lock error when the lock fails', async () => {
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const lockError =
     "error: unable to download 'https://api.github.com/repos/zgeoff/impz/commits/c5bea940'";
 
@@ -430,6 +455,93 @@ test('it fails with the lock error when the lock fails', async () => {
   expect(ctx.printOut).not.toHaveBeenCalled();
 });
 
+test("it writes the record's pin table entries with its pins", async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'nixos/flake.nix': '      url = "github:zgeoff/impz/4211437b";\n',
+    'nixos/flake.lock': `{"nodes":{"imp":{"locked":{"rev":"${'4'.repeat(40)}"}}}}\n`,
+    'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:${'1'.repeat(64)}";\n    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}";\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}\n`,
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  await writeFile(
+    join(ctx.root, 'scripts/release/release-pins.json'),
+    `{\n  "imp-base": {\n    "version": "1.0.0",\n    "digest": "sha256:${'2'.repeat(64)}"\n  },\n  "nixie": {\n    "version": "0.7.0",\n    "digest": "sha256:${'5'.repeat(64)}"\n  }\n}\n`,
+  );
+
+  const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
+  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
+
+  await applyReleasePins({
+    record: getReleaseRecord('imp'),
+    version: '1.0.1',
+    values: {
+      commit: `c5bea940${'c'.repeat(32)}`,
+      digests: { 'imp-host': `sha256:${'3'.repeat(64)}`, 'imp-base': `sha256:${'4'.repeat(64)}` },
+    },
+    root: ctx.root,
+    run: stub.run,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  const table = await readFile(join(ctx.root, 'scripts/release/release-pins.json'), 'utf8');
+
+  expect(table).toBe(
+    `{\n  "imp-host": {\n    "version": "1.0.1",\n    "digest": "sha256:${'3'.repeat(64)}",\n    "commit": "c5bea940"\n  },\n  "imp-base": {\n    "version": "1.0.1",\n    "digest": "sha256:${'4'.repeat(64)}"\n  },\n  "nixie": {\n    "version": "0.7.0",\n    "digest": "sha256:${'5'.repeat(64)}"\n  }\n}\n`,
+  );
+});
+
+test('it puts the pin table back when the lock fails', async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'nixos/flake.nix': '      url = "github:zgeoff/impz/4211437b";\n',
+    'nixos/flake.lock': `{"nodes":{"imp":{"locked":{"rev":"${'4'.repeat(40)}"}}}}\n`,
+    'nixos/hosts/geoffcloud/configuration.nix': `    image = "ghcr.io/zgeoff/imp-host:1.0.0@sha256:${'1'.repeat(64)}";\n    impRegistryImage = "ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}";\n`,
+    'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'2'.repeat(64)}\n`,
+    'scripts/release/release-pins.json': `{\n  "imp-base": {\n    "version": "1.0.0",\n    "digest": "sha256:${'2'.repeat(64)}"\n  }\n}\n`,
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const lockError =
+    "error: unable to download 'https://api.github.com/repos/zgeoff/impz/commits/c5bea940'";
+
+  const stub = buildStubRunner(buildStubReleaseDocker({ lockError }).handle);
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('imp'),
+    version: '1.0.1',
+    values: {
+      commit: `c5bea940${'c'.repeat(32)}`,
+      digests: { 'imp-host': `sha256:${'3'.repeat(64)}`, 'imp-base': `sha256:${'4'.repeat(64)}` },
+    },
+    root: ctx.root,
+    run: stub.run,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  const tree = await Promise.all(
+    Object.keys(files).map((path) => readFile(join(ctx.root, path), 'utf8')),
+  );
+
+  expect(applied).toStrictEqual(new Error(lockError));
+  expect(tree).toStrictEqual(Object.values(files));
+});
+
 test('it refuses the release pinned with another digest without writing', async () => {
   const ctx = await setupTest();
 
@@ -445,6 +557,8 @@ test('it refuses the release pinned with another digest without writing', async 
       writeFile(join(ctx.root, entry[0]), entry[1]),
     ),
   );
+
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
 
@@ -491,6 +605,8 @@ test('it refuses imp-base pins that disagree without writing', async () => {
     ),
   );
 
+  await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
+
   const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
 
   const applied = await applyReleasePins({
@@ -528,6 +644,11 @@ test('it pins an atc release in the real pin files and keeps every other line', 
   ];
 
   await Promise.all(paths.map((path) => copyFile(join(ctx.checkout, path), join(ctx.root, path))));
+
+  await copyFile(
+    join(ctx.checkout, 'scripts/release/release-pins.json'),
+    join(ctx.root, 'scripts/release/release-pins.json'),
+  );
 
   const before = await Promise.all(paths.map((path) => readFile(join(ctx.root, path), 'utf8')));
 

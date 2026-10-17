@@ -25,6 +25,7 @@ test('it opens an atc bump that waits for review on a major release', async () =
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'images/agent/Dockerfile': `ARG ATC_VERSION=4.2.0\nARG ATC_SHA256=${'1'.repeat(64)}\n`,
     'nixos/packages/atc.nix': `let\n  version = "2.26.2";\n  sha256 = "${'2'.repeat(64)}";\nin\n`,
     'images/atc-gateway/versions.env': `ATC_RELEASE=@zgeoff/atc@2.27.0\nATC_ASSET=atc-gateway-linux-x64\nATC_ASSET_SHA256=${'3'.repeat(64)}\nGATEWAY_IMAGE_TAG=2.27.0\n`,
@@ -69,7 +70,7 @@ test('it opens an atc bump that waits for review on a major release', async () =
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
 
   expect(stat).toBe(
-    'images/agent/Dockerfile         | 4 ++--\n images/atc-gateway/versions.env | 6 +++---\n nixos/packages/atc.nix          | 4 ++--\n 3 files changed, 7 insertions(+), 7 deletions(-)',
+    'images/agent/Dockerfile           |  4 ++--\n images/atc-gateway/versions.env   |  6 +++---\n nixos/packages/atc.nix            |  4 ++--\n scripts/release/release-pins.json | 16 +++++++++++++++-\n 4 files changed, 22 insertions(+), 8 deletions(-)',
   );
 
   expect(
@@ -101,6 +102,7 @@ test('it opens an imp patch bump that merges on its own', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'6'.repeat(64)}\n`,
     'nixos/flake.nix': '    imp = {\n      url = "github:zgeoff/impz/4211437b";\n    };\n',
     'nixos/flake.lock':
@@ -181,6 +183,7 @@ test('it locks the imp commit with the github token by name, never in an argv', 
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'images/agent/Dockerfile': `FROM ghcr.io/zgeoff/imp-base:1.0.0@sha256:${'6'.repeat(64)}\n`,
     'nixos/flake.nix': '    imp = {\n      url = "github:zgeoff/impz/4211437b";\n    };\n',
     'nixos/flake.lock':
@@ -235,6 +238,7 @@ test('it flags a nixie bump with the migrations of a release between', async () 
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'infra/Pulumi.prod.yaml': `  geoff-cloud:nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
   });
 
@@ -315,6 +319,7 @@ test('it opens an auto mode patch bump that merges on its own', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'images/agent/Dockerfile': `ARG AUTO_MODE_VERSION=0.19.3\nARG AUTO_MODE_SHA256=${'d'.repeat(64)}\n`,
   });
 
@@ -369,6 +374,7 @@ test('it pins the auto mode tarball sum that the registry serves', async () => {
   const ctx = await setupTest();
 
   const checkout = await createCloudCheckout({
+    'scripts/release/release-pins.json': '{}\n',
     'images/agent/Dockerfile': `ARG AUTO_MODE_VERSION=0.19.3\nARG AUTO_MODE_SHA256=${'d'.repeat(64)}\n`,
   });
 

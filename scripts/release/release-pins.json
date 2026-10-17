@@ -1,0 +1,36 @@
+{
+  "atc-agent": {
+    "version": "4.11.0",
+    "sum": "bcb6dd867fa46b1ce96d7ec85e0f501690c25d8b22d330153a89f48135e8aaba"
+  },
+  "atc-daemon": {
+    "version": "4.11.0",
+    "sum": "bcb6dd867fa46b1ce96d7ec85e0f501690c25d8b22d330153a89f48135e8aaba"
+  },
+  "atc-gateway": {
+    "version": "4.11.0",
+    "sum": "0ee701cda0da4f8087f302a545d3aac05240d7f938f5074327a8b284fe1f41dd",
+    "tag": "4.11.0"
+  },
+  "imp-host": {
+    "version": "2.3.0",
+    "digest": "sha256:f04f30125f2e5a3d95402ade411b30f7b71f5aed4b4437501a216ed6fe6d1c6e",
+    "commit": "94932a6b"
+  },
+  "imp-base": {
+    "version": "2.3.0",
+    "digest": "sha256:d3fc6492c0880d9b10edcf860e760b3f46c75fbfcaeb8aded33de5a0ae25b749"
+  },
+  "nixie": {
+    "version": "0.31.0",
+    "digest": "sha256:3f1a40c6ea052a61889fd9aaa121a52ab4441922bd7bb42bdc0321021534a336"
+  },
+  "nixie-web": {
+    "version": "0.31.0",
+    "digest": "sha256:725903de2911c304d66588dc590d81e943e2addcf14196fe3b32279c8484b449"
+  },
+  "auto-mode": {
+    "version": "2.0.0",
+    "sum": "1ebdd145c73a3e2a5de018bf9db8788633434ccf49e03a9e5c1b24107cae7986"
+  }
+}

@@ -8,7 +8,12 @@ test('it merges a green atc bump at its head', () => {
     authorLogin: 'app/cloud-release-check',
     head: '1111111111111111111111111111111111111111',
     labels: ['update:minor', 'auto-merge'],
-    files: ['images/atc-gateway/versions.env', 'images/agent/Dockerfile', 'nixos/packages/atc.nix'],
+    files: [
+      'images/atc-gateway/versions.env',
+      'images/agent/Dockerfile',
+      'nixos/packages/atc.nix',
+      'scripts/release/release-pins.json',
+    ],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -45,6 +50,7 @@ test('it merges an imp bump once the nixos checks passed', () => {
       'nixos/flake.lock',
       'nixos/flake.nix',
       'nixos/hosts/geoffcloud/configuration.nix',
+      'scripts/release/release-pins.json',
     ],
     commits: [
       {
@@ -70,7 +76,7 @@ test('it merges a nixie bump once the nixie backup fixture passed', () => {
     authorLogin: 'app/cloud-release-check',
     head: '3333333333333333333333333333333333333333',
     labels: ['update:patch', 'auto-merge'],
-    files: ['infra/Pulumi.prod.yaml'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '3333333333333333333333333333333333333333',
@@ -98,7 +104,7 @@ test('it merges an auto-mode bump that changes only the agent image', () => {
     authorLogin: 'app/cloud-release-check',
     head: '4444444444444444444444444444444444444444',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '4444444444444444444444444444444444444444',
@@ -115,6 +121,34 @@ test('it merges an auto-mode bump that changes only the agent image', () => {
   expect(
     decide({ branch: 'release-check/auto-mode', appLogin: 'app/cloud-release-check', pr }),
   ).toStrictEqual({ action: 'merge', number: 8, head: '4444444444444444444444444444444444444444' });
+});
+
+test('it holds a bump that does not update the pin table', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 12,
+    authorLogin: 'app/cloud-release-check',
+    head: '5555555555555555555555555555555555555555',
+    labels: ['update:patch', 'auto-merge'],
+    files: ['images/agent/Dockerfile'],
+    commits: [
+      {
+        oid: '5555555555555555555555555555555555555555',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'agent image', name: 'check', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/auto-mode', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({
+    action: 'hold',
+    number: 12,
+    reason: 'it does not update scripts/release/release-pins.json',
+  });
 });
 
 test('it skips a branch that is not a release check branch', () => {
@@ -141,7 +175,7 @@ test('it holds a pull request that another author opened', () => {
     number: 7,
     authorLogin: 'someone',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -166,7 +200,7 @@ test('it holds a pull request from another repository', () => {
     authorLogin: 'app/cloud-release-check',
     isCrossRepository: true,
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -190,7 +224,7 @@ test('it holds a pull request with a commit that another author pushed', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -218,7 +252,7 @@ test('it holds a pull request without a commit', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [],
     checkRuns: [{ workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' }],
   });
@@ -237,7 +271,7 @@ test('it holds a pull request labelled needs-review beside auto-merge', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge', 'needs-review'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -261,7 +295,7 @@ test('it holds a pull request without the auto-merge label', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:major'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -334,7 +368,7 @@ test('it holds a pull request while a check is pending', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -358,7 +392,7 @@ test('it holds a pull request whose check failed and names it', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -381,7 +415,7 @@ test('it waits for ci before ci registers its check', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['infra/Pulumi.prod.yaml'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -403,7 +437,12 @@ test('it waits for the nixos checks when the pull request changes nixos', () => 
     number: 9,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['nixos/flake.lock', 'nixos/flake.nix', 'nixos/hosts/geoffcloud/configuration.nix'],
+    files: [
+      'nixos/flake.lock',
+      'nixos/flake.nix',
+      'nixos/hosts/geoffcloud/configuration.nix',
+      'scripts/release/release-pins.json',
+    ],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -423,7 +462,7 @@ test('it waits for the agent image check when the pull request changes the agent
     number: 8,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['images/agent/Dockerfile'],
+    files: ['images/agent/Dockerfile', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -443,7 +482,11 @@ test('it waits for a gateway fixture that has not registered its check', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:minor', 'auto-merge'],
-    files: ['images/atc-gateway/versions.env', 'images/agent/Dockerfile'],
+    files: [
+      'images/atc-gateway/versions.env',
+      'images/agent/Dockerfile',
+      'scripts/release/release-pins.json',
+    ],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -470,7 +513,7 @@ test('it waits for the nixie backup fixture past another workflow fixture', () =
     number: 8,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['infra/Pulumi.prod.yaml'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',
@@ -498,7 +541,7 @@ test('it waits for a required check that was skipped', () => {
     number: 7,
     authorLogin: 'app/cloud-release-check',
     labels: ['update:patch', 'auto-merge'],
-    files: ['infra/Pulumi.prod.yaml'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
     commits: [
       {
         oid: '1111111111111111111111111111111111111111',

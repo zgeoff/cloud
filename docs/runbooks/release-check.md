@@ -29,14 +29,22 @@ nixie pins take their digests from the release notes' `## Images` list, the imp 
 commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes its sum from the
 npm tarball, which it checks against npm's integrity hash and the release's version. Before it
 writes anything, it checks every pin line of the dependency, so a pin at the release with another
-sum fails the bump and changes no file. The bump never moves a pin back to an older release. CI's
-image pin check (`bun run check:image-pins`) covers the pins a person edits too. A release tag of an
-image this repo publishes is never replaced, so the check fails a pull request whose release tag
-names another digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves when
-its publisher rebuilds the image, so for an upstream pin the check asks only that the registry still
-serves the pinned digest. The atc-gateway packages on GHCR are private, so the check reads them with
-a GitHub token that can read packages: CI hands it the workflow's token, and on a PC it takes the
-token that `gh auth token` prints, which needs the `read:packages` scope
+sum fails the bump and changes no file. The bump never moves a pin back to an older release.
+
+The pin table (`scripts/release/release-pins.json`) holds every registry pin's parts, and each bump
+writes its entries beside the pins. CI's release pin check (`bun run check:release-pins`) fails a
+pull request in which a pin line and the table disagree, so a pin edited by hand needs
+`bun scripts/release/check-release-pins.ts --write` to update the table. The merge workflow holds a
+bump that leaves the table unchanged, because only a bump opened before the table existed can do
+that, and the next run rebuilds its branch.
+
+CI's image pin check (`bun run check:image-pins`) covers the pins a person edits too. A release tag
+of an image this repo publishes is never replaced, so the check fails a pull request whose release
+tag names another digest at the registry. An upstream tag, such as Distroless's `nonroot`, moves
+when its publisher rebuilds the image, so for an upstream pin the check asks only that the registry
+still serves the pinned digest. The atc-gateway packages on GHCR are private, so the check reads
+them with a GitHub token that can read packages: CI hands it the workflow's token, and on a PC it
+takes the token that `gh auth token` prints, which needs the `read:packages` scope
 (`gh auth refresh -s read:packages`).
 
 ## When a bump merges on its own
@@ -89,7 +97,9 @@ deleting its branch.
 1. Add a record to the release registry. Its source kind decides how the bump reads a release. Each
    pin line's pattern captures each part of the line in a named group, so the bump reads a version
    and writes a sum or a digest with no code of the dependency's own.
-2. Run `bun run test`. The registry's tests fail when a pattern matches no line, or more than one,
+2. Run `bun scripts/release/check-release-pins.ts --write`, which adds the new pins to the pin
+   table.
+3. Run `bun run test`. The registry's tests fail when a pattern matches no line, or more than one,
    in the checkout's files.
 
 ## Pin a release by hand
