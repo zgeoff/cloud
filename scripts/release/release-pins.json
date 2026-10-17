@@ -1,16 +1,16 @@
 {
   "atc-agent": {
-    "version": "4.11.0",
-    "sum": "bcb6dd867fa46b1ce96d7ec85e0f501690c25d8b22d330153a89f48135e8aaba"
+    "version": "4.12.0",
+    "sum": "7422760269d7303491acd8435930b366ed8ae7b4db43090666ccea82b6288fce"
   },
   "atc-daemon": {
-    "version": "4.11.0",
-    "sum": "bcb6dd867fa46b1ce96d7ec85e0f501690c25d8b22d330153a89f48135e8aaba"
+    "version": "4.12.0",
+    "sum": "7422760269d7303491acd8435930b366ed8ae7b4db43090666ccea82b6288fce"
   },
   "atc-gateway": {
-    "version": "4.11.0",
-    "sum": "0ee701cda0da4f8087f302a545d3aac05240d7f938f5074327a8b284fe1f41dd",
-    "tag": "4.11.0"
+    "version": "4.12.0",
+    "sum": "8f48694597b2ac9a95d94195782b28da4a96cb1be7b720cecdd24d0b24265b5c",
+    "tag": "4.12.0"
   },
   "imp-host": {
     "version": "2.3.0",
