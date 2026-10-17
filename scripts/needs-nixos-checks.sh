@@ -10,8 +10,9 @@
 # that decide when they run (this script, find-nixos-check-run.sh and decide-nixos-checks.sh),
 # the script that opens KVM to them (open-kvm.sh), the scripts that tank-cloud-host-secrets runs in
 # its VM (host/move-host-secrets.sh, install-imp-dns-token.sh and host/write-atc-gateway-token.sh),
-# .bun-version, the workflow itself, and the
-# preview service's source (packages/preview/), which the host's package copies. A rename
+# .bun-version, the workflow itself, the
+# preview service's source (packages/preview/), which the host's package copies, and bun.lock,
+# from which that package fetches the service's dependencies. A rename
 # counts both its old and new path. The root package.json is no input, although its test:nixos
 # script runs the checks: it changes with every dependency bump, and a bump would otherwise
 # re-run the VM rehearsals. An edit to test:nixos runs at the next change to an input, or on a
@@ -61,7 +62,7 @@ while IFS= read -r -d '' path; do
       scripts/find-nixos-check-run.sh | scripts/decide-nixos-checks.sh | scripts/open-kvm.sh | \
       scripts/host/move-host-secrets.sh | scripts/install-imp-dns-token.sh | \
       scripts/host/write-atc-gateway-token.sh | \
-      .bun-version | .github/workflows/nixos-checks.yml)
+      .bun-version | bun.lock | .github/workflows/nixos-checks.yml)
       echo true
       exit 0
       ;;
