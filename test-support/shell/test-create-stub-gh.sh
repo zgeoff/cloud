@@ -211,6 +211,32 @@ EOF
   }
 }
 
+it_copies_nothing_into_the_directory_after_d_on_a_call_no_response_matches() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/release" "$tree/out-dir"
+  echo binary > "$tree/release/widget-linux-x64"
+  jq -cn --arg release "$tree/release" '{
+    argv: ["gh", "release", "download", "v1.0.0", "-R", "acme/widgets", "-p", "widget-linux-x64", "-D", null],
+    downloads: {"widget-linux-x64": "\($release)/widget-linux-x64"}
+  }' > "$tree/responses"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    gh release download v1.0.0 -R acme/widgets -p widget-darwin-arm64 -D "$tree/out-dir" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "unexpected: release download v1.0.0 -R acme/widgets -p widget-darwin-arm64 -D $tree/out-dir"
+  diff /dev/null <(ls -A "$tree/out-dir")
+  diff - "$tree/calls" <<< "[\"gh\",\"release\",\"download\",\"v1.0.0\",\"-R\",\"acme/widgets\",\"-p\",\"widget-darwin-arm64\",\"-D\",\"$tree/out-dir\"]"
+  [ "$status" = 97 ] || {
+    echo "exit $status, want 97" >&2
+    exit 1
+  }
+}
+
 it_fails_closed_on_a_response_with_downloads_for_a_call_without_d() {
   local status=0
   tree="$(mktemp -d)"
