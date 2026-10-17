@@ -83,7 +83,7 @@ export interface ReleaseRecord {
 }
 
 // the script runs with bun and takes the release's tag as its one argument
-export interface GeneratedFiles {
+interface GeneratedFiles {
   readonly script: string;
   readonly files: readonly string[];
 }
