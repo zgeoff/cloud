@@ -248,8 +248,8 @@ pkgs.testers.runNixOSTest {
         machine.succeed("udevadm settle")
         machine.succeed("mkfs.ext4 -q -L rancher /dev/zvol/tank/cloud/rancher")
         machine.succeed("systemctl start tank-cloud-key.service")
-        for dataset in ["host-secrets", "imp-db-backups", "rancher"]:
-            machine.succeed(f"systemctl start '{mount_unit(tank + '/' + dataset)}'")
+        for path in [tank + "/host-secrets", tank + "/imp-db-backups", "/var/lib/rancher"]:
+            machine.succeed(f"systemctl start '{mount_unit(path)}'")
         # fake secrets in geoffcloud's shapes on the root disk, which the datasets do not shadow
         machine.succeed(f"install -d -m 0700 {imp_secrets} {atc_secrets} {db_backups}")
         for name, content in [

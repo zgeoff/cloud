@@ -5,7 +5,8 @@
 #
 # tank/cloud is the encryption root, with keylocation=file:///var/lib/zfs-keys/tank.key. Its
 # children are host-secrets and imp-db-backups, legacy-mounted filesystems, and rancher, a
-# sparse zvol that holds ext4. Each one is declared in fileSystems under /var/lib/tank-cloud.
+# fully reserved zvol that holds ext4. Each one is declared in fileSystems: the two filesystems
+# under /var/lib/tank-cloud, and the zvol at /var/lib/rancher, k3s's own data directory.
 #
 # The pool's import unit loads no key here: tank-cloud-key loads tank/cloud's, after the import
 # and before every mount. A missing or wrong key then fails that unit alone, with the import
@@ -34,12 +35,14 @@ let
   pool = "tank";
   root = "${pool}/cloud";
   mountRoot = "/var/lib/tank-cloud";
-  datasets = [
-    "host-secrets"
-    "imp-db-backups"
-    "rancher"
-  ];
-  mountPoint = dataset: "${mountRoot}/${dataset}";
+  mountPoints = {
+    host-secrets = "${mountRoot}/host-secrets";
+    imp-db-backups = "${mountRoot}/imp-db-backups";
+    # k3s's data directory, so k3s needs no flag to find it
+    rancher = "/var/lib/rancher";
+  };
+  datasets = lib.attrNames mountPoints;
+  mountPoint = dataset: mountPoints.${dataset};
   mountUnit = dataset: "${utils.escapeSystemdPath (mountPoint dataset)}.mount";
   bindSource =
     bind:
@@ -58,10 +61,7 @@ in
         lib.types.submodule {
           options = {
             dataset = lib.mkOption {
-              type = lib.types.enum [
-                "host-secrets"
-                "imp-db-backups"
-              ];
+              type = lib.types.enum datasets;
               description = "The dataset whose mount point holds the bind's source directory.";
             };
             subdirectory = lib.mkOption {
@@ -132,11 +132,16 @@ in
         options = [ "nofail" ];
       };
       # the zvol's device appears once the key is loaded; the weekly fstrim (services.fstrim,
-      # on by default) hands the blocks ext4 frees back to the pool
+      # on by default) hands the blocks ext4 frees back to the pool. The wait for the device runs
+      # from the start of the boot, not from the key, and the pool's import alone waits up to a
+      # minute for vdb, so the default 90 s would fail the mount on a slow disk.
       ${mountPoint "rancher"} = {
         device = "/dev/zvol/${root}/rancher";
         fsType = "ext4";
-        options = [ "nofail" ];
+        options = [
+          "nofail"
+          "x-systemd.device-timeout=5min"
+        ];
       };
     }
     // lib.mapAttrs' (
