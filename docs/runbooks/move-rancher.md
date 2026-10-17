@@ -166,16 +166,26 @@ still hold the data.
 
 ## Roll back
 
-Before the removal, the old trees are still on `vda`, as they were when the copy stopped k3s. Roll
-the host back one generation; the old generation mounts the zvol at `/var/lib/tank-cloud/rancher`
-again and starts k3s on `vda`:
+Before the removal, the old trees are still on `vda`, as they were when the copy stopped k3s. Every
+change the cluster made on the zvol since the copy is lost unless you copy the zvol's trees back
+over the old ones with `cp -a` between the two steps below.
 
-```bash
-ssh root@geoffcloud nixos-rebuild switch --rollback
-```
+1. From this machine, stop k3s and its containers:
 
-Every change the cluster made on the zvol since the copy is lost. To keep it, stop k3s and its
-containers first, and copy the zvol's trees back over the old ones with `cp -a`.
+   ```bash
+   ssh root@geoffcloud bash -s -- stop < scripts/host/move-rancher.sh
+   ```
+
+   Expect `stopped k3s: killed <n> processes` and `unmounted <n> container mounts`. k3s's containers
+   outlive the unit, and their mounts keep the zvol's mounts busy, so the rollback could not unmount
+   them without this step.
+
+2. Roll the host back one generation. The old generation mounts the zvol at
+   `/var/lib/tank-cloud/rancher` again and starts k3s on `vda`:
+
+   ```bash
+   ssh root@geoffcloud nixos-rebuild switch --rollback
+   ```
 
 ## Rehearse it
 
@@ -189,5 +199,6 @@ The check starts a real k3s server with geoffcloud's package and flags on the ro
 that writes into a volume directory. It switches to the config with the zvol, checks that k3s fails
 its assertion on the empty zvol, runs the copy, and checks that the cluster CA, the node password,
 the admin kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive. It then
-runs the removal, and reboots with the pool's import held back past a device's default wait, so k3s
-starts on the zvol only after the import.
+runs the removal and the rollback's stop step, checks that the zvol's mounts then unmount, and
+reboots with the pool's import held back past a device's default wait, so k3s starts on the zvol
+only after the import.

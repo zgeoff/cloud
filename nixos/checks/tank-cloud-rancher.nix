@@ -379,6 +379,21 @@ pkgs.testers.runNixOSTest {
         machine.succeed("systemctl is-active k3s.service")
 
 
+    with subtest("it stops k3s and its containers for a rollback, so no pod keeps writing to the zvol"):
+        # the rollback's switch stops the unit alone: the pod outlives it and still writes
+        machine.succeed("systemctl stop k3s.service")
+        last = machine.succeed(f"tail -n 1 {volume}/ticks").strip()
+        machine.wait_until_succeeds(f"test \"$(tail -n 1 {volume}/ticks)\" -gt {last}", timeout=60)
+        stopped = machine.succeed(move.format("stop")).splitlines()
+
+        assert stopped[0].startswith("stopped k3s: killed ") and int(stopped[0].split()[3]) > 0, stopped
+        assert stopped[1].startswith("unmounted ") and len(stopped) == 2, stopped
+        machine.fail("pgrep -f containerd-shim")
+        # what the rollback's switch does to the zvol's mounts
+        machine.succeed("umount /etc/rancher && umount /var/lib/rancher")
+        assert source("/var/lib/rancher") == "" and source("/etc/rancher") == ""
+
+
     with subtest("it starts k3s on the zvol after a reboot whose pool import waits longer than a device's default timeout"):
         machine.succeed("touch /var/lib/slow-vdb")
         machine.shutdown()

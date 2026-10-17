@@ -19,6 +19,9 @@
 #               the staged entries into /var/lib/rancher, k3s last, and start k3s. A copy that
 #               stopped part-way left no k3s directory, so the next run clears what it left and
 #               copies again.
+#   stop        before a rollback: stop k3s and kill its containers as copy does, and unmount their
+#               leftover mounts, so nothing holds the zvol's mounts and the old generation can
+#               unmount them and start k3s on the root disk
 #   remove-old  only while the zvol is mounted at /var/lib/rancher and its etc-rancher at
 #               /etc/rancher, and the zvol holds the cluster CA that the root disk holds: delete the
 #               old trees' contents on the root disk, through the bind of /. The directories stay,
@@ -286,6 +289,7 @@ remove_old() {
 
 case "${1:-}" in
   copy) copy ;;
+  stop) stop_k3s ;;
   remove-old) remove_old ;;
-  *) die "usage: move-rancher.sh copy|remove-old" ;;
+  *) die "usage: move-rancher.sh copy|stop|remove-old" ;;
 esac
