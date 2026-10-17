@@ -38,6 +38,10 @@ calls nixie's API at its cluster address, and the browser calls `/rpc` on the we
 origin. Pulumi creates the web client after nixie, so a first deploy starts the API before the
 client that calls it.
 
+Pulumi waits for the StatefulSet and the web client's Deployment to report ready pods, and never for
+their Services. The StatefulSet names the API's Service, so Pulumi updates the StatefulSet after
+that Service, and a Service that waited for ready pods would hold back the rollout that brings them.
+
 Both containers run as their images' users on a read-only root, with writable volumes only for
 nixie's data and each container's temporary directory. nixie's health endpoint listens only once
 migrations and the integrity check finish, so the pod's startup probe waits on liveness before the
