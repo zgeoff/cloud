@@ -21,7 +21,8 @@ jobs:
     uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v6
     with:
       include:
-        skill-testing, hook-skill-gate, skill-docs-writing, skill-code-style, skill-skill-writing
+        skill-testing, hook-skill-gate, skill-docs-writing, skill-code-style, skill-skill-writing,
+        workflow-audit-fix
       skip: agents, editorconfig, pr-template
     secrets:
       REPO_SYNC_APP_CLIENT_ID: ${{ secrets.REPO_SYNC_APP_CLIENT_ID }}
