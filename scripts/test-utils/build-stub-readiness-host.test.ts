@@ -77,7 +77,7 @@ test('it answers the node, memory, object, daemon and impd checks from the scena
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 1 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"ready":true}',
       probeCode: '',
     }),
   );
@@ -124,7 +124,7 @@ test('it answers the node, memory, object, daemon and impd checks from the scena
 
   expect(ready.stdout.toString()).toBe('1');
   expect(daemon.exitCode).toBe(0);
-  expect(impd.stdout.toString()).toBe('200 1\n');
+  expect(impd.stdout.toString()).toBe('200\n{"ready":true}');
 });
 
 test('it answers an inactive daemon with systemctl’s exit 3', async () => {

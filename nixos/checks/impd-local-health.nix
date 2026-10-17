@@ -309,6 +309,60 @@ let
         '';
     }
     {
+      title = "it reports impd up when /health answers 200 with ready true in JSON spaced over lines";
+      script =
+        let
+          probe = "${
+            (buildModuleSystem ../modules/impd-local-health.nix { services.impd-local-health.enable = true; })
+            .config.services.impd-local-health.package
+          }/bin/impd-local-health";
+        in
+        ''
+          mkdir home tmp out
+          mkfifo port.fifo
+          exec 3<>port.fifo
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
+            /health 200 'application/json;charset=utf-8' '{ "status": "ok", "ready": true }' "$PWD/requests" >&3 &
+          stub_pid=$!
+          trap 'kill "$stub_pid"' EXIT
+          read -r -t 5 -u 3 port
+
+          status=0
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
+
+          assert_equals 0 "$status" "the probe's exit status"
+          assert_files_equal /dev/null stderr
+          assert_equals 'impd_local_health_up 1' "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" "the up gauge"
+        '';
+    }
+    {
+      title = "it reports impd down when /health answers 200 with a body that names ready true but is not JSON";
+      script =
+        let
+          probe = "${
+            (buildModuleSystem ../modules/impd-local-health.nix { services.impd-local-health.enable = true; })
+            .config.services.impd-local-health.package
+          }/bin/impd-local-health";
+        in
+        ''
+          mkdir home tmp out
+          mkfifo port.fifo
+          exec 3<>port.fifo
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
+            /health 200 'text/html;charset=utf-8' '<p>"ready":true</p>' "$PWD/requests" >&3 &
+          stub_pid=$!
+          trap 'kill "$stub_pid"' EXIT
+          read -r -t 5 -u 3 port
+
+          status=0
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_HEALTH_URL="http://127.0.0.1:$port/health" TEXTFILE_DIR=out ${probe} > stdout 2> stderr || status=$?
+
+          assert_equals 0 "$status" "the probe's exit status"
+          assert_files_equal /dev/null stderr
+          assert_equals 'impd_local_health_up 0' "$(grep '^impd_local_health_up ' out/impd_local_health.prom)" "the up gauge"
+        '';
+    }
+    {
       title = "it reports impd down with the status when no route matches /health";
       script =
         let

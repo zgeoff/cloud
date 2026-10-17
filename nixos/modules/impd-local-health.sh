@@ -12,7 +12,8 @@ code=$("$curl" -s -o "$body" -w '%{http_code}' --max-time "${IMPD_HEALTH_TIMEOUT
 code=${code:-000}
 
 up=0
-if [ "$code" = "200" ] && grep -q '"ready":true' "$body"; then
+# impd's body is JSON; jq parses it, so a body that is not JSON, or whose ready is not true, is down
+if [ "$code" = "200" ] && jq -e '.ready == true' "$body" > /dev/null 2>&1; then
   up=1
 fi
 

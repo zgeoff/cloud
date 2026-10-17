@@ -16,7 +16,7 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.curl
-      pkgs.gnugrep
+      pkgs.jq
     ];
     text = builtins.readFile ./impd-local-health.sh;
   };

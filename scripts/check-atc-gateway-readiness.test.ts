@@ -44,7 +44,7 @@ test('it reports every check ok and exits 0 once the gateway is deployed', async
       storageClasses: ['local-path-retain'],
       deployments: { 'ingress/cloudflared': 1, 'atc/atc-gateway': 1 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '200',
     }),
     buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }),
@@ -191,7 +191,7 @@ test('it reports what the deploy creates as missing, and exits 0, before the dep
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 1 },
       isDaemonActive: false,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '',
     }),
     buildStubGetent({}),
@@ -271,7 +271,7 @@ test('it fails the four host checks and exits 4 when the host does not answer', 
       'missing  -n atc deploy atc-gateway\n' +
       'missing  image ghcr.io/zgeoff/atc-gateway\n' +
       'missing  DNS record atc.geoff.cloud\n' +
-      "FAIL     impd is not ready on geoffcloud's loopback: 000\n" +
+      "FAIL     impd is not ready on geoffcloud's loopback: no answer (000)\n" +
       'missing  atc-daemon service on geoffcloud\n',
   );
 });
@@ -289,7 +289,7 @@ test('it fails the node check when the node is not Ready, and the memory check b
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 0 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '',
     }),
     buildStubGetent({}),
@@ -326,7 +326,7 @@ test('it passes the memory check at exactly 1024 MiB available', async () => {
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 2 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '',
     }),
     buildStubGetent({}),
@@ -359,7 +359,7 @@ test('it fails the impd check with impd’s status when impd is not ready', asyn
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 1 },
       isDaemonActive: true,
-      impdHealth: '503 0',
+      impdHealth: '503\n{"status":"ok","ready":false}',
       probeCode: '',
     }),
     buildStubGetent({}),
@@ -375,7 +375,7 @@ test('it fails the impd check with impd’s status when impd is not ready', asyn
   });
 
   expect(exitCode).toBe(1);
-  expect(ctx.out).toContain("FAIL     impd is not ready on geoffcloud's loopback: 503\n");
+  expect(ctx.out).toContain("FAIL     impd is not ready on geoffcloud's loopback: status 503\n");
 });
 
 test('it fails the public route when its metadata answers another status', async () => {
@@ -391,7 +391,7 @@ test('it fails the public route when its metadata answers another status', async
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 1 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '',
     }),
     buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }),
@@ -429,7 +429,7 @@ test('it fails the public route with 000 when its metadata gets no answer', asyn
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 1 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '',
     }),
     buildStubGetent({ 'atc.geoff.cloud': '104.21.32.1' }),
@@ -466,7 +466,7 @@ test('it fails the in-cluster check when the gateway answers another status', as
       storageClasses: ['local-path-retain'],
       deployments: { 'ingress/cloudflared': 1, 'atc/atc-gateway': 1 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '403',
     }),
     buildStubGetent({}),
@@ -498,7 +498,7 @@ test('it checks the named host', async () => {
       storageClasses: [],
       deployments: { 'ingress/cloudflared': 1 },
       isDaemonActive: true,
-      impdHealth: '200 1',
+      impdHealth: '200\n{"status":"ok","ready":true,"warnings":[]}',
       probeCode: '',
     }),
     buildStubGetent({}),
