@@ -1,5 +1,3 @@
-// each test states its whole scenario and output inline, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, mock, test } from 'bun:test';
 import { checkNixieFetchSandbox } from './check-nixie-fetch-sandbox.ts';
 import { buildStubGeoffcloud } from './test-utils/build-stub-geoffcloud.ts';

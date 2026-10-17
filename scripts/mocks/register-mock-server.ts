@@ -5,8 +5,6 @@ import { server } from './node.ts';
 // test. Each unhandled request is recorded, and the test that sent it fails.
 const unhandledRequests: string[] = [];
 
-// MSW's event carries a Request, which has no readonly form
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 server.events.on('request:unhandled', (event) => {
   unhandledRequests.push(`${event.request.method} ${event.request.url}`);
 });

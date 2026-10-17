@@ -61,7 +61,6 @@ interface Parser {
 }
 
 // GitHub's && and || return an operand, not a boolean
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 function parseOr(parser: Parser): Value {
   let value = parseAnd(parser);
 
@@ -76,7 +75,6 @@ function parseOr(parser: Parser): Value {
   return value;
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 function parseAnd(parser: Parser): Value {
   let value = parseUnary(parser);
 
@@ -91,7 +89,6 @@ function parseAnd(parser: Parser): Value {
   return value;
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 function parseUnary(parser: Parser): Value {
   if (parser.tokens[parser.position] === '!') {
     parser.position += 1;
@@ -113,7 +110,6 @@ function parseUnary(parser: Parser): Value {
   return operator === '==' ? equal : !equal;
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 function parsePrimary(parser: Parser): Value {
   const current = parser.tokens[parser.position];
 
@@ -134,7 +130,6 @@ function parsePrimary(parser: Parser): Value {
   return parseLiteralOrPath(current, parser.context);
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 function parseGroup(parser: Parser): Value {
   const value = parseOr(parser);
 
@@ -143,7 +138,6 @@ function parseGroup(parser: Parser): Value {
   return value;
 }
 
-// oxlint-disable-next-line typescript/prefer-readonly-parameter-types
 function requireToken(parser: Parser, expected: string): void {
   if (parser.tokens[parser.position] !== expected) {
     throw new Error(`expected ${expected}, found ${parser.tokens[parser.position] ?? 'the end'}`);

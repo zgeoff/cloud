@@ -1,5 +1,3 @@
-// the gateway's resources each take their builder, beside its inputs type
-/* oxlint-disable import/max-dependencies */
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';

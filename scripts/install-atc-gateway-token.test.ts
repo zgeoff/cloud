@@ -1,5 +1,3 @@
-// a fault table's rows are parts of the stand-ins' scenarios, whose state is mutable by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { expect, test } from 'bun:test';
 import { installATCGatewayToken } from './install-atc-gateway-token.ts';
 import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';

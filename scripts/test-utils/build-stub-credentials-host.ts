@@ -1,5 +1,3 @@
-// the host's state is mutable by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { readFileSync } from 'node:fs';
 import { toShellArg } from '../to-shell-arg.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';

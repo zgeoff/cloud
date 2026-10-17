@@ -1,5 +1,3 @@
-// the stand-in's images and imps are mutable state by design
-/* oxlint-disable typescript/prefer-readonly-parameter-types */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';

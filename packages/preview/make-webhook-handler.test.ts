@@ -1,4 +1,3 @@
-/* oxlint-disable import/max-dependencies, max-lines-per-function, max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -312,7 +311,6 @@ test('it keeps the newer head when an older push still reads GitHub as a newer o
     turn < 100 && ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 }) === null;
     turn += 1
   ) {
-    // oxlint-disable-next-line no-await-in-loop -- each pass yields one event-loop turn
     await waitForImmediate();
   }
 

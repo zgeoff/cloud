@@ -11,7 +11,6 @@ export async function applySlotEvictions(deps: PreviewDeps, opening: string): Pr
   // a preview that will not sleep, such as one under a lease, keeps running beside the opening one
   for (const name of evictions) {
     try {
-      // oxlint-disable-next-line no-await-in-loop -- one sleep at a time keeps impd's work bounded
       await deps.impd.sleepImp(name);
 
       deps.log(`${name}: asleep to free a slot for ${opening}`);

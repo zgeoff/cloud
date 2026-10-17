@@ -1,4 +1,3 @@
-/* oxlint-disable import/max-dependencies, max-lines-per-function, max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

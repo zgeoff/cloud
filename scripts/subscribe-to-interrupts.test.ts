@@ -1,5 +1,3 @@
-// the first test arranges a real command and two steps and asserts each outcome on its own
-/* oxlint-disable max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
 import { existsSync, readFileSync } from 'node:fs';
@@ -54,8 +52,6 @@ test('it kills the running command, runs the steps newest first, and exits 130 o
   const killed = Promise.withResolvers<RunResult>();
 
   const ctx = setupTest({
-    // RunOptions carries stdin as a Buffer, which has no readonly form
-    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
     run: async (argv, options) => {
       const result = await runProcess(argv, options);
 
@@ -158,8 +154,6 @@ test('it waits for a command that traps SIGTERM to exit before it runs the steps
   const ended = Promise.withResolvers<RunResult>();
 
   const ctx = setupTest({
-    // RunOptions carries stdin as a Buffer, which has no readonly form
-    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
     run: async (argv, options) => {
       const result = await runProcess(argv, options);
 
@@ -206,8 +200,6 @@ test('it sends SIGKILL to a command that outlives its SIGTERM by the grace, then
   const ctx = setupTest({
     graceMs: 50,
 
-    // RunOptions carries stdin as a Buffer, which has no readonly form
-    // oxlint-disable-next-line typescript/prefer-readonly-parameter-types
     run: async (argv, options) => {
       const result = await runProcess(argv, options);
 
@@ -259,7 +251,6 @@ async function waitForExit(pid: number) {
   const deadline = performance.now() + 1000;
 
   while (isAlive(pid) && performance.now() < deadline) {
-    // oxlint-disable-next-line no-await-in-loop -- each poll waits for the pause before it
     await Bun.sleep(5);
   }
 

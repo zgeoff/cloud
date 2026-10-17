@@ -1,5 +1,3 @@
-// the first test parses one entry of each kind as one literal, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { exposureSchema } from './exposure-schema.ts';
 import type { Exposure } from './exposure-schema.ts';

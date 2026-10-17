@@ -1,5 +1,3 @@
-// the test asserts whole resource props as literals, so its bodies are long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { DependencyProviderResource, output } from '@pulumi/pulumi';
 import { makeHostIPTransform } from './make-host-ip-transform.ts';

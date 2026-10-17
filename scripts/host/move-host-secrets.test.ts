@@ -1,4 +1,3 @@
-/* oxlint-disable max-statements, max-lines-per-function */
 import { expect, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

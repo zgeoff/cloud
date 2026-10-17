@@ -1,5 +1,3 @@
-// each test asserts the whole rule list as one literal, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildEdgeRules } from './build-edge-rules.ts';

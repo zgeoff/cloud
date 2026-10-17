@@ -1,5 +1,3 @@
-// each test asserts the output, the config, the backup and the calls on their own, so its body is long
-/* oxlint-disable max-lines-per-function, max-statements */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

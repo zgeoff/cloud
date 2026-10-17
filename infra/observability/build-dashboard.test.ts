@@ -1,5 +1,3 @@
-// the test asserts the whole dashboard as one literal, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, test } from 'bun:test';
 import { buildMockDashboardPanel } from '../test-utils/build-mock-dashboard-panel.ts';
 import { buildDashboard } from './build-dashboard.ts';

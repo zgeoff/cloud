@@ -13,7 +13,6 @@ async function trySleepIdlePreviews(deps: PreviewDeps): Promise<void> {
     const imps = await deps.impd.readImps();
 
     for (const name of planIdleSleeps(imps, deps.settings.idleMs, deps.now())) {
-      // oxlint-disable-next-line no-await-in-loop -- one sleep at a time keeps impd's work bounded
       await trySleepImp(deps, name);
     }
   } catch (error) {

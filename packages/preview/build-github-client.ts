@@ -130,10 +130,9 @@ async function findPreviewCommentID(
   for (let page = 1; ; page += 1) {
     const path = `/repos/${comment.repo}/issues/${comment.number}/comments?per_page=100&page=${page}`;
 
-    // oxlint-disable-next-line no-await-in-loop -- each page follows the one before it
     const response = await send({ path });
 
-    // oxlint-disable-next-line no-await-in-loop, typescript/no-unsafe-type-assertion -- the same page, in GitHub's issue comments shape
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same page, in GitHub's issue comments shape
     const comments = (await response.json()) as readonly IssueComment[];
 
     const match = comments.find(
@@ -188,10 +187,9 @@ async function readPullRequestFiles(
   for (let page = 1; ; page += 1) {
     const path = `/repos/${repo}/pulls/${number}/files?per_page=100&page=${page}`;
 
-    // oxlint-disable-next-line no-await-in-loop -- each page follows the one before it
     const response = await send({ path });
 
-    // oxlint-disable-next-line no-await-in-loop, typescript/no-unsafe-type-assertion -- the same page, in GitHub's pull request files shape
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same page, in GitHub's pull request files shape
     const entries = (await response.json()) as readonly PullRequestFileEntry[];
 
     files.push(...entries.map((entry) => ({ path: entry.filename, patch: entry.patch ?? null })));

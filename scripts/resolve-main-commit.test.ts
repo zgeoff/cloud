@@ -1,5 +1,3 @@
-// each test commits its own history to a real repository, so its body is long
-/* oxlint-disable max-statements */
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';

@@ -1,5 +1,3 @@
-// the first test asserts a whole rendered page as one literal, so its body is long
-/* oxlint-disable max-lines-per-function */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
