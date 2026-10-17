@@ -16,7 +16,7 @@ set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-publish-docker.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-release-download-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -28,6 +28,11 @@ it_pushes_both_images_when_the_registry_lacks_both_tags() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
+  # gh copies each asset a -p names into the -D directory, fetch-atc-release.sh's temp directory
+  jq -cn --arg release "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" '{
+    argv: ["gh", "release", "download", "@zgeoff/atc@2.27.0", "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null],
+    downloads: {"atc-gateway-linux-x64": "\($release)/atc-gateway-linux-x64", "SHA256SUMS": "\($release)/SHA256SUMS"}}' \
+    > "$tree/gh-responses"
   cat > "$tree/repo/images/atc-gateway/versions.env" << EOF
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
@@ -89,6 +94,11 @@ it_skips_a_published_tag_and_pushes_the_other() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
+  # gh copies each asset a -p names into the -D directory, fetch-atc-release.sh's temp directory
+  jq -cn --arg release "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" '{
+    argv: ["gh", "release", "download", "@zgeoff/atc@2.27.0", "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null],
+    downloads: {"atc-gateway-linux-x64": "\($release)/atc-gateway-linux-x64", "SHA256SUMS": "\($release)/SHA256SUMS"}}' \
+    > "$tree/gh-responses"
   cat > "$tree/repo/images/atc-gateway/versions.env" << EOF
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
@@ -141,6 +151,11 @@ it_stops_without_a_push_on_a_lookup_it_cannot_read() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
+  # gh copies each asset a -p names into the -D directory, fetch-atc-release.sh's temp directory
+  jq -cn --arg release "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" '{
+    argv: ["gh", "release", "download", "@zgeoff/atc@2.27.0", "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null],
+    downloads: {"atc-gateway-linux-x64": "\($release)/atc-gateway-linux-x64", "SHA256SUMS": "\($release)/SHA256SUMS"}}' \
+    > "$tree/gh-responses"
   cat > "$tree/repo/images/atc-gateway/versions.env" << EOF
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
@@ -190,6 +205,11 @@ BACKUP_IMAGE_TAG=2.24.0-r2
 BASE_IMAGE=example.invalid/base:1
 RESTIC_IMAGE=example.invalid/restic:1
 EOF
+  # gh's answer for a release the repository lacks, which test-start-stub-github-api.sh pins
+  # against the real gh: "release not found" on stderr, exit 1, nothing downloaded
+  cat > "$tree/gh-responses" << 'EOF'
+{"argv": ["gh", "release", "download", "@zgeoff/atc@9.9.9", "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null], "stderr": "release not found\n", "exit": 1}
+EOF
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" GH_TOKEN=dummy-token GITHUB_ACTOR=octocat GITHUB_STEP_SUMMARY="$tree/summary" bash scripts/publish-atc-gateway-images.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -215,6 +235,11 @@ it_stops_before_any_build_when_the_asset_fails_the_pin() {
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
   echo "$sum  atc-gateway-linux-x64" > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/SHA256SUMS"
+  # gh copies each asset a -p names into the -D directory, fetch-atc-release.sh's temp directory
+  jq -cn --arg release "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0" '{
+    argv: ["gh", "release", "download", "@zgeoff/atc@2.27.0", "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null],
+    downloads: {"atc-gateway-linux-x64": "\($release)/atc-gateway-linux-x64", "SHA256SUMS": "\($release)/SHA256SUMS"}}' \
+    > "$tree/gh-responses"
   cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@2.27.0
 ATC_ASSET=atc-gateway-linux-x64
@@ -299,8 +324,9 @@ it_requires_the_step_summary() {
 
 # setup_test <tree>: a repo copy at <tree>/repo holding the publish script, fetch-atc-release.sh,
 # the gateway Dockerfile and the backup image's build context, with no versions.env, which each
-# case writes; the docker and gh stand-ins in <tree>/bin, the HOME and TMPDIR the script runs
-# with, and empty registry, digest and release directories for the cases to fill
+# case writes; the docker and gh stand-ins in <tree>/bin, gh answering from <tree>/gh-responses,
+# which each case that fetches writes; the HOME and TMPDIR the script runs with, and empty
+# registry, digest and release directories for the cases to fill
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/registry" "$tree/digests" \
@@ -312,7 +338,7 @@ setup_test() {
   cp "$scripts/../images/atc-gateway/Dockerfile" "$tree/repo/images/atc-gateway/"
   cp -r "$scripts/../images/atc-gateway/backup" "$tree/repo/images/atc-gateway/"
   create_stub_publish_docker "$tree/bin"
-  create_stub_release_download_gh "$tree/bin"
+  create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
 }
 
 run_cases

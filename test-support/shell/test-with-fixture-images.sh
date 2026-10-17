@@ -93,25 +93,31 @@ EOF
   }
 }
 
-# A gh stand-in first on PATH records the environment the release fetch gives gh. The case
-# passes none of the opt-outs itself, so the recorded values are the helper's own; the
-# stand-in answers that the release is missing, so nothing is fetched or built.
+# A gh stand-in first on PATH answers the release fetch only when gh runs with all three
+# opt-outs. The case passes none of them itself, so a match shows the helper's own; a call
+# without one matches no recorded answer and ends with exit 97 and "unexpected: <argv>", so the
+# output would differ. The recorded answer is gh's for a missing release, "release not found"
+# and exit 1, which test-start-stub-github-api.sh pins against the real gh, so nothing is fetched
+# or built.
 it_runs_the_release_fetch_with_ghs_telemetry_and_update_check_off() {
   local release status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree" || true' EXIT
   mkdir "$tree/bin" "$tree/home" "$tree/tmp"
-  create_stub_gh "$tree/bin"
+  create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
   sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../images/atc-gateway/versions.env" > "$tree/release"
   release="$(< "$tree/release")"
+  jq -cn --arg release "$release" '{
+    argv: ["gh", "release", "download", $release, "-R", "zgeoff/atc", "-p", "atc-gateway-linux-x64", "-p", "SHA256SUMS", "-D", null],
+    env: {"GH_TELEMETRY": "0", "DO_NOT_TRACK": "1", "GH_NO_UPDATE_NOTIFIER": "1"},
+    stderr: "release not found\n", exit: 1}' > "$tree/gh-responses"
 
   # shellcheck disable=SC2016 # expanded by the inner shell
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     bash -c 'source "$1"; with_fixture_images touch "$2/ran"' _ \
     "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh" "$tree" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/gh-env" <<< 'GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1'
   # the fetch downloads into its own mktemp directory under TMPDIR, so that path is masked
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|WORK|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" <<< "[\"gh\",\"release\",\"download\",\"$release\",\"-R\",\"zgeoff/atc\",\"-p\",\"atc-gateway-linux-x64\",\"-p\",\"SHA256SUMS\",\"-D\",\"WORK\"]"

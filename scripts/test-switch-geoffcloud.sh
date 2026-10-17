@@ -7,7 +7,8 @@
 # the activation, and fails when nixie is not ready after it. Each case
 # that switches commits its own nixos/packages/atc.nix and imp-host pin. gh also serves the nixie
 # release's bun.lock, and the fake clock stands in for the readiness check's pause. It touches
-# no host and runs no Nix: gh lists the green runs (with none named, one for HEAD), and docker
+# no host and runs no Nix: gh replays recorded answers (create-stub-gh.sh), the bun.lock from
+# setup_test and the green runs each case that reaches the gate records, and docker
 # and ssh are stand-ins from test-support/shell that log their argv as JSON lines (two cases hand them to the real docker and ssh, to fail on a
 # missing daemon socket and a refused loopback port), and each case runs the script in
 # its own temporary clone with its own origin, under `env -i` with only the variables it
@@ -26,10 +27,12 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.s
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nix-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nixos-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-racing-git.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
+
+recordings="$(cd "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/gh-recordings" && pwd)"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository,
 # user or system setting from the caller's environment, and commit as a fixed identity.
@@ -61,11 +64,13 @@ it_activates_the_store_path_its_build_printed() {
   git -C "$tree/clone" commit -qm marker
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -128,11 +133,13 @@ it_prints_the_failed_units_the_host_reports_after_the_switch() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_FAILED_UNITS='alloy.service loaded failed failed Alloy' \
@@ -189,11 +196,13 @@ it_builds_the_checked_commit_when_the_checkout_is_edited_during_the_build() {
   git -C "$tree/clone" commit -qm marker
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_EDIT_DURING_BUILD="$tree/clone/nixos/marker" \
@@ -252,11 +261,13 @@ it_never_builds_an_untracked_file() {
   git -C "$tree/clone" push -q origin main
   echo '{ }' > "$tree/clone/nixos/untracked.nix"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -321,15 +332,16 @@ it_builds_the_checked_commit_when_a_commit_lands_after_the_check() {
   git -C "$tree/clone" commit -qm marker
   git -C "$tree/clone" push -q origin main
   checked="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$checked https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
   create_stub_racing_git "$tree/bin" "$(command -v git)" "$tree/clone" "$tree/calls"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
-    STUB_RUNS="$checked https://github.com/zgeoff/cloud/actions/runs/1" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
@@ -413,10 +425,12 @@ it_never_builds_or_switches_a_commit_that_no_green_nixos_run_covers() {
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  # no green run: the --jq filter prints nothing
+  jq -c '{argv: .}' <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_BUILD_SAW="$tree/build-saw" STUB_RUNS= \
+    STUB_BUILD_SAW="$tree/build-saw" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -445,11 +459,14 @@ it_never_builds_or_switches_a_commit_that_changed_nixos_after_the_last_green_run
   echo unchecked > "$tree/clone/nixos/marker"
   git -C "$tree/clone" commit -qam unchecked
   git -C "$tree/clone" push -q origin main
+  # the one green run is on the commit before nixos/ changed
+  jq -c --arg runs "$checked https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_BUILD_SAW="$tree/build-saw" STUB_RUNS="$checked https://github.com/zgeoff/cloud/actions/runs/1" \
+    STUB_BUILD_SAW="$tree/build-saw" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -468,11 +485,14 @@ it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
+  # authentication
+  jq -c '{argv: ., stderr: "To get started with GitHub CLI, please run:  gh auth login\n", exit: 4}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" \
-    STUB_GH_ERROR='To get started with GitHub CLI, please run:  gh auth login' STUB_GH_EXIT=4 \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
@@ -489,7 +509,7 @@ it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
 # cloud#207's skew: the bump pins daemon 4.5.0 while the cluster still runs gateway 2.27.0,
 # whose atc_report_get sends report.get, which atc 4.0.0 renamed note.get
 it_never_builds_or_switches_a_daemon_pin_a_major_release_ahead_of_the_deployed_gateway() {
-  local status=0
+  local commit status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -500,6 +520,9 @@ it_never_builds_or_switches_a_daemon_pin_a_major_release_ahead_of_the_deployed_g
   git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
@@ -524,7 +547,7 @@ EOF
 
 # a gateway rollout recreates its one pod, so for a while no gateway pod runs
 it_never_builds_or_switches_while_no_gateway_pod_runs() {
-  local status=0
+  local commit status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -535,6 +558,9 @@ it_never_builds_or_switches_while_no_gateway_pod_runs() {
   git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
@@ -571,11 +597,13 @@ it_never_activates_when_the_gateway_moves_to_another_major_during_the_build() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_GATEWAY_LATER_IMAGES=ghcr.io/zgeoff/atc-gateway:4.5.0 \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
@@ -609,7 +637,7 @@ EOF
 }
 
 it_never_builds_or_switches_an_impd_major_bump_ahead_of_the_running_nixies_imp_client() {
-  local status=0
+  local commit status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -619,11 +647,14 @@ it_never_builds_or_switches_an_impd_major_bump_ahead_of_the_running_nixies_imp_c
   git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
   git -C "$tree/clone" commit -qm 'pin imp 4.0.0'
   git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -662,12 +693,14 @@ it_fails_the_switch_naming_each_part_when_nixie_is_not_ready_after_it() {
   git -C "$tree/clone" commit -qm 'pin imp 3.4.0'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
   unready='{"status":"unready","parts":{"store":{"isReady":true},"imp_host":{"isReady":false,"reason":"impd 3.4.0 refuses imp client 3.2.1"}}}'
 
   (cd "$tree/clone" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$unready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$unready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -709,10 +742,13 @@ EOF
 }
 
 it_never_builds_or_switches_a_commit_without_the_atc_daemon_pin() {
-  local status=0
+  local commit status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
@@ -748,11 +784,13 @@ it_switches_the_host_that_the_environment_names() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     GEOFFCLOUD_HOST=root@other.test \
@@ -1077,11 +1115,13 @@ it_never_switches_after_a_failed_build() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_ERROR="error: builder for '/nix/store/x.drv' failed with exit code 1" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -1128,11 +1168,13 @@ it_never_switches_when_docker_cannot_reach_its_daemon() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_DOCKER_PASS=1 STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     DOCKER_HOST="unix://$tree/docker.sock" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -1168,11 +1210,13 @@ it_never_switches_when_the_build_prints_no_system_path() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_BUILD_OUT='warning: x' STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
@@ -1213,11 +1257,13 @@ it_never_activates_when_the_copy_fails() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_COPY_ERROR="error: cannot connect to 'root@geoffcloud'" \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -1252,7 +1298,7 @@ EOF
 # listens. The gateway query is the switch's first call to the host, so an unreachable host
 # stops the switch before the build.
 it_never_builds_and_stops_with_ssh_exit_255_when_the_host_is_unreachable() {
-  local status=0
+  local commit status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
@@ -1263,6 +1309,9 @@ it_never_builds_and_stops_with_ssh_exit_255_when_the_host_is_unreachable() {
   git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
@@ -1298,11 +1347,13 @@ it_stops_with_the_activation_exit_code_when_switch_to_configuration_fails() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_ACTIVATE_FAILED_UNITS=atc-daemon.service \
@@ -1359,11 +1410,13 @@ it_stops_with_ssh_exit_255_when_the_connection_drops_before_the_check() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_SSH_DROP_AT_READLINK=1 \
@@ -1414,11 +1467,13 @@ it_fails_when_the_host_runs_another_system_after_the_switch() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-nixos-system-geoffcloud-old \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -1470,11 +1525,13 @@ it_fails_with_systemctls_exit_code_when_listing_failed_units_fails() {
   git -C "$tree/clone" commit -qm 'pin atc'
   git -C "$tree/clone" push -q origin main
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
     TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
     STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
-    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_IMP_CLIENT=3.2.1 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     STUB_FAILED_EXIT=1 \
@@ -1518,10 +1575,10 @@ EOF
 
 # Boot data every case needs: a clone of a bare origin whose main holds one empty commit,
 # the script under test and the pin it reads copied into the clone untracked (they run from
-# there, and the check and the build ignore untracked files), and the docker and ssh stand-ins
-# (test-support/shell/create-stub-nix-docker.sh, test-support/shell/create-stub-nixos-ssh.sh),
-# which log each
-# call's argv as a JSON line to STUB_LOG and end with exit 97 on a call they do not know;
+# there, and the check and the build ignore untracked files), and the docker, ssh and gh stand-ins
+# (test-support/shell/create-stub-nix-docker.sh, test-support/shell/create-stub-nixos-ssh.sh,
+# test-support/shell/create-stub-gh.sh), which log each call's argv as a JSON line to the one
+# call log, <tree>/calls, and end with exit 97 on a call they do not know;
 # fail-closed stand-ins for scp, sftp, rsync and tailscale; and a guard that ends the case
 # unless every remote tool resolves to a stand-in, so no call reaches a real host.
 setup_test() {
@@ -1531,7 +1588,11 @@ setup_test() {
   create_stub_clock "$tree/clock"
   create_stub_nix_docker "$tree/bin"
   create_stub_nixos_ssh "$tree/bin"
-  create_stub_runs_gh "$tree/bin"
+  create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
+  # boot data: the running nixie's bun.lock holds imp-client 3.2.1; each case that reaches the
+  # NixOS checks gate appends its answer to the runs call
+  jq -cn --argjson argv "$nixie_lock_call" --arg lock "$recordings/nixie-bun-lock-imp-client-3.2.1.lock" \
+    '{argv: $argv, stdout_file: $lock}' > "$tree/gh-responses"
   create_stub_remote_tools "$tree/bin" "$tree/calls" scp sftp rsync tailscale
   require_remote_tool_stubs "$tree/bin"
   git init -q --bare -b main "$tree/origin.git"

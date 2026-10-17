@@ -215,6 +215,11 @@ journey sits in `e2e/`, one file per journey. Each shared rule takes its shell f
   [`assert_one_of_outputs`](../../../test-support/shell/assert-one-of-outputs.sh), which binds each
   version's stdout, stderr and exit status together. A process stand-in records an unexpected
   request and answers it with a failure.
+- gh has one stand-in, [`create-stub-gh.sh`](../../../test-support/shell/create-stub-gh.sh),
+  which answers each call from the responses a case records with the exact argv the script sends,
+  and exits 97 on any other call. The comment beside each recorded response cites its source,
+  such as gh's manual or GitHub's REST docs. A long body that several suites replay lives in
+  [`gh-recordings/`](../../../test-support/shell/gh-recordings/).
 - A stand-in that wraps the real tool, such as
   [`create-stub-racing-git.sh`](../../../test-support/shell/create-stub-racing-git.sh), or that
   supplies a value rather than a tool, such as

@@ -1,0 +1,6 @@
+{
+  "lockfileVersion": 1,
+  "packages": {
+    "zod": ["zod@4.4.3", "", {}, "sha512-stub"],
+  }
+}

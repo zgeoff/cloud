@@ -1,0 +1,10 @@
+{
+  "lockfileVersion": 1,
+  "catalog": {
+    "@zgeoff/imp-client": "1.6.2",
+  },
+  "packages": {
+    "@zgeoff/imp-client": ["@zgeoff/imp-client@1.6.2", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-stub"],
+    "zod": ["zod@4.4.3", "", {}, "sha512-stub"],
+  }
+}

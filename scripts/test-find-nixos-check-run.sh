@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test for find-nixos-check-run.sh: against a real git repository in the case tree and a gh
-# stand-in (test-support/shell/create-stub-runs-gh.sh) that lists the green runs, it prints the URL
+# stand-in (test-support/shell/create-stub-gh.sh) that replays the green runs each case records,
+# as the lines the call's --jq filter prints ("<head sha> <run url>" per run), it prints the URL
 # of the newest run whose commit is the given commit or an ancestor with no input of the checks
 # changed since, skips runs it cannot use, prints nothing when no run covers the commit, and
 # fails with gh's error and exit when gh fails. Each case runs the script under `env -i` with
@@ -12,7 +13,7 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-runs-gh.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/find-nixos-check-run.sh"
 
@@ -32,10 +33,14 @@ it_prints_the_url_of_a_green_run_on_the_commit_itself() {
   git -C "$tree/repo" add -A
   git -C "$tree/repo" commit -qm 'add the flake'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
+  jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_RUNS="$commit https://github.com/zgeoff/cloud/actions/runs/7" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" "$commit") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/7
@@ -67,11 +72,15 @@ it_prints_the_newest_run_on_an_ancestor_when_no_input_changed_since() {
   newer="$(git -C "$tree/repo" rev-parse HEAD)"
   echo changed >> "$tree/repo/docs/notes.md"
   git -C "$tree/repo" commit -qam 'change notes'
+  jq -cn --arg runs "$newer https://github.com/zgeoff/cloud/actions/runs/9
+$older https://github.com/zgeoff/cloud/actions/runs/8" '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_RUNS="$newer https://github.com/zgeoff/cloud/actions/runs/9
-$older https://github.com/zgeoff/cloud/actions/runs/8" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/9
@@ -94,10 +103,14 @@ it_prints_nothing_when_nixos_changed_since_the_newest_green_run() {
   checked="$(git -C "$tree/repo" rev-parse HEAD)"
   echo changed >> "$tree/repo/nixos/flake.nix"
   git -C "$tree/repo" commit -qam 'change the flake'
+  jq -cn --arg runs "$checked https://github.com/zgeoff/cloud/actions/runs/8" '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_RUNS="$checked https://github.com/zgeoff/cloud/actions/runs/8" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -122,12 +135,16 @@ it_skips_a_run_on_a_commit_the_checkout_lacks_and_a_run_off_the_history_of_the_c
   git -C "$tree/repo" commit -q --allow-empty -m 'a side commit'
   side="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" checkout -q main
+  jq -cn --arg runs "1111111111111111111111111111111111111111 https://github.com/zgeoff/cloud/actions/runs/11
+$side https://github.com/zgeoff/cloud/actions/runs/10
+$checked https://github.com/zgeoff/cloud/actions/runs/8" '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stdout: "\($runs)\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_RUNS="1111111111111111111111111111111111111111 https://github.com/zgeoff/cloud/actions/runs/11
-$side https://github.com/zgeoff/cloud/actions/runs/10
-$checked https://github.com/zgeoff/cloud/actions/runs/8" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" main) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/8
@@ -143,9 +160,15 @@ it_prints_nothing_when_gh_lists_no_green_run() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  # no green run: the --jq filter prints nothing
+  jq -cn '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]}' \
+    > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" STUB_RUNS= \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -161,10 +184,16 @@ it_fails_with_the_exit_and_error_of_gh_when_gh_fails() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
+  # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
+  # authentication
+  jq -cn '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stderr: "To get started with GitHub CLI, please run:  gh auth login\n", exit: 4}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
-    STUB_GH_ERROR='To get started with GitHub CLI, please run:  gh auth login' STUB_GH_EXIT=4 \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -184,7 +213,7 @@ it_fails_without_calling_gh_for_a_commit_git_cannot_resolve() {
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" no-such-commit) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -203,7 +232,7 @@ it_rejects_a_call_without_one_commit_with_its_usage() {
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -221,7 +250,7 @@ setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
   : > "$tree/calls"
-  create_stub_runs_gh "$tree/bin"
+  create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
   git -C "$tree/repo" init -q -b main
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it
