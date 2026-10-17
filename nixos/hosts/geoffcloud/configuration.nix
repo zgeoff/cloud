@@ -183,7 +183,8 @@ in
   };
 
   # imp: impd and Firecracker in the imp-host container, outside k3s. The module
-  # runs Docker and imports tank (vdb); the secrets are staged at install (runbook).
+  # runs Docker and imports tank (vdb); the secrets are staged at install (runbook) and live on
+  # tank/cloud (services.tank-cloud.binds).
   services.imp = {
     enable = true;
     zfs = {
@@ -218,16 +219,43 @@ in
 
   # tank/cloud, the encrypted datasets on tank (modules/tank-cloud.nix, docs/runbooks/tank-cloud.md):
   # unlocked at boot from /var/lib/zfs-keys/tank.key. Each service here refuses to start while
-  # its datasets are not mounted, instead of starting on the empty mount points on vda.
+  # its datasets are not mounted, instead of starting on the empty mount points on vda. The
+  # secret files of imp-host and the atc daemon and impd's database copies keep their paths, but
+  # live on tank/cloud: each path is a bind mount of a directory of a dataset
+  # (docs/runbooks/move-host-secrets.md).
   services.tank-cloud = {
     enable = true;
+    binds = {
+      imp-host-secrets = {
+        dataset = "host-secrets";
+        subdirectory = "imp-host";
+        path = "/var/lib/imp-host/secrets";
+      };
+      atc-daemon-secrets = {
+        dataset = "host-secrets";
+        subdirectory = "atc-daemon";
+        path = "/var/lib/atc-daemon-secrets";
+      };
+      root-imp-db-backups = {
+        dataset = "imp-db-backups";
+        path = "/root/imp-db-backups";
+      };
+    };
     requiredBy = {
       k3s = [ "rancher" ];
-      imp-host = [ "host-secrets" ];
-      atc-daemon = [ "host-secrets" ];
+      imp-host = [
+        "host-secrets"
+        "imp-host-secrets"
+      ];
+      imp-host-dns-token = [ "imp-host-secrets" ];
+      atc-daemon = [ "atc-daemon-secrets" ];
       preview = [ "host-secrets" ];
     };
   };
+
+  # a path unit that survives the switch keeps its inotify watch on the directory the bind
+  # shadows, so a token rotation would wait for the 5-minute timer; this restarts it with the bind
+  systemd.paths.imp-host-dns-token.unitConfig.RequiresMountsFor = [ "/var/lib/imp-host/secrets" ];
 
   # tank/imp, an encryption root keyed by the same file (modules/imp-dataset-key.nix,
   # docs/runbooks/tank-imp-encryption.md): its key loads at boot, and imp-host stays stopped
