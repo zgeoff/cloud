@@ -76,6 +76,7 @@ const observability = await createObservability({
           provider: k3s.provider,
           alertWebhookURL: k3s.inputs.alertWebhookURL,
           atcDaemons: buildATCDaemonEndpoints(k3s.inputs.atcGateway?.config),
+          nixieReadinessURL: workloads?.nixieReadinessURL,
         },
 });
 

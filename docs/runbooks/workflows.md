@@ -122,7 +122,8 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
    `systemctl --failed`, which should list nothing.
 8. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
    part that is not ready and nixie's reason for it, since a host that switches cleanly can still
-   leave nixie unable to start.
+   leave nixie unable to start. It prints each advisory part that is not ready, such as
+   `conversation_turns`, and passes, because nixie answers while its turns fail.
 
 `bash scripts/test-switch-geoffcloud.sh` (part of `bun run test:scripts`) checks the gates with stub
 `gh`, `docker` and `ssh`. After a switch, `ssh root@geoffcloud k3s kubectl get nodes` should show

@@ -4,6 +4,7 @@ import type { ATCGatewayInputs, NixieInputs } from '../inputs/index.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
+import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
@@ -28,6 +29,9 @@ interface ClusterOutputs {
   readonly atcGatewayRoute?: ATCGatewayRoute;
   readonly onePasswordConnectServiceURL: Output<string>;
   readonly nixieURL?: Output<string>;
+
+  // the in-cluster URL of nixie's readiness report, for the probe of its advisory parts
+  readonly nixieReadinessURL?: string;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7). index.ts builds the cluster's Provider, which
@@ -43,7 +47,7 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
 
   return {
     onePasswordConnectServiceURL: connect.serviceURL,
-    ...(nixie === undefined ? {} : { nixieURL: nixie.url }),
+    ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
 }
