@@ -18,6 +18,8 @@ models:
       effort: medium
       # compact a long conversation at 400k tokens instead of near the full window
       context_tokens: 400000
+      # keep the conversation's cached prompt for an hour; every other profile keeps the 5m default
+      cache_ttl: 1h
     # the memory writer extracts and files memories from each batch of messages
     haiku:
       base_url: https://api.anthropic.com
