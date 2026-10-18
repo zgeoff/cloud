@@ -13,8 +13,8 @@
     "tag": "4.13.1"
   },
   "atc-gateway-image": {
-    "version": "4.13.0",
-    "digest": "sha256:f55e19d9178595ef2d674486496da791cbdc97c4ec16870f949055e5699c2fd8"
+    "version": "4.13.1",
+    "digest": "sha256:dc4b02c70bf95ae9d58d3994e5d7f6e4aee268cb0775b93ffd0d53210b338a75"
   },
   "atc-gateway-backup-image": {
     "tag": "2.24.0-r2",
