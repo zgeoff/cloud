@@ -625,7 +625,8 @@ let
       script = ''
         info=${imp}/packages/cli/src/commands/info.ts
         first=$(grep -A1 -F 'const lines = [' "$info" | tail -n1 | tr -d ' ')
-        pads=$(grep -cF 'console.log(`''${label.padEnd(12)}''${value}`);' "$info" || true)
+        # impz prints each line through console.log, from 2.5 on behind its io.print
+        pads=$(grep -cE '(console\.log|io\.print)\(`\$\{label\.padEnd\(12\)\}\$\{value\}`\);' "$info" || true)
 
         assert_equals "['version',info.version]," "$first" "impz info's first line"
         assert_equals 1 "$pads" "impz info's padded labels"
