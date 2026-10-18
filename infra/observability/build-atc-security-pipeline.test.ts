@@ -1,15 +1,14 @@
 import { expect, test } from 'bun:test';
 import { buildATCSecurityPipeline } from './build-atc-security-pipeline.ts';
 
-test("it counts the gateway's stderr security events from the end of its log files, under the contract's values only, and forwards no line", () => {
+test("it counts the gateway's stderr security events from the start of its log files after a cutoff for history, under the contract's values only, and forwards no line", () => {
   expect(buildATCSecurityPipeline('/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log'))
     .toStrictEqual(`
 // atc's security events, from the gateway's container log files rather than the Kubernetes log
-// API, which joins stdout and stderr; without a saved position a file is read from its end, so a
-// first start counts no earlier sign-in
+// API, which joins stdout and stderr; each file is read from its start, so a new pod's first
+// events count even when they land before Alloy finds the file
 loki.source.file "atc_security" {
-  targets       = [{__path__ = "/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log"}]
-  tail_from_end = true
+  targets = [{__path__ = "/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log"}]
   file_match {
     enabled = true
   }
@@ -21,6 +20,13 @@ loki.process "atc_security" {
   forward_to = []
 
   stage.cri {}
+
+  // the cutoff for history: an event older than the time Alloy takes to find a new file is one
+  // that a start without saved positions reads again, and it raises no alert
+  stage.drop {
+    older_than          = "2m"
+    drop_counter_reason = "atc security event before the cutoff"
+  }
 
   stage.match {
     selector      = "{stream=\\"stderr\\"} |~ \\"^atc security \\\\\\\\{\\""

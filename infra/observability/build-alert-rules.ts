@@ -1,6 +1,7 @@
 import { topology } from '@zgeoff/cloud-topology';
 import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
+import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import { nixieTurnsProbeTarget } from './nixie-turns-probe-target.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
@@ -29,9 +30,9 @@ export interface AlertRuleInputs {
   readonly nixieReadinessURL?: string | undefined;
 }
 
-// geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
-// rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
-// branch, except ImpdLocalHealthDown, HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
+// geoff.cloud's own alerts (#29) and the atc sign-in group as PrometheusRule spec.groups. A missing
+// metric must alert: single-metric rules carry an absent() branch, except ImpdLocalHealthDown,
+// HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -52,6 +53,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
         oomKilledRule,
       ],
     },
+    buildATCSignInRules(),
   ];
 }
 

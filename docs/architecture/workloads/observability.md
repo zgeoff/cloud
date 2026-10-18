@@ -97,9 +97,11 @@ alert holds only values that the contract lists.
 Alloy reads the gateway container's log files on the node, not the Kubernetes log API, because the
 API joins stdout and stderr and the contract puts the events on stderr alone. It counts a stderr
 line only when the line starts with the event prefix, and it never counts stdout, where atc printed
-approval codes before passkey sign-in. A file with no saved read position is read from its end, so
-Alloy's first start counts no sign-in from before it. The pipeline forwards no line: the gateway's
-logs reach Loki through the pod-log path that every pod's logs take.
+approval codes before passkey sign-in. Alloy reads each log file from its start, so a new pod's
+first events count even when they land before Alloy finds the file. It drops each event older than a
+cutoff longer than that search takes, so a start without saved read positions raises no alert for
+history. The pipeline forwards no line: the gateway's logs reach Loki through the pod-log path that
+every pod's logs take.
 
 Alloy labels each count with the event's kind, outcome, reason, route and method, and checks each
 value against the contract. A kind and an outcome pass only as a pair that the contract lists, and

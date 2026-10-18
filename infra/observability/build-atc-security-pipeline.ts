@@ -6,11 +6,10 @@ import { atcSecurityEvents } from './atc-security-events.ts';
 export function buildATCSecurityPipeline(logPath: string): string {
   return `
 // atc's security events, from the gateway's container log files rather than the Kubernetes log
-// API, which joins stdout and stderr; without a saved position a file is read from its end, so a
-// first start counts no earlier sign-in
+// API, which joins stdout and stderr; each file is read from its start, so a new pod's first
+// events count even when they land before Alloy finds the file
 loki.source.file "atc_security" {
-  targets       = [{__path__ = ${toAlloyString(logPath)}}]
-  tail_from_end = true
+  targets = [{__path__ = ${toAlloyString(logPath)}}]
   file_match {
     enabled = true
   }
@@ -22,6 +21,13 @@ loki.process "atc_security" {
   forward_to = []
 
   stage.cri {}
+
+  // the cutoff for history: an event older than the time Alloy takes to find a new file is one
+  // that a start without saved positions reads again, and it raises no alert
+  stage.drop {
+    older_than          = "2m"
+    drop_counter_reason = "atc security event before the cutoff"
+  }
 
   stage.match {
     selector      = ${toAlloyString(String.raw`{stream="stderr"} |~ "^atc security \\{"`)}
