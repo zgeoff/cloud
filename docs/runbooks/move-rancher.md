@@ -76,14 +76,14 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    ```
 
    Expect the activation to start `k3s.service` with no failed unit, and the script to print
-   `== geoffcloud runs <path>`. k3s fails its assertion, because the zvol holds no `k3s` directory
-   yet, and the journal of `k3s.service` holds `Assertion failed for k3s service.`
+   `== root@geoffcloud runs <path>`. k3s fails its assertion, because the zvol holds no `k3s`
+   directory yet, and the journal of `k3s.service` holds `Assertion failed for k3s service.`
 
-2. Stop the script with Ctrl-C once it prints `== geoffcloud runs <path>` and the list of failed
-   units. The script's nixie readiness check follows, and it runs `k3s kubectl` on the host. Any k3s
-   command unpacks k3s's binaries into `/var/lib/rancher/k3s`, and a `k3s` directory that appears
-   during the copy makes the copy refuse to start k3s. Run no k3s command on the host until the copy
-   ends. The host keeps the new generation.
+2. Stop the script with Ctrl-C once it prints `== root@geoffcloud runs <path>` and the list of
+   failed units. The script's nixie readiness check follows, and it runs `k3s kubectl` on the host.
+   Any k3s command unpacks k3s's binaries into `/var/lib/rancher/k3s`, and a `k3s` directory that
+   appears during the copy makes the copy refuse to start k3s. Run no k3s command on the host until
+   the copy ends. The host keeps the new generation.
 
 3. Check that k3s stayed stopped and that the zvol is empty:
 
