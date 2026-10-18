@@ -131,7 +131,9 @@ pkgs.testers.runNixOSTest {
             "/etc/rancher/k3s/k3s.yaml",
         ]
         sums = machine.succeed(f"sha256sum {' '.join(files)}")
-        secret = machine.succeed(f"{kubectl} get secret fixture -o jsonpath='{{.data.word}}' | base64 -d").strip()
+        # k3s can stop itself just after a boot, when the netlink dump of the links is interrupted
+        # ("results may be incomplete or inconsistent"), and systemd starts it again
+        secret = machine.wait_until_succeeds(f"{kubectl} get secret fixture -o jsonpath='{{.data.word}}' | base64 -d", timeout=300).strip()
         return sums, secret
 
 
