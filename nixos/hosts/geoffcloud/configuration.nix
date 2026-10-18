@@ -232,10 +232,9 @@ in
   # unlocked at boot from /var/lib/zfs-keys/tank.key. Each service here refuses to start while
   # its datasets are not mounted, instead of starting on the empty mount points on vda. The
   # secret files of imp-host and the atc daemon and impd's database copies keep their paths, but
-  # live on tank/cloud: each path is a bind mount of a directory of a dataset
-  # (docs/runbooks/move-host-secrets.md). k3s's data directory is the rancher zvol itself, and
-  # /etc/rancher, with the admin kubeconfig and the node password, a directory on it
-  # (docs/runbooks/move-rancher.md).
+  # live on tank/cloud: each path is a bind mount of a directory of a dataset. k3s's data
+  # directory is the rancher zvol itself, and /etc/rancher, with the admin kubeconfig and the node
+  # password, a directory on it.
   services.tank-cloud = {
     enable = true;
     binds = {
@@ -292,7 +291,7 @@ in
   };
 
   # tank/imp, an encryption root keyed by the same file (modules/imp-dataset-key.nix,
-  # docs/runbooks/tank-imp-encryption.md): its key loads at boot, and imp-host stays stopped
+  # docs/runbooks/tank-cloud.md): its key loads at boot, and imp-host stays stopped
   # while it is missing, plain or locked
   services.imp-dataset-key.enable = true;
 
@@ -413,10 +412,9 @@ in
   };
 
   # k3s on a zvol without its cluster's server data would make a new cluster, so the start fails
-  # instead; scripts/host/move-rancher.sh copy puts the k3s directory there last
-  # (docs/runbooks/move-rancher.md). The guard names the two files that k3s makes again when they
-  # are missing: the cluster CA, without which it makes a new CA, and the sqlite datastore, without
-  # which it makes an empty cluster. /var/lib/rancher/k3s is no guard, nor is its server directory:
+  # instead (checks/tank-cloud-rancher.nix). The guard names the two files that k3s makes again
+  # when they are missing: the cluster CA, without which it makes a new CA, and the sqlite
+  # datastore, without which it makes an empty cluster. /var/lib/rancher/k3s is no guard, nor is its server directory:
   # any k3s command, kubectl among them, unpacks k3s's binaries into /var/lib/rancher/k3s/data, and
   # a directory does not show that the files in it exist. A move to another datastore, such as
   # embedded etcd, changes the second path. The bind of /etc/rancher is no guard either: systemd

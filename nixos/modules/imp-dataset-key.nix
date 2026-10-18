@@ -1,6 +1,5 @@
-# imp's dataset as an encryption root: docs/runbooks/tank-imp-encryption.md moves tank/imp into
-# an encrypted copy keyed by tank/cloud's key file, and this module loads its key at boot, with no
-# one present.
+# imp's dataset as an encryption root (docs/runbooks/tank-cloud.md): tank/imp is encrypted and
+# keyed by tank/cloud's key file, and this module loads its key at boot, with no one present.
 #
 # The pool's import unit loads no key (modules/tank-cloud.nix turns that off), so imp-dataset-key
 # loads tank/imp's after the import and before imp's module checks the dataset. It fails when the

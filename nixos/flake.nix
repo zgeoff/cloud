@@ -93,7 +93,7 @@
       checks.x86_64-linux.impd-restore-reset = import ./checks/impd-restore-reset.nix {
         inherit nixpkgs imp;
       };
-      checks.x86_64-linux.tank-imp-encrypt = import ./checks/tank-imp-encrypt.nix {
+      checks.x86_64-linux.imp-dataset-key = import ./checks/imp-dataset-key.nix {
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.tank-cloud-unlock = import ./checks/tank-cloud-unlock.nix {

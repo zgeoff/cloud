@@ -22,8 +22,8 @@
 # the key, the dataset is not mounted, so the bind is not made and the path stays the empty
 # directory on the root disk; a service that names the bind in requiredBy then refuses to start.
 # The module never creates a bind's source directory: tmpfiles could run before the nofail
-# dataset mount and create it on the root disk, so the operator makes it on the dataset
-# (scripts/host/move-host-secrets.sh seed, docs/runbooks/move-host-secrets.md).
+# dataset mount and create it on the root disk, so the operator makes it on the dataset, as
+# docs/runbooks/reinstall-geoffcloud.md does.
 {
   config,
   lib,
