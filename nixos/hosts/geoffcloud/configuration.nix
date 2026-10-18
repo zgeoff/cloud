@@ -404,10 +404,9 @@ in
   };
 
   # k3s on a zvol without its cluster's server data would make a new cluster, so the start fails
-  # instead; scripts/host/move-rancher.sh copy puts the k3s directory there last
-  # (docs/runbooks/move-rancher.md). The guard names the two files that k3s makes again when they
-  # are missing: the cluster CA, without which it makes a new CA, and the sqlite datastore, without
-  # which it makes an empty cluster. /var/lib/rancher/k3s is no guard, nor is its server directory:
+  # instead (checks/tank-cloud-rancher.nix). The guard names the two files that k3s makes again
+  # when they are missing: the cluster CA, without which it makes a new CA, and the sqlite
+  # datastore, without which it makes an empty cluster. /var/lib/rancher/k3s is no guard, nor is its server directory:
   # any k3s command, kubectl among them, unpacks k3s's binaries into /var/lib/rancher/k3s/data, and
   # a directory does not show that the files in it exist. A move to another datastore, such as
   # embedded etcd, changes the second path. The bind of /etc/rancher is no guard either: systemd

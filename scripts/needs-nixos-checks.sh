@@ -9,10 +9,8 @@
 # scripts that run them and pin their image (run-nixos-checks.sh and nix-image.sh), the scripts
 # that decide when they run (this script, find-nixos-check-run.sh and decide-nixos-checks.sh),
 # the script that opens KVM to them (open-kvm.sh), the scripts that tank-cloud-host-secrets runs in
-# its VM (host/move-host-secrets.sh, install-imp-dns-token.sh and host/write-atc-gateway-token.sh),
-# the script that tank-cloud-rancher runs in its VM (host/move-rancher.sh),
-# .bun-version, the workflow itself, the
-# preview service's source (packages/preview/), which the host's package copies, and bun.lock,
+# its VM (install-imp-dns-token.sh and host/write-atc-gateway-token.sh), .bun-version, the
+# workflow itself, the preview service's source (packages/preview/), which the host's package copies, and bun.lock,
 # from which that package fetches the service's dependencies, so every dependency bump runs the
 # checks. A rename counts both its old and new path. The root package.json is no input, although
 # its test:nixos script runs the checks: a change to it alone, such as a script edit, runs at the
@@ -60,8 +58,7 @@ while IFS= read -r -d '' path; do
       test-support/shell/wait-for.sh | \
       scripts/run-nixos-checks.sh | scripts/nix-image.sh | scripts/needs-nixos-checks.sh | \
       scripts/find-nixos-check-run.sh | scripts/decide-nixos-checks.sh | scripts/open-kvm.sh | \
-      scripts/host/move-host-secrets.sh | scripts/install-imp-dns-token.sh | \
-      scripts/host/write-atc-gateway-token.sh | scripts/host/move-rancher.sh | \
+      scripts/install-imp-dns-token.sh | scripts/host/write-atc-gateway-token.sh | \
       .bun-version | bun.lock | .github/workflows/nixos-checks.yml)
       echo true
       exit 0

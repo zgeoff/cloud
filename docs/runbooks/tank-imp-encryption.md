@@ -1,5 +1,10 @@
 # Encrypt tank/imp
 
+**Done:** this move ran on geoffcloud on 2026-10-17 (GEO-641, built in #322), and this runbook
+records the steps that ran. It had no script of its own: #PRNUM removed its rehearsal from the NixOS
+checks and renamed the check `tank-imp-encrypt` to `imp-dataset-key`, which keeps the boot unlock.
+Git history holds the rehearsal.
+
 `tank/imp` holds everything impd keeps on geoffcloud's pool: its database, root token, broker CA,
 TLS key and secret values, and every imp's disk. This runbook moves it into an encrypted copy under
 the same name, keyed by the file that unlocks [tank/cloud](./tank-cloud.md), so neither `vda` nor
@@ -8,7 +13,7 @@ with imp-host stopped sends the last changes and swaps the names. The plain copy
 `tank/imp-old` until its own removal, so a rollback is two renames.
 
 The NixOS module `nixos/modules/imp-dataset-key.nix` loads `tank/imp`'s key at boot, before imp's
-module checks the dataset. The NixOS check `tank-imp-encrypt` rehearses this runbook in a VM under
+module checks the dataset. The NixOS check `tank-imp-encrypt` rehearsed this runbook in a VM under
 imp's module: [Rehearse it](#rehearse-it) gives the run and its result.
 
 ## What the copy changes
@@ -271,11 +276,7 @@ reason, and imp-host stays stopped: restore the key file as
 
 ## Rehearse it
 
-The check needs KVM, and boots one VM:
-
-```bash
-bun run test:nixos tank-imp-encrypt
-```
+The rehearsal ran as the NixOS check `tank-imp-encrypt` until #PRNUM.
 
 The check's header comment lists the scenario: impd's dataset tree, both sends, the cutover, a
 rollback, impd's own flows on the encrypted copy, and reboots with and without the key.

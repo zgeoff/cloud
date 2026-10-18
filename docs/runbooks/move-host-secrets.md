@@ -1,5 +1,9 @@
 # Move the host secrets onto tank/cloud
 
+**Done:** this move ran on geoffcloud on 2026-10-17 (GEO-634, built in #329), and this runbook
+records the steps that ran. #PRNUM removed its script, `scripts/host/move-host-secrets.sh`, and the
+move's steps from the `tank-cloud-host-secrets` check. Git history holds both.
+
 geoffcloud keeps imp-host's secret files in `/var/lib/imp-host/secrets`, the atc daemon's tokens in
 `/var/lib/atc-daemon-secrets`, and impd's database copies in `/root/imp-db-backups`. All three sit
 on `vda`, which Onidel snapshots, so every snapshot would hold the secrets in the clear. This
@@ -19,7 +23,7 @@ The removal deletes what the old directories still hold on `vda`. Until the remo
 revert and a switch. The host script `scripts/host/move-host-secrets.sh` does the seed, the
 comparison and the removal. It never prints a file's content or a checksum.
 
-The NixOS check `tank-cloud-host-secrets` rehearses every step in a VM: [Rehearse it](#rehearse-it)
+The NixOS check `tank-cloud-host-secrets` rehearsed every step in a VM: [Rehearse it](#rehearse-it)
 gives the run.
 
 ## Before you start
@@ -203,11 +207,8 @@ directory on tank/cloud back with `cp -a <directory>/. <old path>/` before you r
 
 ## Rehearse it
 
-The check needs KVM, and boots one VM:
-
-```bash
-bun run test:nixos tank-cloud-host-secrets
-```
+The rehearsal ran as the NixOS check `tank-cloud-host-secrets` until #PRNUM, which kept only the
+check's steps on the layout after the move.
 
 The check makes the datasets with the commands of [tank/cloud](./tank-cloud.md), seeds fake secrets
 in geoffcloud's shapes under main's configuration, runs the seed and the comparison, switches to the
