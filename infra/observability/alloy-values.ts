@@ -1,8 +1,13 @@
 import { lokiURL } from './loki-url.ts';
 
+// Alloy keeps its read positions here, on the node, so a restart resumes where it stopped. Without
+// a position, loki.source.kubernetes re-reads each container's whole log.
+const storagePath = '/var/lib/alloy';
+
 // Alloy as a DaemonSet: tail every pod's logs and the host's journal, and push them to Loki
 export const alloyValues = {
   alloy: {
+    storagePath,
     configMap: {
       content: `
 discovery.kubernetes "pods" {
@@ -36,6 +41,12 @@ loki.process "pods" {
     selector = "{namespace=\\"atc\\", container=\\"atc-gateway\\"} |~ \\"^atc-approval\\""
     action   = "drop"
   }
+  // a start with no saved position reads each container's whole log; Loki
+  // rejects what is over an hour old, after it counts against the rate limit
+  stage.drop {
+    older_than          = "1h"
+    drop_counter_reason = "too old"
+  }
   forward_to = [loki.write.default.receiver]
 }
 
@@ -43,8 +54,8 @@ loki.process "pods" {
 // of the host, which no pod log covers
 loki.source.journal "host" {
   path          = "/var/log/journal"
-  // Loki rejects entries more than an hour behind a stream's newest; a restart
-  // re-reads from max_age, since the read position is not persisted
+  // Loki rejects entries more than an hour behind a stream's newest; a start with
+  // no saved position reads back max_age
   max_age       = "1h"
   relabel_rules = loki.relabel.journal.rules
   labels        = { job = "journal" }
@@ -68,7 +79,15 @@ loki.write "default" {
     },
 
     // /var/log from the host, read-only, for the journal
-    mounts: { varlog: true },
-    resources: { requests: { cpu: '20m', memory: '64Mi' }, limits: { memory: '192Mi' } },
+    mounts: { varlog: true, extra: [{ name: 'storage', mountPath: storagePath }] },
+
+    // the Go runtime collects garbage harder as the heap nears GOMEMLIMIT, below the limit
+    extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
+    resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
+  },
+  controller: {
+    volumes: {
+      extra: [{ name: 'storage', hostPath: { path: storagePath, type: 'DirectoryOrCreate' } }],
+    },
   },
 };
