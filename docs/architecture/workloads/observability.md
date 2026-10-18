@@ -13,7 +13,9 @@ The stack runs in the `observability` namespace:
 
 - **kube-prometheus-stack** runs Prometheus, Alertmanager, Grafana, node-exporter and
   kube-state-metrics, and its default rules beside this repo's own.
-- **Loki** stores logs on a filesystem volume as a single binary.
+- **Loki** stores logs on a filesystem volume as a single binary. Loki retains logs by time only,
+  and local-path does not enforce the volume's request, so Loki's ingestion rate limit bounds its
+  disk use: the most it accepts over the time a log line stays on disk fits below that request.
 - **Alloy** runs on the node and ships every pod's logs and the host's systemd journal to Loki. impd
   logs to the journal through its container's unit, so impd's logs reach Loki the same way. Alloy
   drops the gateway's OAuth approval lines before they reach Loki, because each holds the code that

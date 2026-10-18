@@ -1,5 +1,6 @@
 // Loki as one binary on one node: filesystem storage, a 30-day retention the compactor enforces,
-// and no canary, gateway or caches
+// and no canary, gateway or caches. The ingestion rate limit bounds the volume's disk use, and the
+// burst covers one push of Alloy's default batch.
 export const lokiValues = {
   deploymentMode: 'SingleBinary',
   loki: {
@@ -17,7 +18,11 @@ export const lokiValues = {
         },
       ],
     },
-    limits_config: { retention_period: '720h' },
+    limits_config: {
+      retention_period: '720h',
+      ingestion_rate_mb: 0.004,
+      ingestion_burst_size_mb: 2,
+    },
     compactor: { retention_enabled: true, delete_request_store: 'filesystem' },
   },
   singleBinary: {

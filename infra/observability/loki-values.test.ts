@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { lokiValues } from './loki-values.ts';
 
-test('it runs Loki as one replica on the filesystem, keeping 30 days, with no canary, gateway or caches', () => {
+test('it runs Loki as one replica on the filesystem, keeping 30 days at a capped ingestion rate, with no canary, gateway or caches', () => {
   expect(lokiValues).toStrictEqual({
     deploymentMode: 'SingleBinary',
     loki: {
@@ -19,7 +19,11 @@ test('it runs Loki as one replica on the filesystem, keeping 30 days, with no ca
           },
         ],
       },
-      limits_config: { retention_period: '720h' },
+      limits_config: {
+        retention_period: '720h',
+        ingestion_rate_mb: 0.004,
+        ingestion_burst_size_mb: 2,
+      },
       compactor: { retention_enabled: true, delete_request_store: 'filesystem' },
     },
     singleBinary: {
@@ -36,4 +40,17 @@ test('it runs Loki as one replica on the filesystem, keeping 30 days, with no ca
     lokiCanary: { enabled: false },
     test: { enabled: false },
   });
+});
+
+test('it caps the log lines Loki can hold over 31 days, with snappy worst-case growth, below its 20Gi request', () => {
+  const mib = 2 ** 20;
+  const secondsOnDisk = 31 * 24 * 60 * 60;
+
+  const worstCaseBytes =
+    (lokiValues.loki.limits_config.ingestion_rate_mb * mib * secondsOnDisk +
+      lokiValues.loki.limits_config.ingestion_burst_size_mb * mib) *
+    (7 / 6);
+
+  expect(lokiValues.singleBinary.persistence.size).toBe('20Gi');
+  expect(worstCaseBytes).toBeLessThan(16 * 2 ** 30);
 });
