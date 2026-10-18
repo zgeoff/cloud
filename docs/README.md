@@ -7,8 +7,8 @@ call, the path of a change, the topology and the data.
 
 - [Infrastructure as code](./architecture/infrastructure-as-code.md): the Pulumi program, its
   providers, drift, the apply job and the guards.
-- [Secrets](./architecture/secrets.md): how each secret reaches its user, and what 1Password cannot
-  restore.
+- [Secrets](./architecture/secrets.md): how each secret reaches its user, the encryption at rest and
+  its accepted risks, and what 1Password cannot restore.
 - Host:
   - [The host](./architecture/host/host.md): NixOS, the disks, the services, and how a switch builds
     before it activates.
@@ -51,6 +51,9 @@ call, the path of a change, the topology and the data.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.
+- [Recover a lost disk](./runbooks/lost-disk.md): recover from the loss of `vda`, `vdb` or both.
+- [Leak response](./runbooks/leak-response.md): what a leaked snapshot, account, backup or disk
+  exposes, and what to revoke.
 - [Restore drill](./runbooks/restore-drill.md): restore impd's database and hq on a scratch VM, with
   their measured times, and the untested root-disk snapshot restore.
 - [atc gateway backup and restore](./runbooks/atc-gateway-backup-restore.md): back up and restore

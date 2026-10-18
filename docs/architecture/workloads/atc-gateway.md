@@ -64,8 +64,9 @@ one writer, so the gateway runs as one replica that a rollout stops before it st
 
 The state sits on a claim of a storage class that keeps its volume when the claim is deleted. k3s's
 default local-path class deletes the volume with its claim, and losing the OAuth state would sign
-every client out, so the gateway uses a retaining class instead. The volume is on the root disk, so
-each Onidel snapshot of the disk holds the state in plain form.
+every client out, so the gateway uses a retaining class instead. The volume sits in k3s's data
+directory on the encrypted zvol on the second disk, so no Onidel snapshot holds the state
+([protection at rest](../secrets.md#protection-at-rest)).
 
 A CronJob backs the state up nightly, and never runs two backups at once. It mounts the gateway's
 volume, takes a consistent copy of each database with SQLite's online backup while the gateway keeps

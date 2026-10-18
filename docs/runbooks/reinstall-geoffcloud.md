@@ -1,7 +1,9 @@
 # Reinstall geoffcloud as NixOS
 
 This runbook replaces Ubuntu on `geoffcloud` with the flake in `nixos/`. It wipes `vda` only. `vdb`
-holds imp's ZFS pool, and NixOS imports it.
+holds the ZFS pool `tank`, with every encrypted dataset, and NixOS imports it and unlocks it with
+the key that step 3 stages. When `vdb` is lost too, follow
+[Lose both disks](./lost-disk.md#lose-both-disks), which runs this runbook first.
 
 ## Before you start
 
