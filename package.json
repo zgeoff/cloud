@@ -96,7 +96,7 @@
     "@swc/core": "1.16.13",
     "@tsconfig/strictest": "2.0.8",
     "@types/bun": "1.3.14",
-    "@zgeoff/bun-test-extended": "0.1.0",
+    "@zgeoff/bun-test-extended": "0.2.0",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/format-codemod": "0.1.0",
     "@zgeoff/oxlint-config": "0.2.5",
