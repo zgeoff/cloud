@@ -30,9 +30,8 @@ and the key store beside it. A nightly CronJob copies both databases with restic
 bucket, encrypted with a password that only 1Password and the backup's Secret hold. The CronJob runs
 as nixie's user, so a restore leaves files nixie can open, and the record keys stay useless without
 the deployment key in the secrets file. [nixie's backup](../../runbooks/nixie-backup.md) gives the
-steps. The volume sits on the root disk, so each Onidel snapshot of the disk holds the database in
-plain form, and [the runbook](../../runbooks/nixie.md#disk-snapshots) deletes each manual snapshot
-once its change is checked.
+steps. The volume sits in k3s's data directory on the encrypted zvol on the second disk, so no
+Onidel snapshot holds the databases ([protection at rest](../secrets.md#protection-at-rest)).
 
 The web client is a Deployment of its own, because it holds no state, no secret and no database. It
 calls nixie's API at its cluster address, and the browser calls `/rpc` on the web client's own

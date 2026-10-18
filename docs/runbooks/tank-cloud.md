@@ -98,9 +98,9 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 1. Switch with `bash scripts/switch-geoffcloud.sh`, as [Workflows](./workflows.md#switch-the-host)
    describes. The switch restarts k3s, imp-host and the atc daemon, because their units gain the
    mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once the
-   zvol holds k3s's data directory `k3s`, so it never makes a new cluster on an empty zvol by
-   accident. For a new cluster, make the empty directory before the switch:
-   `mount /dev/zvol/tank/cloud/rancher /mnt && install -d /mnt/k3s && umount /mnt`.
+   zvol holds a cluster's certificate authority and datastore, so it never makes a new cluster on an
+   empty zvol by accident. For a new cluster, lift that guard for the first start alone, as step 11
+   of [Lose `vdb`](./lost-disk.md#lose-vdb) does.
 2. Check the mounts and the services:
 
    ```bash

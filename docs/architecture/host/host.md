@@ -11,15 +11,21 @@ next. NixOS keeps each earlier system as a generation, so a switch is one step t
 
 The VM has two disks with different owners:
 
-- **The root disk** holds NixOS, k3s and its datastore, the cluster's volumes and every host secret
-  file. disko lays it out at install, and an Onidel snapshot copies it whole before a risky change.
-- **The second disk** holds imp's ZFS pool. NixOS imports the pool and never formats the disk, so a
-  reinstall that rebuilds the root disk leaves every imp in place. The host keeps the ZFS host ID
-  the pool was created under, so the import needs no force, and the import finds the disk by
-  partition UUID, because a virtio disk has no serial to name it by.
+- **The root disk** holds NixOS, the pool's key, the host's tailnet identity, its SSH host keys and
+  the atc daemon's state. disko lays it out at install, and an Onidel snapshot copies it whole
+  before a risky change.
+- **The second disk** holds the ZFS pool `tank`, with impd's dataset and the `tank/cloud` datasets:
+  k3s's data directory, the host's secret files and the copies of impd's database. NixOS imports the
+  pool and never formats the disk, so a reinstall that rebuilds the root disk leaves every imp and
+  the cluster in place. The host keeps the ZFS host ID the pool was created under, so the import
+  needs no force, and the import finds the disk by partition UUID, because a virtio disk has no
+  serial to name it by.
 
-The ZFS kernel module must support the host's kernel, so a NixOS upgrade can wait on ZFS. The
-reinstall runs `nixos-anywhere`, whose kexec the VM's Secure Boot blocks, so Secure Boot stays off
+ZFS encrypts every dataset on the pool that holds data, and the host loads the key from the root
+disk at boot, so neither disk alone exposes the data
+([protection at rest](../secrets.md#protection-at-rest)). The ZFS kernel module must support the
+host's kernel, so a NixOS upgrade can wait on ZFS. The reinstall runs `nixos-anywhere`, whose kexec
+the VM's Secure Boot blocks, so Secure Boot stays off
 ([the reinstall runbook](../../runbooks/reinstall-geoffcloud.md)).
 
 ## Services

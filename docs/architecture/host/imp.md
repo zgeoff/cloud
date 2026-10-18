@@ -45,7 +45,9 @@ for imp's own public endpoint.
 
 ## The database
 
-impd's database is SQLite in WAL mode on the dataset `tank/imp`, which mounts only inside imp-host,
+impd's database is SQLite in WAL mode on the dataset `tank/imp`, an encryption root of its own that
+the host unlocks at boot with the pool's key
+([protection at rest](../secrets.md#protection-at-rest)). The dataset mounts only inside imp-host,
 so the host's own view of impd's state directory is empty. WAL mode means the database file alone is
 never a consistent copy while impd runs: a tar of the live files can catch the main file and its log
 at different moments. A copy therefore runs inside the container, with SQLite's `VACUUM INTO`, which
@@ -75,6 +77,6 @@ steps and what a restore loses.
 impd backs each imp up to R2 with restic, under its own password, and a restore of imps runs through
 impd ([the restore runbook](../../runbooks/restore-geoff-cloud.md#1-restore-imps-from-restic)). An
 imp created with the backup opt-out stays out of every backup for its life. nixie creates each of
-its sandboxes that way, so a forget in nixie leaves no copy in R2. The copies of impd's database
-stay on the host's root disk, so an Onidel snapshot of the root disk carries them too. The pool
-itself has no backup of its own beyond what impd backs up.
+its sandboxes that way, so a forget in nixie leaves no copy in R2. The copies of impd's database sit
+on the encrypted dataset `tank/cloud/imp-db-backups` on the pool, so a lost pool loses them with the
+database. The pool itself has no backup of its own beyond what impd backs up.

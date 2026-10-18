@@ -280,13 +280,9 @@ step is safe to repeat.
 ## Keep nixie's data out of copies
 
 A forget in nixie removes an item everywhere nixie holds it, but a copy taken outside nixie keeps
-it. Three kinds of copy exist, and each has its rule.
-
-### Disk snapshots
-
-Each manual Onidel snapshot of the root disk holds `nixie.db` and `keys.db` in plain form. Delete
-each one once the host change it guarded is checked, through `DELETE /snapshots/<snapshot_id>` on
-the Onidel API.
+it. Two kinds of copy exist, and each has its rule. An Onidel snapshot of the root disk holds no
+copy, because nixie's volume sits on the encrypted zvol on `vdb`
+([protection at rest](../architecture/secrets.md#protection-at-rest)).
 
 ### imp backups
 

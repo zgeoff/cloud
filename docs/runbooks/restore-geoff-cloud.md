@@ -12,7 +12,7 @@ check the result.
 | One imp, or every imp               | 1       | imp restic backups in R2 `geoff-cloud-backups/imp/geoffcloud` |
 | impd's database after a bad upgrade | 2       | copies in `/root/imp-db-backups/`                             |
 | A bad host change                   | 3       | the previous NixOS generation                                 |
-| The root disk (`vda`)               | 4       | an Onidel snapshot, or a reinstall                            |
+| `vda`, `vdb` or both disks          | 4       | a snapshot or a reinstall, then the backups                   |
 | The cluster's workloads             | 5       | Pulumi, rehearsed on a scratch cluster                        |
 | The atc gateway's data              | 6       | `docs/runbooks/atc-gateway-backup-restore.md`                 |
 
@@ -215,26 +215,16 @@ reconciliation that section 2's caution describes.
 `nix-env -p /nix/var/nix/profiles/system --list-generations` lists the generations. If imp's version
 changes, restore the matching database copy too (section 2).
 
-## 4. Recover the root disk
+## 4. Recover a lost disk
 
-**Untested.** No snapshot restore or reinstall has been rehearsed since geoffcloud went live. A
-snapshot of the 240 GB root disk needs a VM with a disk at least that large, which an hourly Onidel
-VM cannot have ([the restore drill](./restore-drill.md#restore-a-root-disk-snapshot)).
+Follow [Recover a lost disk](./lost-disk.md). It holds three scenarios:
 
-**CAUTION:** A snapshot restores `vda` only. impd's database lives on `vdb`, so a snapshot from
-before an imp upgrade brings back an older image beside a newer database, and impd refuses to start.
-Before impd starts, either switch to a generation whose image matches the database, or restore a
-database copy that matches the snapshot's image (section 2). k3s's datastore lives on `vdb` too, on
-the zvol `tank/cloud/rancher`, so a snapshot from before a k3s upgrade brings back an older k3s
-binary beside a newer datastore, which that binary may refuse or corrupt. Before k3s starts, switch
-to a generation whose k3s is at least the datastore's version.
-
-`vda` holds NixOS. `vdb` holds imp's ZFS pool and is never part of these steps.
-
-- **From a snapshot:** `bun run onidel:snapshot` takes one before a risky change. Restore it from
-  the Onidel panel.
-- **From nothing:** follow `docs/runbooks/reinstall-geoffcloud.md`. NixOS imports the pool from
-  `vdb`, so the imps survive.
+- **Lose `vda`:** restore an Onidel snapshot, or reinstall with the key from the 1Password item
+  `zfs-tank-key` and both tailnet keys in `--extra-files`. Everything on the pool survives.
+- **Lose `vdb`:** recreate the pool and its two encryption roots, install the host's secret files
+  from 1Password, start a new impd, add its secrets again, mint new tokens, restore the imps,
+  rebuild the cluster, and restore the gateway and nixie from restic.
+- **Lose both:** reinstall, then follow the `vdb` steps.
 
 ## 5. Rebuild the cluster
 

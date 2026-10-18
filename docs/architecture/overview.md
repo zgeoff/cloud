@@ -113,20 +113,25 @@ The estate keeps state in five places, and each has its own backup or none:
 - **Pulumi state** sits in a Cloudflare R2 bucket, encrypted with a passphrase, and holds every
   secret Pulumi generated, such as Grafana's admin password
   ([infrastructure as code](./infrastructure-as-code.md)).
-- **impd's state** sits on its own ZFS dataset on the VM's second disk: its SQLite database, its
-  tokens and its secrets. impd backs the imps up to R2 itself, and an operator copies the database
-  before each imp upgrade ([imp on the host](./host/imp.md)).
+- **impd's state** sits on its own encrypted ZFS dataset on the VM's second disk: its SQLite
+  database, its tokens and its secrets. impd backs the imps up to R2 itself, and an operator copies
+  the database before each imp upgrade ([imp on the host](./host/imp.md)).
 - **The gateway's state**, two SQLite files with every OAuth client and grant, sits on a cluster
-  volume that outlives its claim, and a nightly job backs it up to R2
+  volume that outlives its claim, and a nightly job backs it up to R2. nixie's databases sit on a
+  volume of the same kind, with their own nightly backup
   ([the atc gateway](./workloads/atc-gateway.md#state-and-backup)).
 - **Metrics and logs** sit on cluster volumes with no backup, because losing them loses history,
   never service ([observability](./workloads/observability.md)).
 - **Deployment inputs** live in the owner's 1Password vault `cloud`, which the repo names only by
   reference ([secrets](./secrets.md)).
 
-The root disk is in every Onidel snapshot, so a snapshot holds the cluster's datastore and the
-gateway's state in plain form, behind the Onidel account. The second disk is never snapshotted, and
-its imps rely on impd's own backups.
+The data sits on the second disk and its key on the root disk, so neither disk alone exposes the
+data. ZFS encrypts two dataset trees there: impd's dataset, and `tank/cloud`, which holds k3s's data
+directory, the host's secret files and the copies of impd's database. k3s's data directory holds the
+cluster's datastore and every cluster volume. Every Onidel snapshot copies the root disk, which
+keeps only the key, the host's tailnet identity, its SSH host keys and the atc daemon's state in
+plain form. Onidel never snapshots the second disk, so its data relies on each system's own backup
+([protection at rest](./secrets.md#protection-at-rest)).
 
 ## Cross-cutting
 

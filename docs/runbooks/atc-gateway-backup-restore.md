@@ -24,8 +24,9 @@ Rules:
 - restic encrypts on the cluster before upload, with a password that lives only in 1Password and the
   backup Secret. R2 holds ciphertext.
 - Credentials are never in a backup. A restore needs 1Password for the restic password.
-- The root disk, and so the volume, is also in the Onidel VM snapshots, in plain form, behind the
-  Onidel account. That is a separate, account-protected copy; this runbook does not rely on it.
+- The volume sits on the encrypted zvol on `vdb`, which Onidel never snapshots, so an Onidel
+  snapshot holds no copy of the state
+  ([protection at rest](../architecture/secrets.md#protection-at-rest)).
 
 ## Where
 
