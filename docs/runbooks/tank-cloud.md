@@ -95,13 +95,19 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
 ## Switch and check
 
-1. Switch with `bash scripts/switch-geoffcloud.sh`, as [Workflows](./workflows.md#switch-the-host)
+1. For a new cluster, start it before the switch, as step 11 of
+   [Lose `vdb`](./lost-disk.md#lose-vdb) does. That step needs a host whose running system already
+   enables `services.tank-cloud`, as a lost `vdb` leaves, because the guard and the mounts live in
+   that system. The switch script cannot make the cluster: before it builds, it reads the cluster's
+   atc-gateway and nixie pods over `k3s kubectl`, which reaches no API while k3s stays stopped, and
+   a new cluster runs neither workload. The cluster and its workloads come before any switch,
+   through that step and the rebuild it ends with.
+2. Switch with `bash scripts/switch-geoffcloud.sh`, as [Workflows](./workflows.md#switch-the-host)
    describes. The switch restarts k3s, imp-host and the atc daemon, because their units gain the
    mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once the
    zvol holds a cluster's certificate authority and datastore, so it never makes a new cluster on an
-   empty zvol by accident. For a new cluster, lift that guard for the first start alone, as step 11
-   of [Lose `vdb`](./lost-disk.md#lose-vdb) does.
-2. Check the mounts and the services:
+   empty zvol by accident.
+3. Check the mounts and the services:
 
    ```bash
    for path in /var/lib/tank-cloud/{host-secrets,imp-db-backups} /var/lib/rancher; do
@@ -124,7 +130,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    Expect `tank/cloud/host-secrets[/imp-host] zfs`, `tank/cloud/host-secrets[/atc-daemon] zfs`,
    `tank/cloud/imp-db-backups zfs` and `/dev/zd<n>[/etc-rancher] ext4`.
 
-3. Make the two filesystems root-only, because they hold secrets:
+4. Make the two filesystems root-only, because they hold secrets:
 
    ```bash
    chmod 0700 /var/lib/tank-cloud/host-secrets /var/lib/tank-cloud/imp-db-backups
