@@ -55,3 +55,7 @@ agent:
   names:
     - Nix
     - Nixie
+
+# per-turn retrieval: how many earlier messages join the query (nixie's default is 3)
+memory:
+  retrieval_messages: 1
