@@ -73,7 +73,8 @@ docs/
 
 ## Host safety
 
-- Never touch `/dev/vdb` on the host. It holds imp's ZFS pool.
+- Never write to `/dev/vdb` on the host directly. It holds the ZFS pool `tank`, which holds imp's
+  data. ZFS commands on `tank`, such as `zpool trim tank`, are fine.
 - The host's firewall is NixOS's table `inet nixos-fw`, plus `inet cloud_host` for the atc daemon's
   port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and Docker add their own
   tables. imp's `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and
