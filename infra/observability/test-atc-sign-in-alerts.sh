@@ -340,7 +340,10 @@ EOF
 
   # the retries go on while the case reads, so the count is a measurement: at least the two posts
   # the stand-in took, and masked in the compared line
-  [ "$(awk '{ print $2 }' "$tree/failed")" -ge 2 ] || { echo "failed count $(cat "$tree/failed"), want 2 or more" >&2; exit 1; }
+  [ "$(awk '{ print $2 }' "$tree/failed")" -ge 2 ] || {
+    echo "failed count $(cat "$tree/failed"), want 2 or more" >&2
+    exit 1
+  }
   sed 's/ [0-9]*$/ <count>/' "$tree/failed" > "$tree/out"
   diff - "$tree/out" << 'EOF'
 alertmanager_notification_requests_failed_total{integration="discord"} <count>
