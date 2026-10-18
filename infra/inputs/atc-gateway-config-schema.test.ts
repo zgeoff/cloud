@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
-import type { ATCGatewayRawConfig } from './types.ts';
+import type { ATCGatewayConfig, ATCGatewayRawConfig } from './types.ts';
 
 test('it passes a config through as given', () => {
-  const payload = {
+  const payload: ATCGatewayConfig = {
     image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0-r2@sha256:${'1'.repeat(64)}`,
     publicURL: 'https://atc.geoff.cloud',
@@ -22,7 +22,7 @@ test('it passes a config through as given', () => {
     defaultDaemon: 'geoffcloud',
     stateDir: '/var/lib/atc',
     trustForwardedFrom: ['127.0.0.1', '::1'],
-  } as const;
+  };
 
   expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
 });
@@ -441,7 +441,7 @@ test.each([
 });
 
 test('it takes an empty trustForwardedFrom, which trusts no proxy', () => {
-  const payload = {
+  const payload: ATCGatewayConfig = {
     image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
     publicURL: 'https://atc.geoff.cloud',
@@ -454,7 +454,7 @@ test('it takes an empty trustForwardedFrom, which trusts no proxy', () => {
     },
     defaultDaemon: 'geoffcloud',
     trustForwardedFrom: [],
-  } as const;
+  };
 
   expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
 });
