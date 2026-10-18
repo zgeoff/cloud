@@ -76,8 +76,8 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    ```
 
    Expect the activation to start `k3s.service` with no failed unit, and the script to print
-   `== root@geoffcloud runs <path>`. k3s fails its assertion, because the zvol holds no `k3s`
-   directory yet, and the journal of `k3s.service` holds `Assertion failed for k3s service.`
+   `== root@geoffcloud runs <path>`. k3s fails its assertion, because the zvol holds no cluster CA
+   or datastore yet, and the journal of `k3s.service` holds `Assertion failed for k3s service.`
 
 2. Stop the script with Ctrl-C once it prints `== root@geoffcloud runs <path>` and the list of
    failed units. The script's nixie readiness check follows, and it runs `k3s kubectl` on the host.
@@ -253,9 +253,10 @@ bun run test:nixos tank-cloud-rancher
 The check starts a real k3s server with geoffcloud's package and flags on the root disk, with a pod
 that writes into a volume directory, and recreates the zvol as in
 [Before you start](#before-you-start). It switches to the config with the zvol, checks that k3s
-fails its assertion on the empty zvol, and runs the copy while k3s commands run, which the copy
-refuses before k3s starts. It runs the copy again, and checks that the cluster CA, the node
-password, the admin kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive.
-It then clears a bind of `/` that holds pod mounts, runs the removal and the rollback's stop step,
-checks that the zvol's mounts then unmount, and reboots with the pool's import held back past a
-device's default wait, so k3s starts on the zvol only after the import.
+fails its assertion on the empty zvol, on the binaries a k3s command unpacks there, and on empty
+server directories, and runs the copy while k3s commands run, which the copy refuses before k3s
+starts. It runs the copy again, and checks that the cluster CA, the node password, the admin
+kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive. It then clears a
+bind of `/` that holds pod mounts, runs the removal and the rollback's stop step, checks that the
+zvol's mounts then unmount, and reboots with the pool's import held back past a device's default
+wait, so k3s starts on the zvol only after the import.

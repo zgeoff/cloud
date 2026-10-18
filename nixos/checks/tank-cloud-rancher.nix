@@ -1,14 +1,16 @@
 # The move of k3s's data onto the zvol tank/cloud/rancher (docs/runbooks/move-rancher.md) in a NixOS
 # VM with geoffcloud's own k3s package and flags, as one journey whose subtests run in order. The
 # VM's base config is the one after the move: geoffcloud's /etc/rancher bind, k3s's requiredBy and
-# its assertion on /var/lib/rancher/k3s, so the zvol is mounted at /var/lib/rancher. The specialisation `before` is main's config: the zvol
-# at /var/lib/tank-cloud/rancher, no bind, and k3s needing the zvol's mount alone. On a pool with
+# its assertion on the cluster's server data, so the zvol is mounted at /var/lib/rancher. The
+# specialisation `before` is main's config: the zvol at /var/lib/tank-cloud/rancher, no bind, and
+# k3s needing the zvol's mount alone. On a pool with
 # datasets made by the commands of docs/runbooks/tank-cloud.md and a throwaway key, the journey
 # starts a real k3s server on the root disk under `before`, with a pod that writes into a volume
 # directory, a Secret, and files with a hard link, an xattr and another owner in that directory.
 # It recreates the zvol under `before` as docs/runbooks/move-rancher.md does, then switches to the
 # base config with switch-to-configuration test as the owner's switch does, and checks that k3s
-# stays stopped on the empty zvol. It runs scripts/host/move-rancher.sh copy while k3s commands run,
+# stays stopped on the empty zvol, on the binaries a k3s command unpacks there and on empty server
+# directories. It runs scripts/host/move-rancher.sh copy while k3s commands run,
 # which the copy refuses, and again without them, and checks the same cluster CA, node password,
 # Secret and volume on the zvol. It clears a shared bind of / left with pod mounts in it, as the
 # runbook does, runs remove-old, and reboots with the pool's disk late, past systemd's default 90 s
@@ -336,6 +338,12 @@ pkgs.testers.runNixOSTest {
         assert machine.succeed("ls -A /etc/rancher") == ""
         state = machine.succeed("systemctl show -p ActiveState,AssertResult --value k3s.service").split()
         assert state == ["inactive", "no"], f"k3s is {state}"
+        # the guard is geoffcloud's own, from its evaluated config
+        guard = machine.succeed("grep '^Assert' /etc/systemd/system/k3s.service")
+        assert guard == (
+            "AssertPathExists=/var/lib/rancher/k3s/server/tls/server-ca.crt\n"
+            "AssertPathExists=/var/lib/rancher/k3s/server/db/state.db\n"
+        ), guard
         # k3s's containers outlive it: the pod still writes into its volume on the root disk
         machine.succeed("pgrep -f containerd-shim")
         assert root_disk("/var/lib/rancher") == ["k3s"]
@@ -346,6 +354,25 @@ pkgs.testers.runNixOSTest {
 
         assert machine.succeed("ls -A /var/lib/rancher/k3s").split() == ["data"]
         assert machine.succeed("systemctl is-active k3s.service || true").strip() == "inactive"
+
+
+    with subtest("it fails k3s's start on the unpacked binaries alone, and on empty server directories"):
+        status, output = machine.execute("systemctl start k3s.service 2>&1")
+
+        assert status == 1 and output == "Assertion failed on job for k3s.service.\n", f"start exited {status}: {output}"
+        state = machine.succeed("systemctl show -p ActiveState,AssertResult --value k3s.service").split()
+        assert state == ["inactive", "no"], f"k3s is {state}"
+        assert machine.succeed("ls -A /var/lib/rancher/k3s").split() == ["data"]
+
+        # the directories that would hold the CA and the datastore, without the files
+        machine.succeed("mkdir -p /var/lib/rancher/k3s/server/tls /var/lib/rancher/k3s/server/db")
+        status, output = machine.execute("systemctl start k3s.service 2>&1")
+        machine.succeed("rm -r /var/lib/rancher/k3s/server")
+
+        assert status == 1 and output == "Assertion failed on job for k3s.service.\n", f"start exited {status}: {output}"
+        state = machine.succeed("systemctl show -p ActiveState,AssertResult --value k3s.service").split()
+        assert state == ["inactive", "no"], f"k3s is {state}"
+        assert machine.succeed("ls -A /var/lib/rancher/k3s").split() == ["data"]
 
 
     with subtest("it refuses to remove the old copy while the zvol holds no cluster CA"):
@@ -406,6 +433,8 @@ pkgs.testers.runNixOSTest {
         assert lines[4].startswith("match /var/lib/rancher: "), copied
         assert lines[5].startswith("match /etc/rancher: "), copied
         assert lines[6:] == ["started k3s on tank/cloud/rancher"], copied
+        # the copied CA and datastore pass the guard
+        assert machine.succeed("systemctl show -p AssertResult --value k3s.service").strip() == "yes"
         assert binds_left() == [], binds_left()
         assert source("/var/lib/rancher") == f"{zvol()} ext4"
         assert source("/etc/rancher") == f"{zvol()}[/etc-rancher] ext4"
