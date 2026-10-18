@@ -20,6 +20,9 @@ The stack runs in the `observability` namespace:
   logs to the journal through its container's unit, so impd's logs reach Loki the same way. Alloy
   drops the gateway's OAuth approval lines before they reach Loki, because each holds the code that
   approves a client's sign-in, so it stays in the pod's own log, which only a cluster admin reads.
+  Alloy keeps its read position in each log on a directory of the node, so a restart resumes where
+  it stopped. Without a saved position, Alloy reads each container's whole log again, and Loki
+  rejects the lines that fall too far behind what it already holds.
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
   tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness

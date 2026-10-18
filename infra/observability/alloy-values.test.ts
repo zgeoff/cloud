@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test';
 import { alloyValues } from './alloy-values.ts';
 
-test("it tails every pod's logs and the host journal into Loki, dropping the atc gateway's approval lines", () => {
+test("it tails every pod's logs and the host journal into Loki from saved positions, dropping the atc gateway's approval lines", () => {
   expect(alloyValues).toStrictEqual({
     alloy: {
+      storagePath: '/var/lib/alloy',
       configMap: {
         content: `
 discovery.kubernetes "pods" {
@@ -44,8 +45,8 @@ loki.process "pods" {
 // of the host, which no pod log covers
 loki.source.journal "host" {
   path          = "/var/log/journal"
-  // Loki rejects entries more than an hour behind a stream's newest; a restart
-  // re-reads from max_age, since the read position is not persisted
+  // Loki rejects entries more than an hour behind a stream's newest; a start with
+  // no saved position reads back max_age
   max_age       = "1h"
   relabel_rules = loki.relabel.journal.rules
   labels        = { job = "journal" }
@@ -67,8 +68,29 @@ loki.write "default" {
 }
 `,
       },
-      mounts: { varlog: true },
-      resources: { requests: { cpu: '20m', memory: '64Mi' }, limits: { memory: '192Mi' } },
+      mounts: { varlog: true, extra: [{ name: 'storage', mountPath: '/var/lib/alloy' }] },
+      extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
+      resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
+    },
+    controller: {
+      volumes: {
+        extra: [
+          { name: 'storage', hostPath: { path: '/var/lib/alloy', type: 'DirectoryOrCreate' } },
+        ],
+      },
     },
   });
+});
+
+test('it keeps its read positions on a directory of the node, which outlives the container and the pod', () => {
+  expect(alloyValues.alloy.mounts.extra).toStrictEqual([
+    { name: 'storage', mountPath: alloyValues.alloy.storagePath },
+  ]);
+
+  expect(alloyValues.controller.volumes.extra).toStrictEqual([
+    {
+      name: 'storage',
+      hostPath: { path: alloyValues.alloy.storagePath, type: 'DirectoryOrCreate' },
+    },
+  ]);
 });
