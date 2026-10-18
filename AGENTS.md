@@ -33,7 +33,6 @@ workers/           Cloudflare Workers: the external health check
 images/            container images: the agent image and the atc gateway
 nixos/             the host flake
 deploy/            the manifests and config of the workloads the cluster runs, such as nixie
-patches/           Bun patches, which patchedDependencies in the root package.json applies
 scripts/           repo tooling, run through the root package.json scripts
 test-support/      the shell suites' assertions and stand-ins
 e2e/               whole-workflow suites
@@ -47,10 +46,16 @@ docs/
 
 - Pin exact versions, with no `^` or `~` ranges. `bun add` saves exact versions, so the rule covers
   hand-written edits.
-- The dependency-cruiser patch in `patches/` makes its SWC extractor collect an import type nested
-  in another type, such as `Array<import('./a.ts').T>`, because without it the boundary check misses
-  that dependency. A bump of dependency-cruiser carries the patch to the new version with
-  `bun patch`, and `scripts/check-boundaries.test.ts` fails when the patch is lost.
+
+## Import boundaries
+
+- The `zgeoff/import-zones` lint rule enforces the import boundaries, and
+  [`.oxlintrc.json`](.oxlintrc.json) holds its zones: no relative import into another workspace
+  package, and the direction between infra's groups.
+- Never add an `oxlint-disable-next-line zgeoff/import-zones` comment to make an import pass. Change
+  the import, or change the zones in a PR that reviews the boundary.
+- [`e2e/import-zones.test.ts`](e2e/import-zones.test.ts) checks that each boundary still fails a
+  forbidden import.
 
 ## Commands
 
