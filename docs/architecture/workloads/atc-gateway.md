@@ -6,7 +6,9 @@ the sessions and runs them; the gateway never talks to impd and never runs a ses
 gateway keeps its clients and its grants in SQLite, so it runs as one replica on a volume that
 outlives a deleted claim, and a nightly job backs that volume up.
 [Public ingress](../network/public-ingress.md) covers the route in, and
-[the agent image](./agent-image.md) covers the image that sessions run on.
+[the agent image](./agent-image.md) covers the image that sessions run on. Each sign-in outcome that
+the gateway writes as a security event reaches Discord as an alert, under
+[sign-in alerts](./observability.md#sign-in-alerts).
 
 ## Daemons and the registry
 

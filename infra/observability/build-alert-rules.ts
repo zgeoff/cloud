@@ -1,19 +1,23 @@
 import { topology } from '@zgeoff/cloud-topology';
 import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
+import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import { nixieTurnsProbeTarget } from './nixie-turns-probe-target.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
-interface AlertRule {
+export interface AlertRule {
   readonly alert: string;
   readonly expr: string;
   readonly for: string;
-  readonly labels: { readonly severity: 'critical' | 'warning' };
+
+  // notice for activity the owner should see that is no fault; the chart's InfoInhibitor silences
+  // an info alert while no warning fires beside it
+  readonly labels: { readonly severity: 'critical' | 'warning' | 'notice' };
   readonly annotations: { readonly summary: string };
 }
 
-interface AlertRuleGroup {
+export interface AlertRuleGroup {
   readonly name: string;
   readonly rules: readonly AlertRule[];
 }
@@ -26,9 +30,9 @@ export interface AlertRuleInputs {
   readonly nixieReadinessURL?: string | undefined;
 }
 
-// geoff.cloud's own alerts (#29) as PrometheusRule spec.groups, also valid for `promtool check
-// rules`. A missing metric must alert, never read healthy: single-metric rules carry an absent()
-// branch, except ImpdLocalHealthDown, HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
+// geoff.cloud's own alerts (#29) and the atc sign-in group as PrometheusRule spec.groups. A missing
+// metric must alert: single-metric rules carry an absent() branch, except ImpdLocalHealthDown,
+// HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -49,6 +53,7 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
         oomKilledRule,
       ],
     },
+    buildATCSignInRules(),
   ];
 }
 
