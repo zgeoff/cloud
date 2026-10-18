@@ -15,22 +15,14 @@ async function setupTest() {
   const dir = await realpath(created);
   const configText = await Bun.file(join(root, '.oxlintrc.json')).text();
 
-  const parsed: unknown = Bun.JSONC.parse(configText);
-
-  if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('rules' in parsed) ||
-    typeof parsed.rules !== 'object' ||
-    parsed.rules === null ||
-    !('zgeoff/import-zones' in parsed.rules)
-  ) {
-    throw new Error('.oxlintrc.json holds no zgeoff/import-zones options');
-  }
+  // a config without the rule's options lints nothing, so every failing case catches it
+  const repoConfig = Bun.JSONC.parse(configText) as {
+    readonly rules: Readonly<Record<string, unknown>>;
+  };
 
   const lintConfig = {
     jsPlugins: [join(root, 'node_modules', '@zgeoff', 'oxlint-config', 'plugin.js')],
-    rules: { 'zgeoff/import-zones': parsed.rules['zgeoff/import-zones'] },
+    rules: { 'zgeoff/import-zones': repoConfig.rules['zgeoff/import-zones'] },
   };
 
   // the rule roots its globs at the nearest .git, so the tree is a repository of its own
