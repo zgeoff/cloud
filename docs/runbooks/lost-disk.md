@@ -25,7 +25,10 @@ database copy that matches the snapshot's image
 ([roll impd's database back](./restore-geoff-cloud.md#2-roll-impds-database-back)). k3s's datastore
 lives on `vdb` too, so a snapshot from before a k3s upgrade brings back an older k3s binary beside a
 newer datastore, which that binary may refuse or corrupt. Before k3s starts, switch to a generation
-whose k3s is at least the datastore's version.
+whose k3s is at least the datastore's version. Switch on the host with the generation's own
+`bin/switch-to-configuration switch`, from `/nix/var/nix/profiles/system-<n>-link`.
+`scripts/switch-geoffcloud.sh` cannot help here, because it queries the cluster before it builds and
+stops while k3s is down. When the snapshot holds no matching generation, reinstall instead.
 
 - **From a snapshot:** `bun run onidel:snapshot` takes one before a risky change. Restore it from
   the Onidel panel.
@@ -115,16 +118,20 @@ checkout of `main`.
 7. Start a new impd with `ssh root@geoffcloud systemctl start imp-host`, and restore every imp with
    `impz backup restore --all`, as
    [restore imps from restic](./restore-geoff-cloud.md#1-restore-imps-from-restic) describes.
-8. Add impd's secrets again, because they lived on the pool:
+8. Add impd's secrets again, because they lived on the pool, in this order:
+   - The sign-in secrets that the atc daemon's profiles name
+     ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), from their
+     sources. The GitHub secret `gh` among them comes first, because the preview token grants it.
    - nixie's images and model secret, through
      [nixie's runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd).
    - A fresh Connect token, through [Rotate](./onepassword-connect.md#rotate) in the Connect
      runbook.
-   - The preview service's secrets and token, through
-     [Set the service up](./preview.md#set-the-service-up).
-   - The sign-in secrets that the atc daemon's profiles name
-     ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), from their
-     sources.
+   - The preview service's secrets and token, through steps 2 and 3 of
+     [Set the service up](./preview.md#set-the-service-up), then only the `op read ... | ssh`
+     commands of its steps 4 and 5, which send the stored GitHub token and webhook secret. Skip the
+     switch in its step 6: the host already runs the current system, and the switch script queries
+     the cluster, which step 11 rebuilds. Start the unit with
+     `ssh root@geoffcloud systemctl restart preview`.
 9. Put the atc daemon's bearer back on the host first. The 1Password item `atc-daemon-token`
    survives, but its host copy was on the pool, and the credential installer stops when only one
    copy exists. `op read` ends the value with a newline, as the installer writes the file:
@@ -192,7 +199,9 @@ host.
    `(umask 077 && cat > $x/var/lib/tailscale/authkey)`, then paste and press Ctrl-D.
 7. Run reinstall steps 5 to 7, with the VM's public address as the install target. Skip reinstall
    step 2, which needs the old host, and step 4, because no pool remains. The host boots and joins
-   the tailnet, with k3s, imp-host and the atc daemon stopped.
+   the tailnet, with k3s, imp-host and the atc daemon stopped, so step 7's `k3s kubectl` and `impz`
+   checks fail until the pool exists. No step here runs the switch script, which needs a running
+   cluster.
 8. Run steps 1 to 4 of [Lose `vdb`](#lose-vdb).
 9. Delete the staged imp files from `vda` with the first block of reinstall step 8. The bind of the
    new, empty dataset shadows them, so the block takes its first branch, which deletes them through
