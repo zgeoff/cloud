@@ -84,6 +84,10 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
       `${registryDir}/${atcGatewayRegistryFile}`,
       '--state-dir',
       stateDir,
+      ...(inputs.config.trustForwardedFrom ?? []).flatMap((address) => [
+        '--trust-forwarded-from',
+        address,
+      ]),
     ],
     ports: [{ name: 'http', containerPort: atcGatewayPort }],
 
