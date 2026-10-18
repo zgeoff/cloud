@@ -5,6 +5,7 @@ import type { Output } from '@pulumi/pulumi';
 import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
 import { buildMetricsValues } from './build-metrics-values.ts';
 import { createAlertWebhook } from './create-alert-webhook.ts';
+import { makeDeleteBeforeReplaceTransform } from './make-delete-before-replace-transform.ts';
 
 interface MetricsInputs {
   readonly grafanaPassword: Output<string>;
@@ -35,7 +36,12 @@ export function createMetrics(ns: Namespace, inputs: MetricsInputs, cluster: Pro
       },
     },
 
-    // the Alertmanager pod mounts the webhook's Secret, so the Secret comes first
-    { provider: cluster, dependsOn: webhook === undefined ? [] : [webhook.resource] },
+    // The Alertmanager pod mounts the webhook's Secret, so the Secret comes first. A change to
+    // Alertmanager's config replaces the chart's fixed-name Secret, so the old one goes first.
+    {
+      provider: cluster,
+      dependsOn: webhook === undefined ? [] : [webhook.resource],
+      transforms: [makeDeleteBeforeReplaceTransform(cluster)],
+    },
   );
 }
