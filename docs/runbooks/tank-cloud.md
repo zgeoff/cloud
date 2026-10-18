@@ -14,13 +14,24 @@ enables it. The `tank-cloud-unlock` check boots a VM through those commands, a r
 without the key and a restored key.
 
 The secret files of imp-host and the atc daemon and impd's database copies keep their paths and live
-on these datasets: the module bind-mounts a directory of `host-secrets` at
-`/var/lib/imp-host/secrets` and `/var/lib/atc-daemon-secrets`, and the root of `imp-db-backups` at
-`/root/imp-db-backups`. A bind is `nofail` and requires its dataset's mount, so without the key it
-is not made, and the path stays the empty directory on `vda`.
-[Move the host secrets](./move-host-secrets.md) moves the files and removes the old copies. The
-module also bind-mounts the zvol's directory `etc-rancher` at `/etc/rancher`, and
-[Move k3s's data](./move-rancher.md) moves k3s's data onto the zvol.
+on these datasets: the module bind-mounts the directories `imp-host` and `atc-daemon` of
+`host-secrets` at `/var/lib/imp-host/secrets` and `/var/lib/atc-daemon-secrets`, and the root of
+`imp-db-backups` at `/root/imp-db-backups`. A bind is `nofail` and requires its dataset's mount, so
+without the key it is not made, and the path stays the empty directory on `vda`.
+`scripts/install-imp-dns-token.sh` and `copy-impd-db-host` each refuse to write while their bind is
+not mounted, so neither writes onto `vda`.
+
+The zvol holds k3s's datastore, with every Kubernetes Secret, the agent and kubelet keys and every
+cluster volume, at `/var/lib/rancher`. The module bind-mounts the zvol's directory `etc-rancher` at
+`/etc/rancher`, which holds the admin kubeconfig and the node password. `/var/lib/kubelet` stays on
+`vda`.
+
+`tank/imp`, which holds everything impd keeps on the pool, is an encryption root of its own, keyed
+by the same file. The NixOS module `nixos/modules/imp-dataset-key.nix` loads its key at boot, after
+the pool's import and before imp's module checks the dataset. When `tank/imp` is missing, plain or
+locked, the unit fails and imp-host stays stopped, so imp's module never makes a plain `tank/imp`.
+The `imp-dataset-key` check boots a VM through a missing dataset, a reboot with the key, a reboot
+without it and a restored key.
 
 ## Create the datasets
 
@@ -88,8 +99,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    describes. The switch restarts k3s, imp-host and the atc daemon, because their units gain the
    mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once the
    zvol holds k3s's data directory `k3s`, so it never makes a new cluster on an empty zvol by
-   accident. Move an existing cluster onto the zvol with [Move k3s's data](./move-rancher.md). For a
-   new cluster, make the empty directory before the switch:
+   accident. For a new cluster, make the empty directory before the switch:
    `mount /dev/zvol/tank/cloud/rancher /mnt && install -d /mnt/k3s && umount /mnt`.
 2. Check the mounts and the services:
 
@@ -102,6 +112,17 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
    Expect `tank/cloud/host-secrets zfs`, `tank/cloud/imp-db-backups zfs` and a `/dev/zd<n> ext4`
    line, then `active` four times.
+
+   Check the binds the same way:
+
+   ```bash
+   for path in /var/lib/imp-host/secrets /var/lib/atc-daemon-secrets /root/imp-db-backups /etc/rancher; do
+     findmnt -n -o SOURCE,FSTYPE --mountpoint "$path"
+   done
+   ```
+
+   Expect `tank/cloud/host-secrets[/imp-host] zfs`, `tank/cloud/host-secrets[/atc-daemon] zfs`,
+   `tank/cloud/imp-db-backups zfs` and `/dev/zd<n>[/etc-rancher] ext4`.
 
 3. Make the two filesystems root-only, because they hold secrets:
 
@@ -120,8 +141,9 @@ them again by name, as step 2 of
 ## If the key fails to load at boot
 
 The unit `tank-cloud-key` fails, and its journal holds the reason, such as
-`Failed to open key material file` for a missing key file. The host stays reachable over SSH, and
-k3s, imp-host and the atc daemon stay stopped. The datasets keep their data.
+`Failed to open key material file` for a missing key file. `imp-dataset-key` fails the same way for
+`tank/imp`. The host stays reachable over SSH, and k3s, imp-host and the atc daemon stay stopped.
+The datasets keep their data.
 
 1. Restore the key from the 1Password item `zfs-tank-key`. The key travels on SSH's stdin, never on
    a command line, because Tailscale SSH logs each command line:
@@ -140,8 +162,9 @@ k3s, imp-host and the atc daemon stay stopped. The datasets keep their data.
    ssh root@geoffcloud systemctl start tank-cloud.target k3s imp-host atc-daemon imp-host-dns-token.path
    ```
 
-   The target requires every mount and every bind, and each mount loads the key again. The services
-   alone would mount only the datasets they need, and leave `imp-db-backups` unmounted. The DNS
-   token's path unit needs the imp-host secrets bind, so it stays stopped until you start it too.
+   The target requires every mount and every bind, and each mount loads the key again. imp-host's
+   start runs `imp-dataset-key` again, which loads `tank/imp`'s key. The services alone would mount
+   only the datasets they need, and leave `imp-db-backups` unmounted. The DNS token's path unit
+   needs the imp-host secrets bind, so it stays stopped until you start it too.
 
 3. Check as in [Switch and check](#switch-and-check).

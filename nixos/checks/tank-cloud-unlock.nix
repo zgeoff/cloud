@@ -1,8 +1,8 @@
 # The boot unlock of tank/cloud (modules/tank-cloud.nix) in a NixOS VM, across real reboots: a
 # ZFS pool on an empty disk, imported at boot as geoffcloud imports tank, and the datasets made
 # with the commands of docs/runbooks/tank-cloud.md and a throwaway key, and the bind mounts of
-# geoffcloud's own services.tank-cloud.binds on directories made on the datasets, as the move of
-# the host secrets makes them (docs/runbooks/move-host-secrets.md). A stand-in for each service in
+# geoffcloud's own services.tank-cloud.binds on directories made on the datasets, as
+# docs/runbooks/reinstall-geoffcloud.md makes them. A stand-in for each service in
 # geoffcloud's own services.tank-cloud.requiredBy needs the datasets and binds that it names, and
 # writes a marker into every one of them when it starts, so a start on the root disk's empty mount
 # points would leave a file there. The subtests are one journey and run in order: datasets made, a

@@ -1,7 +1,7 @@
 # The boot unlock of tank/imp (modules/imp-dataset-key.nix) in a NixOS VM under imp's own module,
 # as one journey whose subtests run in order. On a pool shaped like geoffcloud's, the VM first boots
 # with no tank/imp, then makes tank/imp as its own encryption root, keyed by tank/cloud's key file
-# as docs/runbooks/tank-imp-encryption.md left it, with files in place of impd's database and
+# as docs/runbooks/tank-cloud.md describes it, with files in place of impd's database and
 # secrets. It reboots into the encrypted dataset with its key, then without it, then restores the
 # key. The stand-in imp-host is busybox that only sleeps (build-stub-imp-host-image.nix), loaded
 # from its archive in place of a pull. The test utilities pass their own check

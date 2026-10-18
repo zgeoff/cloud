@@ -57,10 +57,9 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    warns.
 
    The pool `tank` keeps `tank/cloud`, which holds the live copies of the imp files and of the atc
-   daemon's tokens ([Move the host secrets](./move-host-secrets.md)). The install puts the staged
-   imp files on `vda` in the clear, and a bind mount from `tank/cloud` shadows them without removing
-   them. Step 8 moves them into `tank/cloud` or deletes them, and the reinstall is not complete
-   before it.
+   daemon's tokens ([tank/cloud](./tank-cloud.md)). The install puts the staged imp files on `vda`
+   in the clear, and a bind mount from `tank/cloud` shadows them without removing them. Step 8 moves
+   them into `tank/cloud` or deletes them, and the reinstall is not complete before it.
 
    Stage the key of the encryption root `tank/cloud` too. `--no-newline` keeps the file at exactly
    the key's 64 hex characters, so the length check catches a wrong item before the install:

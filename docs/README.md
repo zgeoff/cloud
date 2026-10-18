@@ -49,12 +49,6 @@ call, the path of a change, the topology and the data.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
-- [Move the host secrets](./runbooks/move-host-secrets.md): the record of the done move of the
-  secret files and impd's database copies onto tank/cloud.
-- [Move k3s's data](./runbooks/move-rancher.md): the record of the done move of `/var/lib/rancher`
-  and `/etc/rancher` onto the zvol tank/cloud/rancher.
-- [Encrypt tank/imp](./runbooks/tank-imp-encryption.md): the record of the done move of impd's
-  dataset into an encrypted copy under the same name.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.
 - [Restore drill](./runbooks/restore-drill.md): restore impd's database and hq on a scratch VM, with
