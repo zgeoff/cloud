@@ -32,7 +32,7 @@ because the exposure is the same.
    further.
 2. Revoke the host's node and its host keys, as [Rejoin the tailnet](#rejoin-the-tailnet) describes.
 3. Change the ZFS key, as [Change the ZFS key](#change-the-zfs-key) describes, so the leaked key
-   cannot open a later copy of `vdb`.
+   cannot open a later copy of `vdb`. That holds only while no copy of `vdb` leaked with it.
 
 ## The Onidel account leaks
 
@@ -129,9 +129,15 @@ tailnet again with a new auth key. The reboot puts every imp to sleep and restar
 
 ## Change the ZFS key
 
-**Untested.** `zfs change-key` wraps the master key under a new key on both encryption roots. The
-master key stays, so this protects a later copy of `vdb` from the old key, but not a copy that
-leaked before.
+**Untested.** `zfs change-key` wraps the master key under a new key on both encryption roots, and
+the master key stays the same. So the change protects a later copy of `vdb` only when the old key
+leaked without any copy of `vdb`. Someone who holds the old key and an earlier copy of `vdb`
+recovers the master key from that copy, and the master key decrypts every later copy as well.
+
+Only a new encryption root gets a new master key, so a leak of both needs the data moved into new
+roots, such as by a `zfs send` without `--raw` into a dataset made with a new key. This runbook does
+not cover that move. Until it happens, the pair reads every copy of `vdb`, which is the accepted
+risk on the master key ([accepted risks](../architecture/secrets.md#accepted-risks)).
 
 1. Make the new key on the host:
 

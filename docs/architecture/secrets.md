@@ -110,7 +110,9 @@ The layout leaves five risks open, each accepted:
 3. **The Tailscale node key, the OpenSSH host keys and the ZFS key stay plain on `vda`**, so a
    snapshot leak exposes them.
 4. **`zfs change-key` leaves the master key unchanged**, so someone with an old key and a copy of
-   `vdb` from before the change recovers the master key, which still decrypts a later copy.
+   `vdb` from before the change recovers the master key, which still decrypts a later copy. A key
+   change therefore protects later copies only when the old key leaked without a copy of `vdb`. Only
+   moving the data into new encryption roots gives it a new master key.
 5. **Losing the pool loses impd's named tokens and grants and the copies of impd's database**,
    because they live only on the pool. A rebuild mints the tokens again.
 
