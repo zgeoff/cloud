@@ -112,6 +112,11 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 After a reboot, `zfs get -H -o value encryption,keystatus tank/cloud` prints `aes-256-gcm` and
 `available`.
 
+k3s, imp-host and the atc daemon each require their datasets' mounts. So `systemctl stop` of a mount
+stops the services that require it, and `systemctl start` of the mount leaves them stopped: start
+them again by name, as step 2 of
+[If the key fails to load at boot](#if-the-key-fails-to-load-at-boot) does.
+
 ## If the key fails to load at boot
 
 The unit `tank-cloud-key` fails, and its journal holds the reason, such as

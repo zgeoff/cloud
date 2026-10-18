@@ -35,7 +35,26 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    the pool fills. Reserve it with `zfs set refreservation=auto tank/cloud/rancher`, which fails
    when the pool lacks the space.
 
-2. Check the space the copy needs against the zvol's free space:
+2. When the reservation fails, recreate the zvol at a size the pool can reserve, such as `20G`:
+
+   **CAUTION:** `zfs destroy` deletes the zvol and everything on it. Check that step 1 listed
+   `lost+found` alone.
+
+   ```bash
+   systemctl stop /var/lib/tank-cloud/rancher
+   zfs destroy tank/cloud/rancher
+   zfs create -V 20G tank/cloud/rancher
+   udevadm settle
+   mkfs.ext4 -q -L rancher /dev/zvol/tank/cloud/rancher
+   systemctl start /var/lib/tank-cloud/rancher
+   systemctl start k3s
+   ```
+
+   k3s requires the zvol's mount, so the mount's stop stops k3s and the cluster's API, and the
+   mount's start leaves k3s stopped. The pods keep running on `vda` until k3s starts again. Check
+   again as in step 1.
+
+3. Check the space the copy needs against the zvol's free space:
 
    ```bash
    du -sxh /var/lib/rancher /etc/rancher
@@ -44,7 +63,7 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
 
    The copy refuses to start when the trees do not fit.
 
-3. From this machine, take a nixie backup and a root disk snapshot, so the cluster has a recovery
+4. From this machine, take a nixie backup and a root disk snapshot, so the cluster has a recovery
    point from before the move ([nixie backup](./nixie-backup.md),
    [Restore geoff.cloud](./restore-geoff-cloud.md#4-recover-the-root-disk)).
 
@@ -56,13 +75,17 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    bash scripts/switch-geoffcloud.sh
    ```
 
-   Expect the activation to end with `starting the following units: k3s.service` and no failed unit,
-   then the script's nixie readiness check to wait. k3s fails its assertion, because the zvol holds
-   no `k3s` directory yet, and the journal of `k3s.service` holds
-   `Assertion failed for k3s service.` Run [Copy](#copy) while the check waits. When the check gives
-   up first, the host still runs the new generation, and you run the check again after the copy.
+   Expect the activation to start `k3s.service` with no failed unit, and the script to print
+   `== root@geoffcloud runs <path>`. k3s fails its assertion, because the zvol holds no `k3s`
+   directory yet, and the journal of `k3s.service` holds `Assertion failed for k3s service.`
 
-2. Check that k3s stayed stopped and that the zvol is empty:
+2. Stop the script with Ctrl-C once it prints `== root@geoffcloud runs <path>` and the list of
+   failed units. The script's nixie readiness check follows, and it runs `k3s kubectl` on the host.
+   Any k3s command unpacks k3s's binaries into `/var/lib/rancher/k3s`, and a `k3s` directory that
+   appears during the copy makes the copy refuse to start k3s. Run no k3s command on the host until
+   the copy ends. The host keeps the new generation.
+
+3. Check that k3s stayed stopped and that the zvol is empty:
 
    ```bash
    systemctl is-active k3s
@@ -70,9 +93,9 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    ls -A /var/lib/rancher
    ```
 
-   Expect `inactive`, a `/dev/zd<n> ext4` line, and `etc-rancher` and `lost+found` alone. systemd
-   made the empty `etc-rancher` for the bind. k3s's pods still run on `vda`, because the unit stops
-   only k3s itself.
+   Expect `inactive`, a `/dev/zd<n> ext4` line, and `etc-rancher` and `lost+found`, plus `k3s` when
+   a k3s command ran. systemd made the empty `etc-rancher` for the bind. k3s's pods still run on
+   `vda`, because the unit stops only k3s itself.
 
 ## Copy
 
@@ -96,13 +119,20 @@ Run each command on geoffcloud as root, over `ssh root@geoffcloud`, unless it sa
    The script kills k3s's containerd, shims and containers, which outlive the unit, so nothing
    writes to the old trees during the copy. It never runs `k3s-killall.sh`, which also clears
    Tailscale's advertised routes and rewrites iptables. It refuses, and copies nothing, when either
-   path is not the zvol's mount, when the zvol is sparse, or when `/var/lib/rancher/k3s` already
-   exists on it. The copy of `/var/lib/rancher` waits in a staging directory until both trees match,
-   and `k3s` moves into place last. A `MISMATCH` stops the copy before k3s starts; read the listed
-   entries, then run the copy again. A run that stopped part-way clears what it left on the zvol
-   before it copies.
+   path is not the zvol's mount, when the zvol is sparse, or when `/var/lib/rancher/k3s` on it holds
+   more than the binaries a k3s command unpacked. The copy of `/var/lib/rancher` waits in a staging
+   directory until both trees match, and `k3s` moves into place last. A `MISMATCH` stops the copy
+   before k3s starts; read the listed entries, then run the copy again. When a k3s command made
+   `/var/lib/rancher/k3s` during the copy, the copy stops before k3s starts; stop that command, then
+   run the copy again. A run that stopped part-way clears what it left on the zvol before it copies,
+   and prints `cleared <n> entries an earlier copy left on the zvol`.
 
-2. From this machine, check nixie as the switch would have:
+   The script reads the old trees through a private bind of `/` under `/run/move-rancher.<random>`,
+   and removes the bind before k3s starts. When the script prints that the bind is still mounted,
+   remove it as in [Remove a bind of / that the copy left](#remove-a-bind-of--that-the-copy-left).
+
+2. From this machine, check nixie as the switch would have, since the switch stopped before its own
+   check:
 
    ```bash
    bash scripts/check-nixie-ready.sh root@geoffcloud
@@ -164,6 +194,31 @@ snapshots.
 The old blocks stay on `vda` until something overwrites them, and the snapshots from before the move
 still hold the data.
 
+## Remove a bind of / that the copy left
+
+A bind of `/` that the copy could not unmount holds copies of the pod mounts made while it existed,
+such as their volumes. With `/`'s shared propagation, an unmount inside the bind passes to the live
+mount it copies. Make the bind's whole tree private first, so the unmount touches only the bind.
+
+**CAUTION:** Never run `umount -l` on the bind before `mount --make-rprivate`. A lazy unmount of a
+shared bind detaches the live pod mounts it copies.
+
+1. List the binds:
+
+   ```bash
+   findmnt -rn -o TARGET | grep '^/run/move-rancher'
+   ```
+
+2. Remove each bind the list starts with, here `/run/move-rancher.abc123`:
+
+   ```bash
+   mount --make-rprivate /run/move-rancher.abc123
+   umount -R /run/move-rancher.abc123
+   rmdir /run/move-rancher.abc123
+   ```
+
+3. Run step 1 again, and expect no line. `k3s kubectl get pods -A` still shows every pod `Running`.
+
 ## Roll back
 
 Before the removal, the old trees are still on `vda`, as they were when the copy stopped k3s. Every
@@ -196,9 +251,11 @@ bun run test:nixos tank-cloud-rancher
 ```
 
 The check starts a real k3s server with geoffcloud's package and flags on the root disk, with a pod
-that writes into a volume directory. It switches to the config with the zvol, checks that k3s fails
-its assertion on the empty zvol, runs the copy, and checks that the cluster CA, the node password,
-the admin kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive. It then
-runs the removal and the rollback's stop step, checks that the zvol's mounts then unmount, and
-reboots with the pool's import held back past a device's default wait, so k3s starts on the zvol
-only after the import.
+that writes into a volume directory, and recreates the zvol as in
+[Before you start](#before-you-start). It switches to the config with the zvol, checks that k3s
+fails its assertion on the empty zvol, and runs the copy while k3s commands run, which the copy
+refuses before k3s starts. It runs the copy again, and checks that the cluster CA, the node
+password, the admin kubeconfig, a Secret, and the volume's hard link, xattr, ACL and owner survive.
+It then clears a bind of `/` that holds pod mounts, runs the removal and the rollback's stop step,
+checks that the zvol's mounts then unmount, and reboots with the pool's import held back past a
+device's default wait, so k3s starts on the zvol only after the import.
