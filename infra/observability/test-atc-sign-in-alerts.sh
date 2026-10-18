@@ -249,10 +249,10 @@ it_keeps_an_accepted_start_and_a_successful_sign_in_in_separate_alerts() {
 {"series":"loki_process_custom_atc_security_events_total{component_id=\"loki.process.atc_security\",component_path=\"/\",kind=\"owner_auth\",method=\"passkey\",outcome=\"succeeded\",reason=\"none\",route=\"/login\"}","values":"0 0 0 0 0 0 0 0 0 0 0 0 0 1 1 1 1 1 1 1 1"}],
 "alert_rule_test":[
 {"eval_time":"7m30s","alertname":"ATCGatewaySignInStarted","exp_alerts":[
-{"exp_labels":{"severity":"info","route":"/oauth2/authorize"},
+{"exp_labels":{"severity":"notice","route":"/oauth2/authorize"},
 "exp_annotations":{"summary":"The atc gateway accepted 2 sign-in start(s) in the last 5m."}}]},
 {"eval_time":"7m30s","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[
-{"exp_labels":{"severity":"info","method":"passkey","route":"/login"},
+{"exp_labels":{"severity":"notice","method":"passkey","route":"/login"},
 "exp_annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]}]}]}
 EOF
 
@@ -278,12 +278,12 @@ it_fires_on_the_first_event_of_a_new_series_or_after_alloy_restarts_and_clears_a
 {"series":"loki_process_custom_atc_security_events_total{component_id=\"loki.process.atc_security\",component_path=\"/\",kind=\"consent\",method=\"none\",outcome=\"allowed\",reason=\"none\",route=\"/consent\"}","values":"7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 1 1 1"}],
 "alert_rule_test":[
 {"eval_time":"1m","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[
-{"exp_labels":{"severity":"info","method":"passkey","route":"/login"},
+{"exp_labels":{"severity":"notice","method":"passkey","route":"/login"},
 "exp_annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]},
 {"eval_time":"6m30s","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[]},
 {"eval_time":"8m","alertname":"ATCGatewayConsentAllowed","exp_alerts":[]},
 {"eval_time":"9m30s","alertname":"ATCGatewayConsentAllowed","exp_alerts":[
-{"exp_labels":{"severity":"info"},
+{"exp_labels":{"severity":"notice"},
 "exp_annotations":{"summary":"The owner allowed 1 client consent(s) at the atc gateway in the last 5m."}}]}]}]}
 EOF
 
@@ -304,16 +304,16 @@ it_sends_one_discord_message_per_sign_in_alert_name_however_many_alerts_and_post
     send_alerts << 'EOF'
 [{"labels":{"alertname":"ATCGatewayInvalidSignInRequests","severity":"warning","reason":"bad_host","route":"/mcp"},"annotations":{"summary":"The atc gateway rejected 400 invalid request(s), bad_host on /mcp, in the last 5m."}},
 {"labels":{"alertname":"ATCGatewayInvalidSignInRequests","severity":"warning","reason":"invalid_client","route":"/oauth2/authorize"},"annotations":{"summary":"The atc gateway rejected 100 invalid request(s), invalid_client on /oauth2/authorize, in the last 5m."}},
-{"labels":{"alertname":"ATCGatewaySignInStarted","severity":"info","route":"/oauth2/authorize"},"annotations":{"summary":"The atc gateway accepted 1 sign-in start(s) in the last 5m."}},
-{"labels":{"alertname":"ATCGatewayOwnerSignedIn","severity":"info","method":"passkey","route":"/login"},"annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]
+{"labels":{"alertname":"ATCGatewaySignInStarted","severity":"notice","route":"/oauth2/authorize"},"annotations":{"summary":"The atc gateway accepted 1 sign-in start(s) in the last 5m."}},
+{"labels":{"alertname":"ATCGatewayOwnerSignedIn","severity":"notice","method":"passkey","route":"/login"},"annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]
 EOF
   done
   wait_for 90 "Alertmanager to post to Discord" test -f "$tree/discord/bodies/3.json"
 
   jq -r '.embeds[].title' "$tree"/discord/bodies/*.json | LC_ALL=C sort > "$tree/out"
   diff - "$tree/out" << 'EOF'
-[FIRING:1] ATCGatewayOwnerSignedIn (passkey /login info)
-[FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize info)
+[FIRING:1] ATCGatewayOwnerSignedIn (passkey /login notice)
+[FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize notice)
 [FIRING:2] ATCGatewayInvalidSignInRequests (warning)
 EOF
   diff - "$tree/discord/requests" << 'EOF'
@@ -331,7 +331,7 @@ it_logs_and_counts_a_failed_discord_delivery_without_the_webhooks_token() {
   start_alertmanager "$tree"
 
   send_alerts << 'EOF'
-[{"labels":{"alertname":"ATCGatewayOwnerSignedIn","severity":"info","method":"passkey","route":"/login"},"annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]
+[{"labels":{"alertname":"ATCGatewayOwnerSignedIn","severity":"notice","method":"passkey","route":"/login"},"annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]
 EOF
   wait_for 90 "Alertmanager to retry the post" test -f "$tree/discord/bodies/2.json"
 

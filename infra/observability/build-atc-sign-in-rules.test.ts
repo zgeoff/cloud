@@ -9,7 +9,7 @@ test('it alerts once per category of atc sign-in event, with the count of the la
         alert: 'ATCGatewaySignInStarted',
         expr: 'sum by (route) ((loki_process_custom_atc_security_events_total{kind="authorize_started", outcome="accepted"} unless loki_process_custom_atc_security_events_total{kind="authorize_started", outcome="accepted"} offset 5m) or increase(loki_process_custom_atc_security_events_total{kind="authorize_started", outcome="accepted"}[5m])) > 0',
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary:
             'The atc gateway accepted {{ $value | printf "%.0f" }} sign-in start(s) in the last 5m.',
@@ -39,7 +39,7 @@ test('it alerts once per category of atc sign-in event, with the count of the la
         alert: 'ATCGatewayOwnerSignedIn',
         expr: 'sum by (method, route) ((loki_process_custom_atc_security_events_total{kind="owner_auth", outcome="succeeded"} unless loki_process_custom_atc_security_events_total{kind="owner_auth", outcome="succeeded"} offset 5m) or increase(loki_process_custom_atc_security_events_total{kind="owner_auth", outcome="succeeded"}[5m])) > 0',
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary:
             'The owner signed in to the atc gateway {{ $value | printf "%.0f" }} time(s) by {{ $labels.method }} in the last 5m.',
@@ -59,7 +59,7 @@ test('it alerts once per category of atc sign-in event, with the count of the la
         alert: 'ATCGatewayConsentAllowed',
         expr: 'sum by () ((loki_process_custom_atc_security_events_total{kind="consent", outcome="allowed"} unless loki_process_custom_atc_security_events_total{kind="consent", outcome="allowed"} offset 5m) or increase(loki_process_custom_atc_security_events_total{kind="consent", outcome="allowed"}[5m])) > 0',
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary:
             'The owner allowed {{ $value | printf "%.0f" }} client consent(s) at the atc gateway in the last 5m.',
@@ -69,7 +69,7 @@ test('it alerts once per category of atc sign-in event, with the count of the la
         alert: 'ATCGatewayConsentDenied',
         expr: 'sum by (reason) ((loki_process_custom_atc_security_events_total{kind="consent", outcome="denied"} unless loki_process_custom_atc_security_events_total{kind="consent", outcome="denied"} offset 5m) or increase(loki_process_custom_atc_security_events_total{kind="consent", outcome="denied"}[5m])) > 0',
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary:
             'The owner denied {{ $value | printf "%.0f" }} client consent(s) at the atc gateway, reason {{ $labels.reason }}, in the last 5m.',

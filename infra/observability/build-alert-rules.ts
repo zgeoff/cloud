@@ -9,7 +9,10 @@ export interface AlertRule {
   readonly alert: string;
   readonly expr: string;
   readonly for: string;
-  readonly labels: { readonly severity: 'critical' | 'warning' | 'info' };
+
+  // notice for activity the owner should see that is no fault; the chart's InfoInhibitor silences
+  // an info alert while no warning fires beside it
+  readonly labels: { readonly severity: 'critical' | 'warning' | 'notice' };
   readonly annotations: { readonly summary: string };
 }
 

@@ -116,15 +116,19 @@ address alike, a `trusted` one included: none becomes a label, so a spoofed head
 
 | Category                     | Event                          | Severity |
 | ---------------------------- | ------------------------------ | -------- |
-| Accepted authorization start | `authorize_started` `accepted` | info     |
+| Accepted authorization start | `authorize_started` `accepted` | notice   |
 | Rate-limit rejection         | `authorize_started` `rejected` | warning  |
 | Invalid request              | `authorize_invalid`            | warning  |
-| Owner sign-in                | `owner_auth` `succeeded`       | info     |
+| Owner sign-in                | `owner_auth` `succeeded`       | notice   |
 | Failed authentication        | `owner_auth` `failed`          | warning  |
-| Consent allowed              | `consent` `allowed`            | info     |
-| Consent denied               | `consent` `denied`             | info     |
+| Consent allowed              | `consent` `allowed`            | notice   |
+| Consent denied               | `consent` `denied`             | notice   |
 | Suppressed events            | `suppressed`                   | warning  |
 | Unrecognized event           | any kind outside the contract  | warning  |
+
+The owner's own activity takes `notice`, not `info`, because the chart's info-inhibition rule
+silences an `info` alert whenever no warning fires beside it, and an owner sign-in alone must still
+reach Discord.
 
 Two categories have no source. Cloudflare Access refuses a request at the edge before it reaches the
 tunnel, so the gateway writes no event for an edge denial, and no alert covers one. atc's rate limit

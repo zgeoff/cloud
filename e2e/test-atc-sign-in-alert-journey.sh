@@ -3,9 +3,11 @@
 # the case tree, written in the kubelet's CRI format and full of canary secrets; the pinned Alloy
 # running the pipeline build-atc-security-pipeline.ts builds; the pinned Prometheus scraping Alloy
 # and evaluating the rules build-atc-sign-in-rules.ts builds; the pinned Alertmanager with the route
-# build-alertmanager-values.ts builds; and the Discord webhook stand-in, which fails the first posts
-# and then takes them. The journey checks that each category arrives as one Discord message, and
-# that no canary reaches a Discord post, a retry, an alert, Alertmanager's log, or Alloy's metrics.
+# build-alertmanager-values.ts builds; and the Discord webhook stand-in. The chart's InfoInhibitor
+# rule and default inhibit rules run beside the built ones, as in the cluster. The first case fails
+# the first posts and then takes them, and checks that each category arrives as one Discord
+# message, and that no canary reaches a Discord post, a retry, an alert, Alertmanager's log, or
+# Alloy's metrics. The second checks that the owner's activity alone still reaches Discord.
 # infra/observability/test-atc-sign-in-alerts.sh tests each stage on its own.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
@@ -39,7 +41,6 @@ setup_test() {
   prometheus_port="$(pick_port)"
   alloy_url="http://127.0.0.1:$alloy_port"
   alertmanager_url="http://127.0.0.1:$alertmanager_port"
-  echo 500 > "$tree/discord/status"
   start_stub_discord_webhook "$tree/discord"
   printf 'http://127.0.0.1:%s/api/webhooks/1234/CANARY-WEBHOOK-TOKEN' "$(cat "$tree/discord/port")" > "$tree/config/webhook-url"
   (cd "$repo" && TREE="$tree" ALLOY="127.0.0.1:$alloy_port" ALERTMANAGER="127.0.0.1:$alertmanager_port" bun -e "
@@ -48,9 +49,25 @@ setup_test() {
     import { buildAlertmanagerValues } from './infra/observability/build-alertmanager-values.ts';
     const tree = process.env.TREE ?? '';
     await Bun.write(tree + '/config/config.alloy', buildATCSecurityPipeline('/logs/atc_atc-gateway-*/atc-gateway/*.log'));
-    await Bun.write(tree + '/config/rules.json', JSON.stringify({ groups: [buildATCSignInRules()] }));
+    // the chart's InfoInhibitor rule and default inhibit rules beside the built ones, as Helm merges
+    // them in the cluster (kube-prometheus-stack 91.8.2: general.rules.yaml, and values.yaml's
+    // alertmanager.config.inhibit_rules)
+    const infoInhibitor = {
+      alert: 'InfoInhibitor',
+      expr: 'group by (namespace) (ALERTS{severity = \"info\"} == 1) unless on (namespace) group by (namespace) (ALERTS{alertname != \"InfoInhibitor\", alertstate = \"firing\", severity =~ \"warning|critical\"} == 1)',
+      labels: { severity: 'none' },
+    };
+    await Bun.write(tree + '/config/rules.json', JSON.stringify({ groups: [buildATCSignInRules(), { name: 'general.rules', rules: [infoInhibitor] }] }));
     const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url' });
-    await Bun.write(tree + '/config/alertmanager.json', JSON.stringify(alertmanager.config));
+    await Bun.write(tree + '/config/alertmanager.json', JSON.stringify({
+      ...alertmanager.config,
+      inhibit_rules: [
+        { source_matchers: ['severity = critical'], target_matchers: ['severity =~ warning|info'], equal: ['namespace', 'alertname'] },
+        { source_matchers: ['severity = warning'], target_matchers: ['severity = info'], equal: ['namespace', 'alertname'] },
+        { source_matchers: ['alertname = InfoInhibitor'], target_matchers: ['severity = info'], equal: ['namespace'] },
+        { target_matchers: ['alertname = InfoInhibitor'] },
+      ],
+    }));
     await Bun.write(tree + '/config/prometheus.json', JSON.stringify({
       global: { scrape_interval: '1s', evaluation_interval: '1s' },
       rule_files: ['rules.json'],
@@ -114,6 +131,7 @@ it_journeys_from_the_gateways_log_to_one_discord_message_per_category_with_no_ca
   tree="$(mktemp -d)"
   trap teardown EXIT
   setup_test "$tree"
+  echo 500 > "$tree/discord/status"
 
   {
     printf '%s\n' '2026-10-19T09:01:00.000000000Z stdout F Approve Notes app with code CANARY-APPROVAL-CODE'
@@ -130,8 +148,8 @@ it_journeys_from_the_gateways_log_to_one_discord_message_per_category_with_no_ca
   jq -r '.embeds[].title' "$tree"/discord/bodies/*.json | LC_ALL=C sort -u > "$tree/out"
   diff - "$tree/out" << 'EOF'
 [FIRING:1] ATCGatewayInvalidSignInRequests (bad_host other warning)
-[FIRING:1] ATCGatewayOwnerSignedIn (passkey /login info)
-[FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize info)
+[FIRING:1] ATCGatewayOwnerSignedIn (passkey /login notice)
+[FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize notice)
 EOF
   jq -r '.embeds[].description' "$tree"/discord/bodies/*.json | grep -- '- summary = ' | LC_ALL=C sort -u > "$tree/out"
   diff - "$tree/out" << 'EOF'
@@ -147,6 +165,26 @@ EOF
   grep -Eio 'canary[a-z0-9-]*|203\.0\.113\.77|10\.42\.0\.17|/api/webhooks[^ "]*' \
     "$tree/posts" "$tree/alerts" "$tree/alertmanager.log" "$tree/metrics" > "$tree/leaks" || true
   diff /dev/null "$tree/leaks"
+}
+
+it_delivers_an_owners_sign_in_with_no_other_alert_firing_past_the_charts_info_inhibitor() {
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+
+  cat >> "$tree/$log_dir/0.log" << 'EOF'
+2026-10-19T09:01:01.000000000Z stderr F atc security {"v":1,"kind":"authorize_started","outcome":"accepted","route":"/oauth2/authorize"}
+2026-10-19T09:01:02.000000000Z stderr F atc security {"v":1,"kind":"owner_auth","outcome":"succeeded","method":"passkey","route":"/login"}
+2026-10-19T09:01:03.000000000Z stderr F atc security {"v":1,"kind":"consent","outcome":"allowed","route":"/consent"}
+EOF
+  wait_for 180 "Alertmanager to deliver the three categories" has_delivered 3
+
+  jq -r '.embeds[].title' "$tree"/discord/bodies/*.json | LC_ALL=C sort -u > "$tree/out"
+  diff - "$tree/out" << 'EOF'
+[FIRING:1] ATCGatewayConsentAllowed (notice)
+[FIRING:1] ATCGatewayOwnerSignedIn (passkey /login notice)
+[FIRING:1] ATCGatewaySignInStarted (/oauth2/authorize notice)
+EOF
 }
 
 run_cases

@@ -18,7 +18,7 @@ export function buildATCSignInRules(): AlertRuleGroup {
         alert: 'ATCGatewaySignInStarted',
         expr: buildEventCount('kind="authorize_started", outcome="accepted"', ['route']),
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary: `The atc gateway accepted ${count} sign-in start(s) in the last ${window}.`,
         },
@@ -45,7 +45,7 @@ export function buildATCSignInRules(): AlertRuleGroup {
         alert: 'ATCGatewayOwnerSignedIn',
         expr: buildEventCount('kind="owner_auth", outcome="succeeded"', ['method', 'route']),
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary: `The owner signed in to the atc gateway ${count} time(s) by {{ $labels.method }} in the last ${window}.`,
         },
@@ -63,7 +63,7 @@ export function buildATCSignInRules(): AlertRuleGroup {
         alert: 'ATCGatewayConsentAllowed',
         expr: buildEventCount('kind="consent", outcome="allowed"', []),
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary: `The owner allowed ${count} client consent(s) at the atc gateway in the last ${window}.`,
         },
@@ -72,7 +72,7 @@ export function buildATCSignInRules(): AlertRuleGroup {
         alert: 'ATCGatewayConsentDenied',
         expr: buildEventCount('kind="consent", outcome="denied"', ['reason']),
         for: '0m',
-        labels: { severity: 'info' },
+        labels: { severity: 'notice' },
         annotations: {
           summary: `The owner denied ${count} client consent(s) at the atc gateway, reason {{ $labels.reason }}, in the last ${window}.`,
         },
