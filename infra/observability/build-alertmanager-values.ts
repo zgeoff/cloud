@@ -1,5 +1,8 @@
+import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
+
 const nullReceiver = 'null';
 const discordReceiver = 'discord';
+const signInReceiver = 'discord-sign-in';
 
 // the Secret that holds the Discord webhook, and the file Alertmanager reads it from
 interface AlertWebhookMount {
@@ -15,12 +18,21 @@ interface Receiver {
   }[];
 }
 
+interface Route {
+  readonly receiver: string;
+  readonly matchers: string[];
+  readonly group_by?: string[];
+  readonly group_wait?: string;
+  readonly group_interval?: string;
+  readonly repeat_interval?: string;
+}
+
 interface AlertmanagerValues {
   readonly enabled: true;
   readonly config: {
     readonly route: {
       readonly receiver: string;
-      readonly routes: readonly { readonly receiver: string; readonly matchers: string[] }[];
+      readonly routes: readonly Route[];
     };
     readonly receivers: readonly Receiver[];
   };
@@ -44,6 +56,10 @@ export function buildAlertmanagerValues(
             name: discordReceiver,
             discord_configs: [{ webhook_url_file: webhook.file, send_resolved: true }],
           },
+          {
+            name: signInReceiver,
+            discord_configs: [{ webhook_url_file: webhook.file, send_resolved: false }],
+          },
         ];
 
   return {
@@ -51,7 +67,10 @@ export function buildAlertmanagerValues(
     config: {
       route: {
         receiver: webhook === undefined ? nullReceiver : discordReceiver,
-        routes: [{ receiver: nullReceiver, matchers: ['alertname =~ "Watchdog|InfoInhibitor"'] }],
+        routes: [
+          { receiver: nullReceiver, matchers: ['alertname =~ "Watchdog|InfoInhibitor"'] },
+          ...(webhook === undefined ? [] : [buildSignInRoute()]),
+        ],
       },
       receivers: [{ name: nullReceiver }, ...discord],
     },
@@ -61,5 +80,21 @@ export function buildAlertmanagerValues(
       secrets: webhook === undefined ? [] : [webhook.secretName],
       resources: { requests: { cpu: '10m', memory: '32Mi' }, limits: { memory: '128Mi' } },
     },
+  };
+}
+
+// The atc sign-in alerts, one message per alert name, so a flood of one category never buries
+// another. An alert ends when its window passes with no event, which is no news, so the route
+// sends no resolved message.
+function buildSignInRoute(): Route {
+  const names = buildATCSignInRules().rules.map((rule) => rule.alert);
+
+  return {
+    receiver: signInReceiver,
+    matchers: [`alertname =~ "${names.join('|')}"`],
+    group_by: ['alertname'],
+    group_wait: '30s',
+    group_interval: '5m',
+    repeat_interval: '1h',
   };
 }

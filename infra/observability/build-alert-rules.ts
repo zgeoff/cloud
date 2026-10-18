@@ -5,15 +5,15 @@ import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 import { nixieTurnsProbeTarget } from './nixie-turns-probe-target.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
-interface AlertRule {
+export interface AlertRule {
   readonly alert: string;
   readonly expr: string;
   readonly for: string;
-  readonly labels: { readonly severity: 'critical' | 'warning' };
+  readonly labels: { readonly severity: 'critical' | 'warning' | 'info' };
   readonly annotations: { readonly summary: string };
 }
 
-interface AlertRuleGroup {
+export interface AlertRuleGroup {
   readonly name: string;
   readonly rules: readonly AlertRule[];
 }

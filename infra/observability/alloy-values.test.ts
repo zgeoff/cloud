@@ -1,7 +1,8 @@
 import { expect, test } from 'bun:test';
 import { alloyValues } from './alloy-values.ts';
+import { buildATCSecurityPipeline } from './build-atc-security-pipeline.ts';
 
-test("it tails every pod's logs and the host journal into Loki from saved positions, dropping lines over an hour old and the atc gateway's approval lines", () => {
+test("it tails every pod's logs and the host journal into Loki from saved positions, dropping lines over an hour old and the atc gateway's approval lines, and counts the gateway's security events for Prometheus", () => {
   expect(alloyValues).toStrictEqual({
     alloy: {
       storagePath: '/var/lib/alloy',
@@ -46,7 +47,7 @@ loki.process "pods" {
   }
   forward_to = [loki.write.default.receiver]
 }
-
+${buildATCSecurityPipeline('/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log')}
 // the host's journal: impd (imp-host logs to journald), k3s, tailscaled and the rest
 // of the host, which no pod log covers
 loki.source.journal "host" {
@@ -78,6 +79,7 @@ loki.write "default" {
       extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
       resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
     },
+    serviceMonitor: { enabled: true },
     controller: {
       volumes: {
         extra: [

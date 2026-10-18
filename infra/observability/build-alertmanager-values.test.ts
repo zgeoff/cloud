@@ -18,7 +18,7 @@ test('it routes every alert to the null receiver and mounts nothing without a we
   });
 });
 
-test('it routes alerts to Discord through the mounted Secret, Watchdog and InfoInhibitor to null, when a webhook is given', () => {
+test('it routes alerts to Discord through the mounted Secret, Watchdog and InfoInhibitor to null, and the atc sign-in alerts grouped by name without resolved messages, when a webhook is given', () => {
   expect(
     buildAlertmanagerValues({
       secretName: 'alertmanager-discord',
@@ -29,7 +29,19 @@ test('it routes alerts to Discord through the mounted Secret, Watchdog and InfoI
     config: {
       route: {
         receiver: 'discord',
-        routes: [{ receiver: 'null', matchers: ['alertname =~ "Watchdog|InfoInhibitor"'] }],
+        routes: [
+          { receiver: 'null', matchers: ['alertname =~ "Watchdog|InfoInhibitor"'] },
+          {
+            receiver: 'discord-sign-in',
+            matchers: [
+              'alertname =~ "ATCGatewaySignInStarted|ATCGatewaySignInRateLimited|ATCGatewayInvalidSignInRequests|ATCGatewayOwnerSignedIn|ATCGatewayOwnerAuthFailed|ATCGatewayConsentAllowed|ATCGatewayConsentDenied|ATCGatewaySecurityEventsSuppressed|ATCGatewayUnrecognizedSecurityEvents"',
+            ],
+            group_by: ['alertname'],
+            group_wait: '30s',
+            group_interval: '5m',
+            repeat_interval: '1h',
+          },
+        ],
       },
       receivers: [
         { name: 'null' },
@@ -39,6 +51,15 @@ test('it routes alerts to Discord through the mounted Secret, Watchdog and InfoI
             {
               webhook_url_file: '/etc/alertmanager/secrets/alertmanager-discord/webhook-url',
               send_resolved: true,
+            },
+          ],
+        },
+        {
+          name: 'discord-sign-in',
+          discord_configs: [
+            {
+              webhook_url_file: '/etc/alertmanager/secrets/alertmanager-discord/webhook-url',
+              send_resolved: false,
             },
           ],
         },

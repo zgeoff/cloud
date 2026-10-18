@@ -1,10 +1,16 @@
+import { buildATCSecurityPipeline } from './build-atc-security-pipeline.ts';
 import { lokiURL } from './loki-url.ts';
 
 // Alloy keeps its read positions here, on the node, so a restart resumes where it stopped. Without
 // a position, loki.source.kubernetes re-reads each container's whole log.
 const storagePath = '/var/lib/alloy';
 
-// Alloy as a DaemonSet: tail every pod's logs and the host's journal, and push them to Loki
+// The kubelet's log files of the atc gateway's container, under /var/log, which the chart mounts:
+// one directory per pod, named <namespace>_<pod>_<uid>, and one per container inside it
+const atcGatewayLogPath = '/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log';
+
+// Alloy as a DaemonSet: tail every pod's logs and the host's journal, and push them to Loki, and
+// count atc's security events for Prometheus, which scrapes Alloy through the chart's ServiceMonitor
 export const alloyValues = {
   alloy: {
     storagePath,
@@ -49,7 +55,7 @@ loki.process "pods" {
   }
   forward_to = [loki.write.default.receiver]
 }
-
+${buildATCSecurityPipeline(atcGatewayLogPath)}
 // the host's journal: impd (imp-host logs to journald), k3s, tailscaled and the rest
 // of the host, which no pod log covers
 loki.source.journal "host" {
@@ -85,6 +91,7 @@ loki.write "default" {
     extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
     resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
   },
+  serviceMonitor: { enabled: true },
   controller: {
     volumes: {
       extra: [{ name: 'storage', hostPath: { path: storagePath, type: 'DirectoryOrCreate' } }],
