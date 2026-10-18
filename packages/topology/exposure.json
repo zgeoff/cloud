@@ -37,6 +37,17 @@
       "reason": "The atc gateway's pod dials the daemon on the host's tailnet address, and inet cloud_host admits only pod addresses on cni0"
     },
     {
+      "name": "atc-daemon-home-pc",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 8415,
+      "scope": "host",
+      "interface": "tailscale0",
+      "admission": true,
+      "reason": "home-pc's atc client dials the daemon on the host's tailnet address, and inet cloud_host admits only home-pc's tailnet address on tailscale0",
+      "ticket": "GEO-464"
+    },
+    {
       "name": "onepassword-connect-relay",
       "kind": "host-port",
       "protocol": "tcp",

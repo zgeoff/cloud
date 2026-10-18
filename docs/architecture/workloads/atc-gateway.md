@@ -21,7 +21,7 @@ The gateway dials; a daemon never dials out. The two daemons sit at different di
 
 - **The cloud daemon** runs on the host, so the gateway's traffic reaches the host's own tailnet
   address from the pod network without crossing the tailnet, and needs no tailnet grant. The host's
-  narrowing table admits that one path to the daemon's port
+  narrowing table admits that path to the daemon's port, and the owner's PC beside it
   ([firewalls](../network/firewalls.md#the-narrowing-table)).
 - **The PC daemon** runs on the owner's PC and is reached over the tailnet, through the one grant
   `tag:cloud` holds to the PC's daemon port ([the tailnet](../network/tailnet.md)). The PC sleeps,

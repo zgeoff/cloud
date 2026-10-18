@@ -1,25 +1,28 @@
 # The host's own nftables table, inet cloud_host, beside NixOS's inet nixos-fw: it narrows a TCP
-# port that nixos-fw accepts more widely, such as on a trusted interface, to one path. Each
-# admission accepts its port only from its interface, IPv4 source range and destination address,
-# and drops every other packet to that port. A drop in any input chain is final, and the accept
-# only passes the packet on to nixos-fw, so nixos-fw must still open the port for the admitted
-# path. The table's input chain runs before nixos-fw's (priority filter - 10). The rules are
-# sorted by port, so the table's text does not depend on the order the modules define them in.
+# port that nixos-fw accepts more widely, such as on a trusted interface, to its admitted paths.
+# Each admission accepts its port from its interface, IPv4 source range and destination address,
+# and after a port's last admission the chain drops every other packet to that port. A drop in
+# any input chain is final, and an accept only passes the packet on to nixos-fw, so nixos-fw must
+# still open the port for each admitted path. The table's input chain runs before nixos-fw's
+# (priority filter - 10). The rules are sorted by port, then interface and source, so the table's
+# text does not depend on the order the modules define them in.
 { config, lib, ... }:
 let
   cfg = config.networking.cloudHost;
-  admissions = lib.sort (a: b: a.port < b.port) cfg.admissions;
-  ports = map (admission: admission.port) admissions;
-  duplicatePorts = lib.unique (lib.filter (port: lib.count (p: p == port) ports > 1) ports);
-  duplicatePortList = lib.concatMapStringsSep ", " toString duplicatePorts;
-  # two lines of the input chain, indented as its other lines
-  renderAdmission =
+  toSortKey = admission: "${admission.interface} ${admission.sourceCIDR}";
+  admissions = lib.sort (
+    a: b: if a.port == b.port then toSortKey a < toSortKey b else a.port < b.port
+  ) cfg.admissions;
+  ports = lib.unique (map (admission: admission.port) admissions);
+  # a line of the input chain, indented as its other lines
+  renderAccept =
     admission:
-    let
-      port = toString admission.port;
-    in
-    "  tcp dport ${port} iifname \"${admission.interface}\" ip saddr ${admission.sourceCIDR} ip daddr ${admission.destinationAddress} accept\n"
-    + "  tcp dport ${port} drop\n";
+    "  tcp dport ${toString admission.port} iifname \"${admission.interface}\" ip saddr ${admission.sourceCIDR} ip daddr ${admission.destinationAddress} accept\n";
+  # each of the port's accepts, then the drop of every other packet to it
+  renderPort =
+    port:
+    lib.concatMapStrings renderAccept (lib.filter (admission: admission.port == port) admissions)
+    + "  tcp dport ${toString port} drop\n";
 in
 {
   options.networking.cloudHost.admissions = lib.mkOption {
@@ -50,8 +53,8 @@ in
     );
     default = [ ];
     description = ''
-      The ports inet cloud_host narrows, one admission per port. With none, the module adds no
-      table.
+      The paths inet cloud_host admits, one admission per path. A port with several admissions
+      accepts each path and drops every other packet. With none, the module adds no table.
     '';
   };
 
@@ -65,10 +68,6 @@ in
         assertion = !config.networking.nftables.flushRuleset;
         message = "networking.cloudHost.admissions needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and Docker";
       }
-      {
-        assertion = duplicatePorts == [ ];
-        message = "networking.cloudHost.admissions admits port ${duplicatePortList} more than once: the first admission's drop would end every later one";
-      }
     ];
 
     networking.nftables.tables.cloud_host = {
@@ -76,7 +75,7 @@ in
       content = ''
         chain input {
           type filter hook input priority filter - 10; policy accept;
-        ${lib.concatMapStrings renderAdmission admissions}}
+        ${lib.concatMapStrings renderPort ports}}
       '';
     };
   };

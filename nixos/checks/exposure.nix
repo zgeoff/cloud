@@ -317,6 +317,128 @@ let
         '';
     }
     {
+      title = "it passes a port that two admissions narrow when the registry marks each path";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.firewall.trustedInterfaces = [
+              "cni0"
+              "tailscale0"
+            ];
+            networking.cloudHost.admissions = [
+              {
+                port = 8415;
+                interface = "cni0";
+                sourceCIDR = "10.42.0.0/16";
+                destinationAddress = "100.64.0.1";
+              }
+              {
+                port = 8415;
+                interface = "tailscale0";
+                sourceCIDR = "100.64.0.2/32";
+                destinationAddress = "100.64.0.1";
+              }
+            ];
+          };
+          icmp = {
+            name = "icmp";
+            kind = "host-port";
+            protocol = "icmp";
+            scope = "public";
+          };
+          podPath = {
+            name = "atc-daemon";
+            kind = "host-port";
+            protocol = "tcp";
+            port = 8415;
+            scope = "host";
+            interface = "cni0";
+            admission = true;
+          };
+          pcPath = {
+            name = "atc-daemon-home-pc";
+            kind = "host-port";
+            protocol = "tcp";
+            port = 8415;
+            scope = "host";
+            interface = "tailscale0";
+            admission = true;
+          };
+        in
+        ''
+          assert_equals '[]' ${
+            renderMismatches system.config [
+              icmp
+              podPath
+              pcPath
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports the second admission of a port when the registry marks only the first path";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.firewall.trustedInterfaces = [
+              "cni0"
+              "tailscale0"
+            ];
+            networking.cloudHost.admissions = [
+              {
+                port = 8415;
+                interface = "cni0";
+                sourceCIDR = "10.42.0.0/16";
+                destinationAddress = "100.64.0.1";
+              }
+              {
+                port = 8415;
+                interface = "tailscale0";
+                sourceCIDR = "100.64.0.2/32";
+                destinationAddress = "100.64.0.1";
+              }
+            ];
+          };
+          icmp = {
+            name = "icmp";
+            kind = "host-port";
+            protocol = "icmp";
+            scope = "public";
+          };
+          podPath = {
+            name = "atc-daemon";
+            kind = "host-port";
+            protocol = "tcp";
+            port = 8415;
+            scope = "host";
+            interface = "cni0";
+            admission = true;
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "inet cloud_host admits tcp 8415 on tailscale0 with no host-scope registry entry that marks the admission"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              icmp
+              podPath
+            ]
+          } "mismatches"
+        '';
+    }
+    {
       title = "it reports a port on an interface and an admission without their entries";
       script =
         let
@@ -587,7 +709,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's docker-daemon entry is host scope on docker0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admission for tcp 8415 is on cni0"
+                "the registry's docker-daemon entry is host scope on docker0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
               ]
             )
           } ${

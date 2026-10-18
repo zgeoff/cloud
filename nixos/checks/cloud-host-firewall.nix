@@ -97,7 +97,7 @@ let
         '';
     }
     {
-      title = "it fails an assertion when two admissions name one port";
+      title = "it renders every accept of a port, sorted by interface, before the one drop of that port";
       script =
         let
           system = buildModuleSystem ../modules/cloud-host-firewall.nix {
@@ -108,27 +108,32 @@ let
             networking.cloudHost.admissions = [
               {
                 port = 8415;
-                interface = "cni0";
-                sourceCIDR = "10.42.0.0/16";
+                interface = "tailscale0";
+                sourceCIDR = "100.64.0.2/32";
                 destinationAddress = "100.64.0.1";
               }
               {
                 port = 8415;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "cni0";
+                sourceCIDR = "10.42.0.0/16";
+                destinationAddress = "100.64.0.1";
               }
             ];
           };
+          table = system.config.networking.nftables.tables.cloud_host;
         in
         ''
-          assert_equals ${
-            lib.escapeShellArg (
-              builtins.toJSON [
-                "networking.cloudHost.admissions admits port 8415 more than once: the first admission's drop would end every later one"
-              ]
-            )
-          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+          printf '%s' ${lib.escapeShellArg table.content} > actual
+
+          assert_files_equal - actual <<'EOF'
+          chain input {
+            type filter hook input priority filter - 10; policy accept;
+            tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.64.0.1 accept
+            tcp dport 8415 iifname "tailscale0" ip saddr 100.64.0.2/32 ip daddr 100.64.0.1 accept
+            tcp dport 8415 drop
+          }
+          EOF
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {

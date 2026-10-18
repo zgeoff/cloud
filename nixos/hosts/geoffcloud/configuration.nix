@@ -18,6 +18,7 @@ let
       builtins.filter (entry: entry.scope == "public" && entry.protocol == protocol) hostPorts
     );
   atcDaemonExposure = getHostPort "atc-daemon";
+  atcDaemonHomePCExposure = getHostPort "atc-daemon-home-pc";
   previewLinkExposure = getHostPort "preview-link";
   previewWebhookExposure = getHostPort "preview-webhook";
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
@@ -126,18 +127,26 @@ in
     '';
   };
 
-  # atc's daemon port, k3s pods only, in inet cloud_host (modules/cloud-host-firewall.nix).
-  # tailscale0 is trusted above, so nixos-fw alone would accept the port from every tailnet
-  # device the policy lets reach geoffcloud (today every member, through autogroup:member -> *).
-  # The admission narrows it to the gateway's path: the pod dials the host's tailnet address, so
-  # the packet enters on cni0 from a pod address, and local delivery skips flannel's masquerade
-  # in postrouting. Every other source, the tailnet and the host's own loopback included, is
-  # dropped; nixos-fw, which trusts cni0, accepts what the admission passes on. Any pod on the
-  # host can still reach the port; the daemon's bearer token gates the rest.
+  # atc's daemon port, k3s pods and home-pc only, in inet cloud_host
+  # (modules/cloud-host-firewall.nix). tailscale0 is trusted above, so nixos-fw alone would accept
+  # the port from every tailnet device the policy lets reach geoffcloud (today every member,
+  # through autogroup:member -> *). The first admission narrows it to the gateway's path: the pod
+  # dials the host's tailnet address, so the packet enters on cni0 from a pod address, and local
+  # delivery skips flannel's masquerade in postrouting. The second admits home-pc's tailnet
+  # address on tailscale0. Every other source, the rest of the tailnet and the host's own
+  # loopback included, is dropped; nixos-fw, which trusts cni0 and tailscale0, accepts what the
+  # admissions pass on. Any pod on the host can still reach the port; the daemon's bearer token
+  # gates the rest.
   networking.cloudHost.admissions = [
     {
       inherit (atcDaemonExposure) port interface;
       sourceCIDR = k3sPodCIDR;
+      destinationAddress = atcDaemonAddress;
+    }
+    # home-pc's atc client, over the tailnet
+    {
+      inherit (atcDaemonHomePCExposure) port interface;
+      sourceCIDR = "${topology.tailnet.nodes.homePC.address}/32";
       destinationAddress = atcDaemonAddress;
     }
     # the preview service's webhook listener, on the same path for cloudflared's pod
