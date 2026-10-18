@@ -1,7 +1,7 @@
 # Encrypt tank/imp
 
 **Done:** this move ran on geoffcloud on 2026-10-17 (GEO-641, built in #322), and this runbook
-records the steps that ran. It had no script of its own: #PRNUM removed its rehearsal from the NixOS
+records the steps that ran. It had no script of its own: #405 removed its rehearsal from the NixOS
 checks and renamed the check `tank-imp-encrypt` to `imp-dataset-key`, which keeps the boot unlock.
 Git history holds the rehearsal.
 
@@ -276,7 +276,7 @@ reason, and imp-host stays stopped: restore the key file as
 
 ## Rehearse it
 
-The rehearsal ran as the NixOS check `tank-imp-encrypt` until #PRNUM.
+The rehearsal ran as the NixOS check `tank-imp-encrypt` until #405.
 
 The check's header comment lists the scenario: impd's dataset tree, both sends, the cutover, a
 rollback, impd's own flows on the encrypted copy, and reboots with and without the key.

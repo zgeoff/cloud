@@ -1,8 +1,8 @@
 # Move k3s's data onto tank/cloud
 
 **Done:** this move ran on geoffcloud on 2026-10-18 (GEO-636, built in #367), and this runbook
-records the steps that ran. #PRNUM removed its script, `scripts/host/move-rancher.sh`, and the
-move's steps from the `tank-cloud-rancher` check. Git history holds both.
+records the steps that ran. #405 removed its script, `scripts/host/move-rancher.sh`, and the move's
+steps from the `tank-cloud-rancher` check. Git history holds both.
 
 k3s keeps its datastore, with every Kubernetes Secret, the agent and kubelet keys and every cluster
 volume, in `/var/lib/rancher`, and the admin kubeconfig and the node password in `/etc/rancher`. On
@@ -248,7 +248,7 @@ over the old ones with `cp -a` between the two steps below.
 
 ## Rehearse it
 
-The rehearsal ran as the NixOS check `tank-cloud-rancher` until #PRNUM, which kept only the check's
+The rehearsal ran as the NixOS check `tank-cloud-rancher` until #405, which kept only the check's
 steps on the layout after the move: k3s's guard and the reboot.
 
 The check starts a real k3s server with geoffcloud's package and flags on the root disk, with a pod

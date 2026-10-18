@@ -1,7 +1,7 @@
 # Move the host secrets onto tank/cloud
 
 **Done:** this move ran on geoffcloud on 2026-10-17 (GEO-634, built in #329), and this runbook
-records the steps that ran. #PRNUM removed its script, `scripts/host/move-host-secrets.sh`, and the
+records the steps that ran. #405 removed its script, `scripts/host/move-host-secrets.sh`, and the
 move's steps from the `tank-cloud-host-secrets` check. Git history holds both.
 
 geoffcloud keeps imp-host's secret files in `/var/lib/imp-host/secrets`, the atc daemon's tokens in
@@ -207,7 +207,7 @@ directory on tank/cloud back with `cp -a <directory>/. <old path>/` before you r
 
 ## Rehearse it
 
-The rehearsal ran as the NixOS check `tank-cloud-host-secrets` until #PRNUM, which kept only the
+The rehearsal ran as the NixOS check `tank-cloud-host-secrets` until #405, which kept only the
 check's steps on the layout after the move.
 
 The check makes the datasets with the commands of [tank/cloud](./tank-cloud.md), seeds fake secrets
