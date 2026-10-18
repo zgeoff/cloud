@@ -9,7 +9,7 @@
     "zgeoff/function-verb": ["error", { "verbs": ["decide", "install", "open", "switch"] }],
 
     // the import boundaries: no relative import into another workspace package, and the direction
-    // between infra's groups; e2e/import-zones.test.ts checks that each one fails a real import
+    // between infra's groups
     "zgeoff/import-zones": [
       "error",
       {

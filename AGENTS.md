@@ -54,8 +54,6 @@ docs/
   package, and the direction between infra's groups.
 - Never add an `oxlint-disable-next-line zgeoff/import-zones` comment to make an import pass. Change
   the import, or change the zones in a PR that reviews the boundary.
-- [`e2e/import-zones.test.ts`](e2e/import-zones.test.ts) checks that each boundary still fails a
-  forbidden import.
 
 ## Commands
 
