@@ -6,13 +6,13 @@
 #   ssh root@geoffcloud bash -s -- copy < scripts/host/move-rancher.sh
 #
 # Both modes run after the switch to the config that mounts the zvol at /var/lib/rancher and binds
-# its directory etc-rancher at /etc/rancher. k3s's unit asserts that /var/lib/rancher/k3s exists, so
-# k3s stays stopped on the empty zvol instead of making a new cluster, and the copy puts that
-# directory in place last. Any k3s command, kubectl among them, unpacks k3s's binaries into
-# /var/lib/rancher/k3s/data, so nothing may run one between the switch and the end of the copy. The
-# old trees on the root disk lie under the zvol's mounts, so the script reads them through a
-# non-recursive, private bind of /: a shared one would take a copy of each mount made under / while
-# it exists, such as a pod's volume, and could not be unmounted.
+# its directory etc-rancher at /etc/rancher. k3s's unit asserts that the cluster CA and the datastore
+# exist under /var/lib/rancher/k3s/server, so k3s stays stopped on the empty zvol instead of making a
+# new cluster, and the copy puts the k3s directory in place last. Any k3s command, kubectl among
+# them, unpacks k3s's binaries into /var/lib/rancher/k3s/data, so nothing may run one between the
+# switch and the end of the copy. The old trees on the root disk lie under the zvol's mounts, so the
+# script reads them through a non-recursive, private bind of /: a shared one would take a copy of
+# each mount made under / while it exists, such as a pod's volume, and could not be unmounted.
 #
 #   copy        stop k3s and kill its containers, which outlive it (KillMode=process); copy the old
 #               /var/lib/rancher into a staging directory on the zvol and the old /etc/rancher into
@@ -270,7 +270,7 @@ copy() {
   compare_tree "$etc" "$old_etc" "$etc" || die "refusing to start k3s: the copy of $etc differs"
 
   sync -f "$data"
-  # k3s's data directory last: its presence lets k3s start. A k3s command run during the copy makes
+  # k3s's data directory last: the cluster CA and the datastore in it let k3s start. A k3s command run during the copy makes
   # the directory again; mv -T never moves the copy into it, and fails when it is not empty.
   [ ! -e "$data/k3s" ] || die "refusing to start k3s: something made $data/k3s during the copy, such as a k3s command; stop it and run the copy again"
   find "$staging" -mindepth 1 -maxdepth 1 ! -name k3s -exec mv -t "$data" {} +

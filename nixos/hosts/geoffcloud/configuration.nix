@@ -403,11 +403,19 @@ in
     ];
   };
 
-  # k3s on a zvol without its data directory would make a new cluster with a new CA, so the
-  # start fails instead; scripts/host/move-rancher.sh copy puts the directory there last
-  # (docs/runbooks/move-rancher.md). The bind of /etc/rancher is no guard: systemd makes a bind's
-  # missing source directory.
-  systemd.services.k3s.unitConfig.AssertPathExists = "/var/lib/rancher/k3s";
+  # k3s on a zvol without its cluster's server data would make a new cluster, so the start fails
+  # instead; scripts/host/move-rancher.sh copy puts the k3s directory there last
+  # (docs/runbooks/move-rancher.md). The guard names the two files that k3s makes again when they
+  # are missing: the cluster CA, without which it makes a new CA, and the sqlite datastore, without
+  # which it makes an empty cluster. /var/lib/rancher/k3s is no guard, nor is its server directory:
+  # any k3s command, kubectl among them, unpacks k3s's binaries into /var/lib/rancher/k3s/data, and
+  # a directory does not show that the files in it exist. A move to another datastore, such as
+  # embedded etcd, changes the second path. The bind of /etc/rancher is no guard either: systemd
+  # makes a bind's missing source directory.
+  systemd.services.k3s.unitConfig.AssertPathExists = [
+    "/var/lib/rancher/k3s/server/tls/server-ca.crt"
+    "/var/lib/rancher/k3s/server/db/state.db"
+  ];
 
   environment.etc."k3s-resolv.conf".text = ''
     nameserver 1.1.1.1
