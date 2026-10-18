@@ -48,10 +48,12 @@ reaches the host only on the one port opened there, the Connect relay's.
 Trusting the tailnet interface has a cost: the atc daemon listens on the host's tailnet address, so
 NixOS's table alone would admit the daemon's port from every tailnet device the policy lets reach
 the host, and every member's device can reach it. This repo's table runs before NixOS's and admits
-the daemon's port only from a pod address arriving on the pod interface, which is the path the
-gateway's traffic takes to the host's own address. It drops the port from every other source, the
-tailnet and the host's loopback included. A drop in any input chain is final, and an accept here
-only passes the packet on to NixOS's table, which trusts the pod interface.
+the daemon's port on two paths. The first is a pod address arriving on the pod interface, which is
+the path the gateway's traffic takes to the host's own address. The second is the owner's PC's
+tailnet address on the tailnet interface, so the PC's atc client reaches the cloud daemon directly.
+The table drops the port from every other source, the rest of the tailnet and the host's loopback
+included. A drop in any input chain is final, and an accept here only passes the packet on to
+NixOS's table, which trusts both interfaces.
 
 The same table admits the Connect relay's port only from Docker's subnet on Docker's bridge, so only
 a container on the host reaches the relay
