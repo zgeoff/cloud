@@ -29,13 +29,24 @@ whose k3s is at least the datastore's version.
 
 - **From a snapshot:** `bun run onidel:snapshot` takes one before a risky change. Restore it from
   the Onidel panel.
-- **From nothing:** follow [the reinstall runbook](./reinstall-geoffcloud.md). Its step 3 stages the
-  key from the 1Password item `zfs-tank-key` and both tailnet keys in `--extra-files`. NixOS imports
-  the pool and unlocks it with that key, so the imps, impd's database, the cluster and the host's
-  secret files survive. When no system runs on `vda`, nothing runs `nixos-anywhere`'s kexec, and an
-  apply fails while k3s is down. So boot the installer and mint the host's key in the console,
-  through steps 1 to 7 of [Lose both disks](#lose-both-disks). imp's node keeps its state on the
-  pool, so it needs no new key.
+- **From nothing:** reinstall onto the empty disk. The pool survives with its live files, so the
+  host needs only its own new tailnet key and the ZFS key:
+
+  1. Run steps 1 to 4 of [Lose both disks](#lose-both-disks): Secure Boot off, the installer, its
+     SSH server, and the `edge` group detached.
+  2. Remove only the node `geoffcloud` in the Tailscale admin console, and generate one auth key for
+     it: `tag:cloud`, not reusable, not ephemeral, pre-approved. Keep `imp-geoffcloud`: its identity
+     is on `tank/imp`, so imp's node rejoins with it and needs no key.
+  3. Run reinstall step 3 with that key in `$x/var/lib/tailscale/authkey`, and skip its
+     `bun run up`. Stage the ZFS key as the step does, and stage none of the imp files: the bind
+     from the pool's `host-secrets` dataset mounts imp-host's live files over
+     `/var/lib/imp-host/secrets`, so a staged copy would sit hidden on `vda`.
+  4. Run reinstall steps 5 to 7, with the VM's public address as the install target. Skip step 2,
+     which needs the old host, step 4, because no running host holds the pool, and step 8, because
+     nothing of imp's was staged.
+  5. Attach the `edge` group again with an apply by hand that refreshes first, as
+     [Apply by hand](./workflows.md#apply-by-hand) describes. The cluster runs again, so the apply
+     reaches it.
 
 ## Lose `vdb`
 
@@ -114,9 +125,18 @@ checkout of `main`.
    - The sign-in secrets that the atc daemon's profiles name
      ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), from their
      sources.
-9. Mint `atc-cloud` and install the atc daemon's files with
-   `bun scripts/install-atc-gateway-credentials.ts`, then start the daemon with
+9. Put the atc daemon's bearer back on the host first. The 1Password item `atc-daemon-token`
+   survives, but its host copy was on the pool, and the credential installer stops when only one
+   copy exists. `op read` ends the value with a newline, as the installer writes the file:
+
+   ```bash
+   op read op://cloud/atc-daemon-token/credential | ssh root@geoffcloud 'mountpoint -q /var/lib/atc-daemon-secrets && (umask 077 && cat > /var/lib/atc-daemon-secrets/gateway-token) && chmod 0400 /var/lib/atc-daemon-secrets/gateway-token && echo ok'
+   ```
+
+   Expect `ok`. Then mint `atc-cloud` with `bun scripts/install-atc-gateway-credentials.ts`, which
+   finds the two bearer copies equal and skips them. Start the daemon with
    `ssh root@geoffcloud systemctl start atc-daemon`.
+
 10. Mint nixie's token into its sops file, through
     [Mint nixie's impd token](./nixie.md#mint-nixies-impd-token), and land the file through a PR.
 11. Start a new cluster on the empty zvol. k3s refuses to start until the zvol holds a cluster's
