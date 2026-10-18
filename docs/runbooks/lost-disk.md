@@ -32,7 +32,10 @@ whose k3s is at least the datastore's version.
 - **From nothing:** follow [the reinstall runbook](./reinstall-geoffcloud.md). Its step 3 stages the
   key from the 1Password item `zfs-tank-key` and both tailnet keys in `--extra-files`. NixOS imports
   the pool and unlocks it with that key, so the imps, impd's database, the cluster and the host's
-  secret files survive.
+  secret files survive. When no system runs on `vda`, nothing runs `nixos-anywhere`'s kexec, and an
+  apply fails while k3s is down. So boot the installer and mint the host's key in the console,
+  through steps 1 to 7 of [Lose both disks](#lose-both-disks). imp's node keeps its state on the
+  pool, so it needs no new key.
 
 ## Lose `vdb`
 
@@ -75,15 +78,16 @@ checkout of `main`.
    ```
 
 5. Remove the node `imp-geoffcloud` in the Tailscale admin console, because its state was on the
-   pool. Mint a fresh `impHostAuthKey` with the `--replace` of `imp-geoffcloud` from step 3 of
-   [the reinstall runbook](./reinstall-geoffcloud.md#steps).
-6. Install imp-host's secret files from 1Password and Pulumi, each on SSH's stdin, then install the
-   DNS token:
+   pool. Then generate an auth key for imp's node on the console's Keys page: tag `tag:imp`, not
+   reusable, not ephemeral, pre-approved. Do not mint it with `bun run up`: Pulumi's Kubernetes
+   provider still points at the lost cluster, so an apply fails on the unreachable resources until
+   step 11 rebuilds the cluster.
+6. Install imp-host's secret files from the console and 1Password, each on SSH's stdin, then install
+   the DNS token:
 
    ```bash
    put() { ssh root@geoffcloud "mountpoint -q /var/lib/imp-host/secrets && cd /var/lib/imp-host/secrets && (umask 077 && cat > $1) && chmod 400 $1 && echo ok"; }
-   (cd infra && op run --env-file=../.env -- pulumi stack output --stack prod --show-secrets impHostAuthKey) \
-     | put tailscale-authkey
+   put tailscale-authkey # paste the key from step 5, then press Ctrl-D
    op read op://cloud/imp-restic/password | put backup-password
    printf '%s\n' \
      "IMP_BACKUP_REPOSITORY=s3:$(op read op://cloud/r2-backups/endpoint)/geoff-cloud-backups/imp/geoffcloud" \
@@ -94,7 +98,8 @@ checkout of `main`.
    bash scripts/install-imp-dns-token.sh
    ```
 
-   Expect `ok` three times, then the script's `installed:` line.
+   Expect `ok` three times, then the script's `installed:` line. The pasted key reaches the host on
+   stdin, so it stays out of the shell history and every command line.
 
 7. Start a new impd with `ssh root@geoffcloud systemctl start imp-host`, and restore every imp with
    `impz backup restore --all`, as
@@ -140,11 +145,36 @@ needs the backups' passwords and R2 keys and the Pulumi passphrase, in the 1Pass
 It does not need the old key in `zfs-tank-key`, because no data under that key remains. The
 reinstall stages whatever key the item holds, and the new roots use it.
 
-1. Follow [the reinstall runbook](./reinstall-geoffcloud.md) through step 7, and skip step 4,
-   because no old host and no pool remain. The host boots and joins the tailnet, with k3s, imp-host
-   and the atc daemon stopped.
-2. Run steps 1 to 4 of [Lose `vdb`](#lose-vdb).
-3. Delete the staged imp files from `vda` with the first block of reinstall step 8. The bind of the
+The reinstall runbook starts from a running host, which no longer exists, and its `bun run up` mint
+fails while Pulumi points at the lost cluster. So the recovery boots an installer first, mints both
+tailnet keys in the Tailscale admin console, and runs only the reinstall steps that need no old
+host.
+
+1. Turn Secure Boot off for the VM in the Onidel panel, as reinstall step 1 does.
+2. Boot the VM from a NixOS minimal installer ISO, through `POST /isos` and the panel, as
+   [If kexec still fails](./reinstall-geoffcloud.md#if-kexec-still-fails) describes.
+3. In the noVNC console, where the installer logs in as `nixos`, give root your SSH key and start
+   the installer's SSH server, which it leaves stopped:
+
+   ```bash
+   curl -fsSL https://github.com/<github_user>.keys | sudo install -D -m 600 /dev/stdin /root/.ssh/authorized_keys
+   sudo systemctl start sshd
+   ```
+
+4. Detach the `edge` firewall group from the VM in the Onidel panel, because it drops public SSH.
+   The installed host keeps its public port 22 shut by itself, and the `up --refresh` of
+   [Rebuild the cluster](./restore-geoff-cloud.md#5-rebuild-the-cluster) attaches the group again.
+5. Remove the nodes `geoffcloud` and `imp-geoffcloud` in the Tailscale admin console. Generate two
+   auth keys on its Keys page, each not reusable, not ephemeral and pre-approved: one with
+   `tag:cloud` for the host, and one with `tag:imp` for imp's node.
+6. Run reinstall step 3 with those two keys in place of the two `pulumi stack output` reads, and
+   skip its `bun run up`. Write each key into its staged file from the clipboard, for example
+   `(umask 077 && cat > $x/var/lib/tailscale/authkey)`, then paste and press Ctrl-D.
+7. Run reinstall steps 5 to 7, with the VM's public address as the install target. Skip reinstall
+   step 2, which needs the old host, and step 4, because no pool remains. The host boots and joins
+   the tailnet, with k3s, imp-host and the atc daemon stopped.
+8. Run steps 1 to 4 of [Lose `vdb`](#lose-vdb).
+9. Delete the staged imp files from `vda` with the first block of reinstall step 8. The bind of the
    new, empty dataset shadows them, so the block takes its first branch, which deletes them through
    a bind of `/` and leaves the pool alone.
-4. Continue from step 5 of [Lose `vdb`](#lose-vdb).
+10. Continue from step 6 of [Lose `vdb`](#lose-vdb), and paste the `tag:imp` key from step 5 here.
