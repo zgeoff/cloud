@@ -2,6 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import invariant from 'tiny-invariant';
 
 // Lints a temp tree with the zgeoff/import-zones options from the repo's own .oxlintrc.json, so
 // each boundary the config declares fails a real import.
@@ -15,10 +16,17 @@ async function setupTest() {
   const dir = await realpath(created);
   const configText = await Bun.file(join(root, '.oxlintrc.json')).text();
 
-  // a config without the rule's options lints nothing, so every failing case catches it
-  const repoConfig = Bun.JSONC.parse(configText) as {
-    readonly rules: Readonly<Record<string, unknown>>;
-  };
+  const repoConfig: unknown = Bun.JSONC.parse(configText);
+
+  invariant(
+    typeof repoConfig === 'object' &&
+      repoConfig !== null &&
+      'rules' in repoConfig &&
+      typeof repoConfig.rules === 'object' &&
+      repoConfig.rules !== null &&
+      'zgeoff/import-zones' in repoConfig.rules,
+    '.oxlintrc.json configures zgeoff/import-zones',
+  );
 
   const lintConfig = {
     jsPlugins: [join(root, 'node_modules', '@zgeoff', 'oxlint-config', 'plugin.js')],
