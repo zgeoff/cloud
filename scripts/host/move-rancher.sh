@@ -8,8 +8,11 @@
 # Both modes run after the switch to the config that mounts the zvol at /var/lib/rancher and binds
 # its directory etc-rancher at /etc/rancher. k3s's unit asserts that /var/lib/rancher/k3s exists, so
 # k3s stays stopped on the empty zvol instead of making a new cluster, and the copy puts that
-# directory in place last. The old trees on the root disk lie under the zvol's mounts, so the script
-# reads them through a non-recursive bind of /.
+# directory in place last. Any k3s command, kubectl among them, unpacks k3s's binaries into
+# /var/lib/rancher/k3s/data, so nothing may run one between the switch and the end of the copy. The
+# old trees on the root disk lie under the zvol's mounts, so the script reads them through a
+# non-recursive, private bind of /: a shared one would take a copy of each mount made under / while
+# it exists, such as a pod's volume, and could not be unmounted.
 #
 #   copy        stop k3s and kill its containers, which outlive it (KillMode=process); copy the old
 #               /var/lib/rancher into a staging directory on the zvol and the old /etc/rancher into
@@ -18,7 +21,8 @@
 #               owner, size, link count, time, link target, hard-link group and xattrs; then move
 #               the staged entries into /var/lib/rancher, k3s last, and start k3s. A copy that
 #               stopped part-way left no k3s directory, so the next run clears what it left and
-#               copies again.
+#               copies again. A k3s directory that holds only the binaries a k3s command unpacked
+#               counts as a leftover too.
 #   stop        before a rollback: stop k3s and kill its containers as copy does, and unmount their
 #               leftover mounts, so nothing holds the zvol's mounts and the old generation can
 #               unmount them and start k3s on the root disk
@@ -45,11 +49,21 @@ shim_pattern='^(/nix/store/[^/]*k3s-containerd[^/]*/bin/containerd|/var/lib/ranc
 bind_dir=""
 work_dir="$(mktemp -d)"
 
-clean_up() {
+# unmounts the bind of /; leaves it, and says so, when the unmount fails
+release_bind() {
   if [ -n "$bind_dir" ]; then
-    umount "$bind_dir" || true
-    rmdir "$bind_dir" || true
+    if umount "$bind_dir" && rmdir "$bind_dir"; then
+      bind_dir=""
+    else
+      echo "move-rancher: $bind_dir is still mounted; docs/runbooks/move-rancher.md says how to remove it" >&2
+      bind_dir=""
+      return 1
+    fi
   fi
+}
+
+clean_up() {
+  release_bind || true
   rm -rf "$work_dir"
 }
 trap clean_up EXIT
@@ -59,12 +73,20 @@ die() {
   exit 1
 }
 
-# the root disk's view of / without the mounts above it
+# the root disk's view of / without the mounts above it, private, so no mount made under / later
+# appears in it
 ensure_bind() {
   if [ -z "$bind_dir" ]; then
     bind_dir="$(mktemp -d /run/move-rancher.XXXXXX)"
     mount --bind / "$bind_dir"
+    mount --make-private "$bind_dir"
   fi
+}
+
+# succeeds when /var/lib/rancher/k3s holds nothing but the data directory that a k3s command
+# unpacks its binaries into, so k3s's server never ran on it
+is_unpacked_only() {
+  [ -d "$data/k3s" ] && [ -z "$(find "$data/k3s" -mindepth 1 -maxdepth 1 ! -name data)" ]
 }
 
 zvol_device() {
@@ -202,7 +224,9 @@ copy_root_attributes() {
 copy() {
   local reserved size old_data old_etc leftovers needed available entry
   require_mounts
-  [ ! -e "$data/k3s" ] || die "refusing to copy: $data/k3s exists on the zvol, so the copy is done and k3s may have run on it"
+  if [ -e "$data/k3s" ] && ! is_unpacked_only; then
+    die "refusing to copy: $data/k3s exists on the zvol, so the copy is done and k3s may have run on it"
+  fi
   read -r size reserved < <(zfs get -Hp -o value volsize,refreservation "$zvol" | paste -s -d ' ')
   [ "$reserved" -ge "$size" ] || die "refusing to copy: $zvol is sparse (refreservation $reserved < volsize $size); a full pool would fail ext4's writes"
 
@@ -219,7 +243,8 @@ copy() {
     fi
   done
 
-  # what an earlier copy left: it never moved k3s into place, so k3s never ran on it
+  # what an earlier copy left: it never moved k3s into place, so k3s never ran on it. A k3s directory
+  # here holds only what a k3s command unpacked, which the check above made sure of.
   leftovers="$(find "$data" -mindepth 1 -maxdepth 1 ! -name lost+found ! -name etc-rancher | wc -l)"
   leftovers=$((leftovers + $(find "$etc" -mindepth 1 -maxdepth 1 | wc -l)))
   if [ "$leftovers" -gt 0 ]; then
@@ -245,12 +270,16 @@ copy() {
   compare_tree "$etc" "$old_etc" "$etc" || die "refusing to start k3s: the copy of $etc differs"
 
   sync -f "$data"
-  # k3s's data directory last: its presence lets k3s start
+  # k3s's data directory last: its presence lets k3s start. A k3s command run during the copy makes
+  # the directory again; mv -T never moves the copy into it, and fails when it is not empty.
+  [ ! -e "$data/k3s" ] || die "refusing to start k3s: something made $data/k3s during the copy, such as a k3s command; stop it and run the copy again"
   find "$staging" -mindepth 1 -maxdepth 1 ! -name k3s -exec mv -t "$data" {} +
-  mv "$staging/k3s" "$data/k3s"
+  mv -T "$staging/k3s" "$data/k3s" || die "refusing to start k3s: something made $data/k3s during the copy, such as a k3s command; stop it and run the copy again"
   rmdir "$staging"
   copy_root_attributes "$old_data" "$data" || die "refusing to start k3s: $data does not have the old root's mode, owner and xattrs"
   sync -f "$data"
+  # before k3s starts: its pods' mounts would otherwise be made while the bind exists
+  release_bind || die "refusing to start k3s: the bind of / is still mounted"
   systemctl reset-failed k3s.service || true
   systemctl start k3s.service
   echo "started k3s on $zvol"

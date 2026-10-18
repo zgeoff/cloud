@@ -6,11 +6,14 @@
 # datasets made by the commands of docs/runbooks/tank-cloud.md and a throwaway key, the journey
 # starts a real k3s server on the root disk under `before`, with a pod that writes into a volume
 # directory, a Secret, and files with a hard link, an xattr and another owner in that directory.
-# It then switches to the base config with switch-to-configuration test as the owner's switch does,
-# and checks that k3s stays stopped on the empty zvol. It runs scripts/host/move-rancher.sh copy and
-# checks the same cluster CA, node password, Secret and volume on the zvol, runs remove-old, and
-# reboots with the pool's disk late, past systemd's default 90 s wait for a device, which the VM
-# keeps as geoffcloud does, so k3s starts on the zvol only after the import.
+# It recreates the zvol under `before` as docs/runbooks/move-rancher.md does, then switches to the
+# base config with switch-to-configuration test as the owner's switch does, and checks that k3s
+# stays stopped on the empty zvol. It runs scripts/host/move-rancher.sh copy while k3s commands run,
+# which the copy refuses, and again without them, and checks the same cluster CA, node password,
+# Secret and volume on the zvol. It clears a shared bind of / left with pod mounts in it, as the
+# runbook does, runs remove-old, and reboots with the pool's disk late, past systemd's default 90 s
+# wait for a device, which the VM keeps as geoffcloud does, so k3s starts on the zvol only after
+# the import.
 # The pod's image is a local one, as nixpkgs' own k3s test builds it, so the VM pulls nothing. It
 # needs KVM: run `bun run test:nixos tank-cloud-rancher`.
 { nixpkgs, geoffcloud }:
@@ -234,6 +237,11 @@ pkgs.testers.runNixOSTest {
         machine.wait_until_succeeds(f"test \"$(tail -n 1 {volume}/ticks)\" -gt {last}", timeout=60)
 
 
+    def binds_left():
+        """the script's binds of / that are still mounted"""
+        return machine.succeed("findmnt -rn -o TARGET | grep '^/run/move-rancher' || true").split()
+
+
     def root_disk(path):
         """the entries of a path on the root disk, seen without the mounts above it"""
         machine.succeed("mkdir -p /mnt/root-disk && mount --bind / /mnt/root-disk")
@@ -292,6 +300,26 @@ pkgs.testers.runNixOSTest {
         before_move = cluster()
 
 
+    with subtest("it recreates the zvol under main's config, and starts k3s again by hand"):
+        # the steps of docs/runbooks/move-rancher.md for a zvol that cannot be reserved in place
+        machine.succeed("systemctl stop /var/lib/tank-cloud/rancher")
+        # k3s requires the zvol's mount, so the mount's stop stops k3s
+        assert machine.succeed("systemctl is-active k3s.service || true").strip() == "inactive"
+        machine.succeed("zfs destroy tank/cloud/rancher")
+        machine.succeed("zfs create -V 3G tank/cloud/rancher")
+        machine.succeed("udevadm settle")
+        machine.succeed("mkfs.ext4 -q -L rancher /dev/zvol/tank/cloud/rancher")
+        machine.succeed("systemctl start /var/lib/tank-cloud/rancher")
+        assert source("/var/lib/tank-cloud/rancher") == f"{zvol()} ext4"
+        # the mount's start leaves k3s stopped
+        assert machine.succeed("systemctl is-active k3s.service || true").strip() == "inactive"
+        machine.succeed("systemctl start k3s.service")
+        wait_for_k3s()
+
+        assert cluster() == before_move
+        wait_for_writer()
+
+
     with subtest("it keeps k3s stopped on the empty zvol after the switch, before the copy"):
         status, output = machine.execute(f"{after} 2>&1")
         machine.log(output)
@@ -313,6 +341,13 @@ pkgs.testers.runNixOSTest {
         assert root_disk("/var/lib/rancher") == ["k3s"]
 
 
+    with subtest("it unpacks k3s's binaries onto the zvol for any k3s command, with no cluster"):
+        machine.succeed(f"{kubectl} version --client")
+
+        assert machine.succeed("ls -A /var/lib/rancher/k3s").split() == ["data"]
+        assert machine.succeed("systemctl is-active k3s.service || true").strip() == "inactive"
+
+
     with subtest("it refuses to remove the old copy while the zvol holds no cluster CA"):
         status, output = machine.execute(move.format("remove-old") + " 2>&1")
 
@@ -331,18 +366,47 @@ pkgs.testers.runNixOSTest {
         machine.succeed("pgrep -f containerd-shim")
 
 
-    with subtest("it copies k3s's data onto the zvol, stops the pod first, and starts k3s on the same cluster"):
+    with subtest("it refuses to start k3s when a k3s command makes its data directory during the copy, and keeps its bind of / private"):
+        # once the copy has cleared the unpacked binaries and staged its copy: k3s commands, as the
+        # switch's nixie readiness check runs them, and a mount made under / while the bind exists
+        machine.succeed(
+            "systemd-run --unit=k3s-commands --collect -E PATH sh -c '"
+            "until [ -d /var/lib/rancher/.move-rancher ]; do sleep 0.1; done;"
+            " mkdir -p /mnt/probe && mount -t tmpfs probe /mnt/probe;"
+            " while true; do k3s kubectl version --client > /dev/null 2>&1; sleep 0.5; done'"
+        )
+        status, output = machine.execute(move.format("copy") + " 2>&1")
+        machine.succeed("systemctl stop k3s-commands.service")
+        machine.log(output)
+        lines = output.splitlines()
+
+        assert status == 1, f"copy exited {status}"
+        assert lines[0].startswith("stopped k3s: killed ") and int(lines[0].split()[3]) > 0, output
+        assert lines[2].startswith("cleared "), output
+        assert lines[-1] == "move-rancher: refusing to start k3s: something made /var/lib/rancher/k3s during the copy, such as a k3s command; stop it and run the copy again", output
+        # mv never put the copy inside the unpacked binaries' directory
+        assert machine.succeed("ls -A /var/lib/rancher/k3s").split() == ["data"]
+        assert machine.succeed("systemctl is-active k3s.service || true").strip() == "inactive"
+        # a shared bind would hold a copy of the probe's mount and fail to unmount
+        assert binds_left() == [], binds_left()
+        machine.succeed("umount /mnt/probe")
+        machine.fail("pgrep -f containerd-shim")
+
+
+    with subtest("it copies k3s's data onto the zvol and starts k3s on the same cluster"):
         copied = machine.succeed(move.format("copy"))
         machine.log(copied)
         lines = copied.splitlines()
 
-        assert lines[0].startswith("stopped k3s: killed "), copied
-        assert int(lines[0].split()[3]) > 0, copied
+        assert lines[0] == "stopped k3s: killed 0 processes", copied
         assert lines[1].startswith("unmounted "), copied
-        assert lines[2].startswith("copied /var/lib/rancher and /etc/rancher: "), copied
-        assert lines[3].startswith("match /var/lib/rancher: "), copied
-        assert lines[4].startswith("match /etc/rancher: "), copied
-        assert lines[5:] == ["started k3s on tank/cloud/rancher"], copied
+        # the unpacked binaries and what the refused copy wrote
+        assert lines[2].startswith("cleared "), copied
+        assert lines[3].startswith("copied /var/lib/rancher and /etc/rancher: "), copied
+        assert lines[4].startswith("match /var/lib/rancher: "), copied
+        assert lines[5].startswith("match /etc/rancher: "), copied
+        assert lines[6:] == ["started k3s on tank/cloud/rancher"], copied
+        assert binds_left() == [], binds_left()
         assert source("/var/lib/rancher") == f"{zvol()} ext4"
         assert source("/etc/rancher") == f"{zvol()}[/etc-rancher] ext4"
         wait_for_k3s()
@@ -376,7 +440,29 @@ pkgs.testers.runNixOSTest {
         assert root_disk("/var/lib/rancher") == []
         assert root_disk("/etc/rancher") == []
         assert cluster() == before_move
+        assert binds_left() == [], binds_left()
         machine.succeed("systemctl is-active k3s.service")
+
+
+    with subtest("it clears a shared bind of / that holds pod mounts, and keeps the pod's own mounts"):
+        # a bind as an earlier copy left it: shared, so the pod's mounts made after it appear in it
+        machine.succeed("mkdir /run/move-rancher.left && mount --bind / /run/move-rancher.left")
+        machine.succeed(f"{kubectl} delete pod writer --wait")
+        machine.succeed(f"{kubectl} apply -f ${pod}")
+        wait_for_writer()
+        pod_mounts = machine.succeed("findmnt -rn -o TARGET | grep -c '^/var/lib/kubelet/pods/'").strip()
+        assert int(machine.succeed("findmnt -rn -o TARGET | grep -c '^/run/move-rancher.left/'").strip()) > 0
+        status, output = machine.execute("umount /run/move-rancher.left 2>&1")
+        assert status == 32 and "target is busy" in output, f"umount exited {status}: {output}"
+
+        # the runbook's steps
+        machine.succeed("mount --make-rprivate /run/move-rancher.left")
+        machine.succeed("umount -R /run/move-rancher.left")
+        machine.succeed("rmdir /run/move-rancher.left")
+
+        assert binds_left() == [], binds_left()
+        assert machine.succeed("findmnt -rn -o TARGET | grep -c '^/var/lib/kubelet/pods/'").strip() == pod_mounts
+        wait_for_writer()
 
 
     with subtest("it stops k3s and its containers for a rollback, so no pod keeps writing to the zvol"):
