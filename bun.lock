@@ -5,7 +5,7 @@
     "": {
       "name": "@zgeoff/cloud",
       "devDependencies": {
-        "@commitlint/cli": "21.2.0",
+        "@commitlint/cli": "21.2.3",
         "@faker-js/faker": "10.6.0",
         "@orpc/client": "1.15.5",
         "@stylistic/eslint-plugin": "5.10.0",
@@ -39,7 +39,7 @@
         "@pulumi/random": "4.21.2",
         "@pulumi/tailscale": "0.29.1",
         "@pulumi/tls": "5.6.1",
-        "@pulumiverse/acme": "0.18.0",
+        "@pulumiverse/acme": "0.18.1",
         "@zgeoff/cloud-health-check": "workspace:*",
         "@zgeoff/cloud-topology": "workspace:*",
         "@zgeoff/pulumi-onidel": "workspace:*",
@@ -106,7 +106,7 @@
 
     "@cloudflare/workers-types": ["@cloudflare/workers-types@5.20261010.1", "", {}, "sha512-Csvu2Wsd8JWnP8HNg/uAAEYzoGw+eKEvoftoHrbMWuFDoC0g6e5XSP8XO9vJsdjjVpPaURdFoL3g/xpZSdQr3Q=="],
 
-    "@commitlint/cli": ["@commitlint/cli@21.2.0", "", { "dependencies": { "@commitlint/config-conventional": "^21.2.0", "@commitlint/format": "^21.2.0", "@commitlint/lint": "^21.2.0", "@commitlint/load": "^21.2.0", "@commitlint/read": "^21.2.0", "@commitlint/types": "^21.2.0", "tinyexec": "^1.0.0", "yargs": "^18.0.0" }, "bin": { "commitlint": "cli.js" } }, "sha512-4GLVIhUaT3c3GBlQ0GB80/5H3xXdn/Tgw4lrsuoOQVDu2wl4Xw0GuzSar8xZKSMv4H3xaKaQXmvH91GmdyYBZA=="],
+    "@commitlint/cli": ["@commitlint/cli@21.2.3", "", { "dependencies": { "@commitlint/config-conventional": "^21.2.3", "@commitlint/format": "^21.2.3", "@commitlint/lint": "^21.2.3", "@commitlint/load": "^21.2.3", "@commitlint/read": "^21.2.3", "@commitlint/types": "^21.2.3", "tinyexec": "^1.0.0", "yargs": "^18.0.0" }, "bin": { "commitlint": "cli.js" } }, "sha512-5yOX6IRjcrIReCxpyAd04hgI/yhUMpVBJ/ouwFV0wk9yx5+fYRDWZWJ5h55Tbedgfol+5m2mU5nqzbB8g3v0vQ=="],
 
     "@commitlint/config-conventional": ["@commitlint/config-conventional@21.2.3", "", { "dependencies": { "@commitlint/types": "^21.2.3", "conventional-changelog-conventionalcommits": "^10.0.0" } }, "sha512-EP2n5DN2GwRWNVrLX0Jx3mpQlW5PfFi9HnD9OJ8hN/H0xFqpCFyHeGDhg+0P8/21iMMcdkcQgbNqmVklebqYsQ=="],
 
@@ -504,7 +504,7 @@
 
     "@pulumi/tls": ["@pulumi/tls@5.6.1", "", { "dependencies": { "@pulumi/pulumi": "^3.142.0" } }, "sha512-Uijxsh1TfNpr52a307WA3kUTYLOu/jU/nApuz5ovYRZseZkLTLrrF/PiYpIwudum0AXt04XiBHPCHqleM7YX2Q=="],
 
-    "@pulumiverse/acme": ["@pulumiverse/acme@0.18.0", "", { "dependencies": { "@pulumi/pulumi": "^3.0.0" } }, "sha512-3IivJYE7dILVEy+3Urjrc0MC4vuxhlUEcWoEZAhRYRA8SliYRkoDTZfC/dWdmo47DsUyo3TqIEzK2v66tlz5bQ=="],
+    "@pulumiverse/acme": ["@pulumiverse/acme@0.18.1", "", { "dependencies": { "@pulumi/pulumi": "^3.0.0" } }, "sha512-53gRCiqAgX4IyCb5IZe9p5319D8TK0EkYWMJXYEgn4blriZbbwy/+4EJ19d8hSVY5KRqNBolFSCoKy2RYR4TXA=="],
 
     "@redocly/ajv": ["@redocly/ajv@8.11.2", "", { "dependencies": { "fast-deep-equal": "^3.1.1", "json-schema-traverse": "^1.0.0", "require-from-string": "^2.0.2", "uri-js-replace": "^1.0.1" } }, "sha512-io1JpnwtIcvojV7QKDUSIuMN/ikdOUd1ReEnUnMKGfDVridQZ31J0MmIuqwuRjWDZfmvr+Q0MqCcfHM2gTivOg=="],
 

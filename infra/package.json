@@ -12,7 +12,7 @@
     "@pulumi/random": "4.21.2",
     "@pulumi/tailscale": "0.29.1",
     "@pulumi/tls": "5.6.1",
-    "@pulumiverse/acme": "0.18.0",
+    "@pulumiverse/acme": "0.18.1",
     "@zgeoff/cloud-health-check": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/pulumi-onidel": "workspace:*",
