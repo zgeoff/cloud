@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { alloyValues } from './alloy-values.ts';
 
-test("it tails every pod's logs and the host journal into Loki from saved positions, dropping the atc gateway's approval lines", () => {
+test("it tails every pod's logs and the host journal into Loki from saved positions, dropping lines over an hour old and the atc gateway's approval lines", () => {
   expect(alloyValues).toStrictEqual({
     alloy: {
       storagePath: '/var/lib/alloy',
@@ -37,6 +37,12 @@ loki.process "pods" {
   stage.match {
     selector = "{namespace=\\"atc\\", container=\\"atc-gateway\\"} |~ \\"^atc-approval\\""
     action   = "drop"
+  }
+  // a start with no saved position reads each container's whole log; Loki
+  // rejects what is over an hour old, after it counts against the rate limit
+  stage.drop {
+    older_than          = "1h"
+    drop_counter_reason = "too old"
   }
   forward_to = [loki.write.default.receiver]
 }

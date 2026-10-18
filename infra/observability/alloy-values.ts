@@ -41,6 +41,12 @@ loki.process "pods" {
     selector = "{namespace=\\"atc\\", container=\\"atc-gateway\\"} |~ \\"^atc-approval\\""
     action   = "drop"
   }
+  // a start with no saved position reads each container's whole log; Loki
+  // rejects what is over an hour old, after it counts against the rate limit
+  stage.drop {
+    older_than          = "1h"
+    drop_counter_reason = "too old"
+  }
   forward_to = [loki.write.default.receiver]
 }
 
