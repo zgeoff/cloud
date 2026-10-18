@@ -170,8 +170,7 @@ record the claim before you start, so that you can show the same volume came bac
      -o custom-columns=UID:.metadata.uid,VOLUME:.spec.volumeName,CLASS:.spec.storageClassName
    ssh root@geoffcloud k3s kubectl get pv \
      -o custom-columns=NAME:.metadata.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,CLAIM:.spec.claimRef.name
-   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e \
-     'const fs = require("fs"); for (const f of fs.readdirSync("/data")) console.log(f, fs.statSync(`/data/${f}`).size)'
+   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- ls -l /data
    ```
 
    Expect the class `local-path-retain`, the reclaim policy `Retain` on the volume of
