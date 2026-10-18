@@ -4,12 +4,14 @@ import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 import { topology } from '@zgeoff/cloud-topology';
+import { alloyChart } from './alloy-chart.ts';
 import { alloyValues } from './alloy-values.ts';
 import type { AlertRuleInputs } from './build-alert-rules.ts';
 import { createDashboards } from './create-dashboards.ts';
 import { createMetrics } from './create-metrics.ts';
 import { createMonitors } from './create-monitors.ts';
 import { lokiValues } from './loki-values.ts';
+import { makeDeleteBeforeReplaceTransform } from './make-delete-before-replace-transform.ts';
 import { observabilityNamespace } from './observability-namespace.ts';
 
 // Grafana on the host's tailnet address only: the NixOS firewall trusts tailscale0
@@ -62,17 +64,12 @@ export function createClusterObservability(
   };
 }
 
-// Alloy ships pod logs and the host journal to Loki (alloyValues)
+// Alloy ships pod logs and the host journal to Loki (alloyValues). A change to its config replaces
+// the chart's fixed-name ConfigMap, so the old one goes first.
 function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider): Chart {
   return new Chart(
     'alloy',
-    {
-      namespace: ns.metadata.name,
-      chart: 'alloy',
-      version: '1.13.0',
-      repositoryOpts: { repo: 'https://grafana.github.io/helm-charts' },
-      values: alloyValues,
-    },
-    { provider: cluster, dependsOn },
+    { namespace: ns.metadata.name, ...alloyChart, values: alloyValues },
+    { provider: cluster, dependsOn, transforms: [makeDeleteBeforeReplaceTransform(cluster)] },
   );
 }

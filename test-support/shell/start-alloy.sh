@@ -3,7 +3,7 @@
 # with <config dir>/config.alloy as its config and <logs dir> mounted read-only at /logs, and
 # returns once Alloy reports ready. <dir>/url then holds its loopback URL, and <dir>/container the
 # container to remove when the case ends. The image is the alloy chart's appVersion
-# (infra/observability/create-cluster-observability.ts), and it runs as production runs it: uid
+# (infra/observability/alloy-chart.ts), and it runs as production runs it: uid
 # 65532, a read-only root, no capabilities, no privilege escalation. Usage reporting is off, so no
 # case reaches Grafana.
 # shellcheck source-path=SCRIPTDIR
