@@ -22,14 +22,15 @@ async function setupTest() {
     parsed === null ||
     !('rules' in parsed) ||
     typeof parsed.rules !== 'object' ||
-    parsed.rules === null
+    parsed.rules === null ||
+    !('zgeoff/import-zones' in parsed.rules)
   ) {
-    throw new Error('.oxlintrc.json holds no rules');
+    throw new Error('.oxlintrc.json holds no zgeoff/import-zones options');
   }
 
   const lintConfig = {
     jsPlugins: [join(root, 'node_modules', '@zgeoff', 'oxlint-config', 'plugin.js')],
-    rules: { 'zgeoff/import-zones': Reflect.get(parsed.rules, 'zgeoff/import-zones') },
+    rules: { 'zgeoff/import-zones': parsed.rules['zgeoff/import-zones'] },
   };
 
   // the rule roots its globs at the nearest .git, so the tree is a repository of its own
