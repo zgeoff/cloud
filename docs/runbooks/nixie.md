@@ -148,6 +148,45 @@ Expect `["deployment_key","impd_token","model_credentials"]`. A new host key goe
 
 6. Run the deploy checks, as [Check a deploy](#check-a-deploy) describes.
 
+## Replace nixie's StatefulSet
+
+Kubernetes refuses an in-place change to some StatefulSet fields, such as the pod management policy
+and the claim template, so Pulumi replaces the StatefulSet `nixie` to change one. It deletes the old
+StatefulSet, waits until `nixie-0` is gone, and then creates the new one. The delete keeps the claim
+`data-nixie-0`, because a StatefulSet keeps its claims by default, and the new `nixie-0` mounts the
+same claim. The claim is not a Pulumi resource, so the plan never touches it. nixie is down from the
+delete until the new pod turns ready, so run the replace in a host window.
+
+**CAUTION:** The replace stops nixie and depends on the claim to keep its data. Back up first, and
+record the claim before you start, so that you can show the same volume came back.
+
+1. Read the held plan, as [Answer a held run](./prod-apply.md#answer-a-held-run) describes. Expect
+   one replace, `+-` on `kubernetes:apps/v1:StatefulSet::nixie`, and no delete.
+2. Back up now, as [nixie's backup](./nixie-backup.md#back-up-now) describes.
+3. Record the claim, its volume and the data:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n nixie get pvc data-nixie-0 \
+     -o custom-columns=UID:.metadata.uid,VOLUME:.spec.volumeName,CLASS:.spec.storageClassName
+   ssh root@geoffcloud k3s kubectl get pv \
+     -o custom-columns=NAME:.metadata.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,CLAIM:.spec.claimRef.name
+   ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- ls -l /data
+   ```
+
+   Expect the class `local-path-retain`, the reclaim policy `Retain` on the volume of
+   `data-nixie-0`, and `nixie.db` and `keys.db` in the list.
+
+4. Dispatch the held run, as step 2 of [Answer a held run](./prod-apply.md#answer-a-held-run)
+   describes, and watch it finish.
+5. Run the three commands of step 3 again. Expect the same claim UID and volume, and `nixie.db` and
+   `keys.db` at least as large as before.
+6. Check readiness and run the deploy checks, as steps 4 to 6 of
+   [Deploy or upgrade](#deploy-or-upgrade) describe. The log line `writer.started` shows the same
+   schema version as before the replace.
+
+If the run fails after the delete, the claim and its volume stay, and nixie has no pod. Fix the
+cause and dispatch again. The new StatefulSet mounts the same claim.
+
 ## Check a deploy
 
 Two checks prove a deploy end to end. Run both after each deploy or upgrade of nixie, from a repo
@@ -329,13 +368,12 @@ an apply would renew it.
 
 ## Failures
 
-| Symptom                                           | Cause                                    | Fix                                             |
-| ------------------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
-| `imp_host` unready, `FORBIDDEN` in logs           | an image or the model secret is missing  | add it, as above                                |
-| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
-| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe         |
-| an upgrade's rollout never replaces `nixie-0`     | a rolling update waits on an unready pod | `k3s kubectl -n nixie delete pod nixie-0`       |
-| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
-| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
-| TLS error on the name                             | the certificate expired                  | `bun run up`                                    |
-| no `nixie-0` pod after a reset                    | the reset stopped after it scaled to 0   | `bun run nixie:reset --confirm` again           |
+| Symptom                                           | Cause                                   | Fix                                             |
+| ------------------------------------------------- | --------------------------------------- | ----------------------------------------------- |
+| `imp_host` unready, `FORBIDDEN` in logs           | an image or the model secret is missing | add it, as above                                |
+| `definitions` unready                             | git-sync has no checkout yet            | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
+| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout | wait for nixie's next definitions probe         |
+| the pod restarts with `sops could not decrypt`    | the host key is not a recipient         | add it to `.sops.yaml` and run `updatekeys`     |
+| the pod restarts with `nixie refuses the secrets` | a key is missing from the file          | set it, as above                                |
+| TLS error on the name                             | the certificate expired                 | `bun run up`                                    |
+| no `nixie-0` pod after a reset                    | the reset stopped after it scaled to 0  | `bun run nixie:reset --confirm` again           |

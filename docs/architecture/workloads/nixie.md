@@ -23,15 +23,16 @@ flowchart LR
 
 nixie's design in its own repo sets the shape, and this repo keeps its own version of it. nixie runs
 as one replica of a StatefulSet, because SQLite takes one writer, and a rollout stops the old pod
-before it starts the new one. The data volume is a claim of the retaining storage class that the atc
-gateway's volume uses, so deleting the claim keeps `nixie.db` and the key store beside it. A nightly
-CronJob copies both databases with restic to nixie's own R2 bucket, encrypted with a password that
-only 1Password and the backup's Secret hold. The CronJob runs as nixie's user, so a restore leaves
-files nixie can open, and the record keys stay useless without the deployment key in the secrets
-file. [nixie's backup](../../runbooks/nixie-backup.md) gives the steps. The volume sits on the root
-disk, so each Onidel snapshot of the disk holds the database in plain form, and
-[the runbook](../../runbooks/nixie.md#disk-snapshots) deletes each manual snapshot once its change
-is checked.
+before it starts the new one. The StatefulSet starts and replaces its pod without waiting for it to
+turn ready, so an apply that fixes an unready nixie rolls it out. The data volume is a claim of the
+retaining storage class that the atc gateway's volume uses, so deleting the claim keeps `nixie.db`
+and the key store beside it. A nightly CronJob copies both databases with restic to nixie's own R2
+bucket, encrypted with a password that only 1Password and the backup's Secret hold. The CronJob runs
+as nixie's user, so a restore leaves files nixie can open, and the record keys stay useless without
+the deployment key in the secrets file. [nixie's backup](../../runbooks/nixie-backup.md) gives the
+steps. The volume sits on the root disk, so each Onidel snapshot of the disk holds the database in
+plain form, and [the runbook](../../runbooks/nixie.md#disk-snapshots) deletes each manual snapshot
+once its change is checked.
 
 The web client is a Deployment of its own, because it holds no state, no secret and no database. It
 calls nixie's API at its cluster address, and the browser calls `/rpc` on the web client's own

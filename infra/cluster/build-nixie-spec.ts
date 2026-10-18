@@ -48,6 +48,10 @@ export function buildNixieSpec(inputs: NixieSpecInputs): input.apps.v1.StatefulS
     // a StatefulSet's rolling update stops nixie-0 before it starts the new one, so two pods never
     // hold the database at once
     updateStrategy: { type: 'RollingUpdate' },
+
+    // OrderedReady stops a rollout while nixie-0 is unready, so an apply that fixes it waits until
+    // someone deletes the pod; with one replica, Parallel still stops nixie-0 before its replacement
+    podManagementPolicy: 'Parallel',
     serviceName: inputs.serviceName,
     selector: { matchLabels: nixieLabels },
     template: {
