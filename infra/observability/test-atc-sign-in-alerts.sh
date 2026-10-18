@@ -267,6 +267,35 @@ EOF
   assert_equals 0 "$status" "promtool's exit"
 }
 
+it_fires_on_an_event_after_alloy_restarts_and_restores_the_counter_at_its_old_value() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  # one sign-in at 1m, whose alert clears; Alloy is down from 10m and starts again at 11m, a new
+  # process, and counts one new sign-in, so the counter reads 1 on both sides of the restart
+  cat > "$tree/config/test.json" << 'EOF'
+{"rule_files":["rules.json"],"evaluation_interval":"30s","tests":[{"interval":"30s",
+"input_series":[
+{"series":"loki_process_custom_atc_security_events_total{instance=\"alloy:12345\",kind=\"owner_auth\",method=\"passkey\",outcome=\"succeeded\",reason=\"none\",route=\"/login\"}","values":"_ _ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 _ _ 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"},
+{"series":"process_start_time_seconds{instance=\"alloy:12345\"}","values":"100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 100 _ _ 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700 700"}],
+"alert_rule_test":[
+{"eval_time":"7m30s","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[]},
+{"eval_time":"11m30s","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[
+{"exp_labels":{"severity":"notice","method":"passkey","route":"/login"},
+"exp_annotations":{"summary":"The owner signed in to the atc gateway 1 time(s) by passkey in the last 5m."}}]},
+{"eval_time":"17m","alertname":"ATCGatewayOwnerSignedIn","exp_alerts":[]}]}]}
+EOF
+
+  run_promtool_test "$tree/config" test.json > "$tree/out" 2>&1 || status=$?
+
+  diff - "$tree/out" << 'EOF'
+  SUCCESS
+
+EOF
+  assert_equals 0 "$status" "promtool's exit"
+}
+
 it_sends_one_discord_message_per_sign_in_alert_name_however_many_alerts_and_posts_arrive() {
   tree="$(mktemp -d)"
   trap teardown EXIT

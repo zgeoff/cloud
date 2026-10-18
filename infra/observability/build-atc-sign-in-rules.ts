@@ -99,15 +99,16 @@ export function buildATCSignInRules(): AlertRuleGroup {
   };
 }
 
-// The events of one selector in the window, summed per label set and kept when above zero. Alloy
-// makes a series at its first event, already holding that count, and increase() cannot see a rise
-// from no series, so a series that had no sample a window ago counts whole.
+// The events of one selector in the window, summed per label set and kept above zero. increase()
+// sees no rise in a series Alloy makes at its first event, or restores at the same value after a
+// restart, so a series new in the window, or from an Alloy started in it, counts whole.
 function buildEventCount(
   selector: string,
   by: readonly string[],
   metric: string = atcSecurityEvents.eventsMetric,
 ): string {
   const series = `${metric}{${selector}}`;
+  const restarted = `changes(process_start_time_seconds[${window}]) > 0`;
 
-  return `sum by (${by.join(', ')}) ((${series} unless ${series} offset ${window}) or increase(${series}[${window}])) > 0`;
+  return `sum by (${by.join(', ')}) ((${series} unless ${series} offset ${window}) or (${series} and on (instance) ${restarted}) or increase(${series}[${window}])) > 0`;
 }

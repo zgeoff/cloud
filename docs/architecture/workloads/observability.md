@@ -143,8 +143,9 @@ groups the sign-in alerts by name, so each category arrives as one message, a fl
 never buries another, and a category that keeps firing sends again only at the route's repeat
 interval. An alert ends once its window passes with no event, and the route sends no resolved
 message, because the end of a window is no news. Alloy creates each counter at its first event with
-that event counted, and Prometheus's increase sees no rise in a series it never saw at zero, so each
-rule counts a series younger than its window whole.
+that event counted, and a restarted Alloy can count a new event back to the value its counter held
+before. Prometheus's increase sees no rise in either, so each rule counts a series younger than its
+window, or one from an Alloy that started inside it, whole.
 
 A failed post to Discord shows without the webhook's URL: Alertmanager logs the attempt with the
 alert group's name, and counts it in its failed-notification metrics, on which the chart's
