@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildNixieSpec } from './build-nixie-spec.ts';
 
-test('it runs nixie as one replica that a rollout stops before it starts the next, on a retained volume, with git-sync beside it holding the deploy key and nixie alone holding the age identity', () => {
+test('it runs nixie as one replica that a rollout stops before it starts the next, even while it is unready, on a retained volume, with git-sync beside it holding the deploy key and nixie alone holding the age identity', () => {
   const serviceName = output('nixie');
   const configMap = output('nixie-config-0a1b2c3d');
   const secret = output('nixie-secrets-4e5f6a7b');
@@ -20,6 +20,7 @@ test('it runs nixie as one replica that a rollout stops before it starts the nex
   ).toStrictEqual({
     replicas: 1,
     updateStrategy: { type: 'RollingUpdate' },
+    podManagementPolicy: 'Parallel',
     serviceName,
     selector: { matchLabels: { app: 'nixie' } },
     template: {
