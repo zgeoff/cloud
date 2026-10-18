@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import type { CustomResourceOptions } from '@pulumi/pulumi';
 import { DependencyProviderResource, output } from '@pulumi/pulumi';
 import { makeDeleteBeforeReplaceTransform } from './make-delete-before-replace-transform.ts';
 
@@ -22,12 +23,14 @@ test("it deletes a chart's fixed-name Secret before it creates the replacement, 
   });
 
   // a transform's result is typed ResourceOptions, which has no deleteBeforeReplace
-  expect<unknown>(result).toStrictEqual({
+  const opts: CustomResourceOptions = { protect: false, deleteBeforeReplace: true, provider };
+
+  expect(result).toStrictEqual({
     props: {
       metadata: { name: 'alertmanager-kube-prometheus-stack-alertmanager' },
       data,
     },
-    opts: { protect: false, deleteBeforeReplace: true, provider },
+    opts,
   });
 });
 
@@ -47,9 +50,11 @@ test("it deletes a chart's fixed-name ConfigMap before it creates the replacemen
   });
 
   // a transform's result is typed ResourceOptions, which has no deleteBeforeReplace
-  expect<unknown>(result).toStrictEqual({
+  const opts: CustomResourceOptions = { deleteBeforeReplace: true, provider };
+
+  expect(result).toStrictEqual({
     props: { metadata: { name: 'alloy' }, data: { 'config.alloy': 'logging {}\n' } },
-    opts: { deleteBeforeReplace: true, provider },
+    opts,
   });
 });
 
