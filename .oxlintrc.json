@@ -6,7 +6,117 @@
     "es2024": true
   },
   "rules": {
-    "zgeoff/function-verb": ["error", { "verbs": ["decide", "install", "open", "switch"] }]
+    "zgeoff/function-verb": ["error", { "verbs": ["decide", "install", "open", "switch"] }],
+
+    // the import boundaries: no relative import into another workspace package, and the direction
+    // between infra's groups
+    "zgeoff/import-zones": [
+      "error",
+      {
+        "zones": {
+          "any": ["**"],
+          "package": ["infra/**", "packages/**", "sdk/**", "workers/**"],
+          "infra": ["infra/**"],
+          "infra-root": ["infra/index.ts"],
+          "infra-group": ["infra/{inputs,edge,tailnet,ingress,cluster,observability}/**"],
+          "infra-entry": ["infra/*/index.ts"],
+          "infra-shared": ["infra/shared/**"],
+          "infra-inputs": ["infra/inputs/**"],
+          "infra-layer": ["infra/{edge,tailnet,ingress,cluster}/**"],
+          "infra-observability": ["infra/observability/**"],
+          "infra-ingress": ["infra/ingress/**"],
+          "infra-test-utils": ["infra/test-utils/**"]
+        },
+        "extensions": [".ts", ".js", ".mjs", ".cjs", ".d.ts", ".json"],
+        "edges": [
+          {
+            "name": "relative-import-into-another-package",
+            "from": ["package"],
+            "ignore": ["infra/**"],
+            "to": ["any"],
+            "allowWithin": "*/*",
+            "reason": "reach another package through its name and exports"
+          },
+          {
+            "name": "relative-import-into-another-package",
+            "from": ["infra"],
+            "to": ["any"],
+            "allow": ["infra"],
+            "reason": "reach another package through its name and exports"
+          },
+          {
+            "name": "relative-import-from-the-root-package",
+            "from": ["any"],
+            "ignore": ["infra/**", "packages/**", "sdk/**", "workers/**"],
+            "to": ["package"],
+            "reason": "the root package reaches a workspace package through its name"
+          },
+          {
+            "name": "infra-shared-imports-no-group",
+            "from": ["infra-shared"],
+            "to": ["infra"],
+            "allow": ["infra-shared"],
+            "reason": "infra/shared/ holds what several groups read"
+          },
+          {
+            "name": "infra-inputs-imports-no-group",
+            "from": ["infra-inputs"],
+            "to": ["infra"],
+            "allow": ["infra-inputs", "infra-shared", "infra-test-utils"],
+            "reason": "inputs is the lowest group"
+          },
+          {
+            "name": "infra-group-imports-only-lower-layers",
+            "from": ["infra-layer"],
+            "to": ["infra"],
+            "allow": ["infra-inputs", "infra-shared", "infra-test-utils"],
+            "allowWithin": "infra/*",
+            "reason": "index.ts passes every value from one group to another"
+          },
+          {
+            "name": "infra-observability-imports-only-lower-layers",
+            "from": ["infra-observability"],
+            "to": ["infra"],
+            "allow": [
+              "infra-observability",
+              "infra-inputs",
+              "infra-shared",
+              "infra-ingress",
+              "infra-test-utils"
+            ],
+            "reason": "observability reads ingress only for the cloudflared names"
+          },
+          {
+            "name": "infra-cross-group-import-through-the-entry-module",
+            "from": ["infra-group"],
+            "to": ["infra-group"],
+            "allow": ["infra-entry"],
+            "allowWithin": "infra/*",
+            "reason": "one group reaches another only through <group>/index.ts"
+          },
+          {
+            "name": "infra-root-imports-only-entry-modules",
+            "from": ["infra-root"],
+            "to": ["infra"],
+            "allow": ["infra-entry"],
+            "reason": "the composition root imports each group through its entry module"
+          },
+          {
+            "name": "infra-test-utils-only-in-tests",
+            "from": ["infra"],
+            "ignore": ["**/*.test.ts", "infra/test-utils/**"],
+            "to": ["infra-test-utils"],
+            "reason": "the Pulumi program never loads the test utils"
+          }
+        ],
+        "unresolved": [
+          {
+            "name": "unresolved",
+            "reason": "an import the rule cannot resolve skips every boundary above"
+          }
+        ]
+      }
+    ]
   },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", "scripts/nixie-api/openapi.d.ts"],
   "overrides": [

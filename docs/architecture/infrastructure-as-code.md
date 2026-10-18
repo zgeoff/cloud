@@ -14,10 +14,9 @@ The program's root module reads the inputs once and composes the estate from gro
 with one entry module: the inputs, the edge (the VM, its cloud firewall, the zone and the backups
 bucket), the tailnet, public ingress, the cluster's workloads, and observability. The root module
 builds the cluster's Kubernetes provider and passes it to each group that runs a workload, so no
-group creates another group's resources. A boundary check in CI and the pre-push hook keeps that
-shape: it fails an import from one group into a group above it or past another group's entry module,
-and a relative import into another workspace package. Each provider manages its own part of the
-estate:
+group creates another group's resources. A lint rule keeps that shape: it fails an import from one
+group into a group above it or past another group's entry module, and a relative import into another
+workspace package. Each provider manages its own part of the estate:
 
 | Provider                | Manages                                                                    |
 | ----------------------- | -------------------------------------------------------------------------- |
