@@ -36,3 +36,23 @@ test('it renders deploy/nixie/config.yaml as YAML holding the file’s keys and 
   expect(file).not.toContainKey('imp');
   expect(rendered).toStrictEqual({ ...file, imp: buildNixieImpConfig(topology) });
 });
+
+test('it renders a 1-hour cache lifetime on the conversation profile only', async () => {
+  const text = await readFile(new URL('../../deploy/nixie/config.yaml', import.meta.url), 'utf8');
+
+  const rendered: unknown = Bun.YAML.parse(renderNixieConfig(text, buildNixieImpConfig(topology)));
+
+  expect(rendered).toMatchObject({
+    models: {
+      roles: { conversation: 'opus', 'memory-writer': 'haiku', checker: 'sonnet' },
+      profiles: {
+        opus: { cache_ttl: '1h' },
+        haiku: expect.toBeObject(),
+        sonnet: expect.toBeObject(),
+      },
+    },
+  });
+
+  expect(rendered).not.toHaveProperty(['models', 'profiles', 'haiku', 'cache_ttl']);
+  expect(rendered).not.toHaveProperty(['models', 'profiles', 'sonnet', 'cache_ttl']);
+});
