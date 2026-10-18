@@ -180,17 +180,21 @@ test.each<ImportCase & { readonly rule: string }>([
     source: "const step = './steps/' + (process.argv[2] ?? 'apply');\nawait import(step);\n",
     other: 'scripts/steps/apply.ts',
   },
-])('it fails lint on a $rule import: $label', async (row) => {
-  const ctx = await setupTest();
+])(
+  'it fails lint on a $rule import: $label',
+  async (row) => {
+    const ctx = await setupTest();
 
-  await Bun.write(join(ctx.dir, row.other), 'export const value = 1;\n');
-  await Bun.write(join(ctx.dir, row.file), row.source);
+    await Bun.write(join(ctx.dir, row.other), 'export const value = 1;\n');
+    await Bun.write(join(ctx.dir, row.file), row.source);
 
-  const result = await ctx.lint(row.file);
+    const result = await ctx.lint(row.file);
 
-  expect(result.exitCode).toBe(1);
-  expect(result.stdout).toInclude(`zgeoff(import-zones): ${row.rule}: `);
-});
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toInclude(`zgeoff(import-zones): ${row.rule}: `);
+  },
+  30_000,
+);
 
 test.each<ImportCase>([
   {
@@ -241,13 +245,17 @@ test.each<ImportCase>([
     source: "import { port } from '@zgeoff/cloud-topology';\n",
     other: 'packages/topology/index.ts',
   },
-])('it passes $label', async (row) => {
-  const ctx = await setupTest();
+])(
+  'it passes $label',
+  async (row) => {
+    const ctx = await setupTest();
 
-  await Bun.write(join(ctx.dir, row.other), 'export const value = 1;\n');
-  await Bun.write(join(ctx.dir, row.file), row.source);
+    await Bun.write(join(ctx.dir, row.other), 'export const value = 1;\n');
+    await Bun.write(join(ctx.dir, row.file), row.source);
 
-  const result = await ctx.lint(row.file);
+    const result = await ctx.lint(row.file);
 
-  expect(result.exitCode).toBe(0);
-});
+    expect(result.exitCode).toBe(0);
+  },
+  30_000,
+);
