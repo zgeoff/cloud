@@ -22,7 +22,6 @@ const chart = existsSync(join(caseDir, 'chart'))
   ? new Chart('case', { chart: join(caseDir, 'chart'), namespace: 'atc' }, { provider })
   : undefined;
 
-// the fields the tests' raw Roles set
 const ruleSchema = z.object({
   apiGroups: z.array(z.string()),
   resources: z.array(z.string()),
