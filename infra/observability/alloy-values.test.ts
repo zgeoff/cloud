@@ -1,13 +1,25 @@
 import { expect, test } from 'bun:test';
-import { alloyConfig } from './alloy-config.ts';
-import { alloyValues } from './alloy-values.ts';
-import { toHelmTplLiteral } from './to-helm-tpl-literal.ts';
+import { output } from '@pulumi/pulumi';
+import { buildAlloyValues } from './alloy-values.ts';
+import { buildPodLogPositionsSeedScript } from './build-pod-log-positions-seed-script.ts';
 
-test("it runs Alloy's config from saved positions, as a literal for the chart's tpl pass, and lets Prometheus scrape it", () => {
-  expect(alloyValues).toStrictEqual({
+test("it runs Alloy's config from the ConfigMap it names, without the chart creating one, from saved positions seeded or repaired in the entry point before each start, and lets Prometheus scrape it", () => {
+  const configMapName = output('alloy-config-1a2b3c4d');
+
+  expect(buildAlloyValues(configMapName)).toStrictEqual({
     alloy: {
       storagePath: '/var/lib/alloy',
-      configMap: { content: toHelmTplLiteral(alloyConfig) },
+      configMap: { create: false, name: configMapName, key: 'config.alloy' },
+      command: [
+        'sh',
+        '-c',
+        `${buildPodLogPositionsSeedScript({
+          podLogRoot: '/var/log/pods',
+          seedFile: '/var/lib/alloy/pod-log-positions.yml',
+          positionsFile: '/var/lib/alloy/loki.source.file.pods/positions.yml',
+        })}exec /bin/alloy "$@"\n`,
+        'alloy',
+      ],
       mounts: { varlog: true, extra: [{ name: 'storage', mountPath: '/var/lib/alloy' }] },
       extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
       resources: { requests: { cpu: '20m', memory: '128Mi' }, limits: { memory: '384Mi' } },
@@ -24,14 +36,16 @@ test("it runs Alloy's config from saved positions, as a literal for the chart's 
 });
 
 test('it keeps its read positions on a directory of the node, which outlives the container and the pod', () => {
-  expect(alloyValues.alloy.mounts.extra).toStrictEqual([
-    { name: 'storage', mountPath: alloyValues.alloy.storagePath },
+  const values = buildAlloyValues('alloy-config-1a2b3c4d');
+
+  expect(values.alloy.mounts.extra).toStrictEqual([
+    { name: 'storage', mountPath: values.alloy.storagePath },
   ]);
 
-  expect(alloyValues.controller.volumes.extra).toStrictEqual([
+  expect(values.controller.volumes.extra).toStrictEqual([
     {
       name: 'storage',
-      hostPath: { path: alloyValues.alloy.storagePath, type: 'DirectoryOrCreate' },
+      hostPath: { path: values.alloy.storagePath, type: 'DirectoryOrCreate' },
     },
   ]);
 });

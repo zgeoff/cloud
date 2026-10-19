@@ -122,7 +122,15 @@ function buildNixieContainer(image: string): input.core.v1.Container {
       periodSeconds: 30,
       failureThreshold: 3,
     },
-    readinessProbe: { httpGet: { path: '/health/ready', port: nixieAPIPort }, periodSeconds: 10 },
+
+    // nixie answers readiness from memory and reports a slow dependency as degraded with a 200, so
+    // only a process that cannot serve fails it; 5 s rides out a host short of CPU
+    readinessProbe: {
+      httpGet: { path: '/health/ready', port: nixieAPIPort },
+      periodSeconds: 10,
+      timeoutSeconds: 5,
+      failureThreshold: 3,
+    },
     volumeMounts: [
       { name: 'data', mountPath: '/data' },
       {

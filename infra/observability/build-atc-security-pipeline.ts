@@ -16,7 +16,7 @@ loki.source.file "atc_security" {
   forward_to = [loki.process.atc_security.receiver]
 }
 
-// counters only: loki.source.kubernetes "pods" ships the same lines to Loki
+// counters only: loki.source.file "pods" ships the same lines to Loki
 loki.process "atc_security" {
   forward_to = []
 

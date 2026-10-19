@@ -2,13 +2,15 @@ import { DnsRecord } from '@pulumi/cloudflare';
 import type { Provider } from '@pulumi/kubernetes';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import { Ingress } from '@pulumi/kubernetes/networking/v1';
-import type { Output, Resource } from '@pulumi/pulumi';
+import type { Output } from '@pulumi/pulumi';
 import { interpolate } from '@pulumi/pulumi';
+import { createNamespace } from '../shared/create-namespace.ts';
 import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
+import { buildNixieIngressChartArgs } from './build-nixie-ingress-chart-args.ts';
 import { buildNixieIngressSpec } from './build-nixie-ingress-spec.ts';
-import { buildNixieIngressValues } from './build-nixie-ingress-values.ts';
 import { createNixieCertificate } from './create-nixie-certificate.ts';
 import { makeHostIPTransform } from './make-host-ip-transform.ts';
+import { makeMovedResourceTransform } from './make-moved-resource-transform.ts';
 
 interface Backend {
   readonly service: Output<string>;
@@ -16,10 +18,8 @@ interface Backend {
 }
 
 export interface NixieIngressInputs {
+  // nixie's namespace, which holds the Ingress and its certificate
   readonly namespace: Output<string>;
-
-  // the namespace resource, which the controller's chart waits on
-  readonly namespaceResource: Resource;
   readonly hostname: string;
   readonly dnsToken: Output<string>;
   readonly zoneID: Output<string>;
@@ -39,29 +39,29 @@ export function createNixieIngress(
   cluster: Provider,
   inputs: NixieIngressInputs,
 ): NixieIngressOutputs {
+  const controllerNamespace = createNamespace('nixie-ingress', cluster);
+
   const controller = new Chart(
     'nixie-ingress',
-    {
-      namespace: inputs.namespace,
-      chart: 'traefik',
-      version: '41.6.0',
-      repositoryOpts: { repo: 'https://traefik.github.io/charts' },
-
-      // Ingress objects only: no Traefik, Hub or Gateway CRDs in the cluster
-      skipCrds: true,
-      values: buildNixieIngressValues({
-        httpsPort: geoffcloudNode.httpsPort,
-        endpointIP: geoffcloudNode.ip,
-        ingressClass,
-        namespace: 'nixie',
-      }),
-    },
+    buildNixieIngressChartArgs({
+      controllerNamespace: 'nixie-ingress',
+      routesNamespace: 'nixie',
+      ingressClass,
+    }),
     {
       provider: cluster,
-      dependsOn: [inputs.namespaceResource],
+      dependsOn: [controllerNamespace],
+      transforms: [
+        // 443 answers on the host's tailnet address and no other
+        makeHostIPTransform(geoffcloudNode.ip, 'websecure', cluster),
 
-      // 443 answers on the host's tailnet address and no other
-      transforms: [makeHostIPTransform(geoffcloudNode.ip, 'websecure', cluster)],
+        // the controller moved out of nixie's namespace, which Pod Security's baseline covers
+        makeMovedResourceTransform(
+          'kubernetes:apps/v1:Deployment',
+          'nixie-ingress:nixie-ingress/nixie-ingress-traefik',
+          'nixie-ingress:nixie/nixie-ingress-traefik',
+        ),
+      ],
     },
   );
 

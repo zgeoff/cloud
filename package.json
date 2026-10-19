@@ -98,6 +98,7 @@
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/format-codemod": "0.1.0",
     "@zgeoff/oxlint-config": "0.2.5",
+    "@zgeoff/skill-gate": "0.1.0",
     "knip": "6.24.0",
     "lefthook": "2.1.10",
     "msw": "2.15.0",

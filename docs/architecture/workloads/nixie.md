@@ -45,8 +45,12 @@ that Service, and a Service that waited for ready pods would hold back the rollo
 Both containers run as their images' users on a read-only root, with writable volumes only for
 nixie's data and each container's temporary directory. nixie's health endpoint listens only once
 migrations and the integrity check finish, so the pod's startup probe waits on liveness before the
-readiness probe takes over. Readiness lists each part that nixie's slice 1 builds: the database, the
-definitions seed, impd, the conversation imp and the disk.
+readiness probe takes over. The readiness probe takes nixie out of its Service only when the
+database or the definitions seed fails, because nixie cannot serve without them. impd, the
+conversation imp and the disk are dependency parts: one that fails or answers slowly makes nixie
+answer 200 with the status degraded, because nixie is the only endpoint behind its Service and still
+serves its API. The NixieDegraded alert watches that status
+([alert rules](observability.md#alert-rules)).
 
 ## Configuration and definitions
 
@@ -102,9 +106,12 @@ images repeats that step.
 nixie's public name, `nixie.geoff.cloud`, is a DNS-only record at the host's tailnet address, so it
 resolves anywhere and answers on the tailnet only, the pattern impd's names follow. Traefik serves
 the route as nixie's ingress controller. It holds the host's HTTPS port through a hostPort bound to
-the tailnet address alone, so no other interface answers. It watches nixie's namespace only and
-serves no dashboard. The NixOS firewall trusts the tailnet interface, and the tailnet policy lets
-every member's device reach the host on HTTPS ([firewalls](../network/firewalls.md)).
+the tailnet address alone, so no other interface answers. It runs in its own namespace,
+nixie-ingress, because Pod Security's `baseline` level refuses a host port, and that namespace alone
+goes without the level while nixie's own pods keep it
+([cross-cutting rules](../overview.md#cross-cutting)). It watches nixie's namespace only and serves
+no dashboard. The NixOS firewall trusts the tailnet interface, and the tailnet policy lets every
+member's device reach the host on HTTPS ([firewalls](../network/firewalls.md)).
 
 The Ingress sends `/rpc` to nixie and every other path to the web client. Its certificate comes from
 Let's Encrypt through a DNS-01 challenge that the Pulumi run answers with Pulumi's own Cloudflare

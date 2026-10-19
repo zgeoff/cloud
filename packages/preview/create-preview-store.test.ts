@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { Preview } from './create-preview-store.ts';
+import type { ContractRun, Preview } from './create-preview-store.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 
 async function setupTest() {
@@ -464,7 +464,13 @@ test('#claimContractRun refuses a second claim of one head commit and keeps the 
   ctx.store.updateContractPhase(
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
     ['queued'],
-    { phase: 'passed', detail: '18 pass, 0 fail' },
+    { phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' },
+  );
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['settling'],
+    { phase: 'passed', detail: '18 pass, 0 fail', outcome: 'success' },
   );
 
   const claimed = ctx.store.claimContractRun({
@@ -497,7 +503,7 @@ test('#updateContractPhase refuses a change from a phase the run is not in', asy
   const moved = ctx.store.updateContractPhase(
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
     ['running'],
-    { phase: 'passed' },
+    { phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' },
   );
 
   expect(moved).toBeFalse();
@@ -580,7 +586,13 @@ test('#updateInterruptedContractRuns queues again the runs a stopped process lef
   ctx.store.updateContractPhase(
     { repo: 'acme/greenhouse', headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
     ['queued'],
-    { phase: 'failed', detail: '15 pass, 3 fail' },
+    { phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' },
+  );
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' },
+    ['settling'],
+    { phase: 'failed', detail: '15 pass, 3 fail', outcome: 'failure' },
   );
 
   const requeued = ctx.store.updateInterruptedContractRuns();
@@ -600,6 +612,229 @@ test('#updateInterruptedContractRuns queues again the runs a stopped process lef
       headSHA: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
     })?.phase,
   ).toBe('failed');
+});
+
+test.each<
+  [ContractRun['phase'], ContractRun['phase'], [ContractRun['phase'], ContractRun['phase']][]]
+>([
+  ['queued', 'waiting', []],
+  ['queued', 'running', []],
+  ['queued', 'settling', []],
+  ['waiting', 'running', [['queued', 'waiting']]],
+  ['waiting', 'settling', [['queued', 'waiting']]],
+  ['running', 'settling', [['queued', 'running']]],
+  ['running', 'queued', [['queued', 'running']]],
+  ['settling', 'passed', [['queued', 'settling']]],
+  ['settling', 'failed', [['queued', 'settling']]],
+])('#updateContractPhase moves a run from %s to %s', async (from, to, path) => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  for (const [before, after] of path) {
+    ctx.store.updateContractPhase(
+      { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      [before],
+      { phase: after },
+    );
+  }
+
+  const moved = ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    [from],
+    { phase: to },
+  );
+
+  expect(moved).toBeTrue();
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe(to);
+});
+
+test.each<
+  [ContractRun['phase'], ContractRun['phase'], [ContractRun['phase'], ContractRun['phase']][]]
+>([
+  ['queued', 'queued', []],
+  ['queued', 'passed', []],
+  ['queued', 'failed', []],
+  ['waiting', 'queued', [['queued', 'waiting']]],
+  ['waiting', 'waiting', [['queued', 'waiting']]],
+  ['waiting', 'passed', [['queued', 'waiting']]],
+  ['waiting', 'failed', [['queued', 'waiting']]],
+  ['running', 'waiting', [['queued', 'running']]],
+  ['running', 'running', [['queued', 'running']]],
+  ['running', 'passed', [['queued', 'running']]],
+  ['running', 'failed', [['queued', 'running']]],
+  ['settling', 'queued', [['queued', 'settling']]],
+  ['settling', 'waiting', [['queued', 'settling']]],
+  ['settling', 'running', [['queued', 'settling']]],
+  ['settling', 'settling', [['queued', 'settling']]],
+  [
+    'passed',
+    'queued',
+    [
+      ['queued', 'settling'],
+      ['settling', 'passed'],
+    ],
+  ],
+  [
+    'passed',
+    'waiting',
+    [
+      ['queued', 'settling'],
+      ['settling', 'passed'],
+    ],
+  ],
+  [
+    'passed',
+    'running',
+    [
+      ['queued', 'settling'],
+      ['settling', 'passed'],
+    ],
+  ],
+  [
+    'passed',
+    'settling',
+    [
+      ['queued', 'settling'],
+      ['settling', 'passed'],
+    ],
+  ],
+  [
+    'passed',
+    'passed',
+    [
+      ['queued', 'settling'],
+      ['settling', 'passed'],
+    ],
+  ],
+  [
+    'passed',
+    'failed',
+    [
+      ['queued', 'settling'],
+      ['settling', 'passed'],
+    ],
+  ],
+  [
+    'failed',
+    'queued',
+    [
+      ['queued', 'settling'],
+      ['settling', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'waiting',
+    [
+      ['queued', 'settling'],
+      ['settling', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'running',
+    [
+      ['queued', 'settling'],
+      ['settling', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'settling',
+    [
+      ['queued', 'settling'],
+      ['settling', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'passed',
+    [
+      ['queued', 'settling'],
+      ['settling', 'failed'],
+    ],
+  ],
+  [
+    'failed',
+    'failed',
+    [
+      ['queued', 'settling'],
+      ['settling', 'failed'],
+    ],
+  ],
+])(
+  '#updateContractPhase refuses to move a run from %s to %s, a move the contract phase table lacks',
+  async (from, to, path) => {
+    const ctx = await setupTest();
+
+    ctx.store.claimContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      number: 17,
+      imp: 'pv-sdk-0123456789abcdef',
+    });
+
+    for (const [before, after] of path) {
+      ctx.store.updateContractPhase(
+        { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        [before],
+        { phase: after },
+      );
+    }
+
+    expect(() =>
+      ctx.store.updateContractPhase(
+        { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+        [from],
+        { phase: to },
+      ),
+    ).toThrowWithMessage(Error, `a contract run cannot move from ${from} to ${to}`);
+
+    expect(
+      ctx.store.findContractRun({
+        repo: 'acme/greenhouse',
+        headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      })?.phase,
+    ).toBe(from);
+  },
+);
+
+test('#updateContractPhase refuses a change when any of its from phases lacks the move', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  expect(() =>
+    ctx.store.updateContractPhase(
+      { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+      ['running', 'queued'],
+      { phase: 'queued' },
+    ),
+  ).toThrowWithMessage(Error, 'a contract run cannot move from queued to queued');
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('queued');
 });
 
 test('#findContractRun returns null for a head commit it has not seen', async () => {

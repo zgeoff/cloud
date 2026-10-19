@@ -6,7 +6,7 @@ import { buildAlertRules } from './build-alert-rules.ts';
 
 // buildAlertRules' groups as a PrometheusRule (#29), picked up via ruleSelectorNilUsesHelmValues.
 // The chart brings the CRD, so opts waits for it; atcDaemons adds ATCDaemonUnreachable per daemon,
-// and nixieReadinessURL adds NixieTurnsFailing.
+// and nixieReadinessURL adds NixieTurnsFailing and NixieDegraded.
 export function createAlertRules(
   ns: Namespace,
   inputs: AlertRuleInputs,

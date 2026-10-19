@@ -18,19 +18,26 @@ The stack runs in the `observability` namespace:
 - **Loki** stores logs on a filesystem volume as a single binary. Loki retains logs by time only,
   and local-path does not enforce the volume's request, so Loki's ingestion rate limit bounds its
   disk use: the most it accepts over the time a log line stays on disk fits below that request.
-- **Alloy** runs on the node and ships every pod's logs and the host's systemd journal to Loki. impd
-  logs to the journal through its container's unit, so impd's logs reach Loki the same way. Alloy
-  drops the gateway's OAuth approval lines before they reach Loki, because each holds the code that
-  approves a client's sign-in, so it stays in the pod's own log, which only a cluster admin reads.
-  Alloy keeps its read position in each log on a directory of the node, so a restart resumes where
-  it stopped. Without a saved position, Alloy reads each container's whole log again. It drops the
-  lines older than the hour Loki still accepts, because each line Loki rejects first counts against
-  Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for Prometheus, which
-  scrapes Alloy ([sign-in alerts](#sign-in-alerts)).
+- **Alloy** runs on the node and ships every pod's logs and the host's systemd journal to Loki. It
+  reads each container's log files on the node, and labels each line with the pod's namespace, pod
+  and container. impd logs to the journal through its container's unit, so impd's logs reach Loki
+  the same way. Alloy drops the gateway's OAuth approval lines before they reach Loki, because each
+  holds the code that approves a client's sign-in, so it stays in the pod's own log, which only a
+  cluster admin reads. Alloy keeps its read position in each log on a directory of the node, so a
+  restart resumes where it stopped. It reads a log file with no saved position from its first line,
+  so a new container's first lines reach Loki. Alloy's container runs a script before each Alloy
+  start. With no saved positions, the script records every pod log file at its current size, and
+  Alloy takes those as its positions, so a start with an empty position store sends Loki no history.
+  With saved positions, the script resets each position past its file's size, which a log the
+  kubelet replaced while Alloy was stopped leaves, so Alloy reads the new file from its first line.
+  Alloy drops the lines older than the hour Loki still accepts, because each line Loki rejects first
+  counts against Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for
+  Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)).
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
   tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness
-  report through its Service and requires the report's conversation turns part to pass.
+  report through its Service twice, once requiring the report's conversation turns part to pass and
+  once requiring its status to be ready.
 
 Grafana's admin password is a secret Pulumi generates, and Grafana's NodePort answers only on the
 tailnet. Its dashboards are provisioned from code. Metrics and logs sit on cluster volumes with no
@@ -56,6 +63,8 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 - impd's health over HTTPS on the tailnet;
 - nixie's conversation turns, which fail without changing nixie's readiness status, so only the
   advisory part of nixie's readiness report shows them;
+- nixie's readiness status, which reads degraded while impd, the conversation imp or the disk fails
+  and leaves the pod ready, so the chart's pod readiness rule misses it;
 - how long the host has run an older system or imp than the latest green build of `main`, which a
   host timer compares with GitHub every hour, and the age of its last check, because a merged change
   to the host waits for a person to switch it;
@@ -99,11 +108,11 @@ alert holds only values that the contract lists.
 Alloy reads the gateway container's log files on the node, not the Kubernetes log API, because the
 API joins stdout and stderr and the contract puts the events on stderr alone. It counts a stderr
 line only when the line starts with the event prefix, and it never counts stdout, where atc printed
-approval codes before passkey sign-in. Alloy reads each log file from its start, so a new pod's
-first events count even when they land before Alloy finds the file. It drops each event older than a
-cutoff longer than that search takes, so a start without saved read positions raises no alert for
-history. The pipeline forwards no line: the gateway's logs reach Loki through the pod-log path that
-every pod's logs take.
+approval codes before passkey sign-in. This pipeline reads each log file from its start, so a new
+pod's first events count even when they land before Alloy finds the file. It drops each event older
+than a cutoff longer than that search takes, so a start without saved read positions raises no alert
+for history. The pipeline forwards no line: the gateway's logs reach Loki through the pod-log path
+that every pod's logs take.
 
 Alloy labels each count with the event's kind, outcome, reason, route and method, and checks each
 value against the contract. A kind and an outcome pass only as a pair that the contract lists, and

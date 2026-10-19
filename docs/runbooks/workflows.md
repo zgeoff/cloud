@@ -123,9 +123,9 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
 7. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
 8. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
-   part that is not ready and nixie's reason for it, since a host that switches cleanly can still
-   leave nixie unable to start. It prints each advisory part that is not ready, such as
-   `conversation_turns`, and passes, because nixie answers while its turns fail.
+   readiness or dependency part that is not ready and nixie's reason for it, since a host that
+   switches cleanly can still leave nixie unable to start. It prints each advisory part that is not
+   ready, such as `conversation_turns`, and passes, because nixie answers while its turns fail.
 
 A timer on the host checks every hour whether it runs an older system or imp than the latest green
 NixOS checks run on `main`, and after a day of that the `HostBehindLatestBuild` alert fires, as

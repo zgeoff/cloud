@@ -120,7 +120,8 @@ in
     # unless a rule allows it
     filterForward = true;
     # Pods (cni0, flannel.1) need forward too: trustedInterfaces covers input only.
-    # imp's module accepts imp-host's own bridge, and drops its traffic to the k3s
+    # inet cloud_host drops their traffic to Docker's subnet first (cloudHost.forwardDrops
+    # below). imp's module accepts imp-host's own bridge, and drops its traffic to the k3s
     # ranges (services.imp.forwardDeny below).
     extraForwardRules = ''
       iifname { "cni0", "flannel.1" } accept
@@ -156,6 +157,25 @@ in
       destinationAddress = topology.tailnet.nodes.geoffcloud.address;
     }
   ];
+
+  # No pod reaches Docker's subnet, imp-host's every port included: inside imp-host only its imps'
+  # taps are filtered, so from docker0's side impd's plain-HTTP API, sshd and the broker all
+  # answer. In iptables' FORWARD, kube-router's network-policy accept mark runs before DOCKER-USER
+  # and Docker's isolation drop, so a drop there would not hold. In nixos-fw, forward-allow accepts
+  # a DNAT'd flow before extraForwardRules, and only a new flow reaches it. A drop in inet
+  # cloud_host's forward chain is final whatever the other chains accept, and it is static, so it
+  # holds before kube-router programs a new pod.
+  # Every pod reaches impd at its tailnet name instead, which this drop does not match.
+  networking.cloudHost.forwardDrops =
+    map
+      (interface: {
+        inherit interface;
+        destinationCIDR = topology.docker.subnet;
+      })
+      [
+        "cni0"
+        "flannel.1"
+      ];
 
   # 1Password Connect for imps, relayed from docker0 to the Service's pinned ClusterIP; the
   # module admits docker0's subnet to the relay in cloud_host and opens its port on docker0

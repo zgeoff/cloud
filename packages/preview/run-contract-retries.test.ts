@@ -98,7 +98,13 @@ test('it tries every queued and waiting run again, and leaves an ended one alone
   ctx.store.updateContractPhase(
     { repo: 'acme/greenhouse', headSHA: 'cccccccccccccccccccccccccccccccccccccccc' },
     ['queued'],
-    { phase: 'failed', detail: '15 pass, 3 fail' },
+    { phase: 'settling', detail: '15 pass, 3 fail', outcome: 'failure' },
+  );
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'cccccccccccccccccccccccccccccccccccccccc' },
+    ['settling'],
+    { phase: 'failed', detail: '15 pass, 3 fail', outcome: 'failure' },
   );
 
   ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
