@@ -10,7 +10,7 @@ export interface ActionsConcurrency {
 }
 
 // a job output that publishes one step's output, `${{ steps.<step>.outputs.<output> }}`
-export interface ActionsJobOutput {
+interface ActionsJobOutput {
   readonly step: string;
   readonly output: string;
 }
