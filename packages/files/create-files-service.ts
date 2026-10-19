@@ -22,6 +22,9 @@ export interface FilesServiceInputs {
 
   // the bytes still free on the volume
   readonly readFreeBytes: () => number;
+
+  // writes an upload's bytes to a path on the volume, as Bun.write does
+  readonly writeBytes: (path: string, file: Blob) => Promise<unknown>;
 }
 
 // on every response, the API's and the 404s included: no browser guesses a type, and no response
@@ -58,6 +61,7 @@ export function createFilesService(inputs: FilesServiceInputs) {
       publicURL: inputs.publicURL,
       now: inputs.now,
       readFreeBytes: inputs.readFreeBytes,
+      writeBytes: inputs.writeBytes,
     }),
   );
 
