@@ -31,17 +31,36 @@ test('it keeps a held registration pending until release, after it has started',
     }),
   );
 
+  let settled = false;
+
+  const observed = (async () => {
+    const value = await pending;
+
+    settled = true;
+
+    return value;
+  })();
+
   await stub.whenRegistered('cloudflare:index/dnsRecord:DnsRecord::atc');
 
-  const beforeRelease = await Promise.race([
-    pending.then(() => 'settled'),
-    Promise.resolve('held'),
-  ]);
+  // setImmediate runs only after every pending promise callback has run
+  const flushed = Promise.withResolvers<void>();
+
+  setImmediate(() => {
+    flushed.resolve();
+  });
+
+  await flushed.promise;
+
+  const settledBeforeRelease = settled;
 
   stub.release();
 
-  expect(beforeRelease).toBe('held');
-  expect(pending).resolves.toStrictEqual({ id: 'atc-id', state: {} });
+  const result = await observed;
+
+  expect(settledBeforeRelease).toBeFalse();
+  expect(result).toStrictEqual({ id: 'atc-id', state: {} });
+  expect(settled).toBeTrue();
 });
 
 test('it resolves whenRegistered for a registration that started before the wait', async () => {
