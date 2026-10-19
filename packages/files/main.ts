@@ -35,12 +35,13 @@ const stopSweep = startExpirySweep({
   },
 });
 
-console.log(`files listening on port ${config.port}`);
-
+// before the listening line, so a SIGTERM that follows it always stops the service cleanly
 process.once('SIGTERM', () => {
   stopSweep();
   void stopService();
 });
+
+console.log(`files listening on port ${config.port}`);
 
 async function stopService(): Promise<void> {
   await service.stop();
