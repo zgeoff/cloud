@@ -43,8 +43,10 @@ call, the path of a change, the topology and the data.
 ## Runbooks
 
 - [Development](./runbooks/development.md): set up a machine and run a first preview.
-- [Workflows](./runbooks/workflows.md): change infrastructure, switch the host, upgrade imp,
-  observe, rotate a credential.
+- [Workflows](./runbooks/workflows.md): change infrastructure, switch the host, upgrade imp, rotate
+  a credential.
+- [Observe](./runbooks/observe.md): Grafana, logs, metrics, the external health check, and Discord
+  alerts.
 - [The prod apply job](./runbooks/prod-apply.md): set up the job, read a run, answer a held one.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
