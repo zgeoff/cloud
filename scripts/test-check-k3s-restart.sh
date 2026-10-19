@@ -12,6 +12,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-k3s-restart.sh"
 
@@ -23,8 +25,7 @@ setup_test() {
 
 it_passes_with_no_output_a_switch_that_leaves_k3s_alone() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" \
@@ -38,16 +39,12 @@ EOF
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_holds_a_switch_that_would_stop_k3s() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" \
@@ -63,16 +60,12 @@ the switch would interrupt k3s.service, and nixie can stay down for minutes afte
 would stop the following units: alloy.service, k3s.service, var-lib-rancher.mount
 switch in a planned k3s window with --allow-k3s-restart
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_holds_a_switch_that_would_restart_k3s() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" \
@@ -87,16 +80,12 @@ the switch would interrupt k3s.service, and nixie can stay down for minutes afte
 would restart the following units: k3s.service
 switch in a planned k3s window with --allow-k3s-restart
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_lets_a_k3s_restart_through_in_a_planned_k3s_window() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" --allow-k3s-restart \
@@ -113,18 +102,14 @@ would stop the following units: k3s.service
 would restart the following units: atc-daemon.service, k3s.service
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # a stopped k3s that the switch starts, and a changed k3s with restartIfChanged off, both keep
 # the running k3s up
 it_passes_k3s_on_the_start_line_or_the_would_not_stop_line() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" \
@@ -136,16 +121,12 @@ EOF
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_never_reads_another_unit_whose_name_holds_k3s_as_k3s() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" \
@@ -157,16 +138,12 @@ EOF
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_rejects_an_unknown_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script" --allow-k3s \
@@ -174,10 +151,7 @@ it_rejects_an_unknown_argument_with_its_usage() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: check-k3s-restart.sh [--allow-k3s-restart] < <dry-activate output>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 run_cases

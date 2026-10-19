@@ -14,11 +14,12 @@ set -euo pipefail
 # umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 it_passes_the_bedrock_rule_pattern_in_secret_rules_json() {
   local image="$1" config="$2" status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
     "$BEDROCK_PATTERN" > "$tree/opt/auto-mode/dist/secret-rules.json"
@@ -36,16 +37,12 @@ it_passes_the_bedrock_rule_pattern_in_secret_rules_json() {
 INF scanned SIZE in T
 INF no leaks found
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_the_bedrock_rule_pattern_in_a_classify_edit_bundle() {
   local image="$1" config="$2" status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'const rules = [{\n\tid: "aws-amazon-bedrock-api-key-short-lived",\n\tpattern: {\n\t\t"source": "%s",\n\t},\n}];\n' \
     "$BEDROCK_PATTERN" > "$tree/opt/auto-mode/dist/classify-edit-B10-ua5i.js"
@@ -63,16 +60,12 @@ it_passes_the_bedrock_rule_pattern_in_a_classify_edit_bundle() {
 INF scanned SIZE in T
 INF no leaks found
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_the_bedrock_rule_pattern_in_secret_rules_json_outside_auto_mode_dist() {
   local image="$1" config="$2" status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/opt/auto-mode/lib" "$tree/opt/other"
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}' \
@@ -96,16 +89,12 @@ EOF
 INF scanned SIZE in T
 WRN leaks found: 2
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_github_token_beside_the_bedrock_rule_pattern_in_secret_rules_json() {
   local image="$1" config="$2" status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '{"rules":[{"id":"aws-amazon-bedrock-api-key-short-lived","pattern":{"source":"%s","flags":"","engine":"js"}}]}\n{"token":"%s"}\n' \
     "$BEDROCK_PATTERN" "$GITHUB_TOKEN" > "$tree/opt/auto-mode/dist/secret-rules.json"
@@ -125,16 +114,12 @@ EOF
 INF scanned SIZE in T
 WRN leaks found: 1
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_github_token_beside_the_bedrock_rule_pattern_in_a_classify_edit_bundle() {
   local image="$1" config="$2" status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'const rules = [{\n\tid: "aws-amazon-bedrock-api-key-short-lived",\n\tpattern: {\n\t\t"source": "%s",\n\t},\n}];\nconst token = "%s";\n' \
     "$BEDROCK_PATTERN" "$GITHUB_TOKEN" > "$tree/opt/auto-mode/dist/classify-edit-B10-ua5i.js"
@@ -154,10 +139,7 @@ EOF
 INF scanned SIZE in T
 WRN leaks found: 1
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The case tree's /opt with auto-mode's dist directory, where the image keeps auto-mode, and no

@@ -14,14 +14,15 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-pulumi-curl.sh"
 
 scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 it_installs_the_pinned_release_and_adds_it_to_the_path() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"dependencies":{"@pulumi/pulumi":"1.2.3","@pulumi/kubernetes":"4.5.6"}}' > "$tree/repo/infra/package.json"
   mkdir -p "$tree/release/pulumi"
@@ -48,16 +49,12 @@ EOF
 /earlier/bin
 $tree/runner-temp/pulumi
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_installs_no_plugin_when_infra_pins_no_kubernetes_provider() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"dependencies":{"@pulumi/pulumi":"1.2.3"}}' > "$tree/repo/infra/package.json"
   mkdir -p "$tree/release/pulumi"
@@ -71,16 +68,12 @@ it_installs_no_plugin_when_infra_pins_no_kubernetes_provider() {
 
   diff - "$tree/out" <<< 'pulumi-v1.2.3-linux-x64.tar.gz: OK'
   diff /dev/null "$tree/err"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_tarball_whose_checksum_does_not_match() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"dependencies":{"@pulumi/pulumi":"1.2.3"}}' > "$tree/repo/infra/package.json"
   mkdir -p "$tree/release/pulumi"
@@ -94,16 +87,12 @@ it_refuses_a_tarball_whose_checksum_does_not_match() {
   diff - "$tree/err" <<< 'sha256sum: WARNING: 1 computed checksum did NOT match'
   [ ! -e "$tree/runner-temp/pulumi" ]
   [ ! -e "$tree/github-path" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_the_checksum_file_lacks_the_tarball() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"dependencies":{"@pulumi/pulumi":"1.2.3"}}' > "$tree/repo/infra/package.json"
   mkdir -p "$tree/release/pulumi"
@@ -117,16 +106,12 @@ it_fails_when_the_checksum_file_lacks_the_tarball() {
   diff - "$tree/err" <<< "sha256sum: 'standard input': no properly formatted checksum lines found"
   [ ! -e "$tree/runner-temp/pulumi" ]
   [ ! -e "$tree/github-path" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_curls_error_when_the_release_is_missing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"dependencies":{"@pulumi/pulumi":"9.9.9"}}' > "$tree/repo/infra/package.json"
 
@@ -136,16 +121,12 @@ it_fails_with_curls_error_when_the_release_is_missing() {
   diff - "$tree/err" <<< 'curl: (22) The requested URL returned error: 404'
   diff - "$tree/calls" <<< '["curl","-fsSLO","https://get.pulumi.com/releases/sdk/pulumi-v9.9.9-linux-x64.tar.gz"]'
   [ ! -e "$tree/github-path" ]
-  [ "$status" = 22 ] || {
-    echo "exit $status, want 22" >&2
-    exit 1
-  }
+  assert_status 22 "$status"
 }
 
 it_requires_the_runner_temp_directory() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" GITHUB_PATH="$tree/github-path" bash scripts/install-pulumi-cli.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -153,16 +134,12 @@ it_requires_the_runner_temp_directory() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'scripts/install-pulumi-cli.sh: line 13: RUNNER_TEMP: set RUNNER_TEMP to the directory the CLI goes in'
   [ ! -e "$tree/calls" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_requires_the_github_path_file() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" RUNNER_TEMP="$tree/runner-temp" bash scripts/install-pulumi-cli.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -170,10 +147,7 @@ it_requires_the_github_path_file() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'scripts/install-pulumi-cli.sh: line 14: GITHUB_PATH: set GITHUB_PATH to the file that takes the paths for later steps'
   [ ! -e "$tree/calls" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # setup_test <tree>: a repo copy at <tree>/repo holding the script and an empty infra/, which each

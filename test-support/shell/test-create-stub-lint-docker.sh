@@ -9,12 +9,13 @@
 set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-lint-docker.sh"
 
 it_exits_0_with_no_output_for_a_tool_that_finds_nothing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_FAILING_TOOLS='ruff' \
@@ -23,16 +24,12 @@ it_exits_0_with_no_output_for_a_tool_that_finds_nothing() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","run","--rm","example/image","nix","shell","nixpkgs#shfmt","-c","shfmt","-d","a.sh"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_a_named_tool_with_its_findings_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_FAILING_TOOLS='shfmt deadnix' \
@@ -41,16 +38,12 @@ it_fails_a_named_tool_with_its_findings_and_exit_1() {
   diff - "$tree/out" <<< 'deadnix: findings'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","run","--rm","example/image","nix","shell","nixpkgs#deadnix","-c","deadnix","--fail","a.nix"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_answers_each_tool_lint_sh_runs() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   for tool in shellcheck shfmt nixfmt deadnix ruff actionlint; do
@@ -75,8 +68,7 @@ EOF
 
 it_fails_closed_with_exit_97_on_a_tool_it_does_not_model() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -85,16 +77,12 @@ it_fails_closed_with_exit_97_on_a_tool_it_does_not_model() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: run --rm example/image nix shell nixpkgs#hello -c hello'
   diff - "$tree/calls" <<< '["docker","run","--rm","example/image","nix","shell","nixpkgs#hello","-c","hello"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_any_other_docker_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -103,10 +91,7 @@ it_fails_closed_with_exit_97_on_any_other_docker_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: volume rm cloud-lint-store'
   diff - "$tree/calls" <<< '["docker","volume","rm","cloud-lint-store"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 setup_test() {

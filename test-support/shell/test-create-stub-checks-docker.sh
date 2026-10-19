@@ -9,13 +9,14 @@
 set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-checks-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/nix-image.sh"
 
 it_prints_the_check_names_without_a_trailing_newline_for_an_eval() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CHECKS=$'atc-daemon\nimpd-restore\n' \
@@ -25,16 +26,12 @@ it_prints_the_check_names_without_a_trailing_newline_for_an_eval() {
   printf 'atc-daemon\nimpd-restore\n' | cmp - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"eval\",\"--raw\",\"path:/src?dir=nixos#checks.x86_64-linux\",\"--apply\",\"builtins.attrNames\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_an_eval_with_the_set_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CHECKS=atc-daemon \
@@ -45,16 +42,12 @@ it_fails_an_eval_with_the_set_error_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: undefined variable 'x'"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"eval\",\"--raw\",\"path:/src?dir=nixos#checks.x86_64-linux\",\"--apply\",\"builtins.attrNames\"]"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_copies_the_source_and_prints_each_checks_derivation_for_a_path_info() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/src/nixos"
   echo '{ }' > "$tree/src/nixos/flake.nix"
@@ -71,16 +64,12 @@ it_copies_the_source_and_prints_each_checks_derivation_for_a_path_info() {
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\",\"path:/src?dir=nixos#checks.x86_64-linux.impd-restore\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_replaces_an_earlier_calls_copy_of_the_source_for_a_path_info() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/src/nixos" "$tree/saw/stale"
   echo '{ }' > "$tree/src/nixos/flake.nix"
@@ -94,16 +83,12 @@ it_replaces_an_earlier_calls_copy_of_the_source_for_a_path_info() {
   diff - "$tree/out" <<< '/nix/store/00000000000000000000000000000000-atc-daemon.drv'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_copies_the_source_then_fails_a_path_info_with_the_set_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/src/nixos"
   echo '{ }' > "$tree/src/nixos/flake.nix"
@@ -117,16 +102,12 @@ it_copies_the_source_then_fails_a_path_info_with_the_set_error_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: attribute 'atc-daemon' missing"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-v\",\"$tree/src:/src:ro\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--derivation\",\"path:/src?dir=nixos#checks.x86_64-linux.atc-daemon\"]"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_prints_nothing_for_a_build() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -136,16 +117,12 @@ it_prints_nothing_for_a_build() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"/nix/store/00000000000000000000000000000000-atc-daemon.drv^*\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_a_build_with_the_set_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -156,16 +133,12 @@ it_fails_a_build_with_the_set_error_and_exit_1() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "error: Cannot build 'x.drv'."
   diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix\",\"build\",\"--no-link\",\"-L\",\"/nix/store/00000000000000000000000000000000-atc-daemon.drv^*\"]"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" docker volume rm cloud-nixos-checks-store \
@@ -174,10 +147,7 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: volume rm cloud-nixos-checks-store"
   diff - "$tree/calls" <<< '["docker","volume","rm","cloud-nixos-checks-store"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each call

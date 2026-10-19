@@ -12,13 +12,14 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-full-checks.sh"
 
 it_writes_full_true_after_the_existing_outputs_for_a_change_to_a_script() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   mkdir "$tree/repo/scripts"
@@ -36,16 +37,12 @@ earlier=1
 full=true
 EOF
   [ ! -e "$tree/summary" ]
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_writes_full_false_and_reports_the_skipped_checks_for_a_markdown_change() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   echo '# notes' > "$tree/repo/README.md"
@@ -62,16 +59,12 @@ it_writes_full_false_and_reports_the_skipped_checks_for_a_markdown_change() {
 ## Earlier step
 Only Markdown files changed, so the Nix-image linters and the shell suites did not run.
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_gits_error_and_writes_no_output_for_a_base_git_cannot_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/outputs" GITHUB_STEP_SUMMARY="$tree/summary" bash "$script" no-such-ref HEAD) > "$tree/out" 2> "$tree/err" || status=$?
@@ -82,16 +75,12 @@ fatal: Not a valid object name no-such-ref
 ERR
   [ ! -e "$tree/outputs" ]
   [ ! -e "$tree/summary" ]
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_fails_with_the_decisions_usage_for_an_empty_base() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/outputs" GITHUB_STEP_SUMMARY="$tree/summary" bash "$script" '' HEAD) > "$tree/out" 2> "$tree/err" || status=$?
@@ -99,32 +88,24 @@ it_fails_with_the_decisions_usage_for_an_empty_base() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-full-checks.sh <base> <head>'
   [ ! -e "$tree/outputs" ]
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_requires_the_step_outputs_file() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_STEP_SUMMARY="$tree/summary" bash "$script" HEAD HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$script: line 13: GITHUB_OUTPUT: set GITHUB_OUTPUT to the file that takes the step outputs"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_requires_the_step_summary_file() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/outputs" bash "$script" HEAD HEAD) > "$tree/out" 2> "$tree/err" || status=$?
@@ -132,10 +113,7 @@ it_requires_the_step_summary_file() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$script: line 14: GITHUB_STEP_SUMMARY: set GITHUB_STEP_SUMMARY to the file that takes the step summary"
   [ ! -e "$tree/outputs" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 setup_test() {

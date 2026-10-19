@@ -13,29 +13,26 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_passes_when_every_remote_tool_resolves_to_a_stand_in_on_the_default_system_path() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   require_remote_tool_stubs "$tree/bin" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_when_the_system_path_also_holds_every_remote_tool() {
   local tool status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   for tool in ssh scp sftp rsync tailscale; do
     printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/system/$tool"
@@ -46,16 +43,12 @@ it_passes_when_the_system_path_also_holds_every_remote_tool() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/ssh"
 
@@ -68,16 +61,12 @@ it_stops_the_case_before_its_next_step_when_ssh_is_missing() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to nothing, not a stand-in in $tree/bin"
   assert_missing "$tree/script-ran" "the step after the guard ran"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_a_stand_in_is_not_executable() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   chmod -x "$tree/bin/tailscale"
 
@@ -85,16 +74,12 @@ it_fails_when_a_stand_in_is_not_executable() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "tailscale stand-in in $tree/bin is not executable"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_ssh_is_missing_and_the_system_path_holds_one() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/ssh"
   printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/system/ssh"
@@ -104,16 +89,12 @@ it_fails_when_ssh_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to $tree/system/ssh, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_ssh_is_missing_everywhere() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/ssh"
 
@@ -121,16 +102,12 @@ it_fails_when_ssh_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "ssh resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_scp_is_missing_and_the_system_path_holds_one() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/scp"
   printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/system/scp"
@@ -140,16 +117,12 @@ it_fails_when_scp_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "scp resolves to $tree/system/scp, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_scp_is_missing_everywhere() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/scp"
 
@@ -157,16 +130,12 @@ it_fails_when_scp_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "scp resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_sftp_is_missing_and_the_system_path_holds_one() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/sftp"
   printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/system/sftp"
@@ -176,16 +145,12 @@ it_fails_when_sftp_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "sftp resolves to $tree/system/sftp, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_sftp_is_missing_everywhere() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/sftp"
 
@@ -193,16 +158,12 @@ it_fails_when_sftp_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "sftp resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_rsync_is_missing_and_the_system_path_holds_one() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/rsync"
   printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/system/rsync"
@@ -212,16 +173,12 @@ it_fails_when_rsync_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "rsync resolves to $tree/system/rsync, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_rsync_is_missing_everywhere() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/rsync"
 
@@ -229,16 +186,12 @@ it_fails_when_rsync_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "rsync resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_tailscale_is_missing_and_the_system_path_holds_one() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/tailscale"
   printf '#!/usr/bin/env bash\nexit 97\n' > "$tree/system/tailscale"
@@ -248,16 +201,12 @@ it_fails_when_tailscale_is_missing_and_the_system_path_holds_one() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "tailscale resolves to $tree/system/tailscale, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_tailscale_is_missing_everywhere() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   rm "$tree/bin/tailscale"
 
@@ -265,10 +214,7 @@ it_fails_when_tailscale_is_missing_everywhere() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "tailscale resolves to nothing, not a stand-in in $tree/bin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # Runtime every case needs: <tree>/bin with an executable placeholder for each remote

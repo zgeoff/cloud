@@ -19,10 +19,12 @@
 #   bash test-support/shell/with-fixture-images.sh bash e2e/test-atc-gateway-restore.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/start-gateway.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/wait-for-ready.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-backup.sh"
@@ -36,8 +38,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/normalize-restic-ou
 it_restores_a_stored_client_after_a_backup_a_wipe_and_a_restore() {
   local gateway_image="$1" backup_image="$2" client_id
   name="atc-gw-restore-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \

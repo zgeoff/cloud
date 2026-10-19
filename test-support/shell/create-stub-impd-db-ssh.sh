@@ -22,31 +22,23 @@
 # sqlite_autoindex_imps_1 of a three-row table. nixos/checks/impd-restore.nix runs the real
 # script on that report and checks the same joined line.
 #
-# With STUB_SSH_PASS=1, a call to a loopback destination (ssh://<user>@127.0.0.1:<port>)
-# goes to the real ssh after it is logged, with -F /dev/null so no ssh config on the
-# machine applies, so a case reaches a real refused connection. An argument after the
-# destination that starts with `-`, which OpenSSH would still read as an option, ends the
-# call with exit 97 before the real ssh runs. The real ssh is the one on the fixed system
-# path (/usr/local/bin, /usr/bin, /bin) when the stand-in is created, never one from the
-# caller's PATH. A call without `-o BatchMode=yes`, to a host other than STUB_HOST, with
-# any other remote command, or with STUB_SSH_PASS=1 to any destination but loopback ends
+# With STUB_SSH_PASS=1, a call after it is logged goes through print-ssh-pass-through.sh's
+# guard: to the real ssh for a loopback destination, else exit 97. A call without
+# `-o BatchMode=yes`, to a host other than STUB_HOST, or with any other remote command ends
 # with exit 97 and "unexpected: <argv>" on stderr.
+# shellcheck source-path=SCRIPTDIR
+source "$(dirname "${BASH_SOURCE[0]}")/print-ssh-pass-through.sh"
+
 create_stub_impd_db_ssh() {
-  local bin="$1" real_ssh
-  real_ssh="$(PATH=/usr/local/bin:/usr/bin:/bin command -v ssh || true)"
+  local bin="$1"
   {
-    printf '#!/usr/bin/env bash\nreal_ssh=%q\n' "$real_ssh"
+    echo '#!/usr/bin/env bash'
     cat << 'STUB'
 printf '%s\0' ssh "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_TREE/calls"
 if [ "$1 $2" != "-o BatchMode=yes" ]; then echo "unexpected: $*" >&2; exit 97; fi
-if [ -n "${STUB_SSH_PASS:-}" ]; then
-  for arg in "${@:4}"; do
-    if [[ "$arg" == -* ]]; then echo "unexpected: $*" >&2; exit 97; fi
-  done
-  if [ -n "$real_ssh" ] && [[ "$3" =~ ^ssh://[a-z]+@127\.0\.0\.1:[0-9]+$ ]]; then exec "$real_ssh" -F /dev/null "$@"; fi
-  echo "unexpected: $*" >&2
-  exit 97
-fi
+STUB
+    print_ssh_pass_through
+    cat << 'STUB'
 if [ "$#" != 4 ] || [ "$3" != "$STUB_HOST" ] || [[ ! "$4" =~ ^copy-impd-db-host\ ([A-Za-z0-9._-]+)$ ]]; then
   echo "unexpected: $*" >&2
   exit 97

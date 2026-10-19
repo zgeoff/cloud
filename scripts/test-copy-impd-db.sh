@@ -16,14 +16,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-impd-db-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 it_sends_the_copy_to_geoffcloud_with_the_label_and_prints_the_hosts_report() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
@@ -44,16 +45,12 @@ OUT
   diff /dev/null "$tree/err"
   diff "$tree/calls-expected" "$tree/calls"
   diff /dev/null "$tree/stdin"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_sends_the_copy_to_the_host_IMPD_DB_HOST_names() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' '["ssh","-o","BatchMode=yes","root@imp-staging","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
@@ -74,16 +71,12 @@ OUT
   diff /dev/null "$tree/err"
   diff "$tree/calls-expected" "$tree/calls"
   diff /dev/null "$tree/stdin"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_exits_1_with_the_hosts_report_when_the_copy_fails_its_integrity_check() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
@@ -104,16 +97,12 @@ OUT
   diff /dev/null "$tree/err"
   diff "$tree/calls-expected" "$tree/calls"
   diff /dev/null "$tree/stdin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_exits_1_with_dockers_error_when_imp_host_is_not_running() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
@@ -125,16 +114,12 @@ it_exits_1_with_dockers_error_when_imp_host_is_not_running() {
   diff - "$tree/err" <<< 'Error response from daemon: No such container: imp-host'
   diff "$tree/calls-expected" "$tree/calls"
   diff /dev/null "$tree/stdin"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_ssh_exit_255_when_the_host_refuses_the_connection() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","copy-impd-db-host imp-0.29.0-pre-0.30.0"]' > "$tree/calls-expected"
 
@@ -145,16 +130,12 @@ it_fails_with_ssh_exit_255_when_the_host_refuses_the_connection() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff "$tree/calls-expected" "$tree/calls"
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_stops_with_exit_1_and_its_usage_before_any_call_when_no_label_is_given() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -164,16 +145,12 @@ it_stops_with_exit_1_and_its_usage_before_any_call_when_no_label_is_given() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'copy-impd-db.sh: line 17: 1: usage: copy-impd-db.sh <label>, such as imp-0.29.0-pre-0.30.0'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_with_exit_1_before_any_call_when_the_label_holds_another_character() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -183,10 +160,7 @@ it_stops_with_exit_1_before_any_call_when_the_label_holds_another_character() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "the label may hold only letters, digits, '.', '_' and '-'"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # Runtime every case needs: the script in <tree>, the ssh stand-in with fail-closed

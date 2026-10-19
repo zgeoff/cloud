@@ -9,10 +9,13 @@
 # It tests the wrapper itself, so it runs outside it, in its own group:
 # shell-suite: fixture-images
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-gh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-github-api.sh"
@@ -22,8 +25,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/with-fixture-images.sh"
 # random, so the case reads it from the output, then diffs the whole output with it.
 it_runs_the_command_with_both_images_built_then_removes_them_and_returns_its_status() {
   local run status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
 
   # shellcheck disable=SC2016 # expanded by the command's own shell
   with_fixture_images bash -c 'docker image inspect "$FIXTURE_GATEWAY_IMAGE" "$FIXTURE_BACKUP_IMAGE" > /dev/null &&
@@ -45,10 +47,7 @@ EOF
   docker images -q --filter "reference=atc-gateway-backup:fixture-$run" > "$tree/backup-left"
   diff /dev/null "$tree/gateway-left"
   diff /dev/null "$tree/backup-left"
-  [ "$status" = 7 ] || {
-    echo "exit $status, want 7" >&2
-    exit 1
-  }
+  assert_status 7 "$status"
 }
 
 # GH_HOST, SSL_CERT_FILE and an empty SSL_CERT_DIR point gh at the GitHub API stand-in on
@@ -60,8 +59,7 @@ EOF
 # requests are sorted because the two lookups' order is not part of the contract.
 it_reports_a_failed_build_with_its_log_and_runs_nothing() {
   local release status=0
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   mkdir "$tree/github" "$tree/gh" "$tree/home" "$tree/tmp" "$tree/no-certs"
   start_stub_github_api "$tree/github"
   sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../images/atc-gateway/versions.env" > "$tree/release"
@@ -87,10 +85,7 @@ POST /api/graphql RepositoryReleaseByTag tagName=$release
 EOF
   assert_missing "$tree/github/unexpected" "gh sent an unexpected request"
   assert_missing "$tree/ran" "the command ran after a failed build"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # A gh stand-in first on PATH answers the release fetch only when gh runs with all three
@@ -101,8 +96,7 @@ EOF
 # or built.
 it_runs_the_release_fetch_with_ghs_telemetry_and_update_check_off() {
   local release status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   mkdir "$tree/bin" "$tree/home" "$tree/tmp"
   create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
   sed -n 's/^ATC_RELEASE=//p' "$(dirname "${BASH_SOURCE[0]}")/../../images/atc-gateway/versions.env" > "$tree/release"
@@ -127,10 +121,7 @@ FAIL the images did not build from the pinned, checked binary and pinned bases
 EOF
   diff /dev/null "$tree/err"
   assert_missing "$tree/ran" "the command ran after a failed build"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 run_cases

@@ -43,12 +43,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -91,12 +86,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -140,12 +130,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -192,12 +177,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -241,12 +221,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -295,12 +270,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -342,12 +312,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -389,12 +354,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -436,12 +396,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -484,12 +439,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -535,12 +485,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -586,12 +531,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -639,12 +579,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -686,13 +621,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
           )
           machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           broken_before = ctx["broken_path"]
 
@@ -724,12 +653,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -771,13 +695,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "sqlite3 /mnt/imp/db/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
           )
           machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           # the stand-in writes /tmp/holder.pid once the script is inside the check of its staged copy
@@ -810,12 +728,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -865,12 +778,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
@@ -920,12 +828,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == booted, f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(booted)
           generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")

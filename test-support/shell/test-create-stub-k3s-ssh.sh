@@ -9,6 +9,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-k3s-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
@@ -16,8 +18,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_prints_the_hosts_k3s_kubeconfig() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' 'apiVersion: v1' '    server: https://127.0.0.1:6443' > "$tree/host/k3s.yaml"
 
@@ -30,16 +31,12 @@ apiVersion: v1
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_cats_error_and_exit_1_when_the_host_has_no_kubeconfig() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
@@ -48,17 +45,13 @@ it_fails_with_cats_error_and_exit_1_when_the_host_has_no_kubeconfig() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'cat: /etc/rancher/k3s/k3s.yaml: No such file or directory'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The host's missing file and the real cat agree: the same message for the same path.
 it_fails_a_missing_kubeconfig_as_the_real_cat_does() {
   local status=0 real_status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin LC_ALL=C cat "$tree/host/k3s.yaml" > "$tree/real-out" 2> "$tree/real-err" || real_status=$?
 
@@ -77,8 +70,7 @@ it_fails_a_missing_kubeconfig_as_the_real_cat_does() {
 
 it_times_out_with_exit_255_when_the_host_does_not_answer() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' 'apiVersion: v1' > "$tree/host/k3s.yaml"
 
@@ -88,16 +80,12 @@ it_times_out_with_exit_255_when_the_host_does_not_answer() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host geoffcloud port 22: Connection timed out\r'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_fails_closed_with_exit_97_on_another_host() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '%s\n' 'apiVersion: v1' > "$tree/host/k3s.yaml"
 
@@ -107,16 +95,12 @@ it_fails_closed_with_exit_97_on_another_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@other cat /etc/rancher/k3s/k3s.yaml'
   diff - "$tree/calls" <<< '["ssh","root@other","cat","/etc/rancher/k3s/k3s.yaml"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_another_command() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_HOST=root@geoffcloud \
@@ -126,10 +110,7 @@ it_fails_closed_with_exit_97_on_another_command() {
   diff - "$tree/err" <<< "unexpected: root@geoffcloud touch $tree/ran"
   diff - "$tree/calls" <<< "[\"ssh\",\"root@geoffcloud\",\"touch $tree/ran\"]"
   assert_missing "$tree/ran" "the command ran"
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the

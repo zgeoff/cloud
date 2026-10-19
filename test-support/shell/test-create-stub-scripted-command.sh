@@ -9,12 +9,13 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-scripted-command.sh"
 
 it_answers_each_call_in_turn_with_its_own_output_and_status() {
   local status1=0 status2=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'first out\n' > "$tree/answers/1.out"
   printf 'first err\n' > "$tree/answers/1.err"
@@ -46,8 +47,7 @@ EOF
 
 it_fails_closed_with_exit_97_on_a_call_with_no_answer() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/work" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -56,10 +56,7 @@ it_fails_closed_with_exit_97_on_a_call_with_no_answer() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: call 1: up --yes'
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree/work\",\"argv\":[\"pulumi\",\"up\",\"--yes\"]}"
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 setup_test() {

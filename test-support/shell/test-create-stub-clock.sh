@@ -10,12 +10,12 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
 
 it_reads_0_before_any_pause() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/clock" > "$tree/out"
@@ -25,8 +25,7 @@ it_reads_0_before_any_pause() {
 }
 
 it_advances_one_second_for_each_pause_and_records_its_argument() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/sleep" 0.05
@@ -41,8 +40,7 @@ PAUSES
 }
 
 it_keeps_the_time_still_between_reads() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" "$tree/sleep" 0.05
 
@@ -58,8 +56,7 @@ READS
 }
 
 it_answers_as_the_sleep_command_on_PATH() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" sleep 0.05

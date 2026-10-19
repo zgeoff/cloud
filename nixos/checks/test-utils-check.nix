@@ -233,16 +233,42 @@ let
       '';
     }
     {
+      title = "it start-stub-impd starts the stand-in it is given with its port read, and stops it when the case exits";
+      script = ''
+        mkdir home tmp
+        source ${testLib}/wait-for.sh
+
+        bash -c 'set -euo pipefail; source "$1"; start_stub_impd "$2" /health 200 text/plain ok "$PWD/requests"; echo "$port" > port; curl -s "http://127.0.0.1:$port/health" > body' \
+          _ ${./test-utils/start-stub-impd.sh} ${./test-utils/run-stub-impd.py} > out 2> err
+
+        assert_equals ok "$(cat body)" "the stand-in's answer"
+        assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        # curl exits 7 once nothing listens on the port
+        wait_for 5 "the stand-in to stop" bash -c 'status=0; curl -s -o /dev/null "http://127.0.0.1:$1/health" || status=$?; [ "$status" = 7 ]' _ "$(cat port)"
+      '';
+    }
+    {
+      title = "it start-stub-impd lets a case stop the stand-in first, with no error when the case exits";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        bash -c 'set -euo pipefail; source "$1"; start_stub_impd "$2" /health 200 text/plain ok "$PWD/requests"; kill "$stub_pid"; wait "$stub_pid" || true' \
+          _ ${./test-utils/start-stub-impd.sh} ${./test-utils/run-stub-impd.py} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the case's exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+      '';
+    }
+    {
       title = "it run-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
       script = ''
         mkdir home tmp
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
+        start_stub_impd ${./test-utils/run-stub-impd.py} \
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -D headers -o body "http://127.0.0.1:$port/health"
 
@@ -257,13 +283,8 @@ let
       title = "it run-stub-impd records a request for another path and answers it with a failure";
       script = ''
         mkdir home tmp
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
+        start_stub_impd ${./test-utils/run-stub-impd.py} \
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -D headers -o body "http://127.0.0.1:$port/ready"
 
@@ -277,13 +298,8 @@ let
       title = "it run-stub-impd records a request with another method and answers it with a failure";
       script = ''
         mkdir home tmp
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
+        start_stub_impd ${./test-utils/run-stub-impd.py} \
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -X POST -D headers -o body "http://127.0.0.1:$port/health"
 
@@ -297,13 +313,8 @@ let
       title = "it run-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
       script = ''
         mkdir home tmp
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-impd.py} \
-          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests" >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
+        start_stub_impd ${./test-utils/run-stub-impd.py} \
+          /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         # a raw request, so the check sees every byte the stand-in sends before it closes
         exec 4<>"/dev/tcp/127.0.0.1/$port"
@@ -494,12 +505,7 @@ let
       title = "it run-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''
         mkdir home tmp
-        mkfifo port.fifo
-        exec 3<>port.fifo
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" python3 ${./test-utils/run-stub-hung-impd.py} >&3 &
-        stub_pid=$!
-        trap 'kill "$stub_pid"' EXIT
-        read -r -t 5 -u 3 port
+        start_stub_impd ${./test-utils/run-stub-hung-impd.py}
 
         # one real wait serves both units: curl's own deadline is the only end it has
         real_status=0
@@ -707,7 +713,7 @@ let
       '';
     }
     {
-      title = "it buildStubSqlite3 holds to restore-impd-db: it checks the staged file through SQLITE3";
+      title = "it buildStubSqlite3 and buildStubBlockingSqlite3 hold to restore-impd-db: it checks the staged file through SQLITE3";
       script = ''
         staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         checked=$(grep -cF '[ "$("$sqlite" "file:$staged?mode=ro&immutable=1" '"'"'PRAGMA integrity_check;'"'"')" = ok ]' \
@@ -774,19 +780,6 @@ let
         assert_files_equal /dev/null out
         assert_equals "sqlite3-blocking-on-staged-check: set HOLDER_PID_FILE to the file that names the blocked process" \
           "$(cat err)" "the error"
-      '';
-    }
-    {
-      title = "it buildStubBlockingSqlite3 holds to restore-impd-db: it checks the staged file through SQLITE3";
-      script = ''
-        staged=$(grep -cxF 'staged="$db/imp.sqlite.restore"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
-        checked=$(grep -cF '[ "$("$sqlite" "file:$staged?mode=ro&immutable=1" '"'"'PRAGMA integrity_check;'"'"')" = ok ]' \
-          ${../packages/impd-db-tools/restore-impd-db.sh} || true)
-        sqlite=$(grep -cxF 'sqlite="''${SQLITE3:-sqlite3}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
-
-        assert_equals 1 "$staged" "the script's staged file"
-        assert_equals 1 "$checked" "the script's checks of the staged file"
-        assert_equals 1 "$sqlite" "the script's sqlite3"
       '';
     }
     {
@@ -1558,6 +1551,7 @@ pkgs.runCommand "test-utils-check"
       assert_equals false "$rendered" "whether it rendered"
     )
 
+    source ${./test-utils/start-stub-impd.sh}
     source ${testLib}/run-cases.sh
     source ${pkgs.writeText "test-utils-cases.sh" (renderCases cases)}
     run_cases

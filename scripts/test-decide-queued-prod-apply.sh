@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-queued-prod-apply.sh"
 
@@ -25,8 +27,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_decides_an_apply_when_the_revision_changes_a_pulumi_input_since_the_tag() {
   local deployed revision status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   deployed="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" tag deployed/prod
@@ -48,16 +49,12 @@ apply=true
 deployed=$deployed
 EOF
   diff /dev/null "$tree/summary"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_decides_no_apply_and_says_so_when_a_newer_apply_moved_the_tag_past_the_revision() {
   local deployed revision status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra"
   echo 'export {};' > "$tree/repo/infra/index.ts"
@@ -81,16 +78,12 @@ apply=false
 deployed=$deployed
 EOF
   diff - "$tree/summary" <<< "deployed/prod at $deployed already holds every Pulumi input of $revision, so nothing applied."
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   local revision status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   revision="$(git -C "$tree/repo" rev-parse HEAD)"
 
@@ -103,16 +96,12 @@ it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   diff - "$tree/err" <<< 'fatal: Needed a single revision'
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
   local deployed revision status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" checkout -q -b side
   git -C "$tree/repo" commit -q --allow-empty -m 'a commit off main'
@@ -131,16 +120,12 @@ it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
   diff - "$tree/err" <<< "needs-prod-apply: $deployed is not an ancestor of $revision; set the tag by hand at the live revision"
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_missing_revision_as_a_usage_error() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
 
@@ -153,10 +138,7 @@ it_refuses_a_missing_revision_as_a_usage_error() {
   diff - "$tree/err" <<< 'decide-queued-prod-apply: set REVISION'
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

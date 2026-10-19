@@ -9,11 +9,11 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/normalize-restic-output.sh"
 
 it_masks_a_snapshot_ID_at_the_start_of_a_row_and_after_snapshot() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 a1b2c3d4  2020-01-06 10:00:00  atc-gateway  atc-gateway  /tmp/a
@@ -27,8 +27,7 @@ EOF
 }
 
 it_leaves_hex_that_is_not_a_snapshot_ID_alone() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 deadbeef saved
@@ -46,8 +45,7 @@ EOF
 }
 
 it_masks_a_time_from_2021_on_with_or_without_fractional_seconds() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 at 2026-10-07 12:34:56.123456789 +0000 UTC
@@ -61,8 +59,7 @@ EOF
 }
 
 it_keeps_a_2020_time_and_drops_only_zero_fractional_seconds() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 at 2020-01-06 10:00:00.000000000 +0000 UTC
@@ -78,8 +75,7 @@ EOF
 }
 
 it_masks_sizes_in_bytes_KiB_and_MiB() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 Added to the repository: 1.5 MiB (700 B stored)
@@ -95,8 +91,7 @@ EOF
 }
 
 it_masks_a_duration_after_in_and_a_progress_lines_elapsed_time() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 Summary: Restored 2 files/dirs (12 B) in 0:01
@@ -114,8 +109,7 @@ EOF
 }
 
 it_masks_the_repository_ID_that_init_prints() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 created restic repository 3f9c2a7b1e at /repo
@@ -129,8 +123,7 @@ EOF
 }
 
 it_masks_the_restores_temp_directory() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   normalize_restic_output > "$tree/out" << 'EOF'
 restoring snapshot 0f1e2d3c of [/tmp/snap] at 2020-01-06 10:00:00.000000000 +0000 UTC by @atc-gateway to /tmp/tmp.Ab12Cd

@@ -27,22 +27,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it refuses to restore while imp-host runs, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
           status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
@@ -58,36 +44,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses to restore while imp-docker-proxy runs, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
@@ -104,36 +69,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses to restore while an imp-host container runs without its unit, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           machine.succeed("docker run -d --rm --name imp-host ${image29.ref} sleep infinity")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
@@ -151,36 +95,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it restores the copy, saves the stopped database and switches to the copy's generation"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
@@ -259,15 +182,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it reads the migration from a COPY-INFO that names it migration"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed(
               "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
@@ -353,22 +268,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it restores without a switch when the copy's generation is the running one"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
@@ -400,12 +301,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
           # generation 3 is the running system, so nothing switches and no generation is added
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           machine.succeed("systemctl is-active imp-host")
           image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
           assert image == "${image29.ref}", image
@@ -592,13 +488,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           )
           db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite")
           machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
@@ -630,12 +520,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
           # generation 3 is the running system, so nothing switches and no generation is added
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           machine.succeed("systemctl is-active imp-host")
           image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
           assert image == "${image29.ref}", image
@@ -666,13 +551,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           )
           db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
           machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
 
           before = machine.succeed("date -u +%Y%m%dT%H%M%S").strip()
@@ -704,12 +583,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
           # generation 3 is the running system, so nothing switches and no generation is added
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           machine.succeed("systemctl is-active imp-host")
           image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
           assert image == "${image29.ref}", image
@@ -733,22 +607,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it prints its usage, and changes nothing, without arguments"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
@@ -768,29 +628,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a copy without imp.sqlite, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed(
               "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' 'sizeBytes 0' 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
@@ -811,29 +656,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a copy that fails integrity_check, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed("printf 'not a database\\n' > /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite")
           machine.succeed(
@@ -855,29 +685,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a copy without COPY-INFO, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed(
               "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
@@ -898,29 +713,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a COPY-INFO without an image, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed(
               "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
@@ -944,29 +744,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a COPY-INFO without a migration, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed(
               "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
@@ -990,29 +775,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a copy whose newest migration differs from COPY-INFO, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
           machine.succeed(
               "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
@@ -1036,36 +806,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a generation that is not a number, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
@@ -1082,36 +831,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a generation that does not exist, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
@@ -1128,36 +856,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses a generation that runs another image than the copy's, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
@@ -1174,36 +881,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
-          machine.succeed("mount -t zfs tank/imp /mnt/imp")
-          sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          assert_generations_unchanged(ctx["base_path"])
+          sums = read_database_sums()
           assert sums == db_sums, f"the database changed: {sums}"
 
 
       with subtest("it refuses while tank/imp is mounted, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           machine.succeed("mount -t zfs tank/imp /mnt/imp")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
@@ -1222,12 +908,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert mounts == ["/mnt/imp"], f"tank/imp is mounted at {mounts}"
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
           machine.succeed("umount /mnt/imp")
           assert sums == db_sums, f"the database changed: {sums}"
@@ -1235,13 +916,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it refuses a dataset without imp.sqlite, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
           dataset_before = machine.succeed("cd /mnt/imp && find . | sort")
@@ -1265,12 +940,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           machine.succeed("mount -t zfs tank/imp /mnt/imp")
           dataset_after = machine.succeed("cd /mnt/imp && find . | sort")
           machine.succeed("umount /mnt/imp")
@@ -1279,22 +949,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it refuses to restore when docker does not answer, and changes nothing"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           machine.succeed("systemctl stop docker.socket docker.service")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
@@ -1316,12 +972,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           machine.succeed("mount -t zfs tank/imp /mnt/imp")
           sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
           db_files = machine.succeed("ls -A /mnt/imp/db").split()
@@ -1332,15 +983,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it stops, and leaves the database in place, when the staged file fails integrity_check"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           # a copy whose newest marker page is only in its WAL, over a damaged page in the main
           # file: read with its WAL it is sound, and the main file alone, which is all the script
           # stages, is not. The copy is mounted read-only, so no read checkpoints the WAL into it.
@@ -1400,12 +1043,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
           units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           machine.succeed("mount -t zfs tank/imp /mnt/imp")
           sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
           db_files = machine.succeed("ls -A /mnt/imp/db").split()
@@ -1416,15 +1054,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it warns that tank/imp is still mounted when it stops and cannot unmount it"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
           # a copy whose newest marker page is only in its WAL, over a damaged page in the main
           # file: read with its WAL it is sound, and the main file alone, which is all the script
           # stages, is not. The copy is mounted read-only, so no read checkpoints the WAL into it.
@@ -1487,12 +1117,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
           units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           sums = machine.succeed(f"cd {mounts[0]}/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
           db_files = machine.succeed(f"ls -A {mounts[0]}/db").split()
           assert sums == db_sums, f"the database changed: {sums}"
@@ -1501,22 +1126,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it stops, leaving the copy in place and tank/imp mounted, when it cannot unmount tank/imp"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image29.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
 
@@ -1561,12 +1172,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert saved_secret == "dummy-secret-value\n", f"the saved secret reads {saved_secret!r}"
           units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
-          current = machine.succeed("readlink -f /run/current-system").strip()
-          assert current == ctx["base_path"], f"the system is {current}"
-          profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
-          assert profile == "system-3-link", f"the system profile is {profile}"
-          links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
-          assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+          assert_generations_unchanged(ctx["base_path"])
           published = machine.execute(f"cmp /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite {mounts[0]}/db/imp.sqlite")[0]
           db_files = machine.succeed(f"ls -A {mounts[0]}/db").split()
           assert published == 0, "the published database differs from the copy"
@@ -1575,22 +1181,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it stops both units again when imp-host comes up on another image than the copy's"):
           ctx = setup_test()
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          machine.succeed("install -d -m 0700 /mnt/imp/db")
-          machine.succeed("install -d -m 0700 /mnt/imp/secrets")
-          machine.succeed("printf 'dummy-secret-value\\n' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
-          machine.succeed(
-              "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
-          )
-          db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
-          machine.succeed("umount /mnt/imp")
-          machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-0.29-20261004T000000")
-          machine.succeed(
-              "sqlite3 /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('copy');\""
-          )
-          machine.succeed(
-              "printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s /root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite)\" 'lastMigration 0002_tokens' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image ${image28.ref}' > /root/imp-db-backups/pre-0.29-20261004T000000/COPY-INFO"
-          )
+          db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
           machine.succeed("systemctl stop imp-host imp-docker-proxy")
           # /run/current-system names generation 1 (0.28.0) while the loaded units stay generation
           # 3's (0.29.0): the script takes generation 1 as running, skips the switch, and starts

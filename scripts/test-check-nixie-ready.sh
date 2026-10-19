@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nixos-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
@@ -49,8 +51,7 @@ repeat_line() {
 
 it_passes_at_once_when_every_part_is_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -63,16 +64,12 @@ it_passes_at_once_when_every_part_is_ready() {
     echo "it paused: $(cat "$tree/clock/pauses")" >&2
     exit 1
   }
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_naming_each_advisory_part_that_is_not_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -88,16 +85,12 @@ EOF
     echo "it paused: $(cat "$tree/clock/pauses")" >&2
     exit 1
   }
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_pauses_10_seconds_after_each_try_that_is_not_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -108,16 +101,12 @@ it_pauses_10_seconds_after_each_try_that_is_not_ready() {
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "$(repeat_line 3 "$exec_call")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 2 10)"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_after_30_tries_naming_each_part_that_is_not_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -127,16 +116,12 @@ it_fails_after_30_tries_naming_each_part_that_is_not_ready() {
   diff - "$tree/err" <<< 'nixie is not ready after 30 tries: imp_host: impd 4.0.0 refuses imp client 3.2.1; model: the check took longer than 2000 ms'
   diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_on_an_unready_status_even_when_every_part_reads_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -145,16 +130,12 @@ it_fails_on_an_unready_status_even_when_every_part_reads_ready() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'nixie is not ready after 30 tries: status "unready"'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_passes_naming_the_dependency_parts_once_a_degraded_nixie_reports_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -165,16 +146,12 @@ it_passes_naming_the_dependency_parts_once_a_degraded_nixie_reports_ready() {
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "$(repeat_line 2 "$exec_call")"
   diff - "$tree/clock/pauses" <<< '10'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_after_30_tries_naming_each_dependency_part_that_is_not_ready() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -184,16 +161,12 @@ it_fails_after_30_tries_naming_each_dependency_part_that_is_not_ready() {
   diff - "$tree/err" <<< 'nixie is not ready after 30 tries: imp_host: impd 4.0.0 refuses imp client 3.2.1'
   diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_the_last_error_when_no_report_comes_back() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -203,16 +176,12 @@ it_fails_with_the_last_error_when_no_report_comes_back() {
   diff - "$tree/err" <<< 'nixie is not ready after 30 tries: no report from nixie-0: Error from server (NotFound): pods "nixie-0" not found'
   diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_ends_each_try_after_20_seconds_and_fails_naming_the_hang() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -224,16 +193,12 @@ it_ends_each_try_after_20_seconds_and_fails_naming_the_hang() {
   diff /dev/null "$tree/calls"
   diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","-k","5","20"] + .' <<< "$exec_call")")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_counts_a_try_that_the_kill_after_the_deadline_ends_as_a_hang() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -245,16 +210,12 @@ it_counts_a_try_that_the_kill_after_the_deadline_ends_as_a_hang() {
   diff /dev/null "$tree/calls"
   diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","-k","5","20"] + .' <<< "$exec_call")")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_prints_its_usage_without_a_host() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -263,10 +224,7 @@ it_prints_its_usage_without_a_host() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: check-nixie-ready.sh <host>'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 run_cases

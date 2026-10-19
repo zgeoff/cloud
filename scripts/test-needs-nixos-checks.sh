@@ -12,13 +12,14 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/needs-nixos-checks.sh"
 
 it_prints_true_for_a_change_under_nixos() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -32,16 +33,12 @@ it_prints_true_for_a_change_under_nixos() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_run_nixos_checks_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/run-nixos-checks.sh"
@@ -55,16 +52,12 @@ it_prints_true_for_a_change_to_run_nixos_checks_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_case_runner_the_checks_read() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/test-support/shell"
   echo '# shellcheck shell=bash' > "$tree/repo/test-support/shell/run-cases.sh"
@@ -78,16 +71,12 @@ it_prints_true_for_a_change_to_the_case_runner_the_checks_read() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_a_helper_suite_the_checks_run() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/test-support/shell"
   echo '#!/usr/bin/env bash' > "$tree/repo/test-support/shell/test-assert-missing.sh"
@@ -101,16 +90,12 @@ it_prints_true_for_a_change_to_a_helper_suite_the_checks_run() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_wait_helper_the_rehearsal_reads() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/test-support/shell"
   echo '# shellcheck shell=bash' > "$tree/repo/test-support/shell/wait-for.sh"
@@ -124,16 +109,12 @@ it_prints_true_for_a_change_to_the_wait_helper_the_rehearsal_reads() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_a_shell_stand_in_the_checks_never_read() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/test-support/shell"
   echo '# shellcheck shell=bash' > "$tree/repo/test-support/shell/create-stub-gh.sh"
@@ -147,16 +128,12 @@ it_prints_false_for_a_change_to_a_shell_stand_in_the_checks_never_read() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_the_impd_db_copy_script_on_this_machine() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/copy-impd-db.sh"
@@ -170,16 +147,12 @@ it_prints_false_for_a_change_to_the_impd_db_copy_script_on_this_machine() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_nix_image_pin() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '# the first pin' > "$tree/repo/scripts/nix-image.sh"
@@ -193,16 +166,12 @@ it_prints_true_for_a_change_to_the_nix_image_pin() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_needs_nixos_checks_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/needs-nixos-checks.sh"
@@ -216,16 +185,12 @@ it_prints_true_for_a_change_to_needs_nixos_checks_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_find_nixos_check_run_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/find-nixos-check-run.sh"
@@ -239,16 +204,12 @@ it_prints_true_for_a_change_to_find_nixos_check_run_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_decide_nixos_checks_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/decide-nixos-checks.sh"
@@ -262,16 +223,12 @@ it_prints_true_for_a_change_to_decide_nixos_checks_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_open_kvm_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/open-kvm.sh"
@@ -285,16 +242,12 @@ it_prints_true_for_a_change_to_open_kvm_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_install_imp_dns_token_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/install-imp-dns-token.sh"
@@ -308,16 +261,12 @@ it_prints_true_for_a_change_to_install_imp_dns_token_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_write_atc_gateway_token_sh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/scripts/host"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/host/write-atc-gateway-token.sh"
@@ -331,16 +280,12 @@ it_prints_true_for_a_change_to_write_atc_gateway_token_sh() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_shared_constants() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/packages/topology"
   echo '{}' > "$tree/repo/packages/topology/constants.json"
@@ -354,16 +299,12 @@ it_prints_true_for_a_change_to_the_shared_constants() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_preview_service_the_host_runs() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/packages/preview"
   echo 'export {};' > "$tree/repo/packages/preview/main.ts"
@@ -377,16 +318,12 @@ it_prints_true_for_a_change_to_the_preview_service_the_host_runs() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_another_package() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/packages/topology-docs"
   echo '# topology' > "$tree/repo/packages/topology-docs/README.md"
@@ -400,16 +337,12 @@ it_prints_false_for_a_change_to_another_package() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_a_script_the_checks_never_read() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/scripts"
   echo '#!/usr/bin/env bash' > "$tree/repo/scripts/switch-geoffcloud.sh"
@@ -423,16 +356,12 @@ it_prints_false_for_a_change_to_a_script_the_checks_never_read() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_the_root_package_json() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"name":"fixture"}' > "$tree/repo/package.json"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
@@ -445,16 +374,12 @@ it_prints_false_for_a_change_to_the_root_package_json() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_bun_version() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo 1.0.0 > "$tree/repo/.bun-version"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
@@ -467,16 +392,12 @@ it_prints_true_for_a_change_to_the_bun_version() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_lockfile_the_preview_package_reads() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{ "lockfileVersion": 1 }' > "$tree/repo/bun.lock"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
@@ -489,16 +410,12 @@ it_prints_true_for_a_change_to_the_lockfile_the_preview_package_reads() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_the_gitignore() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo node_modules > "$tree/repo/.gitignore"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
@@ -511,16 +428,12 @@ it_prints_false_for_a_change_to_the_gitignore() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_nixos_checks_workflow() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/.github/workflows"
   echo 'name: NixOS checks' > "$tree/repo/.github/workflows/nixos-checks.yml"
@@ -534,16 +447,12 @@ it_prints_true_for_a_change_to_the_nixos_checks_workflow() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_no_input_of_the_checks() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/infra" "$tree/repo/docs" "$tree/repo/.github/workflows"
   echo 'export {};' > "$tree/repo/infra/index.ts"
@@ -561,16 +470,12 @@ it_prints_false_for_a_change_to_no_input_of_the_checks() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_when_a_rename_moves_a_file_out_of_nixos() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -585,16 +490,12 @@ it_prints_true_when_a_rename_moves_a_file_out_of_nixos() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_when_a_file_under_nixos_is_deleted() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -608,16 +509,12 @@ it_prints_true_when_a_file_under_nixos_is_deleted() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_changed_nixos() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos" "$tree/repo/infra"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -638,16 +535,12 @@ it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -663,16 +556,12 @@ it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_a_file_under_nixos_whose_name_git_quotes() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   mkdir "$tree/repo/nixos"
@@ -684,32 +573,24 @@ it_prints_true_for_a_change_to_a_file_under_nixos_whose_name_git_quotes() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_rejects_an_empty_base_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" '' HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-nixos-checks.sh <base> <head>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" 1111111111111111111111111111111111111111 HEAD) \
@@ -719,16 +600,12 @@ it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
   diff - "$tree/err" << 'ERR'
 fatal: Invalid symmetric difference expression 1111111111111111111111111111111111111111...HEAD
 ERR
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_prints_true_for_an_all_zero_base_without_reading_git() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/not-a-repo"
 
@@ -737,16 +614,12 @@ it_prints_true_for_an_all_zero_base_without_reading_git() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_gits_error_for_a_base_git_cannot_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" no-such-ref HEAD) > "$tree/out" 2> "$tree/err" || status=$?
@@ -757,26 +630,19 @@ fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in 
 Use '--' to separate paths from revisions, like this:
 'git <command> [<revision>...] -- [<file>...]'
 ERR
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_rejects_a_call_without_two_arguments_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-nixos-checks.sh <base> <head>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # Runtime every case needs: a git repository on main, with the identity the cases commit with in

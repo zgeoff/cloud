@@ -14,6 +14,7 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-equals.sh"
 
 repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -49,8 +50,7 @@ setup_test() {
 
 it_renders_no_configmap_and_mounts_alloys_config_from_the_configmap_the_values_name() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
 
   run_helm "$tree" template alloy "/work/chart/$(ls "$tree/chart")" --namespace observability \
@@ -85,8 +85,7 @@ EOF
 
 it_renders_the_alloy_container_with_the_entry_script_before_the_charts_run_arguments_over_the_nodes_log_and_storage_directories() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree" || true' EXIT
+  create_case_tree
   setup_test "$tree"
 
   run_helm "$tree" template alloy "/work/chart/$(ls "$tree/chart")" --namespace observability \

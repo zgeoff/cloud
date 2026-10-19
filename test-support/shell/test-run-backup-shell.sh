@@ -11,10 +11,13 @@
 #   CASE='first failing' bash test-support/shell/with-fixture-images.sh bash test-support/shell/test-run-backup-shell.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/run-backup-shell.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 
@@ -25,8 +28,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 it_runs_the_backup_shell_script_from_stdin_as_the_backup_pods_do_with_the_seed_read_only() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-shell-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
   echo seeded > "$tree/seed/note"
   mkdir "$tree/obs"
@@ -53,10 +55,7 @@ tar -cf - -C /tmp/obs .
 EOF
 
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
   tar -xf "$tree/out.tar" -C "$tree/obs"
   printf '65532\nexit 0\n' | diff - "$tree/obs/uid"
   printf '65532\nexit 0\n' | diff - "$tree/obs/gid"
@@ -73,8 +72,7 @@ EOF
 it_stops_the_backup_shell_at_the_first_failing_command() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-shell-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'echo before; false; echo after' \
@@ -82,17 +80,13 @@ it_stops_the_backup_shell_at_the_first_failing_command() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< before
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_replaces_a_default_with_a_trailing_docker_run_option() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-shell-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   # the shell in the container expands the command, so it stays unexpanded here
@@ -102,17 +96,13 @@ it_replaces_a_default_with_a_trailing_docker_run_option() {
 
   diff /dev/null "$tree/err"
   diff - "$tree/out" <<< '10001:10001 /state'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_refuses_a_trailing_docker_run_option_without_a_value() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-shell-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup_shell "$name" "$backup_image" "$tree" --user <<< 'touch /state/ran' \
@@ -120,10 +110,7 @@ it_refuses_a_trailing_docker_run_option_without_a_value() {
 
   diff - "$tree/err" <<< 'run_backup_shell: the docker run option --user has no value'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state"
   diff /dev/null "$tree/state"
 }
@@ -134,11 +121,11 @@ it_names_the_backup_shell_container_after_the_case_while_it_runs() {
   local backup_image="$2" run="$3"
   name="atc-gw-shell-$run-$BASHPID"
   client=""
-  tree="$(mktemp -d)"
-  trap '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'exec sleep 300' > /dev/null 2>&1 &
+  # shellcheck disable=SC2034 # the create_case_tree cleanup reads it
   client=$!
 
   wait_for 30 "the container $name-shell to run" docker exec "$name-shell" true > /dev/null 2>&1

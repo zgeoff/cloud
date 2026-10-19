@@ -10,6 +10,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-racing-git.sh"
 
@@ -21,8 +23,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_answers_rev_parse_origin_main_then_lands_a_commit() {
   local checked status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo committed > "$tree/clone/nixos/marker"
@@ -43,16 +44,12 @@ moved
 marker
 LOG
   diff - "$tree/calls" <<< '["git-moved-head"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_a_failed_rev_parse_origin_main_through_and_lands_nothing() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo committed > "$tree/clone/nixos/marker"
@@ -74,16 +71,12 @@ ERR
   diff - "$tree/head-after" <<< "$head"
   diff - "$tree/clone/nixos/marker" <<< committed
   assert_missing "$tree/calls" "the stand-in logged a move"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_hands_every_other_call_to_the_real_git_unchanged() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo committed > "$tree/clone/nixos/marker"
@@ -99,16 +92,12 @@ it_hands_every_other_call_to_the_real_git_unchanged() {
   diff /dev/null "$tree/err"
   diff - "$tree/clone/nixos/marker" <<< committed
   assert_missing "$tree/calls" "the stand-in logged a move"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_the_real_gits_exit_code_through_on_other_calls() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   head="$(git -C "$tree/clone" rev-parse HEAD)"
 
@@ -121,10 +110,7 @@ it_passes_the_real_gits_exit_code_through_on_other_calls() {
   diff - "$tree/head-after" <<< "$head"
   assert_missing "$tree/clone/nixos/marker" "the stand-in landed a commit"
   assert_missing "$tree/calls" "the stand-in logged a move"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # Runtime every case needs: a clone of a bare origin whose main holds one empty commit,

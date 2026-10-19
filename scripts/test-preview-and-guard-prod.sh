@@ -14,14 +14,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-prod-apply-bun.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/preview-and-guard-prod.sh"
 
 it_passes_the_plan_with_verdict_apply_and_shows_the_guard_s_text() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -39,16 +40,12 @@ it_passes_the_plan_with_verdict_apply_and_shows_the_guard_s_text() {
 {"cwd":"$tree/repo","argv":["bun","run","--silent","preview","--","--refresh","--json"]}
 {"cwd":"$tree/repo","argv":["bun","run","--silent","ci:check-prod-plan","$tree/runner/plan.json","success"]}
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_holds_the_plan_with_verdict_hold_when_the_guard_exits_3() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -66,16 +63,12 @@ it_holds_the_plan_with_verdict_hold_when_the_guard_exits_3() {
 {"cwd":"$tree/repo","argv":["bun","run","--silent","preview","--","--refresh","--json"]}
 {"cwd":"$tree/repo","argv":["bun","run","--silent","ci:check-prod-plan","$tree/runner/plan.json","failure"]}
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_shows_the_guard_s_text_then_fails_naming_the_preview_s_status_when_the_preview_fails() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -96,16 +89,12 @@ EOF
 {"cwd":"$tree/repo","argv":["bun","run","--silent","preview","--","--refresh","--json"]}
 {"cwd":"$tree/repo","argv":["bun","run","--silent","ci:check-prod-plan","$tree/runner/plan.json","success"]}
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_no_verdict_when_the_guard_fails_with_any_other_status() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -122,16 +111,12 @@ it_fails_with_no_verdict_when_the_guard_fails_with_any_other_status() {
 {"cwd":"$tree/repo","argv":["bun","run","--silent","preview","--","--refresh","--json"]}
 {"cwd":"$tree/repo","argv":["bun","run","--silent","ci:check-prod-plan","$tree/runner/plan.json","success"]}
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_before_the_preview_with_the_sdk_build_s_status_when_the_build_fails() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -151,16 +136,12 @@ EOF
     exit 1
   }
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree/repo\",\"argv\":[\"bun\",\"run\",\"sdk:build\"]}"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_refuses_to_run_without_the_drift_outcome() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -172,10 +153,7 @@ it_refuses_to_run_without_the_drift_outcome() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

@@ -12,6 +12,7 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 it_pins_the_nix_image_by_tag_and_digest() {
@@ -38,8 +39,7 @@ it_is_the_one_source_both_nix_scripts_read() {
 }
 
 it_leaves_no_bare_image_reference_under_scripts() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   grep -rn '[n]ixos/nix' "$root/scripts" > "$tree/refs"
   grep -v "^$root/scripts/nix-image\.sh:" "$tree/refs" > "$tree/other" || true

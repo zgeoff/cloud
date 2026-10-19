@@ -14,13 +14,14 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 runner="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-shell-suites.sh"
 
 it_runs_every_suite_of_the_default_group_at_any_depth_in_path_order() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\necho a\n' > "$tree/repo/scripts/test-a.sh"
   mkdir -p "$tree/repo/deploy/new/area"
@@ -40,16 +41,12 @@ root
 3 suites, 0 failed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_leaves_out_ignored_files_claude_files_other_groups_and_files_that_are_not_suites() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\necho a\n' > "$tree/repo/scripts/test-a.sh"
   mkdir -p "$tree/repo/ignored" "$tree/repo/.claude/skills/x/scripts" "$tree/repo/test-support/shell"
@@ -68,16 +65,12 @@ a
 1 suites, 0 failed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_runs_only_the_suites_of_the_named_group() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\necho a\nexit 1\n' > "$tree/repo/scripts/test-a.sh"
   printf '#!/usr/bin/env bash\n# A Docker suite.\n#\n# shell-suite: docker-fixture\n# shellcheck source-path=SCRIPTDIR\necho docker\n' > "$tree/repo/scripts/test-docker.sh"
@@ -91,16 +84,12 @@ docker
 1 suites, 0 failed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_reads_a_group_only_from_the_comment_block_at_the_top() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\nset -e\n# shell-suite: docker-fixture\necho late\n' > "$tree/repo/scripts/test-late.sh"
 
@@ -112,16 +101,12 @@ late
 1 suites, 0 failed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_keeps_going_after_a_failed_suite_and_names_each_failed_suite() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\necho a\nexit 1\n' > "$tree/repo/scripts/test-a.sh"
   printf '#!/usr/bin/env bash\necho b\n' > "$tree/repo/scripts/test-b.sh"
@@ -142,16 +127,12 @@ c
 run-shell-suites: scripts/test-a.sh failed
 run-shell-suites: scripts/test-c.sh failed
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_passes_case_through_to_each_suite() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   # the suite expands CASE when it runs, so the text stays unexpanded here
   # shellcheck disable=SC2016
@@ -165,16 +146,12 @@ a: some title
 1 suites, 0 failed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_runs_from_the_repo_root_when_called_from_a_subdirectory() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\npwd\n' > "$tree/repo/scripts/test-a.sh"
 
@@ -186,16 +163,12 @@ $tree/repo
 1 suites, 0 failed
 EOF
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_when_the_group_has_no_suite() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '#!/usr/bin/env bash\necho a\n' > "$tree/repo/scripts/test-a.sh"
 
@@ -203,42 +176,31 @@ it_fails_when_the_group_has_no_suite() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'run-shell-suites: no suite in the docker-fixture group'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_rejects_a_group_that_is_not_a_plain_name_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash scripts/run-shell-suites.sh 'Docker fixture') > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: run-shell-suites.sh [group]'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_rejects_a_second_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash scripts/run-shell-suites.sh scripts extra) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: run-shell-suites.sh [group]'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # a git repository whose scripts/ holds a copy of the runner, tracked, so the runner runs from the

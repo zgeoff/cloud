@@ -49,6 +49,9 @@ builds in a `nixos/nix` container on the `cloud-nixos-checks-store` volume, neve
   form of the shared skill's one [`setupTest`](../../testing/SKILL.md#setuptest) per file.
 - `setup_test()` returns the generated system paths as runtime handles, like a temporary directory.
   Each subtest names its restore generation and other scenario values in its own body.
+- Beside `setup_test()`, the rehearsal defines helpers that write a dataset or a copy from the
+  values a subtest passes, and that check what a refused restore leaves unchanged. A subtest passes
+  every value it later asserts, such as a marker or a secret, so its body still shows them.
 - In a restore rehearsal, each `with subtest("it …")` starts from `setup_test()`, which resets every
   state a subtest can leave. It asserts `machine.execute`'s status and output exactly, masking only
   what the shell compares may mask, plus every side effect the script promises, including the saved

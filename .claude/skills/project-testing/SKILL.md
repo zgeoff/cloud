@@ -88,7 +88,9 @@ live host.
 - A stand-in hands a call to the real tool only for a loopback destination: ssh for
   `ssh://<user>@127.0.0.1:<port>` with `-F /dev/null` and no option after the destination; docker
   for a `unix://` socket that normalises to a path inside the case tree. The real binary comes from
-  a fixed system path, resolved when the stand-in is created.
+  a fixed system path, resolved when the stand-in is created. Each ssh stand-in writes the ssh guard
+  from [`print_ssh_pass_through`](../../../test-support/shell/print-ssh-pass-through.sh) into its
+  script, so a fix to the guard reaches every ssh stand-in.
 - A failure that real state can produce comes from real state on loopback: a dead port
   (`127.0.0.1:1`), a missing socket, a directory without write permission.
 - A case whose act meets a mode that denies a write, a read or a search runs that act through
@@ -204,8 +206,14 @@ journey sits in `e2e/`, one file per journey. Each shared rule takes its shell f
 | Reproducible data            | random values derive from `SEED`, which the run prints                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 - A case checks its exit status exactly, with
-  `[ "$status" = N ] || { echo "exit $status, want N" >&2; exit 1; }` or `assert_equals`; both are
-  exact.
+  [`assert_status`](../../../test-support/shell/assert-status.sh) or `assert_equals`.
+- A case makes its tree and its EXIT trap with one
+  [`create_case_tree`](../../../test-support/shell/create-case-tree.sh) call, which takes the steps
+  that run before the tree's removal. A suite that defines its own teardown function sets its trap
+  itself.
+- A suite that the NixOS checks run uses neither helper, because the checks see only the files that
+  [`build-shell-lib-source.nix`](../../../nixos/checks/test-utils/build-shell-lib-source.nix)
+  selects.
 - Each git repository that a test creates, a bare origin included, sets `maintenance.auto false`
   in its own config, in a shell suite and a TypeScript test alike. Otherwise a commit, a fetch or a
   push starts git's detached maintenance, whose repack can still write into the repository while
@@ -232,7 +240,10 @@ journey sits in `e2e/`, one file per journey. Each shared rule takes its shell f
   what it changes, and its test pins that change.
 - A stand-in checked against documentation rather than the real tool, such as
   [`create-stub-op.sh`](../../../test-support/shell/create-stub-op.sh), records the pages, the tool
-  version and the check date in its header, and lists what the docs leave unsettled.
+  version and the check date in its header, and lists what the docs leave unsettled. The op
+  stand-ins print op's errors through
+  [`print_op_error`](../../../test-support/shell/print-op-error.sh), which records their sources
+  once.
 - An ssh stand-in that cannot run the remote command, because it needs root or a container, answers
   as the host would, and the case writes out the whole remote command as the expected argv. One that
   runs the command locally runs it under `env -i` from the case's host directory, forwarding only

@@ -9,12 +9,13 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-livez-curl.sh"
 
 it_times_out_on_a_try_before_the_one_that_answers() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_LIVEZ_ANSWER_FROM=2 \
@@ -23,16 +24,12 @@ it_times_out_on_a_try_before_the_one_that_answers() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["curl","-sk","-o","/dev/null","--max-time","5","https://geoffcloud:6443/livez"]'
-  [ "$status" = 28 ] || {
-    echo "exit $status, want 28" >&2
-    exit 1
-  }
+  assert_status 28 "$status"
 }
 
 it_answers_from_the_try_it_names_on() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'try\ntry\n' > "$tree/livez-tries"
 
@@ -47,16 +44,12 @@ try
 try
 try
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_never_answers_without_a_try_to_answer_from() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   for _ in $(seq 1 40); do echo try >> "$tree/livez-tries"; done
 
@@ -65,16 +58,12 @@ it_never_answers_without_a_try_to_answer_from() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 28 ] || {
-    echo "exit $status, want 28" >&2
-    exit 1
-  }
+  assert_status 28 "$status"
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_LIVEZ_ANSWER_FROM=1 \
@@ -87,10 +76,7 @@ it_fails_closed_with_exit_97_on_any_other_call() {
     echo "the stand-in counted a try" >&2
     exit 1
   }
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 setup_test() {

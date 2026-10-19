@@ -8,13 +8,14 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_logs_a_call_and_fails_closed_with_exit_97() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" scp -o BatchMode=yes "$tree/calls" root@geoffcloud:/tmp/ \
@@ -23,15 +24,11 @@ it_logs_a_call_and_fails_closed_with_exit_97() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: scp -o BatchMode=yes $tree/calls root@geoffcloud:/tmp/"
   diff - "$tree/calls" <<< "[\"scp\",\"-o\",\"BatchMode=yes\",\"$tree/calls\",\"root@geoffcloud:/tmp/\"]"
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_writes_one_stand_in_for_each_named_tool() {
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   find "$tree/bin" -type f -perm -u+x -printf '%P\n' | sort > "$tree/tools"
@@ -47,8 +44,7 @@ TOOLS
 
 it_fails_closed_with_exit_97_for_rsync() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" rsync status \
@@ -57,16 +53,12 @@ it_fails_closed_with_exit_97_for_rsync() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: rsync status'
   diff - "$tree/calls" <<< '["rsync","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_for_scp() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" scp status \
@@ -75,16 +67,12 @@ it_fails_closed_with_exit_97_for_scp() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: scp status'
   diff - "$tree/calls" <<< '["scp","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_for_sftp() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" sftp status \
@@ -93,16 +81,12 @@ it_fails_closed_with_exit_97_for_sftp() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: sftp status'
   diff - "$tree/calls" <<< '["sftp","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_for_ssh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" ssh status \
@@ -111,16 +95,12 @@ it_fails_closed_with_exit_97_for_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: ssh status'
   diff - "$tree/calls" <<< '["ssh","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_for_tailscale() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" tailscale status \
@@ -129,10 +109,7 @@ it_fails_closed_with_exit_97_for_tailscale() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: tailscale status'
   diff - "$tree/calls" <<< '["tailscale","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # Runtime every case needs: the stand-ins for rsync, scp, sftp, ssh and tailscale in <tree>/bin,

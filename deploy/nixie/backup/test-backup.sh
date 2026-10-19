@@ -19,10 +19,13 @@
 #   CASE='ls mode' bash deploy/nixie/backup/test-backup.sh
 # shell-suite: nixie-backup-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup-shell.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-restic-output.sh"
@@ -30,8 +33,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-res
 it_backs_up_nixie_db_and_keys_db_alone() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 sqlite3 /state/nixie.db "CREATE TABLE records (v); INSERT INTO records VALUES ('a record');"
@@ -70,10 +72,7 @@ ID  NOW  nixie       nixie       daily snapshot   /tmp/nixie-backup  SIZE
 1 snapshots
 
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/snapshot" << 'EOF'
 restic ls --tag nixie --host nixie latest | tail -n +2
 restic dump latest /nixie.db > /tmp/nixie.db && sqlite3 /tmp/nixie.db 'SELECT v FROM records'
@@ -93,8 +92,7 @@ EOF
 it_backs_up_the_rows_in_a_live_writers_wal() {
   local image="$1" script="$2"
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
 
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 -e STATE_DIR=/state \
@@ -130,8 +128,7 @@ EOF
 it_copies_again_when_nixie_creates_and_forgets_an_item_during_the_copies() {
   local image="$1" script="$2"
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   write_nixie_steps_wrapper "$tree/seed/bin/sqlite3"
 
@@ -164,8 +161,7 @@ EOF
 it_copies_again_when_nixie_removes_a_record_key_between_the_copies() {
   local image="$1" script="$2"
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   write_nixie_steps_wrapper "$tree/seed/bin/sqlite3"
 
@@ -198,8 +194,7 @@ EOF
 it_fails_a_backup_when_nixie_writes_keys_db_during_every_copy() {
   local image="$1" script="$2"
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   write_nixie_steps_wrapper "$tree/seed/bin/sqlite3"
 
@@ -227,8 +222,7 @@ EOF
 it_fails_a_backup_whose_nixie_db_copy_fails_before_restic() {
   local image="$1" script="$2"
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   write_nixie_steps_wrapper "$tree/seed/bin/sqlite3"
 
@@ -256,8 +250,7 @@ EOF
 it_fails_a_backup_without_keys_db_before_restic() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< \
     "sqlite3 /state/nixie.db 'CREATE TABLE records (v);'"
@@ -268,10 +261,7 @@ it_fails_a_backup_without_keys_db_before_restic() {
 
   diff - "$tree/err" <<< 'no keys.db in /state'
   diff /dev/null "$tree/out"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'ls -A /state /repo' > "$tree/left"
   diff - "$tree/left" << 'EOF'
 /repo:
@@ -286,8 +276,7 @@ EOF
 it_fails_a_backup_whose_copy_fails_the_integrity_check() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   python3 - "$tree/seed/keys.db" << 'EOF'
 import sqlite3, sys
@@ -316,10 +305,7 @@ EOF
 
   diff - "$tree/err" <<< 'the copy of keys.db failed the integrity check'
   diff /dev/null "$tree/out"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'restic snapshots --json' > "$tree/snapshots"
   diff - "$tree/snapshots" <<< '[]'
 }
@@ -331,8 +317,7 @@ EOF
 it_prunes_nixies_snapshots_and_leaves_another_tools_alone() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 restic init -q
@@ -352,10 +337,7 @@ EOF
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< 'restic snapshots --json' > "$tree/snapshots"
   jq -r '[.[] | "\(.hostname) \(.paths[0]) \(if .paths == ["/tmp/nixie-backup"] then "NOW" else .time end)"] | sort[]' \
     "$tree/snapshots" > "$tree/kept"
@@ -372,8 +354,7 @@ EOF
 it_restores_both_databases_and_removes_their_stale_wal_and_shm_files() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 restic init -q
@@ -399,10 +380,7 @@ Summary: Restored 2 files/dirs (SIZE) in T
 restored nixie.db: integrity_check ok
 restored keys.db: integrity_check ok
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
 cd /state && stat -c '%n %u:%g' * | sort
 sqlite3 /state/nixie.db 'SELECT v FROM records'
@@ -420,8 +398,7 @@ EOF
 it_fails_a_restore_of_a_snapshot_without_keys_db_and_keeps_the_state() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 restic init -q
@@ -441,10 +418,7 @@ EOF
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @nixie to /tmp/tmp.X
 Summary: Restored 1 files/dirs (SIZE) in T
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< \
     "sqlite3 /state/nixie.db 'SELECT v FROM records'" > "$tree/state"
   diff - "$tree/state" <<< current
@@ -455,8 +429,7 @@ EOF
 it_fails_a_restore_whose_snapshot_fails_the_integrity_check_and_keeps_the_state() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   python3 - "$tree/seed/keys.db" << 'EOF'
 import sqlite3, sys
@@ -493,10 +466,7 @@ EOF
 restoring snapshot ID of [/tmp/snap] at 2020-01-06 10:00:00 +0000 UTC by @nixie to /tmp/tmp.X
 Summary: Restored 2 files/dirs (SIZE) in T
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
 sqlite3 /state/nixie.db 'SELECT v FROM records'
 sqlite3 /state/keys.db 'SELECT v FROM record_keys'
@@ -512,8 +482,7 @@ EOF
 it_fails_a_restore_that_cannot_stage_its_copies_and_keeps_the_state() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 restic init -q
@@ -535,10 +504,7 @@ EOF
 cp: can't create '/state/nixie.db.restoring': Permission denied
 cannot stage nixie.db in /state
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 > "$tree/state" << 'EOF'
 ls -A /state
 cat /state/nixie.db-wal
@@ -556,8 +522,7 @@ EOF
 it_restores_the_snapshot_that_SNAPSHOT_names_instead_of_the_latest() {
   local image="$1" script="$2" older status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 restic init -q
@@ -580,10 +545,7 @@ EOF
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 <<< \
     "sqlite3 /state/nixie.db 'SELECT v FROM records'" > "$tree/value"
   diff - "$tree/value" <<< older
@@ -593,8 +555,7 @@ EOF
 it_lists_nixies_snapshots_alone_in_ls_mode() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
   run_backup_shell "$name" "$image" "$tree" --user 10001:10001 << 'EOF'
 restic init -q
@@ -616,17 +577,13 @@ ID  2020-01-06 10:00:00  nixie       nixie       /tmp/a  SIZE
 -------------------------------------------------------------------
 1 snapshots
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_rejects_an_unknown_mode_with_its_usage() {
   local image="$1" script="$2" status=0
   name="nixie-backup-$3-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$image"
 
   run_backup "$name" "$image" --user 10001:10001 --entrypoint /bin/sh \
@@ -635,10 +592,7 @@ it_rejects_an_unknown_mode_with_its_usage() {
 
   diff - "$tree/err" <<< 'usage: nixie-backup backup|restore|ls'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # A sqlite3 wrapper at <path>, which the nixie.db copy cases put first on PATH. Around each copy

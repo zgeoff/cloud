@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-prod-apply-bun.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-out-deployed-revision.sh"
@@ -26,8 +28,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_checks_out_the_deployed_commit_points_its_env_at_the_deploy_vault_and_installs_there() {
   local deployed short status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf '# the stack secrets\nONIDEL_API_KEY=op://cloud/onidel/credential\nREGION=syd\n' > "$tree/repo/.env"
   echo deployed > "$tree/repo/marker"
@@ -52,16 +53,12 @@ ONIDEL_API_KEY=op://cloud-deploy/onidel/credential
 REGION=syd
 EOF
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree/runner/deployed\",\"argv\":[\"bun\",\"install\",\"--frozen-lockfile\"]}"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_git_s_error_on_a_deployed_commit_git_cannot_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'ONIDEL_API_KEY=op://cloud/onidel/credential\n' > "$tree/repo/.env"
   git -C "$tree/repo" add -A
@@ -79,16 +76,12 @@ it_fails_with_git_s_error_on_a_deployed_commit_git_cannot_resolve() {
     exit 1
   }
   diff /dev/null "$tree/calls"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_stops_before_the_install_when_the_deployed_env_names_another_vault() {
   local deployed short status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'ONIDEL_API_KEY=op://personal/onidel/credential\n' > "$tree/repo/.env"
   git -C "$tree/repo" add -A
@@ -108,16 +101,12 @@ write-deploy-env: a reference outside the cloud vault: ONIDEL_API_KEY
 EOF
   diff - "$tree/runner/deployed/.env" <<< 'ONIDEL_API_KEY=op://personal/onidel/credential'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_the_install_s_exit_when_the_install_fails() {
   local deployed short status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'ONIDEL_API_KEY=op://cloud/onidel/credential\n' > "$tree/repo/.env"
   git -C "$tree/repo" add -A
@@ -133,16 +122,12 @@ it_fails_with_the_install_s_exit_when_the_install_fails() {
   diff - "$tree/out" <<< "HEAD is now at $short the deployed revision"
   diff - "$tree/err" <<< "Preparing worktree (detached HEAD $short)"
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree/runner/deployed\",\"argv\":[\"bun\",\"install\",\"--frozen-lockfile\"]}"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_to_run_without_the_runner_s_temp_directory() {
   local deployed status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   deployed="$(git -C "$tree/repo" rev-parse HEAD)"
 
@@ -154,10 +139,7 @@ it_refuses_to_run_without_the_runner_s_temp_directory() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'check-out-deployed-revision: set RUNNER_TEMP'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

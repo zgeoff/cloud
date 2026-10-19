@@ -9,14 +9,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-kubeconfig-op.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_prints_an_item_it_holds() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/kc"
 
@@ -31,16 +32,12 @@ Category:    DOCUMENT
 OUT
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["op","item","get","kc","--vault","cloud"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_a_missing_item_with_ops_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud"
 
@@ -52,16 +49,12 @@ it_fails_a_missing_item_with_ops_error_and_exit_1() {
 [ERROR] 2026/10/07 12:00:00 "kc" isn't an item in the "cloud" vault. Specify the item with its UUID, name, or domain.
 ERR
   diff - "$tree/calls" <<< '["op","item","get","kc","--vault","cloud"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_create_in_a_missing_vault_with_ops_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   printf 'doc\n' | env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -74,16 +67,12 @@ ERR
   diff - "$tree/calls" <<< '["op","document","create","--vault","cloud","--title","kc","--file-name","kc.yaml","-"]'
   ls -A "$tree/vault" > "$tree/vaults"
   diff /dev/null "$tree/vaults"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_an_item_get_in_a_missing_vault_with_ops_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -94,16 +83,12 @@ it_fails_an_item_get_in_a_missing_vault_with_ops_error_and_exit_1() {
 [ERROR] 2026/10/07 12:00:00 "cloud" isn't a vault in this account. Specify the vault with its ID or name.
 ERR
   diff - "$tree/calls" <<< '["op","item","get","kc","--vault","cloud"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_an_edit_in_a_missing_vault_with_ops_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   printf 'new\n' | env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -116,16 +101,12 @@ ERR
   ls -A "$tree/vault" > "$tree/vaults"
   diff /dev/null "$tree/vaults"
   diff - "$tree/calls" <<< '["op","document","edit","kc","--vault","cloud","--file-name","kc.yaml","-"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_creates_a_document_from_stdin_and_prints_its_JSON() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud"
 
@@ -136,16 +117,12 @@ it_creates_a_document_from_stdin_and_prints_its_JSON() {
   diff /dev/null "$tree/err"
   printf 'line one\nline two\n' | diff - "$tree/vault/cloud/kc/kc.yaml"
   diff - "$tree/calls" <<< '["op","document","create","--vault","cloud","--title","kc","--file-name","kc.yaml","-"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_replaces_a_documents_file_from_stdin() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/kc"
   printf 'old\n' > "$tree/vault/cloud/kc/old.yaml"
@@ -159,16 +136,12 @@ it_replaces_a_documents_file_from_stdin() {
   diff - "$tree/files" <<< kc.yaml
   diff - "$tree/vault/cloud/kc/kc.yaml" <<< new
   diff - "$tree/calls" <<< '["op","document","edit","kc","--vault","cloud","--file-name","kc.yaml","-"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_an_edit_of_a_missing_item_with_ops_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud"
 
@@ -182,16 +155,12 @@ ERR
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/calls" <<< '["op","document","edit","kc","--vault","cloud","--file-name","kc.yaml","-"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_rate_limited_edit_with_ops_error_and_writes_nothing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/kc"
   printf 'old\n' > "$tree/vault/cloud/kc/kc.yaml"
@@ -204,16 +173,12 @@ it_fails_a_rate_limited_edit_with_ops_error_and_writes_nothing() {
   diff - "$tree/err" <<< "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests."
   diff - "$tree/vault/cloud/kc/kc.yaml" <<< old
   diff - "$tree/calls" <<< '["op","document","edit","kc","--vault","cloud","--file-name","kc.yaml","-"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_rate_limited_create_with_ops_error_and_writes_nothing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud"
 
@@ -226,16 +191,12 @@ it_fails_a_rate_limited_create_with_ops_error_and_writes_nothing() {
   ls -A "$tree/vault/cloud" > "$tree/items"
   diff /dev/null "$tree/items"
   diff - "$tree/calls" <<< '["op","document","create","--vault","cloud","--title","kc","--file-name","kc.yaml","-"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_closed_with_exit_97_on_creating_a_title_the_vault_holds() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/kc"
   printf 'old\n' > "$tree/vault/cloud/kc/kc.yaml"
@@ -247,16 +208,12 @@ it_fails_closed_with_exit_97_on_creating_a_title_the_vault_holds() {
   diff - "$tree/err" <<< 'unexpected: document create --vault cloud --title kc --file-name kc.yaml -'
   diff - "$tree/vault/cloud/kc/kc.yaml" <<< old
   diff - "$tree/calls" <<< '["op","document","create","--vault","cloud","--title","kc","--file-name","kc.yaml","-"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_any_other_command() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/kc"
 
@@ -270,10 +227,7 @@ it_fails_closed_with_exit_97_on_any_other_command() {
     echo "the item is gone" >&2
     exit 1
   }
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for every

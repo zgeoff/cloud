@@ -13,13 +13,14 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/needs-prod-apply.sh"
 
 it_prints_true_for_a_change_under_infra() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra"
   echo 'nixie: 0.7.0' > "$tree/repo/infra/Pulumi.prod.yaml"
@@ -33,16 +34,12 @@ it_prints_true_for_a_change_under_infra() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_under_deploy() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
   mkdir -p "$tree/repo/deploy/nixie"
@@ -54,16 +51,12 @@ it_prints_true_for_a_change_under_deploy() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_under_provider() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
   mkdir "$tree/repo/provider"
@@ -75,16 +68,12 @@ it_prints_true_for_a_change_under_provider() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_under_sdk() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
   mkdir -p "$tree/repo/sdk/onidel"
@@ -96,16 +85,12 @@ it_prints_true_for_a_change_under_sdk() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_shared_constants() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
   mkdir -p "$tree/repo/packages/topology"
@@ -117,16 +102,12 @@ it_prints_true_for_a_change_to_the_shared_constants() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_docs_only_change() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra" "$tree/repo/docs"
   echo 'export {};' > "$tree/repo/infra/index.ts"
@@ -141,16 +122,12 @@ it_prints_false_for_a_docs_only_change() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_scripts_workflows_and_nixos() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" tag deployed/prod
   mkdir -p "$tree/repo/scripts" "$tree/repo/.github/workflows" "$tree/repo/nixos" "$tree/repo/docs/infra"
@@ -165,16 +142,12 @@ it_prints_false_for_a_change_to_scripts_workflows_and_nixos() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_when_a_rename_moves_a_file_out_of_infra() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra" "$tree/repo/docs"
   echo 'export {};' > "$tree/repo/infra/notes.ts"
@@ -188,16 +161,12 @@ it_prints_true_when_a_rename_moves_a_file_out_of_infra() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_when_a_later_commit_reverts_a_change_under_infra() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra"
   echo 'nixie: 0.7.0' > "$tree/repo/infra/Pulumi.prod.yaml"
@@ -213,16 +182,12 @@ it_prints_true_when_a_later_commit_reverts_a_change_under_infra() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_the_deployed_revision_itself() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra"
   echo 'export {};' > "$tree/repo/infra/index.ts"
@@ -234,16 +199,12 @@ it_prints_false_for_the_deployed_revision_itself() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_head_older_than_the_deployed_revision() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra"
   echo 'nixie: 0.7.0' > "$tree/repo/infra/Pulumi.prod.yaml"
@@ -259,16 +220,12 @@ it_prints_false_for_a_head_older_than_the_deployed_revision() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_when_the_deployed_revision_is_not_in_the_head_history() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   # as for a tag set on a branch that never merged
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" switch -qc side
@@ -287,42 +244,31 @@ it_fails_when_the_deployed_revision_is_not_in_the_head_history() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'needs-prod-apply: deployed/prod is not an ancestor of HEAD; set the tag by hand at the live revision'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_git_error_when_the_tag_was_never_set() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" deployed/prod HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'fatal: Needed a single revision'
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_rejects_an_empty_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" '' HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-prod-apply.sh <deployed> <head>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

@@ -11,13 +11,14 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/needs-provider-check.sh"
 
 it_prints_true_for_a_change_under_provider() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/provider"
   echo 'module fixture' > "$tree/repo/provider/go.mod"
@@ -31,16 +32,12 @@ it_prints_true_for_a_change_under_provider() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_the_root_package_json() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"name":"fixture"}' > "$tree/repo/package.json"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" add -A
@@ -53,16 +50,12 @@ it_prints_false_for_a_change_to_the_root_package_json() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_ci_workflow() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/.github/workflows"
   echo 'name: CI' > "$tree/repo/.github/workflows/ci.yml"
@@ -76,16 +69,12 @@ it_prints_true_for_a_change_to_the_ci_workflow() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_under_sdk() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/sdk/onidel"
   echo '{"name":"fixture"}' > "$tree/repo/sdk/onidel/package.json"
@@ -99,16 +88,12 @@ it_prints_true_for_a_change_under_sdk() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_sdk_generator() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/scripts"
   echo 'echo gen' > "$tree/repo/scripts/gen-sdk.sh"
@@ -122,16 +107,12 @@ it_prints_true_for_a_change_to_the_sdk_generator() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_pulumi_cli_installer() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/scripts"
   echo 'echo install' > "$tree/repo/scripts/install-pulumi-cli.sh"
@@ -145,16 +126,12 @@ it_prints_true_for_a_change_to_the_pulumi_cli_installer() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_ci_decision_script() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/scripts"
   echo 'echo decide' > "$tree/repo/scripts/decide-provider-checks.sh"
@@ -168,16 +145,12 @@ it_prints_true_for_a_change_to_the_ci_decision_script() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_the_sdk_check() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/scripts"
   echo 'echo check' > "$tree/repo/scripts/check-sdk.sh"
@@ -191,16 +164,12 @@ it_prints_true_for_a_change_to_the_sdk_check() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_change_to_no_input_of_the_checks() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/infra" "$tree/repo/docs" "$tree/repo/.github/workflows"
   echo 'export {};' > "$tree/repo/infra/index.ts"
@@ -218,16 +187,12 @@ it_prints_false_for_a_change_to_no_input_of_the_checks() {
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_when_a_rename_moves_a_file_out_of_provider() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/provider"
   echo 'module fixture' > "$tree/repo/provider/go.mod"
@@ -242,16 +207,12 @@ it_prints_true_when_a_rename_moves_a_file_out_of_provider() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_when_a_file_under_provider_is_deleted() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/provider"
   echo 'module fixture' > "$tree/repo/provider/go.mod"
@@ -265,16 +226,12 @@ it_prints_true_when_a_file_under_provider_is_deleted() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_changed_provider() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/provider" "$tree/repo/infra"
   echo 'module fixture' > "$tree/repo/provider/go.mod"
@@ -295,16 +252,12 @@ it_prints_false_for_a_merge_commit_whose_own_change_touches_no_input_after_main_
 
   diff - "$tree/out" <<< false
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/provider"
   echo 'module fixture' > "$tree/repo/provider/go.mod"
@@ -320,16 +273,12 @@ it_prints_true_for_a_base_that_is_not_an_ancestor_of_the_head() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_true_for_a_change_to_a_file_under_provider_whose_name_git_quotes() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 git -C "$tree/repo" rev-parse HEAD > "$tree/base"
   mkdir "$tree/repo/provider"
@@ -341,32 +290,24 @@ it_prints_true_for_a_change_to_a_file_under_provider_whose_name_git_quotes() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_rejects_an_empty_base_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" '' HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-provider-check.sh <base> <head>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" 1111111111111111111111111111111111111111 HEAD) \
@@ -376,16 +317,12 @@ it_fails_with_gits_error_for_a_commit_id_the_clone_does_not_have() {
   diff - "$tree/err" << 'ERR'
 fatal: Invalid symmetric difference expression 1111111111111111111111111111111111111111...HEAD
 ERR
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_prints_true_for_an_all_zero_base_without_reading_git() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/not-a-repo"
 
@@ -394,16 +331,12 @@ it_prints_true_for_an_all_zero_base_without_reading_git() {
 
   diff - "$tree/out" <<< true
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_gits_error_for_a_base_git_cannot_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" no-such-ref HEAD) > "$tree/out" 2> "$tree/err" || status=$?
@@ -414,26 +347,19 @@ fatal: ambiguous argument 'no-such-ref...HEAD': unknown revision or path not in 
 Use '--' to separate paths from revisions, like this:
 'git <command> [<revision>...] -- [<file>...]'
 ERR
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_rejects_a_call_without_two_arguments_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: needs-provider-check.sh <base> <head>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # Runtime every case needs: a git repository on main, with the identity the cases commit with in

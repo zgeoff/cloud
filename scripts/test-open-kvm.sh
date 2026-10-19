@@ -11,14 +11,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kvm-sudo.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/open-kvm.sh"
 
 it_writes_the_rule_then_reloads_and_triggers_udev() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -32,16 +33,12 @@ it_writes_the_rule_then_reloads_and_triggers_udev() {
 ["sudo","udevadm","control","--reload-rules"]
 ["sudo","udevadm","trigger","--name-match=kvm"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_the_sudo_error_before_any_udev_call_when_sudo_needs_a_password() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -53,10 +50,7 @@ sudo: a terminal is required to read the password; either use the -S option to r
 sudo: a password is required
 EOF
   diff - "$tree/calls" <<< '["sudo","tee","/etc/udev/rules.d/99-kvm4all.rules"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # setup_test <tree>: the sudo stand-in in <tree>/bin, and the home and temp folders the script

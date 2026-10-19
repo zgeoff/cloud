@@ -10,10 +10,13 @@
 #   CASE='readyz' bash test-support/shell/with-fixture-images.sh bash test-support/shell/test-start-gateway.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-gateway.sh"
 
 # One docker inspect of the started container, projected to the configuration the
@@ -21,8 +24,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/start-gateway.sh"
 it_starts_the_gateway_container_with_the_configuration_the_deployment_sets() {
   local gateway_image="$1" backup_image="$2" run="$3"
   name="atc-gw-start-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   start_gateway "$name" "$tree" "$gateway_image" > "$tree/out" 2> "$tree/err"
@@ -88,8 +90,7 @@ EOF
 it_returns_from_start_gateway_only_once_readyz_answers_200() {
   local gateway_image="$1" backup_image="$2" run="$3" status=0
   name="atc-gw-start-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   start_gateway "$name" "$tree" "$gateway_image" > "$tree/out" 2> "$tree/err" || status=$?
@@ -100,10 +101,7 @@ it_returns_from_start_gateway_only_once_readyz_answers_200() {
   diff - "$tree/log.out" <<< 'atc-gateway: serving https://atc.fixture.invalid/mcp, listening on http://0.0.0.0:8414'
   sed -E 's/ [0-9.]+ms$/ Tms/' "$tree/log.err" > "$tree/requests"
   diff - "$tree/requests" <<< 'GET /readyz 200 Tms'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a

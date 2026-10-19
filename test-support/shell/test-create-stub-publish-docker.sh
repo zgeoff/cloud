@@ -11,6 +11,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-publish-docker.sh"
 
 # setup_test <tree>: the stand-in in <tree>/bin and the HOME and TMPDIR it runs with. It sets
@@ -24,8 +26,7 @@ setup_test() {
 
 it_takes_the_login_password_from_stdin_and_logs_the_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   printf '%s' dummy-token | "${case_env[@]}" docker login ghcr.io -u octocat --password-stdin > "$tree/out" 2> "$tree/err" || status=$?
@@ -34,16 +35,12 @@ it_takes_the_login_password_from_stdin_and_logs_the_call() {
   diff /dev/null "$tree/err"
   printf '%s' dummy-token | cmp - "$tree/password"
   diff - "$tree/calls" <<< '["docker","login","ghcr.io","-u","octocat","--password-stdin"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_records_a_build_and_the_names_in_its_context() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context"
   touch "$tree/context/atc-gateway" "$tree/context/Dockerfile"
@@ -58,16 +55,12 @@ atc-gateway
 EOF
   [ -f "$tree/built/ghcr.io_zgeoff_atc-gateway_2.27.0" ]
   diff - "$tree/calls" <<< "[\"docker\",\"build\",\"--build-arg\",\"BASE_IMAGE=example.invalid/base:1\",\"-t\",\"ghcr.io/zgeoff/atc-gateway:2.27.0\",\"$tree/context\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_records_a_build_with_two_build_args() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context"
   touch "$tree/context/Dockerfile"
@@ -79,16 +72,12 @@ it_records_a_build_with_two_build_args() {
   diff - "$tree/contexts/ghcr.io_zgeoff_atc-gateway_2.27.0" <<< 'Dockerfile'
   [ -f "$tree/built/ghcr.io_zgeoff_atc-gateway_2.27.0" ]
   diff - "$tree/calls" <<< "[\"docker\",\"build\",\"--build-arg\",\"BASE_IMAGE=example.invalid/base:1\",\"--build-arg\",\"GATEWAY_PORT=8414\",\"-t\",\"ghcr.io/zgeoff/atc-gateway:2.27.0\",\"$tree/context\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_closed_on_a_build_with_no_tag() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context"
 
@@ -97,16 +86,12 @@ it_fails_closed_on_a_build_with_no_tag() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "unexpected: build --build-arg BASE_IMAGE=example.invalid/base:1 --build-arg GATEWAY_PORT=8414 $tree/context"
   [ ! -e "$tree/built/ghcr.io_zgeoff_atc-gateway_2.27.0" ]
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_prints_the_manifest_of_a_published_ref() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/registry"
   echo '{"schemaVersion":2}' > "$tree/registry/ghcr.io_zgeoff_atc-gateway_2.27.0"
@@ -116,32 +101,24 @@ it_prints_the_manifest_of_a_published_ref() {
   diff - "$tree/out" <<< '{"schemaVersion":2}'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["docker","manifest","inspect","ghcr.io/zgeoff/atc-gateway:2.27.0"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_answers_a_missing_tag_as_docker_does() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   "${case_env[@]}" docker manifest inspect ghcr.io/zgeoff/atc-gateway:9.9.9 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'manifest unknown'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_every_lookup_with_the_registry_error_the_test_wrote() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/registry"
   echo '{"schemaVersion":2}' > "$tree/registry/ghcr.io_zgeoff_atc-gateway_2.27.0"
@@ -151,16 +128,12 @@ it_fails_every_lookup_with_the_registry_error_the_test_wrote() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Get "https://ghcr.io/v2/": dial tcp: lookup ghcr.io: no such host'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_publishes_a_built_ref_with_the_digest_the_test_wrote() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context" "$tree/digests"
   "${case_env[@]}" docker build --build-arg BASE_IMAGE=example.invalid/base:1 -t ghcr.io/zgeoff/atc-gateway:2.27.0 "$tree/context"
@@ -171,16 +144,12 @@ it_publishes_a_built_ref_with_the_digest_the_test_wrote() {
   diff - "$tree/out" <<< 'The push refers to repository [ghcr.io/zgeoff/atc-gateway]'
   diff /dev/null "$tree/err"
   diff - "$tree/registry/ghcr.io_zgeoff_atc-gateway_2.27.0" <<< '{"digest":"sha256:1111111111111111111111111111111111111111111111111111111111111111"}'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_answers_a_push_of_a_ref_with_no_local_image_as_docker_does() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/digests"
   echo sha256:1111111111111111111111111111111111111111111111111111111111111111 > "$tree/digests/ghcr.io_zgeoff_atc-gateway_2.27.0"
@@ -190,16 +159,12 @@ it_answers_a_push_of_a_ref_with_no_local_image_as_docker_does() {
   diff - "$tree/out" <<< 'The push refers to repository [ghcr.io/zgeoff/atc-gateway]'
   diff - "$tree/err" <<< 'tag does not exist: ghcr.io/zgeoff/atc-gateway:2.27.0'
   [ ! -e "$tree/registry/ghcr.io_zgeoff_atc-gateway_2.27.0" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_prints_the_repo_digest_of_a_pushed_ref() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context" "$tree/digests"
   echo sha256:1111111111111111111111111111111111111111111111111111111111111111 > "$tree/digests/ghcr.io_zgeoff_atc-gateway_2.27.0"
@@ -210,32 +175,24 @@ it_prints_the_repo_digest_of_a_pushed_ref() {
 
   diff - "$tree/out" <<< 'ghcr.io/zgeoff/atc-gateway@sha256:1111111111111111111111111111111111111111111111111111111111111111'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_answers_an_inspect_of_a_ref_with_no_local_image_as_docker_does() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   "${case_env[@]}" docker inspect --format '{{index .RepoDigests 0}}' ghcr.io/zgeoff/atc-gateway:2.27.0 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error: no such object: ghcr.io/zgeoff/atc-gateway:2.27.0'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_closed_on_an_inspect_of_a_ref_built_but_never_pushed() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context"
   "${case_env[@]}" docker build --build-arg BASE_IMAGE=example.invalid/base:1 -t ghcr.io/zgeoff/atc-gateway:2.27.0 "$tree/context"
@@ -244,16 +201,12 @@ it_fails_closed_on_an_inspect_of_a_ref_built_but_never_pushed() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: inspect --format {{index .RepoDigests 0}} ghcr.io/zgeoff/atc-gateway:2.27.0'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_on_a_push_with_no_digest_from_the_test() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/context"
   "${case_env[@]}" docker build --build-arg BASE_IMAGE=example.invalid/base:1 -t ghcr.io/zgeoff/atc-gateway:2.27.0 "$tree/context"
@@ -262,16 +215,12 @@ it_fails_closed_on_a_push_with_no_digest_from_the_test() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: push ghcr.io/zgeoff/atc-gateway:2.27.0'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_on_any_other_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   "${case_env[@]}" docker run --rm example.invalid/base:1 > "$tree/out" 2> "$tree/err" || status=$?
@@ -279,10 +228,7 @@ it_fails_closed_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: run --rm example.invalid/base:1'
   diff - "$tree/calls" <<< '["docker","run","--rm","example.invalid/base:1"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 run_cases

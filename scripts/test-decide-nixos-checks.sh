@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks.sh"
@@ -26,8 +28,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_needs_the_checks_for_a_dispatch_without_asking_gh() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
@@ -41,16 +42,12 @@ it_needs_the_checks_for_a_dispatch_without_asking_gh() {
   diff - "$tree/output" <<< 'needed=true'
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_needs_the_checks_for_a_pull_request_without_asking_gh() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
@@ -64,16 +61,12 @@ it_needs_the_checks_for_a_pull_request_without_asking_gh() {
   diff - "$tree/output" <<< 'needed=true'
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
@@ -94,16 +87,12 @@ it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
   diff - "$tree/calls" << 'EOF'
 ["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   # no green run: the --jq filter prints nothing
@@ -125,16 +114,12 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
   diff - "$tree/calls" << 'EOF'
 ["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_the_gh_error_and_writes_nothing_when_gh_fails() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 1 for a failed
@@ -154,16 +139,12 @@ it_fails_with_the_gh_error_and_writes_nothing_when_gh_fails() {
   diff - "$tree/err" <<< 'HTTP 503: Service Unavailable'
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_without_a_github_output_file() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
@@ -176,10 +157,7 @@ it_fails_without_a_github_output_file() {
   diff - "$tree/err" <<< "$script: line 13: GITHUB_OUTPUT: parameter null or not set"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # setup_test <tree>: the gh stand-in in <tree>/bin, the home and temp folders the script runs
