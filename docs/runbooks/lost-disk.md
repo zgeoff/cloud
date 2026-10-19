@@ -144,13 +144,15 @@ checkout of `main`.
 
 7. Start a new impd with `ssh root@geoffcloud systemctl start imp-host`. imp's node joins the
    tailnet with the key from step 5, so give `imp-geoffcloud` its tailnet address back, as
-   [Keep the tailnet addresses](./leak-response.md#keep-the-tailnet-addresses) describes. Then
-   restore every imp with `ssh root@geoffcloud docker exec imp-host impz backup restore --all`, as
+   [Keep the tailnet addresses](./leak-response.md#keep-the-tailnet-addresses) describes. impd
+   writes its DNS records at the node's address, so restart it with
+   `ssh root@geoffcloud systemctl restart imp-host` after the edit. Then restore every imp with
+   `ssh root@geoffcloud docker exec imp-host impz backup restore --all`, as
    [restore imps from restic](./restore-geoff-cloud.md#1-restore-imps-from-restic) describes.
-8. Log imp's CLI on this machine in to the new impd. The token it saved lived in impd's database, so
-   each `impz` call from this machine fails with `unauthorized` until then. Wait until
-   `https://imps.geoff.cloud/health` returns 200, then mint a `manage` token with no imp patterns in
-   imp-host, and pass it to `impz login` on stdin:
+8. Log imp's CLI on this machine in to the new impd. impd's record of the CLI's saved token was in
+   its database, so each `impz` call from this machine fails with `unauthorized` until then. Wait
+   until `https://imps.geoff.cloud/health` returns 200, then mint a `manage` token with no imp
+   patterns in imp-host, and pass it to `impz login` on stdin:
 
    ```bash
    ssh root@geoffcloud docker exec imp-host impz token new operator --scope manage < /dev/null \
@@ -160,11 +162,13 @@ checkout of `main`.
    Expect `impz token whoami` to print `operator`.
 
 9. Add impd's secrets again, because they lived on the pool, in this order:
-   - The secrets of the atc daemon's auth profiles
+   - The secrets of the atc daemon's auth profiles but `op-connect`, which the Connect bullet adds
      ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), each with the
-     kind, host and header of its profile in `nixos/hosts/geoffcloud/configuration.nix`. Step 11's
-     credential installer refuses to mint the daemon's token while one of them is missing, and lists
-     each missing secret.
+     kind, host and header of its profile in `nixos/hosts/geoffcloud/configuration.nix`, on stdin:
+     `op read op://cloud/<item>/credential | host_imp secret add <secret> --kind custom --hosts <host> --header <header> --scheme <scheme>`,
+     or `--kind github` alone for the GitHub profile. `host_imp` is the helper at the top of
+     [Previews](./preview.md). Step 11's credential installer refuses to mint the daemon's token
+     while one of them is missing, and lists each missing secret.
    - The GitHub secret `gh`, through step 1 of
      [Set the service up](./preview.md#set-the-service-up). Each preview imp clones through it. The
      daemon's GitHub profile uses `github-imp-agents`, so the profile secrets leave `gh` out. impd
@@ -278,8 +282,8 @@ without its pool.
 7. Run reinstall steps 5 to 7, with the VM's public address as the install target. Skip reinstall
    step 2, which needs the old host, and step 4, because no pool remains. Detach the ISO in the
    Onidel panel once `nixos-anywhere` finishes, and reboot the VM through the panel if it comes back
-   up in the installer. Before step 7, drop the old key with `ssh-keygen -R geoffcloud`. The host
-   boots and joins the tailnet, with k3s, imp-host and the atc daemon stopped, so step 7's
+   up in the installer. Before reinstall step 7, drop the old key with `ssh-keygen -R geoffcloud`.
+   The host boots and joins the tailnet, with k3s, imp-host and the atc daemon stopped, so step 7's
    `zpool status`, `keystatus`, `k3s kubectl` and `impz` checks fail until the pool exists. Then
    give `geoffcloud` its tailnet address back, as
    [Keep the tailnet addresses](./leak-response.md#keep-the-tailnet-addresses) describes. No step
