@@ -13,6 +13,28 @@ test('it flags nothing for a release without migrations or new sandbox images', 
   ).toStrictEqual([]);
 });
 
+test('it flags nothing for a release whose notes mark each section with an HTML comment', () => {
+  expect(
+    findNixieReleaseFlags({
+      pinned: '## Images\n\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
+      target:
+        "## [0.20.1](https://example.com/compare/v0.20.0...v0.20.1) (2026-01-02)\n\n\n### Bug Fixes\n\n* **geo-1:** a fix\n\n<!-- nixie: migrations -->\n## Migrations\n\nThis release adds no migration since v0.20.0.\n\n<!-- nixie: config schema -->\n## Config schema\n\nEvery config.yaml that v0.20.0 accepts passes this release's config.schema.json.\n\n## Images\n\n- `ghcr.io/zgeoff/nixie@sha256:ccc`\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n",
+      between: [],
+    }),
+  ).toStrictEqual([]);
+});
+
+test('it flags migrations in notes that mark each section with an HTML comment', () => {
+  expect(
+    findNixieReleaseFlags({
+      pinned: '## Images\n',
+      target:
+        "<!-- nixie: migrations -->\n## Migrations\n\n- 0012 adds the labels table\n\n<!-- nixie: config schema -->\n## Config schema\n\nEvery config.yaml that v0.20.0 accepts passes this release's config.schema.json.\n\n## Images\n",
+      between: [],
+    }),
+  ).toStrictEqual(['migrations']);
+});
+
 test('it flags migrations that the target adds', () => {
   expect(
     findNixieReleaseFlags({
