@@ -49,6 +49,20 @@ test.each([['2026-05-01T12:00:00Z'], ['2026-04-30'], ['2020-01-01T00:00:00Z']])(
   },
 );
 
+test.each([
+  ['toString', 'agent'],
+  ['constructor', 'agent'],
+  ['__proto__', 'agent'],
+  ['hasOwnProperty', 'agent'],
+  ['valueOf', 'owner'],
+  ['toString', 'owner'],
+] as const)('it refuses %s from the %s token, a name every object inherits', (expires, role) => {
+  expect(decideExpiry({ expires, role, now: new Date('2026-05-01T12:00:00Z') })).toStrictEqual({
+    outcome: 'invalid',
+    reason: 'expires must be 7d, 30d, never, a date, or a date and time with its offset',
+  });
+});
+
 test.each([['1d'], ['7'], ['forever'], ['2026-13-01'], ['2026-05-31T12:00:00'], ['']])(
   'it refuses %p, which names no expiry',
   (expires) => {

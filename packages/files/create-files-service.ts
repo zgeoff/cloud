@@ -1,4 +1,4 @@
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { OpenAPIHandler } from '@orpc/openapi/fetch';
 import { Elysia } from 'elysia';
@@ -39,8 +39,8 @@ interface RequestContext {
 }
 
 // The service: GET /<id>/<filename> serves a file that has not expired, GET /healthz answers ok,
-// and /api/files is the API (files-contract.ts). Every other path is 404. A file written when a
-// previous run stopped is removed from incoming/ here.
+// and /api/files is the API (files-contract.ts). Every other path is 404. At start it removes what
+// a stopped run left: a half-written file in incoming/, and a file in files/ without a row.
 export function createFilesService(inputs: FilesServiceInputs) {
   const filesDir = join(inputs.dataDir, 'files');
   const incomingDir = join(inputs.dataDir, 'incoming');
@@ -48,6 +48,7 @@ export function createFilesService(inputs: FilesServiceInputs) {
   mkdirSync(filesDir, { recursive: true });
   rmSync(incomingDir, { recursive: true, force: true });
   mkdirSync(incomingDir);
+  removeFilesWithoutRows(inputs.store, filesDir);
 
   const api = new OpenAPIHandler(
     buildFilesRouter({
@@ -81,6 +82,16 @@ export function createFilesService(inputs: FilesServiceInputs) {
     .all('/api/files', sendToAPI, { parse: 'none' })
     .all('/api/files/*', sendToAPI, { parse: 'none' })
     .get('/:id/:filename', (context) => readFileResponse({ ...inputs, filesDir }, context.params));
+}
+
+// A stopped run can leave a file moved into place whose row it never wrote. Nothing lists, serves
+// or sweeps such a file, so it goes before the service takes requests.
+function removeFilesWithoutRows(store: UploadStore, filesDir: string): void {
+  for (const id of readdirSync(filesDir)) {
+    if (store.findUpload(id) === null) {
+      rmSync(join(filesDir, id), { force: true });
+    }
+  }
 }
 
 const fileIDPattern = new RegExp(`^[A-Za-z\\d]{${fileIDLength}}$`, 'u');

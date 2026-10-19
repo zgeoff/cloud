@@ -23,7 +23,7 @@ const agentLimitMs = 30 * dayMs;
 export function decideExpiry(facts: ExpiryFacts): ExpiryDecision {
   const expiresAt = parseExpires(facts.expires, facts.now);
 
-  if (expiresAt === undefined) {
+  if (expiresAt === undefined || (expiresAt !== null && !Number.isFinite(expiresAt.getTime()))) {
     return {
       outcome: 'invalid',
       reason: 'expires must be 7d, 30d, never, a date, or a date and time with its offset',
@@ -49,7 +49,12 @@ export function decideExpiry(facts: ExpiryFacts): ExpiryDecision {
   return { outcome: 'allowed', expiresAt };
 }
 
-const durations: Readonly<Record<string, number>> = { '7d': 7, '30d': 30 };
+// a Map, so a name such as toString that every object inherits names no duration
+const durations: ReadonlyMap<string, number> = new Map([
+  ['7d', 7],
+  ['30d', 30],
+]);
+
 const dateSchema = z.iso.date();
 const dateTimeSchema = z.iso.datetime({ offset: true });
 
@@ -59,7 +64,7 @@ function parseExpires(text: string, now: Date): Date | null | undefined {
     return null;
   }
 
-  const days = durations[text];
+  const days = durations.get(text);
 
   if (days !== undefined) {
     return new Date(now.getTime() + days * dayMs);
