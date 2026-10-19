@@ -14,8 +14,6 @@ interface ExpirySweepSchedule {
   readonly schedule: (run: () => void, intervalMs: number) => () => void;
 }
 
-// Runs the expiry sweep once now, then every sweepIntervalMs, and returns the function that stops
-// the schedule.
 export function startExpirySweep(inputs: ExpirySweepSchedule): () => void {
   const run = (): void => {
     const removed = runExpirySweep({
