@@ -33,8 +33,8 @@ interface TunnelRoutesOutputs {
   readonly previewWebhookURL: Output<string>;
 }
 
-// The tunnel's ingress rules and the proxied CNAME for each hostname. The catch-all 404
-// stays last.
+// The shared tunnel's ingress rules, the atc tunnel's, and the proxied CNAME for each hostname.
+// Each tunnel's catch-all 404 stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
   const gateway = inputs.gateway;
   const previewWebhookRoute = buildPreviewWebhookRoute();
