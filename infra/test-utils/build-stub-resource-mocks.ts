@@ -1,4 +1,5 @@
 import type { runtime } from '@pulumi/pulumi';
+import { z } from 'zod';
 
 // Pulumi mocks that record each resource registration as `<type>::<name>`, in the order the
 // engine receives them. A registration whose key is in held stays pending, as a slow provider
@@ -14,6 +15,9 @@ export function buildStubResourceMocks(held: readonly string[] = []): {
   const started = new Map<string, PromiseWithResolvers<void>>();
 
   const gate = Promise.withResolvers<void>();
+
+  // Pulumi types a registration's inputs as any
+  const inputsSchema = z.record(z.string(), z.unknown());
 
   const getStarted = (key: string): PromiseWithResolvers<void> => {
     const existing = started.get(key) ?? Promise.withResolvers<void>();
@@ -41,9 +45,9 @@ export function buildStubResourceMocks(held: readonly string[] = []): {
           await gate.promise;
         }
 
-        return { id: `${args.name}-id`, state: args.inputs };
+        return { id: `${args.name}-id`, state: inputsSchema.parse(args.inputs) };
       },
-      call: (args: runtime.MockCallArgs) => args.inputs,
+      call: (args: runtime.MockCallArgs) => inputsSchema.parse(args.inputs),
     },
   };
 }
