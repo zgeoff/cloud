@@ -205,6 +205,7 @@ const partResolvers: {
 };
 
 function resolvePart(part: PinPart, input: PinEditsInput): string | Error {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for part.kind reads that kind
   const resolver = partResolvers[part.kind] as PartResolver<typeof part> | undefined;
 
   // the type check refuses a kind with no resolver, so only a registry built outside it lands here

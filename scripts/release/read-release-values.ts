@@ -27,7 +27,7 @@ type ReleaseSource = ReleaseRecord['source'];
 type SourceReader<Source extends ReleaseSource> = (
   read: ReleaseRead,
   source: Source,
-) => Promise<ReleaseReadResult | Error> | Error;
+) => Promise<ReleaseReadResult | Error>;
 
 // One reader per source kind. The release workflows run these scripts without node_modules, so a
 // keyed record branches here in place of ts-pattern's match, and its type still needs every kind.
@@ -39,22 +39,23 @@ const sourceReaders: {
   'release-notes': (read) => readReleaseNotesValues(read),
   'npm-tarball': (read, source) => readNPMTarballValues(read, source.packageName),
   'published-images': (read) =>
-    new Error(
-      `${read.record.name} pins images this repository publishes: the workflow that publishes them opens its pull request`,
+    Promise.resolve(
+      new Error(
+        `${read.record.name} pins images this repository publishes: the workflow that publishes them opens its pull request`,
+      ),
     ),
 };
 
 // Reads what the release publishes for its pins, as its record's source kind says
-export async function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
+export function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
   const source = read.record.source;
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for source.kind reads that kind
   const reader = sourceReaders[source.kind] as SourceReader<typeof source> | undefined;
 
   // the type check refuses a kind with no reader, so only a registry built outside it lands here
-  if (reader === undefined) {
-    return new Error('the registry names a release source kind that no reader reads');
-  }
-
-  return await reader(read, source);
+  return reader === undefined
+    ? Promise.resolve(new Error('the registry names a release source kind that no reader reads'))
+    : reader(read, source);
 }
 
 async function readSHA256SumsValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
