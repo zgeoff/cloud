@@ -2,7 +2,7 @@ import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readWorkerBundle } from './read-worker-bundle.ts';
+import { runWorkerBundler } from './run-worker-bundler.ts';
 
 test('it bundles an entry and its imports into one module that runs on its own', async () => {
   const ctx = await setupTest();
@@ -19,7 +19,7 @@ test('it bundles an entry and its imports into one module that runs on its own',
 
   await mkdir(join(ctx.directory, 'out'));
 
-  const bundle = await readWorkerBundle(join(ctx.directory, 'index.ts'));
+  const bundle = await runWorkerBundler(join(ctx.directory, 'index.ts'));
 
   await writeFile(join(ctx.directory, 'out', 'index.js'), bundle);
 
@@ -45,7 +45,7 @@ test('it fails with the bundler reason when an import cannot be resolved', async
 
   await writeFile(entrypoint, "import { greet } from './missing.ts';\nexport default greet;\n");
 
-  expect(readWorkerBundle(entrypoint)).rejects.toThrowWithMessage(
+  expect(runWorkerBundler(entrypoint)).rejects.toThrowWithMessage(
     Error,
     `bundle of ${entrypoint} failed: Could not resolve: "./missing.ts"`,
   );
