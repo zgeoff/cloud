@@ -80,10 +80,15 @@ gh run list --workflow deploy-prod.yml --limit 5
 gh run view <run_id> --log
 ```
 
+Each run's name holds the commit it decides on. Read the commit there, not in the run's head commit:
+GitHub sets a CI-started run's head commit to main's tip when the run starts, so a run for one merge
+shows the next merge's commit when the two land minutes apart.
+
 A run that applied ends its summary with `deployed/prod moved to <revision>.`, and its log shows
 both drift checks. Link the run on the PR or issue as the record of the apply. A run whose decision
-printed `No Pulumi input changed since deployed/prod, so nothing applied.` changed nothing, and so
-did a run whose apply job printed
+printed
+`No commit after deployed/prod at <commit> up to <revision> changes a Pulumi input, so nothing applied.`
+changed nothing, and so did a run whose apply job printed
 `deployed/prod at <commit> already holds every Pulumi input of <revision>, so nothing applied.`
 after it waited behind a newer commit's apply.
 
