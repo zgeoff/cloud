@@ -4,10 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildStubReleaseGH } from '../test-utils/build-stub-release-gh.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { findReleaseBumps } from './find-release-bumps.ts';
+import { readReleaseBumps } from './read-release-bumps.ts';
 
 async function setupTest() {
-  const root = await mkdtemp(join(tmpdir(), 'find-release-bumps-'));
+  const root = await mkdtemp(join(tmpdir(), 'read-release-bumps-'));
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 
@@ -56,7 +56,7 @@ test('it finds nothing when every pin holds its newest release', async () => {
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual([]);
 
@@ -104,7 +104,7 @@ test('it finds the atc line with every pinned version when one pin is older', as
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(['atc 4.3.0 4.3.0 2.26.2 4.3.0']);
 });
@@ -145,7 +145,7 @@ test('it finds the imp and nixie lines when their pins are older', async () => {
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(['imp 1.0.1 1.0.0 0.33.0', 'nixie 0.7.0 0.6.2 0.6.2']);
 });
@@ -186,7 +186,7 @@ test('it finds the auto-mode line when the agent image pin is older', async () =
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(['auto-mode 0.19.3 0.17.0']);
 });
@@ -232,7 +232,7 @@ test('it takes the highest version among the tags of the dependency own form', a
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(['atc 4.10.0 4.2.0 4.2.0 4.2.0']);
 });
@@ -273,7 +273,7 @@ test('it finds nothing for a pin newer than the newest release', async () => {
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual([]);
 });
@@ -305,7 +305,7 @@ test('it fails on a missing pin before it reads a release', async () => {
 
   const stub = buildStubRunner(buildStubReleaseGH({}));
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(
     new Error(
@@ -350,7 +350,7 @@ test('it fails on a doubled pin', async () => {
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(
     new Error(
@@ -395,7 +395,7 @@ test('it fails when a repository has no release of its form', async () => {
     }),
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(new Error('zgeoff/impz has no release tagged vX.Y.Z'));
 });
@@ -431,7 +431,7 @@ test('it gives the gh error when a release list fails', async () => {
       : undefined,
   );
 
-  const bumps = await findReleaseBumps(ctx.root, stub.run);
+  const bumps = await readReleaseBumps(ctx.root, stub.run);
 
   expect(bumps).toStrictEqual(
     new Error('HTTP 401: Bad credentials (https://api.github.com/graphql)'),

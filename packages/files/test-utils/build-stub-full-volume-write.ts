@@ -2,11 +2,13 @@
 // file's first byte to path, as a real write does before the volume runs out, then fails with the
 // real ENOSPC that a write to /dev/full raises.
 export function buildStubFullVolumeWrite(): (path: string, file: Blob) => Promise<unknown> {
-  return async (path, file) => {
-    const bytes = await file.arrayBuffer();
+  return writeToFullVolume;
+}
 
-    await Bun.write(path, new Uint8Array(bytes, 0, 1));
+async function writeToFullVolume(path: string, file: Blob): Promise<unknown> {
+  const bytes = await file.arrayBuffer();
 
-    return Bun.write('/dev/full', file);
-  };
+  await Bun.write(path, new Uint8Array(bytes, 0, 1));
+
+  return Bun.write('/dev/full', file);
 }

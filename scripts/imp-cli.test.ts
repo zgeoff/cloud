@@ -92,7 +92,7 @@ test('#loadImpJSON stops with imp’s exit code when the call fails', () => {
 
 test('#loadHostImpJSON reads impd’s tokens through the CLI in imp-host over ssh as root', async () => {
   const host = buildMockCredentialsHostScenario();
-  const stub = buildStubRunner(buildStubCredentialsHost(host).handle);
+  const stub = buildStubRunner(buildStubCredentialsHost(host).answer);
 
   const tokens = await loadHostImpJSON(
     { run: stub.run, printOut: () => {}, printErr: () => {}, host: 'geoffcloud' },
@@ -120,7 +120,7 @@ test('#loadHostImpJSON reads impd’s tokens through the CLI in imp-host over ss
 
 test('#loadHostImpJSON stops with docker’s exit code when imp-host is stopped', () => {
   const stub = buildStubRunner(
-    buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'secret-ls' })).handle,
+    buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'secret-ls' })).answer,
   );
 
   expect(
@@ -144,7 +144,7 @@ test('#loadHostImpJSON stops when imp prints something other than JSON, naming t
 
 test('#loadHostImpJSON sends its stdin to the CLI through docker exec -i', async () => {
   const host = buildStubCredentialsHost(buildMockCredentialsHostScenario({ secrets: [] }));
-  const stub = buildStubRunner(host.handle);
+  const stub = buildStubRunner(host.answer);
 
   await loadHostImpJSON(
     { run: stub.run, printOut: () => {}, printErr: () => {}, host: 'geoffcloud' },

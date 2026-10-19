@@ -37,17 +37,6 @@ export async function installATCImpToken(
   await createImpToken(context);
 }
 
-async function createImpToken(context: Readonly<ATCCredentialsContext>) {
-  const script = await readHostScript('mint-atc-imp-token.sh');
-
-  // the script runs imp's CLI with the argv that follows the directory
-  await runOnHost(
-    context,
-    ['bash', '-s', '--', context.directory, ...buildHostImpArgv([])],
-    script,
-  );
-}
-
 async function checkSavedToken(
   context: Readonly<ATCCredentialsContext>,
   token: unknown,
@@ -120,4 +109,15 @@ function pickFix(context: Readonly<ATCCredentialsContext>, file: string, exitCod
   return exitCode === 120
     ? `Check ${file} on the host, then rerun`
     : `Check impd on the host's 127.0.0.1:${context.impdPort}, then rerun`;
+}
+
+async function createImpToken(context: Readonly<ATCCredentialsContext>) {
+  const script = await readHostScript('mint-atc-imp-token.sh');
+
+  // the script runs imp's CLI with the argv that follows the directory
+  await runOnHost(
+    context,
+    ['bash', '-s', '--', context.directory, ...buildHostImpArgv([])],
+    script,
+  );
 }

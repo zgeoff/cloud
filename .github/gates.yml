@@ -4,9 +4,9 @@
 # gate's paths and none of its ignore globs. The globs follow Bun.Glob: `*` stays inside one
 # directory, and `**` crosses any number of them, none included.
 #
-# scripts/needs-gate.test.ts covers this file: each glob must match a file in the checkout, so a path
-# with a typo fails the tests instead of skipping a check, and a table of changes pins each gate's
-# answer. A gate's optional `skipped` line goes to the run's summary when CI skips the check.
+# scripts/is-gate-needed.test.ts covers this file: each glob must match a file in the checkout, so a
+# path with a typo fails the tests instead of skipping a check, and a table of changes pins each
+# gate's answer. A gate's optional `skipped` line goes to the run's summary when CI skips the check.
 gates:
   # The four linters that run in the pinned Nix image (shell, Nix, Python and Actions) and the
   # shell suites, which take most of the CI job's time. None of them reads a Markdown file.
@@ -33,7 +33,7 @@ gates:
       - .github/workflows/ci.yml
       - .github/gates.yml
       - scripts/run-decide-gates.ts
-      - scripts/needs-gate.ts
+      - scripts/is-gate-needed.ts
       - scripts/load-gate-manifest.ts
 
   # The NixOS checks, which boot VMs and take minutes. A green run on main covers each later
@@ -77,7 +77,7 @@ gates:
       - scripts/find-nixos-check-run.sh
       - .github/gates.yml
       - scripts/run-decide-gates.ts
-      - scripts/needs-gate.ts
+      - scripts/is-gate-needed.ts
       - scripts/load-gate-manifest.ts
 
   # The prod apply: the inputs of the Pulumi program. A change to anything else, such as the docs,

@@ -1,8 +1,10 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from './run-process.ts';
+import { removeDescendant } from './test-utils/remove-descendant.ts';
+import { waitForFile } from './test-utils/wait-for-file.ts';
 
 test('it passes each argv element to the program whole, with no shell to split or expand it', async () => {
   const result = await runProcess(['printf', '%s|', 'two words', '$HOME', '*', "it's"]);
@@ -150,30 +152,3 @@ test('it stops reading the pipes that a descendant outside its group holds once 
 
   expect(result.exitCode).toBe(137);
 });
-
-async function removeDescendant(directory: string, pidFile: string) {
-  const text = await readFile(pidFile, 'utf8').catch(() => '');
-
-  const pid = Number(text);
-
-  // a pid of 0 or below would signal this test's own process group
-  if (Number.isInteger(pid) && pid > 0) {
-    try {
-      process.kill(pid, 'SIGKILL');
-    } catch {
-      // the descendant has exited
-    }
-  }
-
-  await rm(directory, { recursive: true, force: true });
-}
-
-async function waitForFile(path: string) {
-  for (let text = ''; text === ''; ) {
-    text = await readFile(path, 'utf8').catch(() => '');
-
-    if (text === '') {
-      await Bun.sleep(10);
-    }
-  }
-}

@@ -17,7 +17,7 @@
   "scripts": {
     "audit": "bun audit",
     "deadcode": "knip",
-    "files:branch": "bun scripts/collect-branch-files.ts",
+    "files:branch": "bun scripts/read-branch-files.ts",
     "lint": "oxlint",
     "lint:files": "oxlint",
     "lint:fix": "oxlint --fix",
@@ -100,7 +100,7 @@
     "@zgeoff/bun-test-extended": "0.2.0",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/format-codemod": "0.1.0",
-    "@zgeoff/oxlint-config": "0.2.11",
+    "@zgeoff/oxlint-config": "0.5.2",
     "@zgeoff/skill-gate": "0.1.0",
     "knip": "6.24.0",
     "lefthook": "2.1.10",

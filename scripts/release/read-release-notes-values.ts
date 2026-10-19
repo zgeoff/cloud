@@ -1,5 +1,5 @@
 import { findJSONField } from '../find-json-field.ts';
-import { findNixieReleaseFlags } from './find-nixie-release-flags.ts';
+import { collectNixieReleaseFlags } from './collect-nixie-release-flags.ts';
 import { isNewerVersion } from './is-newer-version.ts';
 import { parseReleaseVersion } from './parse-release-version.ts';
 import { readReleaseTags } from './read-release-tags.ts';
@@ -10,7 +10,7 @@ import { runChecked } from './run-checked.ts';
 export async function readReleaseNotesValues(
   read: ReleaseRead,
 ): Promise<ReleaseReadResult | Error> {
-  const versions = await findVersionsToRead(read);
+  const versions = await readNoteVersions(read);
 
   if (versions instanceof Error) {
     return versions;
@@ -27,10 +27,10 @@ export async function readReleaseNotesValues(
 
   return digests instanceof Error
     ? digests
-    : { values: { digests }, flags: findNixieReleaseFlags({ pinned, target, between }) };
+    : { values: { digests }, flags: collectNixieReleaseFlags({ pinned, target, between }) };
 }
 
-async function findVersionsToRead(read: ReleaseRead) {
+async function readNoteVersions(read: ReleaseRead) {
   const prefix = read.record.tagPrefix;
 
   const tags = await readReleaseTags(read.run, read.record.repo);

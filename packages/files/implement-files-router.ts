@@ -12,9 +12,6 @@ import { mintFileID } from './mint-file-id.ts';
 import { pickContentType, sniffLength } from './pick-content-type.ts';
 import type { Role, Upload } from './types.ts';
 
-// the largest file the service takes: Cloudflare's request body limit on the free plan
-export const maxFileBytes = 100_000_000;
-
 // space an upload leaves free, for the metadata file and its write-ahead log
 const reserveBytes = 64 * 1024 * 1024;
 
@@ -46,7 +43,7 @@ export interface FilesContext {
 // The API's procedures. Every call needs a role token: owner may do everything, and agent may
 // upload with an expiry of 30 days at most, and list, read and remove agent uploads only. An
 // owner upload is not found for agent, and expire is the owner's alone.
-export function buildFilesRouter(inputs: FilesRouterInputs) {
+export function implementFilesRouter(inputs: FilesRouterInputs) {
   const os = implement(filesContract)
     .$context<FilesContext>()
     .use((options) => {
@@ -136,6 +133,9 @@ export function buildFilesRouter(inputs: FilesRouterInputs) {
   });
 }
 
+// the largest file the service takes: Cloudflare's request body limit on the free plan
+export const maxFileBytes = 100_000_000;
+
 function requireUploadAllowed(file: Blob, filename: string): void {
   if (!isSafeFilename(filename)) {
     throw new ORPCError('BAD_REQUEST', {
@@ -218,17 +218,6 @@ function toUploadError(error: unknown): unknown {
     : error;
 }
 
-// an agent never sees an owner upload, so it is not found rather than refused
-function requireVisibleUpload(store: UploadStore, id: string, role: Role): Upload {
-  const upload = store.findUpload(id);
-
-  if (upload === null || (role === 'agent' && upload.uploader !== 'agent')) {
-    throw new ORPCError('NOT_FOUND', { message: `no upload ${id}` });
-  }
-
-  return upload;
-}
-
 function buildUploadOutput(upload: Upload, publicURL: string): UploadOutput {
   return {
     id: upload.id,
@@ -243,4 +232,15 @@ function buildUploadOutput(upload: Upload, publicURL: string): UploadOutput {
     link: upload.link,
     expiresAt: upload.expiresAt?.toISOString() ?? null,
   };
+}
+
+// an agent never sees an owner upload, so it is not found rather than refused
+function requireVisibleUpload(store: UploadStore, id: string, role: Role): Upload {
+  const upload = store.findUpload(id);
+
+  if (upload === null || (role === 'agent' && upload.uploader !== 'agent')) {
+    throw new ORPCError('NOT_FOUND', { message: `no upload ${id}` });
+  }
+
+  return upload;
 }

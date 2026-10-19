@@ -4,8 +4,10 @@ import { parsePinTable } from './parse-pin-table.ts';
 import { pinTableFile } from './pin-table-file.ts';
 import { releaseRegistry } from './release-registry.ts';
 
-export function findPinTableMismatches(files: Readonly<Record<string, string>>): readonly string[] {
-  const table = loadTable(files[pinTableFile]);
+export function collectPinTableMismatches(
+  files: Readonly<Record<string, string>>,
+): readonly string[] {
+  const table = parsePinTableFile(files[pinTableFile]);
 
   if (typeof table === 'string') {
     return [table];
@@ -20,7 +22,7 @@ export function findPinTableMismatches(files: Readonly<Record<string, string>>):
   return [...collectLineMismatches(files, table), ...extra];
 }
 
-function loadTable(text: string | undefined): PinValues | string {
+function parsePinTableFile(text: string | undefined): PinValues | string {
   if (text === undefined) {
     return `${pinTableFile} is missing`;
   }

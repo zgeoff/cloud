@@ -36,6 +36,11 @@ interface StubCommandAnswer {
   readonly hold?: boolean;
 }
 
+// the imp a redeemed ticket opens, or null for a socket the bearer token opened, which may open any
+interface ExecSocketData {
+  readonly ticketImp: string | null;
+}
+
 export interface StubImpd {
   readonly url: string;
   readonly token: string;
@@ -61,14 +66,6 @@ export interface StubImpd {
   readonly tickets: Map<string, string>;
 }
 
-// the imp a redeemed ticket opens, or null for a socket the bearer token opened, which may open any
-interface ExecSocketData {
-  readonly ticketImp: string | null;
-}
-
-// the version system.info reports: the impd the host pins
-const stubImpdVersion = '2.3.0';
-
 export function startStubImpd(): StubImpd {
   const token = 'imp_stubpreview.stub-secret';
 
@@ -86,31 +83,33 @@ export function startStubImpd(): StubImpd {
     tickets: new Map(),
   };
 
+  const answerRequest = async (request: Request, bunServer: Bun.Server<ExecSocketData>) => {
+    const url = new URL(request.url);
+
+    if (url.pathname === '/exec') {
+      return createExecSocket(stub, request, bunServer);
+    }
+
+    if (request.headers.get('authorization') !== `Bearer ${token}`) {
+      return buildRPCError(401, 'UNAUTHORIZED', 'missing or wrong token');
+    }
+
+    const procedure = url.pathname.replace(/^\/rpc\//u, '');
+
+    // a procedure without input, such as system.info, comes with no body
+    const text = await request.text();
+
+    const body = (text === '' ? {} : JSON.parse(text)) as {
+      readonly json?: Record<string, unknown>;
+    };
+
+    return buildProcedureResponse(stub, procedure, body.json ?? {});
+  };
+
   const server = Bun.serve<ExecSocketData>({
     hostname: '127.0.0.1',
     port: 0,
-    fetch: async (request, bunServer) => {
-      const url = new URL(request.url);
-
-      if (url.pathname === '/exec') {
-        return createExecSocket(stub, request, bunServer);
-      }
-
-      if (request.headers.get('authorization') !== `Bearer ${token}`) {
-        return buildRPCError(401, 'UNAUTHORIZED', 'missing or wrong token');
-      }
-
-      const procedure = url.pathname.replace(/^\/rpc\//u, '');
-
-      // a procedure without input, such as system.info, comes with no body
-      const text = await request.text();
-
-      const body = (text === '' ? {} : JSON.parse(text)) as {
-        readonly json?: Record<string, unknown>;
-      };
-
-      return buildProcedureResponse(stub, procedure, body.json ?? {});
-    },
+    fetch: answerRequest,
     websocket: {
       message: (socket: ServerWebSocket<ExecSocketData>, raw) => {
         runStubCommand(stub, socket, raw);
@@ -155,6 +154,14 @@ function createExecSocket(
     ? undefined
     : new Response('not a WebSocket\n', { status: 400 });
 }
+
+function buildRPCError(status: number, code: string, message: string): Response {
+  // oRPC's error body: the error's JSON in the envelope, with its status as the HTTP status
+  return Response.json({ json: { defined: true, code, status, message } }, { status });
+}
+
+// the version system.info reports: the impd the host pins
+const stubImpdVersion = '2.3.0';
 
 function buildProcedureResponse(
   stub: StubImpd,
@@ -245,17 +252,6 @@ function buildProcedureResponse(
     );
 }
 
-function toImpRecord(imp: StubImp) {
-  return {
-    id: `imp-${imp.name}`,
-    name: imp.name,
-    image: imp.image,
-    state: imp.state,
-    httpPort: imp.httpPort,
-    lastActiveAt: new Date(imp.lastActiveAt),
-  };
-}
-
 function buildRPCResult(output: unknown): Response {
   const meta: (string | number)[][] = [];
   const json = encodeRPCValue(output, [], meta);
@@ -290,9 +286,15 @@ function encodeRPCValue(
   return value;
 }
 
-function buildRPCError(status: number, code: string, message: string): Response {
-  // oRPC's error body: the error's JSON in the envelope, with its status as the HTTP status
-  return Response.json({ json: { defined: true, code, status, message } }, { status });
+function toImpRecord(imp: StubImp) {
+  return {
+    id: `imp-${imp.name}`,
+    name: imp.name,
+    image: imp.image,
+    state: imp.state,
+    httpPort: imp.httpPort,
+    lastActiveAt: new Date(imp.lastActiveAt),
+  };
 }
 
 function runStubCommand(

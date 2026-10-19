@@ -59,7 +59,7 @@ test('it reads the imp commit and both image digests for an image-digests source
         'ghcr.io/zgeoff/imp-host:1.0.1': `sha256:${'3'.repeat(64)}`,
         'ghcr.io/zgeoff/imp-base:1.0.1': `sha256:${'4'.repeat(64)}`,
       },
-    }).handle,
+    }).answer,
   );
 
   const read = await readReleaseValues({

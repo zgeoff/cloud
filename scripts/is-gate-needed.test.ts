@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
+import { isGateNeeded } from './is-gate-needed.ts';
 import { loadGateManifest } from './load-gate-manifest.ts';
-import { needsGate } from './needs-gate.ts';
 import { runProcess } from './run-process.ts';
 
 // The manifest's own suite: it reads the real .github/gates.yml, so a change to a gate's paths
@@ -39,7 +39,7 @@ test.each([
     throw new Error(`the manifest has no gate ${name}`);
   }
 
-  expect(needsGate(gate, paths)).toBe(expected);
+  expect(isGateNeeded(gate, paths)).toBe(expected);
 });
 
 test('it holds the gates that CI, the NixOS checks and the prod apply read', async () => {
@@ -73,7 +73,7 @@ test('it names only globs that match a file in the checkout', async () => {
 
 test('it skips a change whose every path an ignore glob matches', () => {
   expect(
-    needsGate({ name: 'lint', paths: ['**'], ignore: ['**/*.md'], skipped: undefined }, [
+    isGateNeeded({ name: 'lint', paths: ['**'], ignore: ['**/*.md'], skipped: undefined }, [
       'README.md',
       'docs/a.md',
     ]),
@@ -82,7 +82,7 @@ test('it skips a change whose every path an ignore glob matches', () => {
 
 test('it needs the check when one path matches and no ignore glob does', () => {
   expect(
-    needsGate({ name: 'lint', paths: ['**'], ignore: ['**/*.md'], skipped: undefined }, [
+    isGateNeeded({ name: 'lint', paths: ['**'], ignore: ['**/*.md'], skipped: undefined }, [
       'README.md',
       'src/a.ts',
     ]),
@@ -91,7 +91,7 @@ test('it needs the check when one path matches and no ignore glob does', () => {
 
 test('it keeps a single star inside one directory', () => {
   expect(
-    needsGate({ name: 'go', paths: ['provider/*'], ignore: [], skipped: undefined }, [
+    isGateNeeded({ name: 'go', paths: ['provider/*'], ignore: [], skipped: undefined }, [
       'provider/cmd/main.go',
     ]),
   ).toBeFalse();
@@ -99,6 +99,6 @@ test('it keeps a single star inside one directory', () => {
 
 test('it needs no check for a change with no path', () => {
   expect(
-    needsGate({ name: 'lint', paths: ['**'], ignore: [], skipped: undefined }, []),
+    isGateNeeded({ name: 'lint', paths: ['**'], ignore: [], skipped: undefined }, []),
   ).toBeFalse();
 });

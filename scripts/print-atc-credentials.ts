@@ -26,6 +26,10 @@ export async function printATCCredentials(context: Readonly<ATCCredentialsContex
   await printModes(context);
 }
 
+function buildSummary(record: unknown, keys: readonly string[]) {
+  return Object.fromEntries(keys.map((key) => [key, findJSONField(record, key)]));
+}
+
 async function printModes(context: Readonly<ATCCredentialsContext>) {
   const paths = [
     context.directory,
@@ -36,8 +40,4 @@ async function printModes(context: Readonly<ATCCredentialsContext>) {
   const stat = await runOnHost(context, ['stat', '-c', '%n %U %a %s bytes', ...paths]);
 
   context.printOut(stat);
-}
-
-function buildSummary(record: unknown, keys: readonly string[]) {
-  return Object.fromEntries(keys.map((key) => [key, findJSONField(record, key)]));
 }

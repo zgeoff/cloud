@@ -48,16 +48,8 @@ function buildSSHAnswer(scenario: Readonly<StubReadinessHostScenario>, call: Stu
   return buildCommandAnswer(scenario, call, splitShellWords(command));
 }
 
-function splitShellWords(command: string): readonly string[] | undefined {
-  const word = String.raw`'(?:[^']|'\\'')*'`;
-
-  if (!new RegExp(`^${word}(?: ${word})*$`, 'u').test(command)) {
-    return undefined;
-  }
-
-  const words = command.match(new RegExp(word, 'gu')) ?? [];
-
-  return words.map((quoted) => quoted.slice(1, -1).replaceAll(String.raw`'\''`, "'"));
+function buildUnexpected(call: StubCall): StubAnswer {
+  return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
 }
 
 type HostCommand = (
@@ -112,15 +104,6 @@ function buildCommandAnswer(
     : command[1](scenario, words);
 }
 
-function isShapeOf(shape: string, words: readonly string[]) {
-  const parts = shape.split(' ');
-
-  return (
-    parts.length === words.length &&
-    parts.every((part, index) => part === '*' || part === words[index])
-  );
-}
-
 function buildFreeAnswer(scenario: Readonly<StubReadinessHostScenario>): StubAnswer {
   // procps-ng's free -m layout, with the available column last
   const mem = `Mem:            3915        1234         567          12        2113        ${scenario.availableMiB}`;
@@ -136,6 +119,11 @@ function findObject(names: readonly string[], kind: string, name = ''): StubAnsw
   return names.includes(name)
     ? { stdout: `NAME   STATUS   AGE\n${name}    Active   2d\n` }
     : buildNotFound(kind, name);
+}
+
+function buildNotFound(kind: string, name: string): StubAnswer {
+  // kubectl v1.35.8's NotFound error and exit 1, from its source
+  return { exitCode: 1, stderr: `Error from server (NotFound): ${kind} "${name}" not found\n` };
 }
 
 function buildDeployAnswer(
@@ -163,11 +151,23 @@ function buildReadyReplicasAnswer(
   return ready === undefined ? buildNotFound('deployments.apps', name) : { stdout: String(ready) };
 }
 
-function buildNotFound(kind: string, name: string): StubAnswer {
-  // kubectl v1.35.8's NotFound error and exit 1, from its source
-  return { exitCode: 1, stderr: `Error from server (NotFound): ${kind} "${name}" not found\n` };
+function isShapeOf(shape: string, words: readonly string[]) {
+  const parts = shape.split(' ');
+
+  return (
+    parts.length === words.length &&
+    parts.every((part, index) => part === '*' || part === words[index])
+  );
 }
 
-function buildUnexpected(call: StubCall): StubAnswer {
-  return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
+function splitShellWords(command: string): readonly string[] | undefined {
+  const word = String.raw`'(?:[^']|'\\'')*'`;
+
+  if (!new RegExp(`^${word}(?: ${word})*$`, 'u').test(command)) {
+    return undefined;
+  }
+
+  const words = command.match(new RegExp(word, 'gu')) ?? [];
+
+  return words.map((quoted) => quoted.slice(1, -1).replaceAll(String.raw`'\''`, "'"));
 }

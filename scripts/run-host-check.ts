@@ -9,6 +9,8 @@ export interface HostCheckIO {
   readonly host: string;
 }
 
+const hostTimeoutMs = 120_000;
+
 export function runHostCheck(
   io: Readonly<HostCheckIO>,
   remote: readonly string[],
@@ -33,8 +35,6 @@ export async function runOnHost(
 
   return result.stdout.toString();
 }
-
-const hostTimeoutMs = 120_000;
 
 function buildHostArgv(host: string, remote: readonly string[]): readonly string[] {
   // Tailscale SSH logs the line and Alloy ships it to Loki, so a secret goes in stdin, never here

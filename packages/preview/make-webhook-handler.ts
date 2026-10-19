@@ -58,6 +58,78 @@ function shouldPreview(deps: PreviewDeps, event: PullRequestEvent): boolean {
   return listed && !event.fromFork;
 }
 
+// A close the service saw before any head leaves this mark on its ended record, so a late push
+// finds the preview ended and a redelivered close posts no comment
+const unseenCloseDetail = 'the pull request closed before any preview';
+
+async function removePreview(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
+  const before = deps.store.findPreview(event);
+
+  updatePreviewEnded(deps, event, before === null);
+
+  // the imp's name derives from the pull request, so its imp goes even without a record of it
+  const imp = buildImpName(event.repo, event.number);
+
+  const existing = await deps.impd.readImp(imp);
+
+  await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
+
+  if (before === null || before.detail === unseenCloseDetail) {
+    return;
+  }
+
+  const link = `${deps.settings.baseURL}/${event.repo}/${event.number}`;
+
+  await deps.github.updatePreviewComment({
+    repo: event.repo,
+    number: event.number,
+    body: renderPreviewComment(link, null),
+  });
+
+  deps.log(`${event.repo}#${event.number}: preview ended`);
+}
+
+function updatePreviewEnded(deps: PreviewDeps, event: PullRequestEvent, unseen: boolean): void {
+  const imp = buildImpName(event.repo, event.number);
+
+  if (unseen) {
+    deps.store.upsertHead({ repo: event.repo, number: event.number, imp, headSHA: event.headSHA });
+  }
+
+  deps.store.updatePhase(event, ['waiting', 'booting', 'ready', 'failed'], {
+    phase: 'ended',
+    ...(unseen ? { detail: unseenCloseDetail } : {}),
+  });
+}
+
+async function updatePreviewHead(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
+  const compose = await deps.github.readComposeFile(event.repo, event.headSHA);
+
+  // only an open brings an ended preview back, so a push delivered after the close never
+  // revives it
+  if (compose === null || isEndedPush(deps, event)) {
+    return;
+  }
+
+  const imp = buildImpName(event.repo, event.number);
+
+  deps.store.upsertHead({ repo: event.repo, number: event.number, imp, headSHA: event.headSHA });
+
+  const link = `${deps.settings.baseURL}/${event.repo}/${event.number}`;
+
+  await deps.github.updatePreviewComment({
+    repo: event.repo,
+    number: event.number,
+    body: renderPreviewComment(link, event.headSHA),
+  });
+
+  deps.log(`${event.repo}#${event.number}: preview link for ${event.headSHA}`);
+}
+
+function isEndedPush(deps: PreviewDeps, event: PullRequestEvent): boolean {
+  return event.action === 'update' && deps.store.findPreview(event)?.phase === 'ended';
+}
+
 function shouldCheckContract(deps: PreviewDeps, event: PullRequestEvent): boolean {
   const repos = deps.settings.contract?.repos;
 
@@ -93,76 +165,4 @@ async function claimContractRun(deps: PreviewDeps, event: PullRequestEvent): Pro
 
     startContractRun(deps, key);
   }
-}
-
-async function updatePreviewHead(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
-  const compose = await deps.github.readComposeFile(event.repo, event.headSHA);
-
-  // only an open brings an ended preview back, so a push delivered after the close never
-  // revives it
-  if (compose === null || isEndedPush(deps, event)) {
-    return;
-  }
-
-  const imp = buildImpName(event.repo, event.number);
-
-  deps.store.upsertHead({ repo: event.repo, number: event.number, imp, headSHA: event.headSHA });
-
-  const link = `${deps.settings.baseURL}/${event.repo}/${event.number}`;
-
-  await deps.github.updatePreviewComment({
-    repo: event.repo,
-    number: event.number,
-    body: renderPreviewComment(link, event.headSHA),
-  });
-
-  deps.log(`${event.repo}#${event.number}: preview link for ${event.headSHA}`);
-}
-
-function isEndedPush(deps: PreviewDeps, event: PullRequestEvent): boolean {
-  return event.action === 'update' && deps.store.findPreview(event)?.phase === 'ended';
-}
-
-// A close the service saw before any head leaves this mark on its ended record, so a late push
-// finds the preview ended and a redelivered close posts no comment
-const unseenCloseDetail = 'the pull request closed before any preview';
-
-async function removePreview(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
-  const before = deps.store.findPreview(event);
-
-  updatePreviewEnded(deps, event, before === null);
-
-  // the imp's name derives from the pull request, so its imp goes even without a record of it
-  const imp = buildImpName(event.repo, event.number);
-
-  const existing = await deps.impd.findImp(imp);
-
-  await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
-
-  if (before === null || before.detail === unseenCloseDetail) {
-    return;
-  }
-
-  const link = `${deps.settings.baseURL}/${event.repo}/${event.number}`;
-
-  await deps.github.updatePreviewComment({
-    repo: event.repo,
-    number: event.number,
-    body: renderPreviewComment(link, null),
-  });
-
-  deps.log(`${event.repo}#${event.number}: preview ended`);
-}
-
-function updatePreviewEnded(deps: PreviewDeps, event: PullRequestEvent, unseen: boolean): void {
-  const imp = buildImpName(event.repo, event.number);
-
-  if (unseen) {
-    deps.store.upsertHead({ repo: event.repo, number: event.number, imp, headSHA: event.headSHA });
-  }
-
-  deps.store.updatePhase(event, ['waiting', 'booting', 'ready', 'failed'], {
-    phase: 'ended',
-    ...(unseen ? { detail: unseenCloseDetail } : {}),
-  });
 }

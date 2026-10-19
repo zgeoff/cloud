@@ -17,7 +17,7 @@ export async function createBumpBranch(
   const name = `release-check/${input.dependency}`;
   const title = `chore(${input.dependency}): bump ${input.dependency} to ${input.version}`;
 
-  const clean = await isTreeClean(context);
+  const clean = await probeTreeClean(context);
 
   // a change another pin left in the tree would ride along in this commit, under this title
   if (!clean) {
@@ -30,9 +30,16 @@ export async function createBumpBranch(
     return pinned;
   }
 
-  const changed = await isTreeChanged(context);
+  const changed = await probeTreeChanged(context);
 
   return changed ? createBumpCommit(context, { name, title }) : 'unchanged';
+}
+
+async function probeTreeClean(context: BumpContext) {
+  const unstaged = await context.run(['git', 'diff', '--quiet'], toRunOptions(context));
+  const staged = await context.run(['git', 'diff', '--cached', '--quiet'], toRunOptions(context));
+
+  return unstaged.exitCode === 0 && staged.exitCode === 0;
 }
 
 async function writeBranchPins(context: BumpContext, input: BumpBranchInput, name: string) {
@@ -44,14 +51,7 @@ async function writeBranchPins(context: BumpContext, input: BumpBranchInput, nam
   return checkedOut ?? input.applyPins();
 }
 
-async function isTreeClean(context: BumpContext) {
-  const unstaged = await context.run(['git', 'diff', '--quiet'], toRunOptions(context));
-  const staged = await context.run(['git', 'diff', '--cached', '--quiet'], toRunOptions(context));
-
-  return unstaged.exitCode === 0 && staged.exitCode === 0;
-}
-
-async function isTreeChanged(context: BumpContext) {
+async function probeTreeChanged(context: BumpContext) {
   const result = await context.run(['git', 'diff', '--quiet'], toRunOptions(context));
 
   return result.exitCode !== 0;
@@ -73,7 +73,7 @@ async function createBumpCommit(
     return lease instanceof Error ? lease : { ...branch, lease, same: false, sameRelease: false };
   }
 
-  const same = await isSameChange(context, lease);
+  const same = await probeSameChange(context, lease);
   const leaseTitle = await readGitText(context, ['log', '-1', '--format=%s', lease]);
 
   return { ...branch, lease, same, sameRelease: same || leaseTitle === branch.title };
@@ -99,7 +99,13 @@ async function readLease(context: BumpContext, name: string) {
   return fetched ?? readGitText(context, ['rev-parse', 'FETCH_HEAD']);
 }
 
-async function isSameChange(context: BumpContext, lease: string) {
+async function readGitText(context: BumpContext, args: readonly string[]) {
+  const text = await runChecked(context.run, ['git', ...args], toRunOptions(context));
+
+  return text instanceof Error ? text : text.trim();
+}
+
+async function probeSameChange(context: BumpContext, lease: string) {
   const files = await readGitText(context, ['diff', '--name-only', 'origin/main', 'HEAD']);
   const base = await readGitText(context, ['merge-base', 'origin/main', lease]);
 
@@ -118,10 +124,4 @@ async function isSameChange(context: BumpContext, lease: string) {
   );
 
   return contents.exitCode === 0;
-}
-
-async function readGitText(context: BumpContext, args: readonly string[]) {
-  const text = await runChecked(context.run, ['git', ...args], toRunOptions(context));
-
-  return text instanceof Error ? text : text.trim();
 }

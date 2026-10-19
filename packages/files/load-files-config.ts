@@ -26,21 +26,21 @@ export function loadFilesConfig(env: Readonly<Record<string, string | undefined>
   };
 }
 
-function requireValue(env: Readonly<Record<string, string | undefined>>, name: string): string {
-  const value = env[name]?.trim() ?? '';
-
-  if (value === '') {
-    throw new Error(`${name} is not set`);
-  }
-
-  return value;
-}
-
 function requireHash(env: Readonly<Record<string, string | undefined>>, name: string): string {
   const value = requireValue(env, name).toLowerCase();
 
   if (!/^[\da-f]{64}$/u.test(value)) {
     throw new Error(`${name} must be a SHA-256 digest as 64 hex characters`);
+  }
+
+  return value;
+}
+
+function requireValue(env: Readonly<Record<string, string | undefined>>, name: string): string {
+  const value = env[name]?.trim() ?? '';
+
+  if (value === '') {
+    throw new Error(`${name} is not set`);
   }
 
   return value;

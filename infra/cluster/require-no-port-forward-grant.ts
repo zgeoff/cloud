@@ -46,6 +46,10 @@ function findPortForwardGrant(props: unknown): string | undefined {
     : undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 const portForwardClusterRoles = new Set([
   'cluster-admin',
   'admin',
@@ -86,8 +90,4 @@ function isListCovering(list: unknown, values: readonly string[]): boolean {
   }
 
   return list.some((item: unknown) => typeof item !== 'string' || values.includes(item));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

@@ -15,20 +15,62 @@ export async function runPreviewBoot(deps: PreviewDeps, preview: Preview): Promi
   deps.log(`${preview.repo}#${preview.number}: ${result.phase} at ${preview.headSHA}`);
 }
 
-function pickSettledPhase(deps: PreviewDeps, preview: Preview, result: PhaseChange): PhaseChange {
-  const headSHA = deps.store.findPreview(preview)?.headSHA;
-
-  // an older head's failure says nothing about the head a push moved to meanwhile, so that preview
-  // waits for its next open instead of showing the older failure
-  return result.phase === 'failed' && headSHA !== preview.headSHA ? { phase: 'waiting' } : result;
-}
-
 async function tryRunBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseChange> {
   try {
     return await runBootSteps(deps, preview);
   } catch (error) {
     return { phase: 'failed', detail: error instanceof Error ? error.message : String(error) };
   }
+}
+
+async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseChange> {
+  const compose = await deps.github.readComposeFile(preview.repo, preview.headSHA);
+
+  if (compose === null) {
+    return { phase: 'failed', detail: `preview/compose.yaml is gone at ${preview.headSHA}` };
+  }
+
+  const contract = parsePreviewContract(compose);
+
+  await startImpInSlot(deps, preview, contract);
+
+  const closed = await checkClosedDuringBoot(deps, preview);
+
+  return closed ?? runBuild(deps, preview, contract);
+}
+
+async function startImpInSlot(
+  deps: PreviewDeps,
+  preview: Preview,
+  contract: PreviewContract,
+): Promise<void> {
+  const imp = await deps.impd.readImp(preview.imp);
+
+  await applySlotEvictions(deps, preview.imp);
+
+  if (imp === null) {
+    await deps.impd.createImp({
+      name: preview.imp,
+      image: deps.settings.impImage,
+      memoryMib: deps.settings.impMemoryMib,
+      httpPort: contract.port,
+    });
+  } else {
+    await deps.impd.updateHTTPPort(preview.imp, contract.port);
+
+    await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
+  }
+
+  // every boot installs the grants, so an imp whose grant failed or never came gets it now
+  for (const secret of collectGrantSecrets(deps)) {
+    await deps.impd.installGrant(preview.imp, secret);
+  }
+}
+
+function collectGrantSecrets(deps: PreviewDeps): string[] {
+  return [deps.settings.impGitHubSecret, deps.settings.impModelSecret].filter(
+    (secret) => secret !== null,
+  );
 }
 
 async function checkClosedDuringBoot(
@@ -84,22 +126,6 @@ else
 fi
 `;
 
-async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseChange> {
-  const compose = await deps.github.readComposeFile(preview.repo, preview.headSHA);
-
-  if (compose === null) {
-    return { phase: 'failed', detail: `preview/compose.yaml is gone at ${preview.headSHA}` };
-  }
-
-  const contract = parsePreviewContract(compose);
-
-  await startImpInSlot(deps, preview, contract);
-
-  const closed = await checkClosedDuringBoot(deps, preview);
-
-  return closed ?? runBuild(deps, preview, contract);
-}
-
 async function runBuild(
   deps: PreviewDeps,
   preview: Preview,
@@ -134,40 +160,6 @@ async function runBuild(
   return waitForHealth(deps, preview, contract);
 }
 
-async function startImpInSlot(
-  deps: PreviewDeps,
-  preview: Preview,
-  contract: PreviewContract,
-): Promise<void> {
-  const imp = await deps.impd.findImp(preview.imp);
-
-  await applySlotEvictions(deps, preview.imp);
-
-  if (imp === null) {
-    await deps.impd.createImp({
-      name: preview.imp,
-      image: deps.settings.impImage,
-      memoryMib: deps.settings.impMemoryMib,
-      httpPort: contract.port,
-    });
-  } else {
-    await deps.impd.updateHTTPPort(preview.imp, contract.port);
-
-    await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
-  }
-
-  // every boot installs the grants, so an imp whose grant failed or never came gets it now
-  for (const secret of collectGrantSecrets(deps)) {
-    await deps.impd.installGrant(preview.imp, secret);
-  }
-}
-
-function collectGrantSecrets(deps: PreviewDeps): string[] {
-  return [deps.settings.impGitHubSecret, deps.settings.impModelSecret].filter(
-    (secret) => secret !== null,
-  );
-}
-
 async function waitForHealth(
   deps: PreviewDeps,
   preview: Preview,
@@ -195,4 +187,12 @@ function formatUnreachablePort(contract: PreviewContract, health: HealthResult):
     // impd's proxy reaches the app on the imp's own address, never on the guest's loopback
     `The app must listen on 0.0.0.0:${contract.port} in the imp, not on 127.0.0.1 alone.`,
   ].join('\n');
+}
+
+function pickSettledPhase(deps: PreviewDeps, preview: Preview, result: PhaseChange): PhaseChange {
+  const headSHA = deps.store.findPreview(preview)?.headSHA;
+
+  // an older head's failure says nothing about the head a push moved to meanwhile, so that preview
+  // waits for its next open instead of showing the older failure
+  return result.phase === 'failed' && headSHA !== preview.headSHA ? { phase: 'waiting' } : result;
 }

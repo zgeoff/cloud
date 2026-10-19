@@ -2,14 +2,6 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildGatewayApplicationArgs } from './build-gateway-application-args.ts';
 
-const destinations = [
-  { type: 'public', uri: 'atc.geoff.cloud/oauth2/authorize' },
-  { type: 'public', uri: 'atc.geoff.cloud/login' },
-  { type: 'public', uri: 'atc.geoff.cloud/enroll' },
-  { type: 'public', uri: 'atc.geoff.cloud/consent' },
-  { type: 'public', uri: 'atc.geoff.cloud/error' },
-];
-
 test("it fronts only the gateway's browser paths, with the one-time PIN and the owner policy alone", () => {
   const identityProviderID = output('one-time-pin-id');
   const policyID = output('owner-policy-id');
@@ -26,7 +18,13 @@ test("it fronts only the gateway's browser paths, with the one-time PIN and the 
     name: 'atc gateway sign-in',
     type: 'self_hosted',
     domain: 'atc.geoff.cloud/oauth2/authorize',
-    destinations,
+    destinations: [
+      { type: 'public', uri: 'atc.geoff.cloud/oauth2/authorize' },
+      { type: 'public', uri: 'atc.geoff.cloud/login' },
+      { type: 'public', uri: 'atc.geoff.cloud/enroll' },
+      { type: 'public', uri: 'atc.geoff.cloud/consent' },
+      { type: 'public', uri: 'atc.geoff.cloud/error' },
+    ],
     policies: [{ id: policyID, precedence: 1 }],
     allowedIdps: [identityProviderID],
     autoRedirectToIdentity: true,
@@ -48,6 +46,14 @@ test.each([
   '/.well-known/oauth-protected-resource/mcp',
 ])('it leaves the machine path %s outside every destination', (path: string) => {
   const url = `atc.geoff.cloud${path}`;
+
+  const destinations = [
+    { type: 'public', uri: 'atc.geoff.cloud/oauth2/authorize' },
+    { type: 'public', uri: 'atc.geoff.cloud/login' },
+    { type: 'public', uri: 'atc.geoff.cloud/enroll' },
+    { type: 'public', uri: 'atc.geoff.cloud/consent' },
+    { type: 'public', uri: 'atc.geoff.cloud/error' },
+  ];
 
   expect(
     destinations.filter(

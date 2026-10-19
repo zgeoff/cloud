@@ -28,6 +28,16 @@ export interface StubNixieAPI {
   readonly createSession: () => string;
 }
 
+interface StubState {
+  readonly options: StubNixieAPIOptions;
+  readonly codes: Set<string>;
+  readonly sessions: { readonly sessionID: string; readonly token: string; revoked: boolean }[];
+  readonly sequences: number[];
+  readonly calls: string[];
+  readonly streams: StubStream[];
+  readonly opened: PromiseWithResolvers<void>;
+}
+
 export function startStubNixieAPI(options: StubNixieAPIOptions): StubNixieAPI {
   const state: StubState = {
     options,
@@ -45,7 +55,7 @@ export function startStubNixieAPI(options: StubNixieAPIOptions): StubNixieAPI {
     }
   });
 
-  server.use(...buildHandlers(state));
+  server.use(...declareRoutes(state));
 
   return {
     get sessions() {
@@ -60,19 +70,7 @@ export function startStubNixieAPI(options: StubNixieAPIOptions): StubNixieAPI {
   };
 }
 
-interface StubState {
-  readonly options: StubNixieAPIOptions;
-  readonly codes: Set<string>;
-  readonly sessions: { readonly sessionID: string; readonly token: string; revoked: boolean }[];
-  readonly sequences: number[];
-  readonly calls: string[];
-  readonly streams: StubStream[];
-  readonly opened: PromiseWithResolvers<void>;
-}
-
-type Input = (key: string) => unknown;
-
-function buildHandlers(state: StubState) {
+function declareRoutes(state: StubState) {
   return [
     makeRoute(state, 'sessions/enrol', (_request, input) => createSession(state, input)),
     makeRoute(state, 'sessions/revoke', (_request, input) => updateRevoked(state, input)),
@@ -80,6 +78,8 @@ function buildHandlers(state: StubState) {
     makeRoute(state, 'log/follow', (request, input) => startFollow(state, { request, input })),
   ];
 }
+
+type Input = (key: string) => unknown;
 
 function makeRoute(
   state: StubState,
@@ -128,6 +128,14 @@ function createSession(state: StubState, input: Input): Response {
   const session = createSessionRow(state);
 
   return HttpResponse.json({ json: { sessionID: session.sessionID, token: session.token } });
+}
+
+function createSessionRow(state: StubState) {
+  const session = { sessionID: crypto.randomUUID(), token: crypto.randomUUID(), revoked: false };
+
+  state.sessions.push(session);
+
+  return session;
 }
 
 function updateRevoked(state: StubState, input: Input): Response {
@@ -196,12 +204,4 @@ function createRecord(state: StubState): void {
   for (const stream of state.streams) {
     stream.sendRecord(sequence);
   }
-}
-
-function createSessionRow(state: StubState) {
-  const session = { sessionID: crypto.randomUUID(), token: crypto.randomUUID(), revoked: false };
-
-  state.sessions.push(session);
-
-  return session;
 }

@@ -35,6 +35,16 @@ export function findResticBackup(
   };
 }
 
+function buildVariableNames(prefix: string) {
+  return {
+    password: `${prefix}_RESTIC_PASSWORD`,
+    accessKeyID: `${prefix}_R2_ACCESS_KEY_ID`,
+    secretAccessKey: `${prefix}_R2_SECRET_ACCESS_KEY`,
+    endpoint: `${prefix}_R2_ENDPOINT`,
+    bucket: `${prefix}_R2_BUCKET`,
+  } as const;
+}
+
 function hasAnyVariable(env: Environment, variables: readonly string[]): boolean {
   return variables.some((name) => (env[name] ?? '') !== '');
 }
@@ -57,14 +67,8 @@ function requireEveryVariable(env: Environment, variables: readonly string[], la
   }
 }
 
-function buildVariableNames(prefix: string) {
-  return {
-    password: `${prefix}_RESTIC_PASSWORD`,
-    accessKeyID: `${prefix}_R2_ACCESS_KEY_ID`,
-    secretAccessKey: `${prefix}_R2_SECRET_ACCESS_KEY`,
-    endpoint: `${prefix}_R2_ENDPOINT`,
-    bucket: `${prefix}_R2_BUCKET`,
-  } as const;
+function getValue(env: Environment, name: string): string {
+  return env[name] ?? '';
 }
 
 function buildRepository(
@@ -85,8 +89,4 @@ function buildRepository(
   }
 
   return `s3:${endpoint}/${bucket}/${path}`;
-}
-
-function getValue(env: Environment, name: string): string {
-  return env[name] ?? '';
 }

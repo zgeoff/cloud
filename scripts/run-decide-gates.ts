@@ -5,9 +5,9 @@ import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ExitError } from './exit-error.ts';
+import { isGateNeeded } from './is-gate-needed.ts';
 import { loadGateManifest } from './load-gate-manifest.ts';
 import type { Gate, GateManifest } from './load-gate-manifest.ts';
-import { needsGate } from './needs-gate.ts';
 import type { ScriptIO } from './run-or-exit.ts';
 import { runOrExit } from './run-or-exit.ts';
 import { runProcess } from './run-process.ts';
@@ -38,7 +38,7 @@ export function runDecideGates(options: Readonly<RunDecideGatesOptions>): Promis
 
     const decisions = gates.map((gate: Gate) => ({
       gate,
-      needed: paths === 'all' || needsGate(gate, paths),
+      needed: paths === 'all' || isGateNeeded(gate, paths),
     }));
 
     const lines = decisions.map((each) => `${each.gate.name}=${String(each.needed)}\n`).join('');

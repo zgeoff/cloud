@@ -27,7 +27,7 @@ const openapiTypescript = await import('openapi-typescript');
 const header =
   '// Generated from openapi.json beside it by `bun run nixie:openapi <tag>`: never edit it by hand.\n\n';
 
-export async function renderNixieAPITypes(document: string): Promise<string> {
+export async function generateNixieAPITypes(document: string): Promise<string> {
   const nodes = await openapiTypescript.default(document);
 
   return header + openapiTypescript.astToString(nodes);

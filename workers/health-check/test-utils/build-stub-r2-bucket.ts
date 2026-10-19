@@ -19,22 +19,25 @@ export function buildStubR2Bucket(initial: Readonly<Record<string, string>> = {}
     Object.entries(initial).map(([key, value]) => [key, buildR2Object(key, value)]),
   );
 
+  // R2's API names the lookup `get`, though it misses with null
+  const findObject = (key: string, options?: R2GetOptions): Promise<R2ObjectBody | null> => {
+    if (options !== undefined) {
+      return Promise.reject(new Error('the stub R2 bucket does not model get options'));
+    }
+
+    const value = objects.get(key);
+    const object = metadata.get(key);
+
+    if (value === undefined || object === undefined) {
+      return Promise.resolve(null);
+    }
+
+    return Promise.resolve(buildR2ObjectBody(object, value));
+  };
+
   return {
     objects,
-    get: (key: string, options?: R2GetOptions): Promise<R2ObjectBody | null> => {
-      if (options !== undefined) {
-        return Promise.reject(new Error('the stub R2 bucket does not model get options'));
-      }
-
-      const value = objects.get(key);
-      const object = metadata.get(key);
-
-      if (value === undefined || object === undefined) {
-        return Promise.resolve(null);
-      }
-
-      return Promise.resolve(buildR2ObjectBody(object, value));
-    },
+    get: findObject,
     put: (
       key: string,
       value: Parameters<R2Bucket['put']>[1],

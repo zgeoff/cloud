@@ -7,7 +7,7 @@ import {
 import { entryPath } from '@zgeoff/cloud-health-check/contract';
 import type { Target } from '@zgeoff/cloud-health-check/contract';
 import { buildHealthCheckBindings } from './build-health-check-bindings.ts';
-import { buildWorkerBundle } from './build-worker-bundle.ts';
+import { readWorkerBundle } from './read-worker-bundle.ts';
 
 interface HealthCheckInputs {
   readonly accountID: string;
@@ -27,7 +27,7 @@ const observability = {
 };
 
 export async function createHealthCheck(inputs: HealthCheckInputs): Promise<WorkersCronTrigger> {
-  const content = await buildWorkerBundle(entryPath);
+  const content = await readWorkerBundle(entryPath);
 
   // R2, not KV: the API token has R2 rights and no KV rights
   const state = new R2Bucket('health-check-state', {

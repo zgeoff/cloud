@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import type { StubAnswer, StubHandler } from './build-stub-runner.ts';
 
 export function buildStubCheckAgentImage(failures: number): StubHandler {
-  return (call) => {
+  const answerCall: StubHandler = (call) => {
     const [program = '', script = '', flag, name] = call.argv;
 
     const isCheck =
@@ -20,4 +20,6 @@ export function buildStubCheckAgentImage(failures: number): StubHandler {
     // answering only when the script exists proves the build ran the archive's copy
     return isCheck && existsSync(script) ? answer : undefined;
   };
+
+  return answerCall;
 }

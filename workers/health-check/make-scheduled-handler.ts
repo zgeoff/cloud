@@ -57,12 +57,6 @@ async function checkTarget(target: Target, env: Env, destination: LogDestination
   await sendAlert(env[bindingNames.alertURL], message);
 }
 
-async function readStoredHealth(bucket: StateBucket, key: string): Promise<string | null> {
-  const stored = await bucket.get(key);
-
-  return stored === null ? null : stored.text();
-}
-
 type Health = 'up' | 'tunnel-down' | 'origin-down' | 'unreachable';
 
 const probeTimeoutMs = 10_000;
@@ -90,6 +84,12 @@ function pickHealth(status: number): Health {
   }
 
   return 'up';
+}
+
+async function readStoredHealth(bucket: StateBucket, key: string): Promise<string | null> {
+  const stored = await bucket.get(key);
+
+  return stored === null ? null : stored.text();
 }
 
 async function sendAlert(url: string | undefined, message: string): Promise<void> {

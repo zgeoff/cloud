@@ -5,7 +5,10 @@ export function buildRealProgramHandler(
   programs: readonly string[],
   env?: Readonly<Record<string, string>>,
 ): StubHandler {
-  return (call) => (programs.includes(call.argv[0] ?? '') ? runReal(call, env) : undefined);
+  const answerCall: StubHandler = (call) =>
+    programs.includes(call.argv[0] ?? '') ? runReal(call, env) : undefined;
+
+  return answerCall;
 }
 
 async function runReal(call: StubCall, env?: Readonly<Record<string, string>>) {

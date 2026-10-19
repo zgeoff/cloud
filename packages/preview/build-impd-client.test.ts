@@ -32,7 +32,7 @@ test('#createImp creates an imp outside every backup, with the HTTP port it name
   });
 });
 
-test('#findImp reads an imp with its last activity as a date', async () => {
+test('#readImp reads an imp with its last activity as a date', async () => {
   const ctx = setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-7', {
@@ -46,7 +46,7 @@ test('#findImp reads an imp with its last activity as a date', async () => {
     grants: [],
   });
 
-  const result = await ctx.client.findImp('pv-0a1b2c3d-7');
+  const result = await ctx.client.readImp('pv-0a1b2c3d-7');
 
   expect(result).toStrictEqual({
     name: 'pv-0a1b2c3d-7',
@@ -55,10 +55,10 @@ test('#findImp reads an imp with its last activity as a date', async () => {
   });
 });
 
-test('#findImp returns null for an imp impd does not know', async () => {
+test('#readImp returns null for an imp impd does not know', async () => {
   const ctx = setupTest();
 
-  const result = await ctx.client.findImp('pv-0a1b2c3d-7');
+  const result = await ctx.client.readImp('pv-0a1b2c3d-7');
 
   expect(result).toBeNull();
 });

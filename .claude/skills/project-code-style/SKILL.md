@@ -8,15 +8,14 @@ description:
 
 # cloud code style
 
-The shared `code-style` skill holds the rules and the shared verb list. This skill holds only what
-cloud adds to them, and never relaxes a rule there.
+The shared `code-style` skill holds the rules and the role table of verbs. This skill holds only
+what cloud adds to them, and never relaxes a rule there.
 
 ## Project verbs
 
-cloud adds these verbs to the shared taxonomy. Each sits close to a shared verb, so each carries
-the meaning that tells it apart: `decide` is a pure producer, and the others are effectful. A new verb goes here and into the `verbs` option of
-`zgeoff/function-verb` in [`.oxlintrc.json`](../../../.oxlintrc.json) in the same PR, and
-`check-project-verbs.sh` fails when the two lists differ.
+The role table leaves these verbs free, and cloud gives each a fixed meaning. Each sits close to a
+shared verb, so each carries the meaning that tells it apart: `decide` is a pure producer, and the
+others are effectful. A function that starts with one of them keeps its meaning here.
 
 - `decide`: picks one outcome of a closed set, with its reason, from the facts it is given, as
   opposed to `pick`, which selects among known alternatives and gives no reason, and `plan`, which

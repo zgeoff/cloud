@@ -3,14 +3,14 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { collectRelatedTests } from './run-related-tests.ts';
+import { resolveRelatedTests } from './run-related-tests.ts';
 
 test('it selects a test file that exists', async () => {
   const ctx = await setupTest();
 
   writeFileSync(join(ctx.directory, 'src/a.test.ts'), '');
 
-  expect(collectRelatedTests(['src/a.test.ts'], ctx.directory)).toStrictEqual(['src/a.test.ts']);
+  expect(resolveRelatedTests(['src/a.test.ts'], ctx.directory)).toStrictEqual(['src/a.test.ts']);
 });
 
 test('it selects the sibling test of a source file', async () => {
@@ -19,7 +19,7 @@ test('it selects the sibling test of a source file', async () => {
   writeFileSync(join(ctx.directory, 'src/a.ts'), '');
   writeFileSync(join(ctx.directory, 'src/a.test.ts'), '');
 
-  expect(collectRelatedTests(['src/a.ts'], ctx.directory)).toStrictEqual(['src/a.test.ts']);
+  expect(resolveRelatedTests(['src/a.ts'], ctx.directory)).toStrictEqual(['src/a.test.ts']);
 });
 
 test('it skips a source file with no sibling test and a test file that was deleted', async () => {
@@ -27,7 +27,7 @@ test('it skips a source file with no sibling test and a test file that was delet
 
   writeFileSync(join(ctx.directory, 'src/a.ts'), '');
 
-  expect(collectRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.directory)).toStrictEqual([]);
+  expect(resolveRelatedTests(['src/a.ts', 'src/gone.test.ts'], ctx.directory)).toStrictEqual([]);
 });
 
 test('it skips a declaration file even when a test sits beside it', async () => {
@@ -36,7 +36,7 @@ test('it skips a declaration file even when a test sits beside it', async () => 
   writeFileSync(join(ctx.directory, 'src/types.d.ts'), '');
   writeFileSync(join(ctx.directory, 'src/types.d.test.ts'), '');
 
-  expect(collectRelatedTests(['src/types.d.ts'], ctx.directory)).toStrictEqual([]);
+  expect(resolveRelatedTests(['src/types.d.ts'], ctx.directory)).toStrictEqual([]);
 });
 
 test('it skips files that are not TypeScript', async () => {
@@ -45,7 +45,7 @@ test('it skips files that are not TypeScript', async () => {
   writeFileSync(join(ctx.directory, 'src/a.md'), '');
   writeFileSync(join(ctx.directory, 'src/a.test.ts'), '');
 
-  expect(collectRelatedTests(['src/a.md', 'README.md'], ctx.directory)).toStrictEqual([]);
+  expect(resolveRelatedTests(['src/a.md', 'README.md'], ctx.directory)).toStrictEqual([]);
 });
 
 test('it keeps the order of the paths and drops duplicates', async () => {
@@ -56,7 +56,7 @@ test('it keeps the order of the paths and drops duplicates', async () => {
   writeFileSync(join(ctx.directory, 'src/a.test.ts'), '');
 
   expect(
-    collectRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.directory),
+    resolveRelatedTests(['src/b.ts', 'src/a.test.ts', 'src/b.test.ts'], ctx.directory),
   ).toStrictEqual(['src/b.test.ts', 'src/a.test.ts']);
 });
 

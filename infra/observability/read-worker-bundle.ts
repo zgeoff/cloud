@@ -1,4 +1,4 @@
-export async function buildWorkerBundle(entrypoint: string): Promise<string> {
+export async function readWorkerBundle(entrypoint: string): Promise<string> {
   const result = await Bun.build({
     entrypoints: [entrypoint],
     format: 'esm',

@@ -18,7 +18,7 @@ test('it prints the manifest descriptor of a reference the scenario names', asyn
     manifests: { 'ghcr.io/zgeoff/imp-host:1.0.1': `sha256:${'3'.repeat(64)}` },
   });
 
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.answer);
 
   const result = await stub.run([
     'docker',
@@ -38,7 +38,7 @@ test('it prints the manifest descriptor of a reference the scenario names', asyn
 });
 
 test('it fails the inspect of an unknown reference as buildx does', async () => {
-  const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({}).answer);
 
   const result = await stub.run([
     'docker',
@@ -60,7 +60,7 @@ test('it writes the scenario lock into the mounted flake and hands it no NIX_CON
   const ctx = await setupTest();
 
   const docker = buildStubReleaseDocker({ lock: '{"nodes":{}}\n' });
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.answer);
 
   const result = await stub.run(
     [
@@ -90,7 +90,7 @@ test('it hands the lock the caller NIX_CONFIG with -e NIX_CONFIG', async () => {
   const ctx = await setupTest();
 
   const docker = buildStubReleaseDocker({ lock: '{}\n' });
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.answer);
 
   await stub.run(
     [
@@ -120,7 +120,7 @@ test('it fails a lock with the scenario error and leaves the lock unchanged', as
   await writeFile(join(ctx.directory, 'flake.lock'), 'before\n');
 
   const stub = buildStubRunner(
-    buildStubReleaseDocker({ lock: 'after\n', lockError: 'error: unable to download' }).handle,
+    buildStubReleaseDocker({ lock: 'after\n', lockError: 'error: unable to download' }).answer,
   );
 
   const result = await stub.run([
@@ -148,7 +148,7 @@ test('it fails a lock with the scenario error and leaves the lock unchanged', as
 });
 
 test('it leaves another docker call to the next handler', async () => {
-  const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({}).answer);
 
   const result = await stub.run(['docker', 'run', '--rm', 'alpine', 'true']);
 

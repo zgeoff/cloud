@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { collectPinFiles } from './collect-pin-files.ts';
-import { findPinTableMismatches } from './find-pin-table-mismatches.ts';
+import { collectPinTableMismatches } from './collect-pin-table-mismatches.ts';
 import { pinTableFile } from './pin-table-file.ts';
 import { planPinTable } from './plan-pin-table.ts';
 import { releaseRegistry } from './release-registry.ts';
@@ -32,7 +32,7 @@ export async function checkReleasePins(
     return 0;
   }
 
-  return printMismatches(options, findPinTableMismatches(files));
+  return printMismatches(options, collectPinTableMismatches(files));
 }
 
 async function loadFiles(root: string) {

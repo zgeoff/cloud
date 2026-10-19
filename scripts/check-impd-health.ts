@@ -43,14 +43,6 @@ function findHealthProblem(output: string): string | undefined {
   return `a 200 whose body has ready ${pickReadyLabel(ready)}`;
 }
 
-function pickReadyLabel(ready: unknown): string {
-  if (ready === false) {
-    return 'false';
-  }
-
-  return ready === undefined ? 'missing' : 'that is not a boolean';
-}
-
 function parseBody(text: string): unknown {
   try {
     const value: unknown = JSON.parse(text);
@@ -59,4 +51,12 @@ function parseBody(text: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function pickReadyLabel(ready: unknown): string {
+  if (ready === false) {
+    return 'false';
+  }
+
+  return ready === undefined ? 'missing' : 'that is not a boolean';
 }

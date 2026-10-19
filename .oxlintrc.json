@@ -6,7 +6,7 @@
     "es2024": true
   },
   "rules": {
-    "zgeoff/function-verb": ["error", { "verbs": ["decide", "install", "open", "switch"] }],
+    "zgeoff/function-verb": "error",
 
     // the import boundaries: no relative import into another workspace package, and the direction
     // between infra's groups

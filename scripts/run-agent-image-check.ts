@@ -14,9 +14,6 @@ export interface AgentImageCheck {
   readonly work: string;
 }
 
-// the check downloads gitleaks and sweeps the whole image, so it gets longer than a call's default
-const checkTimeoutMs = 1_800_000;
-
 export async function runAgentImageCheck(
   io: Readonly<InterruptibleIO>,
   target: Readonly<AgentImageCheck>,
@@ -31,6 +28,21 @@ export async function runAgentImageCheck(
     dropCleanup();
   }
 }
+
+async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {
+  const removed = await runOrExit(io, buildImpArgv(['rm', check]));
+
+  printErrText(io, removed.stdout.toString());
+}
+
+function printErrText(io: Readonly<ScriptIO>, text: string) {
+  if (text !== '') {
+    io.printErr(text);
+  }
+}
+
+// the check downloads gitleaks and sweeps the whole image, so it gets longer than a call's default
+const checkTimeoutMs = 1_800_000;
 
 async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImageCheck>) {
   const created = await runOrExit(io, buildImpArgv(['new', target.check, '--image', target.image]));
@@ -68,16 +80,4 @@ function createImpShim(work: string): string {
   chmodSync(shim, 0o755);
 
   return directory;
-}
-
-async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {
-  const removed = await runOrExit(io, buildImpArgv(['rm', check]));
-
-  printErrText(io, removed.stdout.toString());
-}
-
-function printErrText(io: Readonly<ScriptIO>, text: string) {
-  if (text !== '') {
-    io.printErr(text);
-  }
 }

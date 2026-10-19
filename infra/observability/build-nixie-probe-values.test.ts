@@ -50,14 +50,6 @@ test("it probes nixie's readiness report every 30s for passing turns and for the
   });
 });
 
-const readyParts = {
-  database: { isReady: true, reason: null },
-  definitions: { isReady: true, reason: null },
-  imp_host: { isReady: true, reason: null },
-  conversation_imp: { isReady: true, reason: null },
-  disk: { isReady: true, reason: null },
-};
-
 // nixie's /health/ready body as Response.json writes it: the status, each readiness part, and each
 // advisory part, each part as { isReady, reason } (zgeoff/nixie modules/ops/src/build-health-app.ts
 // and types.ts at 9afa077)
@@ -66,7 +58,13 @@ test.each([
     'clear turns',
     {
       status: 'ready',
-      parts: readyParts,
+      parts: {
+        database: { isReady: true, reason: null },
+        definitions: { isReady: true, reason: null },
+        imp_host: { isReady: true, reason: null },
+        conversation_imp: { isReady: true, reason: null },
+        disk: { isReady: true, reason: null },
+      },
       advisory: { conversation_turns: { isReady: true, reason: null } },
     },
     true,
@@ -75,7 +73,13 @@ test.each([
     'failing turns',
     {
       status: 'ready',
-      parts: readyParts,
+      parts: {
+        database: { isReady: true, reason: null },
+        definitions: { isReady: true, reason: null },
+        imp_host: { isReady: true, reason: null },
+        conversation_imp: { isReady: true, reason: null },
+        disk: { isReady: true, reason: null },
+      },
       advisory: { conversation_turns: { isReady: false, reason: 'the last 3 turns failed' } },
     },
     false,
@@ -84,7 +88,13 @@ test.each([
     'turns failing at the sandbox host',
     {
       status: 'ready',
-      parts: readyParts,
+      parts: {
+        database: { isReady: true, reason: null },
+        definitions: { isReady: true, reason: null },
+        imp_host: { isReady: true, reason: null },
+        conversation_imp: { isReady: true, reason: null },
+        disk: { isReady: true, reason: null },
+      },
       advisory: {
         conversation_turns: {
           isReady: false,
@@ -98,12 +108,31 @@ test.each([
     'failing turns whose reason holds a brace',
     {
       status: 'ready',
-      parts: readyParts,
+      parts: {
+        database: { isReady: true, reason: null },
+        definitions: { isReady: true, reason: null },
+        imp_host: { isReady: true, reason: null },
+        conversation_imp: { isReady: true, reason: null },
+        disk: { isReady: true, reason: null },
+      },
       advisory: { conversation_turns: { isReady: false, reason: 'a step {3} failed' } },
     },
     false,
   ],
-  ['no advisory part, as before nixie 0.29.1', { status: 'ready', parts: readyParts }, false],
+  [
+    'no advisory part, as before nixie 0.29.1',
+    {
+      status: 'ready',
+      parts: {
+        database: { isReady: true, reason: null },
+        definitions: { isReady: true, reason: null },
+        imp_host: { isReady: true, reason: null },
+        conversation_imp: { isReady: true, reason: null },
+        disk: { isReady: true, reason: null },
+      },
+    },
+    false,
+  ],
 ])('it reads a body with %s as passing the turns probe: %p', (_kind, body, isPassing) => {
   const [pattern] = buildNixieProbeValues('http://nixie.test/health/ready').config.modules
     .nixie_turns.http.fail_if_body_not_matches_regexp;

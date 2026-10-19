@@ -6,6 +6,10 @@ interface CommandResult {
   readonly output: string;
 }
 
+// How long past the guest's own bound the host waits: the guest's kill after its bound, and the
+// time impd takes to report the exit
+const deadlineGraceMs = 90_000;
+
 export async function runContractSuite(
   deps: PreviewDeps,
   contract: ContractSettings,
@@ -34,6 +38,31 @@ export async function runContractSuite(
   }
 
   return result;
+}
+
+interface GuestCommand {
+  readonly imp: string;
+  readonly argv: readonly string[];
+  readonly signal: AbortSignal;
+}
+
+async function tryRunGuestCommand(
+  deps: PreviewDeps,
+  command: GuestCommand,
+): Promise<CommandResult> {
+  try {
+    return await deps.impd.runCommand(command.imp, command.argv, {
+      // impd refuses to start the command unless the broker reaches the guest, so the suite never
+      // runs without its model route
+      requireBroker: true,
+      signal: command.signal,
+    });
+  } catch (error) {
+    return {
+      code: null,
+      output: `the exec failed: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
 }
 
 // Bun's linux-x64 build from its npm package, because imp's base image has tar but no unzip for the
@@ -78,35 +107,6 @@ function buildContractArgv(contract: ContractSettings, run: ContractRun): string
     run.headSHA,
   ];
 }
-
-interface GuestCommand {
-  readonly imp: string;
-  readonly argv: readonly string[];
-  readonly signal: AbortSignal;
-}
-
-async function tryRunGuestCommand(
-  deps: PreviewDeps,
-  command: GuestCommand,
-): Promise<CommandResult> {
-  try {
-    return await deps.impd.runCommand(command.imp, command.argv, {
-      // impd refuses to start the command unless the broker reaches the guest, so the suite never
-      // runs without its model route
-      requireBroker: true,
-      signal: command.signal,
-    });
-  } catch (error) {
-    return {
-      code: null,
-      output: `the exec failed: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-// How long past the guest's own bound the host waits: the guest's kill after its bound, and the
-// time impd takes to report the exit
-const deadlineGraceMs = 90_000;
 
 async function waitForDeadline(deps: PreviewDeps, delayMs: number): Promise<null> {
   await deps.sleep(delayMs);

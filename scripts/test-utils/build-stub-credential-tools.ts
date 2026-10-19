@@ -26,7 +26,7 @@ export function buildStubCredentialTools(
 ): StubCredentialTools {
   const op = buildStubOp(scenario.op);
   const host = buildStubCredentialsHost(scenario.host);
-  const runner = buildStubRunner(op.handle, buildStubATCKey(scenario.atcKey), host.handle);
+  const runner = buildStubRunner(op.answer, buildStubATCKey(scenario.atcKey), host.answer);
 
   return { run: runner.run, calls: runner.calls, op, host };
 }

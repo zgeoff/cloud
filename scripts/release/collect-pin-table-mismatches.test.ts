@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { collectPinFiles } from './collect-pin-files.ts';
-import { findPinTableMismatches } from './find-pin-table-mismatches.ts';
+import { collectPinTableMismatches } from './collect-pin-table-mismatches.ts';
 import { parsePinTable } from './parse-pin-table.ts';
 import { releaseRegistry } from './release-registry.ts';
 
@@ -20,7 +20,7 @@ async function setupTest() {
 test('it finds no mismatch between the checkout and its committed table', async () => {
   const ctx = await setupTest();
 
-  expect(findPinTableMismatches(ctx.files)).toStrictEqual([]);
+  expect(collectPinTableMismatches(ctx.files)).toStrictEqual([]);
 });
 
 test('it reports a pin line that holds another version than the table', async () => {
@@ -37,7 +37,7 @@ test('it reports a pin line that holds another version than the table', async ()
   const line = dockerfile.split('\n').indexOf(`ARG AUTO_MODE_VERSION=${pinned}`) + 1;
 
   expect(
-    findPinTableMismatches({
+    collectPinTableMismatches({
       ...ctx.files,
       'images/agent/Dockerfile': dockerfile.replace(
         `ARG AUTO_MODE_VERSION=${pinned}\n`,
@@ -61,7 +61,7 @@ test('it reports a pin that the table lacks', async () => {
   const { 'nixie-web': _, ...rest } = table;
 
   expect(
-    findPinTableMismatches({
+    collectPinTableMismatches({
       ...ctx.files,
       'scripts/release/release-pins.json': JSON.stringify(rest),
     }),
@@ -78,7 +78,7 @@ test('it reports an entry that no registry record pins', async () => {
   }
 
   expect(
-    findPinTableMismatches({
+    collectPinTableMismatches({
       ...ctx.files,
       'scripts/release/release-pins.json': JSON.stringify({
         ...table,
@@ -96,7 +96,7 @@ test('it reports a __proto__ entry as one that no registry record pins', async (
   const text = ctx.files['scripts/release/release-pins.json'] ?? '';
 
   expect(
-    findPinTableMismatches({
+    collectPinTableMismatches({
       ...ctx.files,
       'scripts/release/release-pins.json': text.replace(
         /^\{/u,
@@ -113,7 +113,7 @@ test('it reports a missing table', async () => {
 
   const { 'scripts/release/release-pins.json': _, ...files } = ctx.files;
 
-  expect(findPinTableMismatches(files)).toStrictEqual([
+  expect(collectPinTableMismatches(files)).toStrictEqual([
     'scripts/release/release-pins.json is missing',
   ]);
 });
@@ -122,6 +122,6 @@ test('it reports a table that holds no JSON object', async () => {
   const ctx = await setupTest();
 
   expect(
-    findPinTableMismatches({ ...ctx.files, 'scripts/release/release-pins.json': '[]\n' }),
+    collectPinTableMismatches({ ...ctx.files, 'scripts/release/release-pins.json': '[]\n' }),
   ).toStrictEqual(['scripts/release/release-pins.json holds no JSON object']);
 });

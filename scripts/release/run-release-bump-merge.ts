@@ -42,18 +42,10 @@ export async function runReleaseBumpMerge(
   return applyDecision(options, settings, pr);
 }
 
-interface Settings {
-  readonly eventName: string;
-  readonly branch: string | undefined;
-  readonly summary: string;
-  readonly appLogin: string;
-  readonly mergeToken: string;
-}
-
 async function loadSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
   const env = options.env;
 
-  if (!hasRunnerSettings(options)) {
+  if (!checkRunnerSettings(options)) {
     return 2;
   }
 
@@ -70,7 +62,7 @@ async function loadSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
   return requireTokens(options, { eventName, branch, summary: env['GITHUB_STEP_SUMMARY'] ?? '' });
 }
 
-function hasRunnerSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
+function checkRunnerSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
   const missing = [
     'GITHUB_EVENT_NAME',
     'GITHUB_EVENT_PATH',
@@ -99,6 +91,14 @@ async function loadEvent(options: Readonly<RunReleaseBumpMergeOptions>, path: st
 
     return new Error(reason);
   }
+}
+
+interface Settings {
+  readonly eventName: string;
+  readonly branch: string | undefined;
+  readonly summary: string;
+  readonly appLogin: string;
+  readonly mergeToken: string;
 }
 
 function requireTokens(
@@ -155,6 +155,24 @@ async function readOpenPullRequest(
   }
 
   return readPullRequest(options, number);
+}
+
+async function runGH(
+  options: Readonly<RunReleaseBumpMergeOptions>,
+  args: readonly string[],
+  token?: string,
+): Promise<RunResult | number> {
+  const env = token === undefined ? options.env : { ...options.env, GH_TOKEN: token };
+
+  const result = await options.run(['gh', ...args], { env });
+
+  if (result.exitCode !== 0) {
+    options.printErr(result.stderr.toString());
+
+    return result.exitCode;
+  }
+
+  return result;
 }
 
 function findOwnNumber(text: string) {
@@ -241,24 +259,6 @@ async function printReport(
   await appendFile(settings.summary, text);
 
   return 0;
-}
-
-async function runGH(
-  options: Readonly<RunReleaseBumpMergeOptions>,
-  args: readonly string[],
-  token?: string,
-): Promise<RunResult | number> {
-  const env = token === undefined ? options.env : { ...options.env, GH_TOKEN: token };
-
-  const result = await options.run(['gh', ...args], { env });
-
-  if (result.exitCode !== 0) {
-    options.printErr(result.stderr.toString());
-
-    return result.exitCode;
-  }
-
-  return result;
 }
 
 if (import.meta.main) {

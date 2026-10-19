@@ -44,24 +44,15 @@ test.each([
   ]);
 });
 
-const sessionsCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions';
-
-const resetCommand =
-  'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie reset --keep-sessions --yes';
-
-const plan = `nixie reset on geoffcloud: this removes every record, every memory, the conversation and every sandbox; only a restore from a backup undoes it
-device sessions kept signed in: 2
-steps:
-  1. ${resetCommand}
-`;
-
-const sessions = JSON.stringify([{ sessionID: 'a' }, { sessionID: 'b' }]);
-
 test('it lists the kept sessions and the step on a dry run and runs only the session list', async () => {
   const runRemote = mock((command: string) => {
     const result =
-      command === sessionsCommand
-        ? { exitCode: 0, stdout: `${sessions}\n`, stderr: '' }
+      command === 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions'
+        ? {
+            exitCode: 0,
+            stdout: `${JSON.stringify([{ sessionID: 'a' }, { sessionID: 'b' }])}\n`,
+            stderr: '',
+          }
         : { exitCode: 97, stdout: '', stderr: `unexpected: ${command}` };
 
     return Promise.resolve(result);
@@ -73,19 +64,32 @@ test('it lists the kept sessions and the step on a dry run and runs only the ses
   const exitCode = await resetNixie({ args: ['--dry-run'], runRemote, printOut, printErr });
 
   expect(exitCode).toBe(0);
-  expect(runRemote.mock.calls).toStrictEqual([[sessionsCommand]]);
+
+  expect(runRemote.mock.calls).toStrictEqual([
+    ['k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions'],
+  ]);
+
   expect(printErr).not.toHaveBeenCalled();
 
   expect(printOut.mock.calls).toStrictEqual([
-    [plan],
+    [
+      `nixie reset on geoffcloud: this removes every record, every memory, the conversation and every sandbox; only a restore from a backup undoes it
+device sessions kept signed in: 2
+steps:
+  1. k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie reset --keep-sessions --yes
+`,
+    ],
     ['dry run: nothing changed; run again with --confirm to reset\n'],
   ]);
 });
 
 test('it resets through nixie reset and prints what nixie answered', async () => {
   const answers: Record<string, string> = {
-    [sessionsCommand]: sessions,
-    [resetCommand]:
+    'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions': JSON.stringify([
+      { sessionID: 'a' },
+      { sessionID: 'b' },
+    ]),
+    'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie reset --keep-sessions --yes':
       'nixie removed the log up to sequence 412 at 2026-10-14T09:30:00.000Z and kept 2 device sessions signed in.\n',
   };
 
@@ -99,12 +103,23 @@ test('it resets through nixie reset and prints what nixie answered', async () =>
   const exitCode = await resetNixie({ args: ['--confirm'], runRemote, printOut, printErr });
 
   expect(exitCode).toBe(0);
-  expect(runRemote.mock.calls).toStrictEqual([[sessionsCommand], [resetCommand]]);
+
+  expect(runRemote.mock.calls).toStrictEqual([
+    ['k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions'],
+    ['k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie reset --keep-sessions --yes'],
+  ]);
+
   expect(printErr).not.toHaveBeenCalled();
 
   expect(printOut.mock.calls).toStrictEqual([
-    [plan],
-    [`==> 1. ${resetCommand}\n`],
+    [
+      `nixie reset on geoffcloud: this removes every record, every memory, the conversation and every sandbox; only a restore from a backup undoes it
+device sessions kept signed in: 2
+steps:
+  1. k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie reset --keep-sessions --yes
+`,
+    ],
+    ['==> 1. k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie reset --keep-sessions --yes\n'],
     [
       'nixie removed the log up to sequence 412 at 2026-10-14T09:30:00.000Z and kept 2 device sessions signed in.\n',
     ],
@@ -117,8 +132,12 @@ test('it resets through nixie reset and prints what nixie answered', async () =>
 test("it exits 1 with nixie's answer when the reset fails", async () => {
   const runRemote = mock((command: string) => {
     const result =
-      command === sessionsCommand
-        ? { exitCode: 0, stdout: sessions, stderr: '' }
+      command === 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions'
+        ? {
+            exitCode: 0,
+            stdout: JSON.stringify([{ sessionID: 'a' }, { sessionID: 'b' }]),
+            stderr: '',
+          }
         : {
             exitCode: 1,
             stdout: '{"event":"command.failed","command":"reset"}\n',
@@ -149,7 +168,7 @@ test("it exits 1 with nixie's answer when the reset fails", async () => {
 test('it stops before any change when nixie does not list its sessions', async () => {
   const runRemote = mock((command: string) => {
     const result =
-      command === sessionsCommand
+      command === 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions'
         ? {
             exitCode: 1,
             stdout: '',
@@ -166,7 +185,11 @@ test('it stops before any change when nixie does not list its sessions', async (
   const exitCode = await resetNixie({ args: ['--confirm'], runRemote, printOut, printErr });
 
   expect(exitCode).toBe(1);
-  expect(runRemote.mock.calls).toStrictEqual([[sessionsCommand]]);
+
+  expect(runRemote.mock.calls).toStrictEqual([
+    ['k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sessions'],
+  ]);
+
   expect(printOut).not.toHaveBeenCalled();
 
   expect(printErr.mock.calls).toStrictEqual([

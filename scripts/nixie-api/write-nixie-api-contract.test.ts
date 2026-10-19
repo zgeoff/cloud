@@ -3,7 +3,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { renderNixieAPITypes } from './render-nixie-api-types.ts';
+import { generateNixieAPITypes } from './generate-nixie-api-types.ts';
 import { writeNixieAPIContract } from './write-nixie-api-contract.ts';
 
 async function setupTest() {
@@ -45,7 +45,7 @@ test('it writes the document that gh reads at the tag, and its types', async () 
 
   const written = await Bun.file(join(ctx.directory, 'openapi.json')).text();
   const types = await Bun.file(join(ctx.directory, 'openapi.d.ts')).text();
-  const expectedTypes = await renderNixieAPITypes(document);
+  const expectedTypes = await generateNixieAPITypes(document);
 
   expect(exitCode).toBe(0);
   expect(written).toBe(document);

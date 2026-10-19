@@ -39,26 +39,6 @@ export interface StubActionsScheduler {
   readonly getRun: (runID: number) => StubRun;
 }
 
-export function buildStubActionsScheduler(workflowText: string): StubActionsScheduler {
-  const workflow = parseActionsWorkflow(workflowText);
-  const state: SchedulerState = { workflow, runs: [], groups: new Map() };
-
-  return {
-    startRun: (github) => createRun(state, github),
-    finishJob: (runID, job, result) => {
-      updateFinishedJob(state, { runID, job }, result);
-    },
-    getRun: (runID) => {
-      const run = getRunState(state, runID);
-
-      return {
-        status: run.status,
-        jobs: Object.fromEntries([...run.jobs].map(([name, job]) => [name, job.status])),
-      };
-    },
-  };
-}
-
 interface JobState {
   status: StubJobStatus;
   outputs: Readonly<Record<string, string>>;
@@ -83,6 +63,26 @@ interface SchedulerState {
   readonly groups: Map<string, StubConcurrencyGroup<Holder>>;
 }
 
+export function buildStubActionsScheduler(workflowText: string): StubActionsScheduler {
+  const workflow = parseActionsWorkflow(workflowText);
+  const state: SchedulerState = { workflow, runs: [], groups: new Map() };
+
+  return {
+    startRun: (github) => createRun(state, github),
+    finishJob: (runID, job, result) => {
+      updateFinishedJob(state, { runID, job }, result);
+    },
+    getRun: (runID) => {
+      const run = getRunState(state, runID);
+
+      return {
+        status: run.status,
+        jobs: Object.fromEntries([...run.jobs].map(([name, job]) => [name, job.status])),
+      };
+    },
+  };
+}
+
 function createRun(state: SchedulerState, github: StubGitHubContext): number {
   const runID = state.runs.length + 1;
 
@@ -104,43 +104,6 @@ function createRun(state: SchedulerState, github: StubGitHubContext): number {
   updateRuns(state);
 
   return runID;
-}
-
-function updateFinishedJob(state: SchedulerState, holder: Required<Holder>, result: StubJobResult) {
-  const job = getRunState(state, holder.runID).jobs.get(holder.job);
-
-  if (job?.status !== 'in_progress') {
-    throw new Error(
-      `run ${holder.runID} job ${holder.job} is ${job?.status ?? 'missing'}, not in_progress`,
-    );
-  }
-
-  const definition = state.workflow.jobs.find((each) => each.name === holder.job);
-
-  job.status = result.status;
-
-  job.outputs = Object.fromEntries(
-    Object.entries(definition?.outputs ?? {}).map(([name, source]) => [
-      name,
-      result.steps?.[source.step]?.[source.output] ?? '',
-    ]),
-  );
-
-  if (definition?.concurrency !== undefined) {
-    removeRunningHolder(state, definition.concurrency);
-  }
-
-  updateRuns(state);
-}
-
-function getRunState(state: SchedulerState, runID: number): RunState {
-  const run = state.runs[runID - 1];
-
-  if (run === undefined) {
-    throw new Error(`no run ${runID}`);
-  }
-
-  return run;
 }
 
 // A job its `if` skips, which the docs leave unsettled, never registers, so it neither waits nor
@@ -174,6 +137,26 @@ function startHolder(state: SchedulerState, holder: Holder): void {
   setJobStatus(run, holder.job, 'in_progress');
 }
 
+function getRunState(state: SchedulerState, runID: number): RunState {
+  const run = state.runs[runID - 1];
+
+  if (run === undefined) {
+    throw new Error(`no run ${runID}`);
+  }
+
+  return run;
+}
+
+function setJobStatus(run: RunState, job: string, status: StubJobStatus): void {
+  const jobState = run.jobs.get(job);
+
+  if (jobState === undefined) {
+    throw new Error(`no job ${job}`);
+  }
+
+  jobState.status = status;
+}
+
 function updateToCancelled(state: SchedulerState, holder: Holder): void {
   const run = getRunState(state, holder.runID);
 
@@ -189,32 +172,6 @@ function updateToCancelled(state: SchedulerState, holder: Holder): void {
     job.status = 'cancelled';
   });
 }
-
-function setJobStatus(run: RunState, job: string, status: StubJobStatus): void {
-  const jobState = run.jobs.get(job);
-
-  if (jobState === undefined) {
-    throw new Error(`no job ${job}`);
-  }
-
-  jobState.status = status;
-}
-
-function removeRunningHolder(state: SchedulerState, concurrency: ActionsConcurrency): void {
-  const group = state.groups.get(concurrency.group);
-
-  if (group === undefined) {
-    throw new Error(`no group ${concurrency.group}`);
-  }
-
-  const next = group.finish();
-
-  if (next !== undefined) {
-    startHolder(state, next);
-  }
-}
-
-const doneStatuses = new Set<StubJobStatus>(['success', 'failure', 'skipped', 'cancelled']);
 
 // starts each waiting job whose needs have ended, and ends each run whose jobs all have, until
 // nothing changes
@@ -242,6 +199,8 @@ function updateRun(state: SchedulerState, run: RunState, runID: number): boolean
   return true;
 }
 
+const doneStatuses = new Set<StubJobStatus>(['success', 'failure', 'skipped', 'cancelled']);
+
 function isReady(run: RunState, job: ActionsJob): boolean {
   return (
     run.jobs.get(job.name)?.status === 'waiting' &&
@@ -261,6 +220,20 @@ function updateCompletedRun(state: SchedulerState, run: RunState): boolean {
   }
 
   return true;
+}
+
+function removeRunningHolder(state: SchedulerState, concurrency: ActionsConcurrency): void {
+  const group = state.groups.get(concurrency.group);
+
+  if (group === undefined) {
+    throw new Error(`no group ${concurrency.group}`);
+  }
+
+  const next = group.finish();
+
+  if (next !== undefined) {
+    startHolder(state, next);
+  }
 }
 
 function startJob(state: SchedulerState, holder: Required<Holder>, job: ActionsJob): void {
@@ -288,4 +261,31 @@ function startJob(state: SchedulerState, holder: Required<Holder>, job: ActionsJ
 
   setJobStatus(run, job.name, 'pending');
   registerHolder(state, job.concurrency, holder);
+}
+
+function updateFinishedJob(state: SchedulerState, holder: Required<Holder>, result: StubJobResult) {
+  const job = getRunState(state, holder.runID).jobs.get(holder.job);
+
+  if (job?.status !== 'in_progress') {
+    throw new Error(
+      `run ${holder.runID} job ${holder.job} is ${job?.status ?? 'missing'}, not in_progress`,
+    );
+  }
+
+  const definition = state.workflow.jobs.find((each) => each.name === holder.job);
+
+  job.status = result.status;
+
+  job.outputs = Object.fromEntries(
+    Object.entries(definition?.outputs ?? {}).map(([name, source]) => [
+      name,
+      result.steps?.[source.step]?.[source.output] ?? '',
+    ]),
+  );
+
+  if (definition?.concurrency !== undefined) {
+    removeRunningHolder(state, definition.concurrency);
+  }
+
+  updateRuns(state);
 }

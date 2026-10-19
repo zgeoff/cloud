@@ -56,7 +56,7 @@ test('it pins the input, the lock and both images', async () => {
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
-  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).answer);
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -108,7 +108,7 @@ test('it locks the flake in the pinned Nix image and hands the lock back to the 
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
-  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -162,7 +162,7 @@ test('it hands the github token to the lock by its environment, never in an argv
     lock: `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`,
   });
 
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -208,7 +208,7 @@ test('it adds the github token after the caller nix config', async () => {
     lock: `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`,
   });
 
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -250,7 +250,7 @@ test('it hands the lock no nix config without a github token', async () => {
     lock: `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`,
   });
 
-  const stub = buildStubRunner(docker.handle);
+  const stub = buildStubRunner(docker.answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -287,7 +287,7 @@ test('it keeps a newer imp-base and pins the host', async () => {
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
-  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -336,7 +336,7 @@ test('it runs no lock when imp-host already holds the release', async () => {
 
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
-  const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({}).answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -388,7 +388,7 @@ test('it refuses a lock that names another commit', async () => {
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"${'9'.repeat(40)}"}}}}\n`;
-  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).answer);
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -431,7 +431,7 @@ test('it fails with the lock error when the lock fails', async () => {
   const lockError =
     "error: unable to download 'https://api.github.com/repos/zgeoff/impz/commits/c5bea940'";
 
-  const stub = buildStubRunner(buildStubReleaseDocker({ lockError }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lockError }).answer);
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -475,7 +475,7 @@ test("it writes the record's pin table entries with its pins", async () => {
   );
 
   const lock = `{"nodes":{"imp":{"locked":{"rev":"c5bea940${'c'.repeat(32)}"}}}}\n`;
-  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lock }).answer);
 
   await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -517,7 +517,7 @@ test('it puts the pin table back when the lock fails', async () => {
   const lockError =
     "error: unable to download 'https://api.github.com/repos/zgeoff/impz/commits/c5bea940'";
 
-  const stub = buildStubRunner(buildStubReleaseDocker({ lockError }).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({ lockError }).answer);
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -558,7 +558,7 @@ test('it refuses the release pinned with another digest without writing', async 
 
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
-  const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({}).answer);
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('imp'),
@@ -605,7 +605,7 @@ test('it refuses imp-base pins that disagree without writing', async () => {
 
   await writeFile(join(ctx.root, 'scripts/release/release-pins.json'), '{}\n');
 
-  const stub = buildStubRunner(buildStubReleaseDocker({}).handle);
+  const stub = buildStubRunner(buildStubReleaseDocker({}).answer);
 
   const applied = await applyReleasePins({
     record: getReleaseRecord('imp'),

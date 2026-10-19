@@ -4,7 +4,7 @@ import { buildStubRunner } from './build-stub-runner.ts';
 
 test('it lists a vault’s items as op’s item JSON', async () => {
   const op = buildStubOp({ vaults: { cloud: { 'atc-daemon-token': 'fixture-bearer' } } });
-  const stub = buildStubRunner(op.handle);
+  const stub = buildStubRunner(op.answer);
 
   const result = await stub.run(['op', 'item', 'list', '--vault', 'cloud', '--format', 'json']);
 
@@ -21,7 +21,7 @@ test('it lists a vault’s items as op’s item JSON', async () => {
 
 test('it saves the credential of an item created from stdin, and reads it back with a newline', async () => {
   const op = buildStubOp({ vaults: { cloud: {} } });
-  const stub = buildStubRunner(op.handle);
+  const stub = buildStubRunner(op.answer);
 
   await stub.run(['op', 'item', 'create', '--vault', 'cloud', '-', '--format', 'json'], {
     stdin: Buffer.from(
@@ -36,7 +36,7 @@ test('it saves the credential of an item created from stdin, and reads it back w
 });
 
 test('it fails op’s way for a vault that does not exist', async () => {
-  const stub = buildStubRunner(buildStubOp({ vaults: {} }).handle);
+  const stub = buildStubRunner(buildStubOp({ vaults: {} }).answer);
 
   const result = await stub.run(['op', 'vault', 'get', 'missing', '--format', 'json']);
 
@@ -48,7 +48,7 @@ test('it fails op’s way for a vault that does not exist', async () => {
 });
 
 test('it fails a read of a missing item op’s way', async () => {
-  const stub = buildStubRunner(buildStubOp({ vaults: { cloud: {} } }).handle);
+  const stub = buildStubRunner(buildStubOp({ vaults: { cloud: {} } }).answer);
 
   const result = await stub.run(['op', 'read', 'op://cloud/atc-daemon-token/credential']);
 
@@ -61,7 +61,7 @@ test('it fails a read of a missing item op’s way', async () => {
 
 test('it fails the call the scenario names as a rate-limited op does, and saves nothing', async () => {
   const op = buildStubOp({ vaults: { cloud: {} }, failAt: 'item-create' });
-  const stub = buildStubRunner(op.handle);
+  const stub = buildStubRunner(op.answer);
 
   const result = await stub.run(
     ['op', 'item', 'create', '--vault', 'cloud', '-', '--format', 'json'],
@@ -81,7 +81,7 @@ test('it fails the call the scenario names as a rate-limited op does, and saves 
 
 test('it records the service account token each call ran with', async () => {
   const op = buildStubOp({ vaults: { cloud: {} } });
-  const stub = buildStubRunner(op.handle);
+  const stub = buildStubRunner(op.answer);
 
   await stub.run(['op', 'vault', 'get', 'cloud', '--format', 'json'], {
     env: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture' },
@@ -93,7 +93,7 @@ test('it records the service account token each call ran with', async () => {
 });
 
 test('it leaves a call to op it does not model to the next handler', async () => {
-  const stub = buildStubRunner(buildStubOp({ vaults: {} }).handle);
+  const stub = buildStubRunner(buildStubOp({ vaults: {} }).answer);
 
   const result = await stub.run(['op', 'item', 'delete', 'atc-daemon-token']);
 

@@ -28,7 +28,7 @@ interface CommandOptions {
 // impd confines each call to the imps its token names
 export interface ImpdClient {
   readonly createImp: (options: ImpCreateOptions) => Promise<ImpActivity>;
-  readonly findImp: (name: string) => Promise<ImpActivity | null>;
+  readonly readImp: (name: string) => Promise<ImpActivity | null>;
   readonly readImps: () => Promise<ImpActivity[]>;
   readonly sleepImp: (name: string) => Promise<void>;
   readonly wakeImp: (name: string) => Promise<void>;
@@ -59,7 +59,7 @@ export function buildImpdClient(
 
         return toImpActivity(imp);
       }),
-    findImp: (name) => findImpActivity(client, name),
+    readImp: (name) => readImpActivity(client, name),
     readImps: () =>
       withImpdErrors(async () => {
         const imps = await client.imps.list({});
@@ -119,7 +119,11 @@ async function withImpdErrors<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
-async function findImpActivity(client: ImpClient, name: string): Promise<ImpActivity | null> {
+function toImpActivity(imp: Imp): ImpActivity {
+  return { name: imp.name, state: imp.state, lastActiveAt: imp.lastActiveAt };
+}
+
+async function readImpActivity(client: ImpClient, name: string): Promise<ImpActivity | null> {
   try {
     return await withImpdErrors(async () => {
       const imp = await client.imps.get({ name });
@@ -133,10 +137,6 @@ async function findImpActivity(client: ImpClient, name: string): Promise<ImpActi
 
     throw error;
   }
-}
-
-function toImpActivity(imp: Imp): ImpActivity {
-  return { name: imp.name, state: imp.state, lastActiveAt: imp.lastActiveAt };
 }
 
 async function installImpGrant(client: ImpClient, name: string, secret: string): Promise<void> {

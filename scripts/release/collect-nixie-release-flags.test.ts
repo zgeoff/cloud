@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
-import { findNixieReleaseFlags } from './find-nixie-release-flags.ts';
+import { collectNixieReleaseFlags } from './collect-nixie-release-flags.ts';
 
 test('it flags nothing for a release without migrations or new sandbox images', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned:
         '## Images\n\n- `ghcr.io/zgeoff/nixie@sha256:aaa`\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
       target:
@@ -15,7 +15,7 @@ test('it flags nothing for a release without migrations or new sandbox images', 
 
 test('it flags nothing for a release whose notes mark each section with an HTML comment', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
       target:
         "## [0.20.1](https://example.com/compare/v0.20.0...v0.20.1) (2026-01-02)\n\n\n### Bug Fixes\n\n* **geo-1:** a fix\n\n<!-- nixie: migrations -->\n## Migrations\n\nThis release adds no migration since v0.20.0.\n\n<!-- nixie: config schema -->\n## Config schema\n\nEvery config.yaml that v0.20.0 accepts passes this release's config.schema.json.\n\n## Images\n\n- `ghcr.io/zgeoff/nixie@sha256:ccc`\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n",
@@ -26,7 +26,7 @@ test('it flags nothing for a release whose notes mark each section with an HTML 
 
 test('it flags migrations in notes that mark each section with an HTML comment', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n',
       target:
         "<!-- nixie: migrations -->\n## Migrations\n\n- 0012 adds the labels table\n\n<!-- nixie: config schema -->\n## Config schema\n\nEvery config.yaml that v0.20.0 accepts passes this release's config.schema.json.\n\n## Images\n",
@@ -37,7 +37,7 @@ test('it flags migrations in notes that mark each section with an HTML comment',
 
 test('it flags migrations that the target adds', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n',
       target: '## Migrations\n\n- 0007 adds the drafts table\n\n## Images\n',
       between: [],
@@ -47,7 +47,7 @@ test('it flags migrations that the target adds', () => {
 
 test('it flags migrations that only a release between adds', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n',
       target: '## Migrations\n\nThis release adds no migration since v0.31.1.\n\n## Images\n',
       between: ['## Migrations\n\n- 0008 renames a column\n'],
@@ -57,7 +57,7 @@ test('it flags migrations that only a release between adds', () => {
 
 test('it flags migrations when a release lacks the section', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n',
       target: '## Changes\n\n- a fix\n\n## Images\n',
       between: [],
@@ -67,7 +67,7 @@ test('it flags migrations when a release lacks the section', () => {
 
 test('it flags migrations when the section is blank', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n',
       target: '## Migrations\n\n\n## Images\n',
       between: [],
@@ -79,7 +79,7 @@ test('it flags migrations in a section longer than a pipe buffer', () => {
   const long = Array.from({ length: 4000 }, (_, index) => `- ${index} adds a column`).join('\n');
 
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n',
       target: `## Migrations\n\n${long}\n\n## Images\n`,
       between: [],
@@ -89,7 +89,7 @@ test('it flags migrations in a section longer than a pipe buffer', () => {
 
 test('it flags a changed sandbox image, ignoring nixie and nixie-web', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned:
         '## Images\n\n- `ghcr.io/zgeoff/nixie@sha256:aaa`\n- `ghcr.io/zgeoff/nixie-web@sha256:ddd`\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
       target:
@@ -101,7 +101,7 @@ test('it flags a changed sandbox image, ignoring nixie and nixie-web', () => {
 
 test('it flags both for a release with both', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Images\n\n- `ghcr.io/zgeoff/sandbox-node@sha256:bbb`\n',
       target:
         '## Migrations\n\n- 0009 adds an index\n\n## Images\n\n- `ghcr.io/zgeoff/sandbox-python@sha256:ggg`\n',
@@ -112,7 +112,7 @@ test('it flags both for a release with both', () => {
 
 test('it reads the pinned release notes for images only', () => {
   expect(
-    findNixieReleaseFlags({
+    collectNixieReleaseFlags({
       pinned: '## Migrations\n\n- 0006 adds the sessions table\n\n## Images\n',
       target: '## Migrations\n\nThis release adds no migration since v0.30.0.\n\n## Images\n',
       between: [],

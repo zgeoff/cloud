@@ -3,10 +3,10 @@ import { join } from 'node:path';
 import { OpenAPIHandler } from '@orpc/openapi/fetch';
 import { Elysia } from 'elysia';
 import { buildFileHeaders } from './build-file-headers.ts';
-import { buildFilesRouter, maxFileBytes } from './build-files-router.ts';
 import type { UploadStore } from './create-upload-store.ts';
 import { findTokenRole } from './find-token-role.ts';
 import type { TokenHashes } from './find-token-role.ts';
+import { implementFilesRouter, maxFileBytes } from './implement-files-router.ts';
 import { fileIDLength } from './mint-file-id.ts';
 
 export interface FilesServiceInputs {
@@ -54,7 +54,7 @@ export function createFilesService(inputs: FilesServiceInputs) {
   removeFilesWithoutRows(inputs.store, filesDir);
 
   const api = new OpenAPIHandler(
-    buildFilesRouter({
+    implementFilesRouter({
       store: inputs.store,
       filesDir,
       incomingDir,
