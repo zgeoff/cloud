@@ -68,6 +68,10 @@ checkout. On a first start the seed retries until the first clone arrives. The p
 group is a supplementary group of both containers, which is what lets git-sync read its key and
 nixie read git-sync's checkout.
 
+nixie, not this repo, owns the definitions format:
+[nixie's definitions doc](https://github.com/zgeoff/nixie/blob/main/docs/architecture/core/definitions.md#the-definitions-format)
+defines it, and each nixie release publishes the JSON Schema of the definitions manifest.
+
 ## Secrets
 
 nixie decrypts its own secrets file in its own process at start and keeps the plaintext in memory.
