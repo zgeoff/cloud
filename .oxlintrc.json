@@ -156,6 +156,12 @@
                 "importNames": ["Namespace", "NamespacePatch"],
                 "allowTypeImports": true,
                 "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
+              },
+              {
+                "name": "@pulumi/kubernetes",
+                "importNames": ["core"],
+                "allowTypeImports": true,
+                "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
               }
             ]
           }
@@ -182,10 +188,29 @@
       }
     },
     {
+      // the entry point builds Config, and declares no namespace
       "files": ["infra/index.ts"],
       "rules": {
         "no-restricted-properties": "off",
-        "no-restricted-imports": "off"
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@pulumi/kubernetes/core/v1",
+                "importNames": ["Namespace", "NamespacePatch"],
+                "allowTypeImports": true,
+                "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
+              },
+              {
+                "name": "@pulumi/kubernetes",
+                "importNames": ["core"],
+                "allowTypeImports": true,
+                "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
+              }
+            ]
+          }
+        ]
       }
     }
   ]
