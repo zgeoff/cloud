@@ -5,7 +5,7 @@ import { buildStubGeoffcloud } from './test-utils/build-stub-geoffcloud.ts';
 test('it reads a public page from the sandbox, finds every internal address blocked, and removes the sandbox', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -65,7 +65,7 @@ test('it reads a public page from the sandbox, finds every internal address bloc
 test('it fails when the sandbox reaches an internal address, and still removes the sandbox', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -103,7 +103,7 @@ test('it fails when the sandbox reaches an internal address, and still removes t
 test('it fails when a sandbox probe exits with a status that proves no block, such as a missing timeout', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -161,7 +161,7 @@ test('it fails when a sandbox probe exits with a status that proves no block, su
 test('it fails when the sandbox cannot read the public page', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -199,7 +199,7 @@ test('it fails when the sandbox cannot read the public page', async () => {
 test('it removes the sandbox when a command fails mid-check', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -240,7 +240,7 @@ test('it removes the sandbox when a command fails mid-check', async () => {
 test('it creates no sandbox when a target does not answer the host', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -274,7 +274,7 @@ test('it creates no sandbox when a target does not answer the host', async () =>
 test('it stops when impd cannot create the sandbox, and names it for impz ls', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',
@@ -317,7 +317,7 @@ test('it stops when impd cannot create the sandbox, and names it for impz ls', a
 test('it probes the tailnet address given as its argument', async () => {
   const host = buildStubGeoffcloud({
     manifest:
-      '{"fetch":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}',
+      '{"fetch":{"name":"nixie-fetch-9c4e2a71b0d3","ref":"ghcr.io/zgeoff/nixie-fetch:0.3.0@sha256:9c4e2a71b0d35f68e1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f708"}}',
     impdAddresses: ['100.88.1.2'],
     nodeAddresses: ['104.250.100.18'],
     podAddress: '10.42.0.17',

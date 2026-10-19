@@ -108,8 +108,7 @@ function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>
     : undefined;
 }
 
-const enrolCodeCommand =
-  'k3s kubectl -n nixie exec nixie-0 -c nixie -- bun /app/main.js enrol-code';
+const enrolCodeCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie enrol-code';
 
 // enrol-code prints the code on its first line, then a line that says until when it works
 async function readEnrolmentCode(

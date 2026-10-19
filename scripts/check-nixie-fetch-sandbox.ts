@@ -124,8 +124,7 @@ async function checkHostReaches(
   return false;
 }
 
-const manifestCommand =
-  'k3s kubectl -n nixie exec nixie-0 -c nixie -- cat /app/sandbox-manifest.json';
+const manifestCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sandbox-manifest';
 
 async function readFetchImage(
   options: Readonly<CheckFetchSandboxOptions>,

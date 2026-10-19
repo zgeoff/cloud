@@ -12,9 +12,9 @@
 #   can roll the gateway out between the switch's two checks;
 # - the kubectl query for the nixie pods' images: prints STUB_NIXIE_IMAGES the same way, and
 #   from the second query on STUB_NIXIE_LATER_IMAGES instead, when that is set;
-# - the kubectl exec into nixie-0 that fetches /health/ready: prints line <n> of
-#   STUB_NIXIE_REPORTS for the n-th call, and its last line for every call after, each a report
-#   body as nixie's server sends it. With STUB_NIXIE_REPORTS unset, it fails as kubectl does for
+# - the kubectl exec into nixie-0 that runs nixie health: prints line <n> of STUB_NIXIE_REPORTS
+#   for the n-th call, and its last line for every call after, each a report body as nixie's
+#   server sends it, and exits 1 with kubectl's message for a report whose status is not ready. With STUB_NIXIE_REPORTS unset, it fails as kubectl does for
 #   a pod that does not exist: "Error from server (NotFound): pods "nixie-0" not found" on
 #   stderr and exit 1;
 # - switch-to-configuration dry-activate: prints STUB_DRY_ACTIVATE, the lines of the units it
@@ -107,14 +107,20 @@ case "${*:4}" in
       printf '%s' "${STUB_NIXIE_IMAGES:-}"
     fi
     ;;
-  "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'")
+  "k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health")
     if [ -z "${STUB_NIXIE_REPORTS+set}" ]; then
       echo 'Error from server (NotFound): pods "nixie-0" not found' >&2
       exit 1
     fi
     calls="$(grep -cF 'k3s kubectl -n nixie exec nixie-0' "$STUB_LOG")"
     total="$(printf '%s\n' "$STUB_NIXIE_REPORTS" | wc -l)"
-    printf '%s\n' "$STUB_NIXIE_REPORTS" | sed -n "$((calls < total ? calls : total))p"
+    report="$(printf '%s\n' "$STUB_NIXIE_REPORTS" | sed -n "$((calls < total ? calls : total))p")"
+    printf '%s\n' "$report"
+    # nixie health exits 1 unless the server answers ready, and kubectl says so on stderr
+    if [[ "$report" != '{"status":"ready"'* ]]; then
+      echo 'command terminated with exit code 1' >&2
+      exit 1
+    fi
     ;;
   "NIXOS_INSTALL_BOOTLOADER=0 systemd-run "*"/bin/switch-to-configuration'"*" dry-activate")
     if [ -n "${STUB_DRY_ACTIVATE_LOCKED:-}" ]; then
