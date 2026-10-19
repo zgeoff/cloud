@@ -118,6 +118,12 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      # the Pulumi CLI at infra's @pulumi/pulumi pin, with the Kubernetes plugin at infra's pin,
+      # for the port-forward guard's preview test and the SDK check; the tarball is checked
+      # against the release's checksum file
+      - name: Setup Pulumi CLI
+        run: bun run ci:install-pulumi-cli
+
       - name: Test
         run: bun run test
 
@@ -165,12 +171,6 @@ jobs:
       - name: Provider checks
         if: steps.decide.outputs.provider == 'true'
         run: bun run provider:check
-
-      # the Pulumi CLI at infra's @pulumi/pulumi pin, so the SDK check has no pin of its own;
-      # the tarball is checked against the release's checksum file
-      - name: Setup Pulumi CLI
-        if: steps.decide.outputs.provider == 'true'
-        run: bun run ci:install-pulumi-cli
 
       - name: SDK check
         if: steps.decide.outputs.provider == 'true'

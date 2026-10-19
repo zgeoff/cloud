@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Test for install-pulumi-cli.sh: in a copy of the script with the case's own infra/package.json,
 # it downloads the tarball of the pinned @pulumi/pulumi release into RUNNER_TEMP, checks it against
-# the release's checksum file, extracts it and adds RUNNER_TEMP/pulumi to GITHUB_PATH; a checksum
-# that does not match, a checksum file without the tarball and a failed download each fail it
-# before anything is extracted; and it requires both GitHub variables. curl is a stand-in that
+# the release's checksum file, extracts it, adds RUNNER_TEMP/pulumi to GITHUB_PATH and installs the
+# pinned Kubernetes plugin with it; a missing Kubernetes pin fails it; a checksum that does not
+# match, a checksum file without the tarball and a failed download each fail it before anything is
+# extracted; and it requires both GitHub variables. curl is a stand-in that
 # serves the case's release files, so no case reaches get.pulumi.com. Each case runs the script
 # under `env -i` and compares its whole stdout, stderr, call log and GITHUB_PATH.
 #
@@ -22,9 +23,9 @@ it_installs_the_pinned_release_and_adds_it_to_the_path() {
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
-  echo '{"dependencies":{"@pulumi/pulumi":"1.2.3"}}' > "$tree/repo/infra/package.json"
+  echo '{"dependencies":{"@pulumi/pulumi":"1.2.3","@pulumi/kubernetes":"4.5.6"}}' > "$tree/repo/infra/package.json"
   mkdir -p "$tree/release/pulumi"
-  printf '#!/bin/sh\necho pulumi\n' > "$tree/release/pulumi/pulumi"
+  printf '#!/bin/sh\necho "pulumi $*"\n' > "$tree/release/pulumi/pulumi"
   chmod +x "$tree/release/pulumi/pulumi"
   tar -C "$tree/release" -czf "$tree/pulumi/pulumi-v1.2.3-linux-x64.tar.gz" pulumi
   sum="$(sha256sum < "$tree/pulumi/pulumi-v1.2.3-linux-x64.tar.gz" | cut -d' ' -f1)"
@@ -33,7 +34,10 @@ it_installs_the_pinned_release_and_adds_it_to_the_path() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" RUNNER_TEMP="$tree/runner-temp" GITHUB_PATH="$tree/github-path" bash scripts/install-pulumi-cli.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" <<< 'pulumi-v1.2.3-linux-x64.tar.gz: OK'
+  diff - "$tree/out" << 'EOF'
+pulumi-v1.2.3-linux-x64.tar.gz: OK
+pulumi plugin install resource kubernetes 4.5.6
+EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'EOF'
 ["curl","-fsSLO","https://get.pulumi.com/releases/sdk/pulumi-v1.2.3-linux-x64.tar.gz"]
@@ -46,6 +50,29 @@ $tree/runner-temp/pulumi
 EOF
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_installs_no_plugin_when_infra_pins_no_kubernetes_provider() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  echo '{"dependencies":{"@pulumi/pulumi":"1.2.3"}}' > "$tree/repo/infra/package.json"
+  mkdir -p "$tree/release/pulumi"
+  printf '#!/bin/sh\necho "pulumi $*"\n' > "$tree/release/pulumi/pulumi"
+  chmod +x "$tree/release/pulumi/pulumi"
+  tar -C "$tree/release" -czf "$tree/pulumi/pulumi-v1.2.3-linux-x64.tar.gz" pulumi
+  sum="$(sha256sum < "$tree/pulumi/pulumi-v1.2.3-linux-x64.tar.gz" | cut -d' ' -f1)"
+  echo "$sum  pulumi-v1.2.3-linux-x64.tar.gz" > "$tree/pulumi/pulumi-1.2.3-checksums.txt"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" RUNNER_TEMP="$tree/runner-temp" GITHUB_PATH="$tree/github-path" bash scripts/install-pulumi-cli.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'pulumi-v1.2.3-linux-x64.tar.gz: OK'
+  diff /dev/null "$tree/err"
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
     exit 1
   }
 }
@@ -124,7 +151,7 @@ it_requires_the_runner_temp_directory() {
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" GITHUB_PATH="$tree/github-path" bash scripts/install-pulumi-cli.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'scripts/install-pulumi-cli.sh: line 12: RUNNER_TEMP: set RUNNER_TEMP to the directory the CLI goes in'
+  diff - "$tree/err" <<< 'scripts/install-pulumi-cli.sh: line 13: RUNNER_TEMP: set RUNNER_TEMP to the directory the CLI goes in'
   [ ! -e "$tree/calls" ]
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
@@ -141,7 +168,7 @@ it_requires_the_github_path_file() {
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" RUNNER_TEMP="$tree/runner-temp" bash scripts/install-pulumi-cli.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'scripts/install-pulumi-cli.sh: line 13: GITHUB_PATH: set GITHUB_PATH to the file that takes the paths for later steps'
+  diff - "$tree/err" <<< 'scripts/install-pulumi-cli.sh: line 14: GITHUB_PATH: set GITHUB_PATH to the file that takes the paths for later steps'
   [ ! -e "$tree/calls" ]
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2

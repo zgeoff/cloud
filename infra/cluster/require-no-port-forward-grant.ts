@@ -1,12 +1,8 @@
-// A Role or ClusterRole, a binding, or a patch of one, at any RBAC API version
-const rbacTypePattern =
-  /^kubernetes:rbac\.authorization\.k8s\.io\/[^:]+:(?:Cluster)?Role(?:Binding)?(?:Patch)?$/u;
-
 // Refuses an RBAC object, a Helm chart's included, that grants a port-forward: one reaches a pod
 // from 127.0.0.1, which the atc gateway trusts. It covers every namespace and fails
 // closed, so a rule or a reference it cannot read, such as an unresolved Output, counts as a grant.
 export function requireNoPortForwardGrant(type: string, props: unknown): void {
-  if (!rbacTypePattern.test(type)) {
+  if (!isRBACType(type)) {
     return;
   }
 
@@ -15,6 +11,14 @@ export function requireNoPortForwardGrant(type: string, props: unknown): void {
   if (reason !== undefined) {
     throw new Error(`${type} ${reason}; no RBAC object may grant pods/portforward`);
   }
+}
+
+// a Role or ClusterRole, a binding, or a patch of one, at any RBAC API version
+const rbacTypePattern =
+  /^kubernetes:rbac\.authorization\.k8s\.io\/[^:]+:(?:Cluster)?Role(?:Binding)?(?:Patch)?$/u;
+
+function isRBACType(type: string): boolean {
+  return rbacTypePattern.test(type);
 }
 
 function findPortForwardGrant(props: unknown): string | undefined {

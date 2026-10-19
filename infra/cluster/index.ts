@@ -10,8 +10,8 @@ import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
 
-// the guard the program root registers before its first resource
-export { registerPortForwardGuard } from './register-port-forward-guard.ts';
+// the cluster's Kubernetes provider, with the port-forward guard registered first
+export { createClusterProvider } from './create-cluster-provider.ts';
 
 interface ClusterInputs {
   // set only after the owner approves the deploy, with the token of the atc tunnel that the

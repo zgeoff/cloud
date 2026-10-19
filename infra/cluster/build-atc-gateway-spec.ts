@@ -12,9 +12,6 @@ const nonrootID = 65_532;
 export const atcGatewayRegistryFile = 'registry.json';
 const registryDir = '/etc/atc-gateway';
 
-// the atc tunnel's token Secret, mounted into the cloudflared sidecar alone
-const tunnelTokenDir = '/etc/cloudflared';
-
 // $HOME/.local/state/atc, until atc's packaging names the gateway's state path
 const defaultStateDir = '/home/nonroot/.local/state/atc';
 
@@ -128,6 +125,9 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
     },
   };
 }
+
+// the atc tunnel's token Secret, mounted into the cloudflared sidecar alone
+const tunnelTokenDir = '/etc/cloudflared';
 
 // The atc tunnel's connector. It reads the token from a file, never the env, and keeps its
 // metrics on loopback, so nothing outside the pod reaches it; that leaves kubelet no port to probe.
