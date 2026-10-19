@@ -2,7 +2,7 @@ import { alloyConfig } from './alloy-config.ts';
 import { toHelmTplLiteral } from './to-helm-tpl-literal.ts';
 
 // Alloy keeps its read positions here, on the node, so a restart resumes where it stopped. Without
-// a position, loki.source.kubernetes re-reads each container's whole log.
+// a position, Alloy reads a pod's log file from its end.
 const storagePath = '/var/lib/alloy';
 
 // Alloy as a DaemonSet with alloyConfig, which Prometheus scrapes through the chart's
@@ -15,7 +15,7 @@ export const alloyValues = {
       content: toHelmTplLiteral(alloyConfig),
     },
 
-    // /var/log from the host, read-only, for the journal
+    // /var/log from the host, read-only, for the journal and the pods' log files
     mounts: { varlog: true, extra: [{ name: 'storage', mountPath: storagePath }] },
 
     // the Go runtime collects garbage harder as the heap nears GOMEMLIMIT, below the limit
