@@ -22,9 +22,6 @@ from the `zgeoff` vault on a workstation.
 
 ## Deploy the first time
 
-**CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
-change until the owner approves it, as [the prod apply job](./prod-apply.md) describes.
-
 1. Merge the service. The `files image` workflow publishes `ghcr.io/zgeoff/cloud-files:<commit>`
    from `main`, and its run summary gives the digest.
 2. Create the four items in the `cloud` vault, then copy each into `cloud-deploy`. Mint each token
@@ -55,18 +52,16 @@ change until the owner approves it, as [the prod apply job](./prod-apply.md) des
    ```
 
    Run `bun run preview` and check that it adds the `files` namespace, its Secrets, Service,
-   StatefulSet and backup CronJob, the tunnel route and the proxied record, and changes nothing
-   else.
+   StatefulSet and backup CronJob, and changes nothing else.
 
 4. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
-5. Check the service, and that an upload without a token is refused:
+5. Check that the pod is up:
 
    ```bash
-   curl -sS https://files.geoff.cloud/healthz
-   curl -sS -o /dev/null -w '%{http_code}\n' -F file=@shot.png https://files.geoff.cloud/api/files
+   ssh root@geoffcloud k3s kubectl -n files rollout status statefulset/files --timeout=300s
    ```
 
-   Expect `ok`, then `401`.
+   Expect `statefulset rolling update complete`.
 
 ## Upload a file
 
@@ -91,9 +86,11 @@ Expect a JSON body with the file's `url`. `expires` takes `7d` (the default), `3
 
 1. Mint a new value with `openssl rand -hex 32`, and put it in the item in `cloud` and in each copy:
    `cloud-deploy`, and for the agent token `imp` and `zgeoff`.
-2. Run the `Deploy prod` workflow on `main`. Pulumi replaces the hash Secret, so the guard holds the
-   run until the owner approves it. The new Secret rolls `files-0`, and the old token stops working
-   once the new pod is ready. Existing uploads stay.
+2. [Apply by hand](./workflows.md#apply-by-hand) from `main`. The `Deploy prod` job applies only a
+   new commit, so it never runs for a change in 1Password alone. Both drift checks and the preview
+   show one change: Pulumi replaces the hash Secret `files-tokens`. Expect nothing else.
+3. The new Secret rolls `files-0`, and the old token stops working once the new pod is ready.
+   Existing uploads stay.
 
 ## Back up now
 
@@ -170,9 +167,9 @@ as they are.
    ssh root@geoffcloud k3s kubectl -n files logs -f job/<job-name>
    ```
 
-   Expect `restored files.db: integrity_check ok, <n> uploads, 0 files without a row removed`, where
-   `<n>` matches the number of uploads that `GET /api/files` with the owner token lists, less any
-   made since the snapshot.
+   Expect `restored files.db: integrity_check ok, <n> uploads, 0 files without a row removed`. The
+   snapshot holds every upload that existed at its time, expired ones included, so `<n>` differs
+   from today's list by the uploads made, removed or swept since. Record `<n>` rather than match it.
 
 3. Delete the Job and the scratch claim:
 

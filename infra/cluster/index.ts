@@ -5,7 +5,7 @@ import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patche
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
-import { createFiles } from './files.ts';
+import { createFiles } from './create-files.ts';
 import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
