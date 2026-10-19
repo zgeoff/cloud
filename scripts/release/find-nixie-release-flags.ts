@@ -17,7 +17,8 @@ export function findNixieReleaseFlags(notes: NixieReleaseNotes): readonly string
 }
 
 // each release lists only its own migrations, so a missing section, a blank one or any text but
-// the one sentence nixie writes for a release without one counts as migrations
+// the one sentence nixie writes for a release without one counts as migrations; a whole-line HTML
+// comment, such as the marker nixie puts above the next heading, is not text
 function hasMigrations(notes: string) {
   const section = findSection(notes, '## Migrations');
 
@@ -25,7 +26,9 @@ function hasMigrations(notes: string) {
     return true;
   }
 
-  const text = section.filter((line) => line.trim() !== '').join('\n');
+  const text = section
+    .filter((line) => line.trim() !== '' && !/^\s*<!--.*-->\s*$/u.test(line))
+    .join('\n');
 
   return !/^This release adds no migration since v\d+\.\d+\.\d+\.$/u.test(text);
 }
