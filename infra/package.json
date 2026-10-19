@@ -16,7 +16,7 @@
     "@zgeoff/cloud-health-check": "workspace:*",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/pulumi-onidel": "workspace:*",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "tiny-invariant": "1.3.3"

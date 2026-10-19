@@ -7,7 +7,7 @@
     "./contract": "./contract.ts"
   },
   "dependencies": {
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261011.1",
