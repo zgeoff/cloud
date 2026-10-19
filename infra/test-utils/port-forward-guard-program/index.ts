@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import { Role } from '@pulumi/kubernetes/rbac/v1';
-import type { input } from '@pulumi/kubernetes/types';
+import { z } from 'zod';
 import { createClusterProvider } from '../../cluster/index.ts';
 
 const caseDir = process.env['GUARD_CASE_DIR'];
@@ -22,11 +22,22 @@ const chart = existsSync(join(caseDir, 'chart'))
   ? new Chart('case', { chart: join(caseDir, 'chart'), namespace: 'atc' }, { provider })
   : undefined;
 
-const roles = existsSync(join(caseDir, 'roles.json'))
-  ? (JSON.parse(readFileSync(join(caseDir, 'roles.json'), 'utf8')) as input.rbac.v1.Role[]).map(
-      (role, index) => new Role(`case-${String(index)}`, role, { provider }),
-    )
+// the fields the tests' raw Roles set
+const ruleSchema = z.object({
+  apiGroups: z.array(z.string()),
+  resources: z.array(z.string()),
+  verbs: z.array(z.string()),
+});
+
+const metadataSchema = z.object({ name: z.string(), namespace: z.string() });
+const rolesSchema = z.array(z.object({ metadata: metadataSchema, rules: z.array(ruleSchema) }));
+const rolesPath = join(caseDir, 'roles.json');
+
+const roleArgs = existsSync(rolesPath)
+  ? rolesSchema.parse(JSON.parse(readFileSync(rolesPath, 'utf8')))
   : [];
+
+const roles = roleArgs.map((role, index) => new Role(`case-${String(index)}`, role, { provider }));
 
 export const chartURN = chart?.urn;
 export const roleURNs = roles.map((role) => role.urn);
