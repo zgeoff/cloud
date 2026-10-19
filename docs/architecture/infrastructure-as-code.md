@@ -89,8 +89,8 @@ flowchart LR
   F -->|yes| D1["drift check<br>at deployed/prod"]
   D1 --> P["refreshed preview<br>of the commit"]
   P --> G{"guard"}
-  G -->|hold| H["wait for a<br>manual dispatch"]
-  H --> U
+  G -->|hold| H["end the run as held,<br>wait for a manual dispatch"]
+  H -.-> U
   G -->|pass| U["apply"]
   U --> D2["drift check<br>at the commit"]
   D2 --> T["move deployed/prod"]
@@ -118,13 +118,15 @@ these:
 - a failed drift check from the deployed revision, because the plan then holds changes nobody
   reviewed.
 
-A held run fails and alerts on Discord. A manual dispatch of the workflow on `main` applies whatever
-its own preview plans, so the person who dispatches it has read the held plan first. The dispatch
-applies only once CI has passed on main's tip, because a dispatch skips the trigger that waits for
-CI. Until someone applies or reverts the held change, every later push to `main` runs the job and
-holds again, because the tag still sits behind the change. A failed apply or a failed second drift
-check leaves the tag where it was, so the next run's first drift check fails and holds until a
-person repairs the stack.
+A held run ends as held, not failed: the job succeeds, its summary names the revision to dispatch,
+Discord gets the hold, and the next push's run takes its turn. A manual dispatch of the workflow on
+`main` applies whatever its own preview plans, so the person who dispatches it has read the held
+plan first. The dispatch applies only once CI has passed on main's tip, because a dispatch skips the
+trigger that waits for CI. A later push runs on its own and applies when its own plan passes the
+guard. Until someone applies or reverts the held change, though, that plan still holds the change,
+because the tag sits behind it and the preview covers the whole stack, so the later run ends held
+too. A failed apply or a failed second drift check leaves the tag where it was, so the next run's
+first drift check fails and holds until a person repairs the stack.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
@@ -136,16 +138,15 @@ because a failed apply can leave the stack half changed. Pulumi's update plans w
 but they are experimental, and a plan they reject stops the apply partway, which leaves the stack
 half changed.
 
-One apply runs at a time, and GitHub never cancels one in progress, because a cancelled apply leaves
-the stack half changed. The queue holds only the apply step, which a run reaches after its decision,
-so a failed CI run, a pull request's run and a commit with nothing to apply never join it. The queue
-keeps every apply that waits, up to GitHub's cap on a concurrency group, so no apply takes the place
-of another. GitHub starts the waiting applies first in, first out, but does not guarantee that
-order, and a run starts when CI on its commit passes, so an older commit's apply can start after a
-newer commit's. A waiting apply reads the tag again once its turn comes, so the older apply finds
-its commit already deployed and skips, and the tag moves only forward along `main` in any order. The
-decisions run one at a time in a queue of their own, which keeps every waiting decision in the same
-way, so the applies mostly join their queue in the order the runs started.
+One run of the job runs at a time, and GitHub never cancels one in progress, because a cancelled
+apply leaves the stack half changed. The job's concurrency group holds the whole job, from its
+decision to the tag's move, and the job's filter keeps a failed CI run and a pull request's run out
+of it. The group keeps every run that waits, up to GitHub's cap on a concurrency group, so no run
+takes the place of another. GitHub starts the waiting runs first in, first out, but does not
+guarantee that order, and a run starts when CI on its commit passes, so an older commit's run can
+start after a newer commit's. Each run reads the tag only once its turn comes, so the older run
+finds its commit already deployed and skips, and the tag moves only forward along `main` in any
+order.
 
 The decision counts every commit since the tag that touches a Pulumi input, as the `prod-apply` gate
 of the repo's path-gate manifest lists them, not the difference between the two trees. A commit that

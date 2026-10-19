@@ -1,17 +1,25 @@
 import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
 
-// Evaluates a job's `if` as GitHub's expression docs describe it: literals, `github` and `needs`
-// paths, `!`, `==`, `!=`, `&&`, `||`, parentheses, and the status check functions. Anything else,
-// such as another function or context, throws.
+// Evaluates a job's or a step's `if` as GitHub's expression docs describe it: literals, `github`,
+// `needs` and `steps` paths, `!`, `==`, `!=`, `&&`, `||`, parentheses, and the status check
+// functions. Anything else, such as another function or context, throws.
 interface ActionsNeed {
   readonly result: string;
+  readonly outputs: Readonly<Record<string, string>>;
+}
+
+interface ActionsStep {
+  readonly outcome: string;
   readonly outputs: Readonly<Record<string, string>>;
 }
 
 export interface ActionsConditionContext {
   readonly github: object;
   readonly needs: Readonly<Record<string, ActionsNeed>>;
+
+  // the earlier steps of the job, for a step's `if`; without it, a `steps` path throws
+  readonly steps?: Readonly<Record<string, ActionsStep>>;
 }
 
 const statusFunction = /\b(?:success|failure|cancelled|always)\(\)/u;
@@ -189,6 +197,7 @@ function resolvePath(path: string, context: Readonly<ActionsConditionContext>): 
   const contexts: Readonly<Record<string, unknown>> = {
     github: context.github,
     needs: context.needs,
+    ...(context.steps === undefined ? {} : { steps: context.steps }),
   };
 
   if (root === undefined || !(root in contexts)) {

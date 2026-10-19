@@ -49,6 +49,33 @@ test.each([
 });
 
 test.each([
+  ["steps.outcome.outputs.outcome == 'apply'", true],
+  ["steps.outcome.outputs.outcome == 'held'", false],
+  ["steps.drift.outcome == 'failure'", true],
+  ["steps.guard.outputs.verdict == 'hold'", false],
+])('it evaluates the step condition %s as %p', (condition, met) => {
+  expect(
+    isActionsConditionMet(condition, {
+      github: { event_name: 'push' },
+      needs: {},
+      steps: {
+        drift: { outcome: 'failure', outputs: {} },
+        outcome: { outcome: 'success', outputs: { outcome: 'apply' } },
+      },
+    }),
+  ).toBe(met);
+});
+
+test('it rejects a steps path when no steps context is given', () => {
+  expect(() =>
+    isActionsConditionMet("steps.outcome.outputs.outcome == 'apply'", {
+      github: { event_name: 'push' },
+      needs: {},
+    }),
+  ).toThrowWithMessage(Error, 'unsupported context: steps.outcome.outputs.outcome');
+});
+
+test.each([
   ['hashFiles()', 'unsupported function: hashFiles()'],
   [
     "contains(github.event_name, 'push')",
