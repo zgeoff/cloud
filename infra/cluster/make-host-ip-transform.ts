@@ -19,8 +19,9 @@ export function makeHostIPTransform(
 type Fields = Record<string, unknown>;
 
 function buildBoundProps(props: Fields, hostIP: string, portName: string): Fields {
-  // copies only the objects on the path to the ports: a chart child's props can hold Outputs,
-  // which carry functions and cannot be cloned
+  // Traefik's chart writes hostIP into the entry point's listen address too, which a pod cannot
+  // bind, so it goes on the port. Only the objects on the path to the ports are copied: a chart
+  // child's props can hold Outputs, which carry functions and cannot be cloned.
   return buildWithField(props, 'spec', (spec) =>
     buildWithNested(spec, 'template', (template) =>
       buildWithNested(template, 'spec', (podSpec) =>
@@ -28,8 +29,6 @@ function buildBoundProps(props: Fields, hostIP: string, portName: string): Field
           buildMappedRecords(containers, (container) =>
             buildWithField(container, 'ports', (ports) =>
               buildMappedRecords(ports, (port) =>
-                // Traefik's chart also writes its hostIP value into the entry point's listen
-                // address, which a pod cannot bind, so the host address goes on the port instead
                 port['name'] === portName ? { ...port, hostIP } : port,
               ),
             ),

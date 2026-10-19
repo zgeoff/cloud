@@ -9,8 +9,8 @@ export function createNixieProbe(
   readinessURL: string,
   opts: ComponentResourceOptions,
 ): Chart {
+  // a new release name would replace the release
   return new Chart(
-    // a new name would replace the release
     'nixie-turns-probe',
     {
       namespace: ns.metadata.name,
