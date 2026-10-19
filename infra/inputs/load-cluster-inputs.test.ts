@@ -161,3 +161,43 @@ test("it runs nixie's backup in the gateway's backup image, pulled with the gate
     'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
   );
 });
+
+test("it runs the files service's backup in the gateway's backup image", () => {
+  const config = buildMockATCGatewayConfig({
+    backupImage:
+      'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+    daemons: { geoffcloud: {} },
+    defaultDaemon: 'geoffcloud',
+  });
+
+  const inputs = loadClusterInputs(
+    buildStubConfig({
+      cluster: 'managed',
+      atcGateway: JSON.stringify(config),
+      atcGatewayOwnerEmail: 'owner@example.test',
+      files: JSON.stringify({
+        image:
+          'ghcr.io/zgeoff/cloud-files:0123456@sha256:3333333333333333333333333333333333333333333333333333333333333333',
+        hostname: 'files.geoff.cloud',
+      }),
+    }),
+    {
+      K3S_KUBECONFIG: 'apiVersion: v1',
+      ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
+      ATC_GATEWAY_TOKEN_GEOFFCLOUD: 'g'.repeat(32),
+      GHCR_PULL_USERNAME: 'octo-puller',
+      GHCR_PULL_TOKEN: 'ghp_fake0token0for0tests0only0000000000',
+      FILES_AGENT_TOKEN: 'agent-token-for-tests',
+      FILES_OWNER_TOKEN: 'owner-token-for-tests',
+      FILES_RESTIC_PASSWORD: 'p'.repeat(32),
+      FILES_R2_ACCESS_KEY_ID: 'a'.repeat(32),
+      FILES_R2_SECRET_ACCESS_KEY: 's'.repeat(64),
+      FILES_R2_ENDPOINT: 'https://0123456789abcdef.r2.cloudflarestorage.com',
+      FILES_R2_BUCKET: 'backups',
+    },
+  );
+
+  expect(inputs?.files?.backup?.image).toBe(
+    'ghcr.io/zgeoff/atc-gateway-backup:4.0.0-r1@sha256:2222222222222222222222222222222222222222222222222222222222222222',
+  );
+});

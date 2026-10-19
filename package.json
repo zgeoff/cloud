@@ -31,6 +31,7 @@
     "test:alert-rules": "bash scripts/run-shell-suites.sh alert-rules",
     "test:atc-gateway-fixture": "bash images/atc-gateway/run-fixture-tests.sh",
     "test:nixie-backup-fixture": "bash scripts/run-shell-suites.sh nixie-backup-fixture",
+    "test:files-backup-fixture": "bash scripts/run-shell-suites.sh files-backup-fixture",
     "login:ghcr": "bun scripts/login-ghcr.ts",
     "test:nixos": "bash scripts/run-nixos-checks.sh",
     "ci:write-deploy-env": "bash scripts/write-deploy-env.sh",

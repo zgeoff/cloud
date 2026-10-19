@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 import { atcGatewayConfigSchema } from '../inputs/index.ts';
 import { buildATCGatewayBackupPodSpec } from './build-atc-gateway-backup-pod-spec.ts';
+import { buildFilesBackupPodSpec } from './build-files-backup-pod-spec.ts';
 import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 import { buildRestoreJob } from './build-restore-job.ts';
@@ -131,8 +132,8 @@ function renderGeneratedNote(builder: string): string {
 }
 
 // Each restore Job, named as the backup CronJob's claim, Secrets and ConfigMap are named in infra
-// (atc-gateway.ts, create-atc-gateway-backup-job.ts, create-nixie-backup-job.ts and
-// build-ghcr-pull-secret-args.ts)
+// (atc-gateway.ts, create-atc-gateway-backup-job.ts, create-nixie-backup-job.ts,
+// create-files-backup-job.ts and build-ghcr-pull-secret-args.ts)
 function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
   return [
     {
@@ -171,6 +172,27 @@ function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
           claim: 'data-nixie-0',
           scriptConfigMap: 'nixie-backup-script',
           envSecret: 'nixie-backup',
+          pullSecret: ghcrPullSecretName,
+        }),
+      }),
+    },
+    {
+      path: join('deploy', 'files', 'restore-job.yaml'),
+      header: `${renderGeneratedNote('infra/cluster/build-files-backup-pod-spec.ts')}# One-off restore of the files service's volume, from the files-backup CronJob's repository. Stop
+# the service first (docs/runbooks/files.md), then:
+#   ssh root@geoffcloud k3s kubectl create -f - < deploy/files/restore-job.yaml
+# To list the snapshots instead, set args to ['ls']; to restore another snapshot, set SNAPSHOT. The
+# claim is data-files-0, the service's own. The script and the Secret come from the CronJob's
+# fixed-name ConfigMap and Secret.
+`,
+      job: buildRestoreJob({
+        name: 'files',
+        namespace: 'files',
+        backupPod: buildFilesBackupPodSpec({
+          image: backupImage,
+          claim: 'data-files-0',
+          scriptConfigMap: 'files-backup-script',
+          envSecret: 'files-backup',
           pullSecret: ghcrPullSecretName,
         }),
       }),

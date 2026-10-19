@@ -1,10 +1,11 @@
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
-import type { ATCGatewayInputs, NixieInputs } from '../inputs/index.ts';
+import type { ATCGatewayInputs, FilesInputs, NixieInputs } from '../inputs/index.ts';
 import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patches.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
+import { createFiles } from './files.ts';
 import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
@@ -24,6 +25,9 @@ interface ClusterInputs {
   // set only after the owner approves the deploy (GEO-343)
   readonly nixie?: NixieInputs;
 
+  // set only after the owner approves the deploy (GEO-1364)
+  readonly files?: FilesInputs;
+
   // geoff.cloud's zone, for nixie's DNS record
   readonly zoneID: Output<string>;
 }
@@ -37,6 +41,9 @@ interface ClusterOutputs {
 
   // the in-cluster URL of nixie's readiness report, for the probe of its advisory parts
   readonly nixieReadinessURL?: string;
+
+  // the in-cluster URL of the files service, for its tunnel route
+  readonly filesServiceURL?: Output<string>;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7). index.ts builds the cluster's Provider, which
@@ -54,8 +61,11 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
   const nixie =
     inputs.nixie === undefined ? undefined : createNixie(cluster, inputs.nixie, inputs.zoneID);
 
+  const files = inputs.files === undefined ? undefined : createFiles(cluster, inputs.files);
+
   return {
     onePasswordConnectServiceURL: connect.serviceURL,
+    ...(files === undefined ? {} : { filesServiceURL: files.serviceURL }),
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };
