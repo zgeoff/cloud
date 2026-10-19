@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildMockTunnelRoute } from '../test-utils/build-mock-tunnel-route.ts';
 import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
-import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 
 const browserPattern = '^(?:/oauth2/authorize|/login|/enroll|/consent|/error)$';
@@ -20,7 +19,7 @@ test("it sends the gateway's browser paths through cloudflared's Access check, t
   ]);
 });
 
-// cloudflared's first-match rule over the whole tunnel, the preview webhook's route included: the
+// cloudflared's first-match rule over the atc tunnel, which holds the gateway's routes alone: the
 // hostname equals the rule's, and the rule's path pattern matches the request's decoded path. RE2
 // and JavaScript agree on these patterns' syntax.
 function findRuleIndex(hostname: string, path: string): number {
@@ -29,7 +28,7 @@ function findRuleIndex(hostname: string, path: string): number {
     access,
   );
 
-  return buildTunnelIngresses([...gateway, buildPreviewWebhookRoute()]).findIndex(
+  return buildTunnelIngresses(gateway).findIndex(
     (rule) =>
       (rule.hostname === undefined || rule.hostname === hostname) &&
       (rule.path === undefined || new RegExp(rule.path, 'u').test(path)),
@@ -76,13 +75,13 @@ test.each([
 ])(
   'it answers %s on the gateway hostname with the 404 catch-all',
   (_variant: string, path: string) => {
-    expect(findRuleIndex('atc.geoff.cloud', path)).toBe(3);
+    expect(findRuleIndex('atc.geoff.cloud', path)).toBe(2);
   },
 );
 
 test.each(['/login', '/enroll', '/consent', '/oauth2/authorize'])(
   'it answers the browser path %s on the preview webhook hostname with the 404 catch-all',
   (path: string) => {
-    expect(findRuleIndex('preview-webhook.geoff.cloud', path)).toBe(3);
+    expect(findRuleIndex('preview-webhook.geoff.cloud', path)).toBe(2);
   },
 );

@@ -1,55 +1,53 @@
 # Public ingress
 
-The estate has one way in from the internet: Cloudflare tunnels that cloudflared holds open from
+The estate has one way in from the internet: two Cloudflare tunnels that cloudflared holds open from
 inside the cluster. The host opens no inbound port for them, so a public route exists only as a rule
 in a tunnel's configuration and a DNS record that points at that tunnel, and Pulumi declares both.
-Each workload behind a tunnel brings its own authentication. The shared tunnel has two routes:
-`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server, and
+Each workload behind a tunnel brings its own authentication. The atc tunnel serves
+`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel serves
 `preview-webhook.geoff.cloud`, the preview service's webhook listener, which checks the signature of
 every GitHub delivery. Cloudflare Access adds an owner-only login in front of the gateway's sign-in
 pages, and nowhere else. [The atc gateway](../workloads/atc-gateway.md) and
 [the preview service](../workloads/preview.md) cover what answers behind each route.
 
-## The tunnel
+## The tunnels
+
+Both tunnels take their routes from Cloudflare rather than from a file in the cluster, so a route
+change is a Pulumi change to a tunnel's configuration, and cloudflared picks it up with no redeploy.
+A tunnel's configuration is an ordered list, and cloudflared takes the first rule that matches. Each
+list ends with a catch-all that answers 404, so a hostname with no rule of its own, or any other
+name that reaches the tunnel, gets a 404 and never a workload. Each rule's pattern matches whole
+paths only, so any other path, including a variant of a listed one such as `/login/` or `/LOGIN`,
+falls to the catch-all. Each hostname is a proxied CNAME to its tunnel, so it resolves to
+Cloudflare's edge and never to the host.
+
+### The shared tunnel
 
 The shared tunnel's cloudflared runs in k3s, in its own namespace, as two replicas that each hold
 connections to Cloudflare's edge with the tunnel's token. The tunnel serves while either replica is
-connected, so one replica's restart drops no traffic. The tunnel takes its routes from Cloudflare
-rather than from a file in the cluster, so a route change is a Pulumi change to the tunnel's
-configuration, and cloudflared picks it up with no redeploy.
+connected, so one replica's restart drops no traffic. Its list holds the preview webhook's rule,
+which matches the path `/webhook` alone and routes it to the listener on the host's tailnet address,
+which the host admits only from pod addresses.
 
-The tunnel's configuration is an ordered list, and cloudflared takes the first rule that matches.
-The list holds two rules for the gateway's hostname, both routed to the gateway's Service in the
-cluster, then the preview webhook's hostname, and then a catch-all that answers 404. The first
-gateway rule matches the browser paths of the [route boundary](#the-gateways-route-boundary), and
-the second matches its machine paths. The webhook's rule matches the path `/webhook` alone and
-routes it to the listener on the host's tailnet address, which the host admits only from pod
-addresses. Each rule's pattern matches whole paths only, so any other path, including a variant of a
-listed one such as `/login/` or `/LOGIN`, falls to the catch-all. The catch-all stays last, so a
-hostname with no rule of its own, or any other name that reaches the tunnel, gets a 404 and never a
-workload. Each hostname is a proxied CNAME to the tunnel, so it resolves to Cloudflare's edge and
-never to the host.
+### The atc tunnel
+
+The atc tunnel serves the gateway's hostname alone, so that the gateway can tell a request that came
+through Cloudflare from one that did not. Its connector is a cloudflared sidecar in the gateway's
+pod, which reaches the gateway on the pod's loopback address instead of through the Service. Only a
+process inside the pod, or a port-forward to it, connects from loopback, so the gateway trusts the
+forwarded client address on a request from there and on no other
+([the gateway's security events](../workloads/observability.md#sign-in-alerts)). The sidecar reads
+its token from a file that only it mounts.
+
+The atc tunnel's list holds two rules for the gateway's hostname, then the catch-all. The first rule
+matches the browser paths of the [route boundary](#the-gateways-route-boundary), and the second
+matches its machine paths. The sidecar restarts with the gateway, so the hostname is down while the
+pod restarts. It keeps its metrics on loopback, where kubelet cannot probe them, so the external
+health check on the hostname is the atc tunnel's one monitor.
 
 cloudflared passes the request's own host header through to the gateway. The gateway answers only
 requests addressed to its public host or to loopback, so a request that reached its Service by any
 other name gets a 403.
-
-### The atc tunnel
-
-A second tunnel exists for the gateway's hostname alone, so that the gateway can tell a request that
-came through Cloudflare from one that did not. Its connector is a cloudflared sidecar in the
-gateway's pod, which reaches the gateway on the pod's loopback address instead of through the
-Service. Only a process inside the pod, or a port-forward to it, connects from loopback, so the
-gateway trusts the forwarded client address on a request from there and on no other
-([the gateway's security events](../workloads/observability.md#sign-in-alerts)). The atc tunnel's
-configuration holds the same two gateway rules and the same catch-all as the shared tunnel, with the
-pod's loopback as their origin, so the route boundary and the Access check are identical on both
-tunnels. The sidecar reads its token from a file that only it mounts.
-
-The gateway's hostname resolves to the shared tunnel, so the atc tunnel carries no traffic, and the
-external health check on the hostname reaches the gateway through the shared tunnel. The sidecar
-keeps its metrics on loopback, where kubelet cannot probe them, so no check watches the atc tunnel's
-connection.
 
 ## HTTPS and the edge
 
@@ -114,7 +112,7 @@ Passing Access grants nothing inside atc. The gateway still signs the owner in, 
 asks for explicit consent, and checks PKCE, the redirect, the Host and Origin headers, the scope and
 the resource before it issues a token. atc keeps its grants and tokens in its own database, so a
 change to the Access application or its policy leaves every grant and token valid. A rollback of
-this edge control reverts the Access resources and the tunnel's two gateway rules together, and
+this edge control reverts the Access resources and the atc tunnel's two gateway rules together, and
 leaves atc's own authentication as it is.
 
 ### Other ways to the gateway

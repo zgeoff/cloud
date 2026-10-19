@@ -25,7 +25,7 @@ test("it sends the gateway's browser paths through the Access check and its mach
   ]);
 });
 
-test("it renders the shared tunnel's atc rules with only the origin changed to the pod's loopback", () => {
+test("it renders the gateway's route rules unchanged but for the origin, the pod's loopback", () => {
   const access = { teamName: output('example-team'), audience: output('0123456789abcdef') };
 
   const shared = buildTunnelIngresses(
