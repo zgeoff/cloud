@@ -2,8 +2,6 @@ import { z } from 'zod';
 
 const portSchema = z.int().min(1).max(65_535);
 
-// the Onidel VM: its ID, which infra adopts and the snapshot script names, and the static public
-// addresses the host sets on eth0, with their prefix lengths
 const vmSchema = z.strictObject({
   id: z.uuid(),
   publicIPv4: z.ipv4(),
@@ -22,7 +20,6 @@ const tagsSchema = z.strictObject({
   impE2E: tagSchema,
 });
 
-// each long-lived node's stable tailnet address
 const nodeSchema = z.strictObject({ address: z.ipv4() });
 
 const nodesSchema = z.strictObject({
@@ -50,8 +47,7 @@ const k3sSchema = z.strictObject({
   grafanaNodePort: portSchema,
 });
 
-// The shape of constants.json. Each object is strict, so a misspelt or stale key fails the parse
-// instead of reading as unset.
+// Each object is strict, so a misspelt or stale key fails the parse instead of reading as unset.
 export const topologySchema = z.strictObject({
   vm: vmSchema,
   tailnet: tailnetSchema,

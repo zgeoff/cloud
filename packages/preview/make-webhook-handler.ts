@@ -9,9 +9,6 @@ import { startContractRun } from './start-contract-run.ts';
 import type { PreviewDeps } from './types.ts';
 import { verifyWebhookSignature } from './verify-webhook-signature.ts';
 
-// The public endpoint, POST /webhook, for GitHub's pull_request deliveries. The signature check runs
-// before anything parses the body, so a bad signature gets a 401 and reaches no other code. One
-// delivery runs at a time, in arrival order, so an older one never lands after a newer one.
 export function makeWebhookHandler(deps: PreviewDeps): (request: Request) => Promise<Response> {
   const withDeliveryLock = makeSlotLock();
 
@@ -24,6 +21,7 @@ export function makeWebhookHandler(deps: PreviewDeps): (request: Request) => Pro
 
     const signature = request.headers.get('x-hub-signature-256');
 
+    // before anything parses the body, so a bad signature reaches no other code
     if (!(await verifyWebhookSignature(deps.webhookSecret, body, signature))) {
       return new Response('signature mismatch\n', { status: 401 });
     }
@@ -34,6 +32,7 @@ export function makeWebhookHandler(deps: PreviewDeps): (request: Request) => Pro
         : null;
 
     if (event !== null) {
+      // one delivery at a time, in arrival order, so an older one never lands after a newer one
       await withDeliveryLock(() => applyPullRequestEvent(deps, event));
     }
 
@@ -51,21 +50,18 @@ async function applyPullRequestEvent(deps: PreviewDeps, event: PullRequestEvent)
   }
 }
 
-// A fork's code would run in an imp that holds the broker's GitHub credential, so a pull request
-// from a fork gets no preview, and neither does one in a repository the service does not list,
-// by name or by its owner's `<owner>/*`
 function shouldPreview(deps: PreviewDeps, event: PullRequestEvent): boolean {
   const owner = event.repo.split('/')[0] ?? '';
   const listed = deps.settings.repos.has(event.repo) || deps.settings.repos.has(`${owner}/*`);
 
+  // a fork's code would run in an imp that holds the broker's GitHub credential
   return listed && !event.fromFork;
 }
 
-// The SDK contract suite runs with the broker's model credential, so a pull request from a fork
-// never runs it, and neither does one in a repository the contract settings do not list
 function shouldCheckContract(deps: PreviewDeps, event: PullRequestEvent): boolean {
   const repos = deps.settings.contract?.repos;
 
+  // the suite runs with the broker's model credential, so a fork's code never runs it
   if (repos === undefined || event.action === 'close' || event.fromFork) {
     return false;
   }
@@ -75,9 +71,6 @@ function shouldCheckContract(deps: PreviewDeps, event: PullRequestEvent): boolea
   return repos.has(event.repo) || repos.has(`${owner}/*`);
 }
 
-// opened, reopened or synchronize: a pull request that changes the Agent SDK's pin claims one run
-// of the SDK contract suite for its head commit. A later delivery for the same commit, such as a
-// reopen or GitHub's redelivery, finds the run claimed and starts nothing.
 async function claimContractRun(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
   const files = await deps.github.readPullRequestFiles(event.repo, event.number);
 
@@ -93,6 +86,8 @@ async function claimContractRun(deps: PreviewDeps, event: PullRequestEvent): Pro
     imp: buildContractImpName(event.repo, event.headSHA),
   });
 
+  // a later delivery for the same commit, such as a reopen or GitHub's redelivery, finds the run
+  // claimed and starts nothing
   if (claimed) {
     deps.log(`${event.repo}#${event.number}: an SDK contract run for ${event.headSHA}`);
 
@@ -100,11 +95,11 @@ async function claimContractRun(deps: PreviewDeps, event: PullRequestEvent): Pro
   }
 }
 
-// opened, reopened or synchronize: a head commit with preview/compose.yaml gets the link. Only an
-// open brings an ended preview back, so a push delivered after the close never revives it.
 async function updatePreviewHead(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
   const compose = await deps.github.readComposeFile(event.repo, event.headSHA);
 
+  // only an open brings an ended preview back, so a push delivered after the close never
+  // revives it
   if (compose === null || isEndedPush(deps, event)) {
     return;
   }
@@ -132,8 +127,6 @@ function isEndedPush(deps: PreviewDeps, event: PullRequestEvent): boolean {
 // finds the preview ended and a redelivered close posts no comment
 const unseenCloseDetail = 'the pull request closed before any preview';
 
-// closed, merged or not: the imp goes, and the link reports the preview ended. A redelivered close
-// retries both, so a failed removal or comment heals on GitHub's next attempt.
 async function removePreview(deps: PreviewDeps, event: PullRequestEvent): Promise<void> {
   const before = deps.store.findPreview(event);
 

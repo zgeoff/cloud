@@ -6,9 +6,6 @@ import type { PreviewDeps } from './types.ts';
 import type { HealthResult } from './wait-for-healthy.ts';
 import { waitForHealthy } from './wait-for-healthy.ts';
 
-// Boots a preview of the pull request's head commit, or rebuilds the imp that runs an older one,
-// and leaves it `ready` or `failed`. A preview that left `booting` meanwhile, because its pull
-// request closed, stays as it is.
 export async function runPreviewBoot(deps: PreviewDeps, preview: Preview): Promise<void> {
   // the whole boot holds the slot lock: its build's guest commands would wake an imp that another
   // open put to sleep while it ran
@@ -18,12 +15,11 @@ export async function runPreviewBoot(deps: PreviewDeps, preview: Preview): Promi
   deps.log(`${preview.repo}#${preview.number}: ${result.phase} at ${preview.headSHA}`);
 }
 
-// An older head's failure says nothing about the head a push moved to meanwhile, so that preview
-// waits for its next open instead of showing the older failure. A ready result keeps its built
-// commit, which the next open sees is not the head.
 function pickSettledPhase(deps: PreviewDeps, preview: Preview, result: PhaseChange): PhaseChange {
   const headSHA = deps.store.findPreview(preview)?.headSHA;
 
+  // an older head's failure says nothing about the head a push moved to meanwhile, so that preview
+  // waits for its next open instead of showing the older failure
   return result.phase === 'failed' && headSHA !== preview.headSHA ? { phase: 'waiting' } : result;
 }
 
@@ -35,8 +31,6 @@ async function tryRunBootSteps(deps: PreviewDeps, preview: Preview): Promise<Pha
   }
 }
 
-// A close that came before the imp existed found nothing to remove, so the boot removes the imp
-// it started
 async function checkClosedDuringBoot(
   deps: PreviewDeps,
   preview: Preview,
@@ -45,6 +39,7 @@ async function checkClosedDuringBoot(
     return null;
   }
 
+  // a close that came before the imp existed found nothing to remove
   await deps.impd.removeImp(preview.imp);
 
   return { phase: 'failed', detail: 'the pull request closed during the boot' };
@@ -105,9 +100,6 @@ async function runBootSteps(deps: PreviewDeps, preview: Preview): Promise<PhaseC
   return closed ?? runBuild(deps, preview, contract);
 }
 
-// Checks out the head commit and starts its stack in the imp, then waits for the health path. The
-// guest's `timeout` bounds the build, which holds the slot lock, so a hung build fails its boot
-// rather than block every other preview; it exits 124 when the bound passes.
 async function runBuild(
   deps: PreviewDeps,
   preview: Preview,
@@ -118,6 +110,8 @@ async function runBuild(
   const build = await deps.impd.runCommand(
     preview.imp,
     [
+      // the build holds the slot lock, so the bound fails a hung build's boot rather than block
+      // every other preview; `timeout` exits 124 when the bound passes
       'timeout',
       '--kill-after=30',
       seconds,
@@ -140,9 +134,6 @@ async function runBuild(
   return waitForHealth(deps, preview, contract);
 }
 
-// Frees a slot, then starts the imp: the one from an earlier build, awake, with the port of the
-// commit it rebuilds, or a new one with the contract's port. Every boot then installs the GitHub
-// and model grants, so an imp whose grant failed or never came gets it on the next try.
 async function startImpInSlot(
   deps: PreviewDeps,
   preview: Preview,
@@ -165,13 +156,12 @@ async function startImpInSlot(
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
   }
 
+  // every boot installs the grants, so an imp whose grant failed or never came gets it now
   for (const secret of collectGrantSecrets(deps)) {
     await deps.impd.installGrant(preview.imp, secret);
   }
 }
 
-// The GitHub secret lets the clone reach a private repository, and the model secret is the
-// broker's route for the stack's model calls
 function collectGrantSecrets(deps: PreviewDeps): string[] {
   return [deps.settings.impGitHubSecret, deps.settings.impModelSecret].filter(
     (secret) => secret !== null,
@@ -197,12 +187,12 @@ async function waitForHealth(
       };
 }
 
-// impd's proxy reaches the app on the imp's own address, never on the guest's loopback, so the
-// detail says where the app must listen
 function formatUnreachablePort(contract: PreviewContract, health: HealthResult): string {
   return [
     `port ${contract.port} did not answer ${health.url} through impd's proxy before the boot timed out.`,
     `impd's proxy last answered: ${health.lastAnswer ?? 'nothing'}`,
+
+    // impd's proxy reaches the app on the imp's own address, never on the guest's loopback
     `The app must listen on 0.0.0.0:${contract.port} in the imp, not on 127.0.0.1 alone.`,
   ].join('\n');
 }

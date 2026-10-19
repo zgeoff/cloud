@@ -11,9 +11,7 @@ interface StubR2Bucket extends Pick<R2Bucket, 'get' | 'put'> {
   readonly objects: Map<string, string>;
 }
 
-// Stand-in for R2 get/put over an in-memory text map, typed by @cloudflare/workers-types: get resolves
-// an R2ObjectBody or null; put replaces and resolves its R2Object with single-part-upload metadata.
-// `objects` exposes stored text; strings without options only, rejecting the rest instead of guessing.
+// Stand-in for R2 get/put over an in-memory text map, typed by @cloudflare/workers-types
 export function buildStubR2Bucket(initial: Readonly<Record<string, string>> = {}): StubR2Bucket {
   const objects = new Map(Object.entries(initial));
 

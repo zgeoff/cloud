@@ -7,8 +7,6 @@ import { runPreviewBoot } from './run-preview-boot.ts';
 import type { PreviewDeps } from './types.ts';
 import { waitForHealthy } from './wait-for-healthy.ts';
 
-// The tailnet link, GET /<owner>/<name>/<number>. A ready preview of the head commit redirects to
-// its imp, which impd's wake proxy serves; any other preview gets a page that says where it stands.
 export function makeLinkHandler(deps: PreviewDeps): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
@@ -43,7 +41,6 @@ interface StatusPage extends PreviewPage {
   readonly status: number;
 }
 
-// The page for a preview that the link cannot open now, or null for one it can
 function pickPreviewPage(preview: Preview | null, url: URL): StatusPage | null {
   if (preview?.phase === 'ended') {
     return {
@@ -77,8 +74,6 @@ function buildNoPreviewPage(key: PreviewKey): StatusPage {
   };
 }
 
-// A ready preview of the head commit takes a slot, wakes and redirects; any other boots, and its
-// boot takes the slot once it starts the imp.
 async function openPreview(deps: PreviewDeps, preview: Preview): Promise<Response> {
   const isCurrent = preview.phase === 'ready' && preview.builtSHA === preview.headSHA;
 
@@ -98,21 +93,19 @@ async function openPreview(deps: PreviewDeps, preview: Preview): Promise<Respons
   return buildPageResponse(buildBootingPage(preview));
 }
 
-// A second open while the first one's boot starts finds the phase moved, and boots nothing. The
-// boot runs on after the response.
 function startPreviewBoot(deps: PreviewDeps, preview: Preview): void {
+  // a second open while the first one's boot starts finds the phase moved, and boots nothing
   if (!deps.store.updatePhase(preview, [preview.phase], { phase: 'booting' })) {
     return;
   }
 
+  // the boot runs on after the response
   const boot = runPreviewBoot(deps, { ...preview, phase: 'booting' });
 
   deps.pendingBoots.add(boot);
   void removeSettledBoot(deps.pendingBoots, boot);
 }
 
-// false when impd no longer holds the imp, or when a woken imp's stack does not answer, so the
-// preview boots again
 async function startReadyImp(deps: PreviewDeps, preview: Preview): Promise<boolean> {
   const imp = await deps.impd.findImp(preview.imp);
 
@@ -152,8 +145,8 @@ async function checkWokenStack(deps: PreviewDeps, preview: Preview): Promise<boo
   return health.healthy;
 }
 
-// a boot never rejects: it records its own failure
 async function removeSettledBoot(pending: Set<Promise<void>>, boot: Promise<void>): Promise<void> {
+  // a boot never rejects: it records its own failure
   await boot;
 
   pending.delete(boot);

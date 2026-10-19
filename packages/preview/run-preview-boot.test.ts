@@ -25,8 +25,6 @@ async function setupTest() {
   });
 
   const impd = startStubImpd();
-
-  // a clock that each pause between health probes moves on
   const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
 
   const deps: PreviewDeps = {
@@ -37,7 +35,6 @@ async function setupTest() {
       idleMs: 1_800_000,
       impDomain: 'imps.example.test',
 
-      // the image, size and grant each new imp gets
       impImage: 'base',
       impMemoryMib: 2048,
       impGitHubSecret: 'gh',
