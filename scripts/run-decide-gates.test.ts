@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runDecideGates } from './run-decide-gates.ts';
+import { runProcess } from './run-process.ts';
 import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
@@ -500,4 +501,67 @@ test('it refuses --github without a step summary file', async () => {
   expect(ctx.printErr.mock.calls).toStrictEqual([
     ['run-decide-gates: --github needs GITHUB_STEP_SUMMARY\n'],
   ]);
+});
+
+// the real entry point, with the repo's manifest and the step files from its environment, as CI
+// runs it
+test('it skips the provider and full gates for a docs-only commit when run as the CLI with --github', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'output'), '');
+  await writeFile(join(ctx.directory, 'summary'), '');
+  await mkdir(join(ctx.repo.seed, 'docs'));
+  await writeFile(join(ctx.repo.seed, 'docs', 'guide.md'), '# guide\n');
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the guide']);
+
+  const base = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', 'HEAD']);
+
+  await writeFile(join(ctx.repo.seed, 'docs', 'guide.md'), '# guide\n\nRead the runbook.\n');
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qam', 'extend the guide']);
+
+  const result = await runProcess(
+    [
+      'bun',
+      join(import.meta.dir, 'run-decide-gates.ts'),
+      '--github',
+      base,
+      'HEAD',
+      'provider',
+      'full',
+    ],
+    {
+      cwd: ctx.repo.seed,
+      env: {
+        ...ctx.repo.env,
+        GITHUB_OUTPUT: join(ctx.directory, 'output'),
+        GITHUB_STEP_SUMMARY: join(ctx.directory, 'summary'),
+      },
+    },
+  );
+
+  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+  const summary = await readFile(join(ctx.directory, 'summary'), 'utf8');
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 0,
+    stdout:
+      'provider=false\nfull=false\n' +
+      'No input of the provider checks changed, so the Go checks did not run.\n' +
+      'Only Markdown files changed, so the Nix-image linters and the shell suites did not run.\n',
+    stderr: '',
+  });
+
+  expect(output).toBe('provider=false\nfull=false\n');
+
+  expect(summary).toBe(
+    'No input of the provider checks changed, so the Go checks did not run.\n' +
+      'Only Markdown files changed, so the Nix-image linters and the shell suites did not run.\n',
+  );
 });
