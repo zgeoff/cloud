@@ -2,9 +2,10 @@
 # Test for decide-prod-apply.sh: against a real git repository in the case tree, with origin/main
 # and the deployed/prod tag set by each case, and a gh stand-in for find-ci-run.sh
 # (test-support/shell/create-stub-gh.sh) that replays the runs each case records, it decides
-# whether a CI run's commit or a dispatched main tip needs the prod apply, writes the decision to
-# the step output file, says in the step summary when nothing applies, and refuses a dispatch off main's tip, a dispatch with
-# no green CI run, a commit off main, a missing tag and a tag that has left main. Each case runs
+# whether a CI run's commit or a dispatched main tip needs the prod apply, each of two merges that
+# land minutes apart included, writes the decision to the step output file, says in the step
+# summary when nothing applies, and refuses a dispatch off main's tip, a dispatch with no green CI
+# run, a commit off main, a missing tag and a tag that has left main. Each case runs
 # the script under `env -i` with git's global and system config off, and compares its whole
 # stdout, stderr, step output, step summary and gh call log.
 #
@@ -62,11 +63,12 @@ EOF
 }
 
 it_decides_no_apply_and_says_so_when_no_pulumi_input_changed() {
-  local head status=0
+  local deployed head status=0
   tree="$(mktemp -d)"
   trap 'rm -rf "$tree"' EXIT
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
+  deployed="$(git -C "$tree/repo" rev-parse HEAD)"
   mkdir "$tree/repo/docs"
   echo 'notes' > "$tree/repo/docs/notes.md"
   git -C "$tree/repo" add -A
@@ -80,13 +82,95 @@ it_decides_no_apply_and_says_so_when_no_pulumi_input_changed() {
     EVENT=workflow_run RUN_HEAD="$head" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" <<< 'No Pulumi input changed since deployed/prod, so nothing applied.'
+  diff - "$tree/out" <<< "No commit after deployed/prod at $deployed up to $head changes a Pulumi input, so nothing applied."
   diff /dev/null "$tree/err"
   diff - "$tree/output" << EOF
 apply=false
 revision=$head
 EOF
-  diff - "$tree/summary" <<< 'No Pulumi input changed since deployed/prod, so nothing applied.'
+  diff - "$tree/summary" <<< "No commit after deployed/prod at $deployed up to $head changes a Pulumi input, so nothing applied."
+  diff /dev/null "$tree/calls"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+# In the next two cases, two merges land minutes apart: the first changes only the host (nixos/),
+# the second bumps a pin in infra/Pulumi.prod.yaml. Each merge's CI run starts its own Deploy prod
+# run. GitHub gives both runs main's tip, the second merge, as their own head commit
+# (DISPATCH_SHA), and RUN_HEAD is the commit each CI run checked.
+it_decides_an_apply_of_a_pin_bump_that_merges_minutes_after_a_merge_with_no_pulumi_input() {
+  local bump status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/repo/infra" "$tree/repo/nixos"
+  echo 'example:imageTag: 1.0.0' > "$tree/repo/infra/Pulumi.prod.yaml"
+  echo '{ version = "1.0.0"; }' > "$tree/repo/nixos/agent.nix"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the program and the host'
+  git -C "$tree/repo" tag deployed/prod
+  echo '{ version = "2.0.0"; }' > "$tree/repo/nixos/agent.nix"
+  git -C "$tree/repo" commit -qam 'bump the host agent'
+  echo 'example:imageTag: 1.1.0' > "$tree/repo/infra/Pulumi.prod.yaml"
+  git -C "$tree/repo" commit -qam 'bump the image pin'
+  bump="$(git -C "$tree/repo" rev-parse HEAD)"
+  git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
+    EVENT=workflow_run RUN_HEAD="$bump" DISPATCH_REF=refs/heads/main DISPATCH_SHA="$bump" DISPATCH_REVISION= \
+    bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/output" << EOF
+apply=true
+revision=$bump
+EOF
+  diff /dev/null "$tree/summary"
+  diff /dev/null "$tree/calls"
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_decides_no_apply_for_the_earlier_merge_s_run_and_names_its_commit_while_main_holds_the_pin_bump() {
+  local deployed host bump status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir "$tree/repo/infra" "$tree/repo/nixos"
+  echo 'example:imageTag: 1.0.0' > "$tree/repo/infra/Pulumi.prod.yaml"
+  echo '{ version = "1.0.0"; }' > "$tree/repo/nixos/agent.nix"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the program and the host'
+  git -C "$tree/repo" tag deployed/prod
+  deployed="$(git -C "$tree/repo" rev-parse HEAD)"
+  echo '{ version = "2.0.0"; }' > "$tree/repo/nixos/agent.nix"
+  git -C "$tree/repo" commit -qam 'bump the host agent'
+  host="$(git -C "$tree/repo" rev-parse HEAD)"
+  echo 'example:imageTag: 1.1.0' > "$tree/repo/infra/Pulumi.prod.yaml"
+  git -C "$tree/repo" commit -qam 'bump the image pin'
+  bump="$(git -C "$tree/repo" rev-parse HEAD)"
+  git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
+    EVENT=workflow_run RUN_HEAD="$host" DISPATCH_REF=refs/heads/main DISPATCH_SHA="$bump" DISPATCH_REVISION= \
+    bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< "No commit after deployed/prod at $deployed up to $host changes a Pulumi input, so nothing applied."
+  diff /dev/null "$tree/err"
+  diff - "$tree/output" << EOF
+apply=false
+revision=$host
+EOF
+  diff - "$tree/summary" <<< "No commit after deployed/prod at $deployed up to $host changes a Pulumi input, so nothing applied."
   diff /dev/null "$tree/calls"
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2

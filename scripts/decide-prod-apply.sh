@@ -9,7 +9,9 @@
 # to main on that commit (find-ci-run.sh), and prints the run's URL. Any other event applies
 # RUN_HEAD, the commit the CI run checked. Either way the commit must be on origin/main.
 # needs-prod-apply.sh decides whether a Pulumi input changed since the deployed/prod tag; when none
-# did, it says so on stdout and in $GITHUB_STEP_SUMMARY. This job runs outside the deploy-prod
+# did, it says so on stdout and in $GITHUB_STEP_SUMMARY, naming the tag's commit and the revision,
+# because a workflow_run run's own head commit is main's tip when the run started, which can be a
+# later merge than the commit it decides on. This job runs outside the deploy-prod
 # queue, so another apply can move the tag after it reads it: the apply job decides again once it
 # holds the queue (decide-queued-prod-apply.sh). A "false" here stays true then, because the tag
 # only moves forward along main.
@@ -71,5 +73,6 @@ esac
   echo "revision=$revision"
 } >> "$GITHUB_OUTPUT"
 if [ "$apply" = false ]; then
-  echo "No Pulumi input changed since deployed/prod, so nothing applied." | tee -a "$GITHUB_STEP_SUMMARY"
+  echo "No commit after deployed/prod at $deployed up to $revision changes a Pulumi input, so nothing applied." |
+    tee -a "$GITHUB_STEP_SUMMARY"
 fi

@@ -6,6 +6,10 @@ name: Deploy prod
 # only when the guard passes the plan; then it checks drift again and moves the tag. A held plan
 # waits for a manual dispatch of this workflow on main, which applies whatever the guard found.
 # docs/runbooks/workflows.md covers a held run and the tag's first setting.
+# The run's name holds the commit it decides on: the CI run's commit, or a dispatch's revision. A
+# workflow_run run's own head commit is main's tip when the run starts, which can be a later merge
+# than the one whose CI run started it.
+run-name: Deploy prod ${{ github.event.workflow_run.head_sha || inputs.revision }}
 on:
   workflow_run:
     workflows: [CI]
