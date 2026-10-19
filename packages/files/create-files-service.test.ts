@@ -1,3 +1,4 @@
+import { Database } from 'bun:sqlite';
 import { expect, onTestFinished, test } from 'bun:test';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
@@ -287,7 +288,7 @@ test.each([
 
   expect(response.status).toBe(401);
 
-  expect(ctx.store.collectUploads({ includeExpired: true, now: ctx.clock.now })).toStrictEqual([
+  expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toStrictEqual([
     upload,
   ]);
 });
@@ -302,39 +303,102 @@ test.each([
   expect(response.status).toBe(401);
 });
 
-test('it refuses an agent upload that never expires with 403 and stores nothing', async () => {
-  const ctx = await setupTest();
+test.each([
+  ['an empty bearer token', 'Bearer '],
+  ['the token without its scheme', 'agent-token-5d2b'],
+  ['the scheme in lower case', 'bearer agent-token-5d2b'],
+  ['the Basic scheme', 'Basic agent-token-5d2b'],
+  ['two spaces after the scheme', 'Bearer  agent-token-5d2b'],
+  ['a trailing word', 'Bearer agent-token-5d2b owner-token-c81f'],
+  ['the token in upper case', 'Bearer AGENT-TOKEN-5D2B'],
+  ['a prefix of the token', 'Bearer agent-token-5d2'],
+  [
+    "the token's own hash",
+    'Bearer e9c367b075f26ffc9555ee6d427be042cc58fad7ff555a039d69ac460bf4810c',
+  ],
+])(
+  'it refuses an upload, a list, an info read, an expiry change and a removal with %s',
+  async (_name, authorization) => {
+    const ctx = await setupTest();
 
-  const response = await ctx.service.handle(
-    buildUploadRequest({
-      authorization: 'Bearer agent-token-5d2b',
-      file: new File(['bytes'], 'keep.png'),
-      fields: { expires: 'never' },
-    }),
-  );
+    const upload = buildMockUpload({ id: 'Own3rOwn3rOwn3rOwn3rOw', uploader: 'owner' });
 
-  expect(response.status).toBe(403);
+    ctx.store.writeUpload(upload);
 
-  const files = await readdir(join(ctx.dataDir, 'files'));
+    const form = new FormData();
 
-  expect(files).toBeEmpty();
-});
+    form.append('file', new File(['bytes'], 'new.png'));
 
-test('it refuses an agent upload that expires more than 30 days away with 403', async () => {
-  const ctx = await setupTest();
+    const expiry = JSON.stringify({ expires: 'never' });
 
-  ctx.clock.now = new Date('2026-05-01T12:00:00Z');
+    const responses = await Promise.all([
+      ctx.service.handle(
+        new Request('http://localhost/api/files', {
+          method: 'POST',
+          headers: { Authorization: authorization },
+          body: form,
+        }),
+      ),
+      ctx.service.handle(
+        new Request('http://localhost/api/files', { headers: { Authorization: authorization } }),
+      ),
+      ctx.service.handle(
+        new Request('http://localhost/api/files/Own3rOwn3rOwn3rOwn3rOw', {
+          headers: { Authorization: authorization },
+        }),
+      ),
+      ctx.service.handle(
+        new Request('http://localhost/api/files/Own3rOwn3rOwn3rOwn3rOw/expire', {
+          method: 'POST',
+          headers: { Authorization: authorization, 'Content-Type': 'application/json' },
+          body: expiry,
+        }),
+      ),
+      ctx.service.handle(
+        new Request('http://localhost/api/files/Own3rOwn3rOwn3rOwn3rOw', {
+          method: 'DELETE',
+          headers: { Authorization: authorization },
+        }),
+      ),
+    ]);
 
-  const response = await ctx.service.handle(
-    buildUploadRequest({
-      authorization: 'Bearer agent-token-5d2b',
-      file: new File(['bytes'], 'keep.png'),
-      fields: { expires: '2026-06-01' },
-    }),
-  );
+    expect(responses.map((response) => response.status)).toStrictEqual([401, 401, 401, 401, 401]);
 
-  expect(response.status).toBe(403);
-});
+    expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toStrictEqual([
+      upload,
+    ]);
+  },
+);
+
+test.each([
+  ['never'],
+  ['2026-06-01'],
+  ['2026-05-31T12:00:00.001Z'],
+  ['2026-05-31T22:00:00.001+10:00'],
+  ['2099-01-01'],
+])(
+  'it refuses an agent upload that expires at %s, past its limit, with 403 and stores nothing',
+  async (expires) => {
+    const ctx = await setupTest();
+
+    ctx.clock.now = new Date('2026-05-01T12:00:00Z');
+
+    const response = await ctx.service.handle(
+      buildUploadRequest({
+        authorization: 'Bearer agent-token-5d2b',
+        file: new File(['bytes'], 'keep.png'),
+        fields: { expires },
+      }),
+    );
+
+    expect(response.status).toBe(403);
+
+    const files = await readdir(join(ctx.dataDir, 'files'));
+
+    expect(files).toBeEmpty();
+    expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
+  },
+);
 
 test('it lets an agent upload expire in 30 days', async () => {
   const ctx = await setupTest();
@@ -620,24 +684,36 @@ test('it lets the owner token keep an agent upload forever', async () => {
   expect(ctx.store.findUpload('Ag3ntAg3ntAg3ntAg3ntAg')?.expiresAt).toBeNull();
 });
 
-test("it refuses the agent token's change of an expiry with 403", async () => {
-  const ctx = await setupTest();
+test.each([
+  ['7d', 'agent'],
+  ['30d', 'agent'],
+  ['2026-05-10', 'agent'],
+  ['never', 'agent'],
+  ['7d', 'owner'],
+  ['never', 'owner'],
+] as const)(
+  "it refuses the agent token's change to %s of an expiry on an %s upload with 403",
+  async (expires, uploader) => {
+    const ctx = await setupTest();
 
-  const upload = buildMockUpload({ id: 'Ag3ntAg3ntAg3ntAg3ntAg' });
+    ctx.clock.now = new Date('2026-05-01T12:00:00Z');
 
-  ctx.store.writeUpload(upload);
+    const upload = buildMockUpload({ id: 'Ag3ntAg3ntAg3ntAg3ntAg', uploader });
 
-  const response = await ctx.service.handle(
-    new Request('http://localhost/api/files/Ag3ntAg3ntAg3ntAg3ntAg/expire', {
-      method: 'POST',
-      headers: { Authorization: 'Bearer agent-token-5d2b', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ expires: '7d' }),
-    }),
-  );
+    ctx.store.writeUpload(upload);
 
-  expect(response.status).toBe(403);
-  expect(ctx.store.findUpload('Ag3ntAg3ntAg3ntAg3ntAg')).toStrictEqual(upload);
-});
+    const response = await ctx.service.handle(
+      new Request('http://localhost/api/files/Ag3ntAg3ntAg3ntAg3ntAg/expire', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer agent-token-5d2b', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ expires }),
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(ctx.store.findUpload('Ag3ntAg3ntAg3ntAg3ntAg')).toStrictEqual(upload);
+  },
+);
 
 test('it removes a file that a stopped run left half written', async () => {
   const ctx = await setupTest();
@@ -660,4 +736,95 @@ test('it removes a file that a stopped run left half written', async () => {
   const incoming = await readdir(join(ctx.dataDir, 'incoming'));
 
   expect(incoming).toBeEmpty();
+});
+
+test('it removes a file that a stopped run placed without its row, and keeps each file with a row', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.writeUpload(buildMockUpload({ id: 'Kept0Kept0Kept0Kept0Ke' }));
+
+  await writeFile(join(ctx.dataDir, 'files', 'Kept0Kept0Kept0Kept0Ke'), 'kept');
+  await writeFile(join(ctx.dataDir, 'files', 'Orph0Orph0Orph0Orph0Or'), 'orphan');
+
+  createFilesService({
+    store: ctx.store,
+    dataDir: ctx.dataDir,
+    tokenHashes: {
+      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
+    },
+    publicURL: 'https://files.example.com',
+    now: () => ctx.clock.now,
+    readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+  });
+
+  const files = await readdir(join(ctx.dataDir, 'files'));
+
+  expect(files).toStrictEqual(['Kept0Kept0Kept0Kept0Ke']);
+});
+
+test('it answers 500 and leaves no staged file and no row when the move into place fails', async () => {
+  const ctx = await setupTest();
+
+  await rm(join(ctx.dataDir, 'files'), { recursive: true });
+  await writeFile(join(ctx.dataDir, 'files'), 'a file where the directory was');
+
+  const response = await ctx.service.handle(
+    buildUploadRequest({
+      authorization: 'Bearer agent-token-5d2b',
+      file: new File(['bytes'], 'shot.png'),
+    }),
+  );
+
+  expect(response.status).toBe(500);
+
+  const incoming = await readdir(join(ctx.dataDir, 'incoming'));
+
+  expect(incoming).toBeEmpty();
+  expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
+});
+
+test('it answers 507 and removes the placed file when the metadata write finds the database full', async () => {
+  const ctx = await setupTest();
+
+  const full = new Database(':memory:');
+
+  onTestFinished(() => {
+    full.close();
+  });
+
+  full.run('CREATE TABLE notes (body TEXT)');
+  full.run('PRAGMA max_page_count = 2');
+
+  const insert = full.query('INSERT INTO notes VALUES (?1)');
+
+  const service = createFilesService({
+    store: {
+      ...ctx.store,
+      writeUpload: () => {
+        insert.run('n'.repeat(20_000));
+      },
+    },
+    dataDir: ctx.dataDir,
+    tokenHashes: {
+      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
+    },
+    publicURL: 'https://files.example.com',
+    now: () => ctx.clock.now,
+    readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+  });
+
+  const response = await service.handle(
+    buildUploadRequest({
+      authorization: 'Bearer agent-token-5d2b',
+      file: new File(['bytes'], 'shot.png'),
+    }),
+  );
+
+  expect(response.status).toBe(507);
+
+  const files = await readdir(join(ctx.dataDir, 'files'));
+
+  expect(files).toBeEmpty();
 });

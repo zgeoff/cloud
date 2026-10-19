@@ -7,6 +7,7 @@ import { decideExpiry } from './decide-expiry.ts';
 import { filesContract } from './files-contract.ts';
 import type { UploadOutput } from './files-contract.ts';
 import { isSafeFilename } from './is-safe-filename.ts';
+import { isStorageFullError } from './is-storage-full-error.ts';
 import { mintFileID } from './mint-file-id.ts';
 import { pickContentType, sniffLength } from './pick-content-type.ts';
 import type { Role, Upload } from './types.ts';
@@ -69,7 +70,9 @@ export function buildFilesRouter(inputs: FilesRouterInputs) {
         throw new ORPCError('INSUFFICIENT_STORAGE', { status: 507, message: 'the volume is full' });
       }
 
-      const written = await writeFile(input.file, inputs);
+      const written = await writeFile(input.file, inputs).catch((error: unknown) => {
+        throw toUploadError(error);
+      });
 
       const upload = {
         ...written,
@@ -81,12 +84,18 @@ export function buildFilesRouter(inputs: FilesRouterInputs) {
         expiresAt,
       };
 
-      inputs.store.writeUpload(upload);
+      try {
+        inputs.store.writeUpload(upload);
+      } catch (error) {
+        // a file without a row is one that nothing lists or sweeps, so it goes with the row
+        rmSync(join(inputs.filesDir, written.id), { force: true });
+        throw toUploadError(error);
+      }
 
       return buildUploadOutput(upload, inputs.publicURL);
     }),
     list: os.list.handler((options) => {
-      const uploads = inputs.store.collectUploads({
+      const uploads = inputs.store.readUploads({
         ...(options.context.role === 'agent' ? { uploader: 'agent' as const } : {}),
         includeExpired: options.input.includeExpired ?? false,
         now: inputs.now(),
@@ -192,6 +201,18 @@ async function writeFile(
 
     throw error;
   }
+}
+
+// 507 when the volume or the database ran out of room during the write, as for the free-space
+// check that two concurrent uploads can both pass; any other failure as it is
+function toUploadError(error: unknown): unknown {
+  return isStorageFullError(error)
+    ? new ORPCError('INSUFFICIENT_STORAGE', {
+        status: 507,
+        message: 'the volume is full',
+        cause: error,
+      })
+    : error;
 }
 
 // an agent never sees an owner upload, so it is not found rather than refused

@@ -14,13 +14,40 @@ export interface UploadStore {
 
   // the uploads, newest first, of one uploader or of every uploader, with or without the ones
   // that expired at now but the sweep has not removed yet
-  readonly collectUploads: (filter: UploadFilter) => readonly Upload[];
+  readonly readUploads: (filter: UploadFilter) => readonly Upload[];
   readonly updateExpiry: (id: string, expiresAt: Date | null) => void;
   readonly removeUpload: (id: string) => void;
 
   // the ids of the uploads whose expiry is before now, for the sweep
-  readonly collectExpiredIDs: (now: Date) => readonly string[];
+  readonly readExpiredIDs: (now: Date) => readonly string[];
   readonly close: () => void;
+}
+
+// STRICT, so a wrong type fails the write instead of being stored
+const schema = `CREATE TABLE IF NOT EXISTS uploads (
+  id TEXT PRIMARY KEY,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  sha256 TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  uploader TEXT NOT NULL CHECK (uploader IN ('agent', 'owner')),
+  label TEXT,
+  link TEXT,
+  expires_at INTEGER
+) STRICT`;
+
+interface UploadRow {
+  readonly id: string;
+  readonly filename: string;
+  readonly content_type: string;
+  readonly size: number;
+  readonly sha256: string;
+  readonly created_at: number;
+  readonly uploader: Role;
+  readonly label: string | null;
+  readonly link: string | null;
+  readonly expires_at: number | null;
 }
 
 // The metadata file on the volume beside the files: one row per upload, with times in
@@ -67,45 +94,18 @@ export function createUploadStore(path: string): UploadStore {
 
       return row === null ? null : toUpload(row);
     },
-    collectUploads: (filter) => collectUploads(db, filter),
+    readUploads: (filter) => readUploads(db, filter),
     updateExpiry: (id, expiresAt) => {
       updateExpiry.run(id, expiresAt?.getTime() ?? null);
     },
     removeUpload: (id) => {
       remove.run(id);
     },
-    collectExpiredIDs: (now) => selectExpired.all(now.getTime()).map((row) => row.id),
+    readExpiredIDs: (now) => selectExpired.all(now.getTime()).map((row) => row.id),
     close: () => {
       db.close();
     },
   };
-}
-
-// STRICT, so a wrong type fails the write instead of being stored
-const schema = `CREATE TABLE IF NOT EXISTS uploads (
-  id TEXT PRIMARY KEY,
-  filename TEXT NOT NULL,
-  content_type TEXT NOT NULL,
-  size INTEGER NOT NULL,
-  sha256 TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  uploader TEXT NOT NULL CHECK (uploader IN ('agent', 'owner')),
-  label TEXT,
-  link TEXT,
-  expires_at INTEGER
-) STRICT`;
-
-interface UploadRow {
-  readonly id: string;
-  readonly filename: string;
-  readonly content_type: string;
-  readonly size: number;
-  readonly sha256: string;
-  readonly created_at: number;
-  readonly uploader: Role;
-  readonly label: string | null;
-  readonly link: string | null;
-  readonly expires_at: number | null;
 }
 
 function toUpload(row: UploadRow): Upload {
@@ -124,7 +124,7 @@ function toUpload(row: UploadRow): Upload {
 }
 
 // id breaks a tie between two uploads made in the same millisecond
-function collectUploads(db: Database, filter: UploadFilter): readonly Upload[] {
+function readUploads(db: Database, filter: UploadFilter): readonly Upload[] {
   const includeExpired = filter.includeExpired ? 1 : 0;
 
   const rows = db

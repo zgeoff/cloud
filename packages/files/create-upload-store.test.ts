@@ -83,7 +83,7 @@ test('it lists one uploader newest first, and leaves out an expired upload', asy
   }
 
   expect(
-    ctx.store.collectUploads({
+    ctx.store.readUploads({
       uploader: 'agent',
       includeExpired: false,
       now: new Date('2026-05-03T00:00:00Z'),
@@ -110,7 +110,7 @@ test('it lists every uploader and the expired uploads when asked', async () => {
   ctx.store.writeUpload(owner);
 
   expect(
-    ctx.store.collectUploads({ includeExpired: true, now: new Date('2026-05-03T00:00:00Z') }),
+    ctx.store.readUploads({ includeExpired: true, now: new Date('2026-05-03T00:00:00Z') }),
   ).toStrictEqual([owner, agent]);
 });
 
@@ -131,7 +131,7 @@ test('it breaks a tie in creation time by id', async () => {
   ctx.store.writeUpload(second);
 
   expect(
-    ctx.store.collectUploads({ includeExpired: true, now: new Date('2026-05-01') }),
+    ctx.store.readUploads({ includeExpired: true, now: new Date('2026-05-01') }),
   ).toStrictEqual([second, first]);
 });
 
@@ -170,7 +170,7 @@ test('it collects only the ids whose expiry is before now', async () => {
 
   ctx.store.writeUpload(buildMockUpload({ id: 'never0never0never0neve', expiresAt: null }));
 
-  expect(ctx.store.collectExpiredIDs(new Date('2026-05-03T00:00:00Z'))).toStrictEqual([
+  expect(ctx.store.readExpiredIDs(new Date('2026-05-03T00:00:00Z'))).toStrictEqual([
     'past00past00past00past',
   ]);
 });
