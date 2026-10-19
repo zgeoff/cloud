@@ -2,12 +2,12 @@ import type { Output } from '@pulumi/pulumi';
 import { buildATCTunnelIngresses } from './build-atc-tunnel-ingresses.ts';
 import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
-import type { OriginAccess, TunnelIngress, TunnelRoute } from './build-tunnel-ingresses.ts';
+import type { OriginAccess, TunnelIngress } from './build-tunnel-ingresses.ts';
 
-// the atc gateway's route, the Access application in front of its sign-in pages, and the atc
-// tunnel, whose connector runs in the gateway's pod
+// the atc gateway's public host, the Access application in front of its sign-in pages, and the
+// atc tunnel, whose connector runs in the gateway's pod and reaches it on loopback
 export interface GatewayIngress {
-  readonly route: TunnelRoute;
+  readonly hostname: string;
   readonly access: OriginAccess;
   readonly tunnelID: Output<string>;
 }
@@ -39,8 +39,8 @@ export function buildTunnelRouteSpecs(
       ? {}
       : {
           atc: {
-            ingresses: buildATCTunnelIngresses(gateway.route.hostname, gateway.access),
-            record: { hostname: gateway.route.hostname, tunnelID: gateway.tunnelID },
+            ingresses: buildATCTunnelIngresses(gateway.hostname, gateway.access),
+            record: { hostname: gateway.hostname, tunnelID: gateway.tunnelID },
           },
         }),
   };

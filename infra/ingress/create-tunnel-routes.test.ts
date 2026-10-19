@@ -19,10 +19,7 @@ test("it renders the gateway's loopback rules on the atc tunnel and points its C
     zoneID: output('zone'),
     tunnelID: output('shared-tunnel'),
     gateway: {
-      route: {
-        hostname: 'atc.geoff.cloud',
-        service: 'http://atc-gateway.atc.svc.cluster.local:8414',
-      },
+      hostname: 'atc.geoff.cloud',
       access: { teamName: output('example-team'), audience: output('0123456789abcdef') },
       tunnelID: output('atc-tunnel'),
     },
@@ -82,10 +79,7 @@ test("it registers the shared tunnel's rules only after the gateway's CNAME", as
     zoneID: output('zone'),
     tunnelID: output('shared-tunnel'),
     gateway: {
-      route: {
-        hostname: 'atc.geoff.cloud',
-        service: 'http://atc-gateway.atc.svc.cluster.local:8414',
-      },
+      hostname: 'atc.geoff.cloud',
       access: { teamName: output('example-team'), audience: output('0123456789abcdef') },
       tunnelID: output('atc-tunnel'),
     },
@@ -115,10 +109,7 @@ test("it holds the shared tunnel's rules while the gateway's CNAME is still regi
     zoneID: output('zone'),
     tunnelID: output('shared-tunnel'),
     gateway: {
-      route: {
-        hostname: 'atc.geoff.cloud',
-        service: 'http://atc-gateway.atc.svc.cluster.local:8414',
-      },
+      hostname: 'atc.geoff.cloud',
       access: { teamName: output('example-team'), audience: output('0123456789abcdef') },
       tunnelID: output('atc-tunnel'),
     },

@@ -10,10 +10,7 @@ test("it points the gateway's CNAME at the atc tunnel and leaves the shared tunn
 
   expect(
     buildTunnelRouteSpecs(sharedTunnelID, {
-      route: {
-        hostname: 'atc.geoff.cloud',
-        service: output('http://atc-gateway.atc.svc.cluster.local:8414'),
-      },
+      hostname: 'atc.geoff.cloud',
       access: { teamName, audience },
       tunnelID: atcTunnelID,
     }),

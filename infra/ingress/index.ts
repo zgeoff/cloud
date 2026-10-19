@@ -107,7 +107,7 @@ function createGatewayIngress(inputs: IngressInputs): GatewayIngress | undefined
   }
 
   return {
-    route: atcRoute,
+    hostname: atcRoute.hostname,
     tunnelID: atcTunnel.tunnelID,
     access: createGatewayAccess({
       accountID: inputs.accountID,
