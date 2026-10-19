@@ -9,9 +9,6 @@ interface PodLogsPipelineOptions {
   forwardTo: string;
 }
 
-// Alloy's pipeline for every pod's logs: it reads each container's log files under podLogRoot, as
-// the kubelet writes them in the CRI format, and forwards each line to forwardTo labelled with its
-// namespace, pod, container, job and instance.
 export function buildPodLogsPipeline(options: PodLogsPipelineOptions): string {
   return `
 discovery.relabel "pods" {

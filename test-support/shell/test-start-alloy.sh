@@ -64,6 +64,43 @@ it_runs_alloy_as_uid_65532_on_a_read_only_root_with_no_capabilities() {
   curl -fsS -o /dev/null "$(cat "$tree/alloy/url")/-/ready"
 }
 
+it_resumes_from_the_read_positions_an_earlier_start_kept_in_the_same_storage_volume() {
+  tree="$(mktemp -d)"
+  volume="alloy-storage-$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
+  trap 'docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" "$(cat "$tree/alloy-again/container" 2> /dev/null)" > /dev/null 2>&1 || true; docker volume rm "$volume" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree"
+  mkdir "$tree/alloy-again"
+  cat > "$tree/config/config.alloy" << 'EOF'
+loki.source.file "case" {
+  targets = [{__path__ = "/logs/*.log"}]
+  file_match {
+    enabled = true
+  }
+  forward_to = [loki.process.case.receiver]
+}
+
+loki.process "case" {
+  forward_to = []
+  stage.metrics {
+    metric.counter {
+      name      = "case_lines_total"
+      match_all = true
+      action    = "inc"
+    }
+  }
+}
+EOF
+  printf '%s\n' 'first' 'second' > "$tree/logs/case.log"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume"
+  wait_for 30 "Alloy to count both lines" has_metric "$(cat "$tree/alloy/url")" '^loki_process_custom_case_lines_total{.*} 2$'
+  docker stop "$(cat "$tree/alloy/container")" > /dev/null
+  printf '%s\n' 'third' >> "$tree/logs/case.log"
+
+  start_alloy "$tree/alloy-again" "$tree/config" "$tree/logs" "$volume"
+
+  wait_for 30 "Alloy to count the third line" has_metric "$(cat "$tree/alloy-again/url")" '^loki_process_custom_case_lines_total{.*} 1$'
+}
+
 setup_test() {
   mkdir "$1/alloy" "$1/config" "$1/logs"
 }
