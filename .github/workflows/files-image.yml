@@ -1,0 +1,85 @@
+name: files image
+
+# Builds the files service's image and runs its image test on every change to the service or the
+# image. Only a push to main publishes, as ghcr.io/zgeoff/cloud-files:<commit>; a pull request
+# never does. Pin a published digest in the stack config's files.image to deploy it.
+on:
+  push:
+    branches: [main]
+    paths:
+      - packages/files/**
+      - images/files/**
+      - images/atc-gateway/versions.env
+      - scripts/write-files-image-context.sh
+      - scripts/publish-files-image.sh
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - bun.lock
+      - .bun-version
+      - .github/workflows/files-image.yml
+  pull_request:
+    paths:
+      - packages/files/**
+      - images/files/**
+      - images/atc-gateway/versions.env
+      - scripts/write-files-image-context.sh
+      - scripts/publish-files-image.sh
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - bun.lock
+      - .bun-version
+      - .github/workflows/files-image.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Image test
+        run: bun run test:files-image
+
+  publish:
+    needs: [check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # one publish at a time; each commit's tag is its own, so a later push never replaces an earlier
+    concurrency:
+      group: files-image-publish
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Write the build context
+        run: bun run ci:write-files-image-context context-files
+
+      - name: Build and push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run ci:publish-files-image context-files

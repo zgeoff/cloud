@@ -32,7 +32,7 @@ packages/preview/  the preview service: one tailnet link per pull request, runni
 packages/files/    the file drop at files.geoff.cloud: token-gated uploads, public reads by an
                    unguessable ID, and expiry
 workers/           Cloudflare Workers: the external health check
-images/            container images: the agent image and the atc gateway
+images/            container images: the agent image, the atc gateway and the files service
 nixos/             the host flake
 deploy/            the manifests and config of the workloads the cluster runs, such as nixie
 scripts/           repo tooling, run through the root package.json scripts
