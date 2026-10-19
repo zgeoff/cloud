@@ -15,7 +15,7 @@ interface ExpirySweepSchedule {
 }
 
 // Runs the expiry sweep once now, then every sweepIntervalMs, and returns the function that stops
-// the schedule. Each run prints how many uploads it removed.
+// the schedule.
 export function startExpirySweep(inputs: ExpirySweepSchedule): () => void {
   const run = (): void => {
     const removed = runExpirySweep({
