@@ -150,6 +150,31 @@
                 "importNames": ["Config"],
                 "allowTypeImports": true,
                 "message": "only infra/index.ts builds Config, once; take each value from loadInputs (infra/inputs/)"
+              },
+              {
+                "name": "@pulumi/kubernetes/core/v1",
+                "importNames": ["Namespace", "NamespacePatch"],
+                "allowTypeImports": true,
+                "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // the two modules that declare a namespace, each through buildNamespaceMetadata
+      "files": ["infra/shared/create-namespace.ts", "infra/shared/create-k3s-namespace-patches.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@pulumi/pulumi",
+                "importNames": ["Config"],
+                "allowTypeImports": true,
+                "message": "only infra/index.ts builds Config, once; take each value from loadInputs (infra/inputs/)"
               }
             ]
           }

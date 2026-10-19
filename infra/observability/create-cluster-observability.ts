@@ -1,9 +1,10 @@
 import type { Provider } from '@pulumi/kubernetes';
-import { Namespace } from '@pulumi/kubernetes/core/v1';
+import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 import { topology } from '@zgeoff/cloud-topology';
+import { createNamespace } from '../shared/create-namespace.ts';
 import { alloyChart } from './alloy-chart.ts';
 import { alloyValues } from './alloy-values.ts';
 import type { AlertRuleInputs } from './build-alert-rules.ts';
@@ -32,8 +33,8 @@ export function createClusterObservability(
   monitors: AlertRuleInputs,
 ): ClusterObservabilityOutputs {
   const opts = { provider: cluster };
+  const ns = createNamespace(observabilityNamespace, cluster);
 
-  const ns = new Namespace('observability', { metadata: { name: observabilityNamespace } }, opts);
   const adminPassword = new RandomPassword('grafana-admin', { length: 32, special: false });
 
   const metrics = createMetrics(

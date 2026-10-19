@@ -1,18 +1,15 @@
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
-import { Namespace, Secret } from '@pulumi/kubernetes/core/v1';
+import { Secret } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
+import { createNamespace } from '../shared/create-namespace.ts';
 import { buildCloudflaredSpec } from './build-cloudflared-spec.ts';
 import { cloudflaredNames } from './cloudflared-names.ts';
 
 // The tunnel for every public hostname under geoff.cloud. The routes live in Cloudflare
 // (ZeroTrustTunnelCloudflaredConfig), so this needs only the token.
 export function createCloudflared(cluster: Provider, tunnelToken: Output<string>): Deployment {
-  const ingress = new Namespace(
-    'ingress',
-    { metadata: { name: cloudflaredNames.namespace } },
-    { provider: cluster },
-  );
+  const ingress = createNamespace(cloudflaredNames.namespace, cluster);
 
   const token = new Secret(
     'cloudflared-token',

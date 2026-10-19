@@ -1,16 +1,11 @@
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';
-import {
-  ConfigMap,
-  Namespace,
-  PersistentVolumeClaim,
-  Secret,
-  Service,
-} from '@pulumi/kubernetes/core/v1';
+import { ConfigMap, PersistentVolumeClaim, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import { StorageClass } from '@pulumi/kubernetes/storage/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { ATCGatewayInputs } from '../inputs/index.ts';
+import { createNamespace } from '../shared/create-namespace.ts';
 import { buildATCGatewayRegistry } from './build-atc-gateway-registry.ts';
 import {
   atcGatewayLabels,
@@ -35,7 +30,8 @@ export interface ATCGatewayOutputs {
 }
 
 export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): ATCGatewayOutputs {
-  const ns = new Namespace('atc', { metadata: { name: 'atc' } }, { provider: cluster });
+  const ns = createNamespace('atc', cluster);
+
   const publicHost = new URL(inputs.config.publicURL).host;
 
   const claim = createStateVolume(cluster, ns.metadata.name);
