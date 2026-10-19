@@ -39,7 +39,8 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
           record: createRecord('atc', inputs.zoneID, specs.atc.record),
         };
 
-  // after the gateway's CNAME, so a hostname the shared tunnel drops already points elsewhere
+  // after the gateway's CNAME, so a hostname the shared tunnel drops already points elsewhere; a
+  // failed CNAME update stops the apply before the shared tunnel drops the gateway's rules
   const config = new ZeroTrustTunnelCloudflaredConfig(
     'edge',
     {
