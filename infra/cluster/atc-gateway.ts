@@ -29,13 +29,18 @@ export interface ATCGatewayOutputs {
   readonly publicHost: string;
 }
 
-export function createATCGateway(cluster: Provider, inputs: ATCGatewayInputs): ATCGatewayOutputs {
+// tunnelToken is the atc tunnel's token, which the gateway pod's cloudflared sidecar runs with
+export function createATCGateway(
+  cluster: Provider,
+  inputs: ATCGatewayInputs,
+  tunnelToken: Output<string>,
+): ATCGatewayOutputs {
   const ns = createNamespace('atc', cluster);
 
   const publicHost = new URL(inputs.config.publicURL).host;
 
   const claim = createStateVolume(cluster, ns.metadata.name);
-  const objects = createConfigObjects(cluster, ns.metadata.name, inputs);
+  const objects = createConfigObjects(cluster, ns.metadata.name, inputs, tunnelToken);
 
   createDeployment(
     cluster,
@@ -120,10 +125,12 @@ function createConfigObjects(
   cluster: Provider,
   namespace: Output<string>,
   inputs: ATCGatewayInputs,
+  tunnelToken: Output<string>,
 ): {
   readonly tokens: Output<string>;
   readonly registry: Output<string>;
   readonly pullSecret: Output<string>;
+  readonly tunnelToken: Output<string>;
 } {
   const tokens = new Secret(
     'atc-gateway-daemon-tokens',
@@ -157,9 +164,17 @@ function createConfigObjects(
     credential: inputs.secrets.pullCredential,
   });
 
+  // no fixed name, for the same reason as the daemon tokens: cloudflared reads it only at start
+  const tunnel = new Secret(
+    'atc-tunnel-token',
+    { metadata: { namespace }, stringData: { token: tunnelToken } },
+    { provider: cluster },
+  );
+
   return {
     tokens: tokens.metadata.name,
     registry: registry.metadata.name,
     pullSecret: pull.metadata.name,
+    tunnelToken: tunnel.metadata.name,
   };
 }

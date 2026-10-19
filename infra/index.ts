@@ -1,9 +1,9 @@
 // the program's entry point: it reads the inputs once and wires each group through its entry module
 import { Provider } from '@pulumi/kubernetes';
 import { Config } from '@pulumi/pulumi';
-import { createCluster } from './cluster/index.ts';
+import { createCluster, registerPortForwardGuard } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
-import { createIngress } from './ingress/index.ts';
+import { createATCTunnel, createIngress } from './ingress/index.ts';
 import { buildATCDaemonEndpoints, loadInputs } from './inputs/index.ts';
 import { createObservability } from './observability/index.ts';
 import { createTailnet } from './tailnet/index.ts';
@@ -11,6 +11,10 @@ import { createTailnet } from './tailnet/index.ts';
 // The one place the program reads its stack config and env (.env's op:// refs, through `op
 // run`); every value is checked before any resource registers.
 const inputs = loadInputs(new Config(), process.env);
+
+// before the first resource, so the guard sees every RBAC object the program and its charts declare
+registerPortForwardGuard();
+
 const accountID = inputs.accountID;
 const edge = createEdge({ accountID, hostOnTailnet: inputs.hostOnTailnet });
 
@@ -37,11 +41,18 @@ const k3s =
         provider: new Provider('geoffcloud', { kubeconfig: inputs.cluster.kubeconfig }),
       };
 
+// the atc tunnel's connector runs in the gateway's pod, so the tunnel comes before the cluster
+const atcTunnel = k3s?.inputs.atcGateway === undefined ? undefined : createATCTunnel(accountID);
+
 const workloads =
   k3s === undefined
     ? undefined
     : createCluster(k3s.provider, {
-        ...(k3s.inputs.atcGateway === undefined ? {} : { atcGateway: k3s.inputs.atcGateway }),
+        ...(k3s.inputs.atcGateway === undefined || atcTunnel === undefined
+          ? {}
+          : {
+              atcGateway: { inputs: k3s.inputs.atcGateway, tunnelToken: atcTunnel.tunnelToken },
+            }),
         onePasswordConnect: {
           credentials: k3s.inputs.onePasswordConnectCredentials,
         },
@@ -55,10 +66,12 @@ const ingress = createIngress({
   cluster: k3s?.provider,
   atcRoute: workloads?.atcGatewayRoute,
   atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
+  atcTunnel,
 });
 
 export const tunnelToken = ingress.tunnelToken;
 export const tunnelConfigVersion = ingress.tunnelConfigVersion;
+export const atcTunnelConfigVersion = ingress.atcTunnelConfigVersion;
 export const atcURL = ingress.atcURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;

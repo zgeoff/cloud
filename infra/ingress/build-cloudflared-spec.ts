@@ -1,9 +1,7 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { cloudflaredImage } from '../shared/cloudflared-image.ts';
 import { cloudflaredNames } from './cloudflared-names.ts';
-
-// cloudflared's release; bump deliberately
-const cloudflaredImage = 'cloudflare/cloudflared:2026.9.3';
 
 // cloudflared's Deployment spec: two replicas, the tunnel token from tokenSecret, and
 // Prometheus metrics on its metrics port, which the cloudflared PodMonitor

@@ -115,10 +115,12 @@ They stay in the event line in Loki, where the owner reads them in Grafana over 
 
 An alert holds no source address. Anyone can send the `CF-Connecting-IP` header, and the contract
 marks its value `trusted` only when the request came from a proxy that atc lists. atc matches each
-listed proxy against the socket's exact address, and cloudflared reaches the gateway from a pod
-address that changes whenever its pod restarts. So the stack config lists no proxy for the gateway,
-and every forwarded address arrives `unverified`. Alloy treats every forwarded address alike, a
-`trusted` one included: none becomes a label, so a spoofed header changes no alert.
+listed proxy against the socket's exact address, so the stack config lists the loopback address
+alone, where the atc tunnel's sidecar reaches the gateway
+([the atc tunnel](../network/public-ingress.md#the-atc-tunnel)). A request through the shared
+tunnel, or from any other pod, arrives from a pod address, so its forwarded address arrives
+`unverified`. Alloy treats every forwarded address alike, a `trusted` one included: none becomes a
+label, so a spoofed header changes no alert.
 
 | Category                     | Event                          | Severity |
 | ---------------------------- | ------------------------------ | -------- |

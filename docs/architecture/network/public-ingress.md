@@ -1,9 +1,9 @@
 # Public ingress
 
-The estate has one way in from the internet: a Cloudflare tunnel that cloudflared holds open from
-inside the cluster. The host opens no inbound port for it, so a public route exists only as a rule
-in the tunnel's configuration and a DNS record that points at the tunnel, and Pulumi declares both.
-Each workload behind the tunnel brings its own authentication. The tunnel has two routes:
+The estate has one way in from the internet: Cloudflare tunnels that cloudflared holds open from
+inside the cluster. The host opens no inbound port for them, so a public route exists only as a rule
+in a tunnel's configuration and a DNS record that points at that tunnel, and Pulumi declares both.
+Each workload behind a tunnel brings its own authentication. The shared tunnel has two routes:
 `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server, and
 `preview-webhook.geoff.cloud`, the preview service's webhook listener, which checks the signature of
 every GitHub delivery. Cloudflare Access adds an owner-only login in front of the gateway's sign-in
@@ -12,11 +12,11 @@ pages, and nowhere else. [The atc gateway](../workloads/atc-gateway.md) and
 
 ## The tunnel
 
-cloudflared runs in k3s, in its own namespace, as two replicas that each hold connections to
-Cloudflare's edge with the tunnel's token. The tunnel serves while either replica is connected, so
-one replica's restart drops no traffic. The tunnel takes its routes from Cloudflare rather than from
-a file in the cluster, so a route change is a Pulumi change to the tunnel's configuration, and
-cloudflared picks it up with no redeploy.
+The shared tunnel's cloudflared runs in k3s, in its own namespace, as two replicas that each hold
+connections to Cloudflare's edge with the tunnel's token. The tunnel serves while either replica is
+connected, so one replica's restart drops no traffic. The tunnel takes its routes from Cloudflare
+rather than from a file in the cluster, so a route change is a Pulumi change to the tunnel's
+configuration, and cloudflared picks it up with no redeploy.
 
 The tunnel's configuration is an ordered list, and cloudflared takes the first rule that matches.
 The list holds two rules for the gateway's hostname, both routed to the gateway's Service in the
@@ -33,6 +33,22 @@ never to the host.
 cloudflared passes the request's own host header through to the gateway. The gateway answers only
 requests addressed to its public host or to loopback, so a request that reached its Service by any
 other name gets a 403.
+
+### The atc tunnel
+
+A second tunnel exists for the gateway's hostname alone, so that the gateway can tell a request that
+came through Cloudflare from one that did not. Its connector is a cloudflared sidecar in the
+gateway's pod, which reaches the gateway on the pod's loopback address instead of through the
+Service. Only a process inside the pod, or a port-forward to it, connects from loopback, so the
+gateway trusts the forwarded client address on a request from there and on no other
+([the gateway's security events](../workloads/observability.md#sign-in-alerts)). The atc tunnel's
+configuration holds the same two gateway rules and the same catch-all as the shared tunnel, with the
+pod's loopback as their origin, so the route boundary and the Access check are identical on both
+tunnels. The sidecar reads its token from a file that only it mounts.
+
+The gateway's hostname resolves to the shared tunnel, so the atc tunnel carries no traffic until the
+hostname's CNAME points at it. The sidecar keeps its metrics on loopback, where kubelet cannot probe
+them, so the external health check on the hostname is the atc tunnel's one monitor.
 
 ## HTTPS and the edge
 
@@ -107,6 +123,12 @@ host opens no public port to the cluster. Only the owner's tailnet reaches it ot
 with the k3s API over the tailnet can port-forward to the Service, and a process on the host can
 reach the Service's cluster address. That administrative path is trusted separately, through the
 tailnet policy, and the gateway still answers it only for its public host name.
+
+A port-forward reaches the gateway from the pod's loopback, the address the gateway trusts to set
+the forwarded client address, so whoever can open one can forge that address. The Pulumi program
+fails its preview on any Role, ClusterRole or binding that grants a port-forward, the Helm charts'
+rendered objects included. That leaves the k3s admin kubeconfig as the one holder, and it already
+controls the gateway's pod, Secrets and logs.
 
 ## Adding a route
 

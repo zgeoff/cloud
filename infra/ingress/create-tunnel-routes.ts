@@ -1,6 +1,7 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
 import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
+import { buildATCTunnelIngresses } from './build-atc-tunnel-ingresses.ts';
 import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
 import type { OriginAccess, TunnelRoute } from './build-tunnel-ingresses.ts';
@@ -15,14 +16,17 @@ interface TunnelRoutesInputs {
   readonly gateway?: GatewayIngress | undefined;
 }
 
-// the atc gateway's route and the Access application in front of its sign-in pages
+// the atc gateway's route, the Access application in front of its sign-in pages, and the atc
+// tunnel, whose connector runs in the gateway's pod
 export interface GatewayIngress {
   readonly route: TunnelRoute;
   readonly access: OriginAccess;
+  readonly tunnelID: Output<string>;
 }
 
 interface TunnelRoutesOutputs {
   readonly configVersion: Output<number>;
+  readonly atcConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
 
   // the payload URL each opted-in repository's webhook posts to
@@ -46,6 +50,16 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
     },
   });
 
+  // the atc tunnel's own rules, which serve no traffic until the gateway's CNAME points at it
+  const atcConfig =
+    gateway === undefined
+      ? undefined
+      : new ZeroTrustTunnelCloudflaredConfig('atc', {
+          accountId: inputs.accountID,
+          tunnelId: gateway.tunnelID,
+          config: { ingresses: buildATCTunnelIngresses(gateway.route.hostname, gateway.access) },
+        });
+
   const atc =
     gateway === undefined ? undefined : createRecord('atc', inputs, gateway.route.hostname);
 
@@ -53,6 +67,7 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
 
   return {
     configVersion: config.version,
+    ...(atcConfig === undefined ? {} : { atcConfigVersion: atcConfig.version }),
     ...(atc === undefined ? {} : { atcURL: toURL(atc) }),
     previewWebhookURL: toURL(previewWebhook).apply((url) => `${url}/webhook`),
   };

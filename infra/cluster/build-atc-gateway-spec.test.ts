@@ -3,11 +3,12 @@ import { output } from '@pulumi/pulumi';
 import { buildMockATCGatewayConfig } from '../test-utils/build-mock-atc-gateway-config.ts';
 import { buildATCGatewaySpec, buildATCPodSecurity } from './build-atc-gateway-spec.ts';
 
-test("#buildATCGatewaySpec keeps state in $HOME's state dir and trusts no proxy when the config sets no stateDir or trustForwardedFrom, passing the claim, tokens, registry and pull Secret through", () => {
+test("#buildATCGatewaySpec keeps state in $HOME's state dir and trusts no proxy when the config sets no stateDir or trustForwardedFrom, passing the claim, tokens, registry and pull Secret through and the tunnel's token to the cloudflared sidecar alone", () => {
   const claim = output('atc-gateway-state');
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
   const pullSecret = output('ghcr-pull');
+  const tunnelToken = output('atc-tunnel-token-8c9d0e1f');
 
   expect(
     buildATCGatewaySpec({
@@ -23,6 +24,7 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir and trusts no proxy 
       tokens,
       registry,
       pullSecret,
+      tunnelToken,
     }),
   ).toStrictEqual({
     replicas: 1,
@@ -92,6 +94,30 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir and trusts no proxy 
               capabilities: { drop: ['ALL'] },
             },
           },
+          {
+            name: 'cloudflared',
+            image: 'cloudflare/cloudflared:2026.9.3',
+            args: [
+              'tunnel',
+              '--no-autoupdate',
+              '--metrics',
+              '127.0.0.1:2000',
+              'run',
+              '--token-file',
+              '/etc/cloudflared/token',
+            ],
+            volumeMounts: [{ name: 'tunnel-token', mountPath: '/etc/cloudflared', readOnly: true }],
+            resources: {
+              requests: { cpu: '10m', memory: '32Mi' },
+              limits: { cpu: '200m', memory: '128Mi' },
+            },
+            securityContext: {
+              runAsNonRoot: true,
+              readOnlyRootFilesystem: true,
+              allowPrivilegeEscalation: false,
+              capabilities: { drop: ['ALL'] },
+            },
+          },
         ],
         volumes: [
           { name: 'state', persistentVolumeClaim: { claimName: claim } },
@@ -99,6 +125,7 @@ test("#buildATCGatewaySpec keeps state in $HOME's state dir and trusts no proxy 
           { name: 'runtime', emptyDir: { medium: 'Memory' } },
           { name: 'tmp', emptyDir: {} },
           { name: 'registry', configMap: { name: registry } },
+          { name: 'tunnel-token', secret: { secretName: tunnelToken, defaultMode: 0o440 } },
         ],
       },
     },
@@ -110,6 +137,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
   const pullSecret = output('ghcr-pull');
+  const tunnelToken = output('atc-tunnel-token-8c9d0e1f');
 
   expect(
     buildATCGatewaySpec({
@@ -125,6 +153,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
       tokens,
       registry,
       pullSecret,
+      tunnelToken,
     }),
   ).toStrictEqual({
     replicas: 1,
@@ -194,6 +223,30 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
               capabilities: { drop: ['ALL'] },
             },
           },
+          {
+            name: 'cloudflared',
+            image: 'cloudflare/cloudflared:2026.9.3',
+            args: [
+              'tunnel',
+              '--no-autoupdate',
+              '--metrics',
+              '127.0.0.1:2000',
+              'run',
+              '--token-file',
+              '/etc/cloudflared/token',
+            ],
+            volumeMounts: [{ name: 'tunnel-token', mountPath: '/etc/cloudflared', readOnly: true }],
+            resources: {
+              requests: { cpu: '10m', memory: '32Mi' },
+              limits: { cpu: '200m', memory: '128Mi' },
+            },
+            securityContext: {
+              runAsNonRoot: true,
+              readOnlyRootFilesystem: true,
+              allowPrivilegeEscalation: false,
+              capabilities: { drop: ['ALL'] },
+            },
+          },
         ],
         volumes: [
           { name: 'state', persistentVolumeClaim: { claimName: claim } },
@@ -201,6 +254,7 @@ test('#buildATCGatewaySpec mounts the state volume at the stateDir the config se
           { name: 'runtime', emptyDir: { medium: 'Memory' } },
           { name: 'tmp', emptyDir: {} },
           { name: 'registry', configMap: { name: registry } },
+          { name: 'tunnel-token', secret: { secretName: tunnelToken, defaultMode: 0o440 } },
         ],
       },
     },
@@ -212,6 +266,7 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
   const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
   const registry = output('atc-gateway-registry-4e5f6a7b');
   const pullSecret = output('ghcr-pull');
+  const tunnelToken = output('atc-tunnel-token-8c9d0e1f');
 
   expect(
     buildATCGatewaySpec({
@@ -227,6 +282,7 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
       tokens,
       registry,
       pullSecret,
+      tunnelToken,
     }),
   ).toStrictEqual({
     replicas: 1,
@@ -296,6 +352,30 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
               capabilities: { drop: ['ALL'] },
             },
           },
+          {
+            name: 'cloudflared',
+            image: 'cloudflare/cloudflared:2026.9.3',
+            args: [
+              'tunnel',
+              '--no-autoupdate',
+              '--metrics',
+              '127.0.0.1:2000',
+              'run',
+              '--token-file',
+              '/etc/cloudflared/token',
+            ],
+            volumeMounts: [{ name: 'tunnel-token', mountPath: '/etc/cloudflared', readOnly: true }],
+            resources: {
+              requests: { cpu: '10m', memory: '32Mi' },
+              limits: { cpu: '200m', memory: '128Mi' },
+            },
+            securityContext: {
+              runAsNonRoot: true,
+              readOnlyRootFilesystem: true,
+              allowPrivilegeEscalation: false,
+              capabilities: { drop: ['ALL'] },
+            },
+          },
         ],
         volumes: [
           { name: 'state', persistentVolumeClaim: { claimName: claim } },
@@ -303,6 +383,7 @@ test("#buildATCGatewaySpec sends the public host it is given, port included, as 
           { name: 'runtime', emptyDir: { medium: 'Memory' } },
           { name: 'tmp', emptyDir: {} },
           { name: 'registry', configMap: { name: registry } },
+          { name: 'tunnel-token', secret: { secretName: tunnelToken, defaultMode: 0o440 } },
         ],
       },
     },
@@ -323,6 +404,7 @@ test.each([
     const tokens = output('atc-gateway-daemon-tokens-0a1b2c3d');
     const registry = output('atc-gateway-registry-4e5f6a7b');
     const pullSecret = output('ghcr-pull');
+    const tunnelToken = output('atc-tunnel-token-8c9d0e1f');
 
     expect(
       buildATCGatewaySpec({
@@ -338,6 +420,7 @@ test.each([
         tokens,
         registry,
         pullSecret,
+        tunnelToken,
       }),
     ).toStrictEqual({
       replicas: 1,
@@ -408,6 +491,32 @@ test.each([
                 capabilities: { drop: ['ALL'] },
               },
             },
+            {
+              name: 'cloudflared',
+              image: 'cloudflare/cloudflared:2026.9.3',
+              args: [
+                'tunnel',
+                '--no-autoupdate',
+                '--metrics',
+                '127.0.0.1:2000',
+                'run',
+                '--token-file',
+                '/etc/cloudflared/token',
+              ],
+              volumeMounts: [
+                { name: 'tunnel-token', mountPath: '/etc/cloudflared', readOnly: true },
+              ],
+              resources: {
+                requests: { cpu: '10m', memory: '32Mi' },
+                limits: { cpu: '200m', memory: '128Mi' },
+              },
+              securityContext: {
+                runAsNonRoot: true,
+                readOnlyRootFilesystem: true,
+                allowPrivilegeEscalation: false,
+                capabilities: { drop: ['ALL'] },
+              },
+            },
           ],
           volumes: [
             { name: 'state', persistentVolumeClaim: { claimName: claim } },
@@ -415,6 +524,7 @@ test.each([
             { name: 'runtime', emptyDir: { medium: 'Memory' } },
             { name: 'tmp', emptyDir: {} },
             { name: 'registry', configMap: { name: registry } },
+            { name: 'tunnel-token', secret: { secretName: tunnelToken, defaultMode: 0o440 } },
           ],
         },
       },
