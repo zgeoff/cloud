@@ -220,10 +220,10 @@ changes, restore the matching database copy too (section 2).
 Follow [Recover a lost disk](./lost-disk.md). It holds three scenarios:
 
 - **Lose `vda`:** restore an Onidel snapshot, or reinstall with the key from the 1Password item
-  `zfs-tank-key` and both tailnet keys in `--extra-files`. Everything on the pool survives.
+  `zfs-tank-key` and the host's tailnet key in `--extra-files`. Everything on the pool survives.
 - **Lose `vdb`:** recreate the pool and its two encryption roots, install the host's secret files
-  from 1Password, start a new impd, add its secrets again, mint new tokens, restore the imps,
-  rebuild the cluster, and restore the gateway and nixie from restic.
+  from 1Password, start a new impd, restore the imps, add its secrets again, rebuild the agent
+  image, mint new tokens, rebuild the cluster, and restore the gateway and nixie from restic.
 - **Lose both:** reinstall, then follow the `vdb` steps.
 
 ## 5. Rebuild the cluster
