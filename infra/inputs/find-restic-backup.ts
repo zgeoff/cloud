@@ -1,15 +1,10 @@
 import type { Environment } from './types.ts';
 
-// A restic backup to R2 that one workload owns: its own password, its own R2 key and its own
-// bucket. The workload's .env variables share one prefix, such as ATC_GATEWAY or NIXIE.
 export interface ResticBackupTarget {
-  // the start of each variable name: <prefix>_RESTIC_PASSWORD, <prefix>_R2_BUCKET, ...
   readonly prefix: string;
 
-  // whose backup this is, for the error messages: "the atc gateway's backup"
   readonly label: string;
 
-  // the repository's directory inside the bucket
   readonly path: string;
 }
 
@@ -20,8 +15,6 @@ interface ResticBackupValues {
   readonly secretAccessKey: string;
 }
 
-// A backup's inputs from .env, or undefined when none is set (no CronJob). Throws on a partial set
-// or a whitespace-only value, so a missing reference fails the preview.
 export function findResticBackup(
   env: Environment,
   target: ResticBackupTarget,
@@ -94,7 +87,6 @@ function buildRepository(
   return `s3:${endpoint}/${bucket}/${path}`;
 }
 
-// every variable is set by the time this runs
 function getValue(env: Environment, name: string): string {
   return env[name] ?? '';
 }

@@ -8,14 +8,9 @@ import { Provider as ACMEProvider, Certificate, Registration } from '@pulumivers
 export interface NixieCertificateInputs {
   readonly namespace: Output<string>;
   readonly hostname: string;
-
-  // Pulumi's own Cloudflare token, for the DNS-01 challenge
   readonly dnsToken: Output<string>;
 }
 
-// Let's Encrypt's certificate for nixie's host name, issued in the Pulumi run through a DNS-01
-// challenge, so no DNS token enters the cluster. Returns the TLS Secret's name. An apply within 30
-// days of expiry renews it, so with 90-day certificates an apply is due every 60 days.
 export function createNixieCertificate(
   cluster: Provider,
   inputs: NixieCertificateInputs,
@@ -41,7 +36,11 @@ export function createNixieCertificate(
       accountKeyPem: registration.accountKeyPem,
       commonName: inputs.hostname,
       keyType: 'EC256',
+
+      // with 90-day certificates, an apply is due every 60 days
       minDaysRemaining: 30,
+
+      // issued in the Pulumi run, so no DNS token enters the cluster
       dnsChallenges: [
         { provider: 'cloudflare', config: { CF_DNS_API_TOKEN: secret(inputs.dnsToken) } },
       ],
@@ -52,7 +51,6 @@ export function createNixieCertificate(
   return createTLSSecret(cluster, inputs.namespace, certificate);
 }
 
-// no fixed name: a renewal replaces the Secret, and the Ingress follows the new name
 function createTLSSecret(
   cluster: Provider,
   namespace: Output<string>,
@@ -61,6 +59,7 @@ function createTLSSecret(
   const tls = new Secret(
     'nixie-tls',
     {
+      // no fixed name: a renewal replaces the Secret, and the Ingress follows the new name
       metadata: { namespace },
       type: 'kubernetes.io/tls',
       stringData: {

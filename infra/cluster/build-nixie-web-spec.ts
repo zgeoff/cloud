@@ -1,20 +1,16 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 
-// the web server's port in the pod
 export const nixieWebPort = 3000;
 export const nixieWebLabels = { app: 'nixie-web' };
 
 export interface NixieWebSpecInputs {
-  // the nixie-web image, by tag and digest
   readonly image: string;
 
-  // nixie's private API URL, which only the web server calls; the browser calls /rpc on its origin
+  // only the web server calls it; the browser calls /rpc on its own origin
   readonly apiURL: Output<string>;
 }
 
-// nixie's web client Deployment spec: the TanStack Start server, which holds no state, no secret
-// and no database. An upgrade replaces nixie first and the web client second.
 export function buildNixieWebSpec(inputs: NixieWebSpecInputs): input.apps.v1.DeploymentSpec {
   return {
     replicas: 1,

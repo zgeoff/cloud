@@ -4,7 +4,7 @@ import { buildMockATCGatewayDaemon } from './build-mock-atc-gateway-daemon.ts';
 
 // stateDir's and trustForwardedFrom's absence is behaviour (the gateway takes $HOME's state dir,
 // and trusts no proxy), so undefined leaves each out (exactOptionalPropertyTypes forbids plain
-// overrides). `daemons` names the daemons held; each merges into fresh defaults.
+// overrides).
 type ATCGatewayConfigOverrides = Partial<
   Omit<ATCGatewayConfig, 'daemons' | 'stateDir' | 'trustForwardedFrom'>
 > & {
@@ -13,8 +13,6 @@ type ATCGatewayConfigOverrides = Partial<
   readonly trustForwardedFrom?: string[] | undefined;
 };
 
-// A complete config as the schema checks it: one daemon under a name atc takes, and that daemon
-// as the default. A checked config is also a valid raw one, so a test can write it as JSON.
 export function buildMockATCGatewayConfig(
   overrides: ATCGatewayConfigOverrides = {},
 ): ATCGatewayConfig {

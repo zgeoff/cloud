@@ -18,18 +18,11 @@ import { buildServiceURL } from './build-service-url.ts';
 import { createATCGatewayBackupJob } from './create-atc-gateway-backup-job.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
-// The atc gateway: atc's public MCP origin and OAuth issuer, which dials named
-// daemons (docs/architecture/workloads/atc-gateway.md). Off until the stack config sets
-// atcGateway; setting it is an operator step that needs the owner's approval.
-
 export interface ATCGatewayOutputs {
   readonly serviceURL: Output<string>;
-
-  // the host of the gateway's public URL, which the tunnel routes to serviceURL
   readonly publicHost: string;
 }
 
-// tunnelToken is the atc tunnel's token, which the gateway pod's cloudflared sidecar runs with
 export function createATCGateway(
   cluster: Provider,
   inputs: ATCGatewayInputs,
@@ -91,14 +84,15 @@ function createDeployment(
   );
 }
 
-// local-path's default class deletes the volume with its claim; OAuth state must
-// outlive a deleted claim
 function createStateVolume(cluster: Provider, namespace: Output<string>): Output<string> {
   const retain = new StorageClass(
     'local-path-retain',
     {
       metadata: { name: 'local-path-retain' },
       provisioner: 'rancher.io/local-path',
+
+      // local-path's default class deletes the volume with its claim; OAuth state must outlive a
+      // deleted claim
       reclaimPolicy: 'Retain',
       volumeBindingMode: 'WaitForFirstConsumer',
     },
@@ -164,7 +158,7 @@ function createConfigObjects(
     credential: inputs.secrets.pullCredential,
   });
 
-  // no fixed name, for the same reason as the daemon tokens: cloudflared reads it only at start
+  // no fixed name, so a change rolls the Deployment: cloudflared reads it only at start
   const tunnel = new Secret(
     'atc-tunnel-token',
     { metadata: { namespace }, stringData: { token: tunnelToken } },

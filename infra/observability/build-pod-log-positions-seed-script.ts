@@ -1,5 +1,4 @@
 interface PodLogPositionsSeedScriptOptions {
-  // the directory that holds the kubelet's pod log directories
   podLogRoot: string;
 
   // the file the script writes, in the legacy positions format Alloy imports
@@ -9,9 +8,6 @@ interface PodLogPositionsSeedScriptOptions {
   positionsFile: string;
 }
 
-// A POSIX shell script for the entry point of Alloy's container, before each Alloy start. With no
-// positions file, it records every pod log file under podLogRoot at its current size as seedFile,
-// which Alloy imports; the comments in the script cover a start with a positions file.
 export function buildPodLogPositionsSeedScript(options: PodLogPositionsSeedScriptOptions): string {
   const positions = options.positionsFile;
 

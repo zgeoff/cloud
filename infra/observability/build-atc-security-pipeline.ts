@@ -1,8 +1,5 @@
 import { atcSecurityEvents } from './atc-security-events.ts';
 
-// Alloy's pipeline for atc's security events in the gateway's log files at logPath (a glob): a
-// counter per stderr event, labelled only with values the contract lists. It forwards no line, so
-// no address, client name or other string the client chose leaves it.
 export function buildATCSecurityPipeline(logPath: string): string {
   return `
 // atc's security events, from the gateway's container log files rather than the Kubernetes log
@@ -112,13 +109,11 @@ loki.process "atc_security" {
 `;
 }
 
-// An Alloy string literal: Alloy's escapes are a superset of JSON's.
 function toAlloyString(value: string): string {
+  // Alloy's escapes are a superset of JSON's.
   return JSON.stringify(value);
 }
 
-// The kind when the kind and the outcome make a pair of the contract, `suppressed` for a suppressed
-// event, and `other` for anything else.
 function buildKindTemplate(): string {
   const pairs = Object.entries(atcSecurityEvents.outcomes).map(
     ([kind, outcomes]) => `${kind}\\.(${outcomes.join('|')})`,
@@ -131,8 +126,6 @@ function buildKindTemplate(): string {
   ].join('');
 }
 
-// The value when the contract lists it, `none` when the event has none, and `other` for anything
-// else.
 function buildAllowlistTemplate(values: readonly string[]): string {
   const alternatives = values.map((value) => value.replaceAll(/[.]/gu, String.raw`\.`)).join('|');
 

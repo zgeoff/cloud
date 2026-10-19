@@ -13,7 +13,6 @@ interface MetricsInputs {
   readonly alertWebhookURL: string | undefined;
 }
 
-// kube-prometheus-stack: Prometheus, Alertmanager, Grafana and the exporters
 export function createMetrics(ns: Namespace, inputs: MetricsInputs, cluster: Provider): Chart {
   const webhook =
     inputs.alertWebhookURL === undefined

@@ -2,8 +2,8 @@ import type { Output } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import { lokiURL } from './loki-url.ts';
 
-// the chart's own args plus the textfile collector, which reads metrics that host timers
-// write (impd local health, #29); node-exporter sees the host root at /host/root
+// the textfile collector reads metrics that host timers write; node-exporter sees the host root
+// at /host/root
 const nodeExporterArgs = [
   '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)',
   '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$',
@@ -39,16 +39,14 @@ const kubeletMetricRelabelings = [
   },
 ];
 
-// Grafana's admin password, and the node port it serves on
 interface GrafanaInputs {
   readonly password: Output<string>;
   readonly nodePort: number;
 }
 
-// the chart's values but Alertmanager's, which buildAlertmanagerValues gives
 export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unknown> {
   return {
-    // buildAlertRules has a per-target TargetDown in place of the chart's ratio-based one
+    // a per-target TargetDown rule replaces the chart's ratio-based one
     defaultRules: { disabled: { TargetDown: true } },
 
     // k3s runs these inside the k3s binary, whose metrics the apiserver and kubelet jobs scrape
@@ -87,8 +85,7 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
       resources: grafanaResources,
       additionalDataSources: [{ name: 'Loki', type: 'loki', url: lokiURL, access: 'proxy' }],
 
-      // no Alertmanager datasource: Grafana does no alerting here, and alerts show in
-      // Prometheus and Alertmanager themselves (#28, #29); deleteDatasources removes the
+      // no Alertmanager datasource: Grafana does no alerting here; deleteDatasources removes the
       // copy Grafana provisioned while Alertmanager was off
       sidecar: { datasources: { alertmanager: { enabled: false } } },
       deleteDatasources: [{ name: 'Alertmanager', orgId: 1 }],

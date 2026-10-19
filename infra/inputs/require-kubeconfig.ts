@@ -1,13 +1,8 @@
 import { findVariable } from './find-variable.ts';
 import type { Environment } from './types.ts';
 
-// How the stack treats the k3s cluster: `managed` applies its workloads, `none` leaves the
-// cluster out (a host that has no k3s yet). Set it with `pulumi config set cluster <mode>`.
 const clusterModes = ['managed', 'none'] as const;
 
-// The cluster's kubeconfig, or undefined when the stack leaves it out. An unset mode (or
-// managed without kubeconfig) throws: a missing K3S_KUBECONFIG must not read as "no cluster"
-// and plan to delete every cluster resource.
 export function requireKubeconfig(mode: string | undefined, env: Environment): string | undefined {
   if (!isClusterMode(mode)) {
     throw new Error(
@@ -21,6 +16,8 @@ export function requireKubeconfig(mode: string | undefined, env: Environment): s
 
   const kubeconfig = findVariable(env, 'K3S_KUBECONFIG');
 
+  // a missing K3S_KUBECONFIG must not read as "no cluster" and plan to delete every cluster
+  // resource
   if (kubeconfig === undefined) {
     throw new Error(
       'cluster is managed, but K3S_KUBECONFIG is empty; run through `op run --env-file=../.env`',

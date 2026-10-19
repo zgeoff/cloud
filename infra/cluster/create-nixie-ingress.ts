@@ -18,7 +18,6 @@ interface Backend {
 }
 
 export interface NixieIngressInputs {
-  // nixie's namespace, which holds the Ingress and its certificate
   readonly namespace: Output<string>;
   readonly hostname: string;
   readonly dnsToken: Output<string>;
@@ -33,8 +32,6 @@ export interface NixieIngressOutputs {
 
 const ingressClass = 'nixie';
 
-// Traefik, bound to the host's tailnet address, serves nixie's Ingress with the certificate the run
-// issues; the public DNS name points at that tailnet address, so it answers on the tailnet only
 export function createNixieIngress(
   cluster: Provider,
   inputs: NixieIngressInputs,
@@ -70,7 +67,6 @@ export function createNixieIngress(
   return { url: interpolate`https://${createRecord(inputs).name}` };
 }
 
-// nixie's Ingress, served by the Traefik release once it runs
 function createIngress(cluster: Provider, inputs: NixieIngressInputs, controller: Chart): Ingress {
   return new Ingress(
     'nixie',
@@ -84,6 +80,8 @@ function createIngress(cluster: Provider, inputs: NixieIngressInputs, controller
         web: inputs.web,
       }),
     },
+
+    // served by the Traefik release once it runs
     { provider: cluster, dependsOn: [controller] },
   );
 }
@@ -93,6 +91,8 @@ function createRecord(inputs: NixieIngressInputs): DnsRecord {
     zoneId: inputs.zoneID,
     name: inputs.hostname,
     type: 'A',
+
+    // the host's tailnet address, so nixie answers on the tailnet only
     content: geoffcloudNode.ip,
     proxied: false,
     ttl: 1,

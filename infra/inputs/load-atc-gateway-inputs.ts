@@ -10,14 +10,10 @@ import type {
   StackConfig,
 } from './types.ts';
 
-// The gateway's inputs, or nothing while atcGateway is unset (setting it approves the deploy).
-// Secrets come from .env's op:// references (GHCR_PULL_*, ATC_GATEWAY_TOKEN_<NAME>, the backup's
-// ATC_GATEWAY_RESTIC_* and ATC_GATEWAY_R2_*), and the owner's address from secret stack config.
 export function loadATCGatewayInputs(
   stackConfig: Pick<StackConfig, 'getObject' | 'getSecret'>,
   env: Environment,
 ): { readonly atcGateway?: ATCGatewayInputs } {
-  // unknown until the schema checks it
   const raw = stackConfig.getObject<unknown>('atcGateway');
 
   if (raw === undefined) {
@@ -44,7 +40,6 @@ export function loadATCGatewayInputs(
   };
 }
 
-// all set, or no backup; findResticBackup throws on a partial set
 function findBackupSecrets(env: Environment): ATCGatewayBackupSecrets | undefined {
   const backup = findResticBackup(env, {
     prefix: 'ATC_GATEWAY',

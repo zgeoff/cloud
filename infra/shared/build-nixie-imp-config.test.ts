@@ -2,7 +2,6 @@ import { expect, test } from 'bun:test';
 import { topology } from '@zgeoff/cloud-topology';
 import { buildNixieImpConfig } from './build-nixie-imp-config.ts';
 
-// the values deploy/nixie/config.yaml held by hand before infra built them, in its order
 test('it builds the imp section that nixie ran with from packages/topology', () => {
   expect(buildNixieImpConfig(topology)).toStrictEqual({
     url: 'https://imps.geoff.cloud',

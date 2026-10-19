@@ -1,8 +1,6 @@
 import type { Output } from '@pulumi/pulumi';
 import { toATCGatewayTokenVariable } from '../inputs/index.ts';
 
-// The daemon-token Secret's data: each daemon's bearer token under the
-// ATC_GATEWAY_TOKEN_<NAME> variable the gateway reads it from, through envFrom
 export function buildATCGatewayTokenData(
   tokens: Readonly<Record<string, Output<string>>>,
 ): Record<string, Output<string>> {

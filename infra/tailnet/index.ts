@@ -11,10 +11,8 @@ interface TailnetOutputs {
   readonly impHostAuthKey: Output<string>;
 }
 
-// The tailnet: its whole policy file, the auth keys of the host's and imp's nodes, and the sync
-// of imp's key into 1Password
 export function createTailnet(): TailnetOutputs {
-  // CAUTION: this resource owns the whole tailnet policy file (#5)
+  // CAUTION: this resource owns the whole tailnet policy file
   const policy = new Acl('tailnet-policy', {
     acl: JSON.stringify(tailnetPolicy, null, 2),
     overwriteExistingContent: true,
@@ -33,8 +31,7 @@ export function createTailnet(): TailnetOutputs {
 }
 
 function createHostKey(policy: Acl): TailnetKey {
-  // The host's own tailnet node (tag:cloud), joined once by the NixOS install (#6).
-  // Single-use and preauthorized; the node keeps its identity in /var/lib/tailscale.
+  // Single-use; the node keeps its identity in /var/lib/tailscale.
   const hostKey = new TailnetKey(
     'geoffcloud-host',
     {
@@ -57,9 +54,8 @@ function createHostKey(policy: Acl): TailnetKey {
 }
 
 function createImpKeySync(policy: Acl): Command {
-  // imp's key (tag:imp) for impd nodes, at Tailscale's 90-day maximum expiry (an apply after expiry
-  // mints a fresh one); Pulumi writes each new key into op://cloud/imp-tailscale-authkey. impz's dev
-  // and e2e scripts never read it: they join as tag:imp-e2e, the tag impz owns (docs/runbooks/imp-e2e-tailnet.md).
+  // Tailscale's 90-day maximum expiry; an apply after expiry mints a fresh one, which Pulumi writes
+  // into op://cloud/imp-tailscale-authkey. impz's scripts never read it: they join as tag:imp-e2e.
   const impKey = new TailnetKey(
     'imp',
     {

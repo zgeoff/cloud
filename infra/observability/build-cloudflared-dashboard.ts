@@ -1,7 +1,5 @@
 import { buildDashboard } from './build-dashboard.ts';
 
-// The cloudflared dashboard: its tunnel connections, requests, errors and edge locations from
-// Prometheus
 export function buildCloudflaredDashboard(): Record<string, unknown> {
   return buildDashboard('cloudflared', 'prometheus', [
     {

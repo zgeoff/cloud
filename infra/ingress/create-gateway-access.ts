@@ -16,9 +16,6 @@ interface GatewayAccessInputs {
   readonly ownerEmail: Output<string>;
 }
 
-// The owner-only Access application in front of the atc gateway's sign-in pages, and what
-// cloudflared needs to check its tokens. atc keeps its grants and tokens in its own database, so
-// creating, changing or removing this policy leaves every one of them valid.
 export function createGatewayAccess(inputs: GatewayAccessInputs): OriginAccess {
   // the account's one-time PIN login, which needs no outside identity provider
   const identityProvider = new ZeroTrustAccessIdentityProvider('one-time-pin', {

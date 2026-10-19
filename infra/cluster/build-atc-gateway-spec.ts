@@ -8,7 +8,6 @@ export const atcGatewayPort = topology.atc.gatewayPort;
 export const atcGatewayLabels = { app: 'atc-gateway' };
 const nonrootID = 65_532;
 
-// the registry ConfigMap's key, mounted read-only under registryDir
 export const atcGatewayRegistryFile = 'registry.json';
 const registryDir = '/etc/atc-gateway';
 
@@ -17,23 +16,14 @@ const defaultStateDir = '/home/nonroot/.local/state/atc';
 
 interface GatewaySpecInputs {
   readonly config: ATCGatewayConfig;
-
-  // the host of config.publicURL, which the gateway serves and its probes send as Host
   readonly publicHost: string;
   readonly claim: Output<string>;
   readonly tokens: Output<string>;
   readonly registry: Output<string>;
-
-  // the dockerconfigjson Secret that pulls the private image
   readonly pullSecret: Output<string>;
-
-  // the Secret that holds the atc tunnel's token under the key `token`
   readonly tunnelToken: Output<string>;
 }
 
-// The gateway's Deployment spec: `serve` keeps gateway.db/mcp-auth.db in --state-dir and
-// reads daemons from --registry; atc writes config under $HOME/.config/atc, sockets in
-// $XDG_RUNTIME_DIR. /tmp needs exec for Bun's extracted natives, which an emptyDir allows.
 export function buildATCGatewaySpec(inputs: GatewaySpecInputs): input.apps.v1.DeploymentSpec {
   return {
     replicas: 1,
@@ -52,6 +42,8 @@ export function buildATCGatewaySpec(inputs: GatewaySpecInputs): input.apps.v1.De
           { name: 'state', persistentVolumeClaim: { claimName: inputs.claim } },
           { name: 'config', emptyDir: {} },
           { name: 'runtime', emptyDir: { medium: 'Memory' } },
+
+          // /tmp needs exec for Bun's extracted natives, which an emptyDir allows
           { name: 'tmp', emptyDir: {} },
           { name: 'registry', configMap: { name: inputs.registry } },
 
@@ -98,7 +90,6 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
     ],
     ports: [{ name: 'http', containerPort: atcGatewayPort }],
 
-    // ATC_GATEWAY_TOKEN_<DAEMON>, which the registry's daemons need
     envFrom: [{ secretRef: { name: inputs.tokens } }],
 
     // for `kubectl exec … atc-gateway clients`, which has no --state-dir of its own here;
@@ -126,11 +117,8 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
   };
 }
 
-// the atc tunnel's token Secret, mounted into the cloudflared sidecar alone
 const tunnelTokenDir = '/etc/cloudflared';
 
-// The atc tunnel's connector. It reads the token from a file, never the env, and keeps its
-// metrics on loopback, so nothing outside the pod reaches it; that leaves kubelet no port to probe.
 function buildTunnelContainer(): input.core.v1.Container {
   return {
     name: 'cloudflared',
@@ -139,6 +127,9 @@ function buildTunnelContainer(): input.core.v1.Container {
       'tunnel',
       '--no-autoupdate',
       '--metrics',
+
+      // loopback, so nothing outside the pod reaches the metrics, which leaves kubelet no port to
+      // probe
       '127.0.0.1:2000',
       'run',
       '--token-file',
@@ -158,9 +149,9 @@ function buildTunnelContainer(): input.core.v1.Container {
   };
 }
 
-// the server answers only its public Host (403 otherwise), so every probe sends it
 function buildProbe(path: string, host: string): input.core.v1.Probe {
   return {
+    // the server answers only its public Host (403 otherwise), so every probe sends it
     httpGet: { path, port: atcGatewayPort, httpHeaders: [{ name: 'Host', value: host }] },
   };
 }

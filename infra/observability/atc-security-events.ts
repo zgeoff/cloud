@@ -1,8 +1,7 @@
-// The values of atc's security-event contract (zgeoff/atc docs/architecture/remote/oauth.md,
-// "Security events", at @zgeoff/atc@4.13.2). Alloy counts each event under these values only and
-// turns any other value into `other`, so a label never holds a string the client chose.
+// atc's security-event contract (zgeoff/atc docs/architecture/remote/oauth.md, "Security
+// events", at @zgeoff/atc@4.13.2)
 export const atcSecurityEvents = {
-  // each kind with the outcomes it takes; `suppressed` has no outcome
+  // `suppressed` has no outcome
   outcomes: {
     authorize_started: ['accepted', 'rejected'],
     authorize_invalid: ['rejected'],
@@ -10,8 +9,6 @@ export const atcSecurityEvents = {
     consent: ['allowed', 'denied'],
   },
 
-  // every kind's reasons together: authorize_started's rate limit, authorize_invalid's error codes,
-  // owner_auth's failures, consent's empty allow, and each kind a `suppressed` event counts
   reasons: [
     'rate_limited',
     'invalid_client',
@@ -37,7 +34,7 @@ export const atcSecurityEvents = {
     'consent',
   ],
 
-  // the paths atc writes as an event's route; atc writes any other path as `other`
+  // atc writes any other path as `other`
   routes: [
     '/',
     '/mcp',
@@ -56,11 +53,9 @@ export const atcSecurityEvents = {
     'other',
   ],
 
-  // owner_auth's method: a passkey sign-in, or an enrollment
   methods: ['passkey', 'enrollment_token'],
 
-  // Alloy's counters, under the prefix loki.process gives every metric it makes: one event each,
-  // and the count each `suppressed` event reports
+  // loki.process gives every metric it makes this prefix
   eventsMetric: 'loki_process_custom_atc_security_events_total',
   suppressedMetric: 'loki_process_custom_atc_security_suppressed_events_total',
 } as const;

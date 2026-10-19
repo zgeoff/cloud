@@ -150,7 +150,6 @@ test('it lets a tag:cloud-deploy runner reach the k3s API on geoffcloud', () => 
   ).toBe(true);
 });
 
-// the change closes geoffcloud's TCP 6443 to members and nothing else they reached
 test('it keeps a member device on every other TCP port of geoffcloud', () => {
   const filter = buildStubTailnetFilter(tailnetPolicy);
 

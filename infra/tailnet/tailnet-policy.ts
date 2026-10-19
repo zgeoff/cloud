@@ -5,24 +5,19 @@ import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
 const tags = topology.tailnet.tags;
 const impHostname = topology.tailnet.nodes.imp.hostname;
 
-// The whole tailnet policy file: Pulumi's tailscale.Acl replaces the live file with this,
-// so every relied-on rule must be here.
 // home-pc is the WSL node (home-wsl), where atc's daemon listens on its tailnet address.
 const homePC = {
   ip: topology.tailnet.nodes.homePC.address,
   daemonPort: topology.atc.daemonPort,
 };
 
-// imp's own tailnet node on geoffcloud (imp-geoffcloud, tag:imp), where impd serves
-// https://imps.geoff.cloud. A long-lived node, so its address is stable; a host alias
-// names this one node, where tag:imp would also take in any later impd node.
+// A long-lived node, so its address is stable; a host alias names this one node, where tag:imp
+// would also take in any later impd node.
 const impNode = {
   ip: topology.tailnet.nodes.imp.address,
   httpsPort: 443,
 };
 
-// k3s's API server on geoffcloud, which the prod apply job reaches from its runner and the
-// operator's Pulumi runs reach from home-pc
 const k3sAPIPort = topology.k3s.apiPort;
 
 // What ip '*' covers (TCP and UDP on every port, ICMP and ICMPv6), less TCP on k3s's API port: a
@@ -36,12 +31,8 @@ const allButK3sAPI = [
   '58:*',
 ];
 
-// impd's API, between impd nodes
 const impAPIPort = `tcp:${topology.imp.apiPort}`;
 
-// Tags: tag:cloud reaches only the PC's atc daemon port and imp's 443; members reach tag:imp nodes on any port,
-// while those reach each other on impd's API port and nothing else (imp's isolation goal). impz owns tag:imp-e2e, which
-// reaches only its own API, never a live impd (docs/runbooks/imp-e2e-tailnet.md).
 export const tailnetPolicy = {
   hosts: {
     'home-pc': homePC.ip,
@@ -76,7 +67,7 @@ export const tailnetPolicy = {
     // shifts no other grant
     { src: [tags.cloud], dst: ['home-pc'], ip: [`tcp:${homePC.daemonPort}`] },
 
-    // the cluster's probe of imp's /health (#29) → imp's node, 443 only; last, so
+    // the cluster's probe of imp's /health → imp's node, 443 only; last, so
     // adding it shifts no other grant
     { src: [tags.cloud], dst: [impHostname], ip: [`tcp:${impNode.httpsPort}`] },
 

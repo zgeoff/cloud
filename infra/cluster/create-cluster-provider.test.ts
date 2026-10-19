@@ -5,9 +5,8 @@ import { dirname, join } from 'node:path';
 import invariant from 'tiny-invariant';
 import { runPulumiPreview } from '../test-utils/run-pulumi-preview.ts';
 
-// Each case previews the fixture program through the real Pulumi engine and the Kubernetes
-// provider's Helm renderer, with a local state backend and no cluster. Bun 1.4.2's skipIf takes a
-// boolean, so the probe for the Pulumi CLI runs at collection; CI installs the CLI and its plugin.
+// Bun 1.4.2's skipIf takes a boolean, so the probe for the Pulumi CLI runs at collection; CI
+// installs the CLI and its plugin.
 const pulumiPath = Bun.which('pulumi');
 
 async function setupTest() {

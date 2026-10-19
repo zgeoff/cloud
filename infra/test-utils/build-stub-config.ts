@@ -1,9 +1,6 @@
 import { RunError, secret } from '@pulumi/pulumi';
 import type { Config, Output } from '@pulumi/pulumi';
 
-// Stand-in for Pulumi's Config over raw stack values: get returns the string, getBoolean reads
-// "true" and "false", getObject JSON-parses unchecked, getSecret wraps the string as a secret, a
-// missing key reads undefined. Any other value throws Config's RunError (ConfigTypeError is unexported).
 export function buildStubConfig(
   values: Readonly<Record<string, string>>,
 ): Pick<Config, 'get' | 'getBoolean' | 'getObject' | 'getSecret'> {
@@ -45,6 +42,7 @@ function parseBoolean(key: string, raw: string): boolean {
     return raw === 'true';
   }
 
+  // Config's own ConfigTypeError is unexported, so the stand-in throws RunError
   throw new RunError(`Configuration '${projectName}:${key}' value '${raw}' is not a valid boolean`);
 }
 
@@ -58,7 +56,8 @@ function parseJSON<T>(key: string, raw: string): T {
   }
 }
 
-// secret unwraps its value's type, so it reads back as Config's getSecret types it: the caller's K
 function toSecret<K extends string>(raw: K): Output<K> {
+  // secret unwraps its value's type, so it reads back as Config's getSecret types it: the
+  // caller's K
   return secret(raw) as Output<K>;
 }

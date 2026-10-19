@@ -11,8 +11,8 @@ export interface AlertRule {
   readonly expr: string;
   readonly for: string;
 
-  // notice for activity the owner should see that is no fault; the chart's InfoInhibitor silences
-  // an info alert while no warning fires beside it
+  // notice, not info: the chart's InfoInhibitor silences an info alert while no warning fires
+  // beside it
   readonly labels: { readonly severity: 'critical' | 'warning' | 'notice' };
   readonly annotations: { readonly summary: string };
 }
@@ -23,16 +23,11 @@ export interface AlertRuleGroup {
 }
 
 export interface AlertRuleInputs {
-  // the gateway's daemons, set only while the stack config sets atcGateway
   readonly atcDaemons?: readonly ATCDaemonEndpoint[] | undefined;
 
-  // nixie's in-cluster readiness URL, set only while the stack config sets nixie
   readonly nixieReadinessURL?: string | undefined;
 }
 
-// geoff.cloud's own alerts (#29) and the atc sign-in group as PrometheusRule spec.groups. A missing
-// metric must alert: single-metric rules carry an absent() branch, except ImpdLocalHealthDown,
-// HostBehindLatestBuild, TargetDown and ContainerOOMKilled.
 export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
@@ -62,8 +57,8 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
   ];
 }
 
-// impd's loopback probe, written every minute by a host timer to node-exporter's
-// textfile collector (nixos/modules/impd-local-health.nix)
+// written every minute by a host timer to node-exporter's textfile collector
+// (nixos/modules/impd-local-health.nix)
 const impdRules: readonly AlertRule[] = [
   {
     alert: 'ImpdLocalHealthDown',
@@ -105,9 +100,8 @@ const hostBuildLagRules: readonly AlertRule[] = [
   },
 ];
 
-// The probe of imp's /health over the tailnet (create-imp-health-probe.ts) fails, or
-// reports nothing: clients cannot reach impd then, though the loopback check above may
-// pass. A failed TLS check or a body without "ready": true fails it too.
+// Clients cannot reach impd when this probe fails, though the loopback check may pass. A failed
+// TLS check or a body without "ready": true fails it too.
 const impHealthRule: AlertRule = {
   alert: 'ImpHealthUnreachable',
   expr: `probe_success{target="${impHealthProbeTarget}"} == 0 or absent(probe_success{target="${impHealthProbeTarget}"})`,
@@ -160,30 +154,30 @@ const cloudflaredRule: AlertRule = {
   annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
 };
 
-// A failing TCP connect to an atc daemon fires, as does a missing probe report (unknown reachability,
-// not proven downtime). One rule per daemon while the gateway is configured; the summary carries
-// the address since the absent() series has no instance label.
 function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
   const series = `probe_success{target="${toATCDaemonProbeTarget(daemon.name)}"}`;
 
   return {
     alert: 'ATCDaemonUnreachable',
+
+    // A missing probe report fires too (unknown reachability, not proven downtime)
     expr: `${series} == 0 or absent(${series})`,
     for: '5m',
     labels: { severity: daemon.alertSeverity },
+
+    // the absent() series has no instance label, so the summary carries the address
     annotations: {
       summary: `atc's daemon at ${daemon.address} is unreachable from the cluster.`,
     },
   };
 }
 
-// nixie's turns keep failing, its readiness report is unreachable or lacks the turns part, or the
-// probe reports nothing. Failing turns leave nixie's readiness status and pod ready, so the chart's
-// KubePodNotReady misses them; only this probe of the body's advisory part sees them.
 function buildNixieTurnsRule(readinessURL: string): AlertRule {
   const series = `probe_success{target="${nixieProbeTargets.turns}"}`;
 
   return {
+    // Failing turns leave nixie's readiness status and pod ready, so the chart's KubePodNotReady
+    // misses them.
     alert: 'NixieTurnsFailing',
     expr: `${series} == 0 or absent(${series})`,
     for: '5m',
@@ -194,15 +188,15 @@ function buildNixieTurnsRule(readinessURL: string): AlertRule {
   };
 }
 
-// nixie reports degraded or unready, or its report is unreachable. A failing dependency leaves the
-// pod ready, so the chart's KubePodNotReady misses it; the hold matches KubePodNotReady's, so a
-// dependency slow for a few minutes on a busy host stays quiet.
 function buildNixieDegradedRule(readinessURL: string): AlertRule {
   const series = `probe_success{target="${nixieProbeTargets.status}"}`;
 
   return {
+    // A failing dependency leaves the pod ready, so the chart's KubePodNotReady misses it.
     alert: 'NixieDegraded',
     expr: `${series} == 0 or absent(${series})`,
+
+    // KubePodNotReady's hold, so a dependency slow for a few minutes on a busy host stays quiet
     for: '15m',
     labels: { severity: 'warning' },
     annotations: {

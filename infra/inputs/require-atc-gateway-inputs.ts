@@ -7,13 +7,9 @@ import type { ATCGatewayConfig, Environment } from './types.ts';
 interface CheckedGatewayInputs {
   readonly config: ATCGatewayConfig;
 
-  // each daemon's bearer token, by daemon name
   readonly tokens: Readonly<Record<string, string>>;
 }
 
-// Throws naming the fix unless the gateway can deploy: the atcGateway stack config passes its
-// schema, and each daemon has a token. The message names each failing field by its stack config
-// path, so mistakes fail the preview instead of the pod.
 export function requireATCGatewayInputs(raw: unknown, env: Environment): CheckedGatewayInputs {
   const result = atcGatewayConfigSchema.safeParse(raw);
 
@@ -32,7 +28,6 @@ export function requireATCGatewayInputs(raw: unknown, env: Environment): Checked
   };
 }
 
-// `atcGateway.daemons.geoffcloud.address must be …`: the field's path, then the schema's message
 function formatIssue(issue: z.core.$ZodIssue): string {
   return `${['atcGateway', ...issue.path.map(String)].join('.')} ${issue.message}`;
 }

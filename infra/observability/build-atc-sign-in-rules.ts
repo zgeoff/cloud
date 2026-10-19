@@ -3,16 +3,13 @@ import type { AlertRule, AlertRuleGroup } from './build-alert-rules.ts';
 
 // how far back each rule counts events, and so how long an alert fires after its last event
 const window = '5m';
-
-// The count of events in the window, in printf form for an annotation
 const count = '{{ $value | printf "%.0f" }}';
 
-// Alerts on atc's sign-in events from Alloy's counters, one alert per category, each summing its
-// events per label set into one alert whose value is the count. No rule has an absent() branch,
-// because no event is the normal state; TargetDown covers Alloy itself.
 export function buildATCSignInRules(): AlertRuleGroup {
   return {
     name: 'atc-sign-in',
+
+    // No rule has an absent() branch, because no event is the normal state.
     rules: [
       {
         alert: 'ATCGatewaySignInStarted',
@@ -99,9 +96,6 @@ export function buildATCSignInRules(): AlertRuleGroup {
   };
 }
 
-// The events of one selector in the window, summed per label set and kept above zero. increase()
-// sees no rise in a series Alloy makes at its first event, or restores at the same value after a
-// restart, so a series new in the window, or from an Alloy started in it, counts whole.
 function buildEventCount(
   selector: string,
   by: readonly string[],
@@ -110,5 +104,8 @@ function buildEventCount(
   const series = `${metric}{${selector}}`;
   const restarted = `changes(process_start_time_seconds[${window}]) > 0`;
 
+  // increase() sees no rise in a series Alloy makes at its first event, or restores at the same
+  // value after a restart, so a series new in the window, or from an Alloy started in it, counts
+  // whole.
   return `sum by (${by.join(', ')}) ((${series} unless ${series} offset ${window}) or (${series} and on (instance) ${restarted}) or increase(${series}[${window}])) > 0`;
 }

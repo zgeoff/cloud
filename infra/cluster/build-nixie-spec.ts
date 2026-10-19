@@ -1,48 +1,35 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 
-// nixie's API and health port in the pod
 export const nixieAPIPort = 8080;
 export const nixieLabels = { app: 'nixie' };
-
-// the keys of nixie's Secret: the sops file and the host's age identity that decrypts it
 export const nixieSecretsFileKey = 'secrets.yaml';
 export const nixieAgeKeyKey = 'age-key.txt';
-
-// the keys of git-sync's Secret: the definitions deploy key and GitHub's pinned host key
 export const definitionsDeployKeyKey = 'ssh';
 export const definitionsKnownHostsKey = 'known_hosts';
-
-// the key of nixie's ConfigMap, mounted as /etc/nixie/config.yaml
 export const nixieConfigKey = 'config.yaml';
 
-// GitHub's ed25519 host key, from https://api.github.com/meta (ssh_keys), checked 2026-10-12. The
-// host blocks outbound port 22, so git-sync reaches GitHub's SSH on 443, which serves the same key
+// from https://api.github.com/meta (ssh_keys). The host blocks outbound port 22, so git-sync
+// reaches GitHub's SSH on 443, which serves the same key
 export const githubKnownHosts =
   '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n';
 
-// git-sync v4.7.1, by digest; bump deliberately
 const gitSyncImage =
   'registry.k8s.io/git-sync/git-sync:v4.7.1@sha256:c5e1976da735bf0b53979f079a07475d77174c51863cd084e928ff6074480717';
 
 const definitionsRoot = '/etc/nixie/definitions';
 
 export interface NixieSpecInputs {
-  // the nixie image, by tag and digest
   readonly image: string;
-
-  // the Service that governs the StatefulSet
   readonly serviceName: Output<string>;
   readonly configMap: Output<string>;
   readonly secret: Output<string>;
   readonly definitionsSecret: Output<string>;
 }
 
-// nixie's StatefulSet spec: one replica, because SQLite takes one writer, on a ReadWriteOnce volume
-// that outlives its claim. git-sync clones the definitions every minute into a shared volume; only
-// git-sync mounts the deploy key, and only nixie mounts the age identity.
 export function buildNixieSpec(inputs: NixieSpecInputs): input.apps.v1.StatefulSetSpec {
   return {
+    // SQLite takes one writer
     replicas: 1,
 
     // a StatefulSet's rolling update stops nixie-0 before it starts the new one, so two pods never
@@ -159,8 +146,6 @@ function buildNixieContainer(image: string): input.core.v1.Container {
   };
 }
 
-// git-sync's flags as its GITSYNC_ variables: the checkout lands under the shared volume, and
-// nixie reads the `current` link, which git-sync swaps in one rename
 function buildGitSyncContainer(): input.core.v1.Container {
   return {
     name: 'git-sync',
@@ -169,6 +154,8 @@ function buildGitSyncContainer(): input.core.v1.Container {
       { name: 'GITSYNC_REPO', value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git' },
       { name: 'GITSYNC_REF', value: 'main' },
       { name: 'GITSYNC_ROOT', value: definitionsRoot },
+
+      // nixie reads the `current` link, which git-sync swaps in one rename
       { name: 'GITSYNC_LINK', value: 'current' },
       { name: 'GITSYNC_PERIOD', value: '60s' },
       { name: 'GITSYNC_DEPTH', value: '1' },

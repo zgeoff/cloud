@@ -1,9 +1,6 @@
 import type { runtime } from '@pulumi/pulumi';
 import { z } from 'zod';
 
-// Pulumi mocks that record each registration's `<type>::<name>` key in order, and its inputs by
-// key. A registration whose key is in held stays pending, as a slow provider call would, until
-// release; whenRegistered resolves once a key's registration starts.
 export function buildStubResourceMocks(held: readonly string[] = []): {
   readonly mocks: runtime.Mocks;
   readonly registered: string[];

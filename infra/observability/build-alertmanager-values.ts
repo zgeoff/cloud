@@ -4,7 +4,6 @@ const nullReceiver = 'null';
 const discordReceiver = 'discord';
 const signInReceiver = 'discord-sign-in';
 
-// the Secret that holds the Discord webhook, and the file Alertmanager reads it from
 interface AlertWebhookMount {
   readonly secretName: string;
   readonly file: string;
@@ -42,9 +41,6 @@ interface AlertmanagerValues {
   };
 }
 
-// kube-prometheus-stack's `alertmanager` values (#29); Helm merges `config` over chart defaults, keeping
-// global/inhibit_rules/templates, with route and receivers given whole. Without a webhook all alerts go to
-// null; with one, all but Watchdog/InfoInhibitor go to Discord via the mounted Secret's file.
 export function buildAlertmanagerValues(
   webhook: AlertWebhookMount | undefined,
 ): AlertmanagerValues {
@@ -58,12 +54,17 @@ export function buildAlertmanagerValues(
           },
           {
             name: signInReceiver,
+
+            // a sign-in alert ends when its window passes with no event, which is no news
             discord_configs: [{ webhook_url_file: webhook.file, send_resolved: false }],
           },
         ];
 
   return {
     enabled: true,
+
+    // Helm merges `config` over the chart's defaults, keeping global, inhibit_rules and templates,
+    // so route and receivers are given whole.
     config: {
       route: {
         receiver: webhook === undefined ? nullReceiver : discordReceiver,
@@ -83,15 +84,14 @@ export function buildAlertmanagerValues(
   };
 }
 
-// The atc sign-in alerts, one message per alert name, so a flood of one category never buries
-// another. An alert ends when its window passes with no event, which is no news, so the route
-// sends no resolved message.
 function buildSignInRoute(): Route {
   const names = buildATCSignInRules().rules.map((rule) => rule.alert);
 
   return {
     receiver: signInReceiver,
     matchers: [`alertname =~ "${names.join('|')}"`],
+
+    // one message per alert name, so a flood of one category never buries another
     group_by: ['alertname'],
     group_wait: '30s',
     group_interval: '5m',

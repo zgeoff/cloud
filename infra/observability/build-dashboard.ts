@@ -10,12 +10,12 @@ export interface DashboardPanel {
   readonly height: number;
 }
 
-// the datasource is a variable, so the dashboard does not depend on a generated datasource uid
 export function buildDashboard(
   title: string,
   datasourceType: 'loki' | 'prometheus',
   panels: readonly DashboardPanel[],
 ): Record<string, unknown> {
+  // a variable, so the dashboard does not depend on a generated datasource uid
   const datasource = { type: datasourceType, uid: '$datasource' };
   const positions = buildGridPositions(panels);
 

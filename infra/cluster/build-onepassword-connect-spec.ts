@@ -1,14 +1,9 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 
-// connect-api's port in the pod
 export const onePasswordConnectAPIPort = 8080;
 export const onePasswordConnectLabels = { app: 'onepassword-connect' };
-
-// the credentials Secret's key, mounted as the credentials file
 export const onePasswordConnectCredentialsKey = '1password-credentials.json';
-
-// Connect's release; bump deliberately
 const connectVersion = '1.8.3';
 const connectAPIImage = `1password/connect-api:${connectVersion}`;
 const connectSyncImage = `1password/connect-sync:${connectVersion}`;
@@ -21,9 +16,7 @@ const podSecurityContext: input.core.v1.PodSecurityContext = {
   seccompProfile: { type: 'RuntimeDefault' },
 };
 
-// 1Password Connect's Deployment spec, after 1Password's Helm chart (charts/connect in
-// 1Password/connect-helm-charts): connect-api and connect-sync in one pod, the
-// credentials file from credentialsSecret
+// follows charts/connect in 1Password/connect-helm-charts
 export function buildOnePasswordConnectSpec(
   credentialsSecret: Output<string>,
 ): input.apps.v1.DeploymentSpec {
@@ -79,8 +72,6 @@ const lockedDown: input.core.v1.SecurityContext = {
 const credentialsPath = `/home/opuser/.op/${onePasswordConnectCredentialsKey}`;
 const dataPath = '/home/opuser/.op/data';
 
-// connect-api and connect-sync differ only in ports and image; they share a data volume
-// and talk over the pod's loopback
 function buildConnectContainer(spec: ConnectContainer): input.core.v1.Container {
   return {
     name: spec.name,

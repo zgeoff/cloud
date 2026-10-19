@@ -6,11 +6,10 @@ import { createNamespace } from '../shared/create-namespace.ts';
 import { buildCloudflaredSpec } from './build-cloudflared-spec.ts';
 import { cloudflaredNames } from './cloudflared-names.ts';
 
-// The tunnel for every public hostname under geoff.cloud. The routes live in Cloudflare
-// (ZeroTrustTunnelCloudflaredConfig), so this needs only the token.
 export function createCloudflared(cluster: Provider, tunnelToken: Output<string>): Deployment {
   const ingress = createNamespace(cloudflaredNames.namespace, cluster);
 
+  // the routes live in Cloudflare, so the connector needs only the token
   const token = new Secret(
     'cloudflared-token',
     {

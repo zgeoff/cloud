@@ -26,8 +26,6 @@ const observability = {
   traces: { enabled: false, headSamplingRate: 1, persist: true },
 };
 
-// The external health check (#8): a Worker on a 5-minute cron, bundled from
-// @zgeoff/cloud-health-check by Bun at deploy time. Its state lives in an R2 bucket.
 export async function createHealthCheck(inputs: HealthCheckInputs): Promise<WorkersCronTrigger> {
   const content = await buildWorkerBundle(entryPath);
 

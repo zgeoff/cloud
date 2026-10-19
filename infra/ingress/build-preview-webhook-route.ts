@@ -1,9 +1,6 @@
 import { exposure, topology } from '@zgeoff/cloud-topology';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 
-// GitHub's pull_request webhooks for the preview service on the host, at the address and port the
-// host's own service config reads. Only the /webhook path passes, and the service checks each
-// delivery's signature itself.
 export function buildPreviewWebhookRoute(): TunnelRoute {
   const route = exposure.entries.find((entry) => entry.name === 'preview-webhook-route');
   const listener = exposure.entries.find((entry) => entry.name === 'preview-webhook');
@@ -17,6 +14,8 @@ export function buildPreviewWebhookRoute(): TunnelRoute {
   return {
     hostname: route.hostname,
     service: `http://${topology.tailnet.nodes.geoffcloud.address}:${listener.port}`,
+
+    // no Access check: the service checks each delivery's signature itself
     path: '^/webhook$',
   };
 }

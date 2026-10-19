@@ -1,8 +1,5 @@
 import type { ProviderResource, ResourceTransform } from '@pulumi/pulumi';
 
-// Makes a transform that binds one named container port of a chart's Deployment to a host address.
-// Traefik's chart also writes its hostIP value into the entry point's listen address, which a pod
-// cannot bind, so the host address goes on the rendered port instead. Other resources pass through.
 export function makeHostIPTransform(
   hostIP: string,
   portName: string,
@@ -21,9 +18,10 @@ export function makeHostIPTransform(
 
 type Fields = Record<string, unknown>;
 
-// Copies only the objects on the path to the ports, so every other value keeps its identity: a
-// chart child's props can hold Outputs, which carry functions and cannot be cloned
 function buildBoundProps(props: Fields, hostIP: string, portName: string): Fields {
+  // Traefik's chart writes hostIP into the entry point's listen address too, which a pod cannot
+  // bind, so it goes on the port. Only the objects on the path to the ports are copied: a chart
+  // child's props can hold Outputs, which carry functions and cannot be cloned.
   return buildWithField(props, 'spec', (spec) =>
     buildWithNested(spec, 'template', (template) =>
       buildWithNested(template, 'spec', (podSpec) =>
@@ -45,12 +43,12 @@ function buildWithField(value: Fields, key: string, change: (field: unknown) => 
   return key in value ? { ...value, [key]: change(value[key]) } : value;
 }
 
-// a value that is not a plain object, such as an Output during a preview, passes through whole
 function buildWithNested(
   value: unknown,
   key: string,
   change: (field: unknown) => unknown,
 ): unknown {
+  // a value that is not a plain object, such as an Output during a preview, passes through whole
   return isFields(value) ? buildWithField(value, key, change) : value;
 }
 

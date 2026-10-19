@@ -11,15 +11,10 @@ import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
 interface NixieBackupJobInputs {
   readonly namespace: Output<string>;
-
-  // nixie's StatefulSet, whose first pod owns the claim the backup reads
   readonly statefulSet: StatefulSet;
   readonly backup: NixieBackupInputs;
 }
 
-// Nightly restic backup of nixie.db and keys.db to R2, from nixie's claim beside nixie (one node,
-// so ReadWriteOnce allows it). The Secrets and the ConfigMap keep fixed names, unlike nixie's own,
-// because deploy/nixie/restore-job.yaml names them; the pull Secret serves only the backup here.
 export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobInputs): CronJob {
   const env = createEnvSecret(cluster, inputs);
   const script = createScriptConfigMap(cluster, inputs.namespace);
@@ -46,7 +41,11 @@ export function createNixieBackupJob(cluster: Provider, inputs: NixieBackupJobIn
             template: {
               spec: buildNixieBackupPodSpec({
                 image: inputs.backup.image,
+
+                // one node, so ReadWriteOnce allows the claim beside nixie
                 claim: 'data-nixie-0',
+
+                // fixed names, unlike nixie's own, because the restore Job's YAML names them
                 scriptConfigMap: 'nixie-backup-script',
                 envSecret: 'nixie-backup',
                 pullSecret: ghcrPullSecretName,
@@ -77,11 +76,11 @@ function createEnvSecret(cluster: Provider, inputs: NixieBackupJobInputs): Secre
   );
 }
 
-// Pulumi updates the script in place, and the CronJob's next run reads it
 function createScriptConfigMap(cluster: Provider, namespace: Output<string>): ConfigMap {
   return new ConfigMap(
     'nixie-backup-script',
     {
+      // Pulumi updates the script in place, and the CronJob's next run reads it
       metadata: { name: 'nixie-backup-script', namespace },
       data: {
         'backup.sh': readFileSync(

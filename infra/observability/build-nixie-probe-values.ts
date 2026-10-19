@@ -1,9 +1,6 @@
 import { buildProbeValues } from './build-probe-values.ts';
 import { nixieProbeTargets } from './nixie-probe-targets.ts';
 
-// Two probes of nixie's /health/ready, which answers 200 while its turns or a dependency fail.
-// nixie_turns passes only when the advisory conversation_turns says isReady true, a brace in its
-// reason failing the match; nixie_status passes only on the status ready.
 export function buildNixieProbeValues(readinessURL: string) {
   return buildProbeValues({
     modules: {
@@ -13,6 +10,9 @@ export function buildNixieProbeValues(readinessURL: string) {
         http: {
           preferred_ip_protocol: 'ip4',
           valid_status_codes: [200],
+
+          // /health/ready answers 200 while the turns fail, so the body decides; a brace in the
+          // advisory part's reason fails the match
           fail_if_body_not_matches_regexp: [
             String.raw`"conversation_turns":\s*\{[^{}]*"isReady":\s*true`,
           ],

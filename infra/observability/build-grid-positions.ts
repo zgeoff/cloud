@@ -6,7 +6,6 @@ interface GridPosition {
   readonly h: number;
 }
 
-// panels flow left to right in rows of 24 columns
 export function buildGridPositions(
   panels: readonly { readonly width: number; readonly height: number }[],
 ): GridPosition[] {

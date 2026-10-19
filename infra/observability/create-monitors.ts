@@ -8,9 +8,6 @@ import { createATCDaemonProbe } from './create-atc-daemon-probe.ts';
 import { createImpHealthProbe } from './create-imp-health-probe.ts';
 import { createNixieProbe } from './create-nixie-probe.ts';
 
-// Beyond the stack's own targets: cloudflared, geoff.cloud's alert rules, imp's /health, only
-// with the gateway a TCP probe per atc daemon, and only with nixie the probes of its readiness report.
-// opts carries the cluster and the stack dependency that brings the CRDs.
 export function createMonitors(
   ns: Namespace,
   inputs: AlertRuleInputs,
@@ -29,7 +26,6 @@ export function createMonitors(
   }
 }
 
-// cloudflared serves Prometheus metrics on its metrics port, with the names ingress gives it
 function createCloudflaredMonitor(ns: Namespace, opts: CustomResourceOptions): CustomResource {
   return new CustomResource(
     'cloudflared',

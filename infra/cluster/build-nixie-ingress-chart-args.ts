@@ -3,15 +3,12 @@ import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
 import { buildNixieIngressValues } from './build-nixie-ingress-values.ts';
 
 export interface NixieIngressChartInputs {
-  // the namespace the controller runs in: a hostPort keeps it out of Pod Security's baseline
+  // a hostPort keeps the controller out of Pod Security's baseline
   readonly controllerNamespace: string;
-
-  // the one namespace whose Ingress objects the controller serves
   readonly routesNamespace: string;
   readonly ingressClass: string;
 }
 
-// Traefik's release: it runs in its own namespace and serves the Ingress objects of nixie's
 export function buildNixieIngressChartArgs(inputs: NixieIngressChartInputs): ChartArgs {
   return {
     namespace: inputs.controllerNamespace,

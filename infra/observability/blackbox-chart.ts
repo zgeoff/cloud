@@ -1,4 +1,3 @@
-// the Prometheus blackbox exporter's chart, pinned once for every probe release; bump deliberately
 export const blackboxChart = {
   chart: 'prometheus-blackbox-exporter',
   version: '11.19.1',
