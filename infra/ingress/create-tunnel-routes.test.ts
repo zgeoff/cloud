@@ -1,5 +1,6 @@
 import { expect, onTestFinished, test } from 'bun:test';
 import { output, runtime } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildStubResourceMocks } from '../test-utils/build-stub-resource-mocks.ts';
 import { resolveOutput } from '../test-utils/resolve-output.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
@@ -62,6 +63,42 @@ test("it renders the gateway's loopback rules on the atc tunnel and points its C
     proxied: true,
     ttl: 1,
   });
+});
+
+test("it points the files host's proxied CNAME at the shared tunnel and returns its URL", async () => {
+  const stub = buildStubResourceMocks();
+
+  await runtime.setMocks(stub.mocks, 'geoff-cloud', 'test');
+
+  onTestFinished(() => {
+    stub.release();
+    runtime.resetOptions('', '', -1, '', '', false, '');
+  });
+
+  const routes = createTunnelRoutes({
+    accountID: 'account',
+    zoneID: output('zone'),
+    tunnelID: output('shared-tunnel'),
+    files: {
+      hostname: 'files.geoff.cloud',
+      service: output('http://files.files.svc.cluster.local:8080'),
+    },
+  });
+
+  invariant(routes.filesURL);
+
+  const filesURL = await resolveOutput(routes.filesURL);
+
+  expect(stub.inputs.get('cloudflare:index/dnsRecord:DnsRecord::files')).toStrictEqual({
+    zoneId: 'zone',
+    name: 'files.geoff.cloud',
+    type: 'CNAME',
+    content: 'shared-tunnel.cfargotunnel.com',
+    proxied: true,
+    ttl: 1,
+  });
+
+  expect(filesURL).toBe('https://files.geoff.cloud');
 });
 
 test("it registers the shared tunnel's rules only after the gateway's CNAME", async () => {

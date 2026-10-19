@@ -22,6 +22,9 @@ from the `zgeoff` vault on a workstation.
 
 ## Deploy the first time
 
+**CAUTION:** The first apply adds a public route. Its `Deploy prod` run holds on the tunnel route
+change until the owner approves it, as [the prod apply job](./prod-apply.md) describes.
+
 1. Merge the service. The `files image` workflow publishes `ghcr.io/zgeoff/cloud-files:<commit>`
    from `main`, and its run summary gives the digest.
 2. Create the four items in the `cloud` vault, then copy each into `cloud-deploy`. Mint each token
@@ -52,7 +55,8 @@ from the `zgeoff` vault on a workstation.
    ```
 
    Run `bun run preview` and check that it adds the `files` namespace, its Secrets, Service,
-   StatefulSet and backup CronJob, and changes nothing else.
+   StatefulSet and backup CronJob, the shared tunnel's rule for `files.geoff.cloud` and its proxied
+   record, and changes nothing else.
 
 4. Merge the PR, and approve the held `Deploy prod` run once its plan matches the preview.
 5. Check that the pod is up:
@@ -62,6 +66,15 @@ from the `zgeoff` vault on a workstation.
    ```
 
    Expect `statefulset rolling update complete`.
+
+6. Check the public route, and that an upload without a token is refused:
+
+   ```bash
+   curl -sS https://files.geoff.cloud/healthz
+   curl -sS -o /dev/null -w '%{http_code}\n' -F file=@shot.png https://files.geoff.cloud/api/files
+   ```
+
+   Expect `ok`, then `401`.
 
 ## Upload a file
 

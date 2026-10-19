@@ -116,6 +116,14 @@
       "auth": "GitHub's webhook signature: the preview service refuses every delivery without a valid one"
     },
     {
+      "name": "files",
+      "kind": "tunnel-hostname",
+      "hostname": "files.geoff.cloud",
+      "scope": "public",
+      "reason": "GitHub's camo proxy must fetch PR images over an unauthenticated public URL, and imps cannot reach the tailnet, so uploads must use the public route too. Each upload needs a role token, files serve only under the inline-type and size rules, and nothing else of the service is public but GET /healthz, which answers ok and nothing more",
+      "auth": "Reads are public by an unguessable 22-character ID. Each write needs a bearer token that the service checks against hashes of the agent and owner tokens. Access stays off, because camo cannot sign in."
+    },
+    {
       "name": "imp",
       "kind": "tunnel-hostname",
       "hostname": "imp.geoff.cloud",

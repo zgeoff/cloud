@@ -5,6 +5,7 @@ import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patche
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
+import type { FilesRoute } from './create-files.ts';
 import { createFiles } from './create-files.ts';
 import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
@@ -42,8 +43,8 @@ interface ClusterOutputs {
   // the in-cluster URL of nixie's readiness report, for the probe of its advisory parts
   readonly nixieReadinessURL?: string;
 
-  // the in-cluster URL of the files service, for its tunnel route
-  readonly filesServiceURL?: Output<string>;
+  // the files service's public hostname and in-cluster URL, for its tunnel route
+  readonly filesRoute?: FilesRoute;
 }
 
 // Workloads on the geoffcloud k3s cluster (#6, #7). index.ts builds the cluster's Provider, which
@@ -65,7 +66,7 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
 
   return {
     onePasswordConnectServiceURL: connect.serviceURL,
-    ...(files === undefined ? {} : { filesServiceURL: files.serviceURL }),
+    ...(files === undefined ? {} : { filesRoute: files.route }),
     ...(nixie === undefined ? {} : { nixieURL: nixie.url, nixieReadinessURL }),
     ...(gateway === undefined ? {} : buildATCGatewayRouteOutputs(gateway)),
   };

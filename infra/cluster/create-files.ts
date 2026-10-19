@@ -16,9 +16,15 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { createFilesBackupJob } from './create-files-backup-job.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
+// the tunnel ingress for the service's public hostname: cloudflared sends every path of it to the
+// service's in-cluster URL
+export interface FilesRoute {
+  readonly hostname: string;
+  readonly service: Output<string>;
+}
+
 interface FilesOutputs {
-  // the in-cluster URL that cloudflared sends files.geoff.cloud to
-  readonly serviceURL: Output<string>;
+  readonly route: FilesRoute;
 }
 
 // The files service (GEO-1364): one pod on its own volume, behind a ClusterIP Service that the
@@ -84,6 +90,9 @@ export function createFiles(cluster: Provider, inputs: FilesInputs): FilesOutput
   }
 
   return {
-    serviceURL: interpolate`http://${service.metadata.name}.${namespace}.svc.cluster.local:${filesPort}`,
+    route: {
+      hostname: inputs.config.hostname,
+      service: interpolate`http://${service.metadata.name}.${namespace}.svc.cluster.local:${filesPort}`,
+    },
   };
 }

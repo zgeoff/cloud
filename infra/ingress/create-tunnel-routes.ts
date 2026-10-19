@@ -1,5 +1,6 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
+import type { TunnelRoute } from './build-tunnel-ingresses.ts';
 import { buildTunnelRouteSpecs } from './build-tunnel-route-specs.ts';
 import type { GatewayIngress, TunnelRecordSpec } from './build-tunnel-route-specs.ts';
 
@@ -11,12 +12,16 @@ interface TunnelRoutesInputs {
   // the atc gateway, on its public URL's host, with the Access application in front of its
   // sign-in pages. It owns OAuth too.
   readonly gateway?: GatewayIngress | undefined;
+
+  // the files service, on the shared tunnel, set with the service
+  readonly files?: TunnelRoute | undefined;
 }
 
 interface TunnelRoutesOutputs {
   readonly configVersion: Output<number>;
   readonly atcConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
+  readonly filesURL?: Output<string>;
 
   // the payload URL each opted-in repository's webhook posts to
   readonly previewWebhookURL: Output<string>;
@@ -25,7 +30,7 @@ interface TunnelRoutesOutputs {
 // Each tunnel's ingress rules and the proxied CNAME for each hostname, as buildTunnelRouteSpecs
 // assigns them. Each tunnel's catch-all 404 stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway);
+  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway, inputs.files);
 
   const atc =
     specs.atc === undefined
@@ -53,11 +58,17 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
 
   const previewWebhook = createRecord('preview-webhook', inputs.zoneID, specs.previewWebhookRecord);
 
+  const files =
+    specs.filesRecord === undefined
+      ? undefined
+      : createRecord('files', inputs.zoneID, specs.filesRecord);
+
   return {
     configVersion: config.version,
     ...(atc === undefined
       ? {}
       : { atcConfigVersion: atc.config.version, atcURL: toURL(atc.record) }),
+    ...(files === undefined ? {} : { filesURL: toURL(files) }),
     previewWebhookURL: toURL(previewWebhook).apply((url) => `${url}/webhook`),
   };
 }

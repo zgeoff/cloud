@@ -4,11 +4,13 @@ The estate has one way in from the internet: two Cloudflare tunnels that cloudfl
 inside the cluster. The host opens no inbound port for them, so a public route exists only as a rule
 in a tunnel's configuration and a DNS record that points at that tunnel, and Pulumi declares both.
 Each workload behind a tunnel brings its own authentication. The atc tunnel serves
-`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel serves
-`preview-webhook.geoff.cloud`, the preview service's webhook listener, which checks the signature of
-every GitHub delivery. Cloudflare Access adds an owner-only login in front of the gateway's sign-in
-pages, and nowhere else. [The atc gateway](../workloads/atc-gateway.md) and
-[the preview service](../workloads/preview.md) cover what answers behind each route.
+`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel serves two
+hostnames. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which
+checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which
+serves each file to anyone who holds its link and checks a role token on every write. Cloudflare
+Access adds an owner-only login in front of the gateway's sign-in pages, and nowhere else.
+[The atc gateway](../workloads/atc-gateway.md), [the preview service](../workloads/preview.md) and
+[the files service](../workloads/files.md) cover what answers behind each route.
 
 ## The tunnels
 
@@ -27,7 +29,9 @@ The shared tunnel's cloudflared runs in k3s, in its own namespace, as two replic
 connections to Cloudflare's edge with the tunnel's token. The tunnel serves while either replica is
 connected, so one replica's restart drops no traffic. Its list holds the preview webhook's rule,
 which matches the path `/webhook` alone and routes it to the listener on the host's tailnet address,
-which the host admits only from pod addresses.
+which the host admits only from pod addresses. It then holds the files service's rule, which has no
+path pattern, so every path of `files.geoff.cloud` reaches the service's cluster address and the
+service answers 404 for any path it does not serve.
 
 ### The atc tunnel
 
@@ -65,6 +69,10 @@ endpoints and the MCP endpoint must answer a client that has no browser and no C
 which an Access login in front of them would break. Cloudflare Access therefore never fronts the
 whole hostname. It fronts only the pages that the owner's browser loads to sign in and approve a
 client, which no MCP client calls.
+
+The files service has no Access login either, because GitHub's image proxy fetches each file in a
+pull request without one. A read needs only the link, whose random ID nobody can guess, and every
+upload, listing, expiry change or removal needs one of the service's two role tokens.
 
 Each public route's registry entry names its auth layer, and the Pulumi program fails on a public
 entry without one ([the exposure registry](./firewalls.md#the-exposure-registry)), so a new route

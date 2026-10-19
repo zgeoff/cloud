@@ -32,6 +32,8 @@ call, the path of a change, the topology and the data.
     built and pinned.
   - [Previews](./architecture/workloads/preview.md): one imp per pull request, behind a tailnet
     link, and the signed webhook that posts it.
+  - [The files service](./architecture/workloads/files.md): token-gated uploads, public reads by
+    link, the type rules for serving, expiry and the backup.
   - [Observability](./architecture/workloads/observability.md): metrics, logs, probes, alerts and
     the check from the edge.
 
