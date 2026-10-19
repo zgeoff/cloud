@@ -4,8 +4,9 @@ Four layers filter traffic to the host, and each covers a gap in the one before 
 firewall, outside the VM, admits only Tailscale's port and ICMP from the internet. NixOS's own
 nftables table filters what reaches the host and what it forwards, and trusts the tailnet and the
 cluster's interfaces. A table of this repo's own narrows two ports that the trusted interfaces would
-otherwise leave open, and imp adds tables that keep its imps away from the cluster.
-[The tailnet](./tailnet.md) covers who may reach the host over the tailnet in the first place.
+otherwise leave open and keeps pods away from Docker's bridge, and imp adds tables that keep its
+imps away from the cluster. [The tailnet](./tailnet.md) covers who may reach the host over the
+tailnet in the first place.
 
 ## The cloud firewall
 
@@ -24,7 +25,7 @@ a reload, because a flush would delete the tables that imp, k3s and Docker load:
 | Table              | Loaded by    | Job                                                          |
 | ------------------ | ------------ | ------------------------------------------------------------ |
 | `inet nixos-fw`    | NixOS        | the host's input and forward firewall                        |
-| `inet cloud_host`  | this repo    | narrows the atc daemon's port and the Connect relay's port   |
+| `inet cloud_host`  | this repo    | narrows host ports, and drops pod traffic to Docker's subnet |
 | `inet imp-forward` | imp's module | drops traffic from imp-host's bridge to the cluster's ranges |
 | `inet imp_egress`  | imp-host     | each imp's egress policy, inside the imp-host container      |
 
@@ -60,6 +61,17 @@ a container on the host reaches the relay
 ([1Password Connect](../workloads/onepassword-connect.md)). Both rules are narrower than the trust
 they sit under, and neither stops a pod on the host from reaching the daemon's port: the daemon's
 bearer token is the gate for that.
+
+The same table's forward chain drops every forwarded packet from the pod and overlay interfaces to
+Docker's subnet, so no pod reaches imp-host on any port. imp-host filters inbound traffic only from
+its imps ([imp on the host](../host/imp.md#how-impd-is-reached)), so without the drop a pod would
+reach impd's plain-HTTP API and imp-host's other listeners without the tailnet grant. NixOS's
+forward chain accepts the pods' traffic, and kube-router accepts traffic that its network policies
+allow with a mark in iptables' forward chain, before Docker's isolation drop runs. The drop in this
+repo's table is final whatever those chains accept, because a drop in any base chain is final. The
+host loads it with the rest of its firewall, so it holds before kube-router programs a new pod.
+Every pod reaches impd at its tailnet name instead, and the Connect relay takes traffic from
+Docker's bridge to the host itself, so neither path crosses the drop.
 
 ### imp's tables
 

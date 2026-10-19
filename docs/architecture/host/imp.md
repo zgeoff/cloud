@@ -23,6 +23,12 @@ impd serves its API on the host's loopback and on its own tailnet node, `imp-geo
 to impd. The tailnet node serves impd's API and each imp over HTTPS at `imps.geoff.cloud` and
 `<name>.imps.geoff.cloud` ([the tailnet](../network/tailnet.md)).
 
+imp-host filters inbound traffic only from its imps' interfaces. From Docker's bridge, every
+listener in the container answers, impd's plain-HTTP API, its SSH server and imp's credential broker
+among them, so impd's token is the only gate inside the container. The host's own table therefore
+drops pod traffic to Docker's subnet ([firewalls](../network/firewalls.md#the-narrowing-table)), and
+on Docker's bridge only the host and the containers reach imp-host.
+
 impd reaches the host's Docker only through imp's Docker API proxy, a separate unit with no network
 that forwards the calls impd needs, so the container never mounts the Docker socket. The module also
 loads the `inet imp-forward` table, which drops traffic from imp-host's bridge to the cluster's pod
