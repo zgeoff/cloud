@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { z } from 'zod';
 import { createFilesService } from './create-files-service.ts';
 import { createUploadStore } from './create-upload-store.ts';
 import { buildMockUpload } from './test-utils/build-mock-upload.ts';
@@ -105,7 +106,9 @@ test('it serves a PNG inline with nosniff and the sandbox policy', async () => {
     }),
   );
 
-  const uploaded = (await upload.json()) as { readonly url: string };
+  const uploadBody: unknown = await upload.json();
+
+  const uploaded = z.object({ url: z.string() }).parse(uploadBody);
 
   const response = await ctx.service.handle(
     new Request(`http://localhost${new URL(uploaded.url).pathname}`),
@@ -137,7 +140,9 @@ test('it serves an HTML upload as an octet-stream attachment, whatever type the 
     }),
   );
 
-  const uploaded = (await upload.json()) as { readonly url: string; readonly contentType: string };
+  const uploadBody: unknown = await upload.json();
+
+  const uploaded = z.object({ url: z.string(), contentType: z.string() }).parse(uploadBody);
 
   const response = await ctx.service.handle(
     new Request(`http://localhost${new URL(uploaded.url).pathname}`),
@@ -163,7 +168,9 @@ test('it serves an SVG upload as an attachment', async () => {
     }),
   );
 
-  const uploaded = (await upload.json()) as { readonly url: string };
+  const uploadBody: unknown = await upload.json();
+
+  const uploaded = z.object({ url: z.string() }).parse(uploadBody);
 
   const response = await ctx.service.handle(
     new Request(`http://localhost${new URL(uploaded.url).pathname}`),

@@ -8,12 +8,6 @@ export function isSafeFilename(filename: string): boolean {
     bytes <= 255 &&
     filename !== '.' &&
     filename !== '..' &&
-    ![...filename].some((character) => isForbiddenCharacter(character))
+    !/[/\\\p{Cc}]/u.test(filename)
   );
-}
-
-function isForbiddenCharacter(character: string): boolean {
-  const code = character.codePointAt(0) ?? 0;
-
-  return character === '/' || character === '\\' || code < 0x20 || code === 0x7f;
 }

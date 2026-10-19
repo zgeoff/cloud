@@ -50,9 +50,9 @@ test('it refuses a second upload with the same id', async () => {
 
   ctx.store.writeUpload(buildMockUpload({ id: 'Ab12Ab12Ab12Ab12Ab12Ab' }));
 
-  expect(() => ctx.store.writeUpload(buildMockUpload({ id: 'Ab12Ab12Ab12Ab12Ab12Ab' }))).toThrow(
-    'UNIQUE constraint failed: uploads.id',
-  );
+  expect(() => {
+    ctx.store.writeUpload(buildMockUpload({ id: 'Ab12Ab12Ab12Ab12Ab12Ab' }));
+  }).toThrow('UNIQUE constraint failed: uploads.id');
 });
 
 test('it lists one uploader newest first, and leaves out an expired upload', async () => {
