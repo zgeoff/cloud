@@ -88,18 +88,20 @@ A run that applied ends its summary with `deployed/prod moved to <revision>.`, a
 both drift checks. Link the run on the PR or issue as the record of the apply. A run whose decision
 printed
 `No commit after deployed/prod at <commit> up to <revision> changes a Pulumi input, so nothing applied.`
-changed nothing, and so did a run whose apply job printed
+changed nothing, and so did a run whose decision printed
 `deployed/prod at <commit> already holds every Pulumi input of <revision>, so nothing applied.`
 after it waited behind a newer commit's apply.
 
 A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
-most 100 waiting applies and cancels any more. It still posts `The prod apply failed` to Discord.
-Check that a newer run applied, because its apply covers every change of the cancelled one.
+most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
+that a newer run applied, because its apply covers every change of the cancelled one.
 
 ## Answer a held run
 
-A held run fails at the step `Hold for a manual dispatch`, and Discord shows
-`The prod apply is held for a manual dispatch`. Its summary lists each reason.
+A held run ends green after the step `Decide the outcome`, which prints
+`The guard held the apply. To apply this plan, dispatch Deploy prod on main with revision <revision>.`
+as a notice. Discord shows `The prod apply is held for a manual dispatch`, and the run's summary
+lists each reason. The next push's run starts once the held run ends.
 
 1. Read the held plan. Run a preview from a clean checkout of the held revision to see each change
    in full:

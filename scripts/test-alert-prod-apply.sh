@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test for alert-prod-apply.sh: it resolves the webhook from the env file's ALERT_WEBHOOK_URL
-# reference, prints only its ::add-mask:: line, and posts "held for a manual dispatch" for a held
-# run no person started and "failed" for every other run; it fails with curl's status when the
+# reference, prints only its ::add-mask:: line, and posts "held for a manual dispatch" for a run
+# that ended held and "failed" for every other run; it fails with curl's status when the
 # webhook refuses the post, with op's when the reference does not resolve, and before op runs for
 # an env file without the variable, an empty 1Password token, a missing GitHub variable or a bad
 # argument. op and curl are stand-ins (create-stub-op-read.sh, create-stub-webhook-curl.sh). Each
@@ -21,7 +21,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-webhook
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alert-prod-apply.sh"
 
-it_posts_that_the_apply_failed_when_the_apply_job_never_gave_a_verdict() {
+it_posts_that_the_apply_failed_when_the_apply_job_never_gave_an_outcome() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -30,7 +30,7 @@ it_posts_that_the_apply_failed_when_the_apply_job_never_gave_a_verdict() {
   printf '# alerts\nALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT= EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME= RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
@@ -47,7 +47,7 @@ EOF
   assert_status 0 "$status"
 }
 
-it_posts_that_the_apply_is_held_when_the_guard_held_a_run_no_person_started() {
+it_posts_that_the_apply_is_held_when_the_run_ended_held() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -56,7 +56,7 @@ it_posts_that_the_apply_is_held_when_the_guard_held_a_run_no_person_started() {
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT=hold EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME=held RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
@@ -69,7 +69,7 @@ EOF
   assert_status 0 "$status"
 }
 
-it_posts_that_the_apply_failed_when_a_dispatched_run_holds() {
+it_posts_that_the_apply_failed_when_the_apply_itself_failed() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -78,29 +78,7 @@ it_posts_that_the_apply_failed_when_a_dispatched_run_holds() {
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT=hold EVENT=workflow_dispatch RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
-    bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
-  diff /dev/null "$tree/err"
-  diff - "$tree/webhook-body" << 'EOF'
-{
-  "content": "The prod apply failed: https://github.com/zgeoff/cloud/actions/runs/7"
-}
-EOF
-  assert_status 0 "$status"
-}
-
-it_posts_that_the_apply_failed_when_the_guard_passed_the_plan() {
-  local status=0
-  create_case_tree
-  setup_test "$tree"
-  mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
-  printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
-  printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
-
-  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT=apply EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME=apply RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
@@ -122,7 +100,7 @@ it_fails_with_curls_status_when_the_webhook_refuses_the_post() {
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub STUB_WEBHOOK_STATUS=404 \
-    VERDICT= EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME= RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
@@ -137,7 +115,7 @@ it_fails_with_ops_status_and_posts_nothing_when_the_reference_does_not_resolve()
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT= EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME= RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -157,7 +135,7 @@ it_fails_before_op_runs_when_the_env_file_sets_no_webhook() {
   printf 'OTHER=op://cloud-deploy/other/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT= EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME= RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -175,7 +153,7 @@ it_fails_before_op_runs_and_names_the_token_when_the_token_is_empty() {
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN= \
-    VERDICT= EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME= RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -191,11 +169,11 @@ it_fails_before_op_runs_without_the_run_url() {
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT= EVENT=workflow_run \
+    OUTCOME= \
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "$script: line 23: RUN_URL: parameter null or not set"
+  diff - "$tree/err" <<< "$script: line 21: RUN_URL: parameter null or not set"
   diff /dev/null "$tree/calls"
   assert_status 1 "$status"
 }
@@ -206,7 +184,7 @@ it_rejects_a_missing_env_file_argument_with_its_usage() {
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
-    VERDICT= EVENT=workflow_run RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    OUTCOME= RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"

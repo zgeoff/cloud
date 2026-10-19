@@ -1,22 +1,34 @@
 import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
 
-// Evaluates a job's `if` as GitHub's expression docs describe it: literals, `github` and `needs`
-// paths, `!`, `==`, `!=`, `&&`, `||`, parentheses, and the status check functions. Anything else,
-// such as another function or context, throws.
+// Evaluates a job's or a step's `if` as GitHub's expression docs describe it: literals, `github`,
+// `needs` and `steps` paths, `!`, `==`, `!=`, `&&`, `||`, parentheses, and the status check
+// functions. Anything else, such as another function or context, throws.
 interface ActionsNeed {
   readonly result: string;
+  readonly outputs: Readonly<Record<string, string>>;
+}
+
+// a step's outcome before continue-on-error, and its conclusion after it
+interface ActionsStep {
+  readonly outcome: string;
+  readonly conclusion: string;
   readonly outputs: Readonly<Record<string, string>>;
 }
 
 export interface ActionsConditionContext {
   readonly github: object;
   readonly needs: Readonly<Record<string, ActionsNeed>>;
+
+  // the earlier steps of the job, by id, for a step's `if`; their conclusions decide success() and
+  // failure() beside the needs, and without them a `steps` path throws
+  readonly steps?: Readonly<Record<string, ActionsStep>>;
 }
 
 const statusFunction = /\b(?:success|failure|cancelled|always)\(\)/u;
 
-// A condition with no status check function implies `success()`: every need succeeded.
+// A condition with no status check function implies `success()`: every need and earlier step
+// succeeded.
 export function isActionsConditionMet(
   condition: string,
   context: Readonly<ActionsConditionContext>,
@@ -151,7 +163,7 @@ function resolveStatusFunction(name: string, context: Readonly<ActionsConditionC
   // no test cancels a run, so cancelled() is always false
   return match(name)
     .with('success', () => isSuccess(context))
-    .with('failure', () => Object.values(context.needs).some((need) => need.result === 'failure'))
+    .with('failure', () => isFailure(context))
     .with('always', () => true)
     .with('cancelled', () => false)
     .otherwise(() => {
@@ -160,7 +172,17 @@ function resolveStatusFunction(name: string, context: Readonly<ActionsConditionC
 }
 
 function isSuccess(context: Readonly<ActionsConditionContext>): boolean {
-  return Object.values(context.needs).every((need) => need.result === 'success');
+  return (
+    Object.values(context.needs).every((need) => need.result === 'success') &&
+    Object.values(context.steps ?? {}).every((step) => step.conclusion !== 'failure')
+  );
+}
+
+function isFailure(context: Readonly<ActionsConditionContext>): boolean {
+  return (
+    Object.values(context.needs).some((need) => need.result === 'failure') ||
+    Object.values(context.steps ?? {}).some((step) => step.conclusion === 'failure')
+  );
 }
 
 function parseLiteralOrPath(
@@ -189,6 +211,7 @@ function resolvePath(path: string, context: Readonly<ActionsConditionContext>): 
   const contexts: Readonly<Record<string, unknown>> = {
     github: context.github,
     needs: context.needs,
+    ...(context.steps === undefined ? {} : { steps: context.steps }),
   };
 
   if (root === undefined || !(root in contexts)) {

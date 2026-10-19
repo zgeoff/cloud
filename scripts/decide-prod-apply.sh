@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
-# The Deploy prod workflow's decision, from the repo alone and with no secret: which commit to
-# apply, and whether it needs an apply at all. It writes apply (true or false) and revision to
-# $GITHUB_OUTPUT, for the apply job.
+# The Deploy prod job's decision, its first step once the job holds the deploy-prod concurrency
+# group, so no other apply moves the deployed/prod tag under it: which commit to apply, and whether
+# it needs an apply at all. It writes apply (true or false), revision and deployed, the tag's
+# commit, to $GITHUB_OUTPUT, for the job's later steps.
 #
 # A dispatch (EVENT=workflow_dispatch) applies main's tip only: DISPATCH_REF must be
 # refs/heads/main and DISPATCH_REVISION, the commit the person named, must equal DISPATCH_SHA.
 # Because a dispatch skips the trigger that waits for CI, it also needs a green CI run of a push
 # to main on that commit (find-ci-run.sh), and prints the run's URL. Any other event applies
 # RUN_HEAD, the commit the CI run checked. Either way the commit must be on origin/main.
-# run-decide-gates.ts decides, from the prod-apply gate of .github/gates.yml, whether a commit after the
-# deployed/prod tag changes a Pulumi input; when none does, it says so on stdout and in $GITHUB_STEP_SUMMARY, naming the tag's commit and the revision,
-# because a workflow_run run's own head commit is main's tip when the run started, which can be a
-# later merge than the commit it decides on. This job runs outside the deploy-prod
-# queue, so another apply can move the tag after it reads it: the apply job decides again once it
-# holds the queue (decide-queued-prod-apply.sh). A "false" here stays true then, because the tag
-# only moves forward along main.
+# A commit the tag already holds, as for a run that waited behind a newer commit's apply, needs no
+# apply. Otherwise run-decide-gates.ts decides, from the prod-apply gate of .github/gates.yml, whether
+# a commit after the tag changes a Pulumi input. When no apply is needed, it says so on stdout and
+# in $GITHUB_STEP_SUMMARY, naming the tag's commit and the revision, because a workflow_run run's
+# own head commit is main's tip when the run started, which can be a later merge than the commit
+# it decides on.
 #
-# A refused dispatch, a missing green run, a commit off main, a tag git cannot resolve, and a
-# failure of either helper fail the run with exit 1 (git's own status for the tag, the helper's
-# for a helper), so the job never skips an apply it cannot decide. Missing GitHub variables are
-# a usage error (exit 2).
+# A refused dispatch, a missing green run, a commit off main and a tag that has left main fail the
+# run with exit 1; a tag git cannot resolve fails it with git's status, and a failed helper with
+# the helper's, so the job never skips an apply it cannot decide. Missing GitHub variables are a
+# usage error (exit 2).
 #
 #   EVENT=workflow_run RUN_HEAD=<commit> bash scripts/decide-prod-apply.sh
 #   EVENT=workflow_dispatch DISPATCH_REF=<ref> DISPATCH_SHA=<commit> DISPATCH_REVISION=<commit> \
@@ -65,12 +65,14 @@ deployed="$(git rev-parse --verify 'deployed/prod^{commit}')"
 # live
 if git merge-base --is-ancestor "$revision" "$deployed"; then
   apply=false
+  reason="deployed/prod at $deployed already holds every Pulumi input of $revision, so nothing applied."
 elif ! git merge-base --is-ancestor "$deployed" "$revision"; then
   echo "decide-prod-apply: deployed/prod at $deployed is not an ancestor of $revision; set the tag by hand at the live revision" >&2
   exit 1
 else
   decision="$(bun "$here/run-decide-gates.ts" "$deployed" "$revision" prod-apply)"
   apply="${decision#prod-apply=}"
+  reason="No commit after deployed/prod at $deployed up to $revision changes a Pulumi input, so nothing applied."
 fi
 case "$apply" in
   true | false) ;;
@@ -82,8 +84,8 @@ esac
 {
   echo "apply=$apply"
   echo "revision=$revision"
+  echo "deployed=$deployed"
 } >> "$GITHUB_OUTPUT"
 if [ "$apply" = false ]; then
-  echo "No commit after deployed/prod at $deployed up to $revision changes a Pulumi input, so nothing applied." |
-    tee -a "$GITHUB_STEP_SUMMARY"
+  echo "$reason" | tee -a "$GITHUB_STEP_SUMMARY"
 fi

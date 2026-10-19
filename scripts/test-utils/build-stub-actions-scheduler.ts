@@ -22,9 +22,11 @@ interface StubRun {
   readonly jobs: Readonly<Record<string, StubJobStatus>>;
 }
 
+// the outputs each step of the job set, by the step's id; the job's outputs are the ones its
+// workflow declares, read from these, and an output no step set reads as empty, as on GitHub
 interface StubJobResult {
   readonly status: 'success' | 'failure';
-  readonly outputs?: Readonly<Record<string, string>>;
+  readonly steps?: Readonly<Record<string, Readonly<Record<string, string>>>>;
 }
 
 export interface StubActionsScheduler {
@@ -113,13 +115,19 @@ function updateFinishedJob(state: SchedulerState, holder: Required<Holder>, resu
     );
   }
 
+  const definition = state.workflow.jobs.find((each) => each.name === holder.job);
+
   job.status = result.status;
-  job.outputs = result.outputs ?? {};
 
-  const concurrency = state.workflow.jobs.find((each) => each.name === holder.job)?.concurrency;
+  job.outputs = Object.fromEntries(
+    Object.entries(definition?.outputs ?? {}).map(([name, source]) => [
+      name,
+      result.steps?.[source.step]?.[source.output] ?? '',
+    ]),
+  );
 
-  if (concurrency !== undefined) {
-    removeRunningHolder(state, concurrency);
+  if (definition?.concurrency !== undefined) {
+    removeRunningHolder(state, definition.concurrency);
   }
 
   updateRuns(state);
