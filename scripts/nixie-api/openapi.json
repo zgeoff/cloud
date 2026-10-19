@@ -2348,6 +2348,14 @@
                             ],
                             "type": "string"
                           },
+                          "subject": {
+                            "enum": [
+                              "owner",
+                              "self",
+                              "shared"
+                            ],
+                            "type": "string"
+                          },
                           "text": {
                             "type": "string"
                           },
@@ -2370,6 +2378,7 @@
                           "source",
                           "state",
                           "status",
+                          "subject",
                           "version"
                         ]
                       }
@@ -2684,6 +2693,14 @@
                             ],
                             "type": "string"
                           },
+                          "subject": {
+                            "enum": [
+                              "owner",
+                              "self",
+                              "shared"
+                            ],
+                            "type": "string"
+                          },
                           "text": {
                             "type": "string"
                           },
@@ -2712,6 +2729,7 @@
                           "source",
                           "state",
                           "status",
+                          "subject",
                           "version"
                         ]
                       }
@@ -2949,6 +2967,14 @@
                             ],
                             "type": "string"
                           },
+                          "subject": {
+                            "enum": [
+                              "owner",
+                              "self",
+                              "shared"
+                            ],
+                            "type": "string"
+                          },
                           "text": {
                             "type": "string"
                           },
@@ -2971,6 +2997,7 @@
                           "source",
                           "state",
                           "status",
+                          "subject",
                           "version"
                         ]
                       }
@@ -3216,6 +3243,14 @@
                       ],
                       "type": "string"
                     },
+                    "subject": {
+                      "enum": [
+                        "owner",
+                        "self",
+                        "shared"
+                      ],
+                      "type": "string"
+                    },
                     "text": {
                       "type": "string"
                     },
@@ -3442,6 +3477,7 @@
                     "source",
                     "state",
                     "status",
+                    "subject",
                     "version",
                     "versions"
                   ]
@@ -4450,6 +4486,14 @@
                       ],
                       "type": "string"
                     },
+                    "subject": {
+                      "enum": [
+                        "owner",
+                        "self",
+                        "shared"
+                      ],
+                      "type": "string"
+                    },
                     "text": {
                       "type": "string"
                     },
@@ -4695,6 +4739,7 @@
                     "source",
                     "state",
                     "status",
+                    "subject",
                     "version",
                     "versions",
                     "lost"
@@ -5867,6 +5912,14 @@
                               ]
                             }
                           },
+                          "subject": {
+                            "enum": [
+                              "owner",
+                              "self",
+                              "shared"
+                            ],
+                            "type": "string"
+                          },
                           "targetVersion": {
                             "anyOf": [
                               {
@@ -5899,6 +5952,7 @@
                           "reason",
                           "source",
                           "sources",
+                          "subject",
                           "targetVersion",
                           "text"
                         ]
