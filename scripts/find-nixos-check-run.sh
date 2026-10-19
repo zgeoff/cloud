@@ -2,7 +2,8 @@
 # Finds the green NixOS checks run that covers <commit>, and prints its URL; it prints nothing
 # when no run covers it. A run covers the commit when it is a scheduled or dispatched run of
 # .github/workflows/nixos-checks.yml on main that succeeded, its commit is <commit> or an ancestor
-# of it, and scripts/needs-nixos-checks.sh finds no input of the checks changed between the two.
+# of it, and scripts/decide-gates.ts finds that no commit between the two changes an input of the
+# checks, which the nixos gate of .github/gates.yml lists.
 # Runs on other branches and pull request runs never count: they checked a commit main may not
 # hold. The nightly run reads it to skip a commit that is already covered, and
 # scripts/switch-geoffcloud.sh to refuse a commit that is not.
@@ -33,10 +34,10 @@ gh api -X GET "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs" \
 
 while read -r sha url; do
   git cat-file -e "$sha^{commit}" 2> /dev/null || continue
-  # a run on a commit off <commit>'s history never covers it: needs-nixos-checks.sh prints
-  # "true" for a base that is not an ancestor of the head
-  needed="$(bash "$(dirname "${BASH_SOURCE[0]}")/needs-nixos-checks.sh" "$sha" "$commit")"
-  if [ "$needed" = false ]; then
+  # a run on a commit off <commit>'s history never covers it: decide-gates.ts needs every gate for
+  # a base that is not an ancestor of the head
+  needed="$(bun "$(dirname "${BASH_SOURCE[0]}")/decide-gates.ts" "$sha" "$commit" nixos)"
+  if [ "$needed" = nixos=false ]; then
     echo "$url"
     exit 0
   fi

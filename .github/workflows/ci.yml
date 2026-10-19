@@ -2,11 +2,10 @@ name: CI
 
 # One job for the secret scan, the Bun checks and the provider's Go checks, so a run bills one
 # runner minute where three jobs billed three. The job runs on every pull request and every push
-# to main; scripts/needs-provider-check.sh decides whether the change touches an input of the Go
-# checks or the generated SDK, and the job runs them and the SDK check only then.
-# scripts/needs-full-checks.sh decides the same way whether any changed file is not Markdown, and
-# the job runs the four Nix-image linters and the shell suites only then: they take most of its
-# time, and none of them reads a Markdown file. A failed decision or a failed check fails the job.
+# to main. scripts/decide-gates.ts decides, from the provider and full gates of .github/gates.yml,
+# whether the change touches an input of the Go checks and the SDK check, and whether it changes
+# any file other than Markdown, which the four Nix-image linters and the shell suites need; the
+# job runs each only then. A failed decision or a failed check fails the job.
 on:
   push:
     branches: [main]
@@ -41,21 +40,13 @@ jobs:
 
       # a pull request compares its base with the merge commit under test; a push compares the
       # commit before it (all zeros for a new branch, which needs the checks)
-      - name: Decide whether the change needs the provider checks
+      - name: Decide which checks the change needs
         id: decide
         env:
           BASE:
             ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
             github.event.before }}
-        run: bun run --silent ci:decide-provider-checks "$BASE" "$GITHUB_SHA"
-
-      - name: Decide whether the change needs the full checks
-        id: decide-full
-        env:
-          BASE:
-            ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
-            github.event.before }}
-        run: bun run --silent ci:decide-full-checks "$BASE" "$GITHUB_SHA"
+        run: bun run --silent ci:decide-gates --github "$BASE" "$GITHUB_SHA" provider full
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -69,20 +60,20 @@ jobs:
       # the four linters run tools from nixos/flake.lock's nixpkgs in the pinned Nix image; the
       # first one fills the job's Nix store volume for the others
       - name: Lint shell
-        if: steps.decide-full.outputs.full == 'true'
+        if: steps.decide.outputs.full == 'true'
         run: bun run lint:sh
 
       - name: Lint Nix
-        if: steps.decide-full.outputs.full == 'true'
+        if: steps.decide.outputs.full == 'true'
         run: bun run lint:nix
 
       - name: Lint Python
-        if: steps.decide-full.outputs.full == 'true'
+        if: steps.decide.outputs.full == 'true'
         run: bun run lint:py
 
       # actionlint, then the check that every run step is setup or one bun run call
       - name: Lint Actions
-        if: steps.decide-full.outputs.full == 'true'
+        if: steps.decide.outputs.full == 'true'
         run: bun run lint:actions
 
       - name: Doc links
@@ -137,7 +128,7 @@ jobs:
       # the ubuntu-24.04 image 20260927.320.1 readme lists GitHub CLI 2.101.0, which the GitHub
       # API stand-in's real-gh case (test-support/shell/test-start-stub-github-api.sh) runs
       - name: Test Scripts
-        if: steps.decide-full.outputs.full == 'true'
+        if: steps.decide.outputs.full == 'true'
         run: bun run test:scripts
 
       # the pinned blackbox exporter and promtool in Docker, against the probe and the rules the

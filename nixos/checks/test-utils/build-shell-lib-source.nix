@@ -2,8 +2,8 @@
 # holds those files and no other: run-cases.sh, the assert_* helpers and wait-for.sh, with the
 # suites of run-cases.sh and the assert_* helpers, which test-utils-check.nix runs. Every other
 # file in test-support/shell stays out, so an edit to a stand-in the checks never read changes no
-# check's derivation. scripts/needs-nixos-checks.sh lists the same files as inputs of the checks:
-# a file added here is added there too.
+# check's derivation. The nixos gate of .github/gates.yml lists the same files as inputs of the
+# checks: a file added here is added there too.
 { lib }:
 lib.fileset.toSource {
   root = ../../../test-support/shell;
