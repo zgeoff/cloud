@@ -152,8 +152,5 @@ test.each([
 ])('it refuses %s', (_label: string, type: string, props: unknown, reason: string) => {
   expect(() => {
     requireNoPortForwardGrant(type, props);
-  }).toThrowWithMessage(
-    Error,
-    `${type} ${reason}; no RBAC object may grant pods/portforward (GEO-1388)`,
-  );
+  }).toThrowWithMessage(Error, `${type} ${reason}; no RBAC object may grant pods/portforward`);
 });

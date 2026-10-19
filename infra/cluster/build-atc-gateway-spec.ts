@@ -130,8 +130,7 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
 }
 
 // The atc tunnel's connector. It reads the token from a file, never the env, and keeps its
-// metrics on loopback, so nothing outside the pod reaches it; that leaves kubelet no port to probe,
-// and the external health check on the gateway's hostname watches the tunnel instead.
+// metrics on loopback, so nothing outside the pod reaches it; that leaves kubelet no port to probe.
 function buildTunnelContainer(): input.core.v1.Container {
   return {
     name: 'cloudflared',

@@ -2,16 +2,8 @@
 const rbacTypePattern =
   /^kubernetes:rbac\.authorization\.k8s\.io\/[^:]+:(?:Cluster)?Role(?:Binding)?(?:Patch)?$/u;
 
-// the built-in ClusterRoles that grant pods/portforward, which a binding must never name
-const portForwardClusterRoles = new Set([
-  'cluster-admin',
-  'admin',
-  'edit',
-  'system:aggregate-to-edit',
-]);
-
 // Refuses an RBAC object, a Helm chart's included, that grants a port-forward: one reaches a pod
-// from 127.0.0.1, which the atc gateway trusts (GEO-1388). It covers every namespace and fails
+// from 127.0.0.1, which the atc gateway trusts. It covers every namespace and fails
 // closed, so a rule or a reference it cannot read, such as an unresolved Output, counts as a grant.
 export function requireNoPortForwardGrant(type: string, props: unknown): void {
   if (!rbacTypePattern.test(type)) {
@@ -21,7 +13,7 @@ export function requireNoPortForwardGrant(type: string, props: unknown): void {
   const reason = findPortForwardGrant(props);
 
   if (reason !== undefined) {
-    throw new Error(`${type} ${reason}; no RBAC object may grant pods/portforward (GEO-1388)`);
+    throw new Error(`${type} ${reason}; no RBAC object may grant pods/portforward`);
   }
 }
 
@@ -52,6 +44,14 @@ function findPortForwardGrant(props: unknown): string | undefined {
     ? 'has a rule that covers pods/portforward'
     : undefined;
 }
+
+// the built-in ClusterRoles that grant pods/portforward, which a binding must never name
+const portForwardClusterRoles = new Set([
+  'cluster-admin',
+  'admin',
+  'edit',
+  'system:aggregate-to-edit',
+]);
 
 function findBindingGrant(roleRef: unknown): string | undefined {
   if (!isRecord(roleRef) || typeof roleRef['name'] !== 'string') {

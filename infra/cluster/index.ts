@@ -1,6 +1,5 @@
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
-import { runtime } from '@pulumi/pulumi';
 import type { ATCGatewayInputs, NixieInputs } from '../inputs/index.ts';
 import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patches.ts';
 import { createATCGateway } from './atc-gateway.ts';
@@ -10,16 +9,9 @@ import { nixieReadinessURL } from './nixie-readiness-url.ts';
 import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
-import { requireNoPortForwardGrant } from './require-no-port-forward-grant.ts';
 
-// Fails the preview on any RBAC object that grants pods/portforward (GEO-1388). A stack transform
-// sees every resource registered after it, the Helm charts' rendered objects included, so the
-// program root calls this before it declares any resource.
-export function registerPortForwardGuard(): void {
-  runtime.registerResourceTransform((args) => {
-    requireNoPortForwardGrant(args.type, args.props);
-  });
-}
+// the guard the program root registers before its first resource
+export { registerPortForwardGuard } from './register-port-forward-guard.ts';
 
 interface ClusterInputs {
   // set only after the owner approves the deploy, with the token of the atc tunnel that the
