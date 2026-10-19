@@ -78,7 +78,9 @@ holds no matching generation. Reinstall then, as the next bullet does.
 **Untested.** The pool is gone, and everything on it: every imp's disk, impd's database with its
 named tokens and grants, impd's own secrets, the cluster with every volume, the host's secret files
 and the copies of impd's database. `vda` keeps NixOS, the key and the host's tailnet identity, so
-the host boots and answers SSH, with k3s, imp-host and the atc daemon stopped.
+the host boots and answers SSH, with k3s, imp-host and the atc daemon stopped. The
+`geoffcloud-no-pool` NixOS check boots the host's configuration in a VM with no pool disk, and fails
+unless the VM reaches that state.
 
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the pool
 against the NixOS checks, the secret files against their install scripts, impd's secrets and tokens
@@ -283,8 +285,7 @@ host.
 
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the
 installer against the host's network config and the Onidel API, the staging against the reinstall
-runbook, and the boot without a pool against the units' mount needs. No NixOS check boots a host
-without its pool.
+runbook. The `geoffcloud-no-pool` NixOS check covers the boot without a pool.
 
 1. Turn Secure Boot off for the VM in the Onidel panel, as reinstall step 1 does.
 2. Boot the VM from a NixOS minimal installer ISO, through `POST /isos` and the panel, as
