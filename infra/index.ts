@@ -63,6 +63,7 @@ const ingress = createIngress({
   atcRoute: workloads?.atcGatewayRoute,
   atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
   atcTunnel,
+  filesRoute: workloads?.filesRoute,
 });
 
 export const tunnelToken = ingress.tunnelToken;
@@ -70,6 +71,7 @@ export const tunnelConfigVersion = ingress.tunnelConfigVersion;
 export const atcTunnelConfigVersion = ingress.atcTunnelConfigVersion;
 export const atcURL = ingress.atcURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
+export const filesURL = ingress.filesURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;
 export const atcGatewayServiceURL = workloads?.atcGatewayServiceURL;
 export const nixieURL = workloads?.nixieURL;

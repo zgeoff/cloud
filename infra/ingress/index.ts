@@ -36,6 +36,9 @@ interface IngressInputs {
 
   // the atc tunnel, set with the gateway
   readonly atcTunnel: ATCTunnel | undefined;
+
+  // the files service's route, set with the service
+  readonly filesRoute: TunnelRoute | undefined;
 }
 
 interface IngressOutputs {
@@ -43,6 +46,7 @@ interface IngressOutputs {
   readonly tunnelConfigVersion: Output<number>;
   readonly atcTunnelConfigVersion?: Output<number>;
   readonly atcURL?: Output<string>;
+  readonly filesURL?: Output<string>;
   readonly previewWebhookURL: Output<string>;
 }
 
@@ -67,12 +71,13 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
   }
 
   // the routes: atc.geoff.cloud, a workload in k3s, on the atc tunnel, and the preview service's
-  // webhook listener on the host, on this one
+  // webhook listener on the host and the files service in k3s, on this one
   const routes = createTunnelRoutes({
     accountID: inputs.accountID,
     zoneID: inputs.zoneID,
     tunnelID: tunnel.id,
     gateway: createGatewayIngress(inputs),
+    files: inputs.filesRoute,
   });
 
   return {
@@ -82,6 +87,7 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
       ? {}
       : { atcTunnelConfigVersion: routes.atcConfigVersion }),
     ...(routes.atcURL === undefined ? {} : { atcURL: routes.atcURL }),
+    ...(routes.filesURL === undefined ? {} : { filesURL: routes.filesURL }),
     previewWebhookURL: routes.previewWebhookURL,
   };
 }
