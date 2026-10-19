@@ -2,6 +2,7 @@ import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { ATCGatewayConfig } from '../inputs/index.ts';
+import { cloudflaredImage } from '../shared/cloudflared-image.ts';
 
 export const atcGatewayPort = topology.atc.gatewayPort;
 export const atcGatewayLabels = { app: 'atc-gateway' };
@@ -25,6 +26,9 @@ interface GatewaySpecInputs {
 
   // the dockerconfigjson Secret that pulls the private image
   readonly pullSecret: Output<string>;
+
+  // the Secret that holds the atc tunnel's token under the key `token`
+  readonly tunnelToken: Output<string>;
 }
 
 // The gateway's Deployment spec: `serve` keeps gateway.db/mcp-auth.db in --state-dir and
@@ -43,13 +47,16 @@ export function buildATCGatewaySpec(inputs: GatewaySpecInputs): input.apps.v1.De
         securityContext: buildATCPodSecurity(),
         automountServiceAccountToken: false,
         imagePullSecrets: [{ name: inputs.pullSecret }],
-        containers: [buildGatewayContainer(inputs)],
+        containers: [buildGatewayContainer(inputs), buildTunnelContainer()],
         volumes: [
           { name: 'state', persistentVolumeClaim: { claimName: inputs.claim } },
           { name: 'config', emptyDir: {} },
           { name: 'runtime', emptyDir: { medium: 'Memory' } },
           { name: 'tmp', emptyDir: {} },
           { name: 'registry', configMap: { name: inputs.registry } },
+
+          // group-readable, so the nonroot user reads it through fsGroup
+          { name: 'tunnel-token', secret: { secretName: inputs.tunnelToken, defaultMode: 0o440 } },
         ],
       },
     },
@@ -84,6 +91,10 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
       `${registryDir}/${atcGatewayRegistryFile}`,
       '--state-dir',
       stateDir,
+      ...(inputs.config.trustForwardedFrom ?? []).flatMap((address) => [
+        '--trust-forwarded-from',
+        address,
+      ]),
     ],
     ports: [{ name: 'http', containerPort: atcGatewayPort }],
 
@@ -108,6 +119,38 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
     readinessProbe: { ...buildProbe('/readyz', inputs.publicHost), periodSeconds: 10 },
     resources: { requests: { cpu: '50m', memory: '128Mi' }, limits: { memory: '256Mi' } },
     securityContext: {
+      readOnlyRootFilesystem: true,
+      allowPrivilegeEscalation: false,
+      capabilities: { drop: ['ALL'] },
+    },
+  };
+}
+
+// the atc tunnel's token Secret, mounted into the cloudflared sidecar alone
+const tunnelTokenDir = '/etc/cloudflared';
+
+// The atc tunnel's connector. It reads the token from a file, never the env, and keeps its
+// metrics on loopback, so nothing outside the pod reaches it; that leaves kubelet no port to probe.
+function buildTunnelContainer(): input.core.v1.Container {
+  return {
+    name: 'cloudflared',
+    image: cloudflaredImage,
+    args: [
+      'tunnel',
+      '--no-autoupdate',
+      '--metrics',
+      '127.0.0.1:2000',
+      'run',
+      '--token-file',
+      `${tunnelTokenDir}/token`,
+    ],
+    volumeMounts: [{ name: 'tunnel-token', mountPath: tunnelTokenDir, readOnly: true }],
+    resources: {
+      requests: { cpu: '10m', memory: '32Mi' },
+      limits: { cpu: '200m', memory: '128Mi' },
+    },
+    securityContext: {
+      runAsNonRoot: true,
       readOnlyRootFilesystem: true,
       allowPrivilegeEscalation: false,
       capabilities: { drop: ['ALL'] },

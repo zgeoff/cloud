@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { topology } from '@zgeoff/cloud-topology';
 import { z } from 'zod';
 import { pinnedImagePattern } from './pinned-image-pattern.ts';
@@ -57,6 +58,9 @@ const maxDaemons = 34;
 const defaultDaemonUnsetMessage =
   'is unset: name the daemon a call without one goes to, one of atcGateway.daemons';
 
+const trustedProxyMessage =
+  'must be an IP address as the socket reports the proxy, such as 127.0.0.1: atc takes no range or name';
+
 // The atcGateway stack config; setting it approves the deploy. Each check matches what atc's
 // gateway refuses at start, so a mistake fails the preview instead of the pod. Values pass
 // through unchanged: only an unset alertSeverity takes its default.
@@ -108,6 +112,13 @@ export const atcGatewayConfigSchema = z
       // where the state volume mounts and --state-dir points: gateway.db and
       // mcp-auth.db. atc's packaging fixes the path; the default is $HOME's state dir.
       stateDir: z.string().optional(),
+
+      // the proxies whose CF-Connecting-IP security events mark trusted, one
+      // --trust-forwarded-from each; atc matches the socket's peer exactly, so each is one IP.
+      // Unset or empty, every forwarded address reads unverified.
+      trustForwardedFrom: z
+        .array(z.string().refine((address) => isIP(address) !== 0, trustedProxyMessage))
+        .optional(),
     },
     { error: 'must be an object' },
   )

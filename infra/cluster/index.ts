@@ -10,9 +10,13 @@ import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
 
+// the cluster's Kubernetes provider, with the port-forward guard registered first
+export { createClusterProvider } from './create-cluster-provider.ts';
+
 interface ClusterInputs {
-  // set only after the owner approves the deploy
-  readonly atcGateway?: ATCGatewayInputs;
+  // set only after the owner approves the deploy, with the token of the atc tunnel that the
+  // gateway pod's cloudflared sidecar runs
+  readonly atcGateway?: { readonly inputs: ATCGatewayInputs; readonly tunnelToken: Output<string> };
 
   // 1Password Connect for imps (GEO-120)
   readonly onePasswordConnect: OnePasswordConnectInputs;
@@ -41,7 +45,9 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
   createK3sNamespacePatches(cluster);
 
   const gateway =
-    inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);
+    inputs.atcGateway === undefined
+      ? undefined
+      : createATCGateway(cluster, inputs.atcGateway.inputs, inputs.atcGateway.tunnelToken);
 
   const connect = createOnePasswordConnect(cluster, inputs.onePasswordConnect);
 

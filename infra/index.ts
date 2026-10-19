@@ -1,9 +1,8 @@
 // the program's entry point: it reads the inputs once and wires each group through its entry module
-import { Provider } from '@pulumi/kubernetes';
 import { Config } from '@pulumi/pulumi';
-import { createCluster } from './cluster/index.ts';
+import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
-import { createIngress } from './ingress/index.ts';
+import { createATCTunnel, createIngress } from './ingress/index.ts';
 import { buildATCDaemonEndpoints, loadInputs } from './inputs/index.ts';
 import { createObservability } from './observability/index.ts';
 import { createTailnet } from './tailnet/index.ts';
@@ -34,14 +33,21 @@ const k3s =
     ? undefined
     : {
         inputs: inputs.cluster,
-        provider: new Provider('geoffcloud', { kubeconfig: inputs.cluster.kubeconfig }),
+        provider: createClusterProvider('geoffcloud', { kubeconfig: inputs.cluster.kubeconfig }),
       };
+
+// the atc tunnel's connector runs in the gateway's pod, so the tunnel comes before the cluster
+const atcTunnel = k3s?.inputs.atcGateway === undefined ? undefined : createATCTunnel(accountID);
 
 const workloads =
   k3s === undefined
     ? undefined
     : createCluster(k3s.provider, {
-        ...(k3s.inputs.atcGateway === undefined ? {} : { atcGateway: k3s.inputs.atcGateway }),
+        ...(k3s.inputs.atcGateway === undefined || atcTunnel === undefined
+          ? {}
+          : {
+              atcGateway: { inputs: k3s.inputs.atcGateway, tunnelToken: atcTunnel.tunnelToken },
+            }),
         onePasswordConnect: {
           credentials: k3s.inputs.onePasswordConnectCredentials,
         },
@@ -55,10 +61,12 @@ const ingress = createIngress({
   cluster: k3s?.provider,
   atcRoute: workloads?.atcGatewayRoute,
   atcOwnerEmail: k3s?.inputs.atcGateway?.secrets.ownerEmail,
+  atcTunnel,
 });
 
 export const tunnelToken = ingress.tunnelToken;
 export const tunnelConfigVersion = ingress.tunnelConfigVersion;
+export const atcTunnelConfigVersion = ingress.atcTunnelConfigVersion;
 export const atcURL = ingress.atcURL;
 export const previewWebhookURL = ingress.previewWebhookURL;
 export const onePasswordConnectServiceURL = workloads?.onePasswordConnectServiceURL;

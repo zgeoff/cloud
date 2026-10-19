@@ -112,8 +112,9 @@ these:
   Pulumi adds later holds too;
 - any change to the tailnet policy, the VM or the cloud firewall, because each can cut the host off
   or open it, and the owner reviews a policy diff before it applies;
-- any change to the tunnel's routes or to the Access application, policy or login in front of the
-  gateway's sign-in pages, because each decides who reaches a public path;
+- any change to a tunnel's routes, to a DNS record, or to the Access application, policy or login in
+  front of the gateway's sign-in pages, because each decides who reaches a public path or which
+  tunnel serves a hostname;
 - a failed drift check from the deployed revision, because the plan then holds changes nobody
   reviewed.
 

@@ -19,7 +19,8 @@ export interface OriginAccess {
   readonly audience: Output<string>;
 }
 
-interface TunnelIngress {
+// one of a tunnel's ingress rules, as ZeroTrustTunnelCloudflaredConfig takes it
+export interface TunnelIngress {
   readonly hostname?: string;
   readonly path?: string;
   readonly service: string | Output<string>;

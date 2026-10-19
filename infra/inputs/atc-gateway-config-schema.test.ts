@@ -1,9 +1,11 @@
 import { expect, test } from 'bun:test';
+import { join } from 'node:path';
+import { z } from 'zod';
 import { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
-import type { ATCGatewayRawConfig } from './types.ts';
+import type { ATCGatewayConfig, ATCGatewayRawConfig } from './types.ts';
 
 test('it passes a config through as given', () => {
-  const payload = {
+  const payload: ATCGatewayConfig = {
     image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
     backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0-r2@sha256:${'1'.repeat(64)}`,
     publicURL: 'https://atc.geoff.cloud',
@@ -21,7 +23,8 @@ test('it passes a config through as given', () => {
     },
     defaultDaemon: 'geoffcloud',
     stateDir: '/var/lib/atc',
-  } as const;
+    trustForwardedFrom: ['127.0.0.1', '::1'],
+  };
 
   expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
 });
@@ -410,4 +413,61 @@ test('it rejects a defaultDaemon that is not among the daemons, listing them', (
     path: ['defaultDaemon'],
     message: "'laptop' is not in atcGateway.daemons (geoffcloud, home-pc)",
   });
+});
+
+test.each([
+  ['a range', '10.42.0.0/16'],
+  ['a name', 'cloudflared.ingress.svc.cluster.local'],
+  ['a host:port', '127.0.0.1:8414'],
+  ['empty', ''],
+])('it rejects a trustForwardedFrom entry that is %s', (_kind, address) => {
+  const result = atcGatewayConfigSchema.safeParse({
+    image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
+    backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+    publicURL: 'https://atc.geoff.cloud',
+    daemons: {
+      geoffcloud: {
+        address: '100.69.47.33:8415',
+        daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+      },
+    },
+    defaultDaemon: 'geoffcloud',
+    trustForwardedFrom: ['127.0.0.1', address],
+  });
+
+  expect(result.error?.issues).toPartiallyContain({
+    path: ['trustForwardedFrom', 1],
+    message:
+      'must be an IP address as the socket reports the proxy, such as 127.0.0.1: atc takes no range or name',
+  });
+});
+
+test('it takes an empty trustForwardedFrom, which trusts no proxy', () => {
+  const payload: ATCGatewayConfig = {
+    image: `ghcr.io/zgeoff/atc-gateway:3.0.0@sha256:${'0'.repeat(64)}`,
+    backupImage: `ghcr.io/zgeoff/atc-gateway-backup:3.0.0@sha256:${'1'.repeat(64)}`,
+    publicURL: 'https://atc.geoff.cloud',
+    daemons: {
+      geoffcloud: {
+        address: '100.69.47.33:8415',
+        daemonID: '0f8e2c1a-4b6d-4e3f-9a7b-1c2d3e4f5a6b',
+        alertSeverity: 'critical',
+      },
+    },
+    defaultDaemon: 'geoffcloud',
+    trustForwardedFrom: [],
+  };
+
+  expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
+});
+
+test("it reads the committed prod config's trusted proxies as the pod's loopback alone", async () => {
+  const text = await Bun.file(join(import.meta.dir, '..', 'Pulumi.prod.yaml')).text();
+
+  const stack = z.object({ config: z.record(z.string(), z.unknown()) }).parse(Bun.YAML.parse(text));
+
+  expect(
+    atcGatewayConfigSchema.safeParse(stack.config['geoff-cloud:atcGateway']).data
+      ?.trustForwardedFrom,
+  ).toStrictEqual(['127.0.0.1']);
 });

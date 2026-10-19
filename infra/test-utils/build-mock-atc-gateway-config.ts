@@ -2,12 +2,15 @@ import { faker } from '@faker-js/faker';
 import type { ATCGatewayConfig, ATCGatewayDaemon } from '../inputs/types.ts';
 import { buildMockATCGatewayDaemon } from './build-mock-atc-gateway-daemon.ts';
 
-// stateDir's absence is behaviour (the gateway takes $HOME's state dir), so undefined leaves it
-// out (exactOptionalPropertyTypes forbids plain overrides). `daemons` names the daemons held;
-// each merges into fresh defaults.
-type ATCGatewayConfigOverrides = Partial<Omit<ATCGatewayConfig, 'daemons' | 'stateDir'>> & {
+// stateDir's and trustForwardedFrom's absence is behaviour (the gateway takes $HOME's state dir,
+// and trusts no proxy), so undefined leaves each out (exactOptionalPropertyTypes forbids plain
+// overrides). `daemons` names the daemons held; each merges into fresh defaults.
+type ATCGatewayConfigOverrides = Partial<
+  Omit<ATCGatewayConfig, 'daemons' | 'stateDir' | 'trustForwardedFrom'>
+> & {
   readonly daemons?: Readonly<Record<string, Partial<ATCGatewayDaemon>>>;
   readonly stateDir?: string | undefined;
+  readonly trustForwardedFrom?: string[] | undefined;
 };
 
 // A complete config as the schema checks it: one daemon under a name atc takes, and that daemon
@@ -15,10 +18,11 @@ type ATCGatewayConfigOverrides = Partial<Omit<ATCGatewayConfig, 'daemons' | 'sta
 export function buildMockATCGatewayConfig(
   overrides: ATCGatewayConfigOverrides = {},
 ): ATCGatewayConfig {
-  const { daemons, stateDir, ...fields } = {
+  const { daemons, stateDir, trustForwardedFrom, ...fields } = {
     daemons: { geoffcloud: {} },
     defaultDaemon: 'geoffcloud',
     stateDir: faker.system.directoryPath(),
+    trustForwardedFrom: [faker.internet.ipv4()],
     ...overrides,
   };
 
@@ -31,5 +35,6 @@ export function buildMockATCGatewayConfig(
       Object.entries(daemons).map(([name, daemon]) => [name, buildMockATCGatewayDaemon(daemon)]),
     ),
     ...(stateDir === undefined ? {} : { stateDir }),
+    ...(trustForwardedFrom === undefined ? {} : { trustForwardedFrom }),
   };
 }

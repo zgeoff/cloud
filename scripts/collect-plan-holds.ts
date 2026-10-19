@@ -23,10 +23,11 @@ export function collectPlanHolds(digest: unknown): string[] {
 const unattendedOps = new Set(['same', 'create', 'update', 'refresh', 'read']);
 
 // the whole tailnet policy file, the VM and the cloud firewall in front of it, and the edge's
-// say over who reaches the public hostnames: the tunnel's routes and the Access login in front of
-// the gateway's sign-in pages
+// say over who reaches the public hostnames: the tunnels' routes, the DNS records that point a
+// hostname at a tunnel, and the Access login in front of the gateway's sign-in pages
 const guardedTypes = new Set([
   'tailscale:index/acl:Acl',
+  'cloudflare:index/dnsRecord:DnsRecord',
   'cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig',
   'cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication',
   'cloudflare:index/zeroTrustAccessPolicy:ZeroTrustAccessPolicy',
