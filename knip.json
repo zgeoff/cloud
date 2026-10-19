@@ -22,7 +22,7 @@
       "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },
-  "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config"],
+  "ignoreDependencies": ["@stylistic/eslint-plugin", "@zgeoff/oxlint-config", "@zgeoff/skill-gate"],
   "ignoreBinaries": ["go", "gofmt", "op", "pulumi"],
   "ignore": [".claude/**"],
   "ignoreWorkspaces": ["sdk/*"]
