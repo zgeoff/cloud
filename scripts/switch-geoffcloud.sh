@@ -4,12 +4,16 @@
 #
 #   bash scripts/switch-geoffcloud.sh               # build, then switch
 #   bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
+#   bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s window
 #
 # A switch first needs a green NixOS checks run that covers the commit; with none, it stops
 # before the build and names the command that starts one. It also stops, before the build and
 # again before the activation, when the commit's atc daemon pin and a running atc gateway pod's
 # image differ in atc major version, since atc breaks its daemon protocol only in a major release,
 # and when the running nixie's imp client refuses the commit's impd major (check-nixie-impd-major.sh).
+# After the copy it holds a switch whose activation would stop or restart k3s, which can keep
+# nixie down for minutes, unless --allow-k3s-restart names a planned k3s window
+# (check-k3s-restart.sh).
 # After the activation it waits for nixie's /health/ready to report every part ready
 # (check-nixie-ready.sh), and fails with each part that is not, since nixie needs impd to start.
 # The switch runs only after the build
@@ -25,13 +29,16 @@ set -euo pipefail
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
-mode="${1:-switch}"
+mode=switch
+k3s_args=()
 host="${GEOFFCLOUD_HOST:-root@geoffcloud}"
 
-case "$mode" in
-  switch | --build-only) ;;
+case "${1:-switch}" in
+  switch) ;;
+  --build-only) mode=--build-only ;;
+  --allow-k3s-restart) k3s_args=(--allow-k3s-restart) ;;
   *)
-    echo "usage: switch-geoffcloud.sh [--build-only]" >&2
+    echo "usage: switch-geoffcloud.sh [--build-only | --allow-k3s-restart]" >&2
     exit 2
     ;;
 esac
@@ -99,6 +106,25 @@ require_nixie_impd_major() {
     "$snapshot/nixos/hosts/geoffcloud/configuration.nix" $images
 }
 
+# A k3s restart can keep nixie down for minutes, so the switch asks the copied system which units
+# its activation would stop or restart, and holds when k3s.service is one of them
+# (scripts/check-k3s-restart.sh). It runs switch-to-configuration dry-activate as nixos-rebuild
+# dry-activate does (nix.py: switch_to_configuration), which changes nothing on the host and
+# prints its lists on stderr. An ssh or dry-activate failure stops the script with its output and
+# exit code rather than reading as no restart.
+require_k3s_kept() {
+  local plan status=0
+  plan="$(ssh -o BatchMode=yes "$host" "NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE \
+    -E NIXOS_INSTALL_BOOTLOADER -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet \
+    --service-type=exec --unit=switch-geoffcloud-dry-activate '$built/bin/switch-to-configuration' \
+    dry-activate" 2>&1)" || status=$?
+  if [ "$status" != 0 ]; then
+    printf '%s\n' "$plan" >&2
+    exit "$status"
+  fi
+  bash "$(dirname "${BASH_SOURCE[0]}")/check-k3s-restart.sh" "${k3s_args[@]}" <<< "$plan"
+}
+
 verified_commit=""
 require_clean_main
 commit="$verified_commit"
@@ -142,6 +168,8 @@ docker run --rm --network host -v geoffcloud-nix-store:/nix \
   -v ~/.ssh/known_hosts:/root/.ssh/known_hosts:ro -e NIX_SSHOPTS="-o BatchMode=yes" \
   "$NIX_IMAGE" nix --extra-experimental-features "nix-command flakes" shell nixpkgs#openssh \
   -c nix --extra-experimental-features nix-command copy --to "ssh://$host" "$built"
+
+require_k3s_kept
 
 # as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a boot after a failed activation still picks the
 # new system, then switch-to-configuration in its own unit, so it survives a dropped SSH. Between

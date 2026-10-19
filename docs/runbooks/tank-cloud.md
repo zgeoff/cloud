@@ -102,11 +102,11 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
    atc-gateway and nixie pods over `k3s kubectl`, which reaches no API while k3s stays stopped, and
    a new cluster runs neither workload. The cluster and its workloads come before any switch,
    through that step and the rebuild it ends with.
-2. Switch with `bash scripts/switch-geoffcloud.sh`, as [Workflows](./workflows.md#switch-the-host)
-   describes. The switch restarts k3s, imp-host and the atc daemon, because their units gain the
-   mount requirement, so imp-host's restart puts every awake imp to sleep. k3s starts only once the
-   zvol holds a cluster's certificate authority and datastore, so it never makes a new cluster on an
-   empty zvol by accident.
+2. Switch with `bash scripts/switch-geoffcloud.sh --allow-k3s-restart` in a planned k3s window, as
+   [Workflows](./workflows.md#switch-the-host) describes. The switch restarts k3s, imp-host and the
+   atc daemon, because their units gain the mount requirement, so imp-host's restart puts every
+   awake imp to sleep. k3s starts only once the zvol holds a cluster's certificate authority and
+   datastore, so it never makes a new cluster on an empty zvol by accident.
 3. Check the mounts and the services:
 
    ```bash

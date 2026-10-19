@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the six
+# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the seven
 # remote commands of a switch, fails closed on anything else, and hands a loopback call to
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
@@ -36,6 +36,73 @@ it_answers_the_switch_with_nothing() {
 CALLS
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_the_named_unit_lists_on_stderr_for_the_dry_activate() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_DRY_ACTIVATE=$'would stop the following units: k3s.service\nwould activate the configuration...' \
+    ssh -o BatchMode=yes root@geoffcloud "NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'ERR'
+would stop the following units: k3s.service
+would activate the configuration...
+ERR
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate"]
+CALLS
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_prints_only_the_activation_line_for_a_dry_activate_with_no_unit_to_change() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud "NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'would activate the configuration...'
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate"]
+CALLS
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_fails_the_dry_activate_with_exit_11_while_another_switch_holds_the_lock() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_DRY_ACTIVATE_LOCKED=1 ssh -o BatchMode=yes root@geoffcloud "NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'Could not acquire lock'
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate"]
+CALLS
+  [ "$status" = 11 ] || {
+    echo "exit $status, want 11" >&2
     exit 1
   }
 }

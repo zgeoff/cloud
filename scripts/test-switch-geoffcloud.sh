@@ -4,7 +4,8 @@
 # pod's image, nor one whose impd the running nixie's imp client refuses, before the build or
 # before the activation, never follows a failed build, activates the exact store path the build
 # printed, built from the checked commit, records that commit beside the path on the host before
-# the activation, and fails when nixie is not ready after it. Each case
+# the activation, never activates a build whose dry-activate would stop or restart k3s unless
+# --allow-k3s-restart names a planned k3s window, and fails when nixie is not ready after it. Each case
 # that switches commits its own nixos/packages/atc.nix and imp-host pin. gh also serves the nixie
 # release's bun.lock, and the fake clock stands in for the readiness check's pause. It touches
 # no host and runs no Nix: gh replays recorded answers (create-stub-gh.sh), the bun.lock from
@@ -49,6 +50,8 @@ imp_host_pin='    image = "ghcr.io/zgeoff/imp-host:3.4.0@sha256:7f3e9c1a5b2d4e6f
 nixie_lock_call='["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/nixie/contents/bun.lock?ref=v0.31.4"]'
 nixie_ready_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '"'"'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"'"'"]'
 nixie_ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true}}}'
+# the dry-activate of the built system on root@geoffcloud, which every switch that copies runs
+dry_activate_call='["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE     -E NIXOS_INSTALL_BOOTLOADER -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud-dry-activate '"'"'/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration'"'"'     dry-activate"]'
 
 it_activates_the_store_path_its_build_printed() {
   local commit status=0
@@ -97,6 +100,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -168,6 +172,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -178,6 +183,236 @@ $nixie_lock_call
 EOF
   [ "$status" = 0 ] || {
     echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_switches_as_before_when_the_activation_restarts_other_units_but_not_k3s() {
+  local commit status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/clone/nixos/packages"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  mkdir -p "$tree/clone/nixos/hosts/geoffcloud"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin atc'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_DRY_ACTIVATE=$'would stop the following units: alloy.service\nwould activate the configuration...\nwould restart the following units: atc-daemon.service, tailscaled.service\nwould start the following units: alloy.service, k3s-images.service' \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== switch root@geoffcloud
+== root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== nixie ready: store, imp_host
+EOF
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+$gh_runs_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+$nixie_lock_call
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+$nixie_lock_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
+EOF
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_never_activates_a_build_whose_activation_would_stop_k3s() {
+  local commit status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/clone/nixos/packages"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  mkdir -p "$tree/clone/nixos/hosts/geoffcloud"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin atc'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_DRY_ACTIVATE=$'would stop the following units: alloy.service, k3s.service\nwould activate the configuration...\nwould start the following units: alloy.service, k3s.service' \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << 'EOF'
+the switch would interrupt k3s.service, and nixie can stay down for minutes after it:
+would stop the following units: alloy.service, k3s.service
+switch in a planned k3s window with --allow-k3s-restart
+EOF
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+EOF
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+$gh_runs_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+$nixie_lock_call
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
+EOF
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_activates_a_build_that_restarts_k3s_in_a_planned_k3s_window() {
+  local commit status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/clone/nixos/packages"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  mkdir -p "$tree/clone/nixos/hosts/geoffcloud"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin atc'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_DRY_ACTIVATE=$'would activate the configuration...\nwould restart the following units: k3s.service' \
+    bash scripts/switch-geoffcloud.sh --allow-k3s-restart) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+== k3s.service restarts in this planned k3s window (--allow-k3s-restart):
+would restart the following units: k3s.service
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== switch root@geoffcloud
+== root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== nixie ready: store, imp_host
+EOF
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+$gh_runs_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+$nixie_lock_call
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+$nixie_lock_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
+EOF
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_never_activates_when_the_dry_activate_fails() {
+  local commit status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+  mkdir -p "$tree/clone/nixos/packages"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  mkdir -p "$tree/clone/nixos/hosts/geoffcloud"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin atc'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_DRY_ACTIVATE_LOCKED=1 \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" <<< 'Could not acquire lock'
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+EOF
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+$gh_runs_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
+$nixie_lock_call
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
+["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
+EOF
+  [ "$status" = 11 ] || {
+    echo "exit $status, want 11" >&2
     exit 1
   }
 }
@@ -230,6 +465,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -294,6 +530,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -367,6 +604,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -626,6 +864,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
@@ -726,6 +965,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -818,6 +1058,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@other.test","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+${dry_activate_call/root@geoffcloud/root@other.test}
 ["ssh","-o","BatchMode=yes","root@other.test","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@other.test","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -844,7 +1085,7 @@ it_rejects_an_unknown_argument_with_its_usage() {
     bash scripts/switch-geoffcloud.sh --switch) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-usage: switch-geoffcloud.sh [--build-only]
+usage: switch-geoffcloud.sh [--build-only | --allow-k3s-restart]
 EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
@@ -1384,6 +1625,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -1442,6 +1684,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -1500,6 +1743,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -1560,6 +1804,7 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
+$dry_activate_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 $nixie_lock_call
@@ -1607,7 +1852,8 @@ setup_test() {
   cp "$(dirname "${BASH_SOURCE[0]}")/switch-geoffcloud.sh" "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh" \
     "$(dirname "${BASH_SOURCE[0]}")/find-nixos-check-run.sh" "$(dirname "${BASH_SOURCE[0]}")/needs-nixos-checks.sh" \
     "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$(dirname "${BASH_SOURCE[0]}")/check-nixie-impd-major.sh" \
-    "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$tree/clone/scripts/"
+    "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$(dirname "${BASH_SOURCE[0]}")/check-k3s-restart.sh" \
+    "$tree/clone/scripts/"
 }
 
 run_cases
