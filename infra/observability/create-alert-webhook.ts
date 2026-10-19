@@ -12,8 +12,6 @@ interface AlertWebhook {
   readonly file: string;
 }
 
-// The Discord webhook as a Secret beside Alertmanager, which mounts it at
-// /etc/alertmanager/secrets/<name>/<key> (#29). It exists only while discordAlerts is on.
 export function createAlertWebhook(
   ns: Namespace,
   webhookURL: string,
@@ -28,5 +26,6 @@ export function createAlertWebhook(
     { provider: cluster },
   );
 
+  // Alertmanager mounts the Secret at /etc/alertmanager/secrets/<name>/<key>.
   return { resource, secretName, file: `/etc/alertmanager/secrets/${secretName}/${key}` };
 }

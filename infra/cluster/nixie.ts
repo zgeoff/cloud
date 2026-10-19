@@ -26,10 +26,6 @@ import { createNixieBackupJob } from './create-nixie-backup-job.ts';
 import type { NixieIngressOutputs } from './create-nixie-ingress.ts';
 import { createNixieIngress } from './create-nixie-ingress.ts';
 
-// nixie (GEO-343): nixie's server with a git-sync sidecar, its web client, and an ingress on the
-// host's tailnet address only. nixie reaches impd at imps.geoff.cloud through the host's node
-// (tag:cloud). docs/architecture/workloads/nixie.md describes the whole.
-
 export function createNixie(
   cluster: Provider,
   inputs: NixieInputs,
@@ -78,7 +74,7 @@ export function createNixie(
 }
 
 // Pulumi waits for readiness, and nixie turns ready only once impd has pulled its sandbox images
-// and booted the conversation imp, which a cold start takes longer than Pulumi's default wait for
+// and booted the conversation imp, which a cold start takes longer than Pulumi's default wait
 const rolloutTimeouts = { create: '30m', update: '30m' };
 
 interface WebShape {
@@ -87,7 +83,6 @@ interface WebShape {
   readonly statefulSet: StatefulSet;
 }
 
-// after nixie, so a first deploy starts the API before the client that calls it
 function createWebDeployment(
   cluster: Provider,
   namespace: Output<string>,
@@ -102,6 +97,8 @@ function createWebDeployment(
         apiURL: interpolate`http://${shape.api}.${namespace}.svc.cluster.local:${nixieAPIPort}`,
       }),
     },
+
+    // after nixie, so a first deploy starts the API before the client that calls it
     { provider: cluster, dependsOn: [shape.statefulSet], customTimeouts: rolloutTimeouts },
   );
 }
@@ -146,14 +143,14 @@ function createStatefulSet(
 
 const deployDir = new URL('../../deploy/nixie/', import.meta.url);
 
-// The ConfigMap and the Secrets have no fixed name: Pulumi names each and replaces it on a change,
-// so the StatefulSet rolls and nixie reads the change at its next start.
 function createConfig(cluster: Provider, namespace: Output<string>): Output<string> {
   const text = readFileSync(new URL('config.yaml', deployDir), 'utf8');
 
   const config = new ConfigMap(
     'nixie-config',
     {
+      // No fixed name, as on the Secrets: Pulumi replaces each on a change, so the StatefulSet
+      // rolls and nixie reads the change at its next start.
       metadata: { namespace },
       data: { [nixieConfigKey]: renderNixieConfig(text, buildNixieImpConfig(topology)) },
     },
@@ -163,7 +160,6 @@ function createConfig(cluster: Provider, namespace: Output<string>): Output<stri
   return config.metadata.name;
 }
 
-// the sops file is encrypted already; the age identity beside it is the secret
 function createSecrets(
   cluster: Provider,
   namespace: Output<string>,
@@ -174,6 +170,7 @@ function createSecrets(
     {
       metadata: { namespace },
       stringData: {
+        // the sops file is encrypted already; the age identity beside it is the secret
         [nixieSecretsFileKey]: readFileSync(new URL('secrets.sops.yaml', deployDir), 'utf8'),
         [nixieAgeKeyKey]: secret(inputs.secrets.ageHostKey),
       },

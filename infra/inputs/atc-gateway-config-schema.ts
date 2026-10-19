@@ -15,7 +15,7 @@ const pinnedImageSchema = z
 // letter first, no `-` last, at most 31 characters
 const daemonNamePattern = /^[a-z](?:[\da-z-]{0,29}[\da-z])?$/u;
 
-// `<host>:<port>`, with an IPv6 host in brackets; atc's registry parser takes ports 1–65535
+// atc's registry parser takes ports 1–65535
 const addressPattern = /^(?:\[[^\]]+\]|[^:[\]]+):(?<port>\d{1,5})$/u;
 const addressMessage = `must be the daemon's tailnet host:port, such as ${topology.tailnet.nodes.geoffcloud.address}:${topology.atc.daemonPort}`;
 
@@ -25,8 +25,6 @@ const daemonIDPattern = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12
 const daemonIDUnsetMessage =
   'is unset: pin the daemon with the output of `atc daemon id` on its host';
 
-// one daemon the gateway dials: its tailnet host:port and the daemonID `atc daemon id`
-// prints there. Both are required; the deploy refuses without them.
 const daemonSchema = z.object(
   {
     address: z
@@ -37,8 +35,7 @@ const daemonSchema = z.object(
       .min(1, daemonIDUnsetMessage)
       .regex(daemonIDPattern, 'must be a lowercase UUID, as `atc daemon id` prints it'),
 
-    // ATCDaemonUnreachable's severity for this daemon. A host that sleeps, such as a PC, takes
-    // warning.
+    // A host that sleeps, such as a PC, takes warning.
     alertSeverity: z
       .enum(['critical', 'warning'], {
         error: (issue) => `must be critical or warning, got ${String(issue.input)}`,
@@ -61,27 +58,21 @@ const defaultDaemonUnsetMessage =
 const trustedProxyMessage =
   'must be an IP address as the socket reports the proxy, such as 127.0.0.1: atc takes no range or name';
 
-// The atcGateway stack config; setting it approves the deploy. Each check matches what atc's
-// gateway refuses at start, so a mistake fails the preview instead of the pod. Values pass
-// through unchanged: only an unset alertSeverity takes its default.
 export const atcGatewayConfigSchema = z
   .object(
     {
-      // a digest-pinned image built from images/atc-gateway, and its backup image
       image: pinnedImageSchema.refine(
         (image) => !image.includes(standInDigest),
         "is the fixture stand-in, not the gateway; wait for atc's release",
       ),
       backupImage: pinnedImageSchema,
 
-      // the origin clients reach, and the OAuth issuer
       publicURL: z.url({
         protocol: /^https$/u,
         error: 'must be the https:// origin clients reach, such as https://atc.geoff.cloud',
       }),
 
-      // the daemons the gateway dials, by name. Each name's bearer token comes from
-      // ATC_GATEWAY_TOKEN_<NAME>.
+      // Each name's bearer token comes from ATC_GATEWAY_TOKEN_<NAME>.
       daemons: z
         .record(z.string().regex(daemonNamePattern), daemonSchema, {
           error: (issue) =>
@@ -104,18 +95,15 @@ export const atcGatewayConfigSchema = z
           }
         }),
 
-      // the daemon a call without one goes to
       defaultDaemon: z
         .string({ error: defaultDaemonUnsetMessage })
         .min(1, defaultDaemonUnsetMessage),
 
-      // where the state volume mounts and --state-dir points: gateway.db and
-      // mcp-auth.db. atc's packaging fixes the path; the default is $HOME's state dir.
+      // atc's packaging fixes the path; the default is $HOME's state dir.
       stateDir: z.string().optional(),
 
-      // the proxies whose CF-Connecting-IP security events mark trusted, one
-      // --trust-forwarded-from each; atc matches the socket's peer exactly, so each is one IP.
-      // Unset or empty, every forwarded address reads unverified.
+      // atc matches the socket's peer exactly, so each is one IP. Unset or empty, every forwarded
+      // address reads unverified.
       trustForwardedFrom: z
         .array(z.string().refine((address) => isIP(address) !== 0, trustedProxyMessage))
         .optional(),

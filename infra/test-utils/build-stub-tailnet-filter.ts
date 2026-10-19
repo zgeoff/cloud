@@ -31,9 +31,8 @@ export interface TailnetFilter {
   ) => boolean;
 }
 
-// Stand-in for the tailnet's packet filter, from Tailscale's grants and policy syntax docs and
-// tailscale/tailscale's wgengine/filter (checked 2026-10-13). It throws on syntax it leaves out,
-// and never allows ICMP that no grant names, so it never allows more than the tailnet does.
+// From Tailscale's grants and policy syntax docs and tailscale/tailscale's wgengine/filter
+// (checked 2026-10-13).
 export function buildStubTailnetFilter(policy: TailnetPolicy): TailnetFilter {
   return {
     canConnect: (source, destination, connection) =>
@@ -112,8 +111,8 @@ function getProtoNumber(proto: string): number {
   return number;
 }
 
-// ports is one port or an inclusive range, first-last
 function isInPortRange(entry: string, ports: string, port: number): boolean {
+  // Tailscale's ports: one port or an inclusive range, first-last
   const [first, last = first] = ports.split('-').map(Number);
 
   if (first === undefined || last === undefined || Number.isNaN(first) || Number.isNaN(last)) {

@@ -3,9 +3,6 @@ import type { Output } from '@pulumi/pulumi';
 import { cloudflaredImage } from '../shared/cloudflared-image.ts';
 import { cloudflaredNames } from './cloudflared-names.ts';
 
-// cloudflared's Deployment spec: two replicas, the tunnel token from tokenSecret, and
-// Prometheus metrics on its metrics port, which the cloudflared PodMonitor
-// (observability/create-monitors.ts) scrapes
 export function buildCloudflaredSpec(tokenSecret: Output<string>): input.apps.v1.DeploymentSpec {
   return {
     replicas: 2,

@@ -5,10 +5,8 @@ import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { buildEdgeRules } from './build-edge-rules.ts';
 
 interface EdgeInputs {
-  // the Cloudflare account every Cloudflare resource belongs to
   readonly accountID: string;
 
-  // set once NixOS answers tailnet SSH: attaches the edge firewall and drops public SSH
   readonly hostOnTailnet: boolean;
 }
 
@@ -23,12 +21,9 @@ interface EdgeOutputs {
 
 const domain = 'geoff.cloud';
 
-// The edge: geoff.cloud's zone and its settings, the backups bucket, and the Onidel VM behind its
-// cloud firewall
 export function createEdge(inputs: EdgeInputs): EdgeOutputs {
   const zone = getZoneOutput({ filter: { name: domain } });
 
-  // restic repositories for imp and the k3s datastore snapshots (#9)
   const backups = new R2Bucket('backups', {
     accountId: inputs.accountID,
     name: 'geoff-cloud-backups',
@@ -55,15 +50,12 @@ export function createEdge(inputs: EdgeInputs): EdgeOutputs {
   };
 }
 
-// the VM behind its cloud firewall, and the firewall's rules
 function createHost(hostOnTailnet: boolean): { readonly firewall: FirewallGroup; readonly vm: Vm } {
-  // Onidel's cloud firewall, outside the VM. Attaching it closes every port it does
-  // not list.
+  // Attaching Onidel's cloud firewall to the VM closes every port it does not list.
   const edge = new FirewallGroup('edge', { description: 'geoff.cloud edge' });
 
-  // The Onidel VM, hand-made on 2026-10-02 and adopted here (#4): every input but name replaces
-  // it, so protect/retainOnDelete guard typos, and vdb (200 GB, imp's pool, no API) is manual.
-  // Once NixOS answers tailnet SSH, `pulumi config set hostOnTailnet true` attaches edge, drops public SSH.
+  // Every input but name replaces the VM, so protect/retainOnDelete guard typos. vdb (200 GB,
+  // imp's pool) has no API and is manual.
   const geoffcloud = new Vm(
     'geoffcloud',
     {
@@ -73,7 +65,7 @@ function createHost(hostOnTailnet: boolean): { readonly firewall: FirewallGroup;
       ram: 32_768,
       disk: 240,
 
-      // Ubuntu 26.04 LTS x64; the NixOS reinstall (#6) does not go through this field
+      // Ubuntu 26.04 LTS x64; the NixOS reinstall does not go through this field
       os: 24,
       ...(hostOnTailnet ? { firewallGroupId: edge.id } : {}),
     },

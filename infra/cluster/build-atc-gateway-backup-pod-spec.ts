@@ -4,19 +4,11 @@ import { buildATCPodSecurity } from './build-atc-gateway-spec.ts';
 
 interface BackupPodInputs {
   readonly image: string;
-
-  // the gateway's state claim, mounted at STATE_DIR
   readonly claim: Input<string>;
-
-  // the Secret with restic's and R2's environment
   readonly envSecret: Input<string>;
-
-  // the dockerconfigjson Secret that pulls the private backup image
   readonly pullSecret: Input<string>;
 }
 
-// The backup Job's pod: the backup image's `backup` with the gateway's claim at
-// /state, as the gateway's own non-root user. buildRestoreJob turns it into the restore Job's pod.
 export function buildATCGatewayBackupPodSpec(inputs: BackupPodInputs) {
   return {
     restartPolicy: 'OnFailure',

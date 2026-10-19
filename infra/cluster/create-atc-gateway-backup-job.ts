@@ -9,15 +9,10 @@ interface BackupJobInputs {
   readonly namespace: Output<string>;
   readonly claim: Output<string>;
   readonly image: string;
-
-  // the namespace's dockerconfigjson Secret, which pulls the private image
   readonly pullSecret: Output<string>;
   readonly secrets: ATCGatewayBackupSecrets;
 }
 
-// Nightly restic backup of the gateway's SQLite files to R2. It mounts the claim
-// next to the gateway (one node, so ReadWriteOnce allows it) and copies each
-// database with sqlite3 .backup, which is consistent while the gateway writes.
 export function createATCGatewayBackupJob(cluster: Provider, inputs: BackupJobInputs): CronJob {
   const env = new Secret(
     'atc-gateway-backup',
@@ -49,6 +44,9 @@ export function createATCGatewayBackupJob(cluster: Provider, inputs: BackupJobIn
             template: {
               spec: buildATCGatewayBackupPodSpec({
                 image: inputs.image,
+
+                // One node, so ReadWriteOnce lets the backup mount the claim beside the gateway;
+                // sqlite3 .backup stays consistent while the gateway writes.
                 claim: inputs.claim,
                 envSecret: env.metadata.name,
                 pullSecret: inputs.pullSecret,

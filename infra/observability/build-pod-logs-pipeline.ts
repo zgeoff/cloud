@@ -2,13 +2,11 @@ interface PodLogsPipelineOptions {
   // the Alloy expression for the pod targets, as discovery.kubernetes gives them
   targets: string;
 
-  // the directory that holds the kubelet's pod log directories
   podLogRoot: string;
 
   // the read positions, in the legacy format, that Alloy imports when it has no positions file
   positionsSeedFile: string;
 
-  // the Alloy expression for the receiver that takes each line
   forwardTo: string;
 }
 

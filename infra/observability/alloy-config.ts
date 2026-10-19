@@ -5,8 +5,6 @@ import { lokiURL } from './loki-url.ts';
 
 const atcGatewayLogPath = `${alloyPaths.podLogs}/atc_atc-gateway-*/atc-gateway/*.log`;
 
-// Alloy's config: tail every pod's logs and the host's journal, and push them to Loki, and count
-// atc's security events for Prometheus
 export const alloyConfig = `
 discovery.kubernetes "pods" {
   role = "pod"

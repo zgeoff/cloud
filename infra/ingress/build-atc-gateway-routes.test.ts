@@ -19,15 +19,14 @@ test("it sends the gateway's browser paths through cloudflared's Access check, t
   ]);
 });
 
-// cloudflared's first-match rule over the atc tunnel, which holds the gateway's routes alone: the
-// hostname equals the rule's, and the rule's path pattern matches the request's decoded path. RE2
-// and JavaScript agree on these patterns' syntax.
 function findRuleIndex(hostname: string, path: string): number {
   const gateway = buildATCGatewayRoutes(
     buildMockTunnelRoute({ hostname: 'atc.geoff.cloud' }),
     access,
   );
 
+  // cloudflared takes the first match, on the decoded path; RE2 and JavaScript agree on these
+  // patterns' syntax
   return buildTunnelIngresses(gateway).findIndex(
     (rule) =>
       (rule.hostname === undefined || rule.hostname === hostname) &&

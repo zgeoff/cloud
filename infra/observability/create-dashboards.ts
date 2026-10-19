@@ -4,7 +4,6 @@ import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import { buildCloudflaredDashboard } from './build-cloudflared-dashboard.ts';
 import { buildIMPDashboard } from './build-imp-dashboard.ts';
 
-// Grafana's dashboard sidecar loads every ConfigMap labelled grafana_dashboard=1 (#27)
 export function createDashboards(ns: Namespace, cluster: Provider): ConfigMap[] {
   const dashboards = { imp: buildIMPDashboard(), cloudflared: buildCloudflaredDashboard() };
 
@@ -16,6 +15,8 @@ export function createDashboards(ns: Namespace, cluster: Provider): ConfigMap[] 
           metadata: {
             name: `dashboard-${name}`,
             namespace: ns.metadata.name,
+
+            // Grafana's dashboard sidecar loads every ConfigMap labelled grafana_dashboard=1
             labels: { grafana_dashboard: '1' },
           },
           data: { [`${name}.json`]: JSON.stringify(dashboard) },

@@ -1,12 +1,10 @@
 import { findVariable } from './find-variable.ts';
 import type { Environment } from './types.ts';
 
-// The Connect server's credentials file (1password-credentials.json), from
-// op://cloud/onepassword-connect-credentials. A cluster that is managed needs it: a
-// missing value would otherwise plan to delete Connect. The error never carries the value.
 export function requireOnePasswordConnectCredentials(env: Environment): string {
   const value = findVariable(env, 'ONEPASSWORD_CONNECT_CREDENTIALS');
 
+  // a missing value would otherwise plan to delete Connect
   if (value === undefined) {
     throw new Error(
       'cluster is managed, but ONEPASSWORD_CONNECT_CREDENTIALS is empty; run through `op run --env-file=../.env`',

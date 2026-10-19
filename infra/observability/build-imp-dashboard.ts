@@ -1,7 +1,7 @@
 import { buildDashboard } from './build-dashboard.ts';
 import type { DashboardPanel } from './build-dashboard.ts';
 
-// impd logs to journald through imp-host.service; it exports no metrics (no OTLP, #8)
+// impd logs to journald through imp-host.service; it exports no metrics (no OTLP)
 const impdStream = '{job="journal", unit="imp-host.service"}';
 
 const impPanels: readonly DashboardPanel[] = [
@@ -52,8 +52,6 @@ const impPanels: readonly DashboardPanel[] = [
   { title: 'impd logs', type: 'logs', expr: impdStream, width: 24, height: 12 },
 ];
 
-// The imp dashboard: impd's journal lines from Loki, its errors, boot template restores and
-// cold boots, backups, and the Docker proxy's lines
 export function buildIMPDashboard(): Record<string, unknown> {
   return buildDashboard('imp', 'loki', impPanels);
 }

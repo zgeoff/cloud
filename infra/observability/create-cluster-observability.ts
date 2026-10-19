@@ -25,9 +25,6 @@ interface ClusterObservabilityOutputs {
   readonly grafanaAdminPassword: Output<string>;
 }
 
-// Prometheus, Alertmanager, Grafana, Loki, Alloy on one node (~1 GiB, #8); 30-day retention.
-// Alertmanager reaches Discord only with alertWebhookURL (#29). monitors adds the probes and
-// alerts for the atc daemons and nixie, each set only with its workload.
 export function createClusterObservability(
   cluster: Provider,
   alertWebhookURL: string | undefined,
@@ -66,9 +63,6 @@ export function createClusterObservability(
   };
 }
 
-// Alloy ships pod logs and the host journal to Loki. Its config sits in a ConfigMap that Pulumi
-// names, so a config change creates the new ConfigMap, points the DaemonSet at it, which rolls
-// Alloy, and deletes the old one.
 function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider): Chart {
   const config = new ConfigMap('alloy-config', buildAlloyConfigMapArgs(ns.metadata.name), {
     provider: cluster,
@@ -76,6 +70,9 @@ function createLogShipper(ns: Namespace, dependsOn: Chart[], cluster: Provider):
 
   return new Chart(
     'alloy',
+
+    // Pulumi names the ConfigMap, so a config change creates the new one, points the DaemonSet at
+    // it, which rolls Alloy, and deletes the old one.
     { namespace: ns.metadata.name, ...alloyChart, values: buildAlloyValues(config.metadata.name) },
     { provider: cluster, dependsOn },
   );

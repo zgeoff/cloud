@@ -1,4 +1,3 @@
-// a backup Job's container: the parts a restore overrides, and the rest it keeps
 interface BackupContainer {
   readonly name: string;
   readonly args: readonly string[];
@@ -14,17 +13,11 @@ interface BackupPodSpec {
 }
 
 interface RestoreJobInputs {
-  // the workload's name, which names the Job (<name>-restore-<suffix>)
   readonly name: string;
   readonly namespace: string;
-
-  // the backup CronJob's pod, from its builder
   readonly backupPod: BackupPodSpec;
 }
 
-// A one-off restore Job from a runbook: the backup pod, run once, with its container's `restore` of
-// SNAPSHOT=latest and without the backup's resources, so a large restore escapes the nightly
-// limit. The image, the user, the claim and the Secret stay the backup's.
 export function buildRestoreJob(inputs: RestoreJobInputs) {
   const pod: BackupPodSpec = {
     ...inputs.backupPod,
@@ -45,6 +38,7 @@ export function buildRestoreJob(inputs: RestoreJobInputs) {
 }
 
 function buildRestoreContainer(container: BackupContainer): BackupContainer {
+  // drops the backup's resources, so a large restore escapes the nightly limit
   const { resources: _resources, ...rest } = container;
 
   return {

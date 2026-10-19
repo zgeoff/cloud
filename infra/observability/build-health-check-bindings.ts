@@ -4,7 +4,6 @@ import { bindingNames } from '@zgeoff/cloud-health-check/contract';
 import type { Target } from '@zgeoff/cloud-health-check/contract';
 
 interface HealthCheckBindingInputs {
-  // the R2 bucket that holds the check's state
   readonly stateBucket: Output<string>;
   readonly targets: readonly Target[];
 
@@ -17,9 +16,6 @@ type HealthCheckBinding =
   | { readonly name: string; readonly type: 'plain_text'; readonly text: string }
   | { readonly name: string; readonly type: 'secret_text'; readonly text: Output<string> };
 
-// The health-check Worker's bindings, under the names its contract gives: its state bucket, its
-// targets as JSON, and the alert webhook as a secret only when one is set, so without one the
-// Worker has no ALERT_URL and alerts nowhere
 export function buildHealthCheckBindings(inputs: HealthCheckBindingInputs): HealthCheckBinding[] {
   return [
     { name: bindingNames.state, type: 'r2_bucket', bucketName: inputs.stateBucket },

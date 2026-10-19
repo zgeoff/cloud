@@ -2,7 +2,6 @@ import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 
 export interface NixieIngressSpecInputs {
-  // the one host name for the web client and the API
   readonly hostname: string;
   readonly ingressClass: string;
   readonly tlsSecret: Output<string>;
@@ -10,8 +9,6 @@ export interface NixieIngressSpecInputs {
   readonly web: { readonly service: Output<string>; readonly port: number };
 }
 
-// nixie's Ingress: one host name, /rpc to nixie and every other path to the web client, with TLS
-// from the certificate the Pulumi run issues
 export function buildNixieIngressSpec(
   inputs: NixieIngressSpecInputs,
 ): input.networking.v1.IngressSpec {

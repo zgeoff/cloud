@@ -4,9 +4,6 @@ import type { CustomResourceOptions } from '@pulumi/pulumi';
 import type { AlertRuleInputs } from './build-alert-rules.ts';
 import { buildAlertRules } from './build-alert-rules.ts';
 
-// buildAlertRules' groups as a PrometheusRule (#29), picked up via ruleSelectorNilUsesHelmValues.
-// The chart brings the CRD, so opts waits for it; atcDaemons adds ATCDaemonUnreachable per daemon,
-// and nixieReadinessURL adds NixieTurnsFailing and NixieDegraded.
 export function createAlertRules(
   ns: Namespace,
   inputs: AlertRuleInputs,
@@ -20,6 +17,8 @@ export function createAlertRules(
       metadata: { name: 'geoff-cloud-alerts', namespace: ns.metadata.name },
       spec: { groups: buildAlertRules(inputs) },
     },
+
+    // The chart brings the CRD, so opts waits for it.
     opts,
   );
 }

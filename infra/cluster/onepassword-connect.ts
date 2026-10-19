@@ -17,12 +17,7 @@ import {
 } from './build-onepassword-connect-spec.ts';
 import { buildServiceURL } from './build-service-url.ts';
 
-// 1Password Connect for imps (GEO-120), following charts/connect in 1Password/connect-helm-charts: the broker swaps a
-// placeholder bearer for the real token on op-connect.imp.internal requests, relayed from the host to this ClusterIP
-// Service (no public route). Read-only token (vault `imp`), so Connect refuses writes; a NetworkPolicy refuses pods.
-
 export interface OnePasswordConnectInputs {
-  // the Connect server's credentials file (JSON)
   readonly credentials: Output<string>;
 }
 
@@ -95,8 +90,6 @@ function createNetworkPolicy(cluster: Provider, namespace: Output<string>): Netw
   );
 }
 
-// no fixed name on the Secret: Pulumi names it and replaces it on a change, so the
-// Deployment rolls and Connect picks the change up
 function createCredentials(
   cluster: Provider,
   namespace: Output<string>,
@@ -105,6 +98,8 @@ function createCredentials(
   const credentials = new Secret(
     'onepassword-connect-credentials',
     {
+      // no fixed name: Pulumi replaces the Secret on a change, so the Deployment rolls and Connect
+      // picks the change up
       metadata: { namespace },
       stringData: { [onePasswordConnectCredentialsKey]: secret(inputs.credentials) },
     },

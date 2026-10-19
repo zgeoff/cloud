@@ -1,7 +1,6 @@
 interface PulumiPreviewOptions {
   readonly pulumiPath: string;
 
-  // the project directory, holding Pulumi.yaml
   readonly cwd: string;
   readonly env: Record<string, string>;
 
@@ -9,8 +8,6 @@ interface PulumiPreviewOptions {
   readonly cleanup: Pick<AsyncDisposableStack, 'defer'>;
 }
 
-// Runs `pulumi preview` on a project and returns its exit code and its stdout followed by its
-// stderr. A preview still running when the test ends, as at a timeout, is killed and awaited.
 export async function runPulumiPreview(
   options: PulumiPreviewOptions,
 ): Promise<{ exitCode: number; output: string }> {

@@ -1,8 +1,5 @@
 import type { CustomResourceOptions, ResourceOptions, ResourceTransform } from '@pulumi/pulumi';
 
-// Makes a transform that ties one chart child to the Pulumi name it had before a move, and deletes
-// the old object before it creates the new one, since two Traefik pods cannot hold the host's port
-// at once. Other resources pass through.
 export function makeMovedResourceTransform(
   type: string,
   name: string,
@@ -15,5 +12,6 @@ export function makeMovedResourceTransform(
 }
 
 function buildMovedOptions(opts: ResourceOptions, previousName: string): CustomResourceOptions {
+  // deletes before it replaces, since two Traefik pods cannot hold the host's port at once
   return { ...opts, aliases: [{ name: previousName }], deleteBeforeReplace: true };
 }

@@ -1,6 +1,5 @@
-// A Pulumi program that create-cluster-provider.test.ts previews through the real engine. It takes
-// the cluster's provider, rendering to files instead of a cluster, then declares the case's Helm
-// chart and raw Roles from the directory GUARD_CASE_DIR names: chart/, and roles.json.
+// The cluster's provider renders to files instead of a cluster. GUARD_CASE_DIR names the case's
+// directory: its Helm chart in chart/, and its raw Roles in roles.json.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
