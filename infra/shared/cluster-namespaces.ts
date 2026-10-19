@@ -1,3 +1,22 @@
+export const clusterNamespaceNames = [
+  'atc',
+  'default',
+  'ingress',
+  'kube-node-lease',
+  'kube-public',
+  'kube-system',
+  'nixie',
+  'observability',
+  'onepassword',
+] as const;
+
+export type ClusterNamespace = (typeof clusterNamespaceNames)[number];
+
+interface ClusterNamespaceEntry {
+  readonly owner: 'pulumi' | 'k3s';
+  readonly podSecurity: 'baseline' | 'exempt';
+}
+
 // Every namespace in the cluster, who creates it, and its Pod Security level (GEO-1246). Exempt:
 // observability's node-exporter needs hostNetwork, and kube-system's local-path helper pods mount a
 // hostPath for each new volume.
@@ -11,9 +30,7 @@ export const clusterNamespaces = {
   nixie: { owner: 'pulumi', podSecurity: 'baseline' },
   observability: { owner: 'pulumi', podSecurity: 'exempt' },
   onepassword: { owner: 'pulumi', podSecurity: 'baseline' },
-} as const;
-
-export type ClusterNamespace = keyof typeof clusterNamespaces;
+} as const satisfies Record<ClusterNamespace, ClusterNamespaceEntry>;
 
 // the namespaces Pulumi declares as Namespace resources
 export type PulumiNamespace = {

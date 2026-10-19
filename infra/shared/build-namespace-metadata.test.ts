@@ -1,10 +1,9 @@
 import { expect, test } from 'bun:test';
 import { buildNamespaceMetadata } from './build-namespace-metadata.ts';
-import type { ClusterNamespace } from './cluster-namespaces.ts';
-import { clusterNamespaces } from './cluster-namespaces.ts';
+import { clusterNamespaceNames } from './cluster-namespaces.ts';
 
 test('it gives every namespace but observability and kube-system the baseline warn and audit labels', () => {
-  const labelled = (Object.keys(clusterNamespaces) as ClusterNamespace[]).filter(
+  const labelled = clusterNamespaceNames.filter(
     (name) => name !== 'observability' && name !== 'kube-system',
   );
 
