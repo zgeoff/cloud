@@ -1,15 +1,13 @@
-// What preview/compose.yaml declares in its `x-preview` block, which Compose ignores: the guest
-// port the app serves HTTP on, where impd's wake proxy sends requests, and the ready path
 export interface PreviewContract {
   readonly port: number;
   readonly healthPath: string;
 }
 
-// Throws on a malformed file or block. A file without the block uses port 8080, impd's default
-// HTTP port, and the path `/`.
 export function parsePreviewContract(composeYAML: string): PreviewContract {
   const compose = requireMapping(Bun.YAML.parse(composeYAML), 'preview/compose.yaml');
   const block = requireMapping(compose['x-preview'] ?? {}, 'x-preview');
+
+  // impd's default HTTP port
   const port = block['port'] ?? 8080;
   const healthPath = block['health'] ?? '/';
 

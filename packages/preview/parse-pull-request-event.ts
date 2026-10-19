@@ -3,17 +3,13 @@ export type PullRequestAction = 'open' | 'update' | 'close';
 export interface PullRequestEvent {
   readonly action: PullRequestAction;
 
-  // owner/name of the repository the pull request targets
   readonly repo: string;
   readonly number: number;
   readonly headSHA: string;
 
-  // the head branch lives in another repository, such as a fork
   readonly fromFork: boolean;
 }
 
-// opened and reopened open a preview, synchronize moves its head, and closed ends it, merged or
-// not; every other action, such as labeled, changes nothing
 const actions = new Map<string, PullRequestAction>([
   ['opened', 'open'],
   ['reopened', 'open'],
@@ -21,9 +17,6 @@ const actions = new Map<string, PullRequestAction>([
   ['closed', 'close'],
 ]);
 
-// The fields of GitHub's pull_request payload that the service reads
-// (https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request), or null for an
-// action that changes nothing. A fork's head repository is null once the fork is deleted.
 export function parsePullRequestEvent(payload: unknown): PullRequestEvent | null {
   const event = requireObject(payload, 'payload');
   const action = actions.get(requireString(event['action'], 'action'));
@@ -42,6 +35,8 @@ export function parsePullRequestEvent(payload: unknown): PullRequestEvent | null
     'pull_request.head',
   );
 
+  // a fork's head repository is null once the fork is deleted
+  // (https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)
   const headRepo =
     head['repo'] === null ? null : requireObject(head['repo'], 'pull_request.head.repo');
 

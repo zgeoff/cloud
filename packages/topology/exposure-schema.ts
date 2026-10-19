@@ -1,11 +1,7 @@
 import { z } from 'zod';
 
-// public: from the internet. tailnet: over the tailnet only, shut on the public interface. host:
-// on one of the host's own interfaces, for its pods or containers. reserved: a name held for a
-// later route. closed: deliberately not exposed.
 const scopeSchema = z.enum(['public', 'tailnet', 'host', 'reserved', 'closed']);
 
-// what every entry records: its name, how far it reaches, and why, with the ticket that owns it
 const entryFields = {
   name: z.string().regex(/^[a-z][\da-z-]*$/u),
   scope: scopeSchema,
@@ -16,9 +12,9 @@ const entryFields = {
     .optional(),
 };
 
-// A port the host's firewall opens or keeps shut. interface names the one interface a host-scope
-// port opens on, edge is the description of a public port's rule at Onidel's edge firewall, and
-// admission marks a port that inet cloud_host narrows to one path.
+// interface names the one interface a host-scope port opens on, edge is the description of a
+// public port's rule at Onidel's edge firewall, and admission marks a port that inet cloud_host
+// narrows to one path.
 const hostPortSchema = z.strictObject({
   ...entryFields,
   kind: z.literal('host-port'),
@@ -29,28 +25,25 @@ const hostPortSchema = z.strictObject({
   admission: z.literal(true).optional(),
 });
 
-// Every kind but a host port is a route to a workload. auth names the layer that authenticates
-// each call on a public route, such as the workload's own OAuth server or a webhook signature.
+// auth names the layer that authenticates each call on a public route, such as the workload's
+// own OAuth server or a webhook signature.
 const routeFields = {
   ...entryFields,
   auth: z.string().min(1).max(255).optional(),
 };
 
-// a hostname the Cloudflare tunnel serves, or holds free for a later route
 const tunnelHostnameSchema = z.strictObject({
   ...routeFields,
   kind: z.literal('tunnel-hostname'),
   hostname: z.hostname(),
 });
 
-// a node attribute the tailnet policy grants, such as funnel
 const tailnetCapabilitySchema = z.strictObject({
   ...routeFields,
   kind: z.literal('tailnet-capability'),
   attr: z.string().min(1),
 });
 
-// a Worker's own workers.dev URL
 const workerURLSchema = z.strictObject({
   ...routeFields,
   kind: z.literal('worker-url'),
@@ -64,9 +57,8 @@ const entrySchema = z.discriminatedUnion('kind', [
   workerURLSchema,
 ]);
 
-// The shape of exposure.json: every public route and port, and each port the host keeps to the
-// tailnet or to itself. The rules that span fields run over the whole list, so each issue's path
-// names the entry and the field at fault.
+// The rules that span fields refine the whole list, so each issue's path names the entry and the
+// field at fault.
 export const exposureSchema = z
   .strictObject({ entries: z.array(entrySchema).readonly() })
   .superRefine(checkEntries);
@@ -111,8 +103,6 @@ function collectHostPortIssues(entry: HostPort): readonly HostPortIssue[] {
   ];
 }
 
-// adds an issue for each entry whose name another entry holds, and for each entry whose fields
-// disagree with each other
 function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
   const names = exposure.entries.map((entry) => entry.name);
 

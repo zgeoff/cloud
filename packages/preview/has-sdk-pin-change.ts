@@ -2,9 +2,6 @@ import type { PullRequestFile } from './build-github-client.ts';
 
 const sdkPackage = '@anthropic-ai/claude-agent-sdk';
 
-// Whether a changed line of a package.json or a bun.lock names the Agent SDK's package. A manifest
-// whose diff GitHub leaves out as too large counts as a change, since a needless run costs less
-// than a missed one.
 export function hasSDKPinChange(files: readonly PullRequestFile[]): boolean {
   return files.some((file) => isManifest(file.path) && hasChangedSDKLine(file.patch));
 }
@@ -15,11 +12,12 @@ function isManifest(path: string): boolean {
   return name === 'package.json' || name === 'bun.lock';
 }
 
-// a unified diff's changed lines start with + or -, and its hunk headers with @@
 function hasChangedSDKLine(patch: string | null): boolean {
+  // GitHub leaves out a diff too large to show, and a needless run costs less than a missed one
   if (patch === null) {
     return true;
   }
 
+  // a unified diff's changed lines start with + or -, and its hunk headers with @@
   return patch.split('\n').some((line) => /^[+-]/u.test(line) && line.includes(`"${sdkPackage}`));
 }

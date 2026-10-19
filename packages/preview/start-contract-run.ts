@@ -2,9 +2,8 @@ import type { ContractRunKey } from './create-preview-store.ts';
 import { runContractRun } from './run-contract-run.ts';
 import type { PreviewDeps } from './types.ts';
 
-// Starts one try at a claimed run of the SDK contract suite, which runs on after its caller
-// returns, because a run takes minutes and a webhook delivery must answer at once
 export function startContractRun(deps: PreviewDeps, key: ContractRunKey): void {
+  // not awaited, because a run takes minutes and a webhook delivery must answer at once
   const run = tryRunContractRun(deps, key);
 
   deps.pendingRuns.add(run);

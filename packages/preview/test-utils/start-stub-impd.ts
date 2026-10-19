@@ -41,7 +41,6 @@ export interface StubImpd {
   readonly token: string;
   readonly imps: Map<string, StubImp>;
 
-  // the domain of impd's wake proxy, which the service's impDomain setting names
   readonly impDomain: string;
   readonly apps: Map<string, StubApp>;
 
@@ -132,7 +131,6 @@ export function startStubImpd(): StubImpd {
   return Object.assign(stub, { url });
 }
 
-// impd answers a refused upgrade with a 401 before any socket opens
 function createExecSocket(
   stub: StubImpd,
   request: Request,
@@ -149,6 +147,7 @@ function createExecSocket(
   const authorized = request.headers.get('authorization') === `Bearer ${stub.token}`;
 
   if (ticketImp === null && !authorized) {
+    // impd answers a refused upgrade with a 401 before any socket opens
     return Response.json({ error: 'unauthorized' }, { status: 401 });
   }
 
@@ -246,7 +245,6 @@ function buildProcedureResponse(
     );
 }
 
-// the fields of impd's ImpSchema that the service reads, beside two it ignores
 function toImpRecord(imp: StubImp) {
   return {
     id: `imp-${imp.name}`,
@@ -258,8 +256,6 @@ function toImpRecord(imp: StubImp) {
   };
 }
 
-// oRPC's RPC serializer: JSON with each Date as its ISO string, and `meta` naming each one's path
-// under type 1, oRPC's DATE
 function buildRPCResult(output: unknown): Response {
   const meta: (string | number)[][] = [];
   const json = encodeRPCValue(output, [], meta);
@@ -274,6 +270,8 @@ function encodeRPCValue(
   meta: (string | number)[][],
 ): unknown {
   if (value instanceof Date) {
+    // oRPC's RPC serializer sends a Date as its ISO string, with its path in `meta` under type 1,
+    // oRPC's DATE
     meta.push([1, ...path]);
 
     return value.toISOString();
@@ -292,8 +290,8 @@ function encodeRPCValue(
   return value;
 }
 
-// oRPC's error body: the ORPCError's JSON in the envelope, with its status as the HTTP status
 function buildRPCError(status: number, code: string, message: string): Response {
+  // oRPC's error body: the error's JSON in the envelope, with its status as the HTTP status
   return Response.json({ json: { defined: true, code, status, message } }, { status });
 }
 
@@ -372,11 +370,11 @@ function runStubCommand(
   socket.close();
 }
 
-// a binary frame is one channel byte, 1 for stdout or 2 for stderr, then the bytes
 function buildExecFrame(channel: 1 | 2, text: string): Uint8Array {
   const bytes = new TextEncoder().encode(text);
   const frame = new Uint8Array(bytes.byteLength + 1);
 
+  // impd's binary frame is one channel byte, 1 for stdout or 2 for stderr, then the bytes
   frame[0] = channel;
 
   frame.set(bytes, 1);

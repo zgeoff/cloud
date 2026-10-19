@@ -34,7 +34,6 @@ async function setupTest() {
       repos: new Set(['acme/greenhouse']),
       slots: 1,
 
-      // half an hour unused puts a preview to sleep
       idleMs: 1_800_000,
       impDomain: 'imps.example.test',
       impImage: 'base',
@@ -54,7 +53,6 @@ async function setupTest() {
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
 
-    // the sweep runs at this moment
     now: () => new Date('2026-10-15T09:00:00Z'),
     sleep: async () => {},
     log,

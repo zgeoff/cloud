@@ -18,9 +18,6 @@ export interface PreviewConfig {
   readonly sweepIntervalMs: number;
 }
 
-// The service's configuration, from its environment, and its three secrets, from the files
-// systemd's LoadCredential puts in $CREDENTIALS_DIRECTORY: `webhook-secret`, `github-token` and
-// `imp-token`. A missing or malformed value throws, so the service never starts half-configured.
 export async function loadPreviewConfig(
   env: Readonly<Record<string, string | undefined>>,
   readText: (path: string) => Promise<string>,
@@ -102,8 +99,6 @@ function parseListener(address: string): Listener {
   return { hostname, port: Number(match?.groups?.['port']) };
 }
 
-// The SDK contract run is on once PREVIEW_CONTRACT_REPOS names a repository, and then it needs the
-// model secret, since a run without it would only fail
 function parseContractSettings(
   env: Readonly<Record<string, string | undefined>>,
 ): ContractSettings | null {
@@ -115,6 +110,8 @@ function parseContractSettings(
 
   return {
     repos,
+
+    // a run without the model secret would only fail
     modelSecret: requireValue(env, 'PREVIEW_CONTRACT_MODEL_SECRET'),
     timeoutMs: requireInteger(env, 'PREVIEW_CONTRACT_TIMEOUT_MINUTES', '10') * 60_000,
   };

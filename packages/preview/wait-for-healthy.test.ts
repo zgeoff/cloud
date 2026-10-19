@@ -26,8 +26,6 @@ async function setupTest() {
   });
 
   const impd = startStubImpd();
-
-  // a clock that each pause between health probes moves on
   const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
 
   const deps: PreviewDeps = {
@@ -43,7 +41,6 @@ async function setupTest() {
       impModelSecret: null,
       healthTimeoutMs: 60_000,
 
-      // one second between probes
       healthPollMs: 1000,
       buildTimeoutMs: 1_800_000,
       contract: null,

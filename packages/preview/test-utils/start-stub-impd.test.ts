@@ -180,6 +180,20 @@ test('it redeems an exec ticket once and refuses it with a 401 after', async () 
   expect(second.status).toBe(401);
 });
 
+test.each([
+  { label: 'no ticket and no token', path: '/exec', headers: {} },
+  { label: 'a ticket impd never issued', path: '/exec?ticket=tk-never-issued', headers: {} },
+  { label: 'another bearer token', path: '/exec', headers: { authorization: 'Bearer tk-other' } },
+])('it refuses an exec opened with $label with a 401', async (row) => {
+  const impd = startStubImpd();
+
+  const response = await fetch(`${impd.url}${row.path}`, { headers: row.headers });
+  const body = await response.json();
+
+  expect(response.status).toBe(401);
+  expect(body).toStrictEqual({ error: 'unauthorized' });
+});
+
 test('it runs a guest command opened with a ticket, with both streams, and wakes the imp', async () => {
   const impd = startStubImpd();
 

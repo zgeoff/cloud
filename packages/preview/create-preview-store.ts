@@ -1,34 +1,22 @@
 import { Database } from 'bun:sqlite';
 
-// waiting: the next open boots the head commit; booting: a boot runs; ready: builtSHA answered its
-// health path; failed: the last boot failed, and `detail` says why; ended: the pull request closed
 type PreviewPhase = 'waiting' | 'booting' | 'ready' | 'failed' | 'ended';
 
-// Every move a preview's phase may make. updatePhase is the one writer of the phase, and it
-// refuses a move this table lacks.
 const phaseMoves: Readonly<Record<PreviewPhase, readonly PreviewPhase[]>> = {
-  // an open boots it, or its pull request closes
   waiting: ['booting', 'ended'],
 
-  // the boot settles, an older head's failure waits for the next open, the pull request closes,
-  // or the service stops during the boot
   booting: ['ready', 'failed', 'waiting', 'ended'],
 
-  // an open rebuilds an older commit or an imp that impd lost, or the pull request closes
   ready: ['booting', 'ended'],
 
-  // a retry boots it, a push to a new head waits for the next open, or the pull request closes
   failed: ['booting', 'waiting', 'ended'],
 
-  // the pull request reopens
   ended: ['waiting'],
 };
 
-// the phase a pull request the service has not seen before starts at
 const firstPhase: PreviewPhase = 'waiting';
 
 export interface PreviewKey {
-  // owner/name of the repository the pull request targets
   readonly repo: string;
   readonly number: number;
 }
@@ -37,7 +25,6 @@ export interface Preview extends PreviewKey {
   readonly imp: string;
   readonly headSHA: string;
 
-  // the commit the imp last booted, which differs from headSHA after a push
   readonly builtSHA: string | null;
   readonly phase: PreviewPhase;
   readonly detail: string | null;
@@ -49,38 +36,24 @@ export interface PhaseChange {
   readonly detail?: string;
 }
 
-// queued: claimed and not yet started; waiting: the preview slots were full, and the commit status
-// says so; running: the suite runs in its imp; settling: the result waits for the imp's removal and
-// its commit status; passed and failed: the commit status holds the result
 type ContractPhase = 'queued' | 'waiting' | 'running' | 'settling' | 'passed' | 'failed';
 
-// Every move a contract run's phase may make. updateContractPhase is the one writer of the phase,
-// and it refuses a move this table lacks.
 const contractPhaseMoves: Readonly<Record<ContractPhase, readonly ContractPhase[]>> = {
-  // a try finds the slots full, starts the run's imp, fails to start it, or finds the contract
-  // settings gone
   queued: ['waiting', 'running', 'settling'],
 
-  // a retry starts the run's imp, fails to start it, or finds the contract settings gone
   waiting: ['running', 'settling'],
 
-  // the suite's result arrives, the contract settings are gone, or the service stopped during the
-  // run and its next start queues it again
   running: ['settling', 'queued'],
 
-  // the imp is gone and GitHub holds the result's status
   settling: ['passed', 'failed'],
 
-  // a run that ended never moves again
   passed: [],
   failed: [],
 };
 
-// the state of the commit status that a run's result sets
 export type ContractOutcome = 'success' | 'failure' | 'error';
 
 export interface ContractRunKey {
-  // owner/name of the repository the pull request targets
   readonly repo: string;
   readonly headSHA: string;
 }
@@ -91,7 +64,6 @@ export interface ContractRun extends ContractRunKey {
   readonly phase: ContractPhase;
   readonly detail: string | null;
 
-  // the result's status, from settling on
   readonly outcome: ContractOutcome | null;
 }
 
@@ -109,40 +81,31 @@ interface PreviewHead extends PreviewKey {
 export interface PreviewStore {
   readonly findPreview: (key: PreviewKey) => Preview | null;
 
-  // records the pull request's head; a closed pull request that reopens waits again
   readonly upsertHead: (head: PreviewHead) => void;
 
-  // moves the preview to `to` only while it stands at one of `from`, and reports whether it moved,
-  // so a boot that ends after its pull request closed never revives it; throws when a phase in
-  // `from` has no move to `to.phase` in the phase table
+  // Moves only from a phase in `from`, so a boot that ends after its pull request closed never
+  // revives it
   readonly updatePhase: (
     key: PreviewKey,
     from: readonly PreviewPhase[],
     to: PhaseChange,
   ) => boolean;
 
-  // fails every boot a stopped process left in `booting`, so its next open retries it; returns
-  // how many it failed
   readonly updateInterruptedBoots: () => number;
 
-  // records a queued run of the SDK contract suite for a head commit, and reports whether this
-  // call recorded it, so a commit runs the suite once however many deliveries name it
+  // Reports whether this call recorded the run, so a commit runs the suite once however many
+  // deliveries name it
   readonly claimContractRun: (run: Omit<ContractRun, 'phase' | 'detail' | 'outcome'>) => boolean;
   readonly findContractRun: (key: ContractRunKey) => ContractRun | null;
 
-  // the runs at one of `phases`, oldest claim first
   readonly collectContractRuns: (phases: readonly ContractPhase[]) => ContractRun[];
 
-  // moves the run to `to` only while it stands at one of `from`, and reports whether it moved;
-  // throws when a phase in `from` has no move to `to.phase` in the contract phase table
   readonly updateContractPhase: (
     key: ContractRunKey,
     from: readonly ContractPhase[],
     to: ContractPhaseChange,
   ) => boolean;
 
-  // queues again every run a stopped process left in `running`, so the next retry starts it over;
-  // returns how many it queued
   readonly updateInterruptedContractRuns: () => number;
   readonly close: () => void;
 }
@@ -157,8 +120,6 @@ interface PreviewRow {
   readonly detail: string | null;
 }
 
-// The service's own record of each pull request it has seen, in one SQLite file. impd stays the
-// source of truth for whether an imp runs or sleeps.
 export function createPreviewStore(path: string): PreviewStore {
   const db = new Database(path, { create: true, strict: true });
 
@@ -179,8 +140,6 @@ type PreviewMethods = Pick<
   'findPreview' | 'upsertHead' | 'updatePhase' | 'updateInterruptedBoots'
 >;
 
-// Only updatePhase writes the phase of a preview that exists: the head's upsert and the sweep of
-// interrupted boots move a phase through it too.
 function buildPreviewMethods(db: Database): PreviewMethods {
   const select = db.query<PreviewRow, [string, number]>(
     'SELECT * FROM previews WHERE repo = ?1 AND number = ?2',
@@ -214,7 +173,6 @@ function buildPreviewMethods(db: Database): PreviewMethods {
     return result.changes === 1;
   };
 
-  // A reopened preview, and a failed one whose head moved, wait for the next open again
   const upsertHead = db.transaction((head: PreviewHead) => {
     const before = select.get(head.repo, head.number);
 
@@ -307,8 +265,6 @@ type ContractRunMethods = Pick<
   | 'updateInterruptedContractRuns'
 >;
 
-// Only updateContractPhase writes the phase of a run that exists: the sweep of interrupted runs
-// moves a phase through it too. A claim inserts a new run at `queued`.
 function buildContractRunMethods(db: Database): ContractRunMethods {
   const claim = db.query(`INSERT INTO contract_runs (repo, head_sha, number, imp, phase)
     VALUES (?1, ?2, ?3, ?4, 'queued') ON CONFLICT (repo, head_sha) DO NOTHING`);
