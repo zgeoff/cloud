@@ -233,11 +233,11 @@ finds the two bearer copies equal and skips them. Start the daemon with
     ```
 
     impd refuses the mint with `NOT_FOUND` for a secret that step 9 did not add, so add that secret
-    first. A rerun after a partial mint first removes the token with
-    `ssh root@geoffcloud docker exec imp-host impz token rm home-pc-cloud`. Keep the target's token
-    source as it is, because a change between a file and a variable changes the target's identity
-    and refuses its sessions with `target_changed`. The daemon reads the file before each call to
-    impd, so the new token needs no restart
+    first. When a failed attempt leaves `home-pc-cloud` in `impz token ls` in imp-host, remove it
+    with `ssh root@geoffcloud docker exec imp-host impz token rm home-pc-cloud` before a rerun. Keep
+    the target's token source as it is, because a change between a file and a variable changes the
+    target's identity and refuses its sessions with `target_changed`. The daemon reads the file
+    before each call to impd, so the new token needs no restart
     ([imp targets](https://github.com/zgeoff/atc/blob/main/docs/guides/configuration/targets.md#imp-targets)).
     A `tokenFile` under `/run/credentials` is a copy that systemd makes, so write the unit's source
     file instead and restart the daemon. A target that sets `tokenEnv` reads the variable at startup
