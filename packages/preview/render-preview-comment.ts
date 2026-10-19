@@ -1,5 +1,3 @@
-// The body of a pull request's preview comment, after the service's marker. An open pull request's
-// comment holds the link; a closed one's says the preview ended.
 export function renderPreviewComment(link: string, headSHA: string | null): string {
   if (headSHA === null) {
     return [

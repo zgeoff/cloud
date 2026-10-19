@@ -4,8 +4,6 @@ import registry from './exposure.json' with { type: 'json' };
 import { requireExposureMatchesTopology } from './require-exposure-matches-topology.ts';
 import { topologySchema } from './topology-schema.ts';
 
-// The shared constants and the exposure registry, each checked against its schema once, when the
-// package loads, and the registry's ports against the constants
 export const topology = topologySchema.parse(constants);
 export const exposure = exposureSchema.parse(registry);
 requireExposureMatchesTopology(exposure, topology);

@@ -28,7 +28,6 @@ async function setupTest() {
 
   const pendingBoots = new Set<Promise<void>>();
 
-  // a clock that each pause between health probes moves on
   const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
 
   const deps: PreviewDeps = {
@@ -36,14 +35,11 @@ async function setupTest() {
       baseURL: 'http://geoffcloud:8417',
       repos: new Set(['acme/greenhouse']),
 
-      // one preview runs at a time
       slots: 1,
       idleMs: 1_800_000,
 
-      // the domain each ready preview redirects under
       impDomain: 'imps.example.test',
 
-      // the image and size each new imp boots with
       impImage: 'base',
       impMemoryMib: 2048,
       impGitHubSecret: 'gh',
@@ -515,7 +511,6 @@ test('it shows the failure page and boots nothing more when the booting page rel
     detail: 'the build exited 1:\nseed: relation "plants" already exists',
   });
 
-  // the retry's build fails the same way
   ctx.impd.answerCommand = (command) => ({ code: command.argv[0] === 'timeout' ? 1 : 0 });
 
   const retried = await ctx.handler(

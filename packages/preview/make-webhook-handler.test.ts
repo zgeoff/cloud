@@ -35,10 +35,8 @@ async function setupTest() {
 
   const deps: PreviewDeps = {
     settings: {
-      // the link's origin, which every comment carries
       baseURL: 'http://geoffcloud:8417',
 
-      // one repository listed by name, and every repository of one owner
       repos: new Set(['acme/greenhouse', 'nursery/*']),
 
       // the handler never reads the rest, which the link and the boot use
@@ -53,7 +51,6 @@ async function setupTest() {
       healthPollMs: 1000,
       buildTimeoutMs: 1_800_000,
 
-      // the listed repository whose pull requests run the SDK contract suite on an SDK pin change
       contract: {
         repos: new Set(['acme/greenhouse']),
         modelSecret: 'model-haiku',
@@ -64,7 +61,6 @@ async function setupTest() {
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
     github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
 
-    // the secret every delivery below is signed with, or deliberately not
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),

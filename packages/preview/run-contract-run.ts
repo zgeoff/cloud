@@ -3,12 +3,8 @@ import type { ContractOutcome, ContractRun, ContractRunKey } from './create-prev
 import { runContractSuite } from './run-contract-suite.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
-// The commit status context that each run sets on its head commit
 const contractStatusContext = 'sdk-contract';
 
-// One try at a claimed run of the SDK contract suite: with a free preview slot, it runs the suite
-// in a new imp at the head commit, removes the imp, and sets the commit status to the result.
-// With every slot taken, the run waits, and the next retry tries it again.
 export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
   const contract = deps.settings.contract;
 
@@ -31,8 +27,6 @@ export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Pr
   await applyContractStatus(deps, run, buildContractStatus(result, contract.timeoutMs));
 }
 
-// A service whose contract settings are gone runs no suite, so a run it still holds, such as one a
-// stop left queued, ends with an error status, and its imp goes like any settled run's
 async function stopContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
   deps.store.updateContractPhase(key, ['queued', 'waiting', 'running'], {
     phase: 'settling',
@@ -48,8 +42,6 @@ interface Status {
   readonly description: string;
 }
 
-// The result waits in the store until the imp is gone and GitHub holds the status, so a refused
-// removal or status leaves the run settling, and the next retry settles it again
 async function applyContractStatus(
   deps: PreviewDeps,
   run: ContractRun,
@@ -64,7 +56,6 @@ async function applyContractStatus(
   await trySettleContractRun(deps, run);
 }
 
-// The imp goes before the status says the run ended, so a run whose status reads done holds no imp
 async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
   const run = deps.store.findContractRun(key);
 
@@ -79,6 +70,7 @@ async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Pro
   } as const;
 
   try {
+    // the imp goes before the status, so a run whose status reads done holds no imp
     await removeContractImp(deps, run.imp);
 
     await deps.github.updateCommitStatus({
@@ -96,9 +88,6 @@ async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Pro
   }
 }
 
-// The run's imp, started, or null when the run is not this try's to start or every slot is taken.
-// A failure to start the imp ends the run with an error status, rather than retry against an impd
-// that refused it.
 async function tryStartContractImp(
   deps: PreviewDeps,
   contract: ContractSettings,
@@ -115,6 +104,7 @@ async function tryStartContractImp(
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
 
+    // ends the run rather than retry against an impd that refused it
     await applyContractStatus(deps, run, {
       state: 'error',
       description: `The run's imp did not start: ${reason}`,
@@ -126,8 +116,6 @@ async function tryStartContractImp(
 
 const fullSlots: Status = { state: 'pending', description: 'Waiting for a free preview slot' };
 
-// Every running imp the token lists holds a slot, a preview's and another run's alike. A run never
-// puts a preview to sleep to take its slot, because the owner may be using it.
 async function startContractImp(
   deps: PreviewDeps,
   contract: ContractSettings,
@@ -135,6 +123,8 @@ async function startContractImp(
 ): Promise<ContractRun | null> {
   const imps = await deps.impd.readImps();
 
+  // a preview's imp and another run's hold a slot alike, and a run never puts a preview to sleep
+  // to take one, because the owner may be using it
   const running = imps.filter((imp) => imp.state === 'running' && imp.name !== run.imp);
 
   if (running.length >= deps.settings.slots) {
@@ -158,10 +148,10 @@ async function startContractImp(
   return run;
 }
 
-// Only the first try that finds the slots full says so, so a retry posts nothing new
 async function updateContractWaiting(deps: PreviewDeps, run: ContractRun): Promise<void> {
   const waiting = { phase: 'waiting', detail: fullSlots.description } as const;
 
+  // only the first try that finds the slots full says so, so a retry posts nothing new
   if (deps.store.updateContractPhase(run, ['queued'], waiting)) {
     await sendContractStatus(deps, run, fullSlots);
   }
@@ -172,14 +162,12 @@ interface ContractImp extends ContractRun {
   readonly existing: boolean;
 }
 
-// A left-behind imp goes first, so every run starts on a clean disk. The model secret's grant is the
-// broker's model route; the GitHub secret's, when the service has one, lets the fetch reach a
-// private repository.
 async function createContractImp(
   deps: PreviewDeps,
   contract: ContractSettings,
   imp: ContractImp,
 ): Promise<void> {
+  // a left-behind imp goes first, so every run starts on a clean disk
   await (imp.existing ? deps.impd.removeImp(imp.imp) : Promise.resolve());
 
   // impd needs an HTTP port for each imp, though nothing in a run's imp listens on it
@@ -190,8 +178,10 @@ async function createContractImp(
     httpPort: 8080,
   });
 
+  // the model secret's grant is the broker's model route
   await deps.impd.installGrant(imp.imp, contract.modelSecret);
 
+  // the GitHub secret's grant lets the fetch reach a private repository
   if (deps.settings.impGitHubSecret !== null) {
     await deps.impd.installGrant(imp.imp, deps.settings.impGitHubSecret);
   }
@@ -203,8 +193,6 @@ async function removeContractImp(deps: PreviewDeps, imp: string): Promise<void> 
   await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
 }
 
-// A pending status that GitHub refuses is logged, and the run goes on, since the result's status
-// replaces it
 async function sendContractStatus(
   deps: PreviewDeps,
   run: ContractRun,
@@ -218,6 +206,7 @@ async function sendContractStatus(
       ...status,
     });
   } catch (error) {
+    // the run goes on, since the result's status replaces a refused pending one
     deps.log(`${run.repo}@${run.headSHA}: the commit status was not set: ${String(error)}`);
   }
 }

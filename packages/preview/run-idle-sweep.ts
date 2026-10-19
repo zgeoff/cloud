@@ -1,15 +1,14 @@
 import { planIdleSleeps } from './plan-idle-sleeps.ts';
 import type { PreviewDeps } from './types.ts';
 
-// One pass of the idle sweep, on a timer: every running preview imp unused for the idle timeout
-// sleeps. impd lists only the token's imps, and the slot lock keeps the sweep out of a running
-// boot's imp. A failure is logged, a refused sleep never stops the others, and the next pass retries.
 export async function runIdleSweep(deps: PreviewDeps): Promise<void> {
+  // a running boot's guest commands would wake an imp the sweep put to sleep
   await deps.withSlotLock(() => trySleepIdlePreviews(deps));
 }
 
 async function trySleepIdlePreviews(deps: PreviewDeps): Promise<void> {
   try {
+    // impd lists only the token's imps
     const imps = await deps.impd.readImps();
 
     for (const name of planIdleSleeps(imps, deps.settings.idleMs, deps.now())) {
