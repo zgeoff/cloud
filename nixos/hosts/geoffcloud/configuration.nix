@@ -163,8 +163,8 @@ in
 
   # No pod reaches the host's SSH: nixos-fw trusts cni0 and flannel.1, so it accepts every port
   # that listens on all addresses from them, and no pod needs OpenSSH. A drop in inet cloud_host's
-  # input chain is final whatever nixos-fw accepts. Tailscale SSH and OpenSSH on tailscale0 are
-  # unaffected.
+  # input chain is final whatever nixos-fw accepts. The drops name only the pod interfaces, so
+  # OpenSSH and Tailscale SSH answer on tailscale0.
   networking.cloudHost.inputDrops =
     lib.concatMap (interface: map (port: { inherit port interface; }) config.services.openssh.ports)
       [

@@ -64,8 +64,8 @@ bearer token is the gate for that.
 
 The same input chain drops SSH's port from the pod and overlay interfaces before any admission runs.
 NixOS's table trusts those interfaces, so without the drop every pod would reach sshd, and no pod
-needs it. Pods still reach the API server, the kubelet and node-exporter, which the trust is for.
-sshd keeps answering on the tailnet interface, and Tailscale SSH stays the access path.
+needs it. Pods reach the API server, the kubelet and node-exporter, which the trust is for. sshd
+answers on the tailnet interface, and Tailscale SSH is the access path.
 
 The same table's forward chain drops every forwarded packet from the pod and overlay interfaces to
 Docker's subnet, so no pod reaches imp-host on any port. imp-host filters inbound traffic only from
