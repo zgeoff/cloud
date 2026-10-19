@@ -63,8 +63,6 @@ jobs:
       DISPATCH_SHA: ${{ github.sha }}
       DISPATCH_REVISION: ${{ inputs.revision }}
       PULUMI_SKIP_UPDATE_CHECK: true
-    # Every step after the decision runs only when it finds the commit needs an apply, and the apply
-    # and the steps after it only when the outcome is apply.
     steps:
       # the workflow's own revision, whose scripts run every step, so a CI run that finishes late
       # for an older commit never mixes this workflow with that commit's scripts. The full history
