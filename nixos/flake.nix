@@ -22,23 +22,27 @@
       imp,
       ...
     }:
+    let
+      # geoffcloud's modules, which geoffcloud-no-pool boots in a VM as they are
+      geoffcloudModules = [
+        disko.nixosModules.disko
+        imp.nixosModules.imp
+        ./modules/impd-local-health.nix
+        ./modules/host-build-lag.nix
+        ./modules/atc-daemon.nix
+        ./modules/cloud-host-firewall.nix
+        ./modules/onepassword-connect-relay.nix
+        ./modules/preview.nix
+        ./modules/tank-cloud.nix
+        ./modules/imp-dataset-key.nix
+        ./hosts/geoffcloud/configuration.nix
+        ./hosts/geoffcloud/disko.nix
+      ];
+    in
     {
       nixosConfigurations.geoffcloud = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
-        modules = [
-          disko.nixosModules.disko
-          imp.nixosModules.imp
-          ./modules/impd-local-health.nix
-          ./modules/host-build-lag.nix
-          ./modules/atc-daemon.nix
-          ./modules/cloud-host-firewall.nix
-          ./modules/onepassword-connect-relay.nix
-          ./modules/preview.nix
-          ./modules/tank-cloud.nix
-          ./modules/imp-dataset-key.nix
-          ./hosts/geoffcloud/configuration.nix
-          ./hosts/geoffcloud/disko.nix
-        ];
+        modules = geoffcloudModules;
       };
 
       # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config, and exposure
@@ -48,7 +52,8 @@
       # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
       # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock, tank-cloud-host-secrets
-      # and tank-cloud-rancher boot a VM of their own, and need KVM too
+      # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
+      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -106,6 +111,10 @@
       };
       checks.x86_64-linux.tank-cloud-rancher = import ./checks/tank-cloud-rancher.nix {
         inherit nixpkgs;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.geoffcloud-no-pool = import ./checks/geoffcloud-no-pool.nix {
+        inherit nixpkgs geoffcloudModules;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
     };
