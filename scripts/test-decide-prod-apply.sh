@@ -9,8 +9,9 @@
 # the script under `env -i` with git's global and system config off, and compares its whole
 # stdout, stderr, step output, step summary and gh call log.
 #
-# The script's "unexpected decision" guard stays untested: needs-prod-apply.sh prints only true
-# or false, or fails, so no real state reaches it.
+# The script's "unexpected decision" guard stays untested: run-decide-gates.ts prints only
+# prod-apply=true or prod-apply=false, or fails, so no real state reaches it. Each case links the
+# real bun into its stand-ins' directory, because the script runs run-decide-gates.ts with it.
 #
 #   bash scripts/test-decide-prod-apply.sh
 #   CASE='dispatch' bash scripts/test-decide-prod-apply.sh
@@ -24,6 +25,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-prod-apply.sh"
+bun="$(command -v bun)"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository, user or
 # system setting from the caller's environment, and commit as a fixed identity.
@@ -356,7 +358,7 @@ it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   assert_status 128 "$status"
 }
 
-it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
+it_refuses_a_tag_that_has_left_main() {
   local deployed head status=0
   create_case_tree
   setup_test "$tree"
@@ -376,7 +378,7 @@ it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "needs-prod-apply: $deployed is not an ancestor of $head; set the tag by hand at the live revision"
+  diff - "$tree/err" <<< "decide-prod-apply: deployed/prod at $deployed is not an ancestor of $head; set the tag by hand at the live revision"
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
@@ -412,6 +414,7 @@ setup_test() {
   : > "$tree/output"
   : > "$tree/summary"
   create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
+  ln -s "$bun" "$tree/bin/bun"
   git -C "$tree/repo" init -q -b main
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it

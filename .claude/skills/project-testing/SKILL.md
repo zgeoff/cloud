@@ -65,7 +65,7 @@ provider and the NixOS checks each have a reference.
   and on an app's pull request that changes `nixos/`. A person's pull request never runs it, so run
   `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can break a
   check. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
-  green run on main covers. [`needs-nixos-checks.sh`](../../../scripts/needs-nixos-checks.sh) lists
+  green run on main covers. The `nixos` gate of [`gates.yml`](../../../.github/gates.yml) lists
   the inputs of the checks, and a run stops covering later commits once one of them changes. A new
   input of the checks extends that list.
 - Every test case is hermetic: no case reaches a real host, the tailnet, 1Password, Onidel,

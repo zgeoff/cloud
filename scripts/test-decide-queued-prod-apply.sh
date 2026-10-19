@@ -18,6 +18,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-queued-prod-apply.sh"
+# the real bun, which each case links into its own directory on PATH, because the script runs
+# run-decide-gates.ts with it
+bun="$(command -v bun)"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository, user or
 # system setting from the caller's environment, and commit as a fixed identity.
@@ -37,7 +40,7 @@ it_decides_an_apply_when_the_revision_changes_a_pulumi_input_since_the_tag() {
   git -C "$tree/repo" commit -qm 'change the program'
   revision="$(git -C "$tree/repo" rev-parse HEAD)"
 
-  (cd "$tree/repo" && env -i PATH="/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" REVISION="$revision" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -66,7 +69,7 @@ it_decides_no_apply_and_says_so_when_a_newer_apply_moved_the_tag_past_the_revisi
   deployed="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" tag deployed/prod
 
-  (cd "$tree/repo" && env -i PATH="/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" REVISION="$revision" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -87,7 +90,7 @@ it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   setup_test "$tree"
   revision="$(git -C "$tree/repo" rev-parse HEAD)"
 
-  (cd "$tree/repo" && env -i PATH="/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" REVISION="$revision" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -99,7 +102,7 @@ it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   assert_status 128 "$status"
 }
 
-it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
+it_refuses_a_tag_that_has_left_main() {
   local deployed revision status=0
   create_case_tree
   setup_test "$tree"
@@ -111,13 +114,13 @@ it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
   git -C "$tree/repo" commit -q --allow-empty -m 'move main on'
   revision="$(git -C "$tree/repo" rev-parse HEAD)"
 
-  (cd "$tree/repo" && env -i PATH="/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" REVISION="$revision" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "needs-prod-apply: $deployed is not an ancestor of $revision; set the tag by hand at the live revision"
+  diff - "$tree/err" <<< "decide-queued-prod-apply: deployed/prod at $deployed is not an ancestor of $revision; set the tag by hand at the live revision"
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   assert_status 1 "$status"
@@ -129,7 +132,7 @@ it_refuses_a_missing_revision_as_a_usage_error() {
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
 
-  (cd "$tree/repo" && env -i PATH="/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" REVISION= \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
@@ -143,7 +146,8 @@ it_refuses_a_missing_revision_as_a_usage_error() {
 
 setup_test() {
   local tree="$1"
-  mkdir -p "$tree/home" "$tree/tmp" "$tree/repo"
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
+  ln -s "$bun" "$tree/bin/bun"
   : > "$tree/output"
   : > "$tree/summary"
   git -C "$tree/repo" init -q -b main

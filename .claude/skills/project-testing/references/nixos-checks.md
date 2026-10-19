@@ -13,7 +13,7 @@ builds in a `nixos/nix` container on the `cloud-nixos-checks-store` volume, neve
 
 - A check reads only the shell helpers that
   [`build-shell-lib-source.nix`](../../../../nixos/checks/test-utils/build-shell-lib-source.nix)
-  selects, and [`needs-nixos-checks.sh`](../../../../scripts/needs-nixos-checks.sh) lists the same
+  selects, and the `nixos` gate of [`gates.yml`](../../../../.github/gates.yml) lists the same
   files. A helper a check starts to read joins both lists. The checks read nothing else outside
   `nixos/` but `packages/topology/` and the host scripts that `tank-cloud-host-secrets` runs in its
   VM.

@@ -162,10 +162,9 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
 without them. The `NixOS checks` workflow builds them on `main` every night, and skips the build
 when an earlier green run covers the commit. A green scheduled or dispatched run on `main` covers
-every later commit that changes no input of the checks: `nixos/`, the scripts and test helpers the
-checks read or run, the scripts that decide when they run, `.bun-version` and the workflow. An app's
-pull request that changes `nixos/`, such as a release bump, runs the checks before it merges; a
-person's pull request skips them.
+every later commit that changes no input of the checks, which the `nixos` gate of
+[`gates.yml`](../../.github/gates.yml) lists. An app's pull request that changes `nixos/`, such as a
+release bump, runs the checks before it merges; a person's pull request skips them.
 
 To switch before the nightly run covers the commit:
 

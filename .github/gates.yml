@@ -1,0 +1,91 @@
+# The path gates: each gate names a check that CI, the NixOS checks or the prod apply runs only
+# when a change touches its paths. scripts/run-decide-gates.ts reads this file and answers, for each
+# gate a caller names, whether any file a commit between two revisions changed matches one of the
+# gate's paths and none of its ignore globs. The globs follow Bun.Glob: `*` stays inside one
+# directory, and `**` crosses any number of them, none included.
+#
+# scripts/needs-gate.test.ts covers this file: each glob must match a file in the checkout, so a path
+# with a typo fails the tests instead of skipping a check, and a table of changes pins each gate's
+# answer. A gate's optional `skipped` line goes to the run's summary when CI skips the check.
+gates:
+  # The four linters that run in the pinned Nix image (shell, Nix, Python and Actions) and the
+  # shell suites, which take most of the CI job's time. None of them reads a Markdown file.
+  full:
+    skipped: Only Markdown files changed, so the Nix-image linters and the shell suites did not run.
+    paths:
+      - '**'
+    ignore:
+      - '**/*.md'
+
+  # The provider's Go checks, which compile with -race and take minutes from a cold cache, and the
+  # SDK check, which builds the provider and regenerates sdk/onidel. The inputs are the Go module,
+  # the generated SDK, the scripts that generate and check it, the CI workflow, which sets Go up,
+  # the script that installs the Pulumi CLI, and the gate filter with this file. The root
+  # package.json only calls those scripts, so it is no input.
+  provider:
+    skipped: No input of the provider checks changed, so the Go checks did not run.
+    paths:
+      - provider/**
+      - sdk/**
+      - scripts/gen-sdk.sh
+      - scripts/check-sdk.sh
+      - scripts/install-pulumi-cli.sh
+      - .github/workflows/ci.yml
+      - .github/gates.yml
+      - scripts/run-decide-gates.ts
+      - scripts/needs-gate.ts
+      - scripts/load-gate-manifest.ts
+
+  # The NixOS checks, which boot VMs and take minutes. A green run on main covers each later
+  # commit until one of these paths changes (scripts/find-nixos-check-run.sh). The inputs are the
+  # flake, which holds the impd database tools the restore rehearsals run; the shared constants it
+  # reads; the preview service's source, which the host's package copies, and bun.lock, from which
+  # that package fetches the service's dependencies; the shell test helpers that
+  # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them; the
+  # scripts that run the checks, pin their image and open KVM to them; the scripts that
+  # tank-cloud-host-secrets runs in its VM; .bun-version; the workflow; and the scripts that decide
+  # when the checks run, with this file. The root package.json is no input, although its
+  # test:nixos script runs the checks: a change to it alone runs at the next change to an input,
+  # or on a dispatch.
+  nixos:
+    paths:
+      - nixos/**
+      - packages/topology/**
+      - packages/preview/**
+      - bun.lock
+      - test-support/shell/run-cases.sh
+      - test-support/shell/test-run-cases.sh
+      - test-support/shell/assert-equals.sh
+      - test-support/shell/test-assert-equals.sh
+      - test-support/shell/assert-not-equals.sh
+      - test-support/shell/test-assert-not-equals.sh
+      - test-support/shell/assert-files-equal.sh
+      - test-support/shell/test-assert-files-equal.sh
+      - test-support/shell/assert-between.sh
+      - test-support/shell/test-assert-between.sh
+      - test-support/shell/assert-missing.sh
+      - test-support/shell/test-assert-missing.sh
+      - test-support/shell/wait-for.sh
+      - scripts/run-nixos-checks.sh
+      - scripts/nix-image.sh
+      - scripts/open-kvm.sh
+      - scripts/install-imp-dns-token.sh
+      - scripts/host/write-atc-gateway-token.sh
+      - .bun-version
+      - .github/workflows/nixos-checks.yml
+      - scripts/decide-nixos-checks.sh
+      - scripts/find-nixos-check-run.sh
+      - .github/gates.yml
+      - scripts/run-decide-gates.ts
+      - scripts/needs-gate.ts
+      - scripts/load-gate-manifest.ts
+
+  # The prod apply: the inputs of the Pulumi program. A change to anything else, such as the docs,
+  # leaves the deployed/prod tag where it is.
+  prod-apply:
+    paths:
+      - infra/**
+      - deploy/**
+      - provider/**
+      - sdk/**
+      - packages/topology/**

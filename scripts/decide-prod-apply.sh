@@ -8,8 +8,8 @@
 # Because a dispatch skips the trigger that waits for CI, it also needs a green CI run of a push
 # to main on that commit (find-ci-run.sh), and prints the run's URL. Any other event applies
 # RUN_HEAD, the commit the CI run checked. Either way the commit must be on origin/main.
-# needs-prod-apply.sh decides whether a Pulumi input changed since the deployed/prod tag; when none
-# did, it says so on stdout and in $GITHUB_STEP_SUMMARY, naming the tag's commit and the revision,
+# run-decide-gates.ts decides, from the prod-apply gate of .github/gates.yml, whether a commit after the
+# deployed/prod tag changes a Pulumi input; when none does, it says so on stdout and in $GITHUB_STEP_SUMMARY, naming the tag's commit and the revision,
 # because a workflow_run run's own head commit is main's tip when the run started, which can be a
 # later merge than the commit it decides on. This job runs outside the deploy-prod
 # queue, so another apply can move the tag after it reads it: the apply job decides again once it
@@ -60,7 +60,18 @@ git merge-base --is-ancestor "$revision" origin/main || {
   exit 1
 }
 deployed="$(git rev-parse --verify 'deployed/prod^{commit}')"
-apply="$(bash "$here/needs-prod-apply.sh" "$deployed" "$revision")"
+# a revision the tag already holds needs nothing, as for a run that waited behind a newer one; a
+# tag off the revision's history needs a person, because only a person can say which revision is
+# live
+if git merge-base --is-ancestor "$revision" "$deployed"; then
+  apply=false
+elif ! git merge-base --is-ancestor "$deployed" "$revision"; then
+  echo "decide-prod-apply: deployed/prod at $deployed is not an ancestor of $revision; set the tag by hand at the live revision" >&2
+  exit 1
+else
+  decision="$(bun "$here/run-decide-gates.ts" "$deployed" "$revision" prod-apply)"
+  apply="${decision#prod-apply=}"
+fi
 case "$apply" in
   true | false) ;;
   *)

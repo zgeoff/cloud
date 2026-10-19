@@ -147,10 +147,10 @@ its commit already deployed and skips, and the tag moves only forward along `mai
 decisions run one at a time in a queue of their own, which keeps every waiting decision in the same
 way, so the applies mostly join their queue in the order the runs started.
 
-The decision counts every commit since the tag that touches a Pulumi input, not the difference
-between the two trees. A commit that reverts an input change while that change applies therefore
-still gets its own apply, and a decision of nothing to apply stays right after the tag moves
-forward.
+The decision counts every commit since the tag that touches a Pulumi input, as the `prod-apply` gate
+of the repo's path-gate manifest lists them, not the difference between the two trees. A commit that
+reverts an input change while that change applies therefore still gets its own apply, and a decision
+of nothing to apply stays right after the tag moves forward.
 
 The job prints only each held step's op and resource name, never a resource's state, and its Pulumi
 runs suppress the stack outputs, because the repo and its logs are public.

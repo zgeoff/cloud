@@ -6,7 +6,7 @@ name: NixOS checks
 # covers (scripts/find-nixos-check-run.sh). So the workflow runs:
 #
 # - nightly on main, building the checks only when no green run covers the commit yet, which is
-#   when an input of the checks (scripts/needs-nixos-checks.sh) changed since the last one;
+#   when an input of the checks (the nixos gate of .github/gates.yml) changed since the last one;
 # - on workflow_dispatch, always building them, on main before a switch or on a branch;
 # - on a pull request that an app opened and that touches nixos/ or packages/topology/, such as
 #   a release check's imp or host atc bump, so the workflow that merges the bump can wait for a

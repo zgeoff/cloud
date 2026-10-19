@@ -1698,12 +1698,17 @@ setup_test() {
   git -C "$tree/clone" config maintenance.auto false
   git -C "$tree/clone" commit -q --allow-empty -m init
   git -C "$tree/clone" push -q origin main
-  mkdir "$tree/clone/scripts"
+  mkdir "$tree/clone/scripts" "$tree/clone/.github"
   cp "$(dirname "${BASH_SOURCE[0]}")/switch-geoffcloud.sh" "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh" \
-    "$(dirname "${BASH_SOURCE[0]}")/find-nixos-check-run.sh" "$(dirname "${BASH_SOURCE[0]}")/needs-nixos-checks.sh" \
+    "$(dirname "${BASH_SOURCE[0]}")/find-nixos-check-run.sh" \
     "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$(dirname "${BASH_SOURCE[0]}")/check-nixie-impd-major.sh" \
     "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$(dirname "${BASH_SOURCE[0]}")/check-k3s-restart.sh" \
     "$tree/clone/scripts/"
+  # the gate filter that find-nixos-check-run.sh runs with the real bun, its modules and its manifest
+  cp "$(dirname "${BASH_SOURCE[0]}")"/{run-decide-gates,load-gate-manifest,needs-gate,exit-error,run-or-exit,run-process,with-exit-code}.ts \
+    "$tree/clone/scripts/"
+  cp "$(dirname "${BASH_SOURCE[0]}")/../.github/gates.yml" "$tree/clone/.github/"
+  ln -s "$(command -v bun)" "$tree/bin/bun"
 }
 
 run_cases

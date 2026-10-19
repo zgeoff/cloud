@@ -18,6 +18,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/find-nixos-check-run.sh"
+# the real bun, which each case links into its stand-ins' directory, because the script runs
+# run-decide-gates.ts with it
+bun="$(command -v bun)"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository, user or
 # system setting from the caller's environment, and commit as a fixed identity.
@@ -221,6 +224,7 @@ setup_test() {
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
   : > "$tree/calls"
   create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
+  ln -s "$bun" "$tree/bin/bun"
   git -C "$tree/repo" init -q -b main
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it
