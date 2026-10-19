@@ -12,7 +12,9 @@ instead of reading as healthy.
 The stack runs in the `observability` namespace:
 
 - **kube-prometheus-stack** runs Prometheus, Alertmanager, Grafana, node-exporter and
-  kube-state-metrics, and its default rules beside this repo's own.
+  kube-state-metrics, and its default rules beside this repo's own. k3s serves the metrics of its
+  whole process, the API server and etcd's client included, on both the API server's and the
+  kubelet's endpoints, so Prometheus keeps the control plane's series from the API server alone.
 - **Loki** stores logs on a filesystem volume as a single binary. Loki retains logs by time only,
   and local-path does not enforce the volume's request, so Loki's ingestion rate limit bounds its
   disk use: the most it accepts over the time a log line stays on disk fits below that request.
