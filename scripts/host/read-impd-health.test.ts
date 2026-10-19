@@ -8,13 +8,17 @@ import { startStubImpd } from '../test-utils/start-stub-impd.ts';
 // The script runs as the host gets it, with real bash reading it on stdin, and real curl asks the
 // impd stand-in on loopback
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'read-impd-health-'));
+  const directory = await mkdtemp(join(tmpdir(), 'read-impd-health-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const script = await readFile(new URL('read-impd-health.sh', import.meta.url));
 
-  return { dir, script, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: dir } };
+  return {
+    directory,
+    script,
+    env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: directory },
+  };
 }
 
 test('it prints the status and then impd’s body for an impd that is ready', async () => {
@@ -85,7 +89,7 @@ test('it keeps a proxy variable and a .curlrc off its request', async () => {
 
   const impd = startStubImpd('imp_fixture_good');
 
-  await writeFile(join(ctx.dir, '.curlrc'), 'proxy = "http://127.0.0.1:1"\n');
+  await writeFile(join(ctx.directory, '.curlrc'), 'proxy = "http://127.0.0.1:1"\n');
 
   const result = await runProcess(['bash', '-s', '--', String(impd.port)], {
     stdin: ctx.script,
@@ -100,7 +104,7 @@ test('its control: the same .curlrc and proxy variable send a plain curl off loo
 
   const impd = startStubImpd('imp_fixture_good');
 
-  await writeFile(join(ctx.dir, '.curlrc'), 'proxy = "http://127.0.0.1:1"\n');
+  await writeFile(join(ctx.directory, '.curlrc'), 'proxy = "http://127.0.0.1:1"\n');
 
   const result = await runProcess(
     ['curl', '-s', '-o', '/dev/null', '-w', '%{http_code}', `http://127.0.0.1:${impd.port}/health`],

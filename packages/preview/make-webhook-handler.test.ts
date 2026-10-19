@@ -21,11 +21,11 @@ import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'preview-webhook-'));
+  const directory = await mkdtemp(join(tmpdir(), 'preview-webhook-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const store = createPreviewStore(join(dir, 'previews.sqlite'));
+  const store = createPreviewStore(join(directory, 'previews.sqlite'));
 
   onTestFinished(() => {
     store.close();

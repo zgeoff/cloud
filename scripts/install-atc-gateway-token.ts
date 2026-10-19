@@ -15,7 +15,7 @@ export async function installATCGatewayToken(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,
 ): Promise<void> {
-  const file = `${context.dir}/gateway-token`;
+  const file = `${context.directory}/gateway-token`;
   const hasFile = preflight.hostFiles.includes('gateway-token');
 
   context.printOut(
@@ -46,7 +46,7 @@ function readItem(context: Readonly<ATCCredentialsContext>) {
 }
 
 async function readHostSum(context: Readonly<ATCCredentialsContext>) {
-  const line = await runOnHost(context, ['sha256sum', `${context.dir}/gateway-token`]);
+  const line = await runOnHost(context, ['sha256sum', `${context.directory}/gateway-token`]);
 
   return line.split(' ')[0] ?? '';
 }
@@ -73,7 +73,7 @@ async function createGatewayToken(context: Readonly<ATCCredentialsContext>) {
 
   const stdin = Buffer.concat([script, Buffer.from(`${bearer}\n`)]);
 
-  await runOnHost(context, ['bash', '-s', '--', context.dir], stdin);
+  await runOnHost(context, ['bash', '-s', '--', context.directory], stdin);
   await requireCopiesOf(context, bearer);
 
   context.printOut('ok: the 1Password item and the host file match\n');

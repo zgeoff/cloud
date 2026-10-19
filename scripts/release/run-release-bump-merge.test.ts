@@ -9,12 +9,12 @@ import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { runReleaseBumpMerge } from './run-release-bump-merge.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'run-release-bump-merge-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-release-bump-merge-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const summary = join(dir, 'summary.md');
-  const eventPath = join(dir, 'event.json');
+  const summary = join(directory, 'summary.md');
+  const eventPath = join(directory, 'event.json');
 
   // boot data: the runner creates the step summary before the step runs
   await writeFile(summary, '');

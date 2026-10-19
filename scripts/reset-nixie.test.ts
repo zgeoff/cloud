@@ -45,12 +45,12 @@ test.each([
 });
 
 test('it lists the files and the steps on a dry run and runs only read-only commands', async () => {
-  const dir = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
+  const directory = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
 
   const answers: Record<string, string> = {
     'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
-    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': `${dir}\n`,
-    [`find ${dir} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n'`]:
+    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': `${directory}\n`,
+    [`find ${directory} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n'`]:
       'nixie.db 258048 bytes\nkeys.db 12288 bytes\n',
   };
 
@@ -75,14 +75,14 @@ test('it lists the files and the steps on a dry run and runs only read-only comm
   expect(printOut.mock.calls).toStrictEqual([
     [
       `nixie reset on geoffcloud: this deletes all of nixie's state and every device enrolment, and cannot be undone
-data volume: ${dir}
+data volume: ${directory}
 files to delete:
   keys.db 12288 bytes
   nixie.db 258048 bytes
 steps:
   1. scale statefulset/nixie to 0
   2. wait for pod nixie-0 to stop
-  3. remove nixie.db-wal, nixie.db-shm, nixie.db, keys.db-wal, keys.db-shm, keys.db from ${dir}
+  3. remove nixie.db-wal, nixie.db-shm, nixie.db, keys.db-wal, keys.db-shm, keys.db from ${directory}
   4. scale statefulset/nixie to 1
   5. wait for nixie to be ready
   6. print a fresh enrolment code
@@ -93,11 +93,11 @@ steps:
 });
 
 test('it stops nixie before it removes the data, then restarts it and asks for a code', async () => {
-  const dir = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
+  const directory = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
 
   const answers: Record<string, string> = {
     'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
-    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': dir,
+    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': directory,
   };
 
   const runRemote = mock((command: string) =>
@@ -117,12 +117,12 @@ test('it stops nixie before it removes the data, then restarts it and asks for a
     ['k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}'],
     ['k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}'],
     [
-      `find ${dir} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n'`,
+      `find ${directory} -maxdepth 1 -type f \\( -name nixie.db-wal -o -name nixie.db-shm -o -name nixie.db -o -name keys.db-wal -o -name keys.db-shm -o -name keys.db \\) -printf '%f %s bytes\\n'`,
     ],
     ['k3s kubectl -n nixie scale statefulset nixie --replicas=0'],
     ['k3s kubectl -n nixie wait --for=delete pod/nixie-0 --timeout=180s'],
     [
-      `rm -f -- ${dir}/nixie.db-wal ${dir}/nixie.db-shm ${dir}/nixie.db ${dir}/keys.db-wal ${dir}/keys.db-shm ${dir}/keys.db`,
+      `rm -f -- ${directory}/nixie.db-wal ${directory}/nixie.db-shm ${directory}/nixie.db ${directory}/keys.db-wal ${directory}/keys.db-shm ${directory}/keys.db`,
     ],
     ['k3s kubectl -n nixie scale statefulset nixie --replicas=1'],
     ['k3s kubectl -n nixie rollout status statefulset/nixie --timeout=600s'],
@@ -131,11 +131,11 @@ test('it stops nixie before it removes the data, then restarts it and asks for a
 });
 
 test('it prints the plan and each step before it runs it, then the enrolment code', async () => {
-  const dir = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
+  const directory = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
 
   const answers: Record<string, string> = {
     'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
-    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': dir,
+    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': directory,
     'k3s kubectl -n nixie exec nixie-0 -c nixie -- bun /app/main.js enrol-code': 'ABCD-EFGH\n',
   };
 
@@ -155,13 +155,13 @@ test('it prints the plan and each step before it runs it, then the enrolment cod
   expect(printOut.mock.calls).toStrictEqual([
     [
       `nixie reset on geoffcloud: this deletes all of nixie's state and every device enrolment, and cannot be undone
-data volume: ${dir}
+data volume: ${directory}
 files to delete:
   (none: the volume holds no data file)
 steps:
   1. scale statefulset/nixie to 0
   2. wait for pod nixie-0 to stop
-  3. remove nixie.db-wal, nixie.db-shm, nixie.db, keys.db-wal, keys.db-shm, keys.db from ${dir}
+  3. remove nixie.db-wal, nixie.db-shm, nixie.db, keys.db-wal, keys.db-shm, keys.db from ${directory}
   4. scale statefulset/nixie to 1
   5. wait for nixie to be ready
   6. print a fresh enrolment code
@@ -170,7 +170,7 @@ steps:
     ['==> 1. scale statefulset/nixie to 0\n'],
     ['==> 2. wait for pod nixie-0 to stop\n'],
     [
-      `==> 3. remove nixie.db-wal, nixie.db-shm, nixie.db, keys.db-wal, keys.db-shm, keys.db from ${dir}\n`,
+      `==> 3. remove nixie.db-wal, nixie.db-shm, nixie.db, keys.db-wal, keys.db-shm, keys.db from ${directory}\n`,
     ],
     ['==> 4. scale statefulset/nixie to 1\n'],
     ['==> 5. wait for nixie to be ready\n'],
@@ -181,11 +181,11 @@ steps:
 });
 
 test('it never removes the data when the pod does not stop', async () => {
-  const dir = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
+  const directory = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
 
   const answers: Record<string, string> = {
     'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
-    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': dir,
+    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': directory,
   };
 
   const runRemote = mock((command: string) => {
@@ -250,16 +250,16 @@ test('it refuses a data volume path outside the storage directory and changes no
 });
 
 test('it stops before any change when the data volume cannot be listed', async () => {
-  const dir = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
+  const directory = '/var/lib/rancher/k3s/storage/pvc-0f1e2d3c_nixie_data-nixie-0';
 
   const answers: Record<string, string> = {
     'k3s kubectl -n nixie get pvc data-nixie-0 -o jsonpath={.spec.volumeName}': 'pvc-0f1e2d3c',
-    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': dir,
+    'k3s kubectl get pv pvc-0f1e2d3c -o jsonpath={.spec.hostPath.path}': directory,
   };
 
   const runRemote = mock((command: string) => {
     const result = command.startsWith('find ')
-      ? { exitCode: 1, stdout: '', stderr: `find: '${dir}': No such file or directory\n` }
+      ? { exitCode: 1, stdout: '', stderr: `find: '${directory}': No such file or directory\n` }
       : { exitCode: 0, stdout: answers[command] ?? '', stderr: '' };
 
     return Promise.resolve(result);
@@ -275,6 +275,6 @@ test('it stops before any change when the data volume cannot be listed', async (
   expect(printOut).not.toHaveBeenCalled();
 
   expect(printErr.mock.calls).toStrictEqual([
-    [`reset-nixie: cannot list the data volume: find: '${dir}': No such file or directory\n`],
+    [`reset-nixie: cannot list the data volume: find: '${directory}': No such file or directory\n`],
   ]);
 });

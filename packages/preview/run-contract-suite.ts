@@ -109,8 +109,8 @@ async function tryRunGuestCommand(
 // time impd takes to report the exit
 const deadlineGraceMs = 90_000;
 
-async function waitForDeadline(deps: PreviewDeps, ms: number): Promise<null> {
-  await deps.sleep(ms);
+async function waitForDeadline(deps: PreviewDeps, delayMs: number): Promise<null> {
+  await deps.sleep(delayMs);
 
   return null;
 }

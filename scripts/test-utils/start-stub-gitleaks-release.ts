@@ -10,14 +10,14 @@ import { runProcess } from '../run-process.ts';
 // tar.gz that holds a `gitleaks` file with the given content, at the release's download URL.
 // Returns the tarball's sha256, as the release's checksums file lists it.
 export async function startStubGitleaksRelease(version: string, content: string): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'stub-gitleaks-release-'));
+  const directory = await mkdtemp(join(tmpdir(), 'stub-gitleaks-release-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await writeFile(join(dir, 'gitleaks'), content, { mode: 0o755 });
-  await runProcess(['tar', '-czf', join(dir, 'release.tar.gz'), '-C', dir, 'gitleaks']);
+  await writeFile(join(directory, 'gitleaks'), content, { mode: 0o755 });
+  await runProcess(['tar', '-czf', join(directory, 'release.tar.gz'), '-C', directory, 'gitleaks']);
 
-  const tarball = await readFile(join(dir, 'release.tar.gz'));
+  const tarball = await readFile(join(directory, 'release.tar.gz'));
 
   const url = `https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz`;
 

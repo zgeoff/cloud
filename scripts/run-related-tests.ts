@@ -54,9 +54,13 @@ export async function runRelatedTests(paths: readonly string[], cwd: string): Pr
 
 // the nearest directory below cwd, relative to it, that holds the test and its own bunfig.toml
 function findPackageDir(test: string, cwd: string): string | undefined {
-  for (let dir = dirname(test); dir !== '.' && dir !== '/'; dir = dirname(dir)) {
-    if (existsSync(join(cwd, dir, 'bunfig.toml'))) {
-      return dir;
+  for (
+    let directory = dirname(test);
+    directory !== '.' && directory !== '/';
+    directory = dirname(directory)
+  ) {
+    if (existsSync(join(cwd, directory, 'bunfig.toml'))) {
+      return directory;
     }
   }
 

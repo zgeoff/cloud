@@ -11,12 +11,12 @@ import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-relea
 
 // a repo with the gitleaks config the check copies, and a work directory the caller owns
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-agent-image-check-dir-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-check-dir-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = join(dir, 'repo');
-  const work = join(dir, 'work');
+  const repo = join(directory, 'repo');
+  const work = join(directory, 'work');
 
   await mkdir(join(repo, 'scripts'), { recursive: true });
   await mkdir(work);
@@ -31,17 +31,17 @@ test('it holds the pinned gitleaks binary and the gitleaks config', async () => 
   const ctx = await setupTest();
   const sum = await startStubGitleaksRelease('8.30.1', 'fake gitleaks\n');
 
-  const dir = await createAgentImageCheckDir(ctx.io, {
+  const directory = await createAgentImageCheckDir(ctx.io, {
     work: ctx.work,
     repo: ctx.repo,
     pins: { GITLEAKS_VERSION: '8.30.1', GITLEAKS_SHA256: sum },
   });
 
-  const files = await readdir(dir);
-  const binary = await readFile(join(dir, 'gitleaks'), 'utf8');
-  const config = await readFile(join(dir, 'gitleaks.toml'), 'utf8');
+  const files = await readdir(directory);
+  const binary = await readFile(join(directory, 'gitleaks'), 'utf8');
+  const config = await readFile(join(directory, 'gitleaks.toml'), 'utf8');
 
-  expect(dir).toBe(join(ctx.work, 'agent-image-check'));
+  expect(directory).toBe(join(ctx.work, 'agent-image-check'));
   expect(files.toSorted()).toStrictEqual(['gitleaks', 'gitleaks.toml']);
   expect(binary).toBe('fake gitleaks\n');
   expect(config).toBe('[extend]\nuseDefault = true\n');

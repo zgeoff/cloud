@@ -12,23 +12,23 @@ test('it prints status 0 for a port with a listener', async () => {
     listener.stop(true);
   });
 
-  const proc = Bun.spawn(
+  const subprocess = Bun.spawn(
     ['bash', '-c', buildTCPProbe({ host: '127.0.0.1', port: listener.port })],
     { env: { PATH: '/usr/bin:/bin' }, stdout: 'pipe' },
   );
 
-  const stdout = await new Response(proc.stdout).text();
+  const stdout = await new Response(subprocess.stdout).text();
 
   expect(stdout).toBe('probe-exit:0\n');
 });
 
 test('it prints status 1 for a port that refuses the connection', async () => {
-  const proc = Bun.spawn(['bash', '-c', buildTCPProbe({ host: '127.0.0.1', port: 1 })], {
+  const subprocess = Bun.spawn(['bash', '-c', buildTCPProbe({ host: '127.0.0.1', port: 1 })], {
     env: { PATH: '/usr/bin:/bin' },
     stdout: 'pipe',
   });
 
-  const stdout = await new Response(proc.stdout).text();
+  const stdout = await new Response(subprocess.stdout).text();
 
   expect(stdout).toBe('probe-exit:1\n');
 });

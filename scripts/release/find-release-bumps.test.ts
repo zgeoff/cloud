@@ -13,7 +13,7 @@ async function setupTest() {
 
   await Promise.all(
     ['images/agent', 'nixos/packages', 'nixos/hosts/geoffcloud', 'images/atc-gateway', 'infra'].map(
-      (dir) => mkdir(join(root, dir), { recursive: true }),
+      (directory) => mkdir(join(root, directory), { recursive: true }),
     ),
   );
 

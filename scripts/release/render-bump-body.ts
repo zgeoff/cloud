@@ -56,26 +56,29 @@ function renderMergeLines(input: BumpBodyInput) {
   return ['It waits for a review, because:', '', ...reasons];
 }
 
-function renderReason(label: string, version: string) {
-  switch (label) {
-    case 'update:major': {
-      return ['- it is a major release.'];
-    }
-    case 'update:minor': {
-      return version.startsWith('0.')
+// The review reason each label gives. The release workflows run these scripts without
+// node_modules, so a Map stands in for ts-pattern's match, and a label it lacks gives no reason.
+const reasonRenderers = new Map<string, (version: string) => string[]>([
+  ['update:major', () => ['- it is a major release.']],
+  [
+    'update:minor',
+    (version) =>
+      version.startsWith('0.')
         ? ['- it is a minor release of a 0.x dependency, which may break.']
-        : [];
-    }
-    case 'migrations': {
-      return ['- a release in the bump adds database migrations, which a revert does not undo.'];
-    }
-    case 'sandbox-images-changed': {
-      return [
-        "- the release changes nixie's sandbox images, which a person adds to impd before the merge, because the `Deploy prod` workflow applies the merged pin (`docs/runbooks/nixie.md`).",
-      ];
-    }
-    default: {
-      return [];
-    }
-  }
+        : [],
+  ],
+  [
+    'migrations',
+    () => ['- a release in the bump adds database migrations, which a revert does not undo.'],
+  ],
+  [
+    'sandbox-images-changed',
+    () => [
+      "- the release changes nixie's sandbox images, which a person adds to impd before the merge, because the `Deploy prod` workflow applies the merged pin (`docs/runbooks/nixie.md`).",
+    ],
+  ],
+]);
+
+function renderReason(label: string, version: string) {
+  return reasonRenderers.get(label)?.(version) ?? [];
 }

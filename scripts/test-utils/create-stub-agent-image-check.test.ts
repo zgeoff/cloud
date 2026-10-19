@@ -6,21 +6,21 @@ import { runProcess } from '../run-process.ts';
 import { createStubAgentImageCheck } from './create-stub-agent-image-check.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-stub-agent-image-check-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-stub-agent-image-check-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   // a failed mkfifo leaves no fifo, so the read of it fails the test
-  const fifo = join(dir, 'check-started');
+  const fifo = join(directory, 'check-started');
 
   await runProcess(['mkfifo', fifo]);
 
-  return { dir, fifo };
+  return { directory, fifo };
 }
 
 test('it writes a check that passes at once without CHECK_STARTED', async () => {
   const ctx = await setupTest();
-  const path = await createStubAgentImageCheck(ctx.dir);
+  const path = await createStubAgentImageCheck(ctx.directory);
 
   const result = await runProcess(['bun', path, '--imp', 'agent-check-abc1234'], {
     env: { PATH: process.env['PATH'] },
@@ -36,7 +36,7 @@ test('it writes a check that passes at once without CHECK_STARTED', async () => 
 
 test('it writes a check that signals the fifo and then runs until it is stopped', async () => {
   const ctx = await setupTest();
-  const path = await createStubAgentImageCheck(ctx.dir);
+  const path = await createStubAgentImageCheck(ctx.directory);
 
   const controller = new AbortController();
 

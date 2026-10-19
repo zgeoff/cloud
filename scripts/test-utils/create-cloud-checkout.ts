@@ -16,13 +16,13 @@ export interface CloudCheckout extends GitOrigin {
 export async function createCloudCheckout(
   files: Readonly<Record<string, string>>,
 ): Promise<CloudCheckout> {
-  const dir = await mkdtemp(join(tmpdir(), 'cloud-checkout-'));
+  const directory = await mkdtemp(join(tmpdir(), 'cloud-checkout-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const origin = await createGitOrigin(dir);
+  const origin = await createGitOrigin(directory);
 
-  const clone = join(dir, 'clone');
+  const clone = join(directory, 'clone');
 
   await Promise.all(
     Object.entries(files).map(async (entry: readonly [string, string]) => {

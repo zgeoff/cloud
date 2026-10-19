@@ -16,7 +16,7 @@ export async function installATCImpToken(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,
 ): Promise<void> {
-  const file = `${context.dir}/imp-token`;
+  const file = `${context.directory}/imp-token`;
   const token = findRecord(preflight.tokens, 'name', 'atc-cloud');
   const hasFile = preflight.hostFiles.includes('imp-token');
 
@@ -44,7 +44,11 @@ async function createImpToken(context: Readonly<ATCCredentialsContext>) {
   const script = await readHostScript('mint-atc-imp-token.sh');
 
   // the script runs imp's CLI with the argv that follows the directory
-  await runOnHost(context, ['bash', '-s', '--', context.dir, ...buildHostImpArgv([])], script);
+  await runOnHost(
+    context,
+    ['bash', '-s', '--', context.directory, ...buildHostImpArgv([])],
+    script,
+  );
 }
 
 async function checkSavedToken(
@@ -91,7 +95,7 @@ async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: st
 
   const result = await runHostCheck(
     context,
-    ['bash', '-s', '--', context.dir, context.impdPort, ...cli],
+    ['bash', '-s', '--', context.directory, context.impdPort, ...cli],
     { stdin: script },
   );
 

@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
 
 // Evaluates a job's `if` as GitHub's expression docs describe it: literals, `github` and `needs`
@@ -39,13 +40,13 @@ function splitTokens(expression: string): string[] {
   token.lastIndex = 0;
 
   while (expression.slice(token.lastIndex).trim() !== '') {
-    const match = token.exec(expression)?.groups?.['token'];
+    const found = token.exec(expression)?.groups?.['token'];
 
-    if (match === undefined) {
+    if (found === undefined) {
       throw new Error(`unsupported expression: ${expression}`);
     }
 
-    tokens.push(match);
+    tokens.push(found);
   }
 
   return tokens;
@@ -147,25 +148,15 @@ function requireToken(parser: Parser, expected: string): void {
 }
 
 function resolveStatusFunction(name: string, context: Readonly<ActionsConditionContext>): boolean {
-  switch (name) {
-    case 'success': {
-      return isSuccess(context);
-    }
-    case 'failure': {
-      return Object.values(context.needs).some((need) => need.result === 'failure');
-    }
-    case 'always': {
-      return true;
-    }
-
-    // no test cancels a run
-    case 'cancelled': {
-      return false;
-    }
-    default: {
+  // no test cancels a run, so cancelled() is always false
+  return match(name)
+    .with('success', () => isSuccess(context))
+    .with('failure', () => Object.values(context.needs).some((need) => need.result === 'failure'))
+    .with('always', () => true)
+    .with('cancelled', () => false)
+    .otherwise(() => {
       throw new Error(`unsupported function: ${name}()`);
-    }
-  }
+    });
 }
 
 function isSuccess(context: Readonly<ActionsConditionContext>): boolean {

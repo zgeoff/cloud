@@ -26,15 +26,15 @@ test('it clones an origin whose main holds the files', async () => {
 test('it removes its directory once the test finishes', async () => {
   const checkout = await createCloudCheckout({ 'notes.txt': 'kept until the end\n' });
 
-  const dir = dirname(checkout.clone);
+  const directory = dirname(checkout.clone);
 
   onTestFinished(async () => {
-    const isKept = await Bun.file(join(dir, 'clone/notes.txt')).exists();
+    const isKept = await Bun.file(join(directory, 'clone/notes.txt')).exists();
 
     expect(isKept).toBe(false);
   });
 
-  const before = await stat(dir);
+  const before = await stat(directory);
 
   expect(before.isDirectory()).toBe(true);
 });

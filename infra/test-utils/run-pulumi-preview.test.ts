@@ -9,18 +9,18 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const dir = await mkdtemp(join(tmpdir(), 'run-pulumi-preview-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-pulumi-preview-'));
 
-  stack.defer(() => rm(dir, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir, stack };
+  return { directory, stack };
 }
 
 test("it returns the preview's exit code and its stdout followed by its stderr, run in the project directory with the given environment", async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'pulumi'),
+    join(ctx.directory, 'pulumi'),
     [
       '#!/bin/sh',
       `printf 'argv: %s\\n' "$*"`,
@@ -34,14 +34,14 @@ test("it returns the preview's exit code and its stdout followed by its stderr, 
   );
 
   const result = await runPulumiPreview({
-    pulumiPath: join(ctx.dir, 'pulumi'),
-    cwd: ctx.dir,
+    pulumiPath: join(ctx.directory, 'pulumi'),
+    cwd: ctx.directory,
     env: { CASE_DIR: '/case' },
     cleanup: ctx.stack,
   });
 
   expect(result).toStrictEqual({
     exitCode: 3,
-    output: `argv: preview --non-interactive\ncwd: ${ctx.dir}\ncase: /case\nrefused\n`,
+    output: `argv: preview --non-interactive\ncwd: ${ctx.directory}\ncase: /case\nrefused\n`,
   });
 });

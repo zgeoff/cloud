@@ -11,19 +11,19 @@ import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
 // a real origin and seed for each case to commit its image to, and recorders for the output
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-agent-image-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(dir);
+  const repo = await createGitOrigin(directory);
 
   const out: string[] = [];
   const err: string[] = [];
 
   return {
-    dir,
+    directory,
     repo,
-    clone: join(dir, 'clone'),
+    clone: join(directory, 'clone'),
     out,
     err,
     printOut: (text: string) => {
@@ -76,7 +76,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
   });
 
   const impCalls = stub.calls.filter((call) => call.argv[0] !== 'git' && call.argv[0] !== 'tar');
-  const src = dirname(dirname(impCalls[2]?.argv[3] ?? ''));
+  const source = dirname(dirname(impCalls[2]?.argv[3] ?? ''));
 
   expect(exitCode).toBe(0);
   expect(ctx.out).toStrictEqual([`agent-${short} imp-build-stub-agent-${short} check passed\n`]);
@@ -99,15 +99,15 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
   expect(impCalls.map((call) => call.argv)).toStrictEqual([
     ['impz', 'image', 'ls', '--json'],
     ['impz', 'ls', '--json'],
-    ['impz', 'image', 'build', join(src, 'images/agent'), '--name', `agent-${short}`],
+    ['impz', 'image', 'build', join(source, 'images/agent'), '--name', `agent-${short}`],
     ['impz', 'image', 'ls', '--json'],
     ['impz', 'new', `agent-check-${short}`, '--image', `agent-${short}`],
-    ['bun', join(src, 'scripts/check-agent-image.ts'), '--imp', `agent-check-${short}`],
+    ['bun', join(source, 'scripts/check-agent-image.ts'), '--imp', `agent-check-${short}`],
     ['impz', 'rm', `agent-check-${short}`],
   ]);
 
-  expect(src).toStartWith(join(tmpdir(), 'agent-image-build-'));
-  expect(access(src)).rejects.toMatchObject({ code: 'ENOENT' });
+  expect(source).toStartWith(join(tmpdir(), 'agent-image-build-'));
+  expect(access(source)).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
 test('it builds an older commit on main, and runs that commit’s bash check when it predates the bun one', async () => {
@@ -598,7 +598,7 @@ test.each([
 
   const exitCode = await createAgentImage({
     args,
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
@@ -617,7 +617,7 @@ test('it refuses an AGENT_IMAGE_BUILD_TIMEOUT that is not a duration, before any
 
   const exitCode = await createAgentImage({
     args: [],
-    cwd: ctx.dir,
+    cwd: ctx.directory,
     buildTimeout: '45 minutes',
     run: stub.run,
     printOut: ctx.printOut,

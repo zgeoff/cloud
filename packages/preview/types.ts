@@ -68,6 +68,6 @@ export interface PreviewDeps {
   // runs the slot rule and the start of an imp as one step, one open at a time
   readonly withSlotLock: <T>(run: () => Promise<T>) => Promise<T>;
   readonly now: () => Date;
-  readonly sleep: (ms: number) => Promise<void>;
+  readonly sleep: (durationMs: number) => Promise<void>;
   readonly log: (line: string) => void;
 }

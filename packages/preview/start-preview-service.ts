@@ -30,7 +30,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     pendingRuns: new Set(),
     withSlotLock: makeSlotLock(),
     now: () => new Date(),
-    sleep: (ms) => Bun.sleep(ms),
+    sleep: (durationMs) => Bun.sleep(durationMs),
     log: (line) => {
       console.log(line);
     },

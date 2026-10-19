@@ -89,28 +89,28 @@ test('it reports a program that dies of its own SIGTERM as no timeout', async ()
 });
 
 test('it runs the program in the directory and with only the environment it names', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'run-process-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-process-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const result = await runProcess(['bash', '-c', 'pwd; env | sort'], {
-    cwd: dir,
+    cwd: directory,
     env: { PATH: process.env['PATH'], RUN_PROCESS_TEST: 'set' },
   });
 
   const lines = result.stdout.toString().split('\n');
 
-  expect(lines[0]).toBe(dir);
+  expect(lines[0]).toBe(directory);
   expect(lines).toIncludeAllMembers(['RUN_PROCESS_TEST=set']);
   expect(lines.filter((line) => line.startsWith('HOME='))).toStrictEqual([]);
 });
 
 test('it sends SIGTERM to the program’s descendants when its signal aborts', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'run-process-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-process-'));
 
-  const pidFile = join(dir, 'pid');
+  const pidFile = join(directory, 'pid');
 
-  onTestFinished(() => removeDescendant(dir, pidFile));
+  onTestFinished(() => removeDescendant(directory, pidFile));
 
   const controller = new AbortController();
 
@@ -129,11 +129,11 @@ test('it sends SIGTERM to the program’s descendants when its signal aborts', a
 });
 
 test('it stops reading the pipes that a descendant outside its group holds once forceStop kills the program', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'run-process-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-process-'));
 
-  const pidFile = join(dir, 'pid');
+  const pidFile = join(directory, 'pid');
 
-  onTestFinished(() => removeDescendant(dir, pidFile));
+  onTestFinished(() => removeDescendant(directory, pidFile));
 
   const controller = new AbortController();
 
@@ -152,7 +152,7 @@ test('it stops reading the pipes that a descendant outside its group holds once 
 });
 
 // kills the descendant whose pid the file holds, should it outlive the test, and removes dir
-async function removeDescendant(dir: string, pidFile: string) {
+async function removeDescendant(directory: string, pidFile: string) {
   const text = await readFile(pidFile, 'utf8').catch(() => '');
 
   const pid = Number(text);
@@ -166,7 +166,7 @@ async function removeDescendant(dir: string, pidFile: string) {
     }
   }
 
-  await rm(dir, { recursive: true, force: true });
+  await rm(directory, { recursive: true, force: true });
 }
 
 // polls until the program has written the file, which the test reads as its start

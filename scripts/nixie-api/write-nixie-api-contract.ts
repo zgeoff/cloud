@@ -12,7 +12,7 @@ export interface WriteNixieAPIContractOptions extends ScriptIO {
   readonly args: readonly string[];
 
   // the directory that holds openapi.json and openapi.d.ts
-  readonly dir: string;
+  readonly directory: string;
 }
 
 const usage = 'usage: write-nixie-api-contract.ts <nixie release tag, such as v0.31.0>\n';
@@ -49,8 +49,8 @@ export function writeNixieAPIContract(
 
     const types = await renderNixieAPITypes(document);
 
-    await writeFile(join(options.dir, 'openapi.json'), document);
-    await writeFile(join(options.dir, 'openapi.d.ts'), types);
+    await writeFile(join(options.directory, 'openapi.json'), document);
+    await writeFile(join(options.directory, 'openapi.d.ts'), types);
 
     options.printOut(`write-nixie-api-contract: wrote nixie ${tag}'s openapi.json and its types\n`);
 
@@ -61,7 +61,7 @@ export function writeNixieAPIContract(
 if (import.meta.main) {
   process.exitCode = await writeNixieAPIContract({
     args: process.argv.slice(2),
-    dir: import.meta.dir,
+    directory: import.meta.dir,
     run: runProcess,
     printOut: (text) => {
       process.stdout.write(text);

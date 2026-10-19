@@ -37,7 +37,7 @@ const sshOptions = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15'];
 // OpenSSH 9.6p1's sshconnect.c error line, which log.c ends with CR LF, and its exit 255
 function buildSSHAnswer(scenario: Readonly<StubReadinessHostScenario>, call: StubCall) {
   const [destination, command, ...rest] = call.argv.slice(sshOptions.length);
-  const isShape = sshOptions.every((word, i) => call.argv[i] === word) && rest.length === 0;
+  const isShape = sshOptions.every((word, index) => call.argv[index] === word) && rest.length === 0;
 
   if (!isShape || destination !== scenario.destination || command === undefined) {
     return buildUnexpected(call);
@@ -127,7 +127,8 @@ function isShapeOf(shape: string, words: readonly string[]) {
   const parts = shape.split(' ');
 
   return (
-    parts.length === words.length && parts.every((part, i) => part === '*' || part === words[i])
+    parts.length === words.length &&
+    parts.every((part, index) => part === '*' || part === words[index])
   );
 }
 

@@ -10,30 +10,30 @@ import { createStubImpCLI } from './test-utils/create-stub-imp-cli.ts';
 // a real origin and clone, the TMPDIR the script makes its work tree in, the fifo the hanging
 // check writes to, and a way to start the script as a child process that the test stops
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'build-agent-image-'));
+  const directory = await mkdtemp(join(tmpdir(), 'build-agent-image-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(dir);
+  const repo = await createGitOrigin(directory);
 
-  const tmp = join(dir, 'tmp');
-  const fifo = join(dir, 'check-started');
+  const temporary = join(directory, 'tmp');
+  const fifo = join(directory, 'check-started');
 
-  await mkdir(tmp);
+  await mkdir(temporary);
 
   // a failed mkfifo leaves no fifo, so the read of it fails the test
   await runProcess(['mkfifo', fifo]);
 
   return {
-    dir,
+    directory,
     repo,
-    tmp,
+    temporary,
     fifo,
-    clone: join(dir, 'clone'),
+    clone: join(directory, 'clone'),
     startBuild: (args: readonly string[], env: Readonly<Record<string, string>>) => {
       const child = Bun.spawn(['bun', join(import.meta.dir, 'build-agent-image.ts'), ...args], {
-        cwd: join(dir, 'clone'),
-        env: { ...repo.env, TMPDIR: tmp, ...env },
+        cwd: join(directory, 'clone'),
+        env: { ...repo.env, TMPDIR: temporary, ...env },
         stdin: 'ignore',
         stdout: 'pipe',
         stderr: 'pipe',
@@ -67,7 +67,7 @@ test.each([
 
     const sha = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', 'HEAD']);
     const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
-    const imp = await createStubImpCLI(join(ctx.dir, 'imp'), { images: [] });
+    const imp = await createStubImpCLI(join(ctx.directory, 'imp'), { images: [] });
 
     const child = ctx.startBuild([], {
       PATH: `${imp.bin}:${ctx.repo.env['PATH'] ?? ''}`,
@@ -96,7 +96,7 @@ test.each([
 
     const calls = await imp.readCalls();
     const state = await imp.readState();
-    const left = await readdir(ctx.tmp);
+    const left = await readdir(ctx.temporary);
 
     expect(calls).toStrictEqual([
       ['image', 'ls', '--json'],
@@ -105,7 +105,7 @@ test.each([
         'image',
         'build',
         expect.toSatisfy((path: string) =>
-          new RegExp(`^${ctx.tmp}/agent-image-build-[^/]+/src/images/agent$`, 'u').test(path),
+          new RegExp(`^${ctx.temporary}/agent-image-build-[^/]+/src/images/agent$`, 'u').test(path),
         ),
         '--name',
         `agent-${short}`,
@@ -135,7 +135,7 @@ test('it keeps the image on an interrupt with --keep, and still removes the chec
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
-  const imp = await createStubImpCLI(join(ctx.dir, 'imp'), { images: [] });
+  const imp = await createStubImpCLI(join(ctx.directory, 'imp'), { images: [] });
 
   const child = ctx.startBuild(['--keep'], {
     PATH: `${imp.bin}:${ctx.repo.env['PATH'] ?? ''}`,
@@ -148,7 +148,7 @@ test('it keeps the image on an interrupt with --keep, and still removes the chec
 
   const exitCode = await child.exited;
   const state = await imp.readState();
-  const left = await readdir(ctx.tmp);
+  const left = await readdir(ctx.temporary);
 
   expect(exitCode).toBe(130);
 
@@ -173,7 +173,7 @@ test('it lets a retry after an interrupt build and check the same commit', async
   await ctx.repo.git(['clone', '-q', ctx.repo.origin, ctx.clone]);
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
-  const imp = await createStubImpCLI(join(ctx.dir, 'imp'), { images: [] });
+  const imp = await createStubImpCLI(join(ctx.directory, 'imp'), { images: [] });
 
   const path = `${imp.bin}:${ctx.repo.env['PATH'] ?? ''}`;
   const interrupted = ctx.startBuild([], { PATH: path, CHECK_STARTED: ctx.fifo });

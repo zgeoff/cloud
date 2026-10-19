@@ -20,12 +20,12 @@ export interface StubImpCLI {
 }
 
 export async function createStubImpCLI(
-  dir: string,
+  directory: string,
   scenario: Readonly<Pick<StubImpScenario, 'images' | 'imps'>>,
 ): Promise<StubImpCLI> {
-  const bin = join(dir, 'bin');
-  const state = join(dir, 'imp-state.json');
-  const calls = join(dir, 'imp-calls');
+  const bin = join(directory, 'bin');
+  const state = join(directory, 'imp-state.json');
+  const calls = join(directory, 'imp-calls');
 
   await mkdir(bin, { recursive: true });
   await writeFile(state, JSON.stringify({ images: scenario.images, imps: scenario.imps ?? [] }));

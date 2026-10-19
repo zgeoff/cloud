@@ -6,11 +6,11 @@ import { loadATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'load-atc-credentials-context-'));
+  const directory = await mkdtemp(join(tmpdir(), 'load-atc-credentials-context-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir, run: buildStubRunner().run };
+  return { directory, run: buildStubRunner().run };
 }
 
 test('it takes the production host, vault, item, directory and impd port by default', async () => {
@@ -30,7 +30,7 @@ test('it takes the production host, vault, item, directory and impd port by defa
     host: 'geoffcloud',
     vault: 'cloud',
     item: 'atc-daemon-token',
-    dir: '/var/lib/atc-daemon-secrets',
+    directory: '/var/lib/atc-daemon-secrets',
     impdPort: '7070',
     opEnv: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture_env' },
   });
@@ -57,7 +57,7 @@ test('it takes each setting the environment names', async () => {
     host: 'canary',
     vault: 'staging',
     item: 'canary-token',
-    dir: '/srv/atc secrets',
+    directory: '/srv/atc secrets',
     impdPort: '7171',
   });
 });
@@ -65,22 +65,22 @@ test('it takes each setting the environment names', async () => {
 test('it reads the 1Password token from the cloud checkout’s settings file when the environment has none', async () => {
   const ctx = await setupTest();
 
-  await mkdir(join(ctx.dir, 'projects/cloud/.claude'), { recursive: true });
+  await mkdir(join(ctx.directory, 'projects/cloud/.claude'), { recursive: true });
 
   await writeFile(
-    join(ctx.dir, 'projects/cloud/.claude/settings.local.json'),
+    join(ctx.directory, 'projects/cloud/.claude/settings.local.json'),
     '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"ops_fixture_settings"}}',
   );
 
   const context = await loadATCCredentialsContext({
     run: ctx.run,
-    env: { HOME: ctx.dir },
+    env: { HOME: ctx.directory },
     printOut: () => {},
     printErr: () => {},
   });
 
   expect(context.opEnv).toStrictEqual({
-    HOME: ctx.dir,
+    HOME: ctx.directory,
     OP_SERVICE_ACCOUNT_TOKEN: 'ops_fixture_settings',
   });
 });
@@ -89,13 +89,16 @@ test('it reads the 1Password token from the settings file the environment names'
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'settings.json'),
+    join(ctx.directory, 'settings.json'),
     '{"env":{"OP_SERVICE_ACCOUNT_TOKEN":"ops_fixture_named"}}',
   );
 
   const context = await loadATCCredentialsContext({
     run: ctx.run,
-    env: { HOME: join(ctx.dir, 'home'), CLOUD_OP_SETTINGS: join(ctx.dir, 'settings.json') },
+    env: {
+      HOME: join(ctx.directory, 'home'),
+      CLOUD_OP_SETTINGS: join(ctx.directory, 'settings.json'),
+    },
     printOut: () => {},
     printErr: () => {},
   });
@@ -109,13 +112,13 @@ test('it stops with exit 2 when the settings file is missing and the environment
   expect(
     loadATCCredentialsContext({
       run: ctx.run,
-      env: { HOME: ctx.dir },
+      env: { HOME: ctx.directory },
       printOut: () => {},
       printErr: () => {},
     }),
   ).rejects.toMatchObject({
     exitCode: 2,
-    message: `cannot read ${ctx.dir}/projects/cloud/.claude/settings.local.json (ENOENT); nothing changed`,
+    message: `cannot read ${ctx.directory}/projects/cloud/.claude/settings.local.json (ENOENT); nothing changed`,
   });
 });
 
@@ -126,32 +129,32 @@ test.each([
 ])('it stops when the settings file holds %s', async (_label: string, settings: string) => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'settings.json'), settings);
+  await writeFile(join(ctx.directory, 'settings.json'), settings);
 
   expect(
     loadATCCredentialsContext({
       run: ctx.run,
-      env: { CLOUD_OP_SETTINGS: join(ctx.dir, 'settings.json') },
+      env: { CLOUD_OP_SETTINGS: join(ctx.directory, 'settings.json') },
       printOut: () => {},
       printErr: () => {},
     }),
   ).rejects.toMatchObject({
     exitCode: 1,
-    message: `${ctx.dir}/settings.json holds no env.OP_SERVICE_ACCOUNT_TOKEN; nothing changed`,
+    message: `${ctx.directory}/settings.json holds no env.OP_SERVICE_ACCOUNT_TOKEN; nothing changed`,
   });
 });
 
 test('it stops when the settings file is not JSON', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'settings.json'), 'not json');
+  await writeFile(join(ctx.directory, 'settings.json'), 'not json');
 
   expect(
     loadATCCredentialsContext({
       run: ctx.run,
-      env: { CLOUD_OP_SETTINGS: join(ctx.dir, 'settings.json') },
+      env: { CLOUD_OP_SETTINGS: join(ctx.directory, 'settings.json') },
       printOut: () => {},
       printErr: () => {},
     }),
-  ).rejects.toMatchObject({ exitCode: 1, message: `no JSON from ${ctx.dir}/settings.json` });
+  ).rejects.toMatchObject({ exitCode: 1, message: `no JSON from ${ctx.directory}/settings.json` });
 });

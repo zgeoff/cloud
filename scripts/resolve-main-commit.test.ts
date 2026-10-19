@@ -9,15 +9,15 @@ import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
 // a real origin and seed for each case to commit to
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'resolve-main-commit-'));
+  const directory = await mkdtemp(join(tmpdir(), 'resolve-main-commit-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(dir);
+  const repo = await createGitOrigin(directory);
 
   const stub = buildStubRunner(buildRealProgramHandler(['git'], repo.env));
 
-  return { dir, repo, clone: join(dir, 'clone'), stub };
+  return { directory, repo, clone: join(directory, 'clone'), stub };
 }
 
 test('it resolves a commit that reached main after the clone, through its fetch', async () => {

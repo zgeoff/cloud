@@ -18,17 +18,17 @@ async function setupTest() {
 
   onTestFinished(() => stack.disposeAsync());
 
-  const dir = await mkdtemp(join(tmpdir(), 'port-forward-guard-'));
+  const directory = await mkdtemp(join(tmpdir(), 'port-forward-guard-'));
 
-  stack.defer(() => rm(dir, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
-  const caseDir = join(dir, 'case');
+  const caseDir = join(directory, 'case');
 
-  await mkdir(join(dir, 'state'));
+  await mkdir(join(directory, 'state'));
   await mkdir(caseDir);
 
   await writeFile(
-    join(dir, 'Pulumi.yaml'),
+    join(directory, 'Pulumi.yaml'),
     [
       'name: port-forward-guard',
       'runtime: bun',
@@ -40,7 +40,7 @@ async function setupTest() {
   const env = {
     PATH: [dirname(pulumiPath), dirname(process.execPath), '/usr/bin', '/bin'].join(':'),
     HOME: homedir(),
-    PULUMI_BACKEND_URL: `file://${join(dir, 'state')}`,
+    PULUMI_BACKEND_URL: `file://${join(directory, 'state')}`,
     PULUMI_CONFIG_PASSPHRASE: 'port-forward-guard',
     PULUMI_SKIP_UPDATE_CHECK: 'true',
     PULUMI_DISABLE_AUTOMATIC_PLUGIN_ACQUISITION: 'true',
@@ -48,13 +48,13 @@ async function setupTest() {
   };
 
   const init = Bun.spawnSync([pulumiPath, 'stack', 'init', 'test', '--non-interactive'], {
-    cwd: dir,
+    cwd: directory,
     env,
   });
 
   invariant(init.exitCode === 0, `pulumi stack init failed: ${init.stderr.toString()}`);
 
-  const runPreview = () => runPulumiPreview({ pulumiPath, cwd: dir, env, cleanup: stack });
+  const runPreview = () => runPulumiPreview({ pulumiPath, cwd: directory, env, cleanup: stack });
 
   return { caseDir, runPreview };
 }

@@ -6,11 +6,11 @@ import { buildStubAgentImageGuest } from './build-stub-agent-image-guest.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'build-stub-agent-image-guest-'));
+  const directory = await mkdtemp(join(tmpdir(), 'build-stub-agent-image-guest-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it lists the mounted check directory and answers the docker run with the guest result', async () => {
@@ -19,10 +19,10 @@ test('it lists the mounted check directory and answers the docker run with the g
   const guest = buildStubAgentImageGuest({ guest: { exitCode: 1, stdout: 'FAIL  bun\n' } });
   const stub = buildStubRunner(guest.handler);
 
-  await writeFile(join(ctx.dir, 'gitleaks'), '');
-  await writeFile(join(ctx.dir, 'gitleaks.toml'), '');
+  await writeFile(join(ctx.directory, 'gitleaks'), '');
+  await writeFile(join(ctx.directory, 'gitleaks.toml'), '');
 
-  const mount = `${ctx.dir}:/run/agent-image-check:ro`;
+  const mount = `${ctx.directory}:/run/agent-image-check:ro`;
 
   const result = await stub.run(['docker', 'run', '--rm', '-i', '-v', mount, 'img', 'bash', '-s']);
 
@@ -42,9 +42,9 @@ test('it lists the directory an imp copy sends, and answers the copy and the exe
   const guest = buildStubAgentImageGuest({ guest: { stdout: '== 0 failed\n' } });
   const stub = buildStubRunner(guest.handler);
 
-  await writeFile(join(ctx.dir, 'gitleaks'), '');
+  await writeFile(join(ctx.directory, 'gitleaks'), '');
 
-  const copy = await stub.run(['impz', 'cp', ctx.dir, 'agent:/run/agent-image-check']);
+  const copy = await stub.run(['impz', 'cp', ctx.directory, 'agent:/run/agent-image-check']);
   const exec = await stub.run(['impz', 'exec', 'agent', '--', 'bash', '-s']);
 
   expect(copy.exitCode).toBe(0);
@@ -58,7 +58,7 @@ test('it answers the imp copy with the scenario’s copy failure', async () => {
   const guest = buildStubAgentImageGuest({ guest: {}, copy: { exitCode: 3, stderr: 'no imp\n' } });
   const stub = buildStubRunner(guest.handler);
 
-  const result = await stub.run(['impz', 'cp', ctx.dir, 'gone:/run/agent-image-check']);
+  const result = await stub.run(['impz', 'cp', ctx.directory, 'gone:/run/agent-image-check']);
 
   expect(result).toStrictEqual({
     exitCode: 3,

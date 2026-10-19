@@ -22,45 +22,54 @@ export interface ReleaseReadResult {
   readonly flags: readonly string[];
 }
 
+type ReleaseSource = ReleaseRecord['source'];
+
+type SourceReader<Source extends ReleaseSource> = (
+  read: ReleaseRead,
+  source: Source,
+) => Promise<ReleaseReadResult | Error> | Error;
+
+// One reader per source kind. The release workflows run these scripts without node_modules, so a
+// keyed record branches here in place of ts-pattern's match, and its type still needs every kind.
+const sourceReaders: {
+  readonly [Kind in ReleaseSource['kind']]: SourceReader<Extract<ReleaseSource, { kind: Kind }>>;
+} = {
+  sha256sums: (read) => readSHA256SumsValues(read),
+  'image-digests': (read, source) => readImageDigestValues(read, source.images),
+  'release-notes': (read) => readReleaseNotesValues(read),
+  'npm-tarball': (read, source) => readNPMTarballValues(read, source.packageName),
+  'published-images': (read) =>
+    new Error(
+      `${read.record.name} pins images this repository publishes: the workflow that publishes them opens its pull request`,
+    ),
+};
+
 // Reads what the release publishes for its pins, as its record's source kind says
 export async function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
   const source = read.record.source;
+  const reader = sourceReaders[source.kind] as SourceReader<typeof source> | undefined;
 
-  switch (source.kind) {
-    case 'sha256sums': {
-      const sums = await runChecked(read.run, [
-        'gh',
-        'release',
-        'download',
-        `${read.record.tagPrefix}${read.version}`,
-        '-R',
-        read.record.repo,
-        '-p',
-        'SHA256SUMS',
-        '-O',
-        '-',
-      ]);
-
-      return sums instanceof Error ? sums : { values: { sha256sums: sums }, flags: [] };
-    }
-    case 'image-digests': {
-      return readImageDigestValues(read, source.images);
-    }
-    case 'release-notes': {
-      return readReleaseNotesValues(read);
-    }
-    case 'npm-tarball': {
-      return readNPMTarballValues(read, source.packageName);
-    }
-    case 'published-images': {
-      return new Error(
-        `${read.record.name} pins images this repository publishes: the workflow that publishes them opens its pull request`,
-      );
-    }
-
-    // the type check refuses a kind with no case, so only a registry built outside it lands here
-    default: {
-      return new Error('the registry names a release source kind that no case reads');
-    }
+  // the type check refuses a kind with no reader, so only a registry built outside it lands here
+  if (reader === undefined) {
+    return new Error('the registry names a release source kind that no reader reads');
   }
+
+  return await reader(read, source);
+}
+
+async function readSHA256SumsValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
+  const sums = await runChecked(read.run, [
+    'gh',
+    'release',
+    'download',
+    `${read.record.tagPrefix}${read.version}`,
+    '-R',
+    read.record.repo,
+    '-p',
+    'SHA256SUMS',
+    '-O',
+    '-',
+  ]);
+
+  return sums instanceof Error ? sums : { values: { sha256sums: sums }, flags: [] };
 }

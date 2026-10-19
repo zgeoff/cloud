@@ -12,7 +12,7 @@ export interface AgentImageCheck {
   readonly check: string;
 
   // the commit's extracted image and scripts, and the work directory that holds them
-  readonly src: string;
+  readonly source: string;
   readonly work: string;
 }
 
@@ -42,11 +42,11 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
 
   printErrText(io, created.stdout.toString());
 
-  const script = join(target.src, 'scripts/check-agent-image.ts');
+  const script = join(target.source, 'scripts/check-agent-image.ts');
 
   const argv = existsSync(script)
     ? ['bun', script, '--imp', target.check]
-    : ['bash', join(target.src, 'scripts/check-agent-image.sh'), '--imp', target.check];
+    : ['bash', join(target.source, 'scripts/check-agent-image.sh'), '--imp', target.check];
 
   const env = {
     ...process.env,
@@ -65,14 +65,14 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
 // A commit from before imp's CLI took its new name has a check that calls `imp`: the shim on its
 // PATH hands each call to the CLI. Returns the shim's directory, inside the work directory.
 function createImpShim(work: string): string {
-  const dir = join(work, 'imp-shim');
-  const shim = join(dir, 'imp');
+  const directory = join(work, 'imp-shim');
+  const shim = join(directory, 'imp');
 
-  mkdirSync(dir, { recursive: true });
+  mkdirSync(directory, { recursive: true });
   writeFileSync(shim, `#!/bin/sh\nexec ${impCLI} "$@"\n`);
   chmodSync(shim, 0o755);
 
-  return dir;
+  return directory;
 }
 
 async function removeCheckImp(io: Readonly<ScriptIO>, check: string) {

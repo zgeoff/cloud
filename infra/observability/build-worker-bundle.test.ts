@@ -8,23 +8,23 @@ test('it bundles an entry and its imports into one module that runs on its own',
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'greet.ts'),
+    join(ctx.directory, 'greet.ts'),
     "export const greet = (name: string): string => 'hi ' + name;\n",
   );
 
   await writeFile(
-    join(ctx.dir, 'index.ts'),
+    join(ctx.directory, 'index.ts'),
     "import { greet } from './greet.ts';\nconsole.log(greet('sam'));\n",
   );
 
-  await mkdir(join(ctx.dir, 'out'));
+  await mkdir(join(ctx.directory, 'out'));
 
-  const bundle = await buildWorkerBundle(join(ctx.dir, 'index.ts'));
+  const bundle = await buildWorkerBundle(join(ctx.directory, 'index.ts'));
 
-  await writeFile(join(ctx.dir, 'out', 'index.js'), bundle);
+  await writeFile(join(ctx.directory, 'out', 'index.js'), bundle);
 
-  const run = Bun.spawnSync([process.execPath, join(ctx.dir, 'out', 'index.js')], {
-    cwd: join(ctx.dir, 'out'),
+  const run = Bun.spawnSync([process.execPath, join(ctx.directory, 'out', 'index.js')], {
+    cwd: join(ctx.directory, 'out'),
   });
 
   expect({
@@ -41,7 +41,7 @@ test('it bundles an entry and its imports into one module that runs on its own',
 test('it fails with the bundler reason when an import cannot be resolved', async () => {
   const ctx = await setupTest();
 
-  const entrypoint = join(ctx.dir, 'index.ts');
+  const entrypoint = join(ctx.directory, 'index.ts');
 
   await writeFile(entrypoint, "import { greet } from './missing.ts';\nexport default greet;\n");
 
@@ -52,9 +52,9 @@ test('it fails with the bundler reason when an import cannot be resolved', async
 });
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'worker-bundle-'));
+  const directory = await mkdtemp(join(tmpdir(), 'worker-bundle-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }

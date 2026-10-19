@@ -8,16 +8,23 @@ import { runProcess } from '../run-process.ts';
 export async function createNPMTarball(
   manifest: Readonly<Record<string, string>>,
 ): Promise<Uint8Array> {
-  const dir = await mkdtemp(join(tmpdir(), 'npm-tarball-'));
+  const directory = await mkdtemp(join(tmpdir(), 'npm-tarball-'));
 
-  await mkdir(join(dir, 'package'));
-  await writeFile(join(dir, 'package/package.json'), `${JSON.stringify(manifest)}\n`);
+  await mkdir(join(directory, 'package'));
+  await writeFile(join(directory, 'package/package.json'), `${JSON.stringify(manifest)}\n`);
 
-  const packed = await runProcess(['tar', '-czf', join(dir, 'package.tgz'), '-C', dir, 'package']);
+  const packed = await runProcess([
+    'tar',
+    '-czf',
+    join(directory, 'package.tgz'),
+    '-C',
+    directory,
+    'package',
+  ]);
 
-  const bytes = packed.exitCode === 0 ? await readFile(join(dir, 'package.tgz')) : null;
+  const bytes = packed.exitCode === 0 ? await readFile(join(directory, 'package.tgz')) : null;
 
-  await rm(dir, { recursive: true, force: true });
+  await rm(directory, { recursive: true, force: true });
 
   if (bytes === null) {
     throw new Error(`tar exited ${packed.exitCode}: ${packed.stderr.toString()}`);

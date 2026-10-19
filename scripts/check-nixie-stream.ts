@@ -188,8 +188,8 @@ function formatStream(report: StreamReport): string {
   return `stream ${report.end} for ${formatSeconds(report.openMs)}: ${report.keepalives} keepalives, longest wait ${formatSeconds(report.longestGapMs)}, ${report.records} records`;
 }
 
-function formatSeconds(ms: number): string {
-  return `${(ms / 1000).toFixed(1)} s`;
+function formatSeconds(durationMs: number): string {
+  return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
 interface Outcome {
@@ -256,16 +256,16 @@ async function removeCheckSession(
 }
 
 async function runSSH(command: string): Promise<RemoteResult> {
-  const proc = Bun.spawn(['ssh', 'root@geoffcloud', command], {
+  const subprocess = Bun.spawn(['ssh', 'root@geoffcloud', command], {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
   });
 
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
+    new Response(subprocess.stdout).text(),
+    new Response(subprocess.stderr).text(),
+    subprocess.exited,
   ]);
 
   return { exitCode, stdout, stderr };

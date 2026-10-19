@@ -16,11 +16,11 @@ import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'preview-contract-'));
+  const directory = await mkdtemp(join(tmpdir(), 'preview-contract-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const store = createPreviewStore(join(dir, 'previews.sqlite'));
+  const store = createPreviewStore(join(directory, 'previews.sqlite'));
 
   onTestFinished(() => {
     store.close();
@@ -199,8 +199,8 @@ test('it posts failure and removes the imp when the run passes its time limit', 
   await runContractRun(
     {
       ...ctx.deps,
-      sleep: (ms) => {
-        sleeps.push(ms);
+      sleep: (durationMs) => {
+        sleeps.push(durationMs);
 
         return Promise.resolve();
       },

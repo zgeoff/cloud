@@ -6,13 +6,13 @@ import { buildStubCheckAgentImage } from './build-stub-check-agent-image.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'build-stub-check-agent-image-'));
+  const directory = await mkdtemp(join(tmpdir(), 'build-stub-check-agent-image-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await mkdir(join(dir, 'scripts'));
+  await mkdir(join(directory, 'scripts'));
 
-  return { dir };
+  return { directory };
 }
 
 test('it passes the bun check of an archive that holds it', async () => {
@@ -20,11 +20,11 @@ test('it passes the bun check of an archive that holds it', async () => {
 
   const stub = buildStubRunner(buildStubCheckAgentImage(0));
 
-  await writeFile(join(ctx.dir, 'scripts/check-agent-image.ts'), '');
+  await writeFile(join(ctx.directory, 'scripts/check-agent-image.ts'), '');
 
   const result = await stub.run([
     'bun',
-    join(ctx.dir, 'scripts/check-agent-image.ts'),
+    join(ctx.directory, 'scripts/check-agent-image.ts'),
     '--imp',
     'agent-check-abc1234',
   ]);
@@ -42,11 +42,11 @@ test('it fails the bash check of an older archive with the failure count', async
 
   const stub = buildStubRunner(buildStubCheckAgentImage(2));
 
-  await writeFile(join(ctx.dir, 'scripts/check-agent-image.sh'), '');
+  await writeFile(join(ctx.directory, 'scripts/check-agent-image.sh'), '');
 
   const result = await stub.run([
     'bash',
-    join(ctx.dir, 'scripts/check-agent-image.sh'),
+    join(ctx.directory, 'scripts/check-agent-image.sh'),
     '--imp',
     'agent-check-abc1234',
   ]);
@@ -62,7 +62,7 @@ test('it leaves a check whose script the archive lacks to the next handler', asy
 
   const result = await stub.run([
     'bun',
-    join(ctx.dir, 'scripts/check-agent-image.ts'),
+    join(ctx.directory, 'scripts/check-agent-image.ts'),
     '--imp',
     'agent-check-abc1234',
   ]);

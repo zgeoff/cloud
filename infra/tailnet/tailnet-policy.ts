@@ -1,3 +1,4 @@
+/* oxlint-disable zgeoff/no-abbreviated-names -- Tailscale's policy file names a grant's sources src */
 import { topology } from '@zgeoff/cloud-topology';
 import { geoffcloudNode } from '../shared/geoffcloud-node.ts';
 

@@ -10,13 +10,13 @@ import { createGitOrigin } from '../test-utils/create-git-origin.ts';
 import { createBumpBranch } from './create-bump-branch.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-bump-branch-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-bump-branch-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const origin = await createGitOrigin(dir);
+  const origin = await createGitOrigin(directory);
 
-  const clone = join(dir, 'clone');
+  const clone = join(directory, 'clone');
   const stub = buildStubRunner(buildRealProgramHandler(['git'], origin.env));
 
   return {

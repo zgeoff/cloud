@@ -5,16 +5,16 @@ import { join } from 'node:path';
 import { createGitOrigin } from './create-git-origin.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-git-origin-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-git-origin-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it creates a seed whose pushes reach the bare origin on main', async () => {
   const ctx = await setupTest();
-  const repo = await createGitOrigin(ctx.dir);
+  const repo = await createGitOrigin(ctx.directory);
 
   await writeFile(join(repo.seed, 'README'), 'seed\n');
 
@@ -30,20 +30,20 @@ test('it creates a seed whose pushes reach the bare origin on main', async () =>
 
 test('it runs git without the user’s global config', async () => {
   const ctx = await setupTest();
-  const repo = await createGitOrigin(ctx.dir);
+  const repo = await createGitOrigin(ctx.directory);
 
   expect(repo.env).toContainEntries([
     ['GIT_CONFIG_GLOBAL', '/dev/null'],
     ['GIT_CONFIG_NOSYSTEM', '1'],
-    ['HOME', join(ctx.dir, 'home')],
+    ['HOME', join(ctx.directory, 'home')],
   ]);
 });
 
 test('it turns off auto maintenance in the origin, the seed and a clone', async () => {
   const ctx = await setupTest();
-  const repo = await createGitOrigin(ctx.dir);
+  const repo = await createGitOrigin(ctx.directory);
 
-  const clone = join(ctx.dir, 'clone');
+  const clone = join(ctx.directory, 'clone');
 
   await repo.git(['clone', '-q', repo.origin, clone]);
 
@@ -59,7 +59,7 @@ test('it turns off auto maintenance in the origin, the seed and a clone', async 
 
 test('it throws with git’s message when a git call fails', async () => {
   const ctx = await setupTest();
-  const repo = await createGitOrigin(ctx.dir);
+  const repo = await createGitOrigin(ctx.directory);
 
   expect(repo.git(['-C', repo.seed, 'rev-parse', '--verify', 'nowhere'])).rejects.toThrow(
     `git -C ${repo.seed} rev-parse --verify nowhere exited 128: fatal: Needed a single revision\n`,
