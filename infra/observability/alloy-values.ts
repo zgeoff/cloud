@@ -13,6 +13,19 @@ export const alloyValues = {
       content: toHelmTplLiteral(alloyConfig),
     },
 
+    // the seed script before each Alloy start, a restart of the container included, then the
+    // image's Alloy with the chart's arguments
+    command: [
+      'sh',
+      '-c',
+      `${buildPodLogPositionsSeedScript({
+        podLogRoot: alloyPaths.podLogs,
+        seedFile: alloyPaths.podLogPositionsSeed,
+        positionsFile: alloyPaths.podLogPositions,
+      })}exec /bin/alloy "$@"\n`,
+      'alloy',
+    ],
+
     // /var/log from the host, read-only, for the journal and the pods' log files
     mounts: { varlog: true, extra: [{ name: 'storage', mountPath: alloyPaths.storage }] },
 
@@ -22,27 +35,6 @@ export const alloyValues = {
   },
   serviceMonitor: { enabled: true },
   controller: {
-    // before each start, the seed of read positions that Alloy's pod-log source imports when it has
-    // none of its own; the image is the chart's appVersion, which the Alloy container runs
-    initContainers: [
-      {
-        name: 'seed-pod-log-positions',
-        image: 'docker.io/grafana/alloy:v1.20.0',
-        command: [
-          'sh',
-          '-c',
-          buildPodLogPositionsSeedScript({
-            podLogRoot: alloyPaths.podLogs,
-            seedFile: alloyPaths.podLogPositionsSeed,
-            positionsFile: alloyPaths.podLogPositions,
-          }),
-        ],
-        volumeMounts: [
-          { name: 'varlog', mountPath: '/var/log', readOnly: true },
-          { name: 'storage', mountPath: alloyPaths.storage },
-        ],
-      },
-    ],
     volumes: {
       extra: [
         { name: 'storage', hostPath: { path: alloyPaths.storage, type: 'DirectoryOrCreate' } },

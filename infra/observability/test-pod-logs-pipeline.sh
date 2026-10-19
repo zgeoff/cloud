@@ -2,10 +2,12 @@
 # Test for the pod-log pipeline in the pinned Alloy: Alloy runs the pipeline
 # build-pod-logs-pipeline.ts builds over one container's logs in the case tree, written in the
 # kubelet's CRI format, with a target shaped as discovery.kubernetes gives it. Each start runs as
-# production runs it: the seed script build-pod-log-positions-seed-script.ts builds runs first, as
-# the init container does, and Alloy keeps its storage in a Docker volume that starts empty, as a
-# new or wiped store does. loki.echo stands in for Loki and prints each entry's labels and line to
-# Alloy's log, which each case compares.
+# production runs it: the container's entry point runs the script
+# build-pod-log-positions-seed-script.ts builds and then Alloy, so a restart of the container runs
+# the script again, and Alloy keeps its storage in a Docker volume that starts empty, as a new or
+# wiped store does. A restart inside the same container stands for a restart of Alloy's container in
+# its pod, and a second container on the volume for a new pod. loki.echo stands in for Loki and
+# prints each entry's labels and line to Alloy's log, which each case compares.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='labelled' bash infra/observability/test-pod-logs-pipeline.sh
@@ -210,6 +212,137 @@ EOF
   diff - "$tree/entries" << 'EOF'
 order 42 placed
 order 43 failed
+EOF
+}
+
+it_keeps_the_seeded_position_of_a_log_with_no_shipped_line_when_alloy_crashes_and_restarts_in_its_container() {
+  local before now
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
+@BEFORE@ stdout F listening on :8080
+@BEFORE@ stderr F order 40 failed
+EOF
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
+  wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
+  # a crash: no stop, so Alloy saves no position of its own for a log it shipped no line from
+  docker kill "$(cat "$tree/alloy/container")" > /dev/null
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
+
+  docker start "$(cat "$tree/alloy/container")" > /dev/null
+
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 60 "Alloy to ship the new line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
+  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
+    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
+  diff - "$tree/entries" << 'EOF'
+order 41 placed
+EOF
+}
+
+it_reads_a_log_from_its_first_line_when_the_kubelet_replaced_it_before_a_crash_with_no_shipped_line() {
+  local before now
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
+@BEFORE@ stdout F listening on :8080
+@BEFORE@ stderr F order 38 failed
+@BEFORE@ stderr F order 39 failed
+@BEFORE@ stderr F order 40 failed
+EOF
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
+  wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
+  docker kill "$(cat "$tree/alloy/container")" > /dev/null
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  mv "$tree/logs/$log_dir/0.log" "$tree/logs/$log_dir/0.log.20261019-052500"
+  sed "s/@NOW@/$now/" > "$tree/logs/$log_dir/0.log" << 'EOF'
+@NOW@ stdout F order 41 placed
+@NOW@ stderr F order 42 failed
+EOF
+
+  docker start "$(cat "$tree/alloy/container")" > /dev/null
+
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 60 "Alloy to ship the new log's last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 failed\""' _ "$(cat "$tree/alloy/container")"
+  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
+    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
+  diff - "$tree/entries" << 'EOF'
+order 41 placed
+order 42 failed
+EOF
+}
+
+it_reads_the_new_log_from_its_first_line_when_the_kubelet_rotates_it_while_alloy_is_stopped() {
+  local now
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
+  wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  sed "s/@NOW@/$now/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
+@NOW@ stdout F order 40 placed
+@NOW@ stdout F order 41 placed
+@NOW@ stdout F order 42 placed
+EOF
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the old log's lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\""' _ "$(cat "$tree/alloy/container")"
+  docker stop "$(cat "$tree/alloy/container")" > /dev/null
+  mv "$tree/logs/$log_dir/0.log" "$tree/logs/$log_dir/0.log.20261019-052500"
+  sed "s/@NOW@/$now/" > "$tree/logs/$log_dir/0.log" << 'EOF'
+@NOW@ stdout F order 43 placed
+@NOW@ stderr F order 44 failed
+EOF
+
+  docker start "$(cat "$tree/alloy/container")" > /dev/null
+
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 60 "Alloy to ship the new log's last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 44 failed\""' _ "$(cat "$tree/alloy/container")"
+  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
+    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
+  diff - "$tree/entries" << 'EOF'
+order 40 placed
+order 41 placed
+order 42 placed
+order 43 placed
+order 44 failed
+EOF
+}
+
+it_resumes_after_a_restart_in_its_container_and_reads_a_log_that_appeared_while_alloy_was_stopped_from_its_first_line() {
+  local now
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
+  wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the first line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
+  docker stop "$(cat "$tree/alloy/container")" > /dev/null
+  echo "$now stdout F order 42 placed" >> "$tree/logs/$log_dir/0.log"
+  sed "s/@NOW@/$now/" > "$tree/logs/$log_dir/1.log" << 'EOF'
+@NOW@ stdout F listening on :8080
+@NOW@ stdout F order 43 placed
+EOF
+
+  docker start "$(cat "$tree/alloy/container")" > /dev/null
+
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 60 "Alloy to ship both logs' last lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\"" && docker logs "$1" 2>&1 | grep -qF "entry=\"order 43 placed\""' _ "$(cat "$tree/alloy/container")"
+  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
+    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' | sort > "$tree/entries"
+  diff - "$tree/entries" << 'EOF'
+listening on :8080
+order 41 placed
+order 42 placed
+order 43 placed
 EOF
 }
 

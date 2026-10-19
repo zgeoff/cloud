@@ -25,12 +25,14 @@ The stack runs in the `observability` namespace:
   holds the code that approves a client's sign-in, so it stays in the pod's own log, which only a
   cluster admin reads. Alloy keeps its read position in each log on a directory of the node, so a
   restart resumes where it stopped. It reads a log file with no saved position from its first line,
-  so a new container's first lines reach Loki. Before each start, an init container records every
-  pod log file at its current size, and Alloy takes those as its positions when it has none of its
-  own. So a start with an empty position store sends Loki no history. Alloy drops the lines older
-  than the hour Loki still accepts, because each line Loki rejects first counts against Loki's
-  ingestion rate limit. Alloy also counts the gateway's sign-in events for Prometheus, which scrapes
-  Alloy ([sign-in alerts](#sign-in-alerts)).
+  so a new container's first lines reach Loki. Alloy's container runs a script before each Alloy
+  start. With no saved positions, the script records every pod log file at its current size, and
+  Alloy takes those as its positions, so a start with an empty position store sends Loki no history.
+  With saved positions, the script resets each position past its file's size, which a log the
+  kubelet replaced while Alloy was stopped leaves, so Alloy reads the new file from its first line.
+  Alloy drops the lines older than the hour Loki still accepts, because each line Loki rejects first
+  counts against Loki's ingestion rate limit. Alloy also counts the gateway's sign-in events for
+  Prometheus, which scrapes Alloy ([sign-in alerts](#sign-in-alerts)).
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
   tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness
