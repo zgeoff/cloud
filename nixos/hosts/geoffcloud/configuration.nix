@@ -1,6 +1,8 @@
 # geoffcloud: Onidel VM, Melbourne. 8 vCPU (EPYC 7513, nested KVM), 31 GiB RAM.
 # vda: root (disko.nix). vdb: imp's ZFS pool, imported, never formatted here.
 {
+  config,
+  lib,
   modulesPath,
   pkgs,
   ...
@@ -110,7 +112,8 @@ in
     # and ICMPv6 packet-too-big, and ping checks that the host is reachable
     allowPing = true;
     # trusted as a source, in input and forward: the tailnet and k3s pods (pods
-    # reach the API server and kubelet on the host)
+    # reach the API server and kubelet on the host). inet cloud_host closes the host's SSH to the
+    # pods (cloudHost.inputDrops below)
     trustedInterfaces = [
       "tailscale0"
       "cni0"
@@ -157,6 +160,17 @@ in
       destinationAddress = topology.tailnet.nodes.geoffcloud.address;
     }
   ];
+
+  # No pod reaches the host's SSH: nixos-fw trusts cni0 and flannel.1, so it accepts every port
+  # that listens on all addresses from them, and no pod needs OpenSSH. A drop in inet cloud_host's
+  # input chain is final whatever nixos-fw accepts. Tailscale SSH and OpenSSH on tailscale0 are
+  # unaffected.
+  networking.cloudHost.inputDrops =
+    lib.concatMap (interface: map (port: { inherit port interface; }) config.services.openssh.ports)
+      [
+        "cni0"
+        "flannel.1"
+      ];
 
   # No pod reaches Docker's subnet, imp-host's every port included: inside imp-host only its imps'
   # taps are filtered, so from docker0's side impd's plain-HTTP API, sshd and the broker all

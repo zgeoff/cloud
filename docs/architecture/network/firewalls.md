@@ -4,9 +4,9 @@ Four layers filter traffic to the host, and each covers a gap in the one before 
 firewall, outside the VM, admits only Tailscale's port and ICMP from the internet. NixOS's own
 nftables table filters what reaches the host and what it forwards, and trusts the tailnet and the
 cluster's interfaces. A table of this repo's own narrows the ports that the trusted interfaces would
-otherwise leave open and keeps pods away from Docker's bridge, and imp adds tables that keep its
-imps away from the cluster. [The tailnet](./tailnet.md) covers who may reach the host over the
-tailnet in the first place.
+otherwise leave open, closes the host's SSH to pods, and keeps pods away from Docker's bridge, and
+imp adds tables that keep its imps away from the cluster. [The tailnet](./tailnet.md) covers who may
+reach the host over the tailnet in the first place.
 
 ## The cloud firewall
 
@@ -22,12 +22,12 @@ to come up on the tailnet.
 The host runs nftables with several tables side by side, so NixOS never flushes the whole ruleset on
 a reload, because a flush would delete the tables that imp, k3s and Docker load:
 
-| Table              | Loaded by    | Job                                                          |
-| ------------------ | ------------ | ------------------------------------------------------------ |
-| `inet nixos-fw`    | NixOS        | the host's input and forward firewall                        |
-| `inet cloud_host`  | this repo    | narrows host ports, and drops pod traffic to Docker's subnet |
-| `inet imp-forward` | imp's module | drops traffic from imp-host's bridge to the cluster's ranges |
-| `inet imp_egress`  | imp-host     | each imp's egress policy, inside the imp-host container      |
+| Table              | Loaded by    | Job                                                                              |
+| ------------------ | ------------ | -------------------------------------------------------------------------------- |
+| `inet nixos-fw`    | NixOS        | the host's input and forward firewall                                            |
+| `inet cloud_host`  | this repo    | narrows host ports, closes SSH to pods, and drops pod traffic to Docker's subnet |
+| `inet imp-forward` | imp's module | drops traffic from imp-host's bridge to the cluster's ranges                     |
+| `inet imp_egress`  | imp-host     | each imp's egress policy, inside the imp-host container                          |
 
 k3s and Docker load their own tables as well, for the cluster's networking and the containers'
 bridge.
@@ -37,8 +37,8 @@ bridge.
 NixOS's table admits nothing from the public interface but Tailscale's port and ICMP. ICMP stays
 open because path MTU discovery needs ICMP's fragmentation-needed and ICMPv6's packet-too-big
 messages, and ping checks that the host is reachable. OpenSSH's NixOS module opens its port on every
-interface by default, so the host turns that off, and sshd answers only through the trusted tailnet
-interface. It trusts the tailnet interface and the cluster's pod and overlay interfaces as sources,
+interface by default, so the host turns that off, and sshd answers only through the trusted
+interfaces. It trusts the tailnet interface and the cluster's pod and overlay interfaces as sources,
 because pods reach the API server and the kubelet on the host, and the tailnet is already filtered
 by the policy. It filters forwarded traffic too, so no public packet reaches a pod or a NodePort,
 and it forwards the pods' own traffic. It does not trust Docker's bridge, so a container on it
@@ -61,6 +61,11 @@ a container on the host reaches the relay
 ([1Password Connect](../workloads/onepassword-connect.md)). Both rules are narrower than the trust
 they sit under, and neither stops a pod on the host from reaching the daemon's port: the daemon's
 bearer token is the gate for that.
+
+The same input chain drops SSH's port from the pod and overlay interfaces before any admission runs.
+NixOS's table trusts those interfaces, so without the drop every pod would reach sshd, and no pod
+needs it. Pods still reach the API server, the kubelet and node-exporter, which the trust is for.
+sshd keeps answering on the tailnet interface, and Tailscale SSH stays the access path.
 
 The same table's forward chain drops every forwarded packet from the pod and overlay interfaces to
 Docker's subnet, so no pod reaches imp-host on any port. imp-host filters inbound traffic only from

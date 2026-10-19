@@ -2,14 +2,16 @@
 # narrows a TCP port that nixos-fw accepts more widely, such as on a trusted interface, to its
 # admitted paths. Each admission accepts its port from its interface, IPv4 source range and
 # destination address, and after a port's last admission the chain drops every other packet to
-# that port. A drop in any input chain is final, and an accept only passes the packet on to
-# nixos-fw, so nixos-fw must still open the port for each admitted path. Its forward chain drops
+# that port. Before the admissions, the input chain drops each TCP port it closes on an
+# interface, whatever nixos-fw's trust of that interface accepts. A drop in any input chain is
+# final, and an accept only passes the packet on to nixos-fw, so nixos-fw must still open the port
+# for each admitted path. Its forward chain drops
 # each forwarded packet from an interface to a destination range, whatever another table's forward
 # chain accepts: a drop in any base chain is final, so neither nixos-fw's trust of the interface
 # nor kube-router's accept mark in iptables' FORWARD passes it. Both chains run before nixos-fw's
-# and iptables' (priority filter - 10). The rules are sorted by port, then interface and source,
-# and the drops by interface and destination, so the table's text does not depend on the order
-# the modules define them in.
+# and iptables' (priority filter - 10). The input drops are sorted by port, then interface, the
+# admissions by port, then interface and source, and the forward drops by interface and
+# destination, so the table's text does not depend on the order the modules define them in.
 { config, lib, ... }:
 let
   cfg = config.networking.cloudHost;
@@ -18,6 +20,9 @@ let
     a: b: if a.port == b.port then toSortKey a < toSortKey b else a.port < b.port
   ) cfg.admissions;
   ports = lib.unique (map (admission: admission.port) admissions);
+  inputDrops = lib.sort (
+    a: b: if a.port == b.port then a.interface < b.interface else a.port < b.port
+  ) cfg.inputDrops;
   toDropSortKey = drop: "${drop.interface} ${drop.destinationCIDR}";
   forwardDrops = lib.sort (a: b: toDropSortKey a < toDropSortKey b) cfg.forwardDrops;
   # a line of the input chain, indented as its other lines
@@ -29,12 +34,14 @@ let
     port:
     lib.concatMapStrings renderAccept (lib.filter (admission: admission.port == port) admissions)
     + "  tcp dport ${toString port} drop\n";
+  # a line of the input chain, indented as its other lines
+  renderInputDrop = drop: "  tcp dport ${toString drop.port} iifname \"${drop.interface}\" drop\n";
   # a line of the forward chain, indented as its other lines
   renderForwardDrop = drop: "  iifname \"${drop.interface}\" ip daddr ${drop.destinationCIDR} drop\n";
-  inputChain = lib.optionalString (admissions != [ ]) ''
+  inputChain = lib.optionalString (inputDrops != [ ] || admissions != [ ]) ''
     chain input {
       type filter hook input priority filter - 10; policy accept;
-    ${lib.concatMapStrings renderPort ports}}
+    ${lib.concatMapStrings renderInputDrop inputDrops}${lib.concatMapStrings renderPort ports}}
   '';
   forwardChain = lib.optionalString (forwardDrops != [ ]) ''
     chain forward {
@@ -72,7 +79,31 @@ in
     default = [ ];
     description = ''
       The paths inet cloud_host admits, one admission per path. A port with several admissions
-      accepts each path and drops every other packet. With none, the table has no input chain.
+      accepts each path and drops every other packet. With neither these nor input drops, the
+      table has no input chain.
+    '';
+  };
+
+  options.networking.cloudHost.inputDrops = lib.mkOption {
+    type = lib.types.listOf (
+      lib.types.submodule {
+        options = {
+          port = lib.mkOption {
+            type = lib.types.port;
+            description = "The TCP port the drop closes.";
+          };
+          interface = lib.mkOption {
+            type = lib.types.str;
+            example = "cni0";
+            description = "The interface the dropped packets enter on.";
+          };
+        };
+      }
+    );
+    default = [ ];
+    description = ''
+      The TCP ports inet cloud_host closes to the host, one drop per port and interface, whatever
+      nixos-fw's trust of the interface accepts.
     '';
   };
 
@@ -96,12 +127,12 @@ in
     default = [ ];
     description = ''
       The forwarded paths inet cloud_host drops, one drop per interface and destination range.
-      With none, the table has no forward chain, and with neither these nor admissions, the module
-      adds no table.
+      With none, the table has no forward chain, and with none of these, the input drops or the
+      admissions, the module adds no table.
     '';
   };
 
-  config = lib.mkIf (cfg.admissions != [ ] || cfg.forwardDrops != [ ]) {
+  config = lib.mkIf (cfg.inputDrops != [ ] || cfg.admissions != [ ] || cfg.forwardDrops != [ ]) {
     assertions = [
       {
         assertion = config.networking.nftables.enable;
