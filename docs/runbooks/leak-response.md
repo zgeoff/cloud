@@ -14,6 +14,11 @@ the root disk's free space are the only ways to shrink that exposure.
 **CAUTION:** Each revocation changes live access to the host or a backup. State its exact effect to
 the coordinating agent, and act only on its approval.
 
+**Desk check:** every section traced against the repo at `main` `14f6e3c`, with nothing run: each
+item against `.env` and the deploy job's env, the Onidel calls against the provider's API spec, the
+R2 keys against the backup jobs, the rejoin against the tailnet keys and the host's Tailscale
+config, and the key change against the key's format and path in the NixOS checks.
+
 ## An Onidel snapshot leaks
 
 A snapshot copies `vda`, which holds these in plain form:
@@ -28,8 +33,18 @@ A snapshot from before the encryption holds every host secret file and the clust
 plain form as well. No such snapshot remains, and the response for it is the account response,
 because the exposure is the same.
 
-1. Delete the snapshot through `DELETE /snapshots/<snapshot_id>` on the Onidel API, so it leaks no
-   further.
+1. Delete the snapshot on the Onidel API, so it leaks no further. `bun run onidel:snapshot` prints
+   no snapshot ID, so list the IDs first. The key reaches curl through a header file, never its
+   command line:
+
+   ```bash
+   onidel() { curl -fsS -H @<(printf 'Authorization: Bearer %s\n' "$(op read op://cloud/onidel-api/credential)") "$@"; }
+   onidel https://api.cloud.onidel.com/snapshots | jq -r '.[] | "\(.id)  \(.created_at)  \(.name)"'
+   onidel -X DELETE https://api.cloud.onidel.com/snapshots/<snapshot_id>
+   ```
+
+   Expect the list without the snapshot when you run the list again.
+
 2. Revoke the host's node and its host keys, as [Rejoin the tailnet](#rejoin-the-tailnet) describes.
 3. Change the ZFS key, as [Change the ZFS key](#change-the-zfs-key) describes, so the leaked key
    cannot open a later copy of `vdb`. That holds only while no copy of `vdb` leaked with it.
@@ -46,8 +61,11 @@ the rest, which is an accepted risk.
 | the Onidel API key   | `onidel-api`    | mint a key in the panel, store it in `cloud` and `cloud-deploy`, then `bun run drift` |
 | the host's node keys | none            | [Rejoin the tailnet](#rejoin-the-tailnet)                                             |
 
-`bun run drift` reads the VM through the new key, so its success shows the key works. Delete the old
-key in the panel after it. Delete every snapshot the account holds, as
+`bun run drift` reads the VM through the new key, so a run that reads every resource shows the key
+works. The provider holds the key in its config, so expect the run to report one in-place update of
+the Onidel provider's `apiKey` and nothing else. Record the new key with an apply by hand, as
+[Apply by hand](./workflows.md#apply-by-hand) describes, and expect that same update in its baseline
+drift. Delete the old key in the panel after the apply. Delete every snapshot the account holds, as
 [An Onidel snapshot leaks](#an-onidel-snapshot-leaks) does.
 
 ## A restic backup leaks
@@ -67,13 +85,14 @@ nixie's bucket also holds hq's repository, under the password in `hq-restic`.
 When an R2 key leaked the repository, roll that key in Cloudflare's R2 dashboard, store the new key
 in its item, and deliver it:
 
-- **imp's key:** rewrite `imp-host.env` with the `printf ... | put imp-host.env` lines of step 6 in
-  [Lose `vdb`](./lost-disk.md#lose-vdb), then run `bash scripts/install-imp-dns-token.sh`, which
-  adds the ACME email back, and `ssh root@geoffcloud systemctl restart imp-host`. The restart puts
-  every awake imp to sleep.
+- **imp's key:** rewrite `imp-host.env` with the `put` helper and the
+  `printf ... | put imp-host.env` lines of step 6 in [Lose `vdb`](./lost-disk.md#lose-vdb), then run
+  `bash scripts/install-imp-dns-token.sh`, which adds the ACME email back, and
+  `ssh root@geoffcloud systemctl restart imp-host`. The restart puts every awake imp to sleep.
 - **The gateway's or nixie's key:** store it in the `cloud-deploy` copy too, and apply by hand, as
   [Apply by hand](./workflows.md#apply-by-hand) describes. The apply writes the key into the backup
-  CronJob's Secret.
+  CronJob's Secret. The bracket's baseline drift reads the new key from 1Password, so expect it to
+  report that Secret's update and nothing else, and go on.
 
 The response leaves each restic password in place. A password that sat in an old `vda` snapshot
 stays valid, which is the accepted no-rotation risk. The host's Tailscale node needs no revocation,
@@ -126,6 +145,26 @@ tailnet again with a new auth key. The reboot puts every imp to sleep and restar
 
    Expect one line for `geoffcloud` with `tag:cloud`. If the host does not rejoin, reboot it through
    the Onidel API: the boot joins with the staged key.
+
+6. Give `geoffcloud` its tailnet address back, as
+   [Keep the tailnet addresses](#keep-the-tailnet-addresses) describes. Then restart each unit that
+   `ssh root@geoffcloud systemctl --failed` lists, such as the atc daemon and the preview service,
+   which failed to bind the old address.
+
+## Keep the tailnet addresses
+
+A node that joins the tailnet again gets a new address, but the host's config, the tailnet policy
+and nixie's config read each node's address from `packages/topology/constants.json`. Until a node
+holds that address again, the atc daemon and the preview service fail to bind on the host, and the
+names that point at the node reach nothing. Run these steps for each node that joined again:
+
+1. On the Tailscale admin console's Machines page, edit the node's IPv4 address, and enter the
+   `address` that `constants.json` gives the node. Tailscale lets an admin change a node's IPv4
+   address at any time ([IP pool](https://tailscale.com/docs/reference/ip-pool)).
+2. Check from your machine: `tailscale ip -4 <node>` prints that address.
+3. Compare the node's IPv6 address, from `tailscale ip -6 <node>`, with its `addressIPv6`, where
+   `constants.json` gives one. Tailscale documents an edit of the IPv4 address only, so when the two
+   differ, change `addressIPv6` through a PR, and let the deploy apply it.
 
 ## Change the ZFS key
 
