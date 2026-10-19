@@ -1,6 +1,5 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
-import { buildATCGatewayRoutes } from './build-atc-gateway-routes.ts';
 import { buildATCTunnelIngresses } from './build-atc-tunnel-ingresses.ts';
 import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
 import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
@@ -33,52 +32,68 @@ interface TunnelRoutesOutputs {
   readonly previewWebhookURL: Output<string>;
 }
 
-// The tunnel's ingress rules and the proxied CNAME for each hostname. The catch-all 404
-// stays last.
+// Each tunnel's ingress rules and the proxied CNAME for each hostname: the gateway's on the atc
+// tunnel, the preview webhook's on the shared one. Each tunnel's catch-all 404 stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
   const gateway = inputs.gateway;
   const previewWebhookRoute = buildPreviewWebhookRoute();
+  const atc = gateway === undefined ? undefined : createATCRoutes(inputs, gateway);
 
-  const config = new ZeroTrustTunnelCloudflaredConfig('edge', {
-    accountId: inputs.accountID,
-    tunnelId: inputs.tunnelID,
-    config: {
-      ingresses: buildTunnelIngresses([
-        ...(gateway === undefined ? [] : buildATCGatewayRoutes(gateway.route, gateway.access)),
-        previewWebhookRoute,
-      ]),
+  // after the gateway's CNAME, so a hostname the shared tunnel drops already points elsewhere
+  const config = new ZeroTrustTunnelCloudflaredConfig(
+    'edge',
+    {
+      accountId: inputs.accountID,
+      tunnelId: inputs.tunnelID,
+      config: { ingresses: buildTunnelIngresses([previewWebhookRoute]) },
     },
-  });
+    { dependsOn: atc === undefined ? [] : [atc.record] },
+  );
 
-  // the atc tunnel's own rules, which serve nothing while the gateway's CNAME points at this tunnel
-  const atcConfig =
-    gateway === undefined
-      ? undefined
-      : new ZeroTrustTunnelCloudflaredConfig('atc', {
-          accountId: inputs.accountID,
-          tunnelId: gateway.tunnelID,
-          config: { ingresses: buildATCTunnelIngresses(gateway.route.hostname, gateway.access) },
-        });
-
-  const atc =
-    gateway === undefined ? undefined : createRecord('atc', inputs, gateway.route.hostname);
-
-  const previewWebhook = createRecord('preview-webhook', inputs, previewWebhookRoute.hostname);
+  const previewWebhook = createRecord(
+    'preview-webhook',
+    inputs.zoneID,
+    previewWebhookRoute.hostname,
+    inputs.tunnelID,
+  );
 
   return {
     configVersion: config.version,
-    ...(atcConfig === undefined ? {} : { atcConfigVersion: atcConfig.version }),
-    ...(atc === undefined ? {} : { atcURL: toURL(atc) }),
+    ...(atc === undefined
+      ? {}
+      : { atcConfigVersion: atc.config.version, atcURL: toURL(atc.record) }),
     previewWebhookURL: toURL(previewWebhook).apply((url) => `${url}/webhook`),
   };
 }
 
-function createRecord(name: string, inputs: TunnelRoutesInputs, hostname: string): DnsRecord {
+// the atc tunnel's rules and the gateway's CNAME to that tunnel
+function createATCRoutes(
+  inputs: TunnelRoutesInputs,
+  gateway: GatewayIngress,
+): { readonly config: ZeroTrustTunnelCloudflaredConfig; readonly record: DnsRecord } {
+  const config = new ZeroTrustTunnelCloudflaredConfig('atc', {
+    accountId: inputs.accountID,
+    tunnelId: gateway.tunnelID,
+    config: { ingresses: buildATCTunnelIngresses(gateway.route.hostname, gateway.access) },
+  });
+
+  return {
+    config,
+    record: createRecord('atc', inputs.zoneID, gateway.route.hostname, gateway.tunnelID),
+  };
+}
+
+function createRecord(
+  name: string,
+  zoneID: Output<string>,
+  hostname: string,
+  tunnelID: Output<string>,
+): DnsRecord {
   return new DnsRecord(name, {
-    zoneId: inputs.zoneID,
+    zoneId: zoneID,
     name: hostname,
     type: 'CNAME',
-    content: inputs.tunnelID.apply((id) => `${id}.cfargotunnel.com`),
+    content: tunnelID.apply((id) => `${id}.cfargotunnel.com`),
     proxied: true,
     ttl: 1,
   });

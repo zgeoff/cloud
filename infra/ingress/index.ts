@@ -46,9 +46,9 @@ interface IngressOutputs {
   readonly previewWebhookURL: Output<string>;
 }
 
-// Public ingress (#7). One tunnel for every public hostname under geoff.cloud;
-// cloudflared runs in k3s with the token below. Each workload brings its own auth, and an
-// owner-only Access application fronts the atc gateway's sign-in pages on top of it.
+// Public ingress (#7). The shared tunnel serves every public hostname under geoff.cloud but the
+// gateway's, which the atc tunnel serves; cloudflared runs in k3s with the token below. Each
+// workload brings its own auth, and Access fronts the gateway's sign-in pages on top of it.
 export function createIngress(inputs: IngressInputs): IngressOutputs {
   const tunnel = new ZeroTrustTunnelCloudflared('edge', {
     accountId: inputs.accountID,
@@ -66,8 +66,8 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     createCloudflared(inputs.cluster, tunnelToken);
   }
 
-  // the tunnel's routes: atc.geoff.cloud, a workload in k3s, and the preview service's webhook
-  // listener on the host
+  // the routes: atc.geoff.cloud, a workload in k3s, on the atc tunnel, and the preview service's
+  // webhook listener on the host, on this one
   const routes = createTunnelRoutes({
     accountID: inputs.accountID,
     zoneID: inputs.zoneID,

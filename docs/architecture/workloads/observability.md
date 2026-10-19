@@ -117,10 +117,10 @@ An alert holds no source address. Anyone can send the `CF-Connecting-IP` header,
 marks its value `trusted` only when the request came from a proxy that atc lists. atc matches each
 listed proxy against the socket's exact address, so the stack config lists the loopback address
 alone, where the atc tunnel's sidecar reaches the gateway
-([the atc tunnel](../network/public-ingress.md#the-atc-tunnel)). A request through the shared
-tunnel, or from any other pod, arrives from a pod address, so its forwarded address arrives
-`unverified`. Alloy treats every forwarded address alike, a `trusted` one included: none becomes a
-label, so a spoofed header changes no alert.
+([the atc tunnel](../network/public-ingress.md#the-atc-tunnel)). A request from another pod or from
+the host arrives from another address, so its forwarded address arrives `unverified`. Alloy treats
+every forwarded address alike, a `trusted` one included: none becomes a label, so a spoofed header
+changes no alert.
 
 | Category                     | Event                          | Severity |
 | ---------------------------- | ------------------------------ | -------- |
