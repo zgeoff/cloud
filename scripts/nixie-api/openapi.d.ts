@@ -1264,6 +1264,8 @@ export interface operations {
                             state: "active" | "retired" | "forgetting" | "forgotten";
                             /** @enum {string} */
                             status: "readable" | "shredded" | "unreadable";
+                            /** @enum {string} */
+                            subject: "owner" | "self" | "shared";
                             text?: string;
                             version: number;
                         }[];
@@ -1392,6 +1394,8 @@ export interface operations {
                             state: "active" | "retired" | "forgetting" | "forgotten";
                             /** @enum {string} */
                             status: "readable" | "shredded" | "unreadable";
+                            /** @enum {string} */
+                            subject: "owner" | "self" | "shared";
                             text?: string;
                             version: number;
                             score?: number;
@@ -1492,6 +1496,8 @@ export interface operations {
                             state: "active" | "retired" | "forgetting" | "forgotten";
                             /** @enum {string} */
                             status: "readable" | "shredded" | "unreadable";
+                            /** @enum {string} */
+                            subject: "owner" | "self" | "shared";
                             text?: string;
                             version: number;
                         }[];
@@ -1593,6 +1599,8 @@ export interface operations {
                         state: "active" | "retired" | "forgetting" | "forgotten";
                         /** @enum {string} */
                         status: "readable" | "shredded" | "unreadable";
+                        /** @enum {string} */
+                        subject: "owner" | "self" | "shared";
                         text?: string;
                         version: number;
                         versions: {
@@ -2065,6 +2073,8 @@ export interface operations {
                         state: "active" | "retired" | "forgetting" | "forgotten";
                         /** @enum {string} */
                         status: "readable" | "shredded" | "unreadable";
+                        /** @enum {string} */
+                        subject: "owner" | "self" | "shared";
                         text?: string;
                         version: number;
                         versions: {
@@ -2589,6 +2599,8 @@ export interface operations {
                                 proposedAt: string;
                                 thread: string | null;
                             }[];
+                            /** @enum {string} */
+                            subject: "owner" | "self" | "shared";
                             targetVersion: number | null;
                             text: string;
                         }[];
