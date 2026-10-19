@@ -1,8 +1,9 @@
 // The one path filter for CI, the NixOS checks and the prod apply, run as `bun
-// scripts/decide-gates.ts [--github] <base> <head> <gate>...`: it prints `<gate>=true` when a commit
-// after <base> up to <head> changes a file the gate's paths in .github/gates.yml match.
+// scripts/run-decide-gates.ts [--github] <base> <head> <gate>...`: it prints `<gate>=true` when a
+// commit after <base> up to <head> changes a file the gate's paths in .github/gates.yml match.
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { ExitError } from './exit-error.ts';
 import { loadGateManifest } from './load-gate-manifest.ts';
 import type { Gate, GateManifest } from './load-gate-manifest.ts';
@@ -12,7 +13,7 @@ import { runOrExit } from './run-or-exit.ts';
 import { runProcess } from './run-process.ts';
 import { withExitCode } from './with-exit-code.ts';
 
-export interface DecideGatesOptions extends ScriptIO {
+export interface RunDecideGatesOptions extends ScriptIO {
   readonly args: readonly string[];
 
   // the checkout whose history the revisions name
@@ -22,14 +23,14 @@ export interface DecideGatesOptions extends ScriptIO {
   readonly githubStepSummary: string | undefined;
 }
 
-const usage = 'usage: decide-gates.ts [--github] <base> <head> <gate>...';
+const usage = 'usage: run-decide-gates.ts [--github] <base> <head> <gate>...';
 
 // A revision git cannot resolve fails with git's status, so a caller never skips a check on an
 // error. --github also appends the lines to the step outputs, and each false gate's skipped line
 // to stdout and the step summary, so every run reports a result.
-export function decideGates(options: Readonly<DecideGatesOptions>): Promise<number> {
+export function runDecideGates(options: Readonly<RunDecideGatesOptions>): Promise<number> {
   return withExitCode(options.printErr, async () => {
-    const args = parseArgs(options.args);
+    const args = parseDecideGatesArgs(options.args);
     const github = args.github ? requireGitHubFiles(options) : undefined;
 
     const gates = await loadGates(options.manifestPath, args.gates);
@@ -69,24 +70,38 @@ interface DecideGatesArgs {
   readonly gates: readonly string[];
 }
 
-function parseArgs(args: readonly string[]): DecideGatesArgs {
-  const github = args[0] === '--github';
-  const [base = '', head = '', ...gates] = github ? args.slice(1) : args;
+// util.parseArgs throws on an option it does not know, such as a misspelt --github
+function parseDecideGatesArgs(args: readonly string[]): DecideGatesArgs {
+  const parsed = tryParseArgs(args);
+  const [base = '', head = '', ...gates] = parsed?.positionals ?? [];
 
   if (base === '' || head === '' || gates.length === 0 || gates.includes('')) {
     throw new ExitError(2, usage);
   }
 
-  return { github, base, head, gates };
+  return { github: parsed?.values.github === true, base, head, gates };
 }
 
-function requireGitHubFiles(options: Readonly<DecideGatesOptions>) {
+function tryParseArgs(args: readonly string[]) {
+  try {
+    return parseArgs({
+      args: [...args],
+      options: { github: { type: 'boolean' } },
+      allowPositionals: true,
+      strict: true,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function requireGitHubFiles(options: Readonly<RunDecideGatesOptions>) {
   if (options.githubOutput === undefined || options.githubOutput === '') {
-    throw new ExitError(2, 'decide-gates: --github needs GITHUB_OUTPUT');
+    throw new ExitError(2, 'run-decide-gates: --github needs GITHUB_OUTPUT');
   }
 
   if (options.githubStepSummary === undefined || options.githubStepSummary === '') {
-    throw new ExitError(2, 'decide-gates: --github needs GITHUB_STEP_SUMMARY');
+    throw new ExitError(2, 'run-decide-gates: --github needs GITHUB_STEP_SUMMARY');
   }
 
   return { output: options.githubOutput, summary: options.githubStepSummary };
@@ -96,7 +111,7 @@ async function loadGates(manifestPath: string, names: readonly string[]): Promis
   const manifest: GateManifest = await loadGateManifest(manifestPath).catch((error: unknown) => {
     throw new ExitError(
       1,
-      `decide-gates: ${error instanceof Error ? error.message : String(error)}`,
+      `run-decide-gates: ${error instanceof Error ? error.message : String(error)}`,
     );
   });
 
@@ -104,7 +119,7 @@ async function loadGates(manifestPath: string, names: readonly string[]): Promis
     const gate = manifest.get(name);
 
     if (gate === undefined) {
-      throw new ExitError(2, `decide-gates: ${manifestPath} has no gate ${name}`);
+      throw new ExitError(2, `run-decide-gates: ${manifestPath} has no gate ${name}`);
     }
 
     return gate;
@@ -115,7 +130,7 @@ async function loadGates(manifestPath: string, names: readonly string[]): Promis
 // paths, and a merge its change against its first parent. A base of all zeros, as a push that
 // creates a branch reports, or one off head's history gives nothing to compare, so 'all'.
 async function readChangedPaths(
-  io: Readonly<DecideGatesOptions>,
+  io: Readonly<RunDecideGatesOptions>,
   base: string,
   head: string,
 ): Promise<string[] | 'all'> {
@@ -160,7 +175,7 @@ async function readChangedPaths(
 }
 
 if (import.meta.main) {
-  process.exitCode = await decideGates({
+  process.exitCode = await runDecideGates({
     args: process.argv.slice(2),
     cwd: process.cwd(),
     manifestPath: join(import.meta.dir, '..', '.github', 'gates.yml'),

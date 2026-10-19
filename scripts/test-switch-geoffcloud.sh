@@ -1705,7 +1705,7 @@ setup_test() {
     "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$(dirname "${BASH_SOURCE[0]}")/check-k3s-restart.sh" \
     "$tree/clone/scripts/"
   # the gate filter that find-nixos-check-run.sh runs with the real bun, its modules and its manifest
-  cp "$(dirname "${BASH_SOURCE[0]}")"/{decide-gates,load-gate-manifest,needs-gate,exit-error,run-or-exit,run-process,with-exit-code}.ts \
+  cp "$(dirname "${BASH_SOURCE[0]}")"/{run-decide-gates,load-gate-manifest,needs-gate,exit-error,run-or-exit,run-process,with-exit-code}.ts \
     "$tree/clone/scripts/"
   cp "$(dirname "${BASH_SOURCE[0]}")/../.github/gates.yml" "$tree/clone/.github/"
   ln -s "$(command -v bun)" "$tree/bin/bun"

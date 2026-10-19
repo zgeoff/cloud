@@ -2,7 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { decideGates } from './decide-gates.ts';
+import { runDecideGates } from './run-decide-gates.ts';
 import { buildRealProgramHandler } from './test-utils/build-real-program-handler.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
@@ -10,7 +10,7 @@ import { createGitOrigin } from './test-utils/create-git-origin.ts';
 // Each test runs real git in its own repository, against a manifest it writes; the manifest's own
 // gates are covered by needs-gate.test.ts.
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'decide-gates-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-decide-gates-'));
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
@@ -44,7 +44,7 @@ test('it skips each gate whose paths no commit in the range changes', async () =
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the readme']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: [base, 'HEAD', 'lint', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -78,7 +78,7 @@ test('it needs a gate for a change that a later commit in the range reverts', as
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the program']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'revert', '--no-edit', 'HEAD']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: [base, 'HEAD', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -108,7 +108,7 @@ test('it counts the old path of a file renamed out of the gate', async () => {
   await ctx.repo.git(['-C', ctx.repo.seed, 'mv', 'infra/notes.md', 'notes.md']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'move the notes']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: [base, 'HEAD', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -144,7 +144,7 @@ test('it counts the change a merge commit brings against its first parent', asyn
   await ctx.repo.git(['-C', ctx.repo.seed, 'switch', '-q', 'main']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'merge', '-q', '--no-ff', '-m', 'merge', 'feature']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: [feature, 'HEAD', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -172,7 +172,7 @@ test('it needs every gate for a base of all zeros', async () => {
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the readme']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['0'.repeat(40), 'HEAD', 'apply', 'go'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -210,7 +210,7 @@ test('it needs every gate for a base that is not an ancestor of the head', async
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the notes']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: [rewritten, 'HEAD', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -234,7 +234,7 @@ test('it fails with git s error and status for a revision git cannot resolve', a
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the readme']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['deployed/prod', 'HEAD', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -259,7 +259,7 @@ test('it refuses a gate the manifest lacks', async () => {
 
   await writeFile(join(ctx.directory, 'gates.yml'), 'gates:\n  apply:\n    paths: [infra/**]\n');
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['HEAD~1', 'HEAD', 'aply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -273,7 +273,7 @@ test('it refuses a gate the manifest lacks', async () => {
   expect(exitCode).toBe(2);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    [`decide-gates: ${join(ctx.directory, 'gates.yml')} has no gate aply\n`],
+    [`run-decide-gates: ${join(ctx.directory, 'gates.yml')} has no gate aply\n`],
   ]);
 
   expect(ctx.runner.calls).toStrictEqual([]);
@@ -282,7 +282,7 @@ test('it refuses a gate the manifest lacks', async () => {
 test('it refuses a call that names no gate', async () => {
   const ctx = await setupTest();
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['HEAD~1', 'HEAD'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -296,8 +296,87 @@ test('it refuses a call that names no gate', async () => {
   expect(exitCode).toBe(2);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    ['usage: decide-gates.ts [--github] <base> <head> <gate>...\n'],
+    ['usage: run-decide-gates.ts [--github] <base> <head> <gate>...\n'],
   ]);
+});
+
+test('it refuses an option it does not know, before any git call', async () => {
+  const ctx = await setupTest();
+
+  const exitCode = await runDecideGates({
+    args: ['--gihtub', 'HEAD~1', 'HEAD', 'apply'],
+    cwd: ctx.repo.seed,
+    manifestPath: join(ctx.directory, 'gates.yml'),
+    githubOutput: undefined,
+    githubStepSummary: undefined,
+    run: ctx.runner.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(2);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['usage: run-decide-gates.ts [--github] <base> <head> <gate>...\n'],
+  ]);
+
+  expect(ctx.runner.calls).toStrictEqual([]);
+});
+
+test('it needs no gate for an empty commit after the base', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'gates.yml'),
+    "gates:\n  full:\n    paths: ['**']\n    ignore: ['**/*.md']\n",
+  );
+
+  await writeFile(join(ctx.repo.seed, 'main.sh'), 'true\n');
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the script']);
+
+  const base = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', 'HEAD']);
+
+  await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-q', '--allow-empty', '-m', 'retry CI']);
+
+  const exitCode = await runDecideGates({
+    args: [base, 'HEAD', 'full'],
+    cwd: ctx.repo.seed,
+    manifestPath: join(ctx.directory, 'gates.yml'),
+    githubOutput: undefined,
+    githubStepSummary: undefined,
+    run: ctx.runner.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['full=false\n']]);
+});
+
+test('it reads --github after the positional arguments', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(join(ctx.directory, 'gates.yml'), 'gates:\n  apply:\n    paths: [infra/**]\n');
+  await writeFile(join(ctx.directory, 'output'), '');
+  await writeFile(join(ctx.directory, 'summary'), '');
+
+  const exitCode = await runDecideGates({
+    args: ['0'.repeat(40), 'HEAD', 'apply', '--github'],
+    cwd: ctx.repo.seed,
+    manifestPath: join(ctx.directory, 'gates.yml'),
+    githubOutput: join(ctx.directory, 'output'),
+    githubStepSummary: join(ctx.directory, 'summary'),
+    run: ctx.runner.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  const output = await readFile(join(ctx.directory, 'output'), 'utf8');
+
+  expect(exitCode).toBe(0);
+  expect(output).toBe('apply=true\n');
 });
 
 test('it fails on a manifest it cannot read, before any git call', async () => {
@@ -305,7 +384,7 @@ test('it fails on a manifest it cannot read, before any git call', async () => {
 
   await writeFile(join(ctx.directory, 'gates.yml'), 'gates:\n  apply:\n    path: [infra/**]\n');
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['HEAD~1', 'HEAD', 'apply'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -319,7 +398,7 @@ test('it fails on a manifest it cannot read, before any git call', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    [`decide-gates: ${join(ctx.directory, 'gates.yml')}: gate apply: unknown key path\n`],
+    [`run-decide-gates: ${join(ctx.directory, 'gates.yml')}: gate apply: unknown key path\n`],
   ]);
 
   expect(ctx.runner.calls).toStrictEqual([]);
@@ -357,7 +436,7 @@ test('it writes each answer to the step outputs, and each skipped line to the su
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
   await ctx.repo.git(['-C', ctx.repo.seed, 'commit', '-qm', 'add the script']);
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['--github', base, 'HEAD', 'lint', 'go'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -384,7 +463,7 @@ test('it writes each answer to the step outputs, and each skipped line to the su
 test('it refuses --github without a step output file', async () => {
   const ctx = await setupTest();
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['--github', 'HEAD~1', 'HEAD', 'lint'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -396,13 +475,16 @@ test('it refuses --github without a step output file', async () => {
   });
 
   expect(exitCode).toBe(2);
-  expect(ctx.printErr.mock.calls).toStrictEqual([['decide-gates: --github needs GITHUB_OUTPUT\n']]);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['run-decide-gates: --github needs GITHUB_OUTPUT\n'],
+  ]);
 });
 
 test('it refuses --github without a step summary file', async () => {
   const ctx = await setupTest();
 
-  const exitCode = await decideGates({
+  const exitCode = await runDecideGates({
     args: ['--github', 'HEAD~1', 'HEAD', 'lint'],
     cwd: ctx.repo.seed,
     manifestPath: join(ctx.directory, 'gates.yml'),
@@ -416,6 +498,6 @@ test('it refuses --github without a step summary file', async () => {
   expect(exitCode).toBe(2);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    ['decide-gates: --github needs GITHUB_STEP_SUMMARY\n'],
+    ['run-decide-gates: --github needs GITHUB_STEP_SUMMARY\n'],
   ]);
 });

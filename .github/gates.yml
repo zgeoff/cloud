@@ -1,5 +1,5 @@
 # The path gates: each gate names a check that CI, the NixOS checks or the prod apply runs only
-# when a change touches its paths. scripts/decide-gates.ts reads this file and answers, for each
+# when a change touches its paths. scripts/run-decide-gates.ts reads this file and answers, for each
 # gate a caller names, whether any file a commit between two revisions changed matches one of the
 # gate's paths and none of its ignore globs. The globs follow Bun.Glob: `*` stays inside one
 # directory, and `**` crosses any number of them, none included.
@@ -32,7 +32,7 @@ gates:
       - scripts/install-pulumi-cli.sh
       - .github/workflows/ci.yml
       - .github/gates.yml
-      - scripts/decide-gates.ts
+      - scripts/run-decide-gates.ts
       - scripts/needs-gate.ts
       - scripts/load-gate-manifest.ts
 
@@ -76,7 +76,7 @@ gates:
       - scripts/decide-nixos-checks.sh
       - scripts/find-nixos-check-run.sh
       - .github/gates.yml
-      - scripts/decide-gates.ts
+      - scripts/run-decide-gates.ts
       - scripts/needs-gate.ts
       - scripts/load-gate-manifest.ts
 

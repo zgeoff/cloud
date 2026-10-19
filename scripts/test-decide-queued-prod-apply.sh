@@ -19,7 +19,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-queued-prod-apply.sh"
 # the real bun, which each case links into its own directory on PATH, because the script runs
-# decide-gates.ts with it
+# run-decide-gates.ts with it
 bun="$(command -v bun)"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository, user or

@@ -80,7 +80,7 @@
     "ci:set-release-bot-identity": "bun scripts/release/run-set-release-bot-identity.ts",
     "ci:bump-releases": "bun scripts/release/run-release-bumps.ts",
     "ci:decide-release-bump-merge": "bun scripts/release/run-release-bump-merge.ts",
-    "ci:decide-gates": "bun scripts/decide-gates.ts",
+    "ci:decide-gates": "bun scripts/run-decide-gates.ts",
     "ci:install-pulumi-cli": "bash scripts/install-pulumi-cli.sh",
     "ci:publish-atc-gateway-images": "bash scripts/publish-atc-gateway-images.sh",
     "ci:decide-atc-gateway-publish": "bun scripts/release/run-decide-gateway-publish.ts",

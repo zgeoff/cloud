@@ -2,7 +2,7 @@ name: CI
 
 # One job for the secret scan, the Bun checks and the provider's Go checks, so a run bills one
 # runner minute where three jobs billed three. The job runs on every pull request and every push
-# to main. scripts/decide-gates.ts decides, from the provider and full gates of .github/gates.yml,
+# to main. scripts/run-decide-gates.ts decides, from the provider and full gates of .github/gates.yml,
 # whether the change touches an input of the Go checks and the SDK check, and whether it changes
 # any file other than Markdown, which the four Nix-image linters and the shell suites need; the
 # job runs each only then. A failed decision or a failed check fails the job.

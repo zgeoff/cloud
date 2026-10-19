@@ -20,7 +20,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-nixos-checks.sh"
 # the real bun, which each case links into its stand-ins' directory, because the script runs
-# decide-gates.ts with it through find-nixos-check-run.sh
+# run-decide-gates.ts with it through find-nixos-check-run.sh
 bun="$(command -v bun)"
 
 # The suite's own git calls (the arrange steps, outside `env -i`) read no repository, user or

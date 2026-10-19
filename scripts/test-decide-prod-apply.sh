@@ -9,9 +9,9 @@
 # the script under `env -i` with git's global and system config off, and compares its whole
 # stdout, stderr, step output, step summary and gh call log.
 #
-# The script's "unexpected decision" guard stays untested: decide-gates.ts prints only
+# The script's "unexpected decision" guard stays untested: run-decide-gates.ts prints only
 # prod-apply=true or prod-apply=false, or fails, so no real state reaches it. Each case links the
-# real bun into its stand-ins' directory, because the script runs decide-gates.ts with it.
+# real bun into its stand-ins' directory, because the script runs run-decide-gates.ts with it.
 #
 #   bash scripts/test-decide-prod-apply.sh
 #   CASE='dispatch' bash scripts/test-decide-prod-apply.sh

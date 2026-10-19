@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # The prod apply job's own decision, made once the job holds the deploy-prod concurrency group, so
 # no other apply moves the deployed/prod tag under it. It resolves the tag as it stands now and asks
-# decide-gates.ts again whether REVISION, the commit the decide job chose, needs an apply: a
+# run-decide-gates.ts again whether REVISION, the commit the decide job chose, needs an apply: a
 # job that waited behind a newer commit's apply finds its commit already deployed. It writes apply
 # (true or false) and deployed, the tag's commit, to $GITHUB_OUTPUT, for the job's later steps;
 # when apply is false, it says so on stdout and in $GITHUB_STEP_SUMMARY.
 #
 # A tag git cannot resolve fails the run with git's status, a tag that has left main with exit 1,
-# and a failure of decide-gates.ts with its status, so the job never skips an apply it cannot
+# and a failure of run-decide-gates.ts with its status, so the job never skips an apply it cannot
 # decide. A missing variable is a usage error (exit 2).
 #
 #   REVISION=<commit> bash scripts/decide-queued-prod-apply.sh
@@ -34,7 +34,7 @@ elif ! git merge-base --is-ancestor "$deployed" "$REVISION"; then
   echo "decide-queued-prod-apply: deployed/prod at $deployed is not an ancestor of $REVISION; set the tag by hand at the live revision" >&2
   exit 1
 else
-  decision="$(bun "$here/decide-gates.ts" "$deployed" "$REVISION" prod-apply)"
+  decision="$(bun "$here/run-decide-gates.ts" "$deployed" "$REVISION" prod-apply)"
   apply="${decision#prod-apply=}"
 fi
 {
