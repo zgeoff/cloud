@@ -46,9 +46,9 @@ configuration holds the same two gateway rules and the same catch-all as the sha
 pod's loopback as their origin, so the route boundary and the Access check are identical on both
 tunnels. The sidecar reads its token from a file that only it mounts.
 
-The gateway's hostname resolves to the shared tunnel, so the atc tunnel carries no traffic until the
-hostname's CNAME points at it. The sidecar keeps its metrics on loopback, where kubelet cannot probe
-them, so the external health check on the hostname is the atc tunnel's one monitor.
+The gateway's hostname resolves to the shared tunnel, so the atc tunnel carries no traffic. The
+sidecar keeps its metrics on loopback, where kubelet cannot probe them, so the external health check
+on the hostname is the atc tunnel's one monitor.
 
 ## HTTPS and the edge
 

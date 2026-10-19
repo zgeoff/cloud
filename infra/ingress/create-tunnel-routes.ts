@@ -50,7 +50,7 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
     },
   });
 
-  // the atc tunnel's own rules, which serve no traffic until the gateway's CNAME points at it
+  // the atc tunnel's own rules, which serve nothing while the gateway's CNAME points at this tunnel
   const atcConfig =
     gateway === undefined
       ? undefined
