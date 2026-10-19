@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # create_stub_publish_docker <bin>: writes <bin>/docker, a stand-in for the docker CLI calls that
-# publish-atc-gateway-images.sh makes. It logs each call's argv as a JSON line to STUB_TREE/calls.
+# publish-atc-gateway-images.sh and publish-files-image.sh make. It logs each call's argv as a JSON line to STUB_TREE/calls.
 # Its state is files named for a ref with each "/" and ":" as "_": STUB_TREE/registry/<ref> for a
 # published ref, STUB_TREE/digests/<ref> for the digest the registry gives a ref on its push, and
 # STUB_TREE/built/<ref> for a local image, which the stand-in writes itself.

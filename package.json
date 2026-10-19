@@ -35,6 +35,7 @@
     "test:nixos": "bash scripts/run-nixos-checks.sh",
     "ci:write-deploy-env": "bash scripts/write-deploy-env.sh",
     "ci:check-prod-plan": "bun scripts/check-prod-plan.ts",
+    "test:files-image": "bash images/files/run-image-tests.sh",
     "test:agent-image": "docker build -t cloud/agent-image images/agent && bun scripts/check-agent-image.ts --docker cloud/agent-image && bash scripts/run-shell-suites.sh agent-image",
     "typecheck": "bun run sdk:build && tsc -p tsconfig.json --noEmit && tsc -p workers/health-check/tsconfig.json --noEmit",
     "format": "oxfmt . && format-codemod --quiet .",
@@ -84,6 +85,8 @@
     "ci:install-pulumi-cli": "bash scripts/install-pulumi-cli.sh",
     "ci:publish-atc-gateway-images": "bash scripts/publish-atc-gateway-images.sh",
     "ci:decide-atc-gateway-publish": "bun scripts/release/run-decide-gateway-publish.ts",
+    "ci:write-files-image-context": "bash scripts/write-files-image-context.sh",
+    "ci:publish-files-image": "bash scripts/publish-files-image.sh",
     "ci:pin-atc-gateway-images": "bun scripts/release/run-published-images-bump.ts atc-gateway-images"
   },
   "devDependencies": {
