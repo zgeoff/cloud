@@ -60,7 +60,12 @@ test('it runs nixie as one replica that a rollout stops before it starts the nex
               periodSeconds: 30,
               failureThreshold: 3,
             },
-            readinessProbe: { httpGet: { path: '/health/ready', port: 8080 }, periodSeconds: 10 },
+            readinessProbe: {
+              httpGet: { path: '/health/ready', port: 8080 },
+              periodSeconds: 10,
+              timeoutSeconds: 5,
+              failureThreshold: 3,
+            },
             volumeMounts: [
               { name: 'data', mountPath: '/data' },
               {

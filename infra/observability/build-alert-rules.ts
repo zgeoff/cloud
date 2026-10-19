@@ -3,7 +3,7 @@ import { cloudflaredNames } from '../ingress/index.ts';
 import type { ATCDaemonEndpoint } from '../inputs/index.ts';
 import { buildATCSignInRules } from './build-atc-sign-in-rules.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
-import { nixieTurnsProbeTarget } from './nixie-turns-probe-target.ts';
+import { nixieProbeTargets } from './nixie-probe-targets.ts';
 import { toATCDaemonProbeTarget } from './to-atc-daemon-probe-target.ts';
 
 export interface AlertRule {
@@ -37,7 +37,12 @@ export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRul
   const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
   const nixieRules =
-    inputs.nixieReadinessURL === undefined ? [] : [buildNixieTurnsRule(inputs.nixieReadinessURL)];
+    inputs.nixieReadinessURL === undefined
+      ? []
+      : [
+          buildNixieTurnsRule(inputs.nixieReadinessURL),
+          buildNixieDegradedRule(inputs.nixieReadinessURL),
+        ];
 
   return [
     {
@@ -176,7 +181,7 @@ function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
 // probe reports nothing. Failing turns leave nixie's readiness status and pod ready, so the chart's
 // KubePodNotReady misses them; only this probe of the body's advisory part sees them.
 function buildNixieTurnsRule(readinessURL: string): AlertRule {
-  const series = `probe_success{target="${nixieTurnsProbeTarget}"}`;
+  const series = `probe_success{target="${nixieProbeTargets.turns}"}`;
 
   return {
     alert: 'NixieTurnsFailing',
@@ -185,6 +190,23 @@ function buildNixieTurnsRule(readinessURL: string): AlertRule {
     labels: { severity: 'critical' },
     annotations: {
       summary: `nixie's turns keep failing, or ${readinessURL} does not report them passing.`,
+    },
+  };
+}
+
+// nixie reports degraded or unready, or its report is unreachable. A failing dependency leaves the
+// pod ready, so the chart's KubePodNotReady misses it; the hold matches KubePodNotReady's, so a
+// dependency slow for a few minutes on a busy host stays quiet.
+function buildNixieDegradedRule(readinessURL: string): AlertRule {
+  const series = `probe_success{target="${nixieProbeTargets.status}"}`;
+
+  return {
+    alert: 'NixieDegraded',
+    expr: `${series} == 0 or absent(${series})`,
+    for: '15m',
+    labels: { severity: 'warning' },
+    annotations: {
+      summary: `nixie at ${readinessURL} reports degraded or unready, or does not answer; its body names the part.`,
     },
   };
 }

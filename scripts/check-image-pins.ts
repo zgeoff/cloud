@@ -27,7 +27,7 @@ const pinFiles = [
   'deploy/nixie/restore-job.yaml',
   'nixos/hosts/geoffcloud/configuration.nix',
   'scripts/nix-image.sh',
-  'infra/observability/test-nixie-turns-alert.sh',
+  'infra/observability/test-nixie-alerts.sh',
 ];
 
 export async function checkImagePins(options: Readonly<CheckImagePinsOptions>): Promise<number> {
