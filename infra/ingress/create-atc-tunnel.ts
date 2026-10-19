@@ -11,7 +11,7 @@ export interface ATCTunnel {
   readonly tunnelToken: Output<string>;
 }
 
-// The tunnel for atc.geoff.cloud alone (GEO-1388). Its connector runs as a sidecar in the gateway
+// The tunnel for atc.geoff.cloud alone. Its connector runs as a sidecar in the gateway
 // pod, so the gateway can trust the forwarded client address on loopback, where only that
 // connector reaches it. createIngress renders its routes.
 export function createATCTunnel(accountID: string): ATCTunnel {
