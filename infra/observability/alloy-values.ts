@@ -1,22 +1,20 @@
 import { alloyConfig } from './alloy-config.ts';
+import { alloyPaths } from './alloy-paths.ts';
+import { buildPodLogPositionsSeedScript } from './build-pod-log-positions-seed-script.ts';
 import { toHelmTplLiteral } from './to-helm-tpl-literal.ts';
-
-// Alloy keeps its read positions here, on the node, so a restart resumes where it stopped. Without
-// a position, Alloy reads a pod's log file from its end.
-const storagePath = '/var/lib/alloy';
 
 // Alloy as a DaemonSet with alloyConfig, which Prometheus scrapes through the chart's
 // ServiceMonitor. The chart runs Helm's tpl over the config, so the config's own Go templates go
 // in as literals.
 export const alloyValues = {
   alloy: {
-    storagePath,
+    storagePath: alloyPaths.storage,
     configMap: {
       content: toHelmTplLiteral(alloyConfig),
     },
 
     // /var/log from the host, read-only, for the journal and the pods' log files
-    mounts: { varlog: true, extra: [{ name: 'storage', mountPath: storagePath }] },
+    mounts: { varlog: true, extra: [{ name: 'storage', mountPath: alloyPaths.storage }] },
 
     // the Go runtime collects garbage harder as the heap nears GOMEMLIMIT, below the limit
     extraEnv: [{ name: 'GOMEMLIMIT', value: '300MiB' }],
@@ -24,8 +22,30 @@ export const alloyValues = {
   },
   serviceMonitor: { enabled: true },
   controller: {
+    // before each start, the seed of read positions that Alloy's pod-log source imports when it has
+    // none of its own; the image is the chart's appVersion, which the Alloy container runs
+    initContainers: [
+      {
+        name: 'seed-pod-log-positions',
+        image: 'docker.io/grafana/alloy:v1.20.0',
+        command: [
+          'sh',
+          '-c',
+          buildPodLogPositionsSeedScript({
+            podLogRoot: alloyPaths.podLogs,
+            seedFile: alloyPaths.podLogPositionsSeed,
+          }),
+        ],
+        volumeMounts: [
+          { name: 'varlog', mountPath: '/var/log', readOnly: true },
+          { name: 'storage', mountPath: alloyPaths.storage },
+        ],
+      },
+    ],
     volumes: {
-      extra: [{ name: 'storage', hostPath: { path: storagePath, type: 'DirectoryOrCreate' } }],
+      extra: [
+        { name: 'storage', hostPath: { path: alloyPaths.storage, type: 'DirectoryOrCreate' } },
+      ],
     },
   },
 };

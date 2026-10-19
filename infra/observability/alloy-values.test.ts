@@ -1,9 +1,10 @@
 import { expect, test } from 'bun:test';
 import { alloyConfig } from './alloy-config.ts';
 import { alloyValues } from './alloy-values.ts';
+import { buildPodLogPositionsSeedScript } from './build-pod-log-positions-seed-script.ts';
 import { toHelmTplLiteral } from './to-helm-tpl-literal.ts';
 
-test("it runs Alloy's config from saved positions, as a literal for the chart's tpl pass, and lets Prometheus scrape it", () => {
+test("it runs Alloy's config from saved positions, seeded before each start, as a literal for the chart's tpl pass, and lets Prometheus scrape it", () => {
   expect(alloyValues).toStrictEqual({
     alloy: {
       storagePath: '/var/lib/alloy',
@@ -14,6 +15,24 @@ test("it runs Alloy's config from saved positions, as a literal for the chart's 
     },
     serviceMonitor: { enabled: true },
     controller: {
+      initContainers: [
+        {
+          name: 'seed-pod-log-positions',
+          image: 'docker.io/grafana/alloy:v1.20.0',
+          command: [
+            'sh',
+            '-c',
+            buildPodLogPositionsSeedScript({
+              podLogRoot: '/var/log/pods',
+              seedFile: '/var/lib/alloy/pod-log-positions.yml',
+            }),
+          ],
+          volumeMounts: [
+            { name: 'varlog', mountPath: '/var/log', readOnly: true },
+            { name: 'storage', mountPath: '/var/lib/alloy' },
+          ],
+        },
+      ],
       volumes: {
         extra: [
           { name: 'storage', hostPath: { path: '/var/lib/alloy', type: 'DirectoryOrCreate' } },

@@ -1,11 +1,12 @@
 import { expect, test } from 'bun:test';
 import { buildPodLogsPipeline } from './build-pod-logs-pipeline.ts';
 
-test("it tails each pod container's log files from their end when it has no position, labelled with the namespace, pod, container, job and instance, and drops the atc gateway's approval lines and lines over an hour old", () => {
+test("it tails each pod container's log files from the seeded positions, labelled with the namespace, pod, container, job and instance, and drops the atc gateway's approval lines and lines over an hour old", () => {
   expect(
     buildPodLogsPipeline({
       targets: 'discovery.kubernetes.web.targets',
       podLogRoot: '/node/log/pods',
+      positionsSeedFile: '/node/alloy/seed.yml',
       forwardTo: 'loki.write.central.receiver',
     }),
   ).toBe(`
@@ -47,13 +48,13 @@ discovery.relabel "pods" {
   }
 }
 
-// a file with no saved read position is read from its end, so a start with an empty position store
-// reads no history. A running tailer reads a rotated log's old file to its end and the new file from
-// its start, so a rotation loses no line. The lines a new container writes before Alloy finds its
-// file never reach Loki, so Alloy looks each second.
+// a file with no read position is read from its first line, so a new container's first lines reach
+// Loki. With no positions file of its own, Alloy starts from the seed, which holds each file that
+// existed before the start at its size then, so a start with an empty store reads no history. A
+// running tailer reads a rotated log's old file to its end and the new file from its start.
 loki.source.file "pods" {
-  targets       = discovery.relabel.pods.output
-  tail_from_end = true
+  targets               = discovery.relabel.pods.output
+  legacy_positions_file = "/node/alloy/seed.yml"
   file_match {
     enabled     = true
     sync_period = "1s"

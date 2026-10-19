@@ -1,11 +1,14 @@
 # shellcheck shell=bash
-# start_alloy <dir> <config dir> <logs dir> [<storage volume>]: starts the pinned Alloy in Docker on
-# the host network, with <config dir>/config.alloy as its config and <logs dir> mounted read-only at
-# /logs, and returns once Alloy reports ready. <dir>/url then holds its loopback URL, and
-# <dir>/container the container to remove when the case ends. Alloy keeps its storage, such as its
-# read positions, on a tmpfs that ends with the container. Given <storage volume>, it keeps it in
-# that Docker volume instead, which it creates when missing and hands to Alloy's uid, so a second
-# start on the same volume resumes from the first's storage; the caller removes the volume. The
+# start_alloy <dir> <config dir> <logs dir> [<storage volume> [<init script>]]: starts the pinned
+# Alloy in Docker on the host network, with <config dir>/config.alloy as its config and <logs dir>
+# mounted read-only at /logs, and returns once Alloy reports ready. <dir>/url then holds its loopback
+# URL, and <dir>/container the container to remove when the case ends. Alloy keeps its storage, such
+# as its read positions, on a tmpfs that ends with the container. Given <storage volume>, it keeps it
+# at /storage in that Docker volume instead, which it creates when missing and hands to Alloy's uid,
+# so a second start on the same volume resumes from the first's storage; the caller removes the
+# volume. Given <init script>, a POSIX shell script, it first runs the script in the same image as
+# root, with no network, <logs dir> read-only at /logs and the volume at /storage, as an init
+# container runs before Alloy's container in production. The
 # image is the alloy chart's appVersion (infra/observability/alloy-chart.ts), and it runs as
 # production runs it: uid 65532, a read-only root, no capabilities, no privilege escalation. Usage
 # reporting is off, so no case reaches Grafana.
@@ -24,6 +27,10 @@ start_alloy() {
   if [ -n "${4:-}" ]; then
     storage_path='/storage'
     storage=(-v "$4:$storage_path")
+    if [ -n "${5:-}" ]; then
+      docker run --rm --user 0 --network none --read-only --entrypoint sh -v "$3:/logs:ro" \
+        "${storage[@]}" "$image" -c "$5"
+    fi
     docker run --rm --user 0 --entrypoint chown "${storage[@]}" "$image" 65532 "$storage_path"
   fi
   docker run -d --name "$container" --network host --user 65532 --read-only --cap-drop ALL \

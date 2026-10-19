@@ -5,6 +5,9 @@ interface PodLogsPipelineOptions {
   // the directory that holds the kubelet's pod log directories
   podLogRoot: string;
 
+  // the read positions, in the legacy format, that Alloy imports when it has no positions file
+  positionsSeedFile: string;
+
   // the Alloy expression for the receiver that takes each line
   forwardTo: string;
 }
@@ -49,13 +52,13 @@ discovery.relabel "pods" {
   }
 }
 
-// a file with no saved read position is read from its end, so a start with an empty position store
-// reads no history. A running tailer reads a rotated log's old file to its end and the new file from
-// its start, so a rotation loses no line. The lines a new container writes before Alloy finds its
-// file never reach Loki, so Alloy looks each second.
+// a file with no read position is read from its first line, so a new container's first lines reach
+// Loki. With no positions file of its own, Alloy starts from the seed, which holds each file that
+// existed before the start at its size then, so a start with an empty store reads no history. A
+// running tailer reads a rotated log's old file to its end and the new file from its start.
 loki.source.file "pods" {
-  targets       = discovery.relabel.pods.output
-  tail_from_end = true
+  targets               = discovery.relabel.pods.output
+  legacy_positions_file = "${options.positionsSeedFile}"
   file_match {
     enabled     = true
     sync_period = "1s"

@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Test for the pod-log pipeline in the pinned Alloy: Alloy runs the pipeline
-# build-pod-logs-pipeline.ts builds over one container's log in the case tree, written in the
-# kubelet's CRI format, with a target shaped as discovery.kubernetes gives it, and with an empty
-# position store, as a start with a new or wiped store has. loki.echo stands in for Loki and prints
-# each entry's labels and line to Alloy's log, which each case compares.
+# build-pod-logs-pipeline.ts builds over one container's logs in the case tree, written in the
+# kubelet's CRI format, with a target shaped as discovery.kubernetes gives it. Each start runs as
+# production runs it: the seed script build-pod-log-positions-seed-script.ts builds runs first, as
+# the init container does, and Alloy keeps its storage in a Docker volume that starts empty, as a
+# new or wiped store does. loki.echo stands in for Loki and prints each entry's labels and line to
+# Alloy's log, which each case compares.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='labelled' bash infra/observability/test-pod-logs-pipeline.sh
@@ -22,12 +24,15 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 log_dir='shop_web-7f9c8d6b5-q4z2m_3b1f0c2e-5a7d-4c19-9e2b-0d6f8a1c4e73/web'
 
 # setup_test <tree>: the pipeline as the repo builds it, fed one pod's container and printing each
-# entry, the directory Alloy records itself in, and the container's empty log
+# entry, the seed script for /logs and /storage, the directories each Alloy start records itself
+# in, the name of the case's storage volume, and the container's empty log
 setup_test() {
   local tree="$1"
-  mkdir -p "$tree/config" "$tree/alloy" "$tree/logs/$log_dir"
+  mkdir -p "$tree/config" "$tree/alloy" "$tree/alloy-again" "$tree/logs/$log_dir"
   : > "$tree/logs/$log_dir/0.log"
+  volume="alloy-storage-$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
   (cd "$repo" && TREE="$tree" bun -e "
+    import { buildPodLogPositionsSeedScript } from './infra/observability/build-pod-log-positions-seed-script.ts';
     import { buildPodLogsPipeline } from './infra/observability/build-pod-logs-pipeline.ts';
     const tree = process.env.TREE ?? '';
     const targets = '[{' + [
@@ -38,8 +43,10 @@ setup_test() {
       '\"__meta_kubernetes_pod_container_name\" = \"web\"',
       '\"__meta_kubernetes_pod_container_port_number\" = \"8080\"',
     ].join(', ') + '}]';
-    const pipeline = buildPodLogsPipeline({ targets, podLogRoot: '/logs', forwardTo: 'loki.echo.loki.receiver' });
+    const seedFile = '/storage/pod-log-positions.yml';
+    const pipeline = buildPodLogsPipeline({ targets, podLogRoot: '/logs', positionsSeedFile: seedFile, forwardTo: 'loki.echo.loki.receiver' });
     await Bun.write(tree + '/config/config.alloy', pipeline + '\nloki.echo \"loki\" {}\n');
+    await Bun.write(tree + '/seed.sh', buildPodLogPositionsSeedScript({ podLogRoot: '/logs', seedFile }));
   ")
 }
 
@@ -56,7 +63,7 @@ it_ships_each_line_the_container_writes_once_alloy_tails_its_file_labelled_as_a_
   tree="$(mktemp -d)"
   trap teardown EXIT
   setup_test "$tree"
-  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
 
@@ -78,7 +85,7 @@ EOF
 EOF
 }
 
-it_reads_none_of_the_lines_the_container_wrote_before_alloy_started_with_an_empty_position_store() {
+it_reads_none_of_the_lines_a_log_held_before_alloy_started_with_an_empty_position_store() {
   local before now
   tree="$(mktemp -d)"
   trap teardown EXIT
@@ -89,7 +96,7 @@ it_reads_none_of_the_lines_the_container_wrote_before_alloy_started_with_an_empt
 @BEFORE@ stderr F order 40 failed
 EOF
 
-  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
   echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
@@ -108,7 +115,7 @@ it_ships_each_line_once_across_a_rotation_of_the_tailed_log_including_the_lines_
   tree="$(mktemp -d)"
   trap teardown EXIT
   setup_test "$tree"
-  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
   echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
@@ -140,11 +147,9 @@ EOF
 it_resumes_from_the_saved_position_after_a_restart_shipping_each_line_written_while_alloy_was_stopped_once() {
   local now
   tree="$(mktemp -d)"
-  volume="alloy-storage-$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
   trap teardown EXIT
   setup_test "$tree"
-  mkdir "$tree/alloy-again"
-  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
   echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
@@ -156,7 +161,8 @@ it_resumes_from_the_saved_position_after_a_restart_shipping_each_line_written_wh
 @NOW@ stderr F order 43 failed
 EOF
 
-  start_alloy "$tree/alloy-again" "$tree/config" "$tree/logs" "$volume"
+  # the seed script runs again and records the log at its new size, which Alloy must ignore
+  start_alloy "$tree/alloy-again" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
 
   # shellcheck disable=SC2016 # expanded by the inner sh
   wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 43 failed\""' _ "$(cat "$tree/alloy-again/container")"
@@ -168,52 +174,58 @@ order 43 failed
 EOF
 }
 
-it_reads_a_restarted_containers_new_log_from_where_alloy_finds_it_beside_the_old_one() {
+it_keeps_the_first_lines_of_a_restarted_containers_new_log_that_appears_after_alloy_started() {
   local now
   tree="$(mktemp -d)"
   trap teardown EXIT
   setup_test "$tree"
-  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
   echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the old log's line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
 
-  # as the kubelet starts a container again: a new log beside the old one, with the first line
+  # as the kubelet starts a container again: a new log beside the old one, with its first lines
   # already in it when Alloy finds it
-  echo "$now stdout F listening on :8080" > "$tree/new.log"
+  sed "s/@NOW@/$now/" > "$tree/new.log" << 'EOF'
+@NOW@ stdout F listening on :8080
+@NOW@ stdout F order 42 placed
+EOF
   mv "$tree/new.log" "$tree/logs/$log_dir/1.log"
-  wait_for 30 "Alloy to tail the new log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 2$'
-  echo "$now stdout F order 42 placed" >> "$tree/logs/$log_dir/1.log"
 
   # shellcheck disable=SC2016 # expanded by the inner sh
-  wait_for 30 "Alloy to ship the new log's line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\""' _ "$(cat "$tree/alloy/container")"
+  wait_for 30 "Alloy to ship the new log's lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 42 placed\""' _ "$(cat "$tree/alloy/container")"
   docker logs "$(cat "$tree/alloy/container")" 2>&1 |
     sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
   diff - "$tree/entries" << 'EOF'
 order 41 placed
+listening on :8080
 order 42 placed
 EOF
 }
 
-it_tails_a_containers_log_that_is_missing_when_alloy_starts_from_where_alloy_finds_it() {
+it_keeps_the_first_lines_of_a_containers_log_that_is_missing_when_alloy_starts() {
   local now
   tree="$(mktemp -d)"
   trap teardown EXIT
   setup_test "$tree"
   rm "$tree/logs/$log_dir/0.log"
-  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
   now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
 
-  echo "$now stdout F listening on :8080" > "$tree/new.log"
+  sed "s/@NOW@/$now/" > "$tree/new.log" << 'EOF'
+@NOW@ stdout F listening on :8080
+@NOW@ stdout F order 41 placed
+EOF
   mv "$tree/new.log" "$tree/logs/$log_dir/0.log"
-  wait_for 30 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
-  echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
 
   # shellcheck disable=SC2016 # expanded by the inner sh
-  wait_for 30 "Alloy to ship the new line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
+  wait_for 30 "Alloy to ship the log's lines" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
   docker logs "$(cat "$tree/alloy/container")" 2>&1 |
     sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
   diff - "$tree/entries" << 'EOF'
+listening on :8080
 order 41 placed
 EOF
 }

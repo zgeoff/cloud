@@ -8,7 +8,7 @@ test("it tails every pod's log files from the node and the host journal into Lok
 discovery.kubernetes "pods" {
   role = "pod"
 }
-${buildPodLogsPipeline({ targets: 'discovery.kubernetes.pods.targets', podLogRoot: '/var/log/pods', forwardTo: 'loki.write.default.receiver' })}${buildATCSecurityPipeline('/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log')}
+${buildPodLogsPipeline({ targets: 'discovery.kubernetes.pods.targets', podLogRoot: '/var/log/pods', positionsSeedFile: '/var/lib/alloy/pod-log-positions.yml', forwardTo: 'loki.write.default.receiver' })}${buildATCSecurityPipeline('/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log')}
 // the host's journal: impd (imp-host logs to journald), k3s, tailscaled and the rest
 // of the host, which no pod log covers
 loki.source.journal "host" {

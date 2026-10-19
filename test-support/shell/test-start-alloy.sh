@@ -101,6 +101,24 @@ EOF
   wait_for 30 "Alloy to count the third line" has_metric "$(cat "$tree/alloy-again/url")" '^loki_process_custom_case_lines_total{.*} 1$'
 }
 
+it_runs_the_init_script_as_root_over_the_logs_and_the_storage_volume_before_alloy_starts() {
+  tree="$(mktemp -d)"
+  volume="alloy-storage-$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
+  trap 'docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true; docker volume rm "$volume" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
+  setup_test "$tree"
+  cat > "$tree/config/config.alloy" << 'EOF'
+local.file "init" {
+  filename = "/storage/init.txt"
+}
+EOF
+  printf '%s\n' 'first' > "$tree/logs/case.log"
+
+  # shellcheck disable=SC2016 # expanded by the init script's sh
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" 'echo "$(id -u) $(cat /logs/case.log)" > /storage/init.txt'
+
+  assert_equals '0 first' "$(docker exec "$(cat "$tree/alloy/container")" cat /storage/init.txt)" "the init script's output"
+}
+
 setup_test() {
   mkdir "$1/alloy" "$1/config" "$1/logs"
 }

@@ -1,11 +1,9 @@
+import { alloyPaths } from './alloy-paths.ts';
 import { buildATCSecurityPipeline } from './build-atc-security-pipeline.ts';
 import { buildPodLogsPipeline } from './build-pod-logs-pipeline.ts';
 import { lokiURL } from './loki-url.ts';
 
-// The kubelet's pod log directories, under /var/log, which the chart mounts: one directory per pod,
-// named <namespace>_<pod>_<uid>, and one per container inside it
-const podLogRoot = '/var/log/pods';
-const atcGatewayLogPath = `${podLogRoot}/atc_atc-gateway-*/atc-gateway/*.log`;
+const atcGatewayLogPath = `${alloyPaths.podLogs}/atc_atc-gateway-*/atc-gateway/*.log`;
 
 // Alloy's config: tail every pod's logs and the host's journal, and push them to Loki, and count
 // atc's security events for Prometheus
@@ -15,7 +13,8 @@ discovery.kubernetes "pods" {
 }
 ${buildPodLogsPipeline({
   targets: 'discovery.kubernetes.pods.targets',
-  podLogRoot,
+  podLogRoot: alloyPaths.podLogs,
+  positionsSeedFile: alloyPaths.podLogPositionsSeed,
   forwardTo: 'loki.write.default.receiver',
 })}${buildATCSecurityPipeline(atcGatewayLogPath)}
 // the host's journal: impd (imp-host logs to journald), k3s, tailscaled and the rest
