@@ -52,6 +52,7 @@ const workloads =
           credentials: k3s.inputs.onePasswordConnectCredentials,
         },
         ...(k3s.inputs.nixie === undefined ? {} : { nixie: k3s.inputs.nixie }),
+        ...(k3s.inputs.files === undefined ? {} : { files: k3s.inputs.files }),
         zoneID: edge.zoneID,
       });
 

@@ -1,6 +1,7 @@
 export const clusterNamespaceNames = [
   'atc',
   'default',
+  'files',
   'ingress',
   'kube-node-lease',
   'kube-public',
@@ -24,6 +25,7 @@ interface ClusterNamespaceEntry {
 export const clusterNamespaces = {
   atc: { owner: 'pulumi', podSecurity: 'baseline' },
   default: { owner: 'k3s', podSecurity: 'baseline' },
+  files: { owner: 'pulumi', podSecurity: 'baseline' },
   ingress: { owner: 'pulumi', podSecurity: 'baseline' },
   'kube-node-lease': { owner: 'k3s', podSecurity: 'baseline' },
   'kube-public': { owner: 'k3s', podSecurity: 'baseline' },

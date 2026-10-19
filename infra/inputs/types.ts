@@ -97,3 +97,39 @@ export interface NixieInputs {
   // without it there is no backup CronJob
   readonly backup?: NixieBackupInputs;
 }
+
+// the stack config's files object; setting it approves the deploy
+export interface FilesConfig {
+  // the files service's image, by tag and digest
+  readonly image: string;
+
+  // the one public DNS name, which the tunnel serves
+  readonly hostname: string;
+}
+
+// a nightly restic backup of the files service's volume to its own repository in R2
+export interface FilesBackupInputs {
+  readonly image: string;
+  readonly secrets: {
+    readonly repository: Output<string>;
+    readonly password: Output<string>;
+    readonly accessKeyID: Output<string>;
+    readonly secretAccessKey: Output<string>;
+  };
+}
+
+export interface FilesInputs {
+  readonly config: FilesConfig;
+
+  // pulls the files image and the backup image, which are private
+  readonly pullCredential: GHCRPullCredential;
+
+  // the SHA-256 of each role token, as hex; the cluster never holds a token
+  readonly tokenHashes: {
+    readonly agent: Output<string>;
+    readonly owner: Output<string>;
+  };
+
+  // without it there is no backup CronJob
+  readonly backup?: FilesBackupInputs;
+}

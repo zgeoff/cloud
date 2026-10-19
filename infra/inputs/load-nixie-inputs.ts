@@ -1,6 +1,7 @@
 import { secret } from '@pulumi/pulumi';
 import { findResticBackup } from './find-restic-backup.ts';
-import { pinnedImagePattern } from './pinned-image-pattern.ts';
+import { requireGeoffCloudHostname } from './require-geoff-cloud-hostname.ts';
+import { requirePinnedImage } from './require-pinned-image.ts';
 import { requireVariable } from './require-variable.ts';
 import type {
   BackupImage,
@@ -34,9 +35,11 @@ export function loadNixieInputs(
     );
   }
 
-  requirePinnedImage('image', config.image);
-  requirePinnedImage('webImage', config.webImage);
-  requireHostname(config.hostname);
+  requirePinnedImage('nixie.image', config.image);
+  requirePinnedImage('nixie.webImage', config.webImage);
+
+  // the DNS record and the certificate live in the geoff.cloud zone
+  requireGeoffCloudHostname('nixie.hostname', config.hostname);
 
   const backup = findBackup(env, backupImage);
 
@@ -82,19 +85,4 @@ function findBackup(
       secretAccessKey: secret(backup.secretAccessKey),
     },
   };
-}
-
-function requirePinnedImage(key: string, image: string | undefined): asserts image is string {
-  if (image === undefined || !pinnedImagePattern.test(image)) {
-    throw new Error(`stack config "nixie.${key}" must name an image by tag and digest`);
-  }
-}
-
-// the DNS record and the certificate live in the geoff.cloud zone
-const hostnamePattern = /^(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+geoff\.cloud$/u;
-
-function requireHostname(hostname: string | undefined): void {
-  if (hostname === undefined || !hostnamePattern.test(hostname)) {
-    throw new Error('stack config "nixie.hostname" must name a host under geoff.cloud');
-  }
 }
