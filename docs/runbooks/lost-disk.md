@@ -165,10 +165,12 @@ checkout of `main`.
    - The secrets of the atc daemon's auth profiles but `op-connect`, which the Connect bullet adds
      ([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)), each with the
      kind, host and header of its profile in `nixos/hosts/geoffcloud/configuration.nix`, on stdin:
-     `op read op://cloud/<item>/credential | host_imp secret add <secret> --kind custom --hosts <host> --header <header> --scheme <scheme>`,
-     or `--kind github` alone for the GitHub profile. `host_imp` is the helper at the top of
-     [Previews](./preview.md). Step 11's credential installer refuses to mint the daemon's token
-     while one of them is missing, and lists each missing secret.
+     `op read op://cloud/<secret>/credential | host_imp secret add <secret> --kind custom --hosts <host> --header <header> --scheme <scheme>`,
+     or `--kind github` alone for the GitHub profile. Each secret's item in the 1Password vault
+     `cloud` has the secret's own title: `claude-setup-token`, `github-imp-agents` and
+     `linear-imp-agents`. `host_imp` is the helper at the top of [Previews](./preview.md). Step 11's
+     credential installer refuses to mint the daemon's token while one of them is missing, and lists
+     each missing secret.
    - The GitHub secret `gh`, through step 1 of
      [Set the service up](./preview.md#set-the-service-up). Each preview imp clones through it. The
      daemon's GitHub profile uses `github-imp-agents`, so the profile secrets leave `gh` out. impd
