@@ -11,10 +11,13 @@
 #   CASE='after a restart' bash test-support/shell/with-fixture-images.sh bash test-support/shell/test-wait-for-ready.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-gateway.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for-ready.sh"
@@ -25,8 +28,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
 it_waits_for_readyz_after_a_restart() {
   local gateway_image="$1" backup_image="$2" run="$3" status=0
   name="atc-gw-ready-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
   start_gateway "$name" "$tree" "$gateway_image"
   docker restart "$name" > /dev/null
@@ -45,10 +47,7 @@ EOF
 GET /readyz 200 Tms
 GET /readyz 200 Tms
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # The container publishes 8414 but nothing listens there, so /readyz never answers before
@@ -58,8 +57,7 @@ EOF
 it_fails_wait_for_ready_with_the_containers_logs_when_readyz_never_answers() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-ready-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" > /dev/null 2>&1 || true'
   docker run -d --name "$name" -p 127.0.0.1::8414 --entrypoint /bin/sh "$backup_image" \
     -c 'echo a log line on stdout; echo a log line on stderr >&2; exec sleep 300' > /dev/null
   create_stub_clock "$tree"
@@ -76,10 +74,7 @@ a log line on stderr
 a log line on stdout
 EOF
   diff - "$tree/pauses" <<< 0.05
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The container has exited before the helper starts, so the helper reports it at its
@@ -88,8 +83,7 @@ EOF
 it_fails_wait_for_ready_with_the_containers_logs_as_soon_as_the_container_stops() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-ready-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" > /dev/null 2>&1 || true'
   docker run -d --name "$name" -p 127.0.0.1::8414 --entrypoint /bin/sh "$backup_image" \
     -c 'echo a log line on stdout; echo a log line on stderr >&2; exit 3' > /dev/null
   docker wait "$name" > /dev/null
@@ -107,10 +101,7 @@ a log line on stderr
 a log line on stdout
 EOF
   assert_missing "$tree/pauses" "wait_for_ready paused before it reported the stop"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # Boot data every case that calls it needs: the registry that start_gateway mounts, and a

@@ -27,59 +27,38 @@
 # - https://www.1password.dev/cli/item-template-json/ : the item JSON (id, title, version,
 #   vault, category, fields with id, type, label and value);
 # - https://www.1password.dev/cli/reference/commands/read/ : `read` prints a newline after the
-#   secret unless -n is given;
-# - https://www.1password.dev/service-accounts/rate-limits/ : the rate-limit error text,
-#   "[ERROR] (429) Too Many Requests: You've reached ... Please retry in 59 minutes or try
-#   other requests.", which the stand-in prints for both STUB_OP_FAIL_AT calls.
+#   secret unless -n is given.
 #
-# The documentation does not settle, so they stay as they were and need a real op sample:
-# op's exit codes (the stand-in uses 1 for every error, as 1Password community answers
-# describe); the "[ERROR] <date> <time>" frame, which the rate-limit example prints without
-# a timestamp and after "Error: "; the "isn't a vault" and "could not read secret" texts,
-# taken from community reports of op 2; the retry time in the rate-limit text; the fields
-# of `vault get` (only id and name here); the fields of an `item list` element and of the
+# Its error lines and their exit code are print-op-error.sh's, with their sources. The
+# documentation does not settle, so they stay as they were and need a real op sample: the
+# fields of `vault get` (only id and name here); the fields of an `item list` element and of the
 # item `item create` prints (the template example shows vault with id alone, created_at,
 # updated_at and last_edited_by, which the stand-in leaves out, and a vault name it adds);
 # the API_CREDENTIAL spelling, which the documentation shows only as "API Credential"; and
 # the credential field's id, "credential", which the script writes and reads.
 create_stub_op() {
   local bin="$1"
-  cat > "$bin/op" << 'STUB'
-#!/usr/bin/env bash
+  {
+    printf '#!/usr/bin/env bash\nsource %q\n' "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/print-op-error.sh"
+    cat << 'STUB'
 printf '%s\0' op "$@" | jq -cRs 'split("\u0000")[:-1]' >> "$STUB_TREE/calls"
 printf '%s\n' "${OP_SERVICE_ACCOUNT_TOKEN-unset}" > "$STUB_TREE/op-token-seen"
 case "$*" in
   "vault get "*" --format json")
-    if [ -d "$STUB_TREE/vault/$3" ]; then
-      jq -cn --arg name "$3" '{id: "fixture-vault-id", name: $name}'
-    else
-      echo "[ERROR] 2026/10/07 12:00:00 \"$3\" isn't a vault in this account. Specify the vault with its ID or name." >&2
-      exit 1
-    fi
+    if [ ! -d "$STUB_TREE/vault/$3" ]; then print_op_error missing-vault "$3"; fi
+    jq -cn --arg name "$3" '{id: "fixture-vault-id", name: $name}'
     ;;
   "item list --vault "*" --format json")
-    if [ "${STUB_OP_FAIL_AT:-}" = item-list ]; then
-      echo "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests." >&2
-      exit 1
-    fi
-    if [ ! -d "$STUB_TREE/vault/$4" ]; then
-      echo "[ERROR] 2026/10/07 12:00:00 \"$4\" isn't a vault in this account. Specify the vault with its ID or name." >&2
-      exit 1
-    fi
+    if [ "${STUB_OP_FAIL_AT:-}" = item-list ]; then print_op_error rate-limit; fi
+    if [ ! -d "$STUB_TREE/vault/$4" ]; then print_op_error missing-vault "$4"; fi
     (cd "$STUB_TREE/vault/$4" && ls -A) | jq -R --arg vault "$4" \
       '{id: "fixture-item-id", title: ., version: 1, vault: {id: "fixture-vault-id", name: $vault}, category: "API_CREDENTIAL"}' |
       jq -s .
     ;;
   "item create --vault "*" - --format json")
     item="$(cat)"
-    if [ "${STUB_OP_FAIL_AT:-}" = item-create ]; then
-      echo "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests." >&2
-      exit 1
-    fi
-    if [ ! -d "$STUB_TREE/vault/$4" ]; then
-      echo "[ERROR] 2026/10/07 12:00:00 \"$4\" isn't a vault in this account. Specify the vault with its ID or name." >&2
-      exit 1
-    fi
+    if [ "${STUB_OP_FAIL_AT:-}" = item-create ]; then print_op_error rate-limit; fi
+    if [ ! -d "$STUB_TREE/vault/$4" ]; then print_op_error missing-vault "$4"; fi
     title="$(jq -r .title <<< "$item")"
     jq -j '.fields[] | select(.id == "credential") | .value' <<< "$item" > "$STUB_TREE/vault/$4/$title"
     jq -n --arg title "$title" --arg vault "$4" \
@@ -91,8 +70,7 @@ case "$*" in
       printf '%s\n' "$STUB_OP_READ_VALUE"
     elif [ ! -f "$STUB_TREE/vault/${ref%/credential}" ]; then
       vault="${ref%%/*}" item="${ref#*/}" item="${item%/credential}"
-      echo "[ERROR] 2026/10/07 12:00:00 could not read secret $2: could not get item $vault/$item: \"$item\" isn't an item in the \"$vault\" vault." >&2
-      exit 1
+      print_op_error unreadable-secret "$2" "$vault" "$item"
     else
       cat "$STUB_TREE/vault/${ref%/credential}"
       echo
@@ -101,5 +79,6 @@ case "$*" in
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac
 STUB
+  } > "$bin/op"
   chmod +x "$bin/op"
 }

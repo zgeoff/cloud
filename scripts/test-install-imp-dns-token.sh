@@ -16,10 +16,13 @@
 #   bash scripts/test-install-imp-dns-token.sh
 #   CASE='local mode' bash scripts/test-install-imp-dns-token.sh   # the cases whose title holds it
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-op-read.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-bash-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-remote-tools.sh"
@@ -28,8 +31,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-with-file-modes
 
 it_installs_the_token_over_ssh_stdin_and_keeps_the_other_env_lines() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -63,16 +65,12 @@ ENV
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_installs_here_in_local_mode_from_the_named_references() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/staging/dns"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/staging/dns/token"
@@ -102,16 +100,12 @@ ENV
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_replaces_a_token_file_it_installed_before() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-rotated-0123456789abc > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -139,16 +133,12 @@ CALLS
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_writes_an_env_file_with_only_the_email_line_when_none_is_there() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -172,16 +162,12 @@ CALLS
 400 dns-api-token
 400 imp-host.env
 MODES
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_stops_with_exit_1_and_changes_nothing_when_the_token_does_not_look_like_a_Cloudflare_token() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' 'not a token: has spaces' > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -199,16 +185,12 @@ it_stops_with_exit_1_and_changes_nothing_when_the_token_does_not_look_like_a_Clo
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_with_exit_1_and_changes_nothing_when_the_email_does_not_look_like_an_email() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -229,16 +211,12 @@ CALLS
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_with_op_exit_1_and_changes_nothing_when_the_token_item_is_missing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud"
   printf '%s\n' IMP_FOO=bar > "$tree/host/secrets/imp-host.env"
@@ -256,16 +234,12 @@ ERR
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_exit_1_and_leaves_both_files_when_the_host_may_not_write_the_secrets_directory() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'chmod -R u+w "$tree" || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'chmod -R u+w "$tree" || true'
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -291,16 +265,12 @@ CALLS
 dns-api-token
 imp-host.env
 FILES
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_and_writes_nothing_when_the_secrets_directory_is_not_a_mount_point() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -315,16 +285,12 @@ it_refuses_and_writes_nothing_when_the_secrets_directory_is_not_a_mount_point() 
   diff - "$tree/err" <<< "$tree/host/secrets is not a mount point; nothing changed"
   ls -A "$tree/host/secrets" > "$tree/files"
   diff /dev/null "$tree/files"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_ssh_exit_255_and_changes_nothing_when_the_host_refuses_the_connection() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/imp-dns-cloudflare"
   printf '%s' cf_test_TOKEN-0123456789abcdefghij > "$tree/vault/cloud/imp-dns-cloudflare/credential"
@@ -347,10 +313,7 @@ CALLS
   diff - "$tree/host/secrets/imp-host.env" <<< IMP_FOO=bar
   ls -A "$tree/host/secrets" > "$tree/files"
   diff - "$tree/files" <<< imp-host.env
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 # Runtime every case needs: the script in <tree>, the op and ssh stand-ins with fail-closed

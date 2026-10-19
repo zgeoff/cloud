@@ -15,14 +15,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-nixos-ssh.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_answers_the_switch_with_nothing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" ssh -o BatchMode=yes root@geoffcloud \
@@ -34,16 +35,12 @@ it_answers_the_switch_with_nothing() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_the_named_unit_lists_on_stderr_for_the_dry_activate() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -59,16 +56,12 @@ ERR
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_only_the_activation_line_for_a_dry_activate_with_no_unit_to_change() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -80,16 +73,12 @@ it_prints_only_the_activation_line_for_a_dry_activate_with_no_unit_to_change() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_the_dry_activate_with_exit_11_while_another_switch_holds_the_lock() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -101,10 +90,7 @@ it_fails_the_dry_activate_with_exit_11_while_another_switch_holds_the_lock() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run --wait --pipe '/nix/store/x/bin/switch-to-configuration' dry-activate"]
 CALLS
-  [ "$status" = 11 ] || {
-    echo "exit $status, want 11" >&2
-    exit 1
-  }
+  assert_status 11 "$status"
 }
 
 # switch-to-configuration-ng sorts the failed units by their lower-case names, so
@@ -112,8 +98,7 @@ CALLS
 # order would put it.
 it_fails_the_switch_as_switch_to_configuration_ng_reports_failed_units() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -131,16 +116,12 @@ OUT
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 it_prints_no_status_text_for_failed_units_when_none_is_given() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -154,16 +135,12 @@ it_prints_no_status_text_for_failed_units_when_none_is_given() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/x' && systemd-run '/nix/store/x/bin/switch-to-configuration' switch"]
 CALLS
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 it_prints_the_named_gateway_images_without_a_newline_for_the_kubectl_query() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -177,16 +154,12 @@ it_prints_the_named_gateway_images_without_a_newline_for_the_kubectl_query() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_nothing_for_the_kubectl_query_when_no_gateway_pod_is_named() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -199,16 +172,12 @@ it_prints_nothing_for_the_kubectl_query_when_no_gateway_pod_is_named() {
   diff - "$tree/calls" << 'CALLS'
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   for query in first second third; do
@@ -228,16 +197,12 @@ it_prints_the_later_gateway_images_from_the_second_kubectl_query_on() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n atc get pods -l app=atc-gateway -o 'jsonpath={.items[*].spec.containers[0].image}'"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_the_named_nixie_images_then_the_later_ones_for_the_nixie_query() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   for query in first second; do
@@ -255,16 +220,12 @@ it_prints_the_named_nixie_images_then_the_later_ones_for_the_nixie_query() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie get pods -l app=nixie -o 'jsonpath={.items[*].spec.containers[?(@.name==\"nixie\")].image}'"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_nothing_for_the_nixie_query_when_no_nixie_pod_is_named() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -274,16 +235,12 @@ it_prints_nothing_for_the_nixie_query_when_no_nixie_pod_is_named() {
 
   cmp /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_one_nixie_report_per_readiness_call_and_repeats_the_last() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   for call in first second third; do
@@ -303,16 +260,12 @@ it_prints_one_nixie_report_per_readiness_call_and_repeats_the_last() {
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
 CALLS
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_the_readiness_call_as_kubectl_does_when_no_report_is_named() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -322,16 +275,12 @@ it_fails_the_readiness_call_as_kubectl_does_when_no_report_is_named() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Error from server (NotFound): pods "nixie-0" not found'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_prints_the_named_current_system_for_readlink() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CURRENT=/nix/store/current \
@@ -341,16 +290,12 @@ it_prints_the_named_current_system_for_readlink() {
   diff - "$tree/out" <<< /nix/store/current
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_drops_the_connection_at_readlink_with_exit_255() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CURRENT=/nix/store/current \
@@ -360,16 +305,12 @@ it_drops_the_connection_at_readlink_with_exit_255() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'Connection to geoffcloud closed by remote host.\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]'
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_prints_the_named_failed_units() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -380,16 +321,12 @@ it_prints_the_named_failed_units() {
   diff - "$tree/out" <<< 'alloy.service loaded failed failed Alloy'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_the_failed_unit_listing_with_the_named_exit_code() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_FAILED_EXIT=1 \
@@ -399,16 +336,12 @@ it_fails_the_failed_unit_listing_with_the_named_exit_code() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'Failed to list units: Connection timed out'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -417,16 +350,12 @@ it_fails_closed_with_exit_97_on_an_unknown_remote_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes root@geoffcloud reboot'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","reboot"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CURRENT=/nix/store/current \
@@ -435,16 +364,12 @@ it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: root@geoffcloud readlink /run/current-system'
   diff - "$tree/calls" <<< '["ssh","root@geoffcloud","readlink","/run/current-system"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -454,18 +379,14 @@ it_hands_a_loopback_call_to_the_real_ssh_which_refuses_a_dead_port_with_exit_255
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 # 127.0.0.2 is loopback too, so a broken guard would only reach a dead local port, never a
 # real host; the guard admits 127.0.0.1 alone.
 it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -475,18 +396,14 @@ it_never_hands_a_call_to_another_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.2:1 true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.2:1","true"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # OpenSSH reads an option even after the destination, so the stand-in refuses one there
 # before it calls the real ssh.
 it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -496,16 +413,12 @@ it_never_hands_a_call_with_an_option_after_the_destination_to_the_real_ssh() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: -o BatchMode=yes ssh://root@127.0.0.1:1 -oProxyCommand=false true'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","-oProxyCommand=false","true"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/fake"
   printf '#!/usr/bin/env bash\necho fake ssh\n' > "$tree/fake/ssh"
   chmod +x "$tree/fake/ssh"
@@ -520,10 +433,7 @@ it_hands_a_call_to_the_system_ssh_not_one_on_the_callers_PATH() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< $'ssh: connect to host 127.0.0.1 port 1: Connection refused\r'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","ssh://root@127.0.0.1:1","true"]'
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for the other

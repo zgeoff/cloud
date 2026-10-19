@@ -4,18 +4,19 @@
 #
 #   bash test-support/shell/test-has-metric.sh
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-equals.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/pick-port.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/has-metric.sh"
 
 it_finds_a_line_of_the_metrics_page() {
-  tree="$(mktemp -d)"
-  trap 'kill "${server_pid:-}" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "${server_pid:-}" 2> /dev/null || true'
   setup_test "$tree"
   printf '%s\n' '# TYPE up gauge' 'up{job="alloy"} 1' > "$tree/www/metrics"
 
@@ -24,8 +25,7 @@ it_finds_a_line_of_the_metrics_page() {
 
 it_returns_1_for_a_pattern_no_line_matches() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'kill "${server_pid:-}" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "${server_pid:-}" 2> /dev/null || true'
   setup_test "$tree"
   printf '%s\n' '# TYPE up gauge' 'up{job="alloy"} 1' > "$tree/www/metrics"
 
@@ -49,6 +49,7 @@ setup_test() {
   port="$(pick_port)"
   url="http://127.0.0.1:$port"
   python3 -m http.server --bind 127.0.0.1 --directory "$1/www" "$port" > "$1/www.log" 2>&1 &
+  # shellcheck disable=SC2034 # the case's create_case_tree cleanup reads it
   server_pid=$!
   wait_for 10 "the file server" curl -fs -o /dev/null "$url/"
 }

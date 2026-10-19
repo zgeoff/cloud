@@ -10,14 +10,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-prod-apply-bun.sh"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 it_answers_an_install_with_exit_0_and_logs_the_directory_it_ran_in() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/work"
 
@@ -27,16 +28,12 @@ it_answers_an_install_with_exit_0_and_logs_the_directory_it_ran_in() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree/work\",\"argv\":[\"bun\",\"install\",\"--frozen-lockfile\"]}"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_an_install_with_the_exit_the_case_sets() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -45,16 +42,12 @@ it_fails_an_install_with_the_exit_the_case_sets() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"install\",\"--frozen-lockfile\"]}"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_echoes_the_sdk_build_script_line_that_the_root_package_json_holds() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   jq -r '"$ " + .scripts["sdk:build"]' "$root/package.json" > "$tree/want"
 
@@ -64,16 +57,12 @@ it_echoes_the_sdk_build_script_line_that_the_root_package_json_holds() {
   diff /dev/null "$tree/out"
   diff "$tree/want" "$tree/err"
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"sdk:build\"]}"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_the_sdk_build_with_bun_s_error_line_and_the_exit_the_case_sets() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -85,16 +74,12 @@ $ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/p
 error: script "sdk:build" exited with code 2
 EOF
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"sdk:build\"]}"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_prints_the_plan_for_the_preview_and_exits_with_the_status_the_case_sets() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -103,16 +88,12 @@ it_prints_the_plan_for_the_preview_and_exits_with_the_status_the_case_sets() {
   diff - "$tree/out" <<< '{"steps":[]}'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"--silent\",\"preview\",\"--\",\"--refresh\",\"--json\"]}"
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_prints_the_guard_text_and_exits_with_the_status_the_case_sets() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -121,16 +102,12 @@ it_prints_the_guard_text_and_exits_with_the_status_the_case_sets() {
   diff - "$tree/out" <<< 'held: replace urn:a'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"--silent\",\"ci:check-prod-plan\",\"/tmp/plan.json\",\"failure\"]}"
-  [ "$status" = 3 ] || {
-    echo "exit $status, want 3" >&2
-    exit 1
-  }
+  assert_status 3 "$status"
 }
 
 it_fails_closed_with_exit_97_on_a_guard_call_without_its_two_arguments() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -139,16 +116,12 @@ it_fails_closed_with_exit_97_on_a_guard_call_without_its_two_arguments() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: run --silent ci:check-prod-plan /tmp/plan.json'
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"--silent\",\"ci:check-prod-plan\",\"/tmp/plan.json\"]}"
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_any_other_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
@@ -157,10 +130,7 @@ it_fails_closed_with_exit_97_on_any_other_call() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: run preview -- --refresh --json'
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"preview\",\"--\",\"--refresh\",\"--json\"]}"
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 setup_test() {

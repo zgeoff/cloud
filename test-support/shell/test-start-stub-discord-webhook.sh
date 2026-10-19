@@ -5,18 +5,19 @@
 #
 #   bash test-support/shell/test-start-stub-discord-webhook.sh
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-equals.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-discord-webhook.sh"
 
 it_takes_a_json_post_with_204_and_records_its_path_and_body() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(curl -q --noproxy '*' -sS --max-time 5 -o "$tree/body" -w '%{http_code}' \
@@ -38,8 +39,7 @@ EOF
 
 it_records_each_of_two_posts_that_arrive_together_under_its_own_number() {
   local first second
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   curl -q --noproxy '*' -sS --max-time 5 -o /dev/null -H 'Content-Type: application/json' \
@@ -60,8 +60,7 @@ EOF
 
 it_answers_the_code_its_status_file_holds_with_discords_error_body_and_records_the_post() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
   echo 500 > "$tree/discord/status"
 
@@ -77,8 +76,7 @@ it_answers_the_code_its_status_file_holds_with_discords_error_body_and_records_t
 
 it_fails_closed_on_a_post_to_another_path() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(curl -q --noproxy '*' -sS --max-time 5 -o "$tree/body" -w '%{http_code}' \
@@ -93,8 +91,7 @@ it_fails_closed_on_a_post_to_another_path() {
 
 it_fails_closed_on_a_post_that_is_not_json() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(curl -q --noproxy '*' -sS --max-time 5 -o "$tree/body" -w '%{http_code}' \
@@ -108,8 +105,7 @@ it_fails_closed_on_a_post_that_is_not_json() {
 
 it_fails_closed_on_another_method() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(curl -q --noproxy '*' -sS --max-time 5 -o "$tree/body" -w '%{http_code}' \

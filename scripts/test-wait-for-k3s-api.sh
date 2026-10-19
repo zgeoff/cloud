@@ -11,6 +11,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-livez-curl.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.sh"
 
@@ -18,8 +20,7 @@ script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/wait-for-k3s-api.sh"
 
 it_returns_at_once_when_the_first_try_answers() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:$tree/clock:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_LIVEZ_ANSWER_FROM=1 \
@@ -32,16 +33,12 @@ it_returns_at_once_when_the_first_try_answers() {
     echo "it paused: $(cat "$tree/clock/pauses")" >&2
     exit 1
   }
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_pauses_2_seconds_after_each_try_that_does_not_answer() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:$tree/clock:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_LIVEZ_ANSWER_FROM=3 \
@@ -58,16 +55,12 @@ EOF
 2
 2
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_returns_when_the_last_of_30_tries_answers() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:$tree/clock:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" STUB_LIVEZ_ANSWER_FROM=30 \
@@ -77,16 +70,12 @@ it_returns_when_the_last_of_30_tries_answers() {
   diff /dev/null "$tree/err"
   diff - <(wc -l < "$tree/calls") <<< 30
   diff - <(wc -l < "$tree/clock/pauses") <<< 29
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_naming_the_api_after_30_tries_that_do_not_answer() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   for _ in $(seq 1 30); do
     echo '["curl","-sk","-o","/dev/null","--max-time","5","https://geoffcloud:6443/livez"]' >> "$tree/want-calls"
@@ -100,10 +89,7 @@ it_fails_naming_the_api_after_30_tries_that_do_not_answer() {
   diff - "$tree/err" <<< "k3s's API on geoffcloud:6443 did not answer"
   diff "$tree/want-calls" "$tree/calls"
   diff "$tree/want-pauses" "$tree/clock/pauses"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 setup_test() {

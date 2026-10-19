@@ -13,6 +13,8 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/find-nixos-check-run.sh"
@@ -25,8 +27,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_prints_the_url_of_a_green_run_on_the_commit_itself() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -50,16 +51,12 @@ it_prints_the_url_of_a_green_run_on_the_commit_itself() {
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_the_newest_run_on_an_ancestor_when_no_input_changed_since() {
   local older newer status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos" "$tree/repo/docs"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -85,16 +82,12 @@ $older https://github.com/zgeoff/cloud/actions/runs/8" '{
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/9
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_nothing_when_nixos_changed_since_the_newest_green_run() {
   local checked status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -115,16 +108,12 @@ it_prints_nothing_when_nixos_changed_since_the_newest_green_run() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_skips_a_run_on_a_commit_the_checkout_lacks_and_a_run_off_the_history_of_the_commit() {
   local checked side status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -149,16 +138,12 @@ $checked https://github.com/zgeoff/cloud/actions/runs/8" '{
 
   diff - "$tree/out" <<< https://github.com/zgeoff/cloud/actions/runs/8
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_nothing_when_gh_lists_no_green_run() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   # no green run: the --jq filter prints nothing
   jq -cn '{
@@ -173,16 +158,12 @@ it_prints_nothing_when_gh_lists_no_green_run() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_the_exit_and_error_of_gh_when_gh_fails() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
   # authentication
@@ -200,16 +181,12 @@ it_fails_with_the_exit_and_error_of_gh_when_gh_fails() {
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 it_fails_without_calling_gh_for_a_commit_git_cannot_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -219,16 +196,12 @@ it_fails_without_calling_gh_for_a_commit_git_cannot_resolve() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'find-nixos-check-run: no-such-commit is not a commit'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_rejects_a_call_without_one_commit_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -238,10 +211,7 @@ it_rejects_a_call_without_one_commit_with_its_usage() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: find-nixos-check-run.sh <commit>'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # Runtime every case needs: the gh stand-in and a git repository on main. Each case commits the

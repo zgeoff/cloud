@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-op-read.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-webhook-curl.sh"
 
@@ -21,8 +23,7 @@ script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/alert-prod-apply.sh"
 
 it_posts_that_the_apply_failed_when_the_apply_job_never_gave_a_verdict() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
   printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
@@ -43,16 +44,12 @@ EOF
   "content": "The prod apply failed: https://github.com/zgeoff/cloud/actions/runs/7"
 }
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_posts_that_the_apply_is_held_when_the_guard_held_a_run_no_person_started() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
   printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
@@ -69,16 +66,12 @@ it_posts_that_the_apply_is_held_when_the_guard_held_a_run_no_person_started() {
   "content": "The prod apply is held for a manual dispatch: https://github.com/zgeoff/cloud/actions/runs/7"
 }
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_posts_that_the_apply_failed_when_a_dispatched_run_holds() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
   printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
@@ -95,16 +88,12 @@ it_posts_that_the_apply_failed_when_a_dispatched_run_holds() {
   "content": "The prod apply failed: https://github.com/zgeoff/cloud/actions/runs/7"
 }
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_posts_that_the_apply_failed_when_the_guard_passed_the_plan() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
   printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
@@ -121,16 +110,12 @@ it_posts_that_the_apply_failed_when_the_guard_passed_the_plan() {
   "content": "The prod apply failed: https://github.com/zgeoff/cloud/actions/runs/7"
 }
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_curls_status_when_the_webhook_refuses_the_post() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
   printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
@@ -142,16 +127,12 @@ it_fails_with_curls_status_when_the_webhook_refuses_the_post() {
 
   diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
   diff - "$tree/err" <<< 'curl: (22) The requested URL returned error: 404'
-  [ "$status" = 22 ] || {
-    echo "exit $status, want 22" >&2
-    exit 1
-  }
+  assert_status 22 "$status"
 }
 
 it_fails_with_ops_status_and_posts_nothing_when_the_reference_does_not_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
@@ -166,16 +147,12 @@ it_fails_with_ops_status_and_posts_nothing_when_the_reference_does_not_resolve()
     echo "it posted: $(cat "$tree/webhook-body")" >&2
     exit 1
   }
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_before_op_runs_when_the_env_file_sets_no_webhook() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'OTHER=op://cloud-deploy/other/credential\n' > "$tree/.env"
 
@@ -186,16 +163,12 @@ it_fails_before_op_runs_when_the_env_file_sets_no_webhook() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "alert-prod-apply: $tree/.env sets no ALERT_WEBHOOK_URL"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_before_op_runs_and_names_the_token_when_the_token_is_empty() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
   printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
@@ -208,16 +181,12 @@ it_fails_before_op_runs_and_names_the_token_when_the_token_is_empty() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "alert-prod-apply: OP_SERVICE_ACCOUNT_TOKEN is empty; set the prod environment's secret to the deploy account's token"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_before_op_runs_without_the_run_url() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
 
@@ -228,16 +197,12 @@ it_fails_before_op_runs_without_the_run_url() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$script: line 23: RUN_URL: parameter null or not set"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_rejects_a_missing_env_file_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
@@ -247,10 +212,7 @@ it_rejects_a_missing_env_file_argument_with_its_usage() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: alert-prod-apply.sh <env file>'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

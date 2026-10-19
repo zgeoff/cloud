@@ -12,6 +12,8 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/find-ci-run.sh"
@@ -24,8 +26,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_prints_the_url_of_the_green_push_run_on_the_exact_commit() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" commit -q --allow-empty -m 'bump nixie'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
@@ -43,16 +44,12 @@ it_prints_the_url_of_the_green_push_run_on_the_exact_commit() {
   diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/actions/runs/9'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$commit\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$commit\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_nothing_when_no_run_on_the_commit_is_green() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" commit -q --allow-empty -m 'bump nixie'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
@@ -69,16 +66,12 @@ it_prints_nothing_when_no_run_on_the_commit_is_green() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$commit\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$commit\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_with_gh_error_and_exit_when_gh_fails() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
@@ -95,16 +88,12 @@ it_fails_with_gh_error_and_exit_when_gh_fails() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$commit\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$commit\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 it_refuses_a_commit_git_cannot_resolve() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -114,16 +103,12 @@ it_refuses_a_commit_git_cannot_resolve() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'find-ci-run: 0123456789abcdef0123456789abcdef01234567 is not a commit'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_rejects_a_missing_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -133,10 +118,7 @@ it_rejects_a_missing_argument_with_its_usage() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: find-ci-run.sh <commit>'
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # Runtime every case needs: the gh stand-in, and a git repository with an empty root commit.

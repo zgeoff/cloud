@@ -9,12 +9,13 @@
 set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-one-of-outputs.sh"
 
 it_passes_silently_for_the_first_candidate() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf 'old wording\n' > "$tree/err"
   printf 'old wording\n' > "$tree/err-v1"
   printf 'new wording\n' > "$tree/err-v2"
@@ -25,16 +26,12 @@ it_passes_silently_for_the_first_candidate() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/assert-err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_silently_for_a_later_candidate() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf 'new wording\n' > "$tree/err"
   printf 'old wording\n' > "$tree/err-v1"
   printf 'new wording\n' > "$tree/err-v2"
@@ -45,16 +42,12 @@ it_passes_silently_for_a_later_candidate() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/assert-err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_for_text_no_candidate_prints() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf 'other wording\n' > "$tree/err"
   printf 'old wording\n' > "$tree/err-v1"
   printf 'new wording\n' > "$tree/err-v2"
@@ -73,16 +66,12 @@ other wording
 not v1: differs in stderr, exit 125
 not v2: differs in stderr
 ERR
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_for_one_candidates_text_with_another_candidates_status() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf 'old wording\n' > "$tree/err"
   printf 'old wording\n' > "$tree/err-v1"
   printf 'new wording\n' > "$tree/err-v2"
@@ -101,16 +90,12 @@ old wording
 not v1: differs in exit 125
 not v2: differs in stderr
 ERR
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_for_one_candidates_stdout_with_another_candidates_stderr() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf '1.0\n' > "$tree/actual-out"
   printf 'new wording\n' > "$tree/actual-err"
   printf '1.0\n' > "$tree/out-v1"
@@ -133,16 +118,12 @@ new wording
 not v1: differs in stderr
 not v2: differs in stdout
 ERR
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_for_output_on_a_stream_a_candidate_expects_empty() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf 'stray\n' > "$tree/actual-out"
   printf 'old wording\n' > "$tree/err"
   printf 'old wording\n' > "$tree/err-v1"
@@ -160,16 +141,12 @@ old wording
 --- exit 125
 not v1: differs in stdout
 ERR
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_for_an_actual_output_file_that_does_not_exist() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   : > "$tree/err-v1"
 
   assert_one_of_outputs "the case" /dev/null "$tree/missing" 0 \
@@ -184,16 +161,12 @@ cat: $tree/missing: No such file or directory
 --- exit 0
 not v1: differs in stderr
 ERR
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_call_without_a_whole_candidate() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   : > "$tree/err"
 
   assert_one_of_outputs "the case" /dev/null "$tree/err" 0 \
@@ -201,26 +174,19 @@ it_refuses_a_call_without_a_whole_candidate() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/assert-err" <<< 'assert_one_of_outputs: want <label> <stdout> <stderr> <status>, then <name> <stdout> <stderr> <status> for each supported output'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_refuses_a_call_without_any_candidate() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   : > "$tree/err"
 
   assert_one_of_outputs "the case" /dev/null "$tree/err" 0 > "$tree/out" 2> "$tree/assert-err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/assert-err" <<< 'assert_one_of_outputs: want <label> <stdout> <stderr> <status>, then <name> <stdout> <stderr> <status> for each supported output'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 run_cases

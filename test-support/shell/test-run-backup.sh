@@ -10,10 +10,13 @@
 #   CASE='exit status' bash test-support/shell/with-fixture-images.sh bash test-support/shell/test-run-backup.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/run-backup.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/run-backup-shell.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/normalize-restic-output.sh"
@@ -24,8 +27,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 it_runs_the_backup_image_as_the_backup_pods_do() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
   mkdir "$tree/obs"
   chmod 0777 "$tree/obs"
@@ -62,10 +64,7 @@ EOF
   diff - "$tree/obs/state-write" <<< 'exit 0'
   diff - "$tree/obs/repo-write" <<< 'exit 0'
   printf '<one>\n<two words>\nexit 0\n' | diff - "$tree/obs/args"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # ls is the one mode that lists the repository's gateway snapshots, so a dropped or
@@ -73,8 +72,7 @@ EOF
 it_runs_the_backup_entrypoint_with_the_arguments() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -93,18 +91,14 @@ ID  2020-01-06 10:00:00  atc-gateway  atc-gateway  /tmp/a  SIZE
 ---------------------------------------------------------------------
 1 snapshots
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # restic exits 10 when the repository does not exist, a status no other path gives
 it_returns_the_backup_entrypoints_exit_status() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" ls > "$tree/out" 2> "$tree/err" || status=$?
@@ -115,27 +109,20 @@ Fatal: repository does not exist: unable to open config file: stat /repo/config:
 Is there a repository at the following location?
 /repo
 EOF
-  [ "$status" = 10 ] || {
-    echo "exit $status, want 10" >&2
-    exit 1
-  }
+  assert_status 10 "$status"
 }
 
 it_refuses_a_docker_run_option_without_a_value() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" --version > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'run_backup: the docker run option --version has no value'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # A trap removes the containers by name, so a run that is interrupted leaves none behind.
@@ -145,11 +132,11 @@ it_names_the_backup_container_after_the_case_while_it_runs() {
   local backup_image="$2" run="$3"
   name="atc-gw-backup-$run-$BASHPID"
   client=""
-  tree="$(mktemp -d)"
-  trap '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree '[ -z "${client:-}" ] || pkill -P "$client" 2> /dev/null || true; [ -z "${client:-}" ] || kill "$client" 2> /dev/null || true; docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
 
   run_backup "$name" "$backup_image" --entrypoint /bin/sleep 300 > /dev/null 2>&1 &
+  # shellcheck disable=SC2034 # the create_case_tree cleanup reads it
   client=$!
 
   wait_for 30 "the container $name-backup to run" docker exec "$name-backup" true > /dev/null 2>&1
@@ -162,8 +149,7 @@ it_names_the_backup_container_after_the_case_while_it_runs() {
 it_shares_the_state_volume_between_run_backup_shell_and_run_backup() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'echo in state > /state/marker'
 
@@ -171,17 +157,13 @@ it_shares_the_state_volume_between_run_backup_shell_and_run_backup() {
 
   diff - "$tree/out" <<< 'in state'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_shares_the_repository_volume_between_run_backup_shell_and_run_backup() {
   local backup_image="$2" run="$3" status=0
   name="atc-gw-backup-$run-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$backup_image"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'echo in repo > /repo/marker'
 
@@ -189,10 +171,7 @@ it_shares_the_repository_volume_between_run_backup_shell_and_run_backup() {
 
   diff - "$tree/out" <<< 'in repo'
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # Boot data every case needs: a seed directory that run_backup_shell mounts at /seed,

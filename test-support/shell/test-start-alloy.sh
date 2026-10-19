@@ -8,18 +8,19 @@
 #
 # shell-suite: alert-rules
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-equals.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/has-metric.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-alloy.sh"
 
 it_runs_the_cases_config_over_its_log_directory() {
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true'
   setup_test "$tree"
   cat > "$tree/config/config.alloy" << 'EOF'
 loki.source.file "case" {
@@ -50,8 +51,7 @@ EOF
 
 it_runs_alloy_as_uid_65532_on_a_read_only_root_with_no_capabilities() {
   local container
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$(cat "$tree/alloy/container" 2> /dev/null)" > /dev/null 2>&1 || true'
   setup_test "$tree"
   printf '%s\n' 'logging {' '  level = "warn"' '}' > "$tree/config/config.alloy"
 

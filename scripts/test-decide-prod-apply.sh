@@ -19,6 +19,8 @@ set -euo pipefail
 # fixed, so the files the cases commit do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/decide-prod-apply.sh"
@@ -31,8 +33,7 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
 
 it_decides_an_apply_of_the_ci_run_s_commit_when_it_changes_a_pulumi_input() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   mkdir "$tree/repo/infra"
@@ -56,16 +57,12 @@ revision=$head
 EOF
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_decides_no_apply_and_says_so_when_no_pulumi_input_changed() {
   local deployed head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   deployed="$(git -C "$tree/repo" rev-parse HEAD)"
@@ -90,10 +87,7 @@ revision=$head
 EOF
   diff - "$tree/summary" <<< "No commit after deployed/prod at $deployed up to $head changes a Pulumi input, so nothing applied."
   diff /dev/null "$tree/calls"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # In the next two cases, two merges land minutes apart: the first changes only the host (nixos/),
@@ -102,8 +96,7 @@ EOF
 # (DISPATCH_SHA), and RUN_HEAD is the commit each CI run checked.
 it_decides_an_apply_of_a_pin_bump_that_merges_minutes_after_a_merge_with_no_pulumi_input() {
   local bump status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra" "$tree/repo/nixos"
   echo 'example:imageTag: 1.0.0' > "$tree/repo/infra/Pulumi.prod.yaml"
@@ -132,16 +125,12 @@ revision=$bump
 EOF
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_decides_no_apply_for_the_earlier_merge_s_run_and_names_its_commit_while_main_holds_the_pin_bump() {
   local deployed host bump status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/repo/infra" "$tree/repo/nixos"
   echo 'example:imageTag: 1.0.0' > "$tree/repo/infra/Pulumi.prod.yaml"
@@ -172,16 +161,12 @@ revision=$host
 EOF
   diff - "$tree/summary" <<< "No commit after deployed/prod at $deployed up to $host changes a Pulumi input, so nothing applied."
   diff /dev/null "$tree/calls"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_applies_main_s_tip_on_a_dispatch_after_a_green_ci_run_on_it() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   mkdir "$tree/repo/deploy"
@@ -210,16 +195,12 @@ revision=$head
 EOF
   diff /dev/null "$tree/summary"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$head\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$head\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_refuses_a_dispatch_on_a_branch_other_than_main() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   head="$(git -C "$tree/repo" rev-parse HEAD)"
@@ -241,16 +222,12 @@ it_refuses_a_dispatch_on_a_branch_other_than_main() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_dispatch_whose_revision_is_not_main_s_tip() {
   local head older status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   older="$(git -C "$tree/repo" rev-parse HEAD)"
@@ -274,16 +251,12 @@ it_refuses_a_dispatch_whose_revision_is_not_main_s_tip() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_dispatch_with_no_green_ci_run_on_main_s_tip() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   git -C "$tree/repo" commit -q --allow-empty -m 'move main on'
@@ -306,16 +279,12 @@ it_refuses_a_dispatch_with_no_green_ci_run_on_main_s_tip() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$head\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$head\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_gh_s_error_and_exit_when_the_ci_run_lookup_fails() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   git -C "$tree/repo" commit -q --allow-empty -m 'move main on'
@@ -339,16 +308,12 @@ it_fails_with_gh_s_error_and_exit_when_the_ci_run_lookup_fails() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff - "$tree/calls" <<< "[\"gh\",\"api\",\"-X\",\"GET\",\"repos/{owner}/{repo}/actions/workflows/ci.yml/runs\",\"-f\",\"head_sha=$head\",\"-f\",\"event=push\",\"-f\",\"branch=main\",\"-f\",\"status=success\",\"-f\",\"per_page=100\",\"--jq\",\".workflow_runs[] | select(.head_sha == \\\"$head\\\" and .event == \\\"push\\\" and .head_branch == \\\"main\\\" and .conclusion == \\\"success\\\") | .html_url\"]"
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 it_refuses_a_ci_run_s_commit_that_is_not_on_main() {
   local side status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
@@ -367,16 +332,12 @@ it_refuses_a_ci_run_s_commit_that_is_not_on_main() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" update-ref refs/remotes/origin/main HEAD
@@ -392,16 +353,12 @@ it_fails_with_git_s_error_when_the_deployed_prod_tag_is_missing() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
   local deployed head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" checkout -q -b side
   git -C "$tree/repo" commit -q --allow-empty -m 'a commit off main'
@@ -423,16 +380,12 @@ it_fails_with_needs_prod_apply_s_error_when_the_tag_has_left_main() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_to_run_without_the_step_output_file() {
   local head status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" tag deployed/prod
   head="$(git -C "$tree/repo" rev-parse HEAD)"
@@ -449,10 +402,7 @@ it_refuses_to_run_without_the_step_output_file() {
   diff /dev/null "$tree/output"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

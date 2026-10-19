@@ -13,17 +13,19 @@
 #
 #   bash test-support/shell/test-start-stub-github-api.sh
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/start-stub-github-api.sh"
 
 it_answers_a_release_lookup_by_tag_with_githubs_404() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -41,8 +43,7 @@ it_answers_a_release_lookup_by_tag_with_githubs_404() {
 
 it_answers_the_release_by_tag_query_with_a_null_release() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   # shellcheck disable=SC2016 # a GraphQL variable, not a shell one
@@ -62,8 +63,7 @@ it_answers_the_release_by_tag_query_with_a_null_release() {
 
 it_fails_closed_on_another_path() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -81,8 +81,7 @@ it_fails_closed_on_another_path() {
 
 it_fails_closed_on_another_graphql_query() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -101,8 +100,7 @@ it_fails_closed_on_another_graphql_query() {
 
 it_fails_closed_on_another_method() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   code="$(env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -120,8 +118,7 @@ it_fails_closed_on_another_method() {
 
 it_fails_closed_on_the_release_by_tag_query_without_a_tag_variable() {
   local code
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
   # shellcheck disable=SC2016 # a GraphQL variable, not a shell one
@@ -143,8 +140,7 @@ it_fails_closed_on_the_release_by_tag_query_without_a_tag_variable() {
 # the requests are sorted.
 it_makes_a_real_gh_release_download_report_the_release_not_found() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'kill "$(cat "$tree/github/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
   mkdir "$tree/gh" "$tree/download" "$tree/no-certs"
 
@@ -163,10 +159,7 @@ REQUESTS
   assert_missing "$tree/github/unexpected" "gh sent an unexpected request"
   ls -A "$tree/download" > "$tree/downloaded"
   diff /dev/null "$tree/downloaded"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # Runtime every case needs: the stand-in, started in <tree>/github, and the HOME and TMPDIR

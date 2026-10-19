@@ -10,13 +10,14 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/write-deploy-env.sh"
 
 it_rewrites_each_cloud_reference_to_the_deploy_vault() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/work/.env" << 'EOF'
 # Every value is an op:// reference resolved by `op run --env-file=.env -- <command>`.
@@ -40,16 +41,12 @@ EOF
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff <(echo .env) <(ls -A "$tree/work")
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_refuses_a_reference_to_another_vault_and_leaves_the_file_unchanged() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/work/.env" << 'EOF'
 ONIDEL_API_KEY=op://cloud/onidel-api/credential
@@ -63,26 +60,19 @@ EOF
   diff "$tree/before" "$tree/work/.env"
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'write-deploy-env: a reference outside the cloud vault: E2E_CLIENT_SECRET QUOTED_TOKEN'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_rejects_a_missing_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/work" && env -i PATH=/usr/bin:/bin HOME="$tree/home" TMPDIR="$tree/tmp" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: write-deploy-env.sh <env file>'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 setup_test() {

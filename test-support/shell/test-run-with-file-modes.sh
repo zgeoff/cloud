@@ -8,15 +8,17 @@
 #
 #   bash test-support/shell/test-run-with-file-modes.sh
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/run-with-file-modes.sh"
 
 it_runs_the_command_with_its_arguments_and_returns_its_exit_status() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
 
   # shellcheck disable=SC2016 # expanded by the inner bash
   run_with_file_modes env -i PATH=/usr/bin:/bin bash -c 'printf "%s|" "$@"; exit 3' bash 'one two' three \
@@ -24,32 +26,24 @@ it_runs_the_command_with_its_arguments_and_returns_its_exit_status() {
 
   diff /dev/null "$tree/err"
   printf '%s' 'one two|three|' | diff - "$tree/out"
-  [ "$status" = 3 ] || {
-    echo "exit $status, want 3" >&2
-    exit 1
-  }
+  assert_status 3 "$status"
 }
 
 it_keeps_the_callers_uid() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   id -u > "$tree/want"
 
   run_with_file_modes env -i PATH=/usr/bin:/bin id -u > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/err"
   diff "$tree/want" "$tree/out"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_denies_an_append_to_a_file_without_write_permission() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf '%s\n' 'first line' > "$tree/notes"
   chmod 0444 "$tree/notes"
 
@@ -60,16 +54,12 @@ it_denies_an_append_to_a_file_without_write_permission() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "bash: line 1: $tree/notes: Permission denied"
   diff - "$tree/notes" <<< 'first line'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_denies_a_create_in_a_directory_without_write_permission() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'chmod -R u+w "$tree" || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'chmod -R u+w "$tree" || true'
   mkdir "$tree/locked"
   chmod 0500 "$tree/locked"
 
@@ -80,16 +70,12 @@ it_denies_a_create_in_a_directory_without_write_permission() {
   diff - "$tree/err" <<< "mktemp: failed to create file via template '$tree/locked/draft.XXXXXX': Permission denied"
   ls -A "$tree/locked" > "$tree/files"
   diff /dev/null "$tree/files"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_the_write_test_for_a_file_without_write_permission() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   touch "$tree/device"
   chmod 0400 "$tree/device"
 
@@ -99,16 +85,12 @@ it_fails_the_write_test_for_a_file_without_write_permission() {
 
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_lets_the_command_write_where_the_mode_allows_it() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   printf '%s\n' 'first line' > "$tree/notes"
 
   # shellcheck disable=SC2016 # expanded by the inner bash
@@ -122,10 +104,7 @@ first line
 second line
 NOTES
   diff - "$tree/created" <<< new
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 run_cases

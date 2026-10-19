@@ -9,14 +9,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-op-read.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-remote-tools.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/require-remote-tool-stubs.sh"
 
 it_prints_the_field_with_no_newline() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/dns"
   printf '%s' token-value > "$tree/vault/cloud/dns/credential"
@@ -27,16 +28,12 @@ it_prints_the_field_with_no_newline() {
   printf '%s' token-value | diff - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud/dns/credential"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_a_missing_item_with_ops_error_and_exit_1() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud"
 
@@ -48,16 +45,12 @@ it_fails_a_missing_item_with_ops_error_and_exit_1() {
 [ERROR] 2026/10/07 12:00:00 could not read secret op://cloud/dns/credential: could not get item cloud/dns: "dns" isn't an item in the "cloud" vault.
 ERR
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud/dns/credential"]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_closed_with_exit_97_on_a_field_the_item_does_not_hold() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/dns"
 
@@ -67,16 +60,12 @@ it_fails_closed_with_exit_97_on_a_field_the_item_does_not_hold() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: read --no-newline op://cloud/dns/credential'
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud/dns/credential"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_a_read_without_no_newline() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud/dns"
   printf '%s' token-value > "$tree/vault/cloud/dns/credential"
@@ -87,16 +76,12 @@ it_fails_closed_with_exit_97_on_a_read_without_no_newline() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: read op://cloud/dns/credential'
   diff - "$tree/calls" <<< '["op","read","op://cloud/dns/credential"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_on_any_other_command() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
@@ -105,10 +90,7 @@ it_fails_closed_with_exit_97_on_any_other_command() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: item list --vault cloud'
   diff - "$tree/calls" <<< '["op","item","list","--vault","cloud"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, with fail-closed stand-ins for every

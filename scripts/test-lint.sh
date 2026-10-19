@@ -14,6 +14,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-lint-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
@@ -21,8 +23,7 @@ scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 it_lints_every_shell_file_git_lists_with_shellcheck_and_shfmt() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/images/sbin" "$tree/repo/ignored" "$tree/repo/.claude/hooks"
   echo '/ignored/' > "$tree/repo/.gitignore"
@@ -44,16 +45,12 @@ it_lints_every_shell_file_git_lists_with_shellcheck_and_shfmt() {
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#shellcheck","-c","shellcheck","-x","images/sbin/setup","scripts/b.sh","scripts/lint.sh","scripts/nix-image.sh"]
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#shfmt","-c","shfmt","-d","images/sbin/setup","scripts/b.sh","scripts/lint.sh","scripts/nix-image.sh"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_lints_the_nix_files_under_nixos_with_nixfmt_and_deadnix() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/nixos/checks" "$tree/repo/other"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -68,16 +65,12 @@ it_lints_the_nix_files_under_nixos_with_nixfmt_and_deadnix() {
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#nixfmt","-c","nixfmt","--check","nixos/checks/a.nix","nixos/flake.nix"]
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#deadnix","-c","deadnix","--fail","nixos/checks/a.nix","nixos/flake.nix"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_lints_the_python_files_with_ruff_check_and_ruff_format() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/nixos/checks"
   echo 'print()' > "$tree/repo/nixos/checks/run-stub.py"
@@ -90,16 +83,12 @@ it_lints_the_python_files_with_ruff_check_and_ruff_format() {
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#ruff","-c","ruff","check","--no-cache","nixos/checks/run-stub.py"]
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#ruff","-c","ruff","format","--check","--no-cache","nixos/checks/run-stub.py"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_lints_the_workflows_with_actionlint_in_the_store_volume_the_environment_names() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/.github/workflows"
   echo 'name: CI' > "$tree/repo/.github/workflows/ci.yml"
@@ -113,16 +102,12 @@ it_lints_the_workflows_with_actionlint_in_the_store_volume_the_environment_names
   diff - "$tree/calls" << EOF
 ["docker","run","--rm","-v","ci-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#actionlint","-c","actionlint",".github/workflows/ci.yml",".github/workflows/other.yaml"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_runs_every_tool_of_the_kind_then_exits_1_when_one_failed() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/repo/nixos"
   echo '{ }' > "$tree/repo/nixos/flake.nix"
@@ -135,16 +120,12 @@ it_runs_every_tool_of_the_kind_then_exits_1_when_one_failed() {
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#nixfmt","-c","nixfmt","--check","nixos/flake.nix"]
 ["docker","run","--rm","-v","cloud-lint-store:/nix","-v","$tree/repo:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","--inputs-from","path:/src/nixos","nixpkgs#deadnix","-c","deadnix","--fail","nixos/flake.nix"]
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_when_there_is_no_file_of_the_kind() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" bash scripts/lint.sh py) > "$tree/out" 2> "$tree/err" || status=$?
@@ -155,16 +136,12 @@ it_fails_when_there_is_no_file_of_the_kind() {
     echo "docker ran: $(cat "$tree/calls")" >&2
     exit 1
   }
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_rejects_an_unknown_kind_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" bash scripts/lint.sh go) > "$tree/out" 2> "$tree/err" || status=$?
@@ -175,26 +152,19 @@ it_rejects_an_unknown_kind_with_its_usage() {
     echo "docker ran: $(cat "$tree/calls")" >&2
     exit 1
   }
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_rejects_a_call_without_a_kind_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" bash scripts/lint.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: lint.sh sh|nix|py|actions'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 # a git repository whose scripts/ holds copies of lint.sh and the image pin it sources, tracked,

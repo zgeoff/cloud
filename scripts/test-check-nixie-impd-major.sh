@@ -17,6 +17,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-nixie-impd-major.sh"
@@ -48,8 +50,7 @@ lock_call() {
 
 it_passes_a_nixie_whose_imp_client_shares_the_impd_major() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 3.4.0
   jq -cn --arg lock "$recordings/nixie-bun-lock-imp-client-3.2.1.lock" '{
@@ -63,16 +64,12 @@ it_passes_a_nixie_whose_imp_client_shares_the_impd_major() {
   diff - "$tree/out" <<< '== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "$(lock_call 0.31.4)"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_passes_nixie_0_28_0_on_a_1_x_client_beside_impd_2() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 2.0.7
   jq -cn --arg lock "$recordings/nixie-bun-lock-imp-client-1.6.2.lock" '{
@@ -86,16 +83,12 @@ it_passes_nixie_0_28_0_on_a_1_x_client_beside_impd_2() {
   diff - "$tree/out" <<< '== impd 2.0.7 on the host, nixie 0.28.0 (imp-client 1.6.2) in the cluster'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "$(lock_call 0.28.0)"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_refuses_an_impd_major_bump_ahead_of_the_nixie_imp_client() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 4.0.0
   jq -cn --arg lock "$recordings/nixie-bun-lock-imp-client-3.2.1.lock" '{
@@ -109,16 +102,12 @@ it_refuses_an_impd_major_bump_ahead_of_the_nixie_imp_client() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the switch would run impd 4.0.0, but a nixie pod runs nixie 0.31.4, whose imp-client 3.2.1 refuses an impd of another major; deploy a nixie that speaks impd 4 first (docs/runbooks/workflows.md, Switch the host)'
   diff - "$tree/calls" <<< "$(lock_call 0.31.4)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_nixie_older_than_0_28_0_on_a_1_x_client_beside_impd_2() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 2.0.7
   jq -cn --arg lock "$recordings/nixie-bun-lock-imp-client-1.6.2.lock" '{
@@ -132,16 +121,12 @@ it_refuses_a_nixie_older_than_0_28_0_on_a_1_x_client_beside_impd_2() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the switch would run impd 2.0.7, but a nixie pod runs nixie 0.27.9, whose imp-client 1.6.2 refuses an impd of another major; deploy a nixie that speaks impd 2 first (docs/runbooks/workflows.md, Switch the host)'
   diff - "$tree/calls" <<< "$(lock_call 0.27.9)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_1_x_client_beside_an_impd_other_than_2() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 3.0.0
   jq -cn --arg lock "$recordings/nixie-bun-lock-imp-client-1.6.2.lock" '{
@@ -155,16 +140,12 @@ it_refuses_a_1_x_client_beside_an_impd_other_than_2() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'the switch would run impd 3.0.0, but a nixie pod runs nixie 0.29.3, whose imp-client 1.6.2 refuses an impd of another major; deploy a nixie that speaks impd 3 first (docs/runbooks/workflows.md, Switch the host)'
   diff - "$tree/calls" <<< "$(lock_call 0.29.3)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_when_no_nixie_pod_runs() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 3.4.0
 
@@ -174,16 +155,12 @@ it_refuses_when_no_nixie_pod_runs() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'no nixie pod runs, so the switch cannot tell which impd it speaks; wait for its rollout (kubectl -n nixie rollout status statefulset nixie)'
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_an_image_that_is_no_nixie_release() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 3.4.0
 
@@ -193,16 +170,12 @@ it_refuses_an_image_that_is_no_nixie_release() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "a nixie pod runs 'ghcr.io/zgeoff/nixie:latest', which is no nixie release image"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_lock_without_the_imp_client() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 3.4.0
   jq -cn --arg lock "$recordings/nixie-bun-lock-without-imp-client.lock" '{
@@ -215,16 +188,12 @@ it_refuses_a_lock_without_the_imp_client() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "nixie 0.31.4's bun.lock names no one @zgeoff/imp-client version"
   diff - "$tree/calls" <<< "$(lock_call 0.31.4)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_with_gh_exit_code_when_the_lock_cannot_be_read() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   write_config "$tree" 3.4.0
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 1 for a failed
@@ -239,16 +208,12 @@ it_stops_with_gh_exit_code_when_the_lock_cannot_be_read() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'gh: Not Found (HTTP 404)'
   diff - "$tree/calls" <<< "$(lock_call 0.31.4)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_configuration_without_the_imp_host_pin() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '  services.imp.enable = true;' > "$tree/configuration.nix"
 
@@ -258,16 +223,12 @@ it_refuses_a_configuration_without_the_imp_host_pin() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$tree/configuration.nix pins no imp-host release image"
   diff /dev/null "$tree/calls"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_refuses_a_missing_configuration() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -275,16 +236,12 @@ it_refuses_a_missing_configuration() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< "$tree/configuration.nix is missing, so the switch has no impd pin to compare"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_prints_its_usage_without_arguments() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -292,10 +249,7 @@ it_prints_its_usage_without_arguments() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'usage: check-nixie-impd-major.sh <configuration.nix> [<nixie image>...]'
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 run_cases

@@ -15,6 +15,8 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-publish-docker.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-gh.sh"
 
@@ -22,8 +24,7 @@ scripts="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 it_pushes_both_images_when_the_registry_lacks_both_tags() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
@@ -80,16 +81,12 @@ EOF
 ghcr.io/zgeoff/atc-gateway:2.27.0: ghcr.io/zgeoff/atc-gateway@sha256:1111111111111111111111111111111111111111111111111111111111111111
 ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2: ghcr.io/zgeoff/atc-gateway-backup@sha256:2222222222222222222222222222222222222222222222222222222222222222
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_skips_a_published_tag_and_pushes_the_other() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
@@ -137,16 +134,12 @@ EOF
 ghcr.io/zgeoff/atc-gateway:2.27.0: already published, not replaced
 ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2: ghcr.io/zgeoff/atc-gateway-backup@sha256:2222222222222222222222222222222222222222222222222222222222222222
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_stops_without_a_push_on_a_lookup_it_cannot_read() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
@@ -185,16 +178,12 @@ build
 manifest
 EOF
   [ ! -e "$tree/summary" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_before_any_build_when_the_release_is_missing() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/repo/images/atc-gateway/versions.env" << 'EOF'
 ATC_RELEASE=@zgeoff/atc@9.9.9
@@ -221,16 +210,12 @@ login
 release
 EOF
   [ ! -e "$tree/summary" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_stops_before_any_build_when_the_asset_fails_the_pin() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo fixture-binary > "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64"
   sum="$(sha256sum < "$tree/releases/zgeoff/atc/@zgeoff/atc@2.27.0/atc-gateway-linux-x64" | cut -d' ' -f1)"
@@ -265,16 +250,12 @@ login
 release
 EOF
   [ ! -e "$tree/repo/context" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_requires_the_token() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" GITHUB_ACTOR=octocat GITHUB_STEP_SUMMARY="$tree/summary" bash scripts/publish-atc-gateway-images.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -282,16 +263,12 @@ it_requires_the_token() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'scripts/publish-atc-gateway-images.sh: line 14: GH_TOKEN: set GH_TOKEN to the token that pushes to ghcr.io'
   [ ! -e "$tree/calls" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_requires_the_actor() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" GH_TOKEN=dummy-token GITHUB_STEP_SUMMARY="$tree/summary" bash scripts/publish-atc-gateway-images.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -299,16 +276,12 @@ it_requires_the_actor() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'scripts/publish-atc-gateway-images.sh: line 15: GITHUB_ACTOR: set GITHUB_ACTOR to the user the token belongs to'
   [ ! -e "$tree/calls" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_requires_the_step_summary() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" GH_TOKEN=dummy-token GITHUB_ACTOR=octocat bash scripts/publish-atc-gateway-images.sh) > "$tree/out" 2> "$tree/err" || status=$?
@@ -316,10 +289,7 @@ it_requires_the_step_summary() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'scripts/publish-atc-gateway-images.sh: line 16: GITHUB_STEP_SUMMARY: set GITHUB_STEP_SUMMARY to the file that records each image'
   [ ! -e "$tree/calls" ]
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # setup_test <tree>: a repo copy at <tree>/repo holding the publish script, fetch-atc-release.sh,

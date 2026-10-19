@@ -23,6 +23,8 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-nix-docker.sh"
@@ -55,8 +57,7 @@ dry_activate_call='["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_
 
 it_activates_the_store_path_its_build_printed() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo committed > "$tree/clone/nixos/marker"
@@ -118,16 +119,12 @@ nixos/marker
 nixos/packages/atc.nix
 EOF
   diff - "$tree/build-saw/nixos/marker" <<< committed
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_prints_the_failed_units_the_host_reports_after_the_switch() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -181,16 +178,12 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_switches_as_before_when_the_activation_restarts_other_units_but_not_k3s() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -243,16 +236,12 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_never_activates_a_build_whose_activation_would_stop_k3s() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -297,16 +286,12 @@ $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 $dry_activate_call
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_activates_a_build_that_restarts_k3s_in_a_planned_k3s_window() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -361,16 +346,12 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_never_activates_when_the_dry_activate_fails() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -411,16 +392,12 @@ $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 $dry_activate_call
 EOF
-  [ "$status" = 11 ] || {
-    echo "exit $status, want 11" >&2
-    exit 1
-  }
+  assert_status 11 "$status"
 }
 
 it_builds_the_checked_commit_when_the_checkout_is_edited_during_the_build() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo committed > "$tree/clone/nixos/marker"
@@ -476,16 +453,12 @@ $nixie_lock_call
 EOF
   diff - "$tree/clone/nixos/marker" <<< edited
   diff - "$tree/build-saw/nixos/marker" <<< committed
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_never_builds_an_untracked_file() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo committed > "$tree/clone/nixos/marker"
@@ -545,10 +518,7 @@ nixos/hosts/geoffcloud/configuration.nix
 nixos/marker
 nixos/packages/atc.nix
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # The script reads HEAD once, while it checks; a commit landing after that check must not
@@ -557,8 +527,7 @@ EOF
 # (rev-parse origin/main) and logs that it did.
 it_builds_the_checked_commit_when_a_commit_lands_after_the_check() {
   local checked status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo committed > "$tree/clone/nixos/marker"
@@ -621,16 +590,12 @@ EOF
   git -C "$tree/clone" rev-parse HEAD~1 > "$tree/parent"
   diff - "$tree/parent" <<< "$checked"
   diff - "$tree/build-saw/nixos/marker" <<< committed
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_builds_and_never_copies_with_build_only() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
 
@@ -651,16 +616,12 @@ EOF
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_never_builds_or_switches_a_commit_that_no_green_nixos_run_covers() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
   # no green run: the --jq filter prints nothing
@@ -678,16 +639,12 @@ EOF
   diff - "$tree/calls" <<< "$gh_runs_call"
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_or_switches_a_commit_that_changed_nixos_after_the_last_green_run() {
   local checked commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo checked > "$tree/clone/nixos/marker"
@@ -712,16 +669,12 @@ no green NixOS checks run covers ${commit:0:7}; start one with \`gh workflow run
 EOF
   diff /dev/null "$tree/out"
   diff - "$tree/calls" <<< "$gh_runs_call"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
   # authentication
@@ -738,18 +691,14 @@ it_never_builds_or_switches_when_gh_cannot_list_the_runs() {
   diff - "$tree/calls" <<< "$gh_runs_call"
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 # cloud#207's skew: the bump pins daemon 4.5.0 while the cluster still runs gateway 2.27.0,
 # whose atc_report_get sends report.get, which atc 4.0.0 renamed note.get
 it_never_builds_or_switches_a_daemon_pin_a_major_release_ahead_of_the_deployed_gateway() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "4.5.0";' > "$tree/clone/nixos/packages/atc.nix"
@@ -777,17 +726,13 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # a gateway rollout recreates its one pod, so for a while no gateway pod runs
 it_never_builds_or_switches_while_no_gateway_pod_runs() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -814,18 +759,14 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The check runs again after the copy, so a gateway rollout that lands during the build or the
 # copy stops the switch before the activation (STUB_GATEWAY_LATER_IMAGES answers that check).
 it_never_activates_when_the_gateway_moves_to_another_major_during_the_build() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -869,16 +810,12 @@ $dry_activate_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_or_switches_an_impd_major_bump_ahead_of_the_running_nixies_imp_client() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -914,16 +851,12 @@ EOF
   }
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_the_switch_naming_each_part_when_nixie_is_not_ready_after_it() {
   local commit status=0 unready
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -975,16 +908,12 @@ $nixie_lock_call
 $(for _ in $(seq 1 30); do printf '%s\n' "$nixie_ready_call"; done)
 EOF
   diff - "$tree/clock/pauses" <<< "$(for _ in $(seq 1 29); do echo 10; done)"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_or_switches_a_commit_without_the_atc_daemon_pin() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/clone" rev-parse HEAD)"
   jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
@@ -1005,16 +934,12 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_switches_the_host_that_the_environment_names() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1067,16 +992,12 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@other.test","systemctl","--failed","--no-legend","--plain"]
 ["ssh","-o","BatchMode=yes","root@other.test","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_rejects_an_unknown_argument_with_its_usage() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
@@ -1090,16 +1011,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_never_builds_from_a_branch_other_than_main() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/clone" checkout -q -b topic
 
@@ -1116,16 +1033,12 @@ EOF
   diff /dev/null "$tree/calls-masked"
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_with_uncommitted_changes() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo committed > "$tree/clone/nixos/marker"
@@ -1145,16 +1058,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_when_git_status_fails() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   head -c 64 /dev/zero | tr "\0" x > "$tree/clone/.git/index"
 
@@ -1170,16 +1079,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_never_builds_when_the_fetch_fails() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mv "$tree/origin.git" "$tree/origin-gone.git"
 
@@ -1198,16 +1103,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_never_builds_when_origin_main_has_moved_on() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git clone -q "$tree/origin.git" "$tree/other"
   git -C "$tree/other" config maintenance.auto false
@@ -1225,16 +1126,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_main_with_an_unpushed_commit() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   git -C "$tree/clone" commit -q --allow-empty -m unpushed
 
@@ -1249,16 +1146,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_never_builds_when_the_commit_cannot_be_archived() {
   local blob status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo committed > "$tree/clone/nixos/marker"
@@ -1280,16 +1173,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_leaves_no_snapshot_archive_behind_when_the_commit_cannot_be_archived() {
   local blob status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/clone/nixos"
   echo committed > "$tree/clone/nixos/marker"
@@ -1312,16 +1201,12 @@ error: cannot read '$blob'
 EOF
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/calls"
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_never_builds_outside_a_git_checkout() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/loose"
   cp "$tree/clone/scripts/switch-geoffcloud.sh" "$tree/clone/scripts/nix-image.sh" "$tree/loose/"
@@ -1337,16 +1222,12 @@ EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff /dev/null "$tree/calls-masked"
-  [ "$status" = 128 ] || {
-    echo "exit $status, want 128" >&2
-    exit 1
-  }
+  assert_status 128 "$status"
 }
 
 it_never_switches_after_a_failed_build() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1385,10 +1266,7 @@ $nixie_lock_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The real docker CLI, behind the logging stand-in, with no daemon at its socket: docker
@@ -1440,8 +1318,7 @@ EOF
 
 it_never_switches_when_the_build_prints_no_system_path() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1477,18 +1354,14 @@ $gh_runs_call
 $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The copy runs nix inside the pinned Nix image, which no hermetic case can start, so
 # the docker stand-in fails it (STUB_COPY_ERROR).
 it_never_activates_when_the_copy_fails() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1529,10 +1402,7 @@ $nixie_lock_call
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","SNAPSHOT:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","build","--no-link","--print-out-paths","path:.?dir=nixos#nixosConfigurations.geoffcloud.config.system.build.toplevel"]
 ["docker","run","--rm","--network","host","-v","geoffcloud-nix-store:/nix","-v","$tree/home/.ssh/known_hosts:/root/.ssh/known_hosts:ro","-e","NIX_SSHOPTS=-o BatchMode=yes","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","shell","nixpkgs#openssh","-c","nix","--extra-experimental-features","nix-command","copy","--to","ssh://root@geoffcloud","/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test"]
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The real ssh, behind the logging stand-in, refused by a loopback port where nothing
@@ -1540,8 +1410,7 @@ EOF
 # stops the switch before the build.
 it_never_builds_and_stops_with_ssh_exit_255_when_the_host_is_unreachable() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1569,16 +1438,12 @@ $gh_runs_call
 EOF
   ls -A "$tree/tmp" > "$tree/tmp-left"
   diff /dev/null "$tree/tmp-left"
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_stops_with_the_activation_exit_code_when_switch_to_configuration_fails() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1631,18 +1496,14 @@ $dry_activate_call
 $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 EOF
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 # Only an interception drops an open session at the readlink check, so the ssh stand-in
 # does it (STUB_SSH_DROP_AT_READLINK).
 it_stops_with_ssh_exit_255_when_the_connection_drops_before_the_check() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1691,16 +1552,12 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 EOF
-  [ "$status" = 255 ] || {
-    echo "exit $status, want 255" >&2
-    exit 1
-  }
+  assert_status 255 "$status"
 }
 
 it_fails_when_the_host_runs_another_system_after_the_switch() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1750,16 +1607,12 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_with_systemctls_exit_code_when_listing_failed_units_fails() {
   local commit status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
@@ -1812,10 +1665,7 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","systemctl","--failed","--no-legend","--plain"]
 EOF
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # Boot data every case needs: a clone of a bare origin whose main holds one empty commit,

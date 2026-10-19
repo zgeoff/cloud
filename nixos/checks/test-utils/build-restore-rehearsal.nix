@@ -196,6 +196,63 @@ pkgs.testers.runNixOSTest {
         }
 
 
+    # The helpers below write a subtest's scenario data, from the values the subtest passes, or
+    # check what it leaves unchanged. Each subtest that uses them asserts what they wrote.
+
+
+    def write_dataset(migrations, marker, secret):
+        """Writes tank/imp as a running imp leaves it: db/imp.sqlite in WAL mode, its -shm and
+        -wal kept, holding a kysely_migration row for each of <migrations> and a marker table
+        with <marker>, and secrets/glm holding <secret> and a newline. Returns the sha256sum
+        lines of the three database files, which read_database_sums() reads again."""
+        rows = ",".join(f"('{name}','t')" for name in migrations)
+        machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
+        machine.succeed("install -d -m 0700 /mnt/imp/db")
+        machine.succeed("install -d -m 0700 /mnt/imp/secrets")
+        machine.succeed(f"printf '%s\\n' '{secret}' > /mnt/imp/secrets/glm && chmod 0600 /mnt/imp/secrets/glm")
+        machine.succeed(
+            f"sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES {rows};\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('{marker}');\""
+        )
+        db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
+        machine.succeed("umount /mnt/imp")
+        return db_sums
+
+
+    def write_copy(copy, migrations, marker, image):
+        """Writes the copy directory <copy> as copy-impd-db-host leaves it: imp.sqlite holding a
+        kysely_migration row for each of <migrations> and a marker table with <marker>, and a
+        COPY-INFO of an intact copy from imp 0.28.0 that names the newest of <migrations> and
+        <image>."""
+        rows = ",".join(f"('{name}','t')" for name in migrations)
+        machine.succeed(f"install -d -m 0700 {copy}")
+        machine.succeed(
+            f"sqlite3 {copy}/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES {rows};\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('{marker}');\""
+        )
+        machine.succeed(
+            f"printf '%s\\n' 'path /var/lib/imp/db/imp.sqlite' \"sizeBytes $(stat -c %s {copy}/imp.sqlite)\" 'lastMigration {migrations[-1]}' 'impVersion 0.28.0' 'createdAt 2026-10-04T00:00:00.000Z' 'integrity ok' 'image {image}' > {copy}/COPY-INFO"
+        )
+
+
+    def read_database_sums():
+        """Returns the sha256sum lines of tank/imp's three database files, as write_dataset()
+        returns them, mounting tank/imp only while it reads them."""
+        machine.succeed("mount -t zfs tank/imp /mnt/imp")
+        sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
+        machine.succeed("umount /mnt/imp")
+        return sums
+
+
+    def assert_generations_unchanged(current_path):
+        """Asserts that the running system is <current_path> and that the system profile still
+        holds the generations 1 to 3 that setup_test() made, with generation 3 current."""
+        current = machine.succeed("readlink -f /run/current-system").strip()
+        assert current == current_path, f"the system is {current}"
+        profile = machine.succeed("readlink /nix/var/nix/profiles/system").strip()
+        assert profile == "system-3-link", f"the system profile is {profile}"
+        links = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
+        assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
+
+
   ''
   + subtests { inherit image28 image29; };
 }

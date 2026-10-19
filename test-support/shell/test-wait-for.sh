@@ -11,14 +11,15 @@ set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/wait-for.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-clock.sh"
 
 it_returns_once_the_command_succeeds_on_a_later_poll() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   create_stub_clock "$tree"
   # shellcheck disable=SC2016 # expanded by the poll script
   printf '#!/usr/bin/env bash\necho poll >> "%s/polls"\n[ "$(wc -l < "%s/polls")" -ge 3 ]\n' "$tree" "$tree" > "$tree/third-poll"
@@ -34,16 +35,12 @@ it_returns_once_the_command_succeeds_on_a_later_poll() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_returns_without_polling_again_when_the_command_succeeds_at_once() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   create_stub_clock "$tree"
   printf '#!/usr/bin/env bash\necho poll >> "%s/polls"\n' "$tree" > "$tree/first-poll"
   chmod +x "$tree/first-poll"
@@ -54,18 +51,14 @@ it_returns_without_polling_again_when_the_command_succeeds_at_once() {
   diff /dev/null "$tree/out"
   diff - "$tree/polls" <<< poll
   assert_missing "$tree/pauses" "wait_for paused after a poll that succeeded"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # The deadline is 3 seconds after the clock's 0. Each failed poll before it pauses, and the
 # pause moves the clock one second, so the fourth poll fails at second 3 and ends the wait.
 it_fails_with_a_named_message_once_the_deadline_passes() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   create_stub_clock "$tree"
   printf '#!/usr/bin/env bash\necho poll >> "%s/polls"\nexit 1\n' "$tree" > "$tree/never"
   chmod +x "$tree/never"
@@ -82,16 +75,12 @@ it_fails_with_a_named_message_once_the_deadline_passes() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_passes_the_command_arguments_through_unchanged() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   create_stub_clock "$tree"
   touch "$tree/a file with spaces"
 
@@ -99,10 +88,7 @@ it_passes_the_command_arguments_through_unchanged() {
     wait_for 5 "the file" test -f "$tree/a file with spaces" > "$tree/out" 2>&1 || status=$?
 
   diff /dev/null "$tree/out"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # With no WAIT_FOR_CLOCK, wait_for reads bash's SECONDS. The poll runs in wait_for's own
@@ -112,8 +98,7 @@ it_passes_the_command_arguments_through_unchanged() {
 # instead of hanging it.
 it_times_out_on_bashs_SECONDS_when_no_clock_is_set() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   create_stub_clock "$tree"
 
   # shellcheck disable=SC2016 # expanded by eval inside wait_for
@@ -129,18 +114,14 @@ it_times_out_on_bashs_SECONDS_when_no_clock_is_set() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # With no WAIT_FOR_SLEEP, wait_for pauses with the sleep command it finds on PATH; here
 # that is create_stub_clock's pause, which records each pause and steps the fake clock.
 it_pauses_with_the_sleep_command_on_PATH_when_no_pause_is_set() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   create_stub_clock "$tree"
   # shellcheck disable=SC2016 # expanded by the poll script
   printf '#!/usr/bin/env bash\necho poll >> "%s/polls"\n[ "$(wc -l < "%s/polls")" -ge 3 ]\n' "$tree" "$tree" > "$tree/third-poll"
@@ -156,10 +137,7 @@ it_pauses_with_the_sleep_command_on_PATH_when_no_pause_is_set() {
 0.05
 0.05
 PAUSES
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 unset WAIT_FOR_CLOCK WAIT_FOR_SLEEP

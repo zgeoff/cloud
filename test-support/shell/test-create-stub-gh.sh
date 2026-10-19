@@ -11,12 +11,13 @@ set -euo pipefail
 # fixed, so the files the cases write do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-gh.sh"
 
 it_answers_a_matching_call_with_its_stdout_stderr_and_exit() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "api", "repos/acme/widgets"], "stdout": "{\"id\":1}\n", "stderr": "gh: warning\n", "exit": 4}
@@ -28,16 +29,12 @@ EOF
   diff - "$tree/out" <<< '{"id":1}'
   diff - "$tree/err" <<< 'gh: warning'
   diff - "$tree/calls" <<< '["gh","api","repos/acme/widgets"]'
-  [ "$status" = 4 ] || {
-    echo "exit $status, want 4" >&2
-    exit 1
-  }
+  assert_status 4 "$status"
 }
 
 it_exits_0_and_prints_nothing_for_a_response_that_names_only_its_argv() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '{"argv": ["gh", "api", "repos/acme/widgets"]}' > "$tree/responses"
 
@@ -47,16 +44,12 @@ it_exits_0_and_prints_nothing_for_a_response_that_names_only_its_argv() {
   diff /dev/null "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","repos/acme/widgets"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_matches_any_one_argument_at_a_null_element() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "release", "download", "v1.0.0", "-D", null], "stdout": "matched\n"}
@@ -68,16 +61,12 @@ EOF
   diff - "$tree/out" <<< matched
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "[\"gh\",\"release\",\"download\",\"v1.0.0\",\"-D\",\"$tree/tmp/work.1a2b\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_closed_on_a_call_longer_than_the_recorded_argv() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "api", "repos/acme/widgets"], "stdout": "matched\n"}
@@ -89,16 +78,12 @@ EOF
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: api repos/acme/widgets --paginate'
   diff - "$tree/calls" <<< '["gh","api","repos/acme/widgets","--paginate"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_on_a_call_shorter_than_the_recorded_argv() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "api", "repos/acme/widgets", null], "stdout": "matched\n"}
@@ -110,16 +95,12 @@ EOF
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: api repos/acme/widgets'
   diff - "$tree/calls" <<< '["gh","api","repos/acme/widgets"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_matches_a_response_whose_environment_the_call_runs_with() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "auth", "status"], "env": {"GH_TELEMETRY": "0", "DO_NOT_TRACK": "1"}, "stdout": "matched\n"}
@@ -131,16 +112,12 @@ EOF
   diff - "$tree/out" <<< matched
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","auth","status"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_closed_on_a_call_without_a_variable_the_response_names() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "auth", "status"], "env": {"GH_TELEMETRY": "0", "DO_NOT_TRACK": "1"}, "stdout": "matched\n"}
@@ -152,16 +129,12 @@ EOF
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: auth status'
   diff - "$tree/calls" <<< '["gh","auth","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_on_a_call_with_another_value_of_a_variable_the_response_names() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "auth", "status"], "env": {"GH_TELEMETRY": "0"}, "stdout": "matched\n"}
@@ -173,16 +146,12 @@ EOF
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: auth status'
   diff - "$tree/calls" <<< '["gh","auth","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_copies_each_download_into_the_directory_after_d() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/release" "$tree/out-dir"
   echo binary > "$tree/release/widget-linux-x64"
@@ -205,16 +174,12 @@ EOF
   diff - "$tree/out-dir/widget-linux-x64" <<< binary
   diff - "$tree/out-dir/SHA256SUMS" <<< sums
   diff - "$tree/calls" <<< "[\"gh\",\"release\",\"download\",\"v1.0.0\",\"-R\",\"acme/widgets\",\"-p\",\"widget-linux-x64\",\"-p\",\"SHA256SUMS\",\"-D\",\"$tree/out-dir\"]"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_copies_nothing_into_the_directory_after_d_on_a_call_no_response_matches() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   mkdir "$tree/release" "$tree/out-dir"
   echo binary > "$tree/release/widget-linux-x64"
@@ -231,16 +196,12 @@ it_copies_nothing_into_the_directory_after_d_on_a_call_no_response_matches() {
   diff - "$tree/err" <<< "unexpected: release download v1.0.0 -R acme/widgets -p widget-darwin-arm64 -D $tree/out-dir"
   diff /dev/null <(ls -A "$tree/out-dir")
   diff - "$tree/calls" <<< "[\"gh\",\"release\",\"download\",\"v1.0.0\",\"-R\",\"acme/widgets\",\"-p\",\"widget-darwin-arm64\",\"-D\",\"$tree/out-dir\"]"
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_on_a_response_with_downloads_for_a_call_without_d() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo binary > "$tree/widget-linux-x64"
   jq -cn --arg asset "$tree/widget-linux-x64" '{
@@ -254,16 +215,12 @@ it_fails_closed_on_a_response_with_downloads_for_a_call_without_d() {
   diff - "$tree/err" <<< 'gh stand-in: the response has downloads but the call has no -D'
   diff /dev/null <(ls -A "$tree/tmp")
   diff - "$tree/calls" <<< '["gh","release","download","v1.0.0"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_prints_the_bytes_of_the_stdout_file_after_stdout() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   printf 'line one\nline two without a newline' > "$tree/body"
   jq -cn --arg body "$tree/body" '{argv: ["gh", "api", "repos/acme/widgets"], stdout: "head\n", stdout_file: $body}' \
@@ -275,16 +232,12 @@ it_prints_the_bytes_of_the_stdout_file_after_stdout() {
   printf 'head\nline one\nline two without a newline' | cmp - "$tree/out"
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","repos/acme/widgets"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_answers_with_the_first_response_that_matches() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "api", "repos/acme/other"], "stdout": "other\n"}
@@ -298,16 +251,12 @@ EOF
   diff - "$tree/out" <<< first
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< '["gh","api","repos/acme/widgets"]'
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_fails_closed_with_exit_97_on_a_call_no_response_matches() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "api", "repos/acme/widgets"], "stdout": "matched\n"}
@@ -319,16 +268,12 @@ EOF
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: api repos/acme/gadgets'
   diff - "$tree/calls" <<< '["gh","api","repos/acme/gadgets"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_fails_closed_with_exit_97_when_no_responses_file_exists() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -337,16 +282,12 @@ it_fails_closed_with_exit_97_when_no_responses_file_exists() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'unexpected: auth status'
   diff - "$tree/calls" <<< '["gh","auth","status"]'
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 it_appends_each_calls_argv_as_one_json_line_keeping_spaces_and_quotes() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   echo '["gh", "--version"]' > "$tree/calls"
 
@@ -360,18 +301,14 @@ it_appends_each_calls_argv_as_one_json_line_keeping_spaces_and_quotes() {
 ["gh", "--version"]
 ["gh","api","-H","Accept: application/vnd.github.raw","--jq",".[] | select(.name == \"a b\")","it's",""]
 EOF
-  [ "$status" = 97 ] || {
-    echo "exit $status, want 97" >&2
-    exit 1
-  }
+  assert_status 97 "$status"
 }
 
 # The stand-in is written before the case records any response, so the first call reads the
 # response file as it stands then and the second reads its replacement.
 it_reads_the_responses_file_at_each_call() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   setup_test "$tree"
   cat > "$tree/responses" << 'EOF'
 {"argv": ["gh", "api", "repos/acme/widgets"], "stdout": "before\n"}
@@ -392,18 +329,14 @@ EOF
 ["gh","api","repos/acme/widgets"]
 ["gh","api","repos/acme/widgets"]
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # create_stub_gh takes relative paths here, and the call runs from another directory, so the log
 # and the responses are found only through the absolute paths the stand-in was written with.
 it_reads_and_logs_through_the_absolute_paths_it_was_written_with() {
   local status=0
-  tree="$(mktemp -d)"
-  trap 'rm -rf "$tree"' EXIT
+  create_case_tree
   mkdir "$tree/bin" "$tree/home" "$tree/tmp" "$tree/elsewhere"
   (cd "$tree" && create_stub_gh bin shared-calls responses)
   cat > "$tree/responses" << 'EOF'
@@ -417,10 +350,7 @@ EOF
   diff /dev/null "$tree/err"
   diff - "$tree/shared-calls" <<< '["gh","api","repos/acme/widgets"]'
   diff /dev/null <(ls -A "$tree/elsewhere")
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # Runtime every case needs: the stand-in in <tree>/bin, logging to <tree>/calls and answering from

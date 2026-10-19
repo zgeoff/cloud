@@ -20,18 +20,20 @@
 #   CASE='foreign Host' bash test-support/shell/with-fixture-images.sh bash images/atc-gateway/test-atc-gateway-image.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/start-gateway.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../test-support/shell/wait-for-ready.sh"
 
 it_answers_the_protected_resource_metadata_on_its_public_Host() {
   local gateway_image="$1" port code
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -67,8 +69,7 @@ EOF
 it_answers_healthz_on_its_public_Host() {
   local gateway_image="$1" port code
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -91,8 +92,7 @@ it_answers_healthz_on_its_public_Host() {
 it_answers_readyz_on_its_public_Host() {
   local gateway_image="$1" port code
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -116,8 +116,7 @@ it_answers_readyz_on_its_public_Host() {
 it_refuses_healthz_for_a_foreign_Host() {
   local gateway_image="$1" port code
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -140,8 +139,7 @@ it_refuses_healthz_for_a_foreign_Host() {
 it_refuses_the_metadata_for_a_foreign_Host() {
   local gateway_image="$1" port code
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   port="$(docker port "$name" 8414/tcp)"
@@ -164,8 +162,7 @@ it_refuses_the_metadata_for_a_foreign_Host() {
 it_runs_the_gateway_process_as_the_nonroot_uid() {
   local gateway_image="$1"
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
 
   start_gateway "$name" "$tree" "$gateway_image"
@@ -183,8 +180,7 @@ EOF
 it_prints_the_new_clients_ID_when_it_adds_a_client() {
   local gateway_image="$1" client_id status=0
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
 
@@ -199,17 +195,13 @@ it_prints_the_new_clients_ID_when_it_adds_a_client() {
   }
   diff - "$tree/added" <<< "Added fixture-client. Its client ID is $client_id"
   diff /dev/null "$tree/err"
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_keeps_a_stored_client_across_a_restart() {
   local gateway_image="$1" client_id
   name="atc-gw-image-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   start_gateway "$name" "$tree" "$gateway_image"
   docker exec "$name" /usr/local/bin/atc-gateway clients add fixture-client \

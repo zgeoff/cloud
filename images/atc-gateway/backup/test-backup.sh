@@ -21,10 +21,13 @@
 #   CASE='ls mode' bash test-support/shell/with-fixture-images.sh bash images/atc-gateway/backup/test-backup.sh
 # shell-suite: atc-gateway-fixture
 # shellcheck source-path=SCRIPTDIR
+# shellcheck disable=SC2016 # each create_case_tree cleanup expands when its case exits
 set -euo pipefail
 # fixed, so the modes the cases assert do not depend on the caller's umask
 umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-cases.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/create-case-tree.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/assert-between.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/run-backup-shell.sh"
@@ -39,8 +42,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../../../test-support/shell/normalize-res
 it_groups_the_gateway_snapshots_across_source_paths_when_a_backup_prunes() {
   local backup_image="$2" before after
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -159,8 +161,7 @@ EOF
 it_leaves_another_tools_snapshot_alone_when_a_backup_prunes() {
   local backup_image="$2"
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -212,42 +213,33 @@ EOF
 it_rejects_a_run_without_a_mode_with_its_usage() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
 
   run_backup "$name" "$backup_image" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< 'usage: atc-gateway-backup backup|restore|ls'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_rejects_an_unknown_mode_with_its_usage() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
 
   run_backup "$name" "$backup_image" prune > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< 'usage: atc-gateway-backup backup|restore|ls'
   diff /dev/null "$tree/out"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_stops_before_restic_when_STATE_DIR_is_unset() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
 
   docker run --rm --name "$name-backup" --user 65532:65532 --security-opt no-new-privileges \
@@ -258,17 +250,13 @@ it_stops_before_restic_when_STATE_DIR_is_unset() {
   diff /dev/null "$tree/out"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /repo' > "$tree/repo"
   diff /dev/null "$tree/repo"
-  [ "$status" = 2 ] || {
-    echo "exit $status, want 2" >&2
-    exit 1
-  }
+  assert_status 2 "$status"
 }
 
 it_fails_a_backup_of_a_state_dir_without_databases() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic init -q; echo notes > /state/readme'
 
@@ -278,10 +266,7 @@ it_fails_a_backup_of_a_state_dir_without_databases() {
   diff /dev/null "$tree/out"
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'restic snapshots --json' > "$tree/snapshots"
   diff - "$tree/snapshots" <<< '[]'
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # The database's index holds a key its table does not (row0010 rewritten as row0019), so
@@ -296,8 +281,7 @@ it_fails_a_backup_of_a_state_dir_without_databases() {
 it_fails_a_backup_whose_copy_fails_the_integrity_check() {
   local backup_image="$2"
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   python3 - "$tree/seed/gateway.db" << 'EOF'
 import sqlite3, sys
@@ -350,8 +334,7 @@ EOF
 it_fails_a_restore_whose_snapshot_fails_the_integrity_check_and_keeps_the_state() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   python3 - "$tree/seed/gateway.db" << 'EOF'
 import sqlite3, sys
@@ -387,17 +370,13 @@ EOF
   diff - "$tree/state-files" <<< gateway.db
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state-rows"
   diff - "$tree/state-rows" <<< current
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_restore_of_a_snapshot_without_databases() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -415,17 +394,13 @@ Summary: Restored 1 files/dirs (SIZE) in T
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'ls -A /state' > "$tree/state"
   diff /dev/null "$tree/state"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 it_fails_a_restore_when_the_repository_holds_no_gateway_snapshot() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -439,18 +414,14 @@ EOF
 Fatal: failed to find snapshot: snapshot filter (Paths:[] Tags:[[atc-gateway]] Hosts:[atc-gateway]): no snapshot found
 EOF
   diff /dev/null "$tree/out"
-  [ "$status" = 1 ] || {
-    echo "exit $status, want 1" >&2
-    exit 1
-  }
+  assert_status 1 "$status"
 }
 
 # ls lists the gateway's snapshots alone; each ID is random, so the case masks that column
 it_lists_the_gateway_snapshots_alone_in_ls_mode() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -472,17 +443,13 @@ ID  2020-01-07 10:00:00  atc-gateway  atc-gateway  /tmp/a  SIZE
 ---------------------------------------------------------------------
 2 snapshots
 EOF
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_restores_the_snapshot_that_SNAPSHOT_names_instead_of_the_latest() {
   local backup_image="$2" older status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -509,17 +476,13 @@ Summary: Restored 1 files/dirs (SIZE) in T
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/value"
   diff - "$tree/value" <<< older
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 it_removes_stale_wal_and_shm_files_when_it_restores_a_database() {
   local backup_image="$2" status=0
   name="atc-gw-backup-script-$4-$BASHPID"
-  tree="$(mktemp -d)"
-  trap 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true; rm -rf "$tree" || true' EXIT
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
   setup_test "$tree" "$name" "$3"
   run_backup_shell "$name" "$backup_image" "$tree" << 'EOF'
 restic init -q
@@ -547,10 +510,7 @@ other.db-wal
 EOF
   run_backup_shell "$name" "$backup_image" "$tree" <<< 'sqlite3 /state/gateway.db "SELECT v FROM f"' > "$tree/state-rows"
   diff - "$tree/state-rows" <<< restored
-  [ "$status" = 0 ] || {
-    echo "exit $status, want 0" >&2
-    exit 1
-  }
+  assert_status 0 "$status"
 }
 
 # Boot data every case needs: a seed directory the backup shell reads at /seed, and a
