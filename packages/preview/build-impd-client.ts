@@ -22,11 +22,10 @@ interface CommandOptions {
   // runs without the broker's GitHub credential
   readonly requireBroker?: boolean;
 
-  // stops the command, and the exec's setup before it, once aborted
   readonly signal?: AbortSignal;
 }
 
-// The impd calls the service makes, each confined by impd to the imps its token names
+// impd confines each call to the imps its token names
 export interface ImpdClient {
   readonly createImp: (options: ImpCreateOptions) => Promise<ImpActivity>;
   readonly findImp: (name: string) => Promise<ImpActivity | null>;
@@ -43,14 +42,14 @@ export interface ImpdClient {
   ) => Promise<CommandResult>;
 }
 
-// The service's calls, made through imp's typed client, so a change to impd's contract fails the
-// type check here
 export function buildImpdClient(
   baseURL: string,
   token: string,
   webSocket: typeof WebSocket = globalThis.WebSocket,
 ): ImpdClient {
   const Socket = webSocket;
+
+  // imp's typed client, so a change to impd's contract fails the type check here
   const client = createImpClient({ url: baseURL, token, connect: (url) => new Socket(url) });
 
   return {
@@ -96,12 +95,11 @@ export function buildImpdClient(
   };
 }
 
-// An impd error, with the code its contract defines, such as NOT_FOUND or LEASED, in its message,
-// so a log line or a commit status names it
 class ImpdError extends Error {
   readonly code: string;
 
   constructor(code: string, message: string, cause: unknown) {
+    // the code goes in the message, so a log line or a commit status names it
     super(`impd ${code}: ${message}`, { cause });
 
     this.name = 'ImpdError';
@@ -109,7 +107,6 @@ class ImpdError extends Error {
   }
 }
 
-// Rethrows the client's errors, an oRPC call's and an exec's, as an ImpdError
 async function withImpdErrors<T>(call: () => Promise<T>): Promise<T> {
   try {
     return await call();
@@ -138,12 +135,10 @@ async function findImpActivity(client: ImpClient, name: string): Promise<ImpActi
   }
 }
 
-// impd's imp record carries far more than the service reads
 function toImpActivity(imp: Imp): ImpActivity {
   return { name: imp.name, state: imp.state, lastActiveAt: imp.lastActiveAt };
 }
 
-// Adds the grant only when the imp lacks it, so a boot can repair an imp whose grant never landed
 async function installImpGrant(client: ImpClient, name: string, secret: string): Promise<void> {
   const granted = await client.grants.list({ name });
 
@@ -154,8 +149,6 @@ async function installImpGrant(client: ImpClient, name: string, secret: string):
   await client.grants.add({ name, secret });
 }
 
-// The command's stdin closes once impd reports it started. Both streams push to one list of
-// texts, so the output keeps the order in which impd sent it.
 async function readCommandResult(handle: ExecHandle): Promise<CommandResult> {
   const texts: string[] = [];
 

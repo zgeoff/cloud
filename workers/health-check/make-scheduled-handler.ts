@@ -1,12 +1,10 @@
-// External health check (#8): host monitoring cannot report the host down, so this Worker probes
-// tunnel hostnames from the edge — 530/1033 reads tunnel down, 502/504 gateway down, else up. Each
-// target's last state lives in R2; a change posts to ALERT_URL when set and always logs to destination.
+// Host monitoring cannot report the host down, so this Worker probes tunnel hostnames from the
+// edge: 530/1033 reads tunnel down, 502/504 gateway down, else up.
 import type { R2Bucket } from '@cloudflare/workers-types';
 import { bindingNames } from './binding-names.ts';
 import { targetsSchema } from './targets-schema.ts';
 import type { Target } from './targets-schema.ts';
 
-// the R2 methods the check calls, typed by Cloudflare's runtime types
 type StateBucket = Pick<R2Bucket, 'get' | 'put'>;
 
 interface Env {
@@ -15,7 +13,6 @@ interface Env {
   readonly [bindingNames.alertURL]?: string;
 }
 
-// where a change of state is logged; the console in production
 interface LogDestination {
   readonly log: (message: string) => void;
 }
@@ -95,8 +92,6 @@ function pickHealth(status: number): Health {
   return 'up';
 }
 
-// The body carries `content` (Discord), `text` (Slack) and `message`, so most
-// webhook receivers show it without a per-service format. No URL, no alert.
 async function sendAlert(url: string | undefined, message: string): Promise<void> {
   if (url === undefined || url === '') {
     return;
@@ -105,6 +100,9 @@ async function sendAlert(url: string | undefined, message: string): Promise<void
   await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
+
+    // `content` for Discord, `text` for Slack and `message`, so most webhook receivers show it
+    // without a per-service format
     body: JSON.stringify({ content: message, text: message, message }),
   });
 }

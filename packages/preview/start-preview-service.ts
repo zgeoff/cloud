@@ -9,8 +9,6 @@ import { runContractRetries } from './run-contract-retries.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
 import type { PreviewDeps } from './types.ts';
 
-// Two listeners, so the public route reaches the webhook alone: the link listener on the tailnet,
-// and the webhook listener that the cluster's tunnel dials. The idle sweep runs on a timer.
 export function startPreviewService(config: PreviewConfig): { readonly stop: () => Promise<void> } {
   const store = createPreviewStore(config.databasePath);
 
@@ -36,6 +34,8 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     },
   };
 
+  // two listeners, so the public route reaches the webhook alone: the link listener on the tailnet,
+  // and the webhook listener that the cluster's tunnel dials
   const linkServer = Bun.serve({ ...config.linkListener, fetch: makeLinkHandler(deps) });
   const webhookServer = Bun.serve({ ...config.webhookListener, fetch: makeWebhookHandler(deps) });
 

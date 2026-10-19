@@ -6,9 +6,6 @@ interface CommandResult {
   readonly output: string;
 }
 
-// Runs the SDK contract suite in the run's imp and returns the guest command's result, or null
-// when the host's deadline passes first. The guest's `timeout` bounds the run, and the deadline
-// backs it for a guest that never reports an exit.
 export async function runContractSuite(
   deps: PreviewDeps,
   contract: ContractSettings,
@@ -22,6 +19,8 @@ export async function runContractSuite(
       argv: buildContractArgv(contract, run),
       signal: exec.signal,
     }),
+
+    // backs the guest's `timeout` for a guest that never reports an exit
     waitForDeadline(deps, contract.timeoutMs + deadlineGraceMs),
   ]);
 
@@ -86,14 +85,14 @@ interface GuestCommand {
   readonly signal: AbortSignal;
 }
 
-// impd refuses to start the command unless the broker reaches the guest, so the suite never runs
-// without its model route. An exec that breaks reads as a command that a signal ended.
 async function tryRunGuestCommand(
   deps: PreviewDeps,
   command: GuestCommand,
 ): Promise<CommandResult> {
   try {
     return await deps.impd.runCommand(command.imp, command.argv, {
+      // impd refuses to start the command unless the broker reaches the guest, so the suite never
+      // runs without its model route
       requireBroker: true,
       signal: command.signal,
     });

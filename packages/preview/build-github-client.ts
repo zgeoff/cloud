@@ -1,16 +1,11 @@
-// The GitHub REST calls the service makes, as the token's owner
 export interface GitHubClient {
-  // preview/compose.yaml at a commit, or null when the commit has none and so has not opted in
   readonly readComposeFile: (repo: string, sha: string) => Promise<string | null>;
 
-  // posts the pull request's preview comment, or edits it in place once one exists
   readonly updatePreviewComment: (comment: PreviewComment) => Promise<void>;
 
-  // every file the pull request changes, with its diff, which GitHub leaves out of a file whose
-  // diff is too large to show
+  // GitHub leaves the diff out of a file whose diff is too large to show
   readonly readPullRequestFiles: (repo: string, number: number) => Promise<PullRequestFile[]>;
 
-  // sets the state of one commit status context on a commit
   readonly updateCommitStatus: (status: CommitStatus) => Promise<void>;
 }
 
@@ -33,14 +28,12 @@ interface PreviewComment {
   readonly body: string;
 }
 
-// The marker that tells the service's own comment from every other comment on the pull request
 export const previewCommentMarker = '<!-- cloud-preview -->';
 
 export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
   const send = (request: GitHubRequest): Promise<Response> =>
     sendGitHubRequest(apiURL, token, request);
 
-  // the token's user, read once, which writes the preview comment
   const tokenUser: { login?: string } = {};
 
   return {
@@ -119,9 +112,6 @@ interface IssueComment {
   readonly user?: { readonly login: string } | null;
 }
 
-// Pages through the pull request's comments, a hundred at a time, until one that the token's own
-// user wrote holds the marker. Anyone can paste the marker, and GitHub lets the service edit only
-// its own comments.
 async function findPreviewCommentID(
   send: (request: GitHubRequest) => Promise<Response>,
   comment: PreviewComment,
@@ -135,6 +125,7 @@ async function findPreviewCommentID(
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same page, in GitHub's issue comments shape
     const comments = (await response.json()) as readonly IssueComment[];
 
+    // anyone can paste the marker, and GitHub lets the service edit only its own comments
     const match = comments.find(
       (candidate) =>
         candidate.user?.login === login && candidate.body?.includes(previewCommentMarker) === true,
@@ -157,11 +148,11 @@ async function readTokenLogin(
   return user.login;
 }
 
-// GitHub refuses a status whose description runs past 140 characters
 async function sendCommitStatus(
   send: (request: GitHubRequest) => Promise<Response>,
   status: CommitStatus,
 ): Promise<void> {
+  // GitHub refuses a status whose description runs past 140 characters
   const description = status.description.slice(0, 140);
 
   await send({
@@ -176,7 +167,6 @@ interface PullRequestFileEntry {
   readonly patch?: string;
 }
 
-// Pages through the pull request's files, a hundred at a time, until a short page
 async function readPullRequestFiles(
   send: (request: GitHubRequest) => Promise<Response>,
   repo: string,

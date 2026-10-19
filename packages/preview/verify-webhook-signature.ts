@@ -1,11 +1,10 @@
-// GitHub's `X-Hub-Signature-256: sha256=<hex>`, an HMAC-SHA256 of the raw body under the webhook's
-// secret (https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries), checked
-// by Web Crypto's verify, which compares in constant time
 export async function verifyWebhookSignature(
   secret: string,
   body: ArrayBuffer,
   header: string | null,
 ): Promise<boolean> {
+  // GitHub's `X-Hub-Signature-256: sha256=<hex>`, an HMAC-SHA256 of the raw body
+  // (https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries)
   const hex = header?.startsWith('sha256=') === true ? header.slice('sha256='.length) : null;
 
   if (hex === null || !/^[\da-f]{64}$/u.test(hex)) {
@@ -20,5 +19,6 @@ export async function verifyWebhookSignature(
     ['verify'],
   );
 
+  // Web Crypto's verify compares in constant time
   return crypto.subtle.verify('HMAC', key, Buffer.from(hex, 'hex'), body);
 }

@@ -1,7 +1,6 @@
 import type { Exposure } from './exposure-schema.ts';
 import type { Topology } from './topology-schema.ts';
 
-// A host-port entry whose port is also a shared constant, and the constant it must equal
 const constantPorts = [
   {
     entry: 'tailscale',
@@ -21,8 +20,6 @@ const constantPorts = [
   },
 ] as const;
 
-// Throws unless each registry port that is also a constant in constants.json holds the same
-// value, and names every pair that differs, so the two files cannot drift apart
 export function requireExposureMatchesTopology(exposure: Exposure, topology: Topology): void {
   const mismatches = constantPorts.flatMap((pair) => {
     const entry = exposure.entries.find((candidate) => candidate.name === pair.entry);

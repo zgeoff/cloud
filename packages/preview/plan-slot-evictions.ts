@@ -1,13 +1,9 @@
 import type { Imp } from '@impz/client';
 import { contractImpPrefix } from './build-contract-imp-name.ts';
 
-// The part of impd's record of an imp that the slot and idle rules read. impd sets lastActiveAt
-// when it creates the imp, and moves it on each use.
+// impd sets lastActiveAt when it creates the imp, and moves it on each use.
 export type ImpActivity = Readonly<Pick<Imp, 'name' | 'state' | 'lastActiveAt'>>;
 
-// The previews to put to sleep, least recently active first, so the opening one fits `slots`
-// running imps. A contract run's imp holds a slot but never sleeps, since its suite would stop
-// halfway, so the opening preview may run beside it.
 export function planSlotEvictions(
   imps: readonly ImpActivity[],
   slots: number,
@@ -15,6 +11,7 @@ export function planSlotEvictions(
 ): string[] {
   const live = imps.filter((imp) => imp.name !== opening && imp.state === 'running');
 
+  // a contract run's imp holds a slot but never sleeps, since its suite would stop halfway
   const previews = live
     .filter((imp) => !imp.name.startsWith(contractImpPrefix))
     .toSorted((left, right) => left.lastActiveAt.getTime() - right.lastActiveAt.getTime());

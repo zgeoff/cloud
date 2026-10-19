@@ -1,5 +1,3 @@
-// What the commit status says once a run of the SDK contract suite ends: the guest command's
-// result, or null when the host's deadline passed first
 interface ContractResult {
   // null when a signal ended the command
   readonly code: number | null;
@@ -39,8 +37,8 @@ export function buildContractStatus(
   };
 }
 
-// bun test ends with one line per outcome, such as ` 15 pass` and ` 3 fail`
 function findTestSummary(output: string): string | null {
+  // bun test ends with one line per outcome, such as ` 15 pass` and ` 3 fail`
   const pass = /^\s*(?<count>\d+) pass$/mu.exec(output)?.groups?.['count'];
   const fail = /^\s*(?<count>\d+) fail$/mu.exec(output)?.groups?.['count'];
 
