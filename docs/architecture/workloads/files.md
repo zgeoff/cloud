@@ -6,7 +6,8 @@ The files service holds the screenshots and other files that agents link from pu
 expires, and then the service answers 404 for it. GitHub's image proxy fetches each image in a pull
 request without signing in, and imps cannot reach the tailnet, so the service sits on a public route
 rather than the tailnet ([public ingress](../network/public-ingress.md)). The service runs in k3s as
-one pod with its own volume, and a nightly job backs that volume up to R2.
+one pod with its own volume, and a nightly job backs that volume up to R2 once the backup is
+configured.
 
 ## Uploads and roles
 
@@ -53,24 +54,32 @@ link.
 The pod keeps the files and one SQLite database of their metadata on a local-path volume that k3s
 retains when the claim goes away. The service writes each upload to a staging directory first,
 hashes it as it streams, then renames it into place, and only then records its row. A crash during
-an upload therefore leaves a staged file and no row, and the service clears the staging directory
-when it starts.
+an upload can therefore leave a staged file, or a file in place with no row. When the service
+starts, it clears the staging directory and removes each file in place that has no row, before it
+takes a request. A failed row write removes its file at once.
 
 The service refuses a file over its size cap with 413, and refuses any upload with 507 when the
-volume would keep less than a fixed reserve free, so a full volume never breaks the database.
+volume would keep less than a fixed reserve free, so a full volume never breaks the database. Two
+uploads at once can both pass that check, so a write that still finds the volume or the database
+full gets 507 as well.
 
-An expired upload stops serving at once, because each read checks the expiry. An in-process sweep
-runs when the service starts and then every hour. It removes each expired file first and its row
-second, so a crash between the two leaves a row whose file is gone, which reads as 404, never a file
-that nothing lists.
+The service stops serving an expired upload at once, because each read checks the expiry. A response
+carries a short public cache lifetime, so Cloudflare or a browser can still return a copy it fetched
+before the expiry until that lifetime ends. An in-process sweep runs when the service starts and
+then every hour. It removes each expired file first and its row second, so a crash between the two
+leaves a row whose file is gone, which reads as 404, never a file that nothing lists.
 
 ## Backup and restore
 
-The `files-backup` CronJob runs nightly in the atc gateway's backup image. It copies the database
-with SQLite's online backup, checks the copy's integrity, and takes one restic snapshot of the copy
-and the files into the `files` repository in R2. A restore checks the snapshot's database copy
-before it changes anything, then restores the files, puts the database in place, and removes each
-file that the restored database does not list. [The runbook](../../runbooks/files.md) covers both.
+The `files-backup` CronJob exists only when the backup's repository and credentials are configured,
+as [the runbook](../../runbooks/files.md#deploy-the-first-time) sets them up, and the service
+deploys without it otherwise. It runs nightly in the atc gateway's backup image. It copies the
+database with SQLite's online backup, checks the copy's integrity, and takes one restic snapshot of
+the copy and the files into the `files` repository in R2. A backup and a restore each hold a lock on
+the volume, so a manual job never runs beside the nightly one. A restore picks one snapshot, checks
+its database copy before it changes anything, then restores the files, puts the database in place,
+and removes each file that the restored database does not list.
+[The runbook](../../runbooks/files.md) covers both.
 
 ## Deployment
 
