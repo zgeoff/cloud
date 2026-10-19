@@ -1,9 +1,7 @@
 import { DnsRecord, ZeroTrustTunnelCloudflaredConfig } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
-import { buildATCTunnelIngresses } from './build-atc-tunnel-ingresses.ts';
-import { buildPreviewWebhookRoute } from './build-preview-webhook-route.ts';
-import { buildTunnelIngresses } from './build-tunnel-ingresses.ts';
-import type { OriginAccess, TunnelRoute } from './build-tunnel-ingresses.ts';
+import { buildTunnelRouteSpecs } from './build-tunnel-route-specs.ts';
+import type { GatewayIngress, TunnelRecordSpec } from './build-tunnel-route-specs.ts';
 
 interface TunnelRoutesInputs {
   readonly accountID: string;
@@ -15,14 +13,6 @@ interface TunnelRoutesInputs {
   readonly gateway?: GatewayIngress | undefined;
 }
 
-// the atc gateway's route, the Access application in front of its sign-in pages, and the atc
-// tunnel, whose connector runs in the gateway's pod
-export interface GatewayIngress {
-  readonly route: TunnelRoute;
-  readonly access: OriginAccess;
-  readonly tunnelID: Output<string>;
-}
-
 interface TunnelRoutesOutputs {
   readonly configVersion: Output<number>;
   readonly atcConfigVersion?: Output<number>;
@@ -32,12 +22,22 @@ interface TunnelRoutesOutputs {
   readonly previewWebhookURL: Output<string>;
 }
 
-// Each tunnel's ingress rules and the proxied CNAME for each hostname: the gateway's on the atc
-// tunnel, the preview webhook's on the shared one. Each tunnel's catch-all 404 stays last.
+// Each tunnel's ingress rules and the proxied CNAME for each hostname, as buildTunnelRouteSpecs
+// assigns them. Each tunnel's catch-all 404 stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
-  const gateway = inputs.gateway;
-  const previewWebhookRoute = buildPreviewWebhookRoute();
-  const atc = gateway === undefined ? undefined : createATCRoutes(inputs, gateway);
+  const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway);
+
+  const atc =
+    specs.atc === undefined
+      ? undefined
+      : {
+          config: new ZeroTrustTunnelCloudflaredConfig('atc', {
+            accountId: inputs.accountID,
+            tunnelId: specs.atc.record.tunnelID,
+            config: { ingresses: specs.atc.ingresses },
+          }),
+          record: createRecord('atc', inputs.zoneID, specs.atc.record),
+        };
 
   // after the gateway's CNAME, so a hostname the shared tunnel drops already points elsewhere
   const config = new ZeroTrustTunnelCloudflaredConfig(
@@ -45,17 +45,12 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
     {
       accountId: inputs.accountID,
       tunnelId: inputs.tunnelID,
-      config: { ingresses: buildTunnelIngresses([previewWebhookRoute]) },
+      config: { ingresses: specs.sharedIngresses },
     },
     { dependsOn: atc === undefined ? [] : [atc.record] },
   );
 
-  const previewWebhook = createRecord(
-    'preview-webhook',
-    inputs.zoneID,
-    previewWebhookRoute.hostname,
-    inputs.tunnelID,
-  );
+  const previewWebhook = createRecord('preview-webhook', inputs.zoneID, specs.previewWebhookRecord);
 
   return {
     configVersion: config.version,
@@ -66,34 +61,12 @@ export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutp
   };
 }
 
-// the atc tunnel's rules and the gateway's CNAME to that tunnel
-function createATCRoutes(
-  inputs: TunnelRoutesInputs,
-  gateway: GatewayIngress,
-): { readonly config: ZeroTrustTunnelCloudflaredConfig; readonly record: DnsRecord } {
-  const config = new ZeroTrustTunnelCloudflaredConfig('atc', {
-    accountId: inputs.accountID,
-    tunnelId: gateway.tunnelID,
-    config: { ingresses: buildATCTunnelIngresses(gateway.route.hostname, gateway.access) },
-  });
-
-  return {
-    config,
-    record: createRecord('atc', inputs.zoneID, gateway.route.hostname, gateway.tunnelID),
-  };
-}
-
-function createRecord(
-  name: string,
-  zoneID: Output<string>,
-  hostname: string,
-  tunnelID: Output<string>,
-): DnsRecord {
+function createRecord(name: string, zoneID: Output<string>, spec: TunnelRecordSpec): DnsRecord {
   return new DnsRecord(name, {
     zoneId: zoneID,
-    name: hostname,
+    name: spec.hostname,
     type: 'CNAME',
-    content: tunnelID.apply((id) => `${id}.cfargotunnel.com`),
+    content: spec.tunnelID.apply((id) => `${id}.cfargotunnel.com`),
     proxied: true,
     ttl: 1,
   });

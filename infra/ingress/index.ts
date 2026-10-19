@@ -6,11 +6,11 @@ import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
 import type { TunnelRoute } from './build-tunnel-ingresses.ts';
+import type { GatewayIngress } from './build-tunnel-route-specs.ts';
 import type { ATCTunnel } from './create-atc-tunnel.ts';
 import { createCloudflared } from './create-cloudflared.ts';
 import { createGatewayAccess } from './create-gateway-access.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
-import type { GatewayIngress } from './create-tunnel-routes.ts';
 
 // the names observability's monitor and alert rule select cloudflared by
 export { cloudflaredNames } from './cloudflared-names.ts';
