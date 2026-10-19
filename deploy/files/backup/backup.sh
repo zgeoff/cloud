@@ -4,11 +4,16 @@
 # backup:  copy files.db from $STATE_DIR with sqlite3 .backup (consistent while the service writes)
 #          to files-backup.db beside it, check the copy with PRAGMA integrity_check, then upload
 #          the copy and the files/ directory with restic, and apply retention.
-# restore: restore the copy of files.db from the latest snapshot (or $SNAPSHOT) into a scratch
-#          directory and check it, then restore files/ onto $STATE_DIR, replace files.db and its
-#          -wal and -shm files with the copy, and remove each file under files/ that the restored
-#          metadata does not list. Run it only while the service is stopped.
+# restore: resolve the latest snapshot (or $SNAPSHOT) to one snapshot ID, restore its copy of
+#          files.db into a scratch directory and check it, then restore files/ from the same
+#          snapshot onto $STATE_DIR, replace files.db and its -wal and -shm files with the copy, and
+#          remove each file under files/ that the restored metadata does not list. Run it only
+#          while the service is stopped.
 # ls:      list snapshots.
+#
+# Backup and restore each hold an exclusive lock on $STATE_DIR/.files-backup.lock, so a manual job
+# never shares the metadata copy with the CronJob's run; the kernel drops the lock with a job that
+# dies, so no stale lock outlives it.
 #
 # The metadata copy comes first, so a file the service writes after it lands in the snapshot with
 # no row, and the restore removes it; a file the sweep removes after it is missing from the
@@ -24,6 +29,14 @@ tag=files
 host=files
 copy=files-backup.db
 
+take_lock() {
+  exec 9> "$state_dir/.files-backup.lock"
+  flock -n 9 || {
+    echo "another files-backup job holds $state_dir/.files-backup.lock" >&2
+    exit 1
+  }
+}
+
 case "${1:-}" in
   backup)
     # sqlite3 creates a database it cannot find, so check for it before the copy
@@ -31,6 +44,7 @@ case "${1:-}" in
       echo "no files.db in $state_dir" >&2
       exit 1
     }
+    take_lock
     restic cat config > /dev/null 2>&1 || restic init
     rm -f "$state_dir/$copy"
     sqlite3 -bail "$state_dir/files.db" ".backup '$state_dir/$copy'"
@@ -46,9 +60,21 @@ case "${1:-}" in
     rm -f "$state_dir/$copy"
     ;;
   restore)
+    take_lock
+    # one snapshot ID for both restores, so a backup that finishes between them cannot pair this
+    # snapshot's metadata with another's files
+    if [ -n "${SNAPSHOT:-}" ]; then
+      found=$(restic snapshots --json "$SNAPSHOT")
+    else
+      found=$(restic snapshots --json --tag "$tag" --host "$host" latest)
+    fi
+    snapshot=$(printf '%s\n' "$found" | sed -n 's/.*[{,]"id":"\([0-9a-f]\{64\}\)".*/\1/p')
+    [ -n "$snapshot" ] || {
+      echo "no snapshot matches ${SNAPSHOT:-latest}" >&2
+      exit 1
+    }
     work=$(mktemp -d)
-    snapshot="${SNAPSHOT:-latest}"
-    restic restore "$snapshot" --tag "$tag" --host "$host" --target "$work" --include "/$copy"
+    restic restore "$snapshot" --target "$work" --include "/$copy"
     [ -e "$work/$copy" ] || {
       echo "the snapshot holds no $copy" >&2
       exit 1
@@ -66,7 +92,7 @@ case "${1:-}" in
         echo "cannot stage files.db in $state_dir" >&2
         exit 1
       }
-    restic restore "$snapshot" --tag "$tag" --host "$host" --target "$state_dir" --include /files
+    restic restore "$snapshot" --target "$state_dir" --include /files
     rm -f "$state_dir/files.db-wal" "$state_dir/files.db-shm"
     mv "$state_dir/files.db.restoring" "$state_dir/files.db"
     sqlite3 "$state_dir/files.db" 'SELECT id FROM uploads;' > "$work/ids"

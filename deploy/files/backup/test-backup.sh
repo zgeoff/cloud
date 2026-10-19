@@ -9,9 +9,10 @@
 # entrypoint, the state volume at /state and a local restic repository at /repo. What this proves:
 # a backup takes a consistent copy of files.db, with the rows still in a live writer's WAL, and the
 # files/ directory, and leaves incoming/ and the live database out; it stops before restic without
-# files.db; a restore checks the metadata copy before it changes anything, then brings back the
-# files and the metadata, drops the old WAL files, and removes each file the metadata does not
-# list; and ls and the usage. What it does not prove: R2, k3s, and the service starting on a
+# files.db, and while another job holds the lock; a restore checks the metadata copy, and stages it
+# on the volume, before it changes anything, then brings back the files and the metadata of one
+# snapshot, the one SNAPSHOT names if set, drops the old WAL files, and removes each file the
+# metadata does not list; and ls and the usage. What it does not prove: R2, k3s, and the service starting on a
 # restored volume, which the restore check in docs/runbooks/files.md covers.
 #
 # `bun run test:files-backup-fixture` runs it; one case alone, or against a local build of the
@@ -185,6 +186,7 @@ sqlite3 /state/files.db 'SELECT id FROM uploads'
 EOF
   diff - "$tree/state" << 'EOF'
 /state:
+.files-backup.lock
 files
 files.db
 
@@ -228,7 +230,124 @@ ls -A /state
 sqlite3 /state/files.db 'SELECT id FROM uploads'
 EOF
   diff - "$tree/state" << 'EOF'
+.files-backup.lock
 files.db
+LIVELIVELIVELIVELIVELI
+EOF
+}
+
+# Another job holds the lock, as a manual job does beside the CronJob's run: the backup stops
+# before it makes or removes a metadata copy, and saves no snapshot.
+it_refuses_a_backup_while_another_job_holds_the_lock() {
+  local image="$1" script="$2"
+  name="files-backup-$3-$BASHPID"
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+  setup_test "$tree" "$name" "$image"
+
+  run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
+    -v "$script:/opt/files-backup/backup.sh:ro" > "$tree/out" 2> "$tree/err" << 'EOF'
+sqlite3 /state/files.db "CREATE TABLE uploads (id TEXT PRIMARY KEY);"
+echo 'the other job' > /state/files-backup.db
+exec 8> /state/.files-backup.lock
+flock -n 8
+status=0
+/bin/sh /opt/files-backup/backup.sh backup || status=$?
+echo "status $status"
+cat /state/files-backup.db
+ls -A /repo
+EOF
+
+  diff - "$tree/err" <<< 'another files-backup job holds /state/.files-backup.lock'
+  diff - "$tree/out" << 'EOF'
+status 1
+the other job
+EOF
+}
+
+# Two snapshots, the later with another upload: SNAPSHOT names the earlier, and the restore brings
+# back that snapshot's metadata and files, not the latest one's. The later snapshot comes from
+# restic directly, since the script's retention keeps one snapshot a day.
+it_restores_the_snapshot_that_snapshot_names_rather_than_the_latest() {
+  local image="$1" script="$2" status=0
+  name="files-backup-$3-$BASHPID"
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+  setup_test "$tree" "$name" "$image"
+  run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
+    -v "$script:/opt/files-backup/backup.sh:ro" > "$tree/first" << 'EOF'
+sqlite3 /state/files.db "CREATE TABLE uploads (id TEXT PRIMARY KEY); INSERT INTO uploads VALUES ('EEEEEEEEEEEEEEEEEEEEEE');"
+mkdir /state/files
+echo 'the first upload' > /state/files/EEEEEEEEEEEEEEEEEEEEEE
+/bin/sh /opt/files-backup/backup.sh backup > /dev/null
+restic snapshots --json --tag files --host files latest | sed -n 's/.*[{,]"id":"\([0-9a-f]\{64\}\)".*/\1/p'
+sqlite3 /state/files.db "INSERT INTO uploads VALUES ('FFFFFFFFFFFFFFFFFFFFFF');"
+echo 'the second upload' > /state/files/FFFFFFFFFFFFFFFFFFFFFF
+sqlite3 /state/files.db ".backup '/state/files-backup.db'"
+(cd /state && restic backup --tag files --host files files-backup.db files > /dev/null)
+rm /state/files-backup.db
+EOF
+
+  run_backup "$name" "$image" --entrypoint /bin/sh -e "SNAPSHOT=$(cat "$tree/first")" \
+    -v "$script:/opt/files-backup/backup.sh:ro" /opt/files-backup/backup.sh restore \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  tail -n 1 "$tree/out" > "$tree/summary"
+  diff - "$tree/summary" <<< 'restored files.db: integrity_check ok, 1 uploads, 1 files without a row removed'
+  assert_status 0 "$status"
+  run_backup_shell "$name" "$image" "$tree" > "$tree/state" << 'EOF'
+ls /state/files
+cat /state/files/EEEEEEEEEEEEEEEEEEEEEE
+sqlite3 /state/files.db 'SELECT id FROM uploads'
+EOF
+  diff - "$tree/state" << 'EOF'
+EEEEEEEEEEEEEEEEEEEEEE
+the first upload
+EEEEEEEEEEEEEEEEEEEEEE
+EOF
+}
+
+# The state volume is a small tmpfs with too little room left for the snapshot's metadata copy:
+# the restore stops at the staging copy, before it changes the live database or the files. A tmpfs
+# volume empties when no container mounts it, so the setup, the restore and the check share one.
+it_stops_a_restore_before_any_change_when_the_metadata_does_not_fit_on_the_volume() {
+  local image="$1" script="$2"
+  name="files-backup-$3-$BASHPID"
+  create_case_tree 'docker rm -f "$name-backup" "$name-shell" "$name-setup" > /dev/null 2>&1 || true; docker volume rm -f "$name-state" "$name-repo" > /dev/null || true'
+  setup_test "$tree" "$name" "$image"
+  docker volume rm "$name-state" > /dev/null
+  docker volume create --driver local --opt type=tmpfs --opt device=tmpfs \
+    --opt o=size=1m,uid=65532,gid=65532 "$name-state" > /dev/null
+
+  run_backup_shell "$name" "$image" "$tree" -e STATE_DIR=/state \
+    -v "$script:/opt/files-backup/backup.sh:ro" > "$tree/out" << 'EOF'
+restic init > /dev/null
+mkdir -p /tmp/snap/files
+sqlite3 /tmp/snap/files-backup.db "CREATE TABLE uploads (id TEXT PRIMARY KEY, pad BLOB); INSERT INTO uploads VALUES ('GGGGGGGGGGGGGGGGGGGGGG', zeroblob(600000));"
+(cd /tmp/snap && restic backup --tag files --host files files-backup.db files > /dev/null)
+sqlite3 /state/files.db "CREATE TABLE uploads (id TEXT PRIMARY KEY); INSERT INTO uploads VALUES ('LIVELIVELIVELIVELIVELI');"
+mkdir /state/files
+echo 'a live upload' > /state/files/LIVELIVELIVELIVELIVELI
+dd if=/dev/zero of=/state/filler bs=1k count=700 2> /dev/null
+status=0
+/bin/sh /opt/files-backup/backup.sh restore > /dev/null 2> /tmp/err || status=$?
+echo "status $status"
+cat /tmp/err
+ls -A /state /state/files
+sqlite3 /state/files.db 'SELECT id FROM uploads'
+EOF
+
+  diff - "$tree/out" << 'EOF'
+status 1
+cp: write error: No space left on device
+cannot stage files.db in /state
+/state:
+.files-backup.lock
+files
+files.db
+filler
+
+/state/files:
+LIVELIVELIVELIVELIVELI
 LIVELIVELIVELIVELIVELI
 EOF
 }
