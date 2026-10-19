@@ -72,6 +72,7 @@
       };
       checks.x86_64-linux.cloud-host-firewall = import ./checks/cloud-host-firewall.nix {
         inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.preview = import ./checks/preview.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
