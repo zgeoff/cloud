@@ -1,11 +1,6 @@
-// Runs the tests that sit beside the given files: a test file runs itself,
-// and a source file runs its sibling test file. Prints a line and exits 0
-// when none of the files has a test.
 import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
-// Test files related to the given paths, ordered and deduplicated: a .test.ts selects itself;
-// another .ts (not .d.ts) selects its sibling .test.ts. Paths resolve against cwd.
 export function collectRelatedTests(paths: readonly string[], cwd: string): string[] {
   const selected = new Set<string>();
 
@@ -26,9 +21,6 @@ export function collectRelatedTests(paths: readonly string[], cwd: string): stri
   return [...selected];
 }
 
-// Runs the related tests, or prints a note and returns 0 when there are none. A test in a package
-// with its own bunfig.toml runs from that package under its preload; the rest run through the
-// repo's test script. Returns the first failing exit code, or 0.
 export async function runRelatedTests(paths: readonly string[], cwd: string): Promise<number> {
   const tests = collectRelatedTests(paths, cwd);
 
@@ -52,7 +44,6 @@ export async function runRelatedTests(paths: readonly string[], cwd: string): Pr
   return 0;
 }
 
-// the nearest directory below cwd, relative to it, that holds the test and its own bunfig.toml
 function findPackageDir(test: string, cwd: string): string | undefined {
   for (
     let directory = dirname(test);

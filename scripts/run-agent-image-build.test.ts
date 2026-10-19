@@ -8,7 +8,6 @@ import { buildStubImp } from './test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
-// a real repository to archive, and a work directory the build writes into
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-agent-image-build-'));
 

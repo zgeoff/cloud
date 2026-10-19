@@ -2,7 +2,6 @@ import type { ReadinessLine } from './format-readiness-line.ts';
 import type { HostCheckIO } from './run-host-check.ts';
 import { runHostCheck } from './run-host-check.ts';
 
-// the host's own state that the gateway needs: a Ready node, free memory and the tunnel
 export async function checkGatewayHost(
   io: Readonly<HostCheckIO>,
 ): Promise<readonly ReadinessLine[]> {
@@ -13,7 +12,6 @@ export async function checkGatewayHost(
   return [node, memory, tunnel];
 }
 
-// the single node's STATUS column, which `get nodes --no-headers` prints second
 async function checkNode(io: Readonly<HostCheckIO>): Promise<ReadinessLine> {
   const result = await runHostCheck(io, ['k3s', 'kubectl', 'get', 'nodes', '--no-headers']);
 
@@ -22,6 +20,7 @@ async function checkNode(io: Readonly<HostCheckIO>): Promise<ReadinessLine> {
     .split('\n')
     .filter((line) => line !== '');
 
+  // `get nodes --no-headers` prints the STATUS column second
   const statuses = lines.map((line) => line.trim().split(/\s+/u)[1]);
   const isReady = result.exitCode === 0 && statuses.length === 1 && statuses[0] === 'Ready';
 
@@ -33,13 +32,13 @@ async function checkNode(io: Readonly<HostCheckIO>): Promise<ReadinessLine> {
       };
 }
 
-// the gateway needs 256 MiB; the check wants a margin of 1024 MiB in free's available column
 async function checkMemory(io: Readonly<HostCheckIO>): Promise<ReadinessLine> {
   const result = await runHostCheck(io, ['free', '-m']);
 
   const match = /^Mem:(?:\s+\d+){5}\s+(?<available>\d+)\s*$/mu.exec(result.stdout.toString());
   const available = match?.groups?.['available'];
 
+  // the gateway needs 256 MiB; the check wants a margin of 1024 MiB in free's available column
   if (result.exitCode === 0 && available !== undefined && Number(available) >= 1024) {
     return { status: 'ok', text: `host has ${available} MiB available (gateway needs 256 MiB)` };
   }

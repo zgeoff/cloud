@@ -22,8 +22,6 @@ const glmAddArgs = [
   'bearer',
 ];
 
-// Adds impd's secret glm from `atc-key zai` on this machine: impd's broker sets
-// `authorization: Bearer <key>` on requests to api.z.ai only. The key reaches imp on stdin.
 export async function installATCGLMSecret(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,

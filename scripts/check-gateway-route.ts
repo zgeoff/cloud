@@ -1,8 +1,6 @@
 import type { ReadinessLine } from './format-readiness-line.ts';
 import type { Runner } from './run-process.ts';
 
-// The public route: a DNS record for atc.geoff.cloud, then the gateway's protected-resource
-// metadata through the tunnel. A metadata request that gets no answer reads as status 000.
 export async function checkGatewayRoute(run: Runner): Promise<ReadinessLine> {
   const lookup = await run(['getent', 'hosts', 'atc.geoff.cloud'], { timeoutMs: 30_000 });
 

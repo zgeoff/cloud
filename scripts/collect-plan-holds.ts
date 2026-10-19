@@ -1,8 +1,5 @@
 import { findJSONField } from './find-json-field.ts';
 
-// The reasons a planned prod apply must wait for a person, from `pulumi preview --json`'s digest;
-// none lets it run unattended. It fails closed: an op outside the allowed list holds, so an op a
-// later Pulumi adds holds too, and so does a digest it cannot read.
 export function collectPlanHolds(digest: unknown): string[] {
   const steps = findJSONField(digest, 'steps');
 
@@ -47,6 +44,7 @@ function collectStepHolds(step: unknown): string[] {
     return ['the plan holds a step without an op or a URN'];
   }
 
+  // fails closed: an op that a later Pulumi adds holds too
   if (!unattendedOps.has(op)) {
     return [`${op} ${urn}`];
   }
@@ -58,8 +56,8 @@ function collectStepHolds(step: unknown): string[] {
   return [];
 }
 
-// urn:pulumi:<stack>::<project>::<parent types and the type, joined by $>::<name>
 function getURNType(urn: string): string {
+  // urn:pulumi:<stack>::<project>::<parent types and the type, joined by $>::<name>
   const qualifiedType = urn.split('::')[2] ?? '';
 
   return qualifiedType.split('$').at(-1) ?? '';

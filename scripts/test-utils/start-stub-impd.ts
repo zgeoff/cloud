@@ -1,8 +1,5 @@
 import { onTestFinished } from 'bun:test';
 
-// Stands in for impd's tokens.whoami and /health on an ephemeral loopback port, for real curl to
-// ask; the test stops it when it ends. Any other request fails closed with a 500 that names the
-// stand-in, and every request is recorded.
 interface StubImpdRequest {
   readonly method: string;
 
@@ -27,8 +24,8 @@ export interface StubImpdHealth {
   readonly body: string;
 }
 
-// impd-local-health.sh counts impd up on a 200 whose body holds "ready":true; the rest of the
-// real body needs an impd sample
+// the host's impd health check counts impd up on a 200 whose body holds "ready":true; the rest of
+// the real body needs an impd sample
 const readyHealth: StubImpdHealth = { status: 200, body: '{"ready":true}' };
 
 export function startStubImpd(goodToken: string, health: StubImpdHealth = readyHealth): StubImpd {

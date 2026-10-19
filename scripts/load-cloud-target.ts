@@ -7,8 +7,6 @@ export interface CloudTarget {
   readonly guestATC?: string | undefined;
 }
 
-// Loads the image fields of an atc config's targets.cloud. A config that is missing, is not JSON,
-// or holds no targets.cloud object stops the script with one message for all three.
 export async function loadCloudTarget(config: string): Promise<CloudTarget> {
   const target = await readCloudTarget(config);
 

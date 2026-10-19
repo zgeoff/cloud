@@ -6,8 +6,6 @@ import { runHostCheck } from './run-host-check.ts';
 // a probe pod pulls its image and starts, so it gets longer than a kubectl get
 const probeTimeoutMs = 300_000;
 
-// The gateway answers in the cluster with its public Host, and any other Host gets 403. It
-// checks nothing before the deploy creates the gateway.
 export async function checkGatewayInCluster(
   io: Readonly<HostCheckIO>,
 ): Promise<readonly ReadinessLine[]> {

@@ -9,15 +9,12 @@ import { runOnHost } from './run-host-check.ts';
 import { runOp } from './run-op.ts';
 
 export interface ATCCredentialsPreflight {
-  // impd's secrets and tokens, as imp's CLI prints them
   readonly secrets: unknown;
   readonly tokens: unknown;
   readonly hasItem: boolean;
   readonly hostFiles: readonly string[];
 }
 
-// Reads what exists, and creates only the root-only directory on the host, so every check that
-// can stop the run comes before the first change
 export async function checkATCCredentialsPreflight(
   context: Readonly<ATCCredentialsContext>,
 ): Promise<ATCCredentialsPreflight> {
@@ -41,11 +38,10 @@ export async function checkATCCredentialsPreflight(
   return { secrets, tokens, hasItem, hostFiles };
 }
 
-// the vault, atc-key and the host; command -v finds atc-key as bash does, and atc-key itself runs
-// only once glm is missing
 async function requireTools(context: Readonly<ATCCredentialsContext>) {
   await runOp(context, ['vault', 'get', context.vault, '--format', 'json']);
 
+  // command -v finds atc-key as bash does; atc-key itself runs only once glm is missing
   const found = await context.run(['sh', '-c', 'command -v atc-key > /dev/null']);
 
   if (found.exitCode !== 0) {
@@ -55,8 +51,8 @@ async function requireTools(context: Readonly<ATCCredentialsContext>) {
   await runOnHost(context, ['true']);
 }
 
-// a failing `info` stops here with docker's own message, so the check reads only a real answer
 async function requireGrantableTokens(context: Readonly<ATCCredentialsContext>) {
+  // a failing `info` stops here with docker's own message, so the check reads only a real answer
   const info = await loadHostImpJSON(context, ['info']);
 
   const features = findJSONField(info, 'features');
@@ -66,9 +62,9 @@ async function requireGrantableTokens(context: Readonly<ATCCredentialsContext>) 
   }
 }
 
-// impd refuses to mint atc-cloud while a secret it may grant is missing, so every one must exist
-// before the run writes a credential. glm is the exception: the run adds it itself.
 function requireGrantableSecrets(secrets: unknown) {
+  // impd refuses to mint atc-cloud while a secret it may grant is missing; the run adds glm
+  // itself
   const missing = atcCloudGrantable.filter(
     (name) => name !== 'glm' && findRecord(secrets, 'name', name) === undefined,
   );

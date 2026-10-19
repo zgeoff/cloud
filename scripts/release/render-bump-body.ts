@@ -6,13 +6,10 @@ export interface BumpBodyInput {
   readonly record: ReleaseRecord;
   readonly version: string;
 
-  // the pins' versions on main, in the record's order
   readonly pinned: readonly string[];
   readonly labels: readonly string[];
 }
 
-// The bump pull request's body: the release, each pin's move, why it merges on its own or waits
-// for a review, and what rolls the merged pin out
 export function renderBumpBody(input: BumpBodyInput): string {
   const tag = `${input.record.tagPrefix}${input.version}`;
   const url = `https://github.com/${input.record.repo}/releases/tag/${encodeURIComponent(tag).replaceAll('%2F', '/')}`;
@@ -56,8 +53,6 @@ function renderMergeLines(input: BumpBodyInput) {
   return ['It waits for a review, because:', '', ...reasons];
 }
 
-// The review reason each label gives. The release workflows run these scripts without
-// node_modules, so a Map stands in for ts-pattern's match, and a label it lacks gives no reason.
 const reasonRenderers = new Map<string, (version: string) => string[]>([
   ['update:major', () => ['- it is a major release.']],
   [
@@ -80,5 +75,6 @@ const reasonRenderers = new Map<string, (version: string) => string[]>([
 ]);
 
 function renderReason(label: string, version: string) {
+  // the release workflows run without node_modules, so a Map stands in for ts-pattern's match
   return reasonRenderers.get(label)?.(version) ?? [];
 }

@@ -6,16 +6,12 @@ import { findReleaseBumps } from './find-release-bumps.ts';
 export interface RunWriteReleaseBumpsOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // the root of the zgeoff/cloud checkout whose pins it reads
   readonly root: string;
   readonly run: Runner;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
 
-// The release check's check job step: it writes each bump line as the multiline output `bumps` to
-// GITHUB_OUTPUT, and lists them on stdout and in GITHUB_STEP_SUMMARY. With no bump it says so there
-// and writes no output, which skips the bump job. A failed search writes nothing.
 export async function runWriteReleaseBumps(
   options: Readonly<RunWriteReleaseBumpsOptions>,
 ): Promise<number> {
@@ -62,6 +58,7 @@ async function writeBumps(
 ) {
   const text = renderSummary(bumps);
 
+  // no output skips the bump job
   if (bumps.length > 0) {
     await appendFile(files.output, `bumps<<EOF\n${bumps.join('\n')}\nEOF\n`);
   }

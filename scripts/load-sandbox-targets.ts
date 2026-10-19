@@ -9,7 +9,6 @@ export interface RemoteResult {
 }
 
 export interface SandboxTarget extends ProbeTarget {
-  // what the address is, for the report: impd, a node, nixie's pod or Service, or the tailnet
   readonly role: 'impd' | 'node' | 'pod' | 'service' | 'tailnet';
 }
 
@@ -20,9 +19,6 @@ export type TargetsResult =
 // impd's API, which nixie's config names by this host
 const impdHost = topology.imp.domain;
 
-// Reads, from geoffcloud, each address a fetch sandbox must not reach: impd's addresses on its
-// HTTPS port, each node's addresses on the kubelet's port, which listens on every address, and
-// nixie's pod and Service on nixie's API port. The tailnet target comes from the caller.
 export async function loadSandboxTargets(
   runRemote: (command: string) => Promise<RemoteResult>,
   tailnet: ProbeTarget,
@@ -63,6 +59,8 @@ function buildTargets(outputs: readonly string[], tailnet: ProbeTarget): Targets
       host,
       port: 443,
     })),
+
+    // the kubelet's port listens on every address of each node
     ...collectAddresses(nodes).map((host) => ({ role: 'node' as const, host, port: 10_250 })),
     ...collectAddresses(pod).map((host) => ({ role: 'pod' as const, host, port: 8080 })),
     ...collectAddresses(service).map((host) => ({ role: 'service' as const, host, port: 8080 })),
@@ -78,7 +76,7 @@ function buildTargets(outputs: readonly string[], tailnet: ProbeTarget): Targets
     : { ok: false, error: `found no address for: ${missing.join(', ')}` };
 }
 
-// each word that is an IP address, once; anything else never reaches a command line
 function collectAddresses(text: string): string[] {
+  // anything that is not an IP address never reaches a command line
   return [...new Set(text.split(/\s+/u).filter((word) => isIP(word) !== 0))];
 }

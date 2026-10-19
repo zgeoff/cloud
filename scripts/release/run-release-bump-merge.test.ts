@@ -21,8 +21,6 @@ async function setupTest() {
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
-
-  // the paths the runner hands every step
   const env = { GITHUB_EVENT_PATH: eventPath, GITHUB_STEP_SUMMARY: summary };
 
   return { summary, eventPath, env, printOut, printErr };

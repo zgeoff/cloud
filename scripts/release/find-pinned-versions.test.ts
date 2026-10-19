@@ -45,7 +45,6 @@ test('it fails on a pin file the checkout lacks', () => {
   );
 });
 
-// the release check reads every record but a published-images one, whose workflow pins it
 const checkedRecords = releaseRegistry.filter(
   (record) => record.source.kind !== 'published-images',
 );

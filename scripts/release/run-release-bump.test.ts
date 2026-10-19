@@ -14,7 +14,6 @@ async function setupTest() {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  // the image the flake lock runs in, as the checkout's own scripts/nix-image.sh pins it
   const pins = await Bun.file(new URL('../nix-image.sh', import.meta.url)).text();
 
   const nixImage = /^NIX_IMAGE='(?<image>[^']+)'$/mu.exec(pins)?.groups?.['image'] ?? '';

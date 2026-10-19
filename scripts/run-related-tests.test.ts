@@ -180,7 +180,6 @@ test('it stops at the first failing run and exits with its failing code', async 
   expect(run.stderr.toString()).not.toInclude('1 pass');
 });
 
-// A temp directory standing in for a repo root.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-related-tests-'));
 

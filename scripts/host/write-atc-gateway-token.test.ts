@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from '../run-process.ts';
 
-// The script runs as the host gets it: real bash reads it on stdin, then the bearer's line
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'write-atc-gateway-token-'));
 

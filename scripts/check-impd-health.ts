@@ -5,14 +5,12 @@ import { readHostScript } from './read-host-script.ts';
 import type { HostCheckIO } from './run-host-check.ts';
 import { runHostCheck } from './run-host-check.ts';
 
-// The cloud daemon drives impd on the host's loopback (tag:cloud has no grant to tag:imp), so the
-// check reads impd's /health there and passes only a 200 whose JSON body has ready true. A failed
-// check's line says why, never the body itself.
 export async function checkImpdHealth(io: Readonly<HostCheckIO>): Promise<ReadinessLine> {
   const script = await readHostScript('read-impd-health.sh');
 
   const port = String(topology.imp.apiPort);
 
+  // tag:cloud has no grant to tag:imp, so the check reads impd on the host's loopback
   const result = await runHostCheck(io, ['bash', '-s', '--', port], { stdin: script });
 
   const problem =
@@ -23,7 +21,6 @@ export async function checkImpdHealth(io: Readonly<HostCheckIO>): Promise<Readin
     : { status: 'FAIL', text: `impd is not ready on ${io.host}'s loopback: ${problem}` };
 }
 
-// what read-impd-health.sh printed: the status on its first line, and impd's body after it
 function findHealthProblem(output: string): string | undefined {
   const [code = '', ...rest] = output.split('\n');
 

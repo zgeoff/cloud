@@ -1,8 +1,6 @@
 import { findJSONField } from '../find-json-field.ts';
 import type { BumpPullRequest } from './decide.ts';
 
-// Parses what `gh pr view <number> --json` prints for the fields decide reads, or gives an Error.
-// Only Actions check runs count as checks: a commit status, such as a review bot's, does not.
 export function parseBumpPullRequest(number: number, text: string): BumpPullRequest | Error {
   const value = tryParseJSON(text);
 
@@ -51,7 +49,6 @@ function tryParseJSON(text: string): unknown {
   }
 }
 
-// each item's string field, or null when the value is not a list of such items
 function collectStrings(value: unknown, key: string): readonly string[] | null {
   if (!Array.isArray(value)) {
     return null;
@@ -103,6 +100,7 @@ function collectCheckRuns(value: unknown): readonly CheckRun[] | null {
   const items: readonly unknown[] = value;
   const runs: CheckRun[] = [];
 
+  // a commit status, such as a review bot's, is no check run
   for (const item of items.filter((each) => findJSONField(each, '__typename') === 'CheckRun')) {
     const run = toCheckRun(item);
 

@@ -7,9 +7,6 @@ import type { ReleaseRead, ReleaseReadResult } from './read-release-values.ts';
 import type { ReleaseRecord } from './release-registry.ts';
 import { runChecked } from './run-checked.ts';
 
-// Reads the digests that the target's notes list under `## Images`, and the review flags from the
-// notes of the oldest pinned release, the target and every release between, each of which lists
-// only its own migrations. A release the latest 30 do not reach would go unread, so it fails.
 export async function readReleaseNotesValues(
   read: ReleaseRead,
 ): Promise<ReleaseReadResult | Error> {
@@ -33,7 +30,6 @@ export async function readReleaseNotesValues(
     : { values: { digests }, flags: findNixieReleaseFlags({ pinned, target, between }) };
 }
 
-// the oldest pinned version, the target, then each version between them
 async function findVersionsToRead(read: ReleaseRead) {
   const prefix = read.record.tagPrefix;
 
@@ -114,7 +110,6 @@ async function readAllNotes(read: ReleaseRead, versions: readonly string[]) {
   return notes;
 }
 
-// each image that a pin's digest part names, from exactly one item under `## Images`
 function collectDigests(record: ReleaseRecord, target: string) {
   const section = findImagesSection(target);
   const digests: Record<string, string> = {};

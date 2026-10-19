@@ -2,7 +2,6 @@ import { runChecked } from './run-checked.ts';
 import { toRunOptions } from './to-run-options.ts';
 import type { BumpContext } from './types.ts';
 
-// runs each git command in the clone in order, and gives the first failure's Error
 export async function runGitSteps(
   context: BumpContext,
   steps: readonly (readonly string[])[],

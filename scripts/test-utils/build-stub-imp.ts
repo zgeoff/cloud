@@ -2,8 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for the impz CLI calls that build-agent-image.ts and switch-agent-image.ts make, over
-// the host's images and imps. `image ls --json` prints the fields of the real output they read.
 interface StubImpImage {
   readonly name: string;
   readonly digest: string;
@@ -18,21 +16,17 @@ export interface StubImpScenario {
   readonly images: readonly StubImpImage[];
   readonly imps?: readonly StubImpInstance[];
 
-  // `image build` fails with this stderr instead of adding the image
   readonly buildError?: string;
 
-  // `image build` outlives the runner's timeout, adding nothing
   readonly buildTimesOut?: boolean;
 }
 
 export interface StubImp {
   readonly handler: StubHandler;
 
-  // the host's images and imps as the calls left them
   readonly images: readonly StubImpImage[];
   readonly imps: readonly StubImpInstance[];
 
-  // the Dockerfile of each build directory, read when its build ran
   readonly builtDockerfiles: readonly string[];
 }
 
@@ -64,7 +58,6 @@ type ImpCommand = (
   args: readonly string[],
 ) => StubAnswer | Promise<StubAnswer>;
 
-// each command's argv after `impz`, with `*` for one argument of any value
 const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ['image ls --json', buildImageList],
   ['image build * --name *', (state, args) => runBuild(state, args[2] ?? '', args[4] ?? '')],
@@ -95,6 +88,7 @@ function isShapeOf(shape: string, args: readonly string[]) {
 }
 
 function buildImageList(state: StubImpState): StubAnswer {
+  // only the fields of the real `image ls --json` output that the scripts read
   const images = state.images.map((image) => ({
     name: image.name,
     ref: `imp/${image.name}:latest`,
@@ -122,12 +116,12 @@ async function runBuild(state: StubImpState, directory: string, name: string): P
   return {};
 }
 
-// The NOT_FOUND messages match imp 0.38.1's answers for a missing name, checked against the
-// geoffcloud host; the CONFLICT messages were not reproduced, and the scripts read only exit codes.
 function removeImage(state: StubImpState, name: string): StubAnswer {
   const index = state.images.findIndex((image) => image.name === name);
 
   if (index === -1) {
+    // imp 0.38.1's NOT_FOUND answer, checked against the geoffcloud host; the CONFLICT messages
+    // were not reproduced, and the scripts read only exit codes
     return { exitCode: 1, stderr: `impz: NOT_FOUND: image ${name} not found\n` };
   }
 

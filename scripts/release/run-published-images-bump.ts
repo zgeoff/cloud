@@ -21,9 +21,6 @@ import { runGitSteps } from './run-git-steps.ts';
 import { toRunOptions } from './to-run-options.ts';
 import type { BumpContext } from './types.ts';
 
-// Opens or updates release-check/<dependency>, which pins the images this repository just published:
-// each tag from the checked-out commit, and its digest from GHCR, which docker must be signed in to.
-// `bun scripts/release/run-published-images-bump.ts <dependency>`
 export async function runPublishedImagesBump(
   context: BumpContext,
   args: readonly string[],
@@ -87,8 +84,6 @@ export async function runPublishedImagesBump(
   });
 }
 
-// Runs can finish out of commit order, and each one rebuilds the one branch from main, so a run
-// whose tags main no longer names leaves the branch to the newer push's run
 async function findMovedTags(
   context: BumpContext,
   images: readonly PublishedImage[],
@@ -113,6 +108,8 @@ async function findMovedTags(
     return current;
   }
 
+  // runs can finish out of commit order, and each rebuilds the one branch from main, so a run whose
+  // tags main no longer names leaves the branch to the newer push's run
   return JSON.stringify(published) === JSON.stringify(current)
     ? undefined
     : {
@@ -120,7 +117,6 @@ async function findMovedTags(
       };
 }
 
-// each file's contents on origin's main, fetched now
 async function readMainFiles(context: BumpContext, paths: readonly string[]) {
   const fetched = await runGitSteps(context, [['fetch', '-q', 'origin', 'main']]);
 
@@ -147,7 +143,6 @@ async function readMainFiles(context: BumpContext, paths: readonly string[]) {
   return files;
 }
 
-// each image's tag, as the line its pattern matches names it
 function collectTags(files: Readonly<Record<string, string>>, images: readonly PublishedImage[]) {
   const tags: Record<string, string> = {};
 
@@ -169,13 +164,10 @@ interface Bump {
   readonly values: ReleaseValues;
   readonly labels: readonly string[];
 
-  // each pin's values on the checkout, and after the bump
   readonly held: PinValues;
   readonly planned: PinValues;
 }
 
-// Reads the tags and their digests, and plans the pins once before the branch is built, so a pin
-// that cannot move fails here and the body names what the bump changes
 async function readBump(
   context: BumpContext,
   record: ReleaseRecord,
@@ -229,6 +221,7 @@ async function readValues(
   for (const image of images) {
     const ref = `ghcr.io/zgeoff/${image.image}:${tags[image.image] ?? ''}`;
 
+    // docker must be signed in to GHCR
     const digest = await readImageDigest(context.run, ref);
 
     if (digest instanceof Error) {
@@ -241,9 +234,6 @@ async function readValues(
   return { tags, digests };
 }
 
-// A pin's release version that moves rates the bump as the release check rates it. A bump that
-// moves no release version, such as a new backup image revision alone, has no update type to rate,
-// so it waits for a review.
 function planLabels(version: string, record: ReleaseRecord, held: PinValues) {
   const pinned = record.pins.flatMap((pin) => {
     const each = held[pin.id]?.['version'];
@@ -259,6 +249,8 @@ function planLabels(version: string, record: ReleaseRecord, held: PinValues) {
     return target !== undefined && from !== undefined && isNewerVersion(target, from);
   });
 
+  // a bump that moves no release version, such as a new backup image revision alone, has no update
+  // type to rate
   return moves ? planBumpLabels(version, pinned, []) : ['needs-review'];
 }
 
@@ -274,7 +266,6 @@ async function loadFiles(root: string, paths: readonly string[]) {
   return Object.fromEntries(entries.flat());
 }
 
-// the Actions run that published the images, from the variables its runner sets
 function findRunURL(env: Readonly<Record<string, string | undefined>>) {
   const server = env['GITHUB_SERVER_URL'] ?? '';
   const repository = env['GITHUB_REPOSITORY'] ?? '';

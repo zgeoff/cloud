@@ -5,7 +5,6 @@ export interface StreamHold {
   readonly url: string;
   readonly token: string;
 
-  // the stream carries only records after this log sequence
   readonly afterSequence: number;
   readonly holdMs: number;
 }
@@ -14,16 +13,12 @@ export interface StreamReport {
   readonly openMs: number;
   readonly keepalives: number;
 
-  // the longest wait for a keepalive, from the open to the end
   readonly longestGapMs: number;
   readonly records: number;
 
-  // held for the whole hold, closed early by nixie, or failed with the reason
   readonly end: 'held' | 'closed' | `failed: ${string}`;
 }
 
-// Holds the conversation thread's stream open, counting its keepalives and its records. oRPC sends
-// the stream as server-sent events: a keepalive is a comment, and a record is a `message` event.
 export async function readNixieStream(
   hold: Readonly<StreamHold>,
 ): Promise<RPCResult<StreamReport>> {
@@ -49,8 +44,7 @@ export async function readNixieStream(
   return { ok: true, value: report };
 }
 
-// The open stream's reader, behind functions. The hold's stop ends a read, so an end after the
-// stop is a stream that stayed open.
+// The hold's stop ends a read, so an end after the stop is a stream that stayed open.
 interface StreamSource {
   readonly next: () => Promise<{ readonly done: boolean; readonly value?: string | undefined }>;
   readonly cancel: () => Promise<void>;
@@ -105,10 +99,8 @@ async function startStream(hold: Readonly<StreamHold>): Promise<RPCResult<Stream
 interface Tally {
   readonly openedAt: number;
 
-  // the text after the last complete event, which waits for the next chunk
   readonly buffer: string;
 
-  // when each keepalive arrived, in ms after the open
   readonly keepaliveTimes: readonly number[];
   readonly records: number;
 }
@@ -137,12 +129,11 @@ async function readEvents(source: StreamSource, tally: Tally): Promise<StreamRep
 interface TallyStep {
   readonly tally: Tally;
 
-  // why the stream ends, when an event ends it
   readonly failure: string | null;
 }
 
-// An event block ends at a blank line
 function countChunk(tally: Tally, text: string): TallyStep {
+  // an SSE event block ends at a blank line
   const blocks = (tally.buffer + text).split('\n\n');
   const buffer = blocks.pop() ?? '';
 
@@ -155,6 +146,7 @@ function countChunk(tally: Tally, text: string): TallyStep {
 function countEvent(tally: Tally, block: string): TallyStep {
   const lines = block.split('\n').filter((line) => line !== '');
 
+  // oRPC sends a keepalive as an SSE comment, and a record as a `message` event
   if (lines.length > 0 && lines.every((line) => line.startsWith(':'))) {
     const keepaliveTimes = [...tally.keepaliveTimes, performance.now() - tally.openedAt];
 

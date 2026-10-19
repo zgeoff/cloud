@@ -5,8 +5,6 @@ import type { Runner } from './run-process.ts';
 
 const image = 'ghcr.io/zgeoff/atc-gateway';
 
-// The package is private, so ghcr's pull token costs a GitHub token that reads packages, and the
-// tag list answers 200 with it. A missing or refused credential FAILs, since the image may exist.
 export async function checkGatewayImage(run: Runner): Promise<ReadinessLine> {
   const githubToken = await readGitHubToken(run);
 
@@ -20,12 +18,12 @@ export async function checkGatewayImage(run: Runner): Promise<ReadinessLine> {
     return { status: 'ok', text: `image ${image} exists` };
   }
 
+  // a refused credential FAILs, since the image may exist
   return status === 401 || status === 403
     ? { status: 'FAIL', text: `image ${image}: ghcr.io refused the GitHub token (${status})` }
     : { status: 'missing', text: `image ${image}` };
 }
 
-// the tag list's status, the token realm's 401 or 403, or 0 when ghcr does not answer
 async function readTagListStatus(githubToken: string) {
   try {
     const pullToken = await readPullToken(githubToken);
@@ -45,10 +43,9 @@ async function readTagListStatus(githubToken: string) {
   }
 }
 
-// ghcr's pull token, paid for with the GitHub token as basic auth's password, or the realm's 401
-// or 403 when it refuses that token, or 0 when it hands out none
 async function readPullToken(githubToken: string): Promise<string | number> {
   const realm = await fetch('https://ghcr.io/token?scope=repository:zgeoff/atc-gateway:pull', {
+    // ghcr's realm takes the GitHub token as basic auth's password
     headers: { authorization: `Basic ${btoa(`x:${githubToken}`)}` },
     signal: AbortSignal.timeout(10_000),
   });

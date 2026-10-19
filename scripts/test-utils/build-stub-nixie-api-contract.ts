@@ -2,9 +2,6 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for `bun <checkout>/scripts/nixie-api/write-nixie-api-contract.ts <tag>`, run from the
-// checkout's root. It writes a marked openapi.json and openapi.d.ts where the real script writes
-// them, and prints its line; with an error, it fails with exit 1 and writes nothing.
 export interface StubNixieAPIContractScenario {
   readonly error?: string;
 }

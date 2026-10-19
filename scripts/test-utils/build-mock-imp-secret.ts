@@ -1,6 +1,3 @@
-// An impd secret as `impz secret ls --json` prints it, after imp 1.0.0's SecretSchema
-// (packages/api/src/secret-schema.ts): the glm secret that install-atc-gateway-credentials adds,
-// by default. Its values are fixed: the script compares them, so none is arbitrary.
 export interface MockImpSecret {
   readonly name: string;
   readonly kind: string;
@@ -14,6 +11,7 @@ export interface MockImpSecret {
 }
 
 export function buildMockImpSecret(overrides: Partial<MockImpSecret> = {}): MockImpSecret {
+  // the values are fixed, since the script under test compares them
   return {
     name: 'glm',
     kind: 'custom',

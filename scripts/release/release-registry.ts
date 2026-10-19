@@ -1,54 +1,55 @@
-// One record per dependency whose releases cloud pins, so a new dependency is one record built
-// from the kinds below (docs/runbooks/release-check.md). It imports nothing outside Bun, because
-// the release workflows run it without node_modules.
+// This file imports nothing outside Bun, because the release workflows run it without node_modules.
 
-// what a release publishes for its pins beside the version, which decides how the bump reads it
 type ReleaseSource =
   | { readonly kind: 'sha256sums' }
   | { readonly kind: 'image-digests'; readonly images: readonly string[] }
   | { readonly kind: 'release-notes' }
   | { readonly kind: 'npm-tarball'; readonly packageName: string }
+
+  // the workflow that publishes the images opens their pull request, and the first image's tag is
+  // the bump's version
   | { readonly kind: 'published-images'; readonly images: readonly PublishedImage[] };
 
-// An image this repository's own workflow publishes, at the tag that one line of a pin file names
-// in its tag group. The workflow that publishes the images opens their pull request, so the release
-// check never reads a published-images record, and the first image's tag is the bump's version.
 export interface PublishedImage {
   readonly image: string;
   readonly file: string;
+
+  // matches the one line of the file that names the image's tag in its tag group
   readonly pattern: string;
 }
 
-// A version is read and compared. A tag or a commit moves with the version and is never read. A
-// sum, a digest or a tarball sum is the release's own value, which a pin at its version must hold.
-// An image tag is the tag a published image carries, which moves with that image's digest.
 export type PinPart =
   | { readonly kind: 'version' }
+
+  // a tag or a commit moves with the version and is never read
   | { readonly kind: 'tag' }
   | { readonly kind: 'commit'; readonly length: number }
+
+  // a sum, a digest or a tarball sum is the release's own value, which a pin at its version must
+  // hold
   | { readonly kind: 'sum'; readonly asset: string | PinAssetLine }
   | { readonly kind: 'digest'; readonly image: string }
   | { readonly kind: 'tarball-sum' }
+
+  // moves with that image's digest
   | { readonly kind: 'image-tag'; readonly image: string };
 
-// the line of a pin file that names the asset whose sum another line pins
 export interface PinAssetLine {
   readonly file: string;
   readonly pattern: string;
 }
 
-// Exactly one line of the file must match the pattern, a regular expression's source that is
-// matched with the u flag; each named group is the part of that name. A source, unlike a RegExp,
-// is readonly all the way down.
 export interface PinLine {
   readonly file: string;
+
+  // a regular expression's source, matched with the u flag, that exactly one line of the file must
+  // match; each named group is the part of that name
   readonly pattern: string;
   readonly parts: Readonly<Record<string, PinPart>>;
 }
 
-// `nix flake lock` in the flake's directory after the pin's lines are written, which must then
-// lock the input at the pinned commit
 export interface PinLock {
+  // runs after the pin's lines are written, and must lock the input at the pinned commit
   readonly kind: 'nix-flake-lock';
   readonly flake: string;
   readonly input: string;
@@ -82,8 +83,8 @@ export interface ReleaseRecord {
   readonly rollout: string;
 }
 
-// the script runs with bun and takes the release's tag as its one argument
 interface GeneratedFiles {
+  // runs with bun and takes the release's tag as its one argument
   readonly script: string;
   readonly files: readonly string[];
 }

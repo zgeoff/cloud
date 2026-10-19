@@ -15,7 +15,6 @@ export interface ApplyReleasePinsOptions {
   readonly version: string;
   readonly values: ReleaseValues;
 
-  // the root of the zgeoff/cloud checkout whose pins it writes
   readonly root: string;
   readonly run: Runner;
 
@@ -25,8 +24,6 @@ export interface ApplyReleasePinsOptions {
   readonly printOut: (text: string) => void;
 }
 
-// Writes the release's pins in the checkout, as planPinEdits plans them, then locks each written
-// pin's flake input, which must lock the release's commit
 export async function applyReleasePins(
   options: Readonly<ApplyReleasePinsOptions>,
 ): Promise<Error | undefined> {
@@ -56,7 +53,6 @@ export async function applyReleasePins(
   return undefined;
 }
 
-// plans the pin table's new text beside the pin edits, when the record's entries change
 function planTableWrite(
   record: ReleaseRecord,
   files: Readonly<Record<string, string>>,
@@ -76,8 +72,6 @@ function planTableWrite(
   return { ...plan, files: { ...plan.files, [pinTableFile]: table } };
 }
 
-// a failed lock or generator puts every pin file, lock file and generated file back, so no pin
-// moves without its lock and the files generated from its release
 async function writeLockedPins(
   options: Readonly<ApplyReleasePinsOptions>,
   files: Readonly<Record<string, string>>,
@@ -98,6 +92,7 @@ async function writeLockedPins(
   // a generated file that the checkout lacked has no contents to put back
   const generatedFiles = (options.record.generated?.files ?? []).filter((path) => path in files);
 
+  // put every file back, so no pin moves without its lock and the files generated from its release
   if (generated instanceof Error) {
     await writePinFiles(options.root, files, [
       ...Object.keys(plan.files),
@@ -109,7 +104,6 @@ async function writeLockedPins(
   return generated;
 }
 
-// the release's tag reaches the record's generator, which writes its files in the checkout
 async function runGenerator(
   options: Readonly<ApplyReleasePinsOptions>,
 ): Promise<Error | undefined> {
@@ -146,7 +140,6 @@ async function runLocks(
   return undefined;
 }
 
-// the contents of each file the record's pins read or lock; a missing file is left out
 async function loadPinFiles(root: string, record: ReleaseRecord) {
   const assetFiles = record.pins.flatMap((pin) =>
     pin.lines.flatMap((line) =>
@@ -177,20 +170,18 @@ async function writePinFiles(
   await Promise.all(paths.map((path) => writePinFile(join(root, path), contents[path] ?? '')));
 }
 
-// writes beside the file, then renames over it with its mode, so a failed write leaves it as it was
 async function writePinFile(path: string, contents: string) {
   const stats = await stat(path);
 
   await writeFile(`${path}.new`, contents);
   await chmod(`${path}.new`, stats.mode);
+
+  // only the rename replaces the file, so a failed write leaves it as it was
   await rename(`${path}.new`, path);
 }
 
-// the Nix image that scripts/nix-image.sh pins, in this script's own checkout
 const nixImageFile = new URL('../nix-image.sh', import.meta.url);
 
-// docker takes NIX_CONFIG by name, so the token stays out of every argv and log line; without the
-// token, the container gets no NIX_CONFIG at all
 async function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock) {
   const pins = await readFile(nixImageFile, 'utf8');
 
@@ -220,6 +211,8 @@ async function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock
       `${join(options.root, lock.flake)}:/src`,
       '-w',
       '/src',
+
+      // docker takes NIX_CONFIG by name, so the token stays out of every argv and log line
       ...(nixConfig === undefined ? [] : ['-e', 'NIX_CONFIG']),
       image,
       'sh',

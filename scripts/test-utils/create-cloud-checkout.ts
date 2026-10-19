@@ -6,18 +6,15 @@ import type { GitOrigin } from './create-git-origin.ts';
 import { createGitOrigin } from './create-git-origin.ts';
 
 export interface CloudCheckout extends GitOrigin {
-  // a clone of the origin, whose main holds the files
   readonly clone: string;
 }
 
-// Creates a git origin in a fresh temp directory whose main holds the files, one commit, and a
-// clone of it, for a test whose script fetches main and pushes branches. The directory goes when
-// the test finishes, so it must run inside a test.
 export async function createCloudCheckout(
   files: Readonly<Record<string, string>>,
 ): Promise<CloudCheckout> {
   const directory = await mkdtemp(join(tmpdir(), 'cloud-checkout-'));
 
+  // the directory goes when the test finishes, so this must run inside a test
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const origin = await createGitOrigin(directory);

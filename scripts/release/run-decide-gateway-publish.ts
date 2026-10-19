@@ -8,16 +8,12 @@ import { runChecked } from './run-checked.ts';
 export interface RunDecideGatewayPublishOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
 
-  // the checkout of the commit the workflow runs on
   readonly cwd: string;
   readonly run: Runner;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
 
-// The atc-gateway images workflow's decide step: for a push, it lists the files that the push
-// changed between BEFORE and SHA, decides, and writes publish=true or publish=false to
-// GITHUB_OUTPUT. It prints the decision, and copies it to GITHUB_STEP_SUMMARY.
 export async function runDecideGatewayPublish(
   options: Readonly<RunDecideGatewayPublishOptions>,
 ): Promise<number> {
@@ -66,7 +62,6 @@ async function readInput(
     : { eventName, ref: env['REF'] ?? '', pushInput: env['PUSH_INPUT'] ?? '', changedFiles };
 }
 
-// the shallow checkout lacks the commit before the push, so it fetches that commit first
 async function readChangedFiles(options: Readonly<RunDecideGatewayPublishOptions>) {
   const before = options.env['BEFORE'] ?? '';
   const sha = options.env['SHA'] ?? '';
@@ -77,6 +72,7 @@ async function readChangedFiles(options: Readonly<RunDecideGatewayPublishOptions
 
   const runOptions = { cwd: options.cwd, env: options.env };
 
+  // the shallow checkout lacks the commit before the push
   const fetched = await runChecked(
     options.run,
     ['git', 'fetch', '-q', '--depth=1', 'origin', before],

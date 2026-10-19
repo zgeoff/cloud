@@ -1,12 +1,8 @@
 import { findPinMatch } from './find-pin-match.ts';
 import type { Pin, ReleaseRecord } from './release-registry.ts';
 
-// each pin's values by pin id, then by named group
 export type PinValues = Readonly<Record<string, Readonly<Record<string, string>>>>;
 
-// Collects what each of the record's pin lines holds, from the files' contents. A pin line that is
-// missing or doubled, or two lines of one pin that hold different values for one group, give the
-// Error.
 export function collectPinValues(
   record: ReleaseRecord,
   files: Readonly<Record<string, string>>,

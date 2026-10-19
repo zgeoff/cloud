@@ -2,9 +2,6 @@ import { readFile } from 'node:fs/promises';
 import { collectPlanHolds } from './collect-plan-holds.ts';
 import { findJSONField } from './find-json-field.ts';
 
-// The prod apply job's guard: returns 0 to apply, 3 to hold for a person, or 1 for a failed or
-// unreadable preview. It prints each held step's op and URN and the preview's errors, never a
-// resource's state, because the job's log is public.
 export interface CheckProdPlanOptions {
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
@@ -92,6 +89,7 @@ function printVerdict(
     return 0;
   }
 
+  // never print a resource's state here: the job's log is public
   options.printOut(`hold: ${holds.map((hold) => `\n- ${hold}`).join('')}\n`);
 
   return 3;

@@ -8,9 +8,6 @@ import { readHostScript } from './read-host-script.ts';
 import { runOnHost } from './run-host-check.ts';
 import { runOp } from './run-op.ts';
 
-// Mints the atc daemon's bearer here, 48 random bytes as base64url, into the 1Password item (the
-// gateway's copy) and a root-only file on the host (the daemon's LoadCredential source). A rerun
-// skips matching copies and stops at a lone one, so it never overwrites.
 export async function installATCGatewayToken(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,
@@ -40,8 +37,8 @@ export async function installATCGatewayToken(
   await createGatewayToken(context);
 }
 
-// op read prints the field and a newline, as the host file holds it
 function readItem(context: Readonly<ATCCredentialsContext>) {
+  // op read prints the field and a newline, as the host file holds it
   return runOp(context, ['read', `op://${context.vault}/${context.item}/credential`]);
 }
 
@@ -79,7 +76,6 @@ async function createGatewayToken(context: Readonly<ATCCredentialsContext>) {
   context.printOut('ok: the 1Password item and the host file match\n');
 }
 
-// both copies read back as the bearer minted here
 async function requireCopiesOf(context: Readonly<ATCCredentialsContext>, bearer: string) {
   const item = await readItem(context);
   const hostSum = await readHostSum(context);
@@ -91,7 +87,6 @@ async function requireCopiesOf(context: Readonly<ATCCredentialsContext>, bearer:
   }
 }
 
-// The item's template goes to op on stdin, so the bearer never reaches op's argv
 async function createItem(context: Readonly<ATCCredentialsContext>, bearer: string) {
   const template = {
     title: context.item,
@@ -99,6 +94,7 @@ async function createItem(context: Readonly<ATCCredentialsContext>, bearer: stri
     fields: [{ id: 'credential', type: 'CONCEALED', label: 'credential', value: bearer }],
   };
 
+  // the template goes on stdin, so the bearer never reaches op's argv
   const stdin = Buffer.from(JSON.stringify(template));
 
   const text = await runOp(

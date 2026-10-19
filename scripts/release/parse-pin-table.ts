@@ -1,8 +1,6 @@
 import type { PinValues } from './collect-pin-values.ts';
 import { pinTableFile } from './pin-table-file.ts';
 
-// Parses the pin table's text, or gives an Error for text that is not a JSON object of entries
-// whose every value is a string.
 export function parsePinTable(text: string): PinValues | Error {
   const table = tryParseJSON(text);
 
@@ -41,7 +39,6 @@ function isObject(value: unknown): value is object {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-// the object's fields, or null when it is no object or a field is not a string
 function collectStringFields(value: unknown): Readonly<Record<string, string>> | null {
   if (!isObject(value)) {
     return null;

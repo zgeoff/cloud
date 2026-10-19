@@ -1,6 +1,3 @@
-// An impd token as `impz token ls --json` prints it, after imp 1.0.0's TokenSchema
-// (packages/api/src/token-schema.ts): the atc-cloud token that install-atc-gateway-credentials
-// mints, by default. The script compares its values, so each is fixed, grantable as a set.
 export interface MockImpToken {
   readonly name: string;
   readonly scope: string;
@@ -11,6 +8,7 @@ export interface MockImpToken {
 }
 
 export function buildMockImpToken(overrides: Partial<MockImpToken> = {}): MockImpToken {
+  // the values are fixed, grantable as a set, since the script under test compares them
   return {
     name: 'atc-cloud',
     scope: 'manage',

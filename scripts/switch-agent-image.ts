@@ -1,6 +1,5 @@
-// Points the atc daemon's cloud target at a checked agent image. Run it on the machine that runs the
-// daemon, once build-agent-image.ts printed "check passed" for the image, as
-// `bun scripts/switch-agent-image.ts <image> [<atc config file>]`.
+// Run it on the machine that runs the atc daemon, once the agent image build printed "check
+// passed" for the image.
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ExitError } from './exit-error.ts';
@@ -15,18 +14,13 @@ import { writeCloudTargetImage } from './write-cloud-target-image.ts';
 export interface SwitchAgentImageOptions extends ScriptIO {
   readonly args: readonly string[];
 
-  // the home whose .config/atc/config.json is the default config
   readonly home: string;
 
-  // the time in milliseconds since the epoch, as Date.now returns it
   readonly now: () => number;
 }
 
-// the atc that the agent image installs, which the daemon runs in the guest
 const guestATC = '/usr/local/bin/atc';
 
-// It never restarts the daemon, which reads its targets at startup: it prints the restart command
-// for a person to run when no session needs the daemon.
 export function switchAgentImage(options: Readonly<SwitchAgentImageOptions>): Promise<number> {
   return withExitCode(options.printErr, async () => {
     const [image, config] = parseArgs(options.args, options.home);

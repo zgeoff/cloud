@@ -3,9 +3,6 @@ import { runGitSteps } from './run-git-steps.ts';
 import { runReleaseBump } from './run-release-bump.ts';
 import type { BumpContext } from './types.ts';
 
-// The release check's bump job step: it opens or updates the bump pull request for each line of
-// BUMPS, the check job's output. Every line runs, from a clean tree, so one dependency's failure
-// leaves the others' pull requests current; any failure fails the step once all have run.
 export async function runReleaseBumps(context: BumpContext): Promise<number> {
   const bumps = (context.env['BUMPS'] ?? '').split('\n').filter((line) => line.trim() !== '');
 
@@ -26,13 +23,12 @@ export async function runReleaseBumps(context: BumpContext): Promise<number> {
   return failed;
 }
 
-// runs one bump in its own collapsed log group, after a reset: a failed pin can leave tracked
-// files changed, and every bump starts from a clean tree
 async function runGroupedBump(context: BumpContext, line: readonly string[]) {
   const [dependency = '', version = ''] = line;
 
   context.printOut(`::group::${dependency} ${version}\n`);
 
+  // a failed pin can leave tracked files changed
   const reset = await runGitSteps(context, [
     ['reset', '-q', '--hard'],
     ['clean', '-fdq'],

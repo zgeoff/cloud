@@ -1,25 +1,21 @@
 import { findJSONField } from '../find-json-field.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for the 1Password CLI, op 2.40.0 as images/agent/Dockerfile pins it, at the calls
-// install-atc-gateway-credentials makes. A vault maps each item's title to its credential. op's
-// exit codes and error frames come from community reports; the docs leave them open.
+// Stands in for the 1Password CLI, op 2.40.0, after www.1password.dev/cli/reference checked on
+// 2026-10-08. op's exit codes and error frames come from community reports; the docs leave them
+// open.
 export interface StubOpScenario {
-  // each vault's items, by title, with their credentials
   readonly vaults: Record<string, Record<string, string>>;
   readonly failAt?: 'item-list' | 'item-create';
 
-  // what `op read` prints in place of the saved credential
   readonly readValue?: string;
 }
 
 export interface StubOp {
   readonly handle: StubHandler;
 
-  // the scenario's vaults, as the calls left them
   readonly vaults: Readonly<Record<string, Readonly<Record<string, string>>>>;
 
-  // the service account token of each call, in order
   readonly tokensSeen: readonly (string | undefined)[];
 }
 
@@ -43,8 +39,6 @@ export function buildStubOp(scenario: StubOpScenario): StubOp {
 
 type OpAnswer = (scenario: StubOpScenario, call: StubCall, args: readonly string[]) => StubAnswer;
 
-// the command shapes from www.1password.dev/cli/reference (vault get, item list, item create
-// reading the item JSON on stdin, and read), checked on 2026-10-08
 const commands: readonly (readonly [RegExp, OpAnswer])[] = [
   [
     /^vault get (?<vault>\S+) --format json$/u,
@@ -95,8 +89,8 @@ function buildVaultAnswer(scenario: StubOpScenario, args: readonly string[]) {
   return { stdout: `${JSON.stringify({ id: 'fixture-vault-id', name: vault })}\n` };
 }
 
-// the item JSON of www.1password.dev/cli/item-template-json/, without the timestamps
 function buildItem(vault: string, title: string) {
+  // the item JSON of www.1password.dev/cli/item-template-json/, without the timestamps
   return {
     id: 'fixture-item-id',
     title,
@@ -142,7 +136,6 @@ function createItem(scenario: StubOpScenario, call: StubCall, args: readonly str
   return { stdout: `${JSON.stringify(buildItem(vault, template.title), null, 2)}\n` };
 }
 
-// the item template the script sends on stdin: its title, and the value of its credential field
 function parseItemTemplate(text: string) {
   const template: unknown = JSON.parse(text);
   const title = findJSONField(template, 'title');
@@ -160,7 +153,6 @@ function parseItemTemplate(text: string) {
   };
 }
 
-// op read prints a newline after the secret unless -n is given
 function buildReadAnswer(scenario: StubOpScenario, args: readonly string[]) {
   const [vault = '', item = ''] = args;
   const credential = scenario.readValue ?? scenario.vaults[vault]?.[item];
@@ -172,5 +164,6 @@ function buildReadAnswer(scenario: StubOpScenario, args: readonly string[]) {
     };
   }
 
+  // op read prints a newline after the secret unless -n is given
   return { stdout: `${credential}\n` };
 }

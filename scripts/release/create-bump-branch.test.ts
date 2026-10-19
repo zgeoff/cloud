@@ -1,4 +1,4 @@
-// a pin callback reports success as undefined, as the branch builder's applyPins type says
+// a pin callback reports success as undefined, as its type says
 /* oxlint-disable unicorn/no-useless-undefined */
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';

@@ -1,9 +1,6 @@
 import { existsSync } from 'node:fs';
 import type { StubAnswer, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for the commit's own check that build-agent-image.ts runs with bun, or with bash for an
-// older commit. It answers only when the script exists, so a test proves the build ran the
-// archive's copy, and prints the failure count as the real check's last line.
 export function buildStubCheckAgentImage(failures: number): StubHandler {
   return (call) => {
     const [program = '', script = '', flag, name] = call.argv;
@@ -20,6 +17,7 @@ export function buildStubCheckAgentImage(failures: number): StubHandler {
       stdout: `== ${failures} failed\n`,
     };
 
+    // answering only when the script exists proves the build ran the archive's copy
     return isCheck && existsSync(script) ? answer : undefined;
   };
 }

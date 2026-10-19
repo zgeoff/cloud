@@ -3,9 +3,6 @@ import { join } from 'node:path';
 import { exposure } from '@zgeoff/cloud-topology';
 import type { ExposureEntry } from '@zgeoff/cloud-topology';
 
-// Writes the exposure registry into docs/reference/exposure.md as a table, between the page's
-// markers. With --check it writes nothing: 0 when the page matches the registry or was written, 1
-// on a difference or an unreadable page.
 export interface WriteExposureTableOptions {
   readonly args: readonly string[];
   readonly entries?: readonly ExposureEntry[];
@@ -47,7 +44,6 @@ export async function writeExposureTable(
     : applyPage({ path: join(parsed.root, page), written, check: parsed.check }, options);
 }
 
-// [--check] [repo root], or undefined for any other arguments
 function parseArgs(args: readonly string[]): { check: boolean; root: string } | undefined {
   const check = args[0] === '--check';
   const rest = check ? args.slice(1) : args;
@@ -57,14 +53,12 @@ function parseArgs(args: readonly string[]): { check: boolean; root: string } | 
     : { check, root: rest[0] ?? '.' };
 }
 
-// a page that differs from the registry: its path, its text with the table, and the mode
 interface PageChange {
   readonly path: string;
   readonly written: string;
   readonly check: boolean;
 }
 
-// the page with the table between its markers, or undefined when it lacks them
 function renderPage(text: string, entries: readonly ExposureEntry[]): string | undefined {
   const start = text.indexOf(startMarker);
   const end = text.indexOf(endMarker);
@@ -74,7 +68,6 @@ function renderPage(text: string, entries: readonly ExposureEntry[]): string | u
     : `${text.slice(0, start + startMarker.length)}\n\n${renderTable(entries)}\n${text.slice(end)}`;
 }
 
-// writes the page that differs from the registry, or fails the check without writing it
 async function applyPage(
   change: PageChange,
   options: Readonly<WriteExposureTableOptions>,
@@ -96,11 +89,10 @@ async function applyPage(
 
 const header = ['Name', 'Kind', 'Exposes', 'Scope', 'Reason', 'Auth', 'Ticket'];
 
-// A table with each column padded to its widest cell, as oxfmt lays a Markdown table out, so the
-// formatter leaves the written page as it is
 function renderTable(entries: readonly ExposureEntry[]): string {
   const rows = [header, ...entries.map((entry) => renderRow(entry))];
 
+  // oxfmt pads each column to its widest cell, so the formatter leaves the written page as it is
   const widths = header.map((_, column) =>
     Math.max(3, ...rows.map((row) => row[column]?.length ?? 0)),
   );
@@ -127,8 +119,8 @@ function renderRow(entry: ExposureEntry): readonly string[] {
   ];
 }
 
-// a pipe would end the cell, so it stays escaped
 function formatCell(text: string): string {
+  // a pipe would end the cell
   return text.replaceAll('|', String.raw`\|`);
 }
 

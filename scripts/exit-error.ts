@@ -1,5 +1,4 @@
-// A script's stop: withExitCode prints the message, which may be empty when the failed tool has
-// already said why, and returns the exit code
+// The message may be empty when the failed tool has already said why.
 export class ExitError extends Error {
   readonly exitCode: number;
 

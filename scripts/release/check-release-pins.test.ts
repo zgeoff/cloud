@@ -7,7 +7,6 @@ import { collectPinFiles } from './collect-pin-files.ts';
 import { parsePinTable } from './parse-pin-table.ts';
 import { releaseRegistry } from './release-registry.ts';
 
-// a copy of every file the registry's pins read in this checkout, with its committed pin table
 async function setupTest() {
   const root = await mkdtemp(join(tmpdir(), 'check-release-pins-'));
 

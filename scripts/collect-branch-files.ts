@@ -1,6 +1,4 @@
-// Prints one per line the files this branch changes vs the remote default branch, minus
-// deletions unless --include-deleted. A branch with no own commits prints nothing; exits 1
-// with a message when no base commit is found, so a hook never checks an empty set.
+// Exits 1 with a message when no base commit is found, so a hook never checks an empty set.
 import { resolve } from 'node:path';
 
 interface CollectBranchFilesOptions {
@@ -13,9 +11,6 @@ interface CollectBranchFilesOptions {
   readonly includeDeleted?: boolean;
 }
 
-// Paths changed between HEAD and its merge base with the remote default branch, relative to
-// the root. Default branch is origin/HEAD, falling back to origin/main; throws with no origin
-// or no common ancestor.
 export async function collectBranchFiles(
   options: Readonly<CollectBranchFilesOptions>,
 ): Promise<string[]> {

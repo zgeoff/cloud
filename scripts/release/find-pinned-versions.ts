@@ -1,9 +1,6 @@
 import { findPinMatch } from './find-pin-match.ts';
 import type { PinPart, ReleaseRecord } from './release-registry.ts';
 
-// The version that each of the record's pins holds, in the record's order: the version part of
-// the pin's first line that has one. A pin line that is missing, or that more than one line
-// holds, gives the Error.
 export function findPinnedVersions(
   record: ReleaseRecord,
   files: Readonly<Record<string, string>>,

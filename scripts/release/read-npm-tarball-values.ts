@@ -1,15 +1,14 @@
 import { findJSONField } from '../find-json-field.ts';
 import type { ReleaseRead, ReleaseReadResult } from './read-release-values.ts';
 
-// Reads the version's tarball from the npm registry, where the agent image fetches it, checks it
-// against npm's dist.integrity and the version its package.json names, and gives its sha256. The
-// GitHub release comes first, so a version npm lacks yet fails this run, and the next one pins it.
 export async function readNPMTarballValues(
   read: ReleaseRead,
   packageName: string,
 ): Promise<ReleaseReadResult | Error> {
   const metadata = await readRegistry(`https://registry.npmjs.org/${packageName}/${read.version}`);
 
+  // the GitHub release comes first, so a version npm lacks yet fails this run, and the next one
+  // pins it
   if (metadata instanceof Error) {
     return metadata;
   }
@@ -71,7 +70,6 @@ async function checkTarball(
   };
 }
 
-// the version that the tarball's package.json names, or null for a tarball without one
 async function readPackagedVersion(bytes: Uint8Array) {
   const files = await new Bun.Archive(bytes).files('package/package.json').catch(() => null);
 

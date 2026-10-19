@@ -1,6 +1,3 @@
-// Read-only readiness checks for the atc gateway (docs/architecture/workloads/atc-gateway.md), as
-// `bun scripts/check-atc-gateway-readiness.ts [<host>]`. It prints one line per check: ok, missing
-// (expected before the deploy) or FAIL. It changes nothing, and prints nothing secret.
 import { checkATCDaemon } from './check-atc-daemon.ts';
 import { checkGatewayHost } from './check-gateway-host.ts';
 import { checkGatewayImage } from './check-gateway-image.ts';
@@ -14,11 +11,9 @@ import type { ScriptIO } from './run-or-exit.ts';
 import { runProcess } from './run-process.ts';
 
 export interface ATCGatewayReadinessOptions extends ScriptIO {
-  // `[<host>]`, geoffcloud by default
   readonly args: readonly string[];
 }
 
-// Exits with the number of FAIL lines, so 0 means ready
 export async function checkATCGatewayReadiness(
   options: Readonly<ATCGatewayReadinessOptions>,
 ): Promise<number> {

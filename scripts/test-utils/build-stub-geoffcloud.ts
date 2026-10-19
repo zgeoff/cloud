@@ -1,8 +1,4 @@
-// Stands in for root's shell on geoffcloud at the fetch sandbox check's commands. It runs no probe:
-// a probe of an address the scenario lets that side reach prints `probe-exit:0`, and any other
-// times out with 124, as a dropped connection does. It tracks the sandboxes imp creates.
 export interface StubGeoffcloudScenario {
-  // nixie's sandbox manifest, as the pod holds it
   readonly manifest: string;
   readonly impdAddresses: readonly string[];
   readonly nodeAddresses: readonly string[];
@@ -13,10 +9,8 @@ export interface StubGeoffcloudScenario {
   readonly hostReaches: readonly string[];
   readonly sandboxReaches: readonly string[];
 
-  // what the sandbox's page fetch prints
   readonly page: string;
 
-  // impz new's exit code
   readonly createExitCode: number;
 }
 
@@ -29,10 +23,8 @@ interface RemoteResult {
 export interface StubGeoffcloud {
   readonly runRemote: (command: string) => Promise<RemoteResult>;
 
-  // every command line, in order
   readonly commands: readonly string[];
 
-  // the sandboxes that exist, by name
   readonly sandboxes: ReadonlySet<string>;
 }
 
@@ -72,7 +64,6 @@ const reads: Record<string, (scenario: StubGeoffcloudScenario) => string> = {
     scenario.serviceAddress,
 };
 
-// the probe as the host's shell gets it, and as it reaches the sandbox's bash through impz exec
 const hostProbe =
   /^timeout 5 bash -c 'exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)' 2>\/dev\/null; echo probe-exit:\$\?$/u;
 
@@ -109,6 +100,7 @@ function buildProbeAnswer(
 
   const reached = reaches.includes(`${probe['host']}:${probe['port']}`);
 
+  // an unreached address times out with 124, as a dropped connection does
   return { exitCode: 0, stdout: `probe-exit:${reached ? 0 : 124}\n`, stderr: '' };
 }
 

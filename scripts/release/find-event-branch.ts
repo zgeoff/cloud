@@ -1,8 +1,5 @@
 import { findJSONField } from '../find-json-field.ts';
 
-// The branch whose bump the release bump merge decides on, from the event that started it: a
-// check workflow that finished on a pull request from this repository, or the auto-merge label
-// put on one. Any other event, or one from another repository, starts no decision.
 export interface WorkflowEvent {
   readonly name: string;
   readonly payload: unknown;

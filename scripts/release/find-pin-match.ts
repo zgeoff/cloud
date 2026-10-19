@@ -1,7 +1,5 @@
 import type { PinAssetLine, PinLine } from './release-registry.ts';
 
-// the one line of a pin file that a pin line's pattern matches: its index, and each named
-// group's text and span within it
 export interface PinMatch {
   readonly index: number;
   readonly text: string;
@@ -9,7 +7,6 @@ export interface PinMatch {
   readonly spans: Readonly<Record<string, readonly [number, number]>>;
 }
 
-// Finds that line in the file's contents, or gives an Error unless exactly one line matches
 export function findPinMatch(
   files: Readonly<Record<string, string>>,
   line: PinLine | PinAssetLine,

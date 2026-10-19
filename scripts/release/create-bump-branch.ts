@@ -7,12 +7,9 @@ export interface BumpBranchInput {
   readonly dependency: string;
   readonly version: string;
 
-  // writes the pins in the clone, or gives the Error that stops the bump
   readonly applyPins: () => Promise<Error | undefined>;
 }
 
-// Builds release-check/<dependency> from origin's main with the pins and commits it, and reads
-// how the branch on origin compares. It gives 'unchanged' when main already pins the release.
 export async function createBumpBranch(
   context: BumpContext,
   input: BumpBranchInput,
@@ -82,7 +79,6 @@ async function createBumpCommit(
   return { ...branch, lease, same, sameRelease: same || leaseTitle === branch.title };
 }
 
-// the branch's current commit on origin, for the push's lease, or empty when it does not exist
 async function readLease(context: BumpContext, name: string) {
   const ref = `refs/heads/${name}`;
 
@@ -103,7 +99,6 @@ async function readLease(context: BumpContext, name: string) {
   return fetched ?? readGitText(context, ['rev-parse', 'FETCH_HEAD']);
 }
 
-// the branch needs no push when it changes the same files as this commit, to the same contents
 async function isSameChange(context: BumpContext, lease: string) {
   const files = await readGitText(context, ['diff', '--name-only', 'origin/main', 'HEAD']);
   const base = await readGitText(context, ['merge-base', 'origin/main', lease]);

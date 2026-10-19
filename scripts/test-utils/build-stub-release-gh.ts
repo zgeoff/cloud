@@ -1,8 +1,8 @@
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for the GitHub CLI calls that the release scripts make. The release and commit answers
-// match gh 2.102.0 (2026-10-13), and the users 404 gh 2.99.0 (2026-10-14). The pull request and
-// label ones follow the gh manual (2026-10-13), since real calls would change pull requests.
+// The release and commit answers match gh 2.102.0 (2026-10-13), and the users 404 gh 2.99.0
+// (2026-10-14). The pull request and label ones follow the gh manual (2026-10-13), since real calls
+// would change pull requests.
 interface StubRelease {
   readonly tag: string;
   readonly notes?: string;
@@ -14,14 +14,11 @@ export interface StubReleaseGHScenario {
   // each repository's published releases, newest first, as `gh release list` orders them
   readonly releases?: Readonly<Record<string, readonly StubRelease[]>>;
 
-  // what `pr list --state open` and `pr list --state closed` list, newest first
   readonly openPRs?: readonly object[];
   readonly closedPRs?: readonly object[];
 
-  // what `pr view <number>` prints, by number
   readonly prViews?: Readonly<Record<number, object>>;
 
-  // the id of each GitHub user, by login
   readonly users?: Readonly<Record<string, number>>;
 }
 
@@ -198,7 +195,6 @@ function findRelease(
   return scenario.releases?.[repo ?? '']?.find((each) => each.tag === tag);
 }
 
-// true when the args hold the flag and value pair, and each of the other flags
 function isFlagged(
   args: readonly string[],
   pair: readonly [string, string],

@@ -9,7 +9,6 @@ import { buildStubImp } from './test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
-// a real origin and seed for each case to commit its image to, and recorders for the output
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-'));
 
@@ -333,7 +332,6 @@ test('it leaves the image to an interrupt from the build on, newest of the steps
 
   const short = await ctx.repo.git(['-C', ctx.repo.seed, 'rev-parse', '--short', 'HEAD']);
 
-  // each registered step, bound to a runner that records what an interrupt would run
   const steps: (() => unknown)[] = [];
   const interrupt = buildStubRunner(() => ({}));
   const imp = buildStubImp({ images: [] });

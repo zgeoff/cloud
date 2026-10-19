@@ -6,12 +6,9 @@ import { runProcess } from '../run-process.ts';
 import { withExitCode } from '../with-exit-code.ts';
 import { renderNixieAPITypes } from './render-nixie-api-types.ts';
 
-// Vendors nixie's contract document at one release tag into openapi.json, and writes its types into
-// openapi.d.ts beside it. Exits 2 on bad arguments, and with gh's code when gh fails.
 export interface WriteNixieAPIContractOptions extends ScriptIO {
   readonly args: readonly string[];
 
-  // the directory that holds openapi.json and openapi.d.ts
   readonly directory: string;
 }
 

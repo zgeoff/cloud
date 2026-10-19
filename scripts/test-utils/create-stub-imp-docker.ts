@@ -2,9 +2,6 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { toShellArg } from '../to-shell-arg.ts';
 
-// Writes <bin>/docker, a stand-in for docker running imp's CLI in imp-host at one call (by default
-// mint-atc-imp-token.sh's). It logs each call's argv to <bin>/docker-calls and its IMP_TOKEN and
-// IMP_URL to <bin>/docker-env, and ends any other call with exit 97 and "unexpected: <argv>".
 export interface StubImpDockerAnswer {
   readonly stdout: string;
   readonly stderr: string;

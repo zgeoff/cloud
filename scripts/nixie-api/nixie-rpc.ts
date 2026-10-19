@@ -7,12 +7,10 @@ import {
 import { buildNixieHeaders } from '../build-nixie-headers.ts';
 import type { paths } from './openapi.d.ts';
 
-// The one place that knows how a call reaches nixie's API, in oRPC's RPC protocol under /rpc,
-// with oRPC's own codec. The procedures and their types come from nixie's contract document, so a
-// procedure that nixie drops or renames fails the type check.
+// The procedures and their types come from nixie's contract document, so a procedure that nixie
+// drops or renames fails the type check.
 type ToProcedure<Path> = Path extends `/${infer Procedure}` ? Procedure : never;
 
-// a procedure's path, such as sessions/enrol
 export type NixieProcedure = ToProcedure<keyof paths>;
 
 type Operation<Procedure extends NixieProcedure> = paths[`/${Procedure}`]['post'];
@@ -23,14 +21,13 @@ type NixieInput<Procedure extends NixieProcedure> = Operation<Procedure>['reques
   ? Input
   : undefined;
 
-// what a call answers on success; a stream's answer has no JSON output
+// a stream's answer has no JSON output
 export type NixieOutput<Procedure extends NixieProcedure> =
   Operation<Procedure>['responses'][200]['content'] extends { 'application/json': infer Output }
     ? Output
     : never;
 
 export interface NixieRequest<Procedure extends NixieProcedure> {
-  // nixie's origin
   readonly url: string;
   readonly token: string | null;
   readonly procedure: Procedure;
@@ -38,12 +35,10 @@ export interface NixieRequest<Procedure extends NixieProcedure> {
   readonly signal?: AbortSignal;
 }
 
-// the output on success, or nixie's error code, null when the answer carries none
 export type NixieAnswer =
   | { readonly ok: true; readonly output: unknown }
   | { readonly ok: false; readonly code: string | null };
 
-// the call's origin and session, which the codec reads to build each request
 interface NixieContext {
   readonly url: string;
   readonly token: string | null;
@@ -58,7 +53,6 @@ const codec = new StandardRPCLinkCodec<NixieContext>(
   },
 );
 
-// The fetch request for one call
 export async function encodeNixieRequest<Procedure extends NixieProcedure>(
   request: Readonly<NixieRequest<Procedure>>,
 ): Promise<Request> {
@@ -77,8 +71,6 @@ export async function encodeNixieRequest<Procedure extends NixieProcedure>(
   });
 }
 
-// An answer's status and body text, decoded: a status below 400 decodes the output, and an error
-// status decodes nixie's error. A body that oRPC cannot decode carries no code.
 export async function decodeNixieAnswer(status: number, text: string): Promise<NixieAnswer> {
   try {
     const output = await codec.decode({
@@ -109,13 +101,13 @@ function toHeaders(
   return result;
 }
 
-// an empty body reads as no body, as oRPC's fetch adapter reads it; text that is not JSON throws,
-// which the codec reports as a body it cannot parse
 function parseBody(text: string): unknown {
+  // an empty body reads as no body, as oRPC's fetch adapter reads it
   if (text === '') {
     return undefined;
   }
 
+  // text that is not JSON throws, which the codec reports as a body it cannot parse
   const value: unknown = JSON.parse(text);
 
   return value;

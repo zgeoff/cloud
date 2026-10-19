@@ -13,11 +13,9 @@ import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 interface TestConfig {
   readonly run: Runner;
 
-  // a script's grace when unset
   readonly graceMs?: number;
 }
 
-// a trap over an emitter that stands in for process, with recorders for stderr and the exit
 function setupTest(config: TestConfig) {
   // process, which the trap listens to in a script, is an EventEmitter
   // oxlint-disable-next-line unicorn/prefer-event-target
@@ -234,20 +232,20 @@ test('it sends SIGKILL to a command that outlives its SIGTERM by the grace, then
   ]);
 });
 
-// A descendant that exits leaves a zombie until something reaps it, and a zombie holds no pipe
 function isAlive(pid: number) {
   try {
     const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
 
+    // an exited descendant stays a zombie until something reaps it, and a zombie holds no pipe
     return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) !== 'Z';
   } catch {
     return false;
   }
 }
 
-// The kernel closes a dying process's pipes a moment before it becomes a zombie, so the test
-// polls for the exit. A second is long enough for a SIGKILL and far short of the grandchild's sleep.
 async function waitForExit(pid: number) {
+  // the kernel closes a dying process's pipes a moment before it becomes a zombie, so the test
+  // polls; a second is long enough for a SIGKILL and far short of the grandchild's sleep
   const deadline = performance.now() + 1000;
 
   while (isAlive(pid) && performance.now() < deadline) {
@@ -257,8 +255,6 @@ async function waitForExit(pid: number) {
   return !isAlive(pid);
 }
 
-// The command's Bash starts a grandchild that holds the captured pipes, as an `impz exec` or a
-// `curl` in an older commit's check does. The grandchild runs prelude, then writes its pid.
 async function runGrandchildCommand(run: Runner, prelude: string) {
   const directory = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
 
@@ -279,6 +275,8 @@ async function runGrandchildCommand(run: Runner, prelude: string) {
     await rm(directory, { recursive: true, force: true });
   });
 
+  // the grandchild holds the captured pipes, as an `impz exec` or a `curl` in an older commit's
+  // check does
   const script = `(${prelude}echo $BASHPID > "$1"; echo > "$2"; exec sleep 30) & wait`;
 
   void run(['bash', '-c', script, 'bash', pidFile, fifo]);

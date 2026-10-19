@@ -1,12 +1,8 @@
 import type { RunOptions, RunResult, Runner } from '../run-process.ts';
 
-// Stands in for runProcess. It records every call, then hands it to each handler in turn; the
-// first handler that answers decides the result. A call no handler answers ends as a stand-in's
-// unknown command does: exit 97 and "unexpected: <argv as JSON>" on stderr.
 export interface StubCall {
   readonly argv: readonly string[];
 
-  // the stdin the script sent, as text; empty when it sent none
   readonly stdin: string;
 
   // the call's other options; its stdin is the text above, so a handler sees no Buffer, and no
@@ -28,7 +24,6 @@ export type StubHandler = (
 export interface StubRunner {
   readonly run: Runner;
 
-  // every call, in order
   readonly calls: readonly StubCall[];
 }
 
@@ -62,6 +57,7 @@ async function findAnswer(handlers: readonly StubHandler[], call: StubCall) {
     }
   }
 
+  // a call no handler answers ends as a stand-in's unknown command does
   return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
 }
 

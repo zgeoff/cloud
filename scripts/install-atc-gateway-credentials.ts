@@ -1,6 +1,3 @@
-// Installs the three credentials for the atc gateway's first canary on geoffcloud: impd's secret
-// glm, the atc daemon's bearer and impd's token atc-cloud. Run it yourself, with
-// `bun scripts/install-atc-gateway-credentials.ts`; it never prints a value.
 import { checkATCCredentialsPreflight } from './check-atc-credentials-preflight.ts';
 import { installATCGatewayToken } from './install-atc-gateway-token.ts';
 import { installATCGLMSecret } from './install-atc-glm-secret.ts';
@@ -11,9 +8,6 @@ import { printATCCredentials } from './print-atc-credentials.ts';
 import { runProcess } from './run-process.ts';
 import { withExitCode } from './with-exit-code.ts';
 
-// Every value travels on stdin, never in argv: each step skips what exists and stops at a part,
-// so a rerun after a failure finishes the rest and never overwrites. The host files live outside
-// /var/lib/atc-daemon, because systemd's StateDirectory would hand that tree to the atc user.
 export function installATCGatewayCredentials(
   options: Readonly<ATCCredentialsOptions>,
 ): Promise<number> {

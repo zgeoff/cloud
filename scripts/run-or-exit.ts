@@ -7,8 +7,6 @@ export interface ScriptIO {
   readonly printErr: (text: string) => void;
 }
 
-// Runs one command as a `set -e` line does: its stderr passes through, and a failure stops the
-// script with the command's exit code. A timeout stops it with 124, as `timeout` exits.
 export async function runOrExit(
   io: Readonly<ScriptIO>,
   argv: readonly string[],

@@ -11,9 +11,6 @@ export interface AgentImageCheckDirInput {
   readonly pins: Readonly<Record<string, string>>;
 }
 
-// Creates <work>/agent-image-check, which the check mounts or copies to /run/agent-image-check in
-// the image: the gitleaks binary the Dockerfile pins, checked against the Dockerfile's sum, and
-// the gitleaks config. Returns its path.
 export async function createAgentImageCheckDir(
   io: Readonly<ScriptIO>,
   input: Readonly<AgentImageCheckDirInput>,
@@ -35,8 +32,6 @@ export async function createAgentImageCheckDir(
   return directory;
 }
 
-// the linux_x64 tarball of the gitleaks release, whose line in the release's checksums file the
-// Dockerfile pins as GITLEAKS_SHA256
 async function readGitleaks(pins: Readonly<Record<string, string>>) {
   const version = pins['GITLEAKS_VERSION'];
   const sum = pins['GITLEAKS_SHA256'];

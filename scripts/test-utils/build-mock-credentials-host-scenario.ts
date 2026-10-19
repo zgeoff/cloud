@@ -3,8 +3,6 @@ import { buildMockImpSecret } from './build-mock-imp-secret.ts';
 import { buildMockImpToken } from './build-mock-imp-token.ts';
 import type { StubCredentialsHostScenario } from './build-stub-credentials-host.ts';
 
-// The host install-atc-gateway-credentials finds when its last run finished: impd has glm, the
-// daemon's profile secrets and atc-cloud, and the secrets directory holds both files
 export function buildMockCredentialsHostScenario(
   overrides: Partial<StubCredentialsHostScenario> = {},
 ): StubCredentialsHostScenario {

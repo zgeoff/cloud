@@ -1,8 +1,5 @@
 import { faker } from '@faker-js/faker';
 
-// What `gh pr view --json` prints for the fields the merge reads, after the gh manual (gh_pr_view,
-// 2026-10-17): by default an arbitrary author's pull request with no labels, files, commits or
-// checks, so each test states the fields its case rests on.
 export interface MockGHPRView {
   readonly author: { readonly login: string };
   readonly isCrossRepository: boolean;

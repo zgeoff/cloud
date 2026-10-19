@@ -11,25 +11,20 @@ export interface AgentImageBuild {
   readonly image: string;
   readonly sha: string;
 
-  // the clone that git archives the commit from
   readonly cwd: string;
 
   // a directory the caller owns and removes
   readonly work: string;
 
-  // the timeout as given, for the message, and in milliseconds
   readonly timeout: string;
   readonly timeoutMs: number;
 }
 
 export interface BuiltAgentImage {
-  // the commit's extracted image and scripts
   readonly source: string;
   readonly digest: string;
 }
 
-// Builds the image from a git archive of the commit, so the clone's working tree never reaches it.
-// imp's image build prints no progress off a terminal, so the build runs quietly.
 export async function runAgentImageBuild(
   io: Readonly<ScriptIO>,
   build: Readonly<AgentImageBuild>,
@@ -45,10 +40,11 @@ export async function runAgentImageBuild(
   return { source, digest: typeof digest === 'string' ? digest : '' };
 }
 
-// git archive writes a tar of the commit's image and scripts, which tar extracts into src
 async function createImageSource(io: Readonly<ScriptIO>, build: Readonly<AgentImageBuild>) {
   const source = join(build.work, 'src');
   const tarball = join(build.work, 'src.tar');
+
+  // a git archive keeps the clone's working tree out of the image
   const archive = ['git', 'archive', '--output', tarball, build.sha, 'images/agent', 'scripts'];
 
   await mkdir(source);
@@ -58,8 +54,6 @@ async function createImageSource(io: Readonly<ScriptIO>, build: Readonly<AgentIm
   return source;
 }
 
-// impd can still finish a build that outlives the timeout, so the message says to read imp image
-// ls before a retry
 async function runImpBuild(
   io: Readonly<ScriptIO>,
   build: Readonly<AgentImageBuild>,
