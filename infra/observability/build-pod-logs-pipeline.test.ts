@@ -48,8 +48,9 @@ discovery.relabel "pods" {
 }
 
 // a file with no saved read position is read from its end, so a start with an empty position store
-// reads no history; a running tailer reads the new file of a rotated log from its start. The lines
-// a new container writes before Alloy finds its file never reach Loki, so Alloy looks each second.
+// reads no history. A running tailer reads a rotated log's old file to its end and the new file from
+// its start, so a rotation loses no line. The lines a new container writes before Alloy finds its
+// file never reach Loki, so Alloy looks each second.
 loki.source.file "pods" {
   targets       = discovery.relabel.pods.output
   tail_from_end = true

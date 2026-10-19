@@ -101,4 +101,38 @@ order 41 placed
 EOF
 }
 
+it_ships_each_line_once_across_a_rotation_of_the_tailed_log_including_the_lines_written_before_alloy_reopens_it() {
+  local now
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs"
+  wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the first line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
+
+  # as the kubelet rotates a container log: the last line lands in the old file, which moves aside
+  # under a name the glob skips, and the runtime writes on in a new 0.log at once, before Alloy's
+  # next poll
+  echo "$now stdout F order 42 placed" >> "$tree/logs/$log_dir/0.log"
+  mv "$tree/logs/$log_dir/0.log" "$tree/logs/$log_dir/0.log.20261019-052500"
+  sed "s/@NOW@/$now/" > "$tree/logs/$log_dir/0.log" << 'EOF'
+@NOW@ stdout F order 43 placed
+@NOW@ stderr F order 44 failed
+EOF
+
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 44 failed\""' _ "$(cat "$tree/alloy/container")"
+  docker logs "$(cat "$tree/alloy/container")" 2>&1 |
+    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
+  diff - "$tree/entries" << 'EOF'
+order 41 placed
+order 42 placed
+order 43 placed
+order 44 failed
+EOF
+}
+
 run_cases
