@@ -33,6 +33,9 @@ export interface FilesRouterInputs {
 
   // the bytes still free on the volume
   readonly readFreeBytes: () => number;
+
+  // writes an upload's bytes to a path on the volume, as Bun.write does
+  readonly writeBytes: (path: string, file: Blob) => Promise<unknown>;
 }
 
 // the role the request's bearer token names, or undefined for no token or an unknown one
@@ -172,13 +175,13 @@ interface WrittenFile {
 // under a new id, so filesDir never holds part of a file. A failed write leaves nothing behind.
 async function writeFile(
   file: Blob,
-  dirs: Pick<FilesRouterInputs, 'filesDir' | 'incomingDir'>,
+  dirs: Pick<FilesRouterInputs, 'filesDir' | 'incomingDir' | 'writeBytes'>,
 ): Promise<WrittenFile> {
   const id = mintFileID();
   const partPath = join(dirs.incomingDir, id);
 
   try {
-    await Bun.write(partPath, file);
+    await dirs.writeBytes(partPath, file);
 
     const hasher = new Bun.CryptoHasher('sha256');
 
