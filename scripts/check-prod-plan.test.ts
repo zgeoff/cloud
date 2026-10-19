@@ -83,6 +83,41 @@ test('it holds a plan with a replace and names the step', async () => {
   expect(ctx.printErr).not.toHaveBeenCalled();
 });
 
+test('it holds a plan that only moves a CNAME to another tunnel', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.dir, 'plan.json'),
+    JSON.stringify({
+      steps: [
+        { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
+        {
+          op: 'update',
+          urn: 'urn:pulumi:prod::geoff-cloud::cloudflare:index/dnsRecord:DnsRecord::atc',
+          diffReasons: ['content'],
+        },
+      ],
+      changeSummary: { same: 1, update: 1 },
+    }),
+  );
+
+  const exitCode = await checkProdPlan({
+    args: [join(ctx.dir, 'plan.json'), 'success'],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(3);
+
+  expect(ctx.printOut.mock.calls).toStrictEqual([
+    [
+      'hold: \n- update of a guarded resource urn:pulumi:prod::geoff-cloud::cloudflare:index/dnsRecord:DnsRecord::atc\n',
+    ],
+  ]);
+
+  expect(ctx.printErr).not.toHaveBeenCalled();
+});
+
 test('it holds a clean plan after a failed drift check', async () => {
   const ctx = await setupTest();
 

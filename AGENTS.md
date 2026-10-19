@@ -122,8 +122,8 @@ docs/
   bracketed by drift checks. `docs/runbooks/prod-apply.md` covers its runs. Its guard holds a run
   for any of these:
   - any operation other than a create, an update or a refresh, such as a delete or a replace
-  - a change to the tailnet policy, the VM, the cloud firewall, the tunnel's routes or the gateway's
-    Access policy
+  - a change to the tailnet policy, the VM, the cloud firewall, a tunnel's routes, a DNS record or
+    the gateway's Access policy
   - a failed drift check, for a manual dispatch
 - Never run `bun run up` while a `Deploy prod` run is in progress.
 - An apply by hand follows the same bracket, in order: `bun run drift` from a clean checkout of the

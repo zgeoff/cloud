@@ -89,6 +89,7 @@ test.each([
     "the tunnel's routes",
     'urn:pulumi:prod::geoff-cloud::cloudflare:index/zeroTrustTunnelCloudflaredConfig:ZeroTrustTunnelCloudflaredConfig::edge',
   ],
+  ['a DNS record', 'urn:pulumi:prod::geoff-cloud::cloudflare:index/dnsRecord:DnsRecord::atc'],
   [
     'the Access application',
     'urn:pulumi:prod::geoff-cloud::cloudflare:index/zeroTrustAccessApplication:ZeroTrustAccessApplication::atc-gateway-sign-in',
