@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildMetricsValues } from './build-metrics-values.ts';
 
-test("it disables the chart's TargetDown, picks up every monitor and rule, and serves Grafana on its node port", () => {
+test("it disables the chart's TargetDown, drops the kubelet's copy of the control plane's series, picks up every monitor and rule, and serves Grafana on its node port", () => {
   const password = output('grafana-admin-password');
 
   expect(buildMetricsValues({ password, nodePort: 30_300 })).toStrictEqual({
@@ -11,12 +11,29 @@ test("it disables the chart's TargetDown, picks up every monitor and rule, and s
     kubeControllerManager: { enabled: false },
     kubeScheduler: { enabled: false },
     kubeProxy: { enabled: false },
+    kubelet: {
+      serviceMonitor: {
+        metricRelabelings: [
+          {
+            action: 'drop',
+            sourceLabels: ['__name__', 'le'],
+            regex:
+              '(csi_operations|storage_operation_duration)_seconds_bucket;(0.25|2.5|15|25|120|600)(\\.0)?',
+          },
+          {
+            action: 'drop',
+            sourceLabels: ['__name__'],
+            regex: '(apiserver|etcd|workqueue|scheduler|kine)_.+',
+          },
+        ],
+      },
+    },
     prometheusOperator: { admissionWebhooks: { enabled: false }, tls: { enabled: false } },
     prometheus: {
       prometheusSpec: {
         retention: '30d',
         retentionSize: '8GB',
-        resources: { requests: { cpu: '100m', memory: '256Mi' }, limits: { memory: '512Mi' } },
+        resources: { requests: { cpu: '100m', memory: '512Mi' }, limits: { memory: '1Gi' } },
         serviceMonitorSelectorNilUsesHelmValues: false,
         podMonitorSelectorNilUsesHelmValues: false,
         ruleSelectorNilUsesHelmValues: false,
