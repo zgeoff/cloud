@@ -202,16 +202,22 @@ test.each([
   }
 
   // a step with no `if` runs on success()
-  const run = steps.filter((step: unknown) =>
-    isActionsConditionMet(String(findJSONField(step, 'if') ?? 'success()'), {
+  const run = steps.filter((step: unknown) => {
+    const condition = findJSONField(step, 'if') ?? 'success()';
+
+    if (typeof condition !== 'string') {
+      throw new TypeError(`a step's if is not an expression: ${JSON.stringify(condition)}`);
+    }
+
+    return isActionsConditionMet(condition, {
       github: { event_name: 'workflow_run' },
       needs: {},
       steps: {
         decide: { outcome: 'success', outputs: decision },
         outcome: { outcome: 'success', outputs: outcome },
       },
-    }),
-  );
+    });
+  });
 
   expect(run.map((step: unknown) => findJSONField(step, 'name'))).toStrictEqual(expected);
 });
