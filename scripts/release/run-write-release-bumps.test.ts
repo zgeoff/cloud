@@ -8,12 +8,12 @@ import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { runWriteReleaseBumps } from './run-write-release-bumps.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'run-write-release-bumps-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-write-release-bumps-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const output = join(dir, 'output');
-  const summary = join(dir, 'summary');
+  const output = join(directory, 'output');
+  const summary = join(directory, 'summary');
 
   // boot data: the runner creates both files before a step runs
   await Promise.all([writeFile(output, ''), writeFile(summary, '')]);

@@ -88,7 +88,10 @@ function buildImpAnswer(state: StubImpState, call: StubCall): StubAnswer | Promi
 function isShapeOf(shape: string, args: readonly string[]) {
   const words = shape.split(' ');
 
-  return words.length === args.length && words.every((word, i) => word === '*' || word === args[i]);
+  return (
+    words.length === args.length &&
+    words.every((word, index) => word === '*' || word === args[index])
+  );
 }
 
 function buildImageList(state: StubImpState): StubAnswer {
@@ -101,8 +104,8 @@ function buildImageList(state: StubImpState): StubAnswer {
   return { stdout: `${JSON.stringify(images)}\n` };
 }
 
-async function runBuild(state: StubImpState, dir: string, name: string): Promise<StubAnswer> {
-  const dockerfile = await readFile(join(dir, 'Dockerfile'), 'utf8');
+async function runBuild(state: StubImpState, directory: string, name: string): Promise<StubAnswer> {
+  const dockerfile = await readFile(join(directory, 'Dockerfile'), 'utf8');
 
   state.builtDockerfiles.push(dockerfile);
 

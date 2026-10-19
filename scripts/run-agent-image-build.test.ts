@@ -10,13 +10,13 @@ import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
 // a real repository to archive, and a work directory the build writes into
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'run-agent-image-build-'));
+  const directory = await mkdtemp(join(tmpdir(), 'run-agent-image-build-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = await createGitOrigin(dir);
+  const repo = await createGitOrigin(directory);
 
-  const work = join(dir, 'work');
+  const work = join(directory, 'work');
 
   await mkdir(work);
 
@@ -59,7 +59,7 @@ test('it builds from the commit’s archive of the image and scripts only, and r
   const hasReadme = await Bun.file(join(ctx.work, 'src/README')).exists();
 
   expect(built).toStrictEqual({
-    src: join(ctx.work, 'src'),
+    source: join(ctx.work, 'src'),
     digest: 'imp-build-stub-agent-abc1234',
   });
 

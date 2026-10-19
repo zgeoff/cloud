@@ -23,7 +23,7 @@ async function setupTest() {
       'infra',
       'scripts/nixie-api',
       'scripts/release',
-    ].map((dir) => mkdir(join(root, dir), { recursive: true })),
+    ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
 
   // the lock runs in the image that scripts/nix-image.sh pins, which the expected argv names

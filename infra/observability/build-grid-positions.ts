@@ -1,3 +1,4 @@
+/* oxlint-disable id-length -- Grafana's gridPos names a panel's width w and its height h */
 interface GridPosition {
   readonly x: number;
   readonly y: number;

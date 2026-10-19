@@ -26,10 +26,10 @@ export function buildStubAgentImageGuest(
 
   return {
     handler: async (call) => {
-      const dir = findCheckDir(call);
+      const directory = findCheckDir(call);
 
-      if (dir !== undefined) {
-        const files = await readdir(dir);
+      if (directory !== undefined) {
+        const files = await readdir(directory);
 
         seen.push(files.toSorted());
       }

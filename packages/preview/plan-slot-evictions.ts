@@ -17,7 +17,7 @@ export function planSlotEvictions(
 
   const previews = live
     .filter((imp) => !imp.name.startsWith(contractImpPrefix))
-    .toSorted((a, b) => a.lastActiveAt.getTime() - b.lastActiveAt.getTime());
+    .toSorted((left, right) => left.lastActiveAt.getTime() - right.lastActiveAt.getTime());
 
   return previews.slice(0, Math.max(0, live.length - (slots - 1))).map((imp) => imp.name);
 }

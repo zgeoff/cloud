@@ -62,7 +62,7 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
 
     options.printErr(`checking ${run.image} on a fresh imp, ${run.check}\n`);
 
-    const passed = await runAgentImageCheck(options, { ...run, src: built.src });
+    const passed = await runAgentImageCheck(options, { ...run, source: built.source });
 
     return await printCheckResult(options, { ...run, digest: built.digest, passed });
   } finally {

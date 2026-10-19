@@ -9,19 +9,19 @@ import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
 // The script runs as the host gets it, with real bash reading it on stdin; docker is a stand-in
 // first on PATH, which answers imp's CLI's whoami and logs the argv and environment it got
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-atc-imp-token-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-atc-imp-token-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const bin = join(dir, 'bin');
-  const secrets = join(dir, 'secrets');
+  const bin = join(directory, 'bin');
+  const secrets = join(directory, 'secrets');
 
   await mkdir(bin);
   await mkdir(secrets);
 
   const script = await readFile(new URL('check-atc-imp-token.sh', import.meta.url));
 
-  const env = { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, HOME: dir };
+  const env = { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, HOME: directory };
   const cli = buildHostImpArgv([], { env: ['IMP_TOKEN', 'IMP_URL'] });
 
   return { bin, secrets, script, env, cli };

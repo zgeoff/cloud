@@ -4,7 +4,7 @@ import { buildMockCredentialsHostScenario } from './build-mock-credentials-host-
 test('it builds a default credentials host scenario', () => {
   expect(buildMockCredentialsHostScenario()).toStrictEqual({
     host: 'geoffcloud',
-    dir: '/var/lib/atc-daemon-secrets',
+    directory: '/var/lib/atc-daemon-secrets',
     impdPort: '7070',
     info: { version: '0.27.0', features: { grantableTokens: true } },
     secrets: [

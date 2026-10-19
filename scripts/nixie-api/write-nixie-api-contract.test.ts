@@ -7,12 +7,12 @@ import { renderNixieAPITypes } from './render-nixie-api-types.ts';
 import { writeNixieAPIContract } from './write-nixie-api-contract.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'write-nixie-api-contract-'));
+  const directory = await mkdtemp(join(tmpdir(), 'write-nixie-api-contract-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   return {
-    dir,
+    directory,
     printOut: mock<(text: string) => void>(),
     printErr: mock<(text: string) => void>(),
   };
@@ -37,14 +37,14 @@ test('it writes the document that gh reads at the tag, and its types', async () 
 
   const exitCode = await writeNixieAPIContract({
     args: ['v0.31.0'],
-    dir: ctx.dir,
+    directory: ctx.directory,
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
 
-  const written = await Bun.file(join(ctx.dir, 'openapi.json')).text();
-  const types = await Bun.file(join(ctx.dir, 'openapi.d.ts')).text();
+  const written = await Bun.file(join(ctx.directory, 'openapi.json')).text();
+  const types = await Bun.file(join(ctx.directory, 'openapi.d.ts')).text();
   const expectedTypes = await renderNixieAPITypes(document);
 
   expect(exitCode).toBe(0);
@@ -66,7 +66,7 @@ test('it runs gh without its telemetry and update check', async () => {
 
   await writeNixieAPIContract({
     args: ['v0.31.0'],
-    dir: ctx.dir,
+    directory: ctx.directory,
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
@@ -89,13 +89,13 @@ test("it stops with gh's exit code and writes nothing when gh cannot read the ta
 
   const exitCode = await writeNixieAPIContract({
     args: ['v0.99.0'],
-    dir: ctx.dir,
+    directory: ctx.directory,
     run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
 
-  const files = await readdir(ctx.dir);
+  const files = await readdir(ctx.directory);
 
   expect(exitCode).toBe(1);
   expect(files).toBeEmpty();
@@ -114,7 +114,7 @@ test.each([
 
   const exitCode = await writeNixieAPIContract({
     args,
-    dir: ctx.dir,
+    directory: ctx.directory,
     run: buildStubRunner().run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,

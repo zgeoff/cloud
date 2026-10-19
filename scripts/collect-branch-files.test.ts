@@ -136,10 +136,10 @@ test('it lists a deleted file when deletions are included', async () => {
 // from history predating the branch. Env strips GIT_* and host git config, so the fixture
 // never reads the repository running the test.
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
+  const directory = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
 
   onTestFinished(async () => {
-    await rm(dir, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true });
   });
 
   const env = {
@@ -152,8 +152,8 @@ async function setupTest() {
     GIT_CONFIG_GLOBAL: '/dev/null',
   };
 
-  const upstream = join(dir, 'upstream.git');
-  const repo = join(dir, 'work');
+  const upstream = join(directory, 'upstream.git');
+  const repo = join(directory, 'work');
 
   // no auto maintenance in either repository: a commit's or a push's detached repack could still
   // write into it while the test's cleanup removes it

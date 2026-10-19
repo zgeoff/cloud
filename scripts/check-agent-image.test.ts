@@ -11,11 +11,11 @@ import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-relea
 
 // a checkout holding the real guest checks and gitleaks config, which every run sends or copies
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-agent-image-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-agent-image-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const repo = join(dir, 'repo');
+  const repo = join(directory, 'repo');
 
   await mkdir(join(repo, 'scripts'), { recursive: true });
   await mkdir(join(repo, 'images/agent'), { recursive: true });
@@ -124,12 +124,12 @@ test('it copies the check directory into the imp, then runs the checks there', a
     registerCleanup: () => () => {},
   });
 
-  const dir = stub.calls[1]?.argv[2] ?? '';
+  const directory = stub.calls[1]?.argv[2] ?? '';
 
   expect(exitCode).toBe(0);
 
   expect(stub.calls.slice(1).map((call) => call.argv)).toStrictEqual([
-    ['impz', 'cp', dir, 'agent-check:/run/agent-image-check'],
+    ['impz', 'cp', directory, 'agent-check:/run/agent-image-check'],
     ['impz', 'exec', 'agent-check', '--', 'bash', '-s'],
   ]);
 

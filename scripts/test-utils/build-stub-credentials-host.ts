@@ -8,7 +8,7 @@ import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 export interface StubCredentialsHostScenario {
   // the host's tailnet name, which the script must reach as root
   readonly host: string;
-  readonly dir: string;
+  readonly directory: string;
   readonly impdPort: string;
 
   // what `impz info --json` prints
@@ -196,27 +196,27 @@ const hostScripts = {
 };
 
 function buildShellAnswer(state: HostState, line: string, stdin: string): StubAnswer | undefined {
-  const dir = state.scenario.dir;
-  const gatewayToken = `${dir}/gateway-token`;
-  const impToken = `${dir}/imp-token`;
+  const directory = state.scenario.directory;
+  const gatewayToken = `${directory}/gateway-token`;
+  const impToken = `${directory}/imp-token`;
 
   const install =
     'mountpoint -q "$1" || { echo "$1 is not a mount point; nothing written" >&2; exit 1; }; install -d -m 0700 -o root -g root "$1"';
 
   const answers: Record<string, () => StubAnswer | undefined> = {
     [toLine(['true'])]: () => ({}),
-    [toLine(['bash', '-c', install, 'bash', dir])]: () => buildInstallAnswer(state),
-    [toLine(['ls', dir])]: () => buildListAnswer(state),
+    [toLine(['bash', '-c', install, 'bash', directory])]: () => buildInstallAnswer(state),
+    [toLine(['ls', directory])]: () => buildListAnswer(state),
     [toLine(['sha256sum', gatewayToken])]: () => buildSumAnswer(state),
-    [toLine(['bash', '-s', '--', dir])]: () =>
+    [toLine(['bash', '-s', '--', directory])]: () =>
       stdin.startsWith(hostScripts.write) ? runHostScript(state, stdin) : undefined,
-    [toLine(['bash', '-s', '--', dir, 'docker', 'exec', 'imp-host', 'impz'])]: () =>
+    [toLine(['bash', '-s', '--', directory, 'docker', 'exec', 'imp-host', 'impz'])]: () =>
       stdin === hostScripts.mint ? runHostScript(state, stdin) : undefined,
     [toLine([
       'bash',
       '-s',
       '--',
-      dir,
+      directory,
       state.scenario.impdPort,
       'docker',
       'exec',
@@ -227,7 +227,7 @@ function buildShellAnswer(state: HostState, line: string, stdin: string): StubAn
       'imp-host',
       'impz',
     ])]: () => (stdin === hostScripts.check ? checkTokenFile(state) : undefined),
-    [toLine(['stat', '-c', '%n %U %a %s bytes', dir, gatewayToken, impToken])]: () =>
+    [toLine(['stat', '-c', '%n %U %a %s bytes', directory, gatewayToken, impToken])]: () =>
       buildStatAnswer(state),
   };
 
@@ -247,7 +247,7 @@ function buildListAnswer(state: HostState) {
 }
 
 function buildSumAnswer(state: HostState) {
-  const path = `${state.scenario.dir}/gateway-token`;
+  const path = `${state.scenario.directory}/gateway-token`;
   const file = state.scenario.files['gateway-token'];
 
   if (file === undefined) {
@@ -350,7 +350,7 @@ function buildStatAnswer(state: HostState): StubAnswer {
 
   const found = ['gateway-token', 'imp-token'].map((name) => {
     const file = gone.has(name) ? undefined : state.scenario.files[name];
-    const path = `${state.scenario.dir}/${name}`;
+    const path = `${state.scenario.directory}/${name}`;
 
     return file === undefined
       ? { error: `stat: cannot statx '${path}': No such file or directory\n` }
@@ -362,7 +362,7 @@ function buildStatAnswer(state: HostState): StubAnswer {
 
   return {
     exitCode: errors === '' ? 0 : 1,
-    stdout: `${state.scenario.dir} root 700 4096 bytes\n${lines}`,
+    stdout: `${state.scenario.directory} root 700 4096 bytes\n${lines}`,
     stderr: errors,
   };
 }

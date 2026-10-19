@@ -5,21 +5,21 @@ import { join } from 'node:path';
 import { checkProdPlan } from './check-prod-plan.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-prod-plan-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-prod-plan-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { dir, printOut, printErr };
+  return { directory, printOut, printErr };
 }
 
 test('it allows the apply of a plan that only updates a workload, after a clean drift check', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'plan.json'),
+    join(ctx.directory, 'plan.json'),
     JSON.stringify({
       steps: [
         { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
@@ -34,7 +34,7 @@ test('it allows the apply of a plan that only updates a workload, after a clean 
   );
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'plan.json'), 'success'],
+    args: [join(ctx.directory, 'plan.json'), 'success'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -52,7 +52,7 @@ test('it holds a plan with a replace and names the step', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'plan.json'),
+    join(ctx.directory, 'plan.json'),
     JSON.stringify({
       steps: [
         { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
@@ -67,7 +67,7 @@ test('it holds a plan with a replace and names the step', async () => {
   );
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'plan.json'), 'success'],
+    args: [join(ctx.directory, 'plan.json'), 'success'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -87,7 +87,7 @@ test('it holds a plan that only moves a CNAME to another tunnel', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'plan.json'),
+    join(ctx.directory, 'plan.json'),
     JSON.stringify({
       steps: [
         { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
@@ -102,7 +102,7 @@ test('it holds a plan that only moves a CNAME to another tunnel', async () => {
   );
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'plan.json'), 'success'],
+    args: [join(ctx.directory, 'plan.json'), 'success'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -122,7 +122,7 @@ test('it holds a clean plan after a failed drift check', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'plan.json'),
+    join(ctx.directory, 'plan.json'),
     JSON.stringify({
       steps: [
         { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
@@ -131,7 +131,7 @@ test('it holds a clean plan after a failed drift check', async () => {
   );
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'plan.json'), 'failure'],
+    args: [join(ctx.directory, 'plan.json'), 'failure'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -147,7 +147,7 @@ test('it fails on a preview that reported an error, and prints the error', async
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'plan.json'),
+    join(ctx.directory, 'plan.json'),
     JSON.stringify({
       steps: [
         { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
@@ -164,7 +164,7 @@ test('it fails on a preview that reported an error, and prints the error', async
   );
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'plan.json'), 'success'],
+    args: [join(ctx.directory, 'plan.json'), 'success'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -181,10 +181,10 @@ test('it fails on a preview that reported an error, and prints the error', async
 test('it fails on a digest that is not JSON', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'plan.json'), 'error: failed to load the stack\n');
+  await writeFile(join(ctx.directory, 'plan.json'), 'error: failed to load the stack\n');
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'plan.json'), 'success'],
+    args: [join(ctx.directory, 'plan.json'), 'success'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -192,7 +192,7 @@ test('it fails on a digest that is not JSON', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    [`check-prod-plan: ${join(ctx.dir, 'plan.json')} holds no preview digest\n`],
+    [`check-prod-plan: ${join(ctx.directory, 'plan.json')} holds no preview digest\n`],
   ]);
 });
 
@@ -200,7 +200,7 @@ test('it fails on a digest file that does not exist', async () => {
   const ctx = await setupTest();
 
   const exitCode = await checkProdPlan({
-    args: [join(ctx.dir, 'missing.json'), 'success'],
+    args: [join(ctx.directory, 'missing.json'), 'success'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -208,7 +208,7 @@ test('it fails on a digest file that does not exist', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    [`check-prod-plan: ${join(ctx.dir, 'missing.json')} holds no preview digest\n`],
+    [`check-prod-plan: ${join(ctx.directory, 'missing.json')} holds no preview digest\n`],
   ]);
 });
 

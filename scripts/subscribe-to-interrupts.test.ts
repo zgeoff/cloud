@@ -139,13 +139,13 @@ test('it never hands the script the result of a command that ends after an inter
 });
 
 test('it waits for a command that traps SIGTERM to exit before it runs the steps', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
+  const directory = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const work = join(dir, 'work');
-  const fifo = join(dir, 'trapped');
-  const copied = join(dir, 'copied');
+  const work = join(directory, 'work');
+  const fifo = join(directory, 'trapped');
+  const copied = join(directory, 'copied');
 
   await mkdir(work);
   await writeFile(join(work, 'src'), 'the archived scripts\n');
@@ -187,11 +187,11 @@ test('it waits for a command that traps SIGTERM to exit before it runs the steps
 });
 
 test('it sends SIGKILL to a command that outlives its SIGTERM by the grace, then runs the steps', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
+  const directory = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const fifo = join(dir, 'trapped');
+  const fifo = join(directory, 'trapped');
 
   await runProcess(['mkfifo', fifo]);
 
@@ -260,10 +260,10 @@ async function waitForExit(pid: number) {
 // The command's Bash starts a grandchild that holds the captured pipes, as an `impz exec` or a
 // `curl` in an older commit's check does. The grandchild runs prelude, then writes its pid.
 async function runGrandchildCommand(run: Runner, prelude: string) {
-  const dir = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
+  const directory = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
 
-  const fifo = join(dir, 'started');
-  const pidFile = join(dir, 'pid');
+  const fifo = join(directory, 'started');
+  const pidFile = join(directory, 'pid');
 
   await runProcess(['mkfifo', fifo]);
 
@@ -276,7 +276,7 @@ async function runGrandchildCommand(run: Runner, prelude: string) {
       process.kill(pid, 'SIGKILL');
     }
 
-    await rm(dir, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true });
   });
 
   const script = `(${prelude}echo $BASHPID > "$1"; echo > "$2"; exec sleep 30) & wait`;

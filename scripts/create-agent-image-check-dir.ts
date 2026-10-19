@@ -19,16 +19,20 @@ export async function createAgentImageCheckDir(
   input: Readonly<AgentImageCheckDirInput>,
 ): Promise<string> {
   const tarball = join(input.work, 'gitleaks.tar.gz');
-  const dir = join(input.work, 'agent-image-check');
+  const directory = join(input.work, 'agent-image-check');
 
   const bytes = await readGitleaks(input.pins);
 
   await writeFile(tarball, bytes);
-  await mkdir(dir);
-  await runOrExit(io, ['tar', '-xzf', tarball, '-C', dir, 'gitleaks']);
-  await copyFile(join(input.repo, 'scripts/agent-image-gitleaks.toml'), join(dir, 'gitleaks.toml'));
+  await mkdir(directory);
+  await runOrExit(io, ['tar', '-xzf', tarball, '-C', directory, 'gitleaks']);
 
-  return dir;
+  await copyFile(
+    join(input.repo, 'scripts/agent-image-gitleaks.toml'),
+    join(directory, 'gitleaks.toml'),
+  );
+
+  return directory;
 }
 
 // the linux_x64 tarball of the gitleaks release, whose line in the release's checksums file the

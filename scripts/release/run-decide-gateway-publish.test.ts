@@ -8,12 +8,12 @@ import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
 import { runDecideGatewayPublish } from './run-decide-gateway-publish.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'decide-gateway-publish-'));
+  const directory = await mkdtemp(join(tmpdir(), 'decide-gateway-publish-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const output = join(dir, 'output');
-  const summary = join(dir, 'summary');
+  const output = join(directory, 'output');
+  const summary = join(directory, 'summary');
 
   await writeFile(output, '');
   await writeFile(summary, '');

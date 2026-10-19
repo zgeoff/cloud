@@ -10,7 +10,7 @@ export function buildMockCredentialsHostScenario(
 ): StubCredentialsHostScenario {
   return {
     host: 'geoffcloud',
-    dir: '/var/lib/atc-daemon-secrets',
+    directory: '/var/lib/atc-daemon-secrets',
     impdPort: '7070',
     info: { version: '0.27.0', features: { grantableTokens: true } },
     secrets: [{ ...buildMockImpSecret() }, ...buildMockATCProfileSecrets()],

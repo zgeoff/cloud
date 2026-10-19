@@ -6,17 +6,17 @@ import type { ContractRun, Preview } from './create-preview-store.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'preview-store-'));
+  const directory = await mkdtemp(join(tmpdir(), 'preview-store-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const store = createPreviewStore(join(dir, 'previews.sqlite'));
+  const store = createPreviewStore(join(directory, 'previews.sqlite'));
 
   onTestFinished(() => {
     store.close();
   });
 
-  return { dir, store };
+  return { directory, store };
 }
 
 test('it records a new pull request as waiting', async () => {
@@ -353,7 +353,7 @@ test('it keeps the previews across a reopen of the database file', async () => {
     headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
   });
 
-  const reopened = createPreviewStore(join(ctx.dir, 'previews.sqlite'));
+  const reopened = createPreviewStore(join(ctx.directory, 'previews.sqlite'));
 
   onTestFinished(() => {
     reopened.close();

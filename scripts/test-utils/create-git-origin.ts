@@ -16,8 +16,8 @@ export interface GitOrigin {
 
 // Creates a real bare repository at <dir>/origin.git and a working repository at <dir>/seed whose
 // origin it is, both on main, for a test whose script fetches from and pushes to an origin
-export async function createGitOrigin(dir: string): Promise<GitOrigin> {
-  const home = join(dir, 'home');
+export async function createGitOrigin(directory: string): Promise<GitOrigin> {
+  const home = join(directory, 'home');
 
   const env = {
     PATH: process.env['PATH'] ?? '/usr/bin:/bin',
@@ -37,8 +37,8 @@ export async function createGitOrigin(dir: string): Promise<GitOrigin> {
   };
 
   const git = makeGit(env);
-  const origin = join(dir, 'origin.git');
-  const seed = join(dir, 'seed');
+  const origin = join(directory, 'origin.git');
+  const seed = join(directory, 'seed');
 
   await mkdir(home, { recursive: true });
   await git(['init', '-q', '--bare', '-b', 'main', origin]);

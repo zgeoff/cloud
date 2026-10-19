@@ -35,10 +35,10 @@ async function writeContract(
   }
 
   const tag = call.argv[2] ?? '';
-  const dir = join(call.options.cwd ?? '', 'scripts/nixie-api');
+  const directory = join(call.options.cwd ?? '', 'scripts/nixie-api');
 
-  await writeFile(join(dir, 'openapi.json'), `{"info":{"version":"${tag}"}}\n`);
-  await writeFile(join(dir, 'openapi.d.ts'), `// nixie ${tag}\n`);
+  await writeFile(join(directory, 'openapi.json'), `{"info":{"version":"${tag}"}}\n`);
+  await writeFile(join(directory, 'openapi.d.ts'), `// nixie ${tag}\n`);
 
   return { stdout: `write-nixie-api-contract: wrote nixie ${tag}'s openapi.json and its types\n` };
 }

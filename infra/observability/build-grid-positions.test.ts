@@ -1,3 +1,4 @@
+/* oxlint-disable id-length -- Grafana's gridPos names a panel's width w and its height h */
 import { expect, test } from 'bun:test';
 import { buildGridPositions } from './build-grid-positions.ts';
 

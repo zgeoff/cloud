@@ -9,19 +9,19 @@ import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
 // The script runs as the host gets it, with real bash reading it on stdin; docker is a stand-in
 // first on PATH
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'mint-atc-imp-token-'));
+  const directory = await mkdtemp(join(tmpdir(), 'mint-atc-imp-token-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const bin = join(dir, 'bin');
-  const secrets = join(dir, 'secrets');
+  const bin = join(directory, 'bin');
+  const secrets = join(directory, 'secrets');
 
   await mkdir(bin);
   await mkdir(secrets);
 
   const script = await readFile(new URL('mint-atc-imp-token.sh', import.meta.url));
 
-  const env = { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, HOME: dir };
+  const env = { PATH: `${bin}:${process.env['PATH'] ?? '/usr/bin:/bin'}`, HOME: directory };
 
   return { bin, secrets, script, env };
 }

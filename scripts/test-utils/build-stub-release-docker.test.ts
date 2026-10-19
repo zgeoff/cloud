@@ -6,11 +6,11 @@ import { buildStubReleaseDocker } from './build-stub-release-docker.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'build-stub-release-docker-'));
+  const directory = await mkdtemp(join(tmpdir(), 'build-stub-release-docker-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it prints the manifest descriptor of a reference the scenario names', async () => {
@@ -68,7 +68,7 @@ test('it writes the scenario lock into the mounted flake and hands it no NIX_CON
       'run',
       '--rm',
       '-v',
-      `${ctx.dir}:/src`,
+      `${ctx.directory}:/src`,
       '-w',
       '/src',
       'example/nix:1.0.0',
@@ -79,7 +79,7 @@ test('it writes the scenario lock into the mounted flake and hands it no NIX_CON
     { env: { NIX_CONFIG: 'connect-timeout = 5' } },
   );
 
-  const lock = await readFile(join(ctx.dir, 'flake.lock'), 'utf8');
+  const lock = await readFile(join(ctx.directory, 'flake.lock'), 'utf8');
 
   expect(result.exitCode).toBe(0);
   expect(lock).toBe('{"nodes":{}}\n');
@@ -98,7 +98,7 @@ test('it hands the lock the caller NIX_CONFIG with -e NIX_CONFIG', async () => {
       'run',
       '--rm',
       '-v',
-      `${ctx.dir}:/src`,
+      `${ctx.directory}:/src`,
       '-w',
       '/src',
       '-e',
@@ -117,7 +117,7 @@ test('it hands the lock the caller NIX_CONFIG with -e NIX_CONFIG', async () => {
 test('it fails a lock with the scenario error and leaves the lock unchanged', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.dir, 'flake.lock'), 'before\n');
+  await writeFile(join(ctx.directory, 'flake.lock'), 'before\n');
 
   const stub = buildStubRunner(
     buildStubReleaseDocker({ lock: 'after\n', lockError: 'error: unable to download' }).handle,
@@ -128,7 +128,7 @@ test('it fails a lock with the scenario error and leaves the lock unchanged', as
     'run',
     '--rm',
     '-v',
-    `${ctx.dir}:/src`,
+    `${ctx.directory}:/src`,
     '-w',
     '/src',
     'example/nix:1.0.0',
@@ -142,7 +142,7 @@ test('it fails a lock with the scenario error and leaves the lock unchanged', as
     stderr: 'error: unable to download\n',
   });
 
-  const lock = await readFile(join(ctx.dir, 'flake.lock'), 'utf8');
+  const lock = await readFile(join(ctx.directory, 'flake.lock'), 'utf8');
 
   expect(lock).toBe('before\n');
 });

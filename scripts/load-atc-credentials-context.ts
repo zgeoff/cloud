@@ -11,7 +11,7 @@ import type { ScriptIO } from './run-or-exit.ts';
 export interface ATCCredentialsContext extends HostIO {
   readonly vault: string;
   readonly item: string;
-  readonly dir: string;
+  readonly directory: string;
   readonly impdPort: string;
 
   // op's environment, which carries the 1Password service account token
@@ -36,7 +36,7 @@ export async function loadATCCredentialsContext(
     host: options.env['ATC_CREDENTIALS_HOST'] ?? 'geoffcloud',
     vault: options.env['ATC_CREDENTIALS_VAULT'] ?? 'cloud',
     item: options.env['ATC_DAEMON_TOKEN_ITEM'] ?? 'atc-daemon-token',
-    dir: options.env['ATC_CREDENTIALS_DIR'] ?? '/var/lib/atc-daemon-secrets',
+    directory: options.env['ATC_CREDENTIALS_DIR'] ?? '/var/lib/atc-daemon-secrets',
     impdPort: options.env['ATC_IMPD_PORT'] ?? String(topology.imp.apiPort),
     opEnv: { ...options.env, OP_SERVICE_ACCOUNT_TOKEN: opToken },
   };

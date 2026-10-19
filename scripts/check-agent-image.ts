@@ -51,12 +51,12 @@ const guestTimeoutMs = 900_000;
 
 async function runCheck(options: Readonly<CheckAgentImageOptions>, target: Target, work: string) {
   const pins = await loadAgentImagePins(join(options.repo, 'images/agent/Dockerfile'));
-  const dir = await createAgentImageCheckDir(options, { work, repo: options.repo, pins });
+  const directory = await createAgentImageCheckDir(options, { work, repo: options.repo, pins });
   const body = await readFile(join(options.repo, 'scripts/agent-image-check-guest.sh'), 'utf8');
 
   const stdin = Buffer.from(buildAgentImageGuestScript({ pins, mode: target.mode, body }));
 
-  const argv = await setupGuest(options, target, dir);
+  const argv = await setupGuest(options, target, directory);
   const result = await options.run(argv, { stdin, timeoutMs: guestTimeoutMs });
 
   options.printOut(result.stdout.toString());
@@ -67,14 +67,21 @@ async function runCheck(options: Readonly<CheckAgentImageOptions>, target: Targe
 
 // An imp gets the check directory copied to its /run, a tmpfs there; docker mounts it read-only.
 // Returns the command that runs bash in the image with the guest script on stdin.
-async function setupGuest(options: Readonly<CheckAgentImageOptions>, target: Target, dir: string) {
+async function setupGuest(
+  options: Readonly<CheckAgentImageOptions>,
+  target: Target,
+  directory: string,
+) {
   if (target.mode === 'docker') {
-    const mount = `${dir}:/run/agent-image-check:ro`;
+    const mount = `${directory}:/run/agent-image-check:ro`;
 
     return ['docker', 'run', '--rm', '-i', '-v', mount, target.name, 'bash', '-s'];
   }
 
-  await runOrExit(options, buildImpArgv(['cp', dir, `${target.name}:/run/agent-image-check`]));
+  await runOrExit(
+    options,
+    buildImpArgv(['cp', directory, `${target.name}:/run/agent-image-check`]),
+  );
 
   return buildImpArgv(['exec', target.name, '--', 'bash', '-s']);
 }

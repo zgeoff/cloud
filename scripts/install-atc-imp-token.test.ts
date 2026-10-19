@@ -76,7 +76,7 @@ test('it checks the saved file against the impd port and directory the environme
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
     host: buildMockCredentialsHostScenario({
       host: 'canary',
-      dir: '/srv/atc secrets',
+      directory: '/srv/atc secrets',
       impdPort: '7171',
     }),
   });

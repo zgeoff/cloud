@@ -11,16 +11,16 @@ import { createGitOrigin } from '../test-utils/create-git-origin.ts';
 import { openReleaseBumpPR } from './open-release-bump-pr.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'open-release-bump-pr-'));
+  const directory = await mkdtemp(join(tmpdir(), 'open-release-bump-pr-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  const origin = await createGitOrigin(dir);
+  const origin = await createGitOrigin(directory);
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { origin, clone: join(dir, 'clone'), printOut, printErr };
+  return { origin, clone: join(directory, 'clone'), printOut, printErr };
 }
 
 test('it opens a labelled pull request when none is open', async () => {

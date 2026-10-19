@@ -2,6 +2,7 @@
 import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { http, passthrough } from 'msw';
+import { match } from 'ts-pattern';
 import { server as mockServer } from '../mocks/node.ts';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
@@ -201,30 +202,24 @@ function buildProcedureResponse(
     return buildRPCError(404, 'NOT_FOUND', `no imp named ${name}`);
   }
 
-  switch (procedure) {
-    case 'imps/get': {
-      return buildRPCResult(toImpRecord(imp));
-    }
-
-    case 'imps/sleep': {
+  return match(procedure)
+    .with('imps/get', () => buildRPCResult(toImpRecord(imp)))
+    .with('imps/sleep', () => {
       imp.state = 'sleeping';
 
       return buildRPCResult(toImpRecord(imp));
-    }
-
-    case 'imps/wake': {
+    })
+    .with('imps/wake', () => {
       imp.state = 'running';
 
       return buildRPCResult(toImpRecord(imp));
-    }
-
-    case 'imps/update': {
+    })
+    .with('imps/update', () => {
       imp.httpPort = Number(input['httpPort']);
 
       return buildRPCResult(toImpRecord(imp));
-    }
-
-    case 'imps/destroy': {
+    })
+    .with('imps/destroy', () => {
       stub.imps.delete(imp.name);
 
       for (const socket of stub.held.get(imp.name) ?? []) {
@@ -232,30 +227,23 @@ function buildProcedureResponse(
       }
 
       return buildRPCResult({});
-    }
-
-    case 'grants/list': {
-      return buildRPCResult(imp.grants);
-    }
-
-    case 'grants/add': {
+    })
+    .with('grants/list', () => buildRPCResult(imp.grants))
+    .with('grants/add', () => {
       imp.grants.push(String(input['secret']));
 
       return buildRPCResult({});
-    }
-
-    case 'exec/ticket': {
+    })
+    .with('exec/ticket', () => {
       const ticket = `stub-ticket.${crypto.randomUUID()}`;
 
       stub.tickets.set(ticket, imp.name);
 
       return buildRPCResult({ ticket, expiresAt: new Date(Date.now() + 30_000) });
-    }
-
-    default: {
-      return new Response(`not impd: start-stub-impd.ts has no ${procedure}\n`, { status: 500 });
-    }
-  }
+    })
+    .otherwise(
+      () => new Response(`not impd: start-stub-impd.ts has no ${procedure}\n`, { status: 500 }),
+    );
 }
 
 // the fields of impd's ImpSchema that the service reads, beside two it ignores

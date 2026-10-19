@@ -29,7 +29,11 @@ export async function printATCCredentials(context: Readonly<ATCCredentialsContex
 }
 
 async function printModes(context: Readonly<ATCCredentialsContext>) {
-  const paths = [context.dir, `${context.dir}/gateway-token`, `${context.dir}/imp-token`];
+  const paths = [
+    context.directory,
+    `${context.directory}/gateway-token`,
+    `${context.directory}/imp-token`,
+  ];
 
   const stat = await runOnHost(context, ['stat', '-c', '%n %U %a %s bytes', ...paths]);
 

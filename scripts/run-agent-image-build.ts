@@ -24,7 +24,7 @@ export interface AgentImageBuild {
 
 export interface BuiltAgentImage {
   // the commit's extracted image and scripts
-  readonly src: string;
+  readonly source: string;
   readonly digest: string;
 }
 
@@ -34,40 +34,50 @@ export async function runAgentImageBuild(
   io: Readonly<ScriptIO>,
   build: Readonly<AgentImageBuild>,
 ): Promise<BuiltAgentImage> {
-  const src = await createImageSource(io, build);
+  const source = await createImageSource(io, build);
 
-  await runImpBuild(io, build, src);
+  await runImpBuild(io, build, source);
 
   const images = await loadImpJSON(io, ['image', 'ls']);
 
   const digest = findJSONField(findRecord(images, 'name', build.image), 'digest');
 
-  return { src, digest: typeof digest === 'string' ? digest : '' };
+  return { source, digest: typeof digest === 'string' ? digest : '' };
 }
 
 // git archive writes a tar of the commit's image and scripts, which tar extracts into src
 async function createImageSource(io: Readonly<ScriptIO>, build: Readonly<AgentImageBuild>) {
-  const src = join(build.work, 'src');
+  const source = join(build.work, 'src');
   const tarball = join(build.work, 'src.tar');
   const archive = ['git', 'archive', '--output', tarball, build.sha, 'images/agent', 'scripts'];
 
-  await mkdir(src);
+  await mkdir(source);
   await runOrExit(io, archive, { cwd: build.cwd });
-  await runOrExit(io, ['tar', '-xf', tarball, '-C', src]);
+  await runOrExit(io, ['tar', '-xf', tarball, '-C', source]);
 
-  return src;
+  return source;
 }
 
 // impd can still finish a build that outlives the timeout, so the message says to read imp image
 // ls before a retry
-async function runImpBuild(io: Readonly<ScriptIO>, build: Readonly<AgentImageBuild>, src: string) {
+async function runImpBuild(
+  io: Readonly<ScriptIO>,
+  build: Readonly<AgentImageBuild>,
+  source: string,
+) {
   const command = formatImpCommand(['image', 'build']);
 
   io.printErr(
     `building ${build.image} from ${build.sha}; ${command} shows no progress off a terminal\n`,
   );
 
-  const argv = buildImpArgv(['image', 'build', join(src, 'images/agent'), '--name', build.image]);
+  const argv = buildImpArgv([
+    'image',
+    'build',
+    join(source, 'images/agent'),
+    '--name',
+    build.image,
+  ]);
 
   const result = await io.run(argv, { timeoutMs: build.timeoutMs });
 

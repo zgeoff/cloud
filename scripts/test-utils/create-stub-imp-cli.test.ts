@@ -6,17 +6,17 @@ import { runProcess } from '../run-process.ts';
 import { createStubImpCLI } from './create-stub-imp-cli.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'create-stub-imp-cli-'));
+  const directory = await mkdtemp(join(tmpdir(), 'create-stub-imp-cli-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it keeps the imps that one call creates for the next call, and logs each argv', async () => {
   const ctx = await setupTest();
 
-  const imp = await createStubImpCLI(ctx.dir, {
+  const imp = await createStubImpCLI(ctx.directory, {
     images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }],
   });
 
@@ -53,7 +53,7 @@ test('it keeps the imps that one call creates for the next call, and logs each a
 
 test('it answers a failing call with buildStubImp’s exit code and stderr', async () => {
   const ctx = await setupTest();
-  const imp = await createStubImpCLI(ctx.dir, { images: [] });
+  const imp = await createStubImpCLI(ctx.directory, { images: [] });
   const result = await runProcess([join(imp.bin, 'impz'), 'rm', 'agent-check-abc1234']);
 
   expect(result).toStrictEqual({
@@ -66,7 +66,7 @@ test('it answers a failing call with buildStubImp’s exit code and stderr', asy
 
 test('it fails a call it does not model with exit 97', async () => {
   const ctx = await setupTest();
-  const imp = await createStubImpCLI(ctx.dir, { images: [] });
+  const imp = await createStubImpCLI(ctx.directory, { images: [] });
   const result = await runProcess([join(imp.bin, 'impz'), 'exec', 'agent-check-abc1234']);
 
   expect(result).toStrictEqual({

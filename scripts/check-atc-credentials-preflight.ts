@@ -35,7 +35,7 @@ export async function checkATCCredentialsPreflight(
   const hostFiles = await readHostFiles(context);
 
   context.printOut(
-    `ok: 1Password vault ${context.vault}, atc-key, ssh root@${context.host}, impd grantableTokens, ${context.dir}\n`,
+    `ok: 1Password vault ${context.vault}, atc-key, ssh root@${context.host}, impd grantableTokens, ${context.directory}\n`,
   );
 
   return { secrets, tokens, hasItem, hostFiles };
@@ -98,10 +98,10 @@ async function readHostFiles(context: Readonly<ATCCredentialsContext>) {
     '-c',
     'mountpoint -q "$1" || { echo "$1 is not a mount point; nothing written" >&2; exit 1; }; install -d -m 0700 -o root -g root "$1"',
     'bash',
-    context.dir,
+    context.directory,
   ]);
 
-  const listing = await runOnHost(context, ['ls', context.dir]);
+  const listing = await runOnHost(context, ['ls', context.directory]);
 
   return listing.split('\n').filter((line) => line !== '');
 }

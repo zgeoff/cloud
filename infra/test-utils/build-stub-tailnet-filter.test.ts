@@ -1,3 +1,4 @@
+/* oxlint-disable zgeoff/no-abbreviated-names -- Tailscale's policy file names a grant's sources src */
 import { expect, test } from 'bun:test';
 import { buildStubTailnetFilter } from './build-stub-tailnet-filter.ts';
 

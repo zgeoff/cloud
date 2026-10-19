@@ -268,16 +268,16 @@ function printDone(options: Readonly<ResetNixieOptions>): number {
 }
 
 async function runSSH(command: string): Promise<RemoteResult> {
-  const proc = Bun.spawn(['ssh', 'root@geoffcloud', command], {
+  const subprocess = Bun.spawn(['ssh', 'root@geoffcloud', command], {
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
   });
 
   const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
+    new Response(subprocess.stdout).text(),
+    new Response(subprocess.stderr).text(),
+    subprocess.exited,
   ]);
 
   return { exitCode, stdout, stderr };

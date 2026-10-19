@@ -11,11 +11,11 @@ import { buildStubCredentialsHost } from './build-stub-credentials-host.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'build-stub-credentials-host-'));
+  const directory = await mkdtemp(join(tmpdir(), 'build-stub-credentials-host-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: dir } };
+  return { directory, env: { PATH: process.env['PATH'] ?? '/usr/bin:/bin', HOME: directory } };
 }
 
 test('it saves the bearer as the real write script does', async () => {
@@ -25,7 +25,7 @@ test('it saves the bearer as the real write script does', async () => {
   const stdin = Buffer.concat([script, Buffer.from('fixture-bearer\n')]);
 
   const host = buildStubCredentialsHost(
-    buildMockCredentialsHostScenario({ dir: ctx.dir, files: {} }),
+    buildMockCredentialsHostScenario({ directory: ctx.directory, files: {} }),
   );
 
   const stub = buildStubRunner(host.handle);
@@ -38,14 +38,14 @@ test('it saves the bearer as the real write script does', async () => {
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      `'bash' '-s' '--' ${toShellArg(ctx.dir)}`,
+      `'bash' '-s' '--' ${toShellArg(ctx.directory)}`,
     ],
     { stdin },
   );
 
-  await runProcess(['bash', '-s', '--', ctx.dir], { stdin, env: ctx.env });
+  await runProcess(['bash', '-s', '--', ctx.directory], { stdin, env: ctx.env });
 
-  const real = await readFile(join(ctx.dir, 'gateway-token'), 'utf8');
+  const real = await readFile(join(ctx.directory, 'gateway-token'), 'utf8');
 
   expect(host.files['gateway-token']).toStrictEqual({ content: real, mode: '400' });
 });
@@ -55,7 +55,7 @@ test('it exits 120 for a missing saved token, as the real check script does', as
   const script = await readHostScript('check-atc-imp-token.sh');
 
   const host = buildStubCredentialsHost(
-    buildMockCredentialsHostScenario({ dir: ctx.dir, files: {} }),
+    buildMockCredentialsHostScenario({ directory: ctx.directory, files: {} }),
   );
 
   const stub = buildStubRunner(host.handle);
@@ -68,14 +68,14 @@ test('it exits 120 for a missing saved token, as the real check script does', as
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      `'bash' '-s' '--' ${toShellArg(ctx.dir)} '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'`,
+      `'bash' '-s' '--' ${toShellArg(ctx.directory)} '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'`,
     ],
     { stdin: script },
   );
 
   const cli = ['docker', 'exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz'];
 
-  const real = await runProcess(['bash', '-s', '--', ctx.dir, '7070', ...cli], {
+  const real = await runProcess(['bash', '-s', '--', ctx.directory, '7070', ...cli], {
     stdin: script,
     env: ctx.env,
   });

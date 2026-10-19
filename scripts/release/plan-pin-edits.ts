@@ -184,35 +184,34 @@ function collectWantedParts(pin: Pin, input: PinEditsInput) {
   return wanted;
 }
 
-function resolvePart(part: PinPart, input: PinEditsInput): string | Error {
-  switch (part.kind) {
-    case 'version':
-    case 'tag': {
-      return input.version;
-    }
-    case 'commit': {
-      return input.values.commit?.slice(0, part.length) ?? new Error('the release names no commit');
-    }
-    case 'sum': {
-      return resolveSum(part.asset, input);
-    }
-    case 'digest': {
-      return (
-        input.values.digests?.[part.image] ?? new Error(`the release lists no ${part.image} digest`)
-      );
-    }
-    case 'tarball-sum': {
-      return input.values.tarballSum ?? new Error('the release has no tarball sum');
-    }
-    case 'image-tag': {
-      return input.values.tags?.[part.image] ?? new Error(`the release names no ${part.image} tag`);
-    }
+type PartResolver<Part extends PinPart> = (part: Part, input: PinEditsInput) => string | Error;
 
-    // the type check refuses a kind with no case, so only a registry built outside it lands here
-    default: {
-      return new Error('the registry names a pin part kind that no case reads');
-    }
-  }
+// One resolver per part kind. The release workflows run these scripts without node_modules, so a
+// keyed record branches here in place of ts-pattern's match, and its type still needs every kind.
+const partResolvers: {
+  readonly [Kind in PinPart['kind']]: PartResolver<Extract<PinPart, { kind: Kind }>>;
+} = {
+  version: (_, input) => input.version,
+  tag: (_, input) => input.version,
+  commit: (part, input) =>
+    input.values.commit?.slice(0, part.length) ?? new Error('the release names no commit'),
+  sum: (part, input) => resolveSum(part.asset, input),
+  digest: (part, input) =>
+    input.values.digests?.[part.image] ?? new Error(`the release lists no ${part.image} digest`),
+  'tarball-sum': (_, input) =>
+    input.values.tarballSum ?? new Error('the release has no tarball sum'),
+  'image-tag': (part, input) =>
+    input.values.tags?.[part.image] ?? new Error(`the release names no ${part.image} tag`),
+};
+
+function resolvePart(part: PinPart, input: PinEditsInput): string | Error {
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for part.kind reads that kind
+  const resolver = partResolvers[part.kind] as PartResolver<typeof part> | undefined;
+
+  // the type check refuses a kind with no resolver, so only a registry built outside it lands here
+  return resolver === undefined
+    ? new Error('the registry names a pin part kind that no resolver reads')
+    : resolver(part, input);
 }
 
 function resolveSum(asset: Extract<PinPart, { kind: 'sum' }>['asset'], input: PinEditsInput) {
@@ -277,7 +276,7 @@ function planLineEdits(state: PinState): LineEdit[] {
 
     // replace the groups from the last to the first, so each span stays where it was
     const spans = Object.entries(match.spans).toSorted(
-      (a: readonly [string, Span], b: readonly [string, Span]) => b[1][0] - a[1][0],
+      (left: readonly [string, Span], right: readonly [string, Span]) => right[1][0] - left[1][0],
     );
 
     let text = match.text;
@@ -297,9 +296,10 @@ function mergeLineEdits(files: Readonly<Record<string, string>>, edits: readonly
   const lines: Record<string, string[]> = {};
 
   for (const edit of edits) {
-    const each = (lines[edit.file] ??= (files[edit.file] ?? '').split('\n'));
+    const fileLines = lines[edit.file] ?? (files[edit.file] ?? '').split('\n');
 
-    each[edit.index] = edit.text;
+    fileLines[edit.index] = edit.text;
+    lines[edit.file] = fileLines;
   }
 
   return Object.fromEntries(

@@ -1,3 +1,4 @@
+/* oxlint-disable zgeoff/no-abbreviated-names -- Tailscale's policy file names a grant's sources src */
 interface TailnetGrant {
   readonly src: readonly string[];
   readonly dst: readonly string[];

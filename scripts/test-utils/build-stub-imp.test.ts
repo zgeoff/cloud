@@ -6,11 +6,11 @@ import { buildStubImp } from './build-stub-imp.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'build-stub-imp-'));
+  const directory = await mkdtemp(join(tmpdir(), 'build-stub-imp-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it lists each image with the name, ref and digest the scripts read', async () => {
@@ -30,9 +30,16 @@ test('it builds an image from a folder and reads the folder’s Dockerfile when 
   const imp = buildStubImp({ images: [] });
   const stub = buildStubRunner(imp.handler);
 
-  await writeFile(join(ctx.dir, 'Dockerfile'), 'FROM ghcr.io/zgeoff/imp-base:0.33.0\n');
+  await writeFile(join(ctx.directory, 'Dockerfile'), 'FROM ghcr.io/zgeoff/imp-base:0.33.0\n');
 
-  const result = await stub.run(['impz', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
+  const result = await stub.run([
+    'impz',
+    'image',
+    'build',
+    ctx.directory,
+    '--name',
+    'agent-abc1234',
+  ]);
 
   expect(result.exitCode).toBe(0);
 
@@ -49,9 +56,16 @@ test('it fails a build with the scenario’s error and adds no image', async () 
   const imp = buildStubImp({ images: [], buildError: 'imp: BUILD_FAILED: the build exited 1' });
   const stub = buildStubRunner(imp.handler);
 
-  await writeFile(join(ctx.dir, 'Dockerfile'), 'FROM scratch\n');
+  await writeFile(join(ctx.directory, 'Dockerfile'), 'FROM scratch\n');
 
-  const result = await stub.run(['impz', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
+  const result = await stub.run([
+    'impz',
+    'image',
+    'build',
+    ctx.directory,
+    '--name',
+    'agent-abc1234',
+  ]);
 
   expect(result).toStrictEqual({
     exitCode: 1,
@@ -69,9 +83,16 @@ test('it answers a build that outlives its timeout as the runner does, and adds 
   const imp = buildStubImp({ images: [], buildTimesOut: true });
   const stub = buildStubRunner(imp.handler);
 
-  await writeFile(join(ctx.dir, 'Dockerfile'), 'FROM scratch\n');
+  await writeFile(join(ctx.directory, 'Dockerfile'), 'FROM scratch\n');
 
-  const result = await stub.run(['impz', 'image', 'build', ctx.dir, '--name', 'agent-abc1234']);
+  const result = await stub.run([
+    'impz',
+    'image',
+    'build',
+    ctx.directory,
+    '--name',
+    'agent-abc1234',
+  ]);
 
   expect(result).toStrictEqual({
     exitCode: 143,

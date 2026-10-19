@@ -6,11 +6,11 @@ import { runProcess } from '../run-process.ts';
 import { startStubGitleaksRelease } from './start-stub-gitleaks-release.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'start-stub-gitleaks-release-'));
+  const directory = await mkdtemp(join(tmpdir(), 'start-stub-gitleaks-release-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it serves a tarball at the release URL that holds gitleaks and matches the sum it returns', async () => {
@@ -25,10 +25,18 @@ test('it serves a tarball at the release URL that holds gitleaks and matches the
 
   const tarball = new Uint8Array(buffer);
 
-  await writeFile(join(ctx.dir, 'release.tar.gz'), tarball);
-  await runProcess(['tar', '-xzf', join(ctx.dir, 'release.tar.gz'), '-C', ctx.dir, 'gitleaks']);
+  await writeFile(join(ctx.directory, 'release.tar.gz'), tarball);
 
-  const extracted = await readFile(join(ctx.dir, 'gitleaks'), 'utf8');
+  await runProcess([
+    'tar',
+    '-xzf',
+    join(ctx.directory, 'release.tar.gz'),
+    '-C',
+    ctx.directory,
+    'gitleaks',
+  ]);
+
+  const extracted = await readFile(join(ctx.directory, 'gitleaks'), 'utf8');
 
   expect(new Bun.CryptoHasher('sha256').update(tarball).digest('hex')).toBe(sum);
   expect(extracted).toBe('fake gitleaks\n');

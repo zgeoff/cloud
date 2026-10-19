@@ -15,13 +15,13 @@ async function setupTest() {
 
   await mkdir(join(work, 'src/scripts'), { recursive: true });
 
-  return { work, src: join(work, 'src') };
+  return { work, source: join(work, 'src') };
 }
 
 test('it runs the source’s check on a fresh imp, with a long timeout, and removes the imp', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.src, 'scripts/check-agent-image.ts'), '');
+  await writeFile(join(ctx.source, 'scripts/check-agent-image.ts'), '');
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler, buildStubCheckAgentImage(0));
@@ -29,14 +29,14 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
 
   const passed = await runAgentImageCheck(
     { run: stub.run, printOut: () => {}, printErr, registerCleanup: () => () => {} },
-    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', source: ctx.source, work: ctx.work },
   );
 
   expect(passed).toBe(true);
 
   expect(stub.calls.map((call) => call.argv)).toStrictEqual([
     ['impz', 'new', 'agent-check-abc1234', '--image', 'agent-abc1234'],
-    ['bun', join(ctx.src, 'scripts/check-agent-image.ts'), '--imp', 'agent-check-abc1234'],
+    ['bun', join(ctx.source, 'scripts/check-agent-image.ts'), '--imp', 'agent-check-abc1234'],
     ['impz', 'rm', 'agent-check-abc1234'],
   ]);
 
@@ -52,14 +52,14 @@ test('it runs the source’s check on a fresh imp, with a long timeout, and remo
 test('it hands a pre-rename check’s imp calls to impz through the shim on its PATH', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.src, 'scripts/check-agent-image.sh'), '');
+  await writeFile(join(ctx.source, 'scripts/check-agent-image.sh'), '');
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler, buildStubCheckAgentImage(0));
 
   await runAgentImageCheck(
     { run: stub.run, printOut: () => {}, printErr: () => {}, registerCleanup: () => () => {} },
-    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', source: ctx.source, work: ctx.work },
   );
 
   const bin = join(ctx.work, 'stub-bin');
@@ -77,14 +77,14 @@ test('it hands a pre-rename check’s imp calls to impz through the shim on its 
 test('it reports a failed check after it removes the imp', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.src, 'scripts/check-agent-image.sh'), '');
+  await writeFile(join(ctx.source, 'scripts/check-agent-image.sh'), '');
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler, buildStubCheckAgentImage(3));
 
   const passed = await runAgentImageCheck(
     { run: stub.run, printOut: () => {}, printErr: () => {}, registerCleanup: () => () => {} },
-    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', source: ctx.source, work: ctx.work },
   );
 
   expect(passed).toBe(false);
@@ -95,7 +95,7 @@ test('it reports a failed check after it removes the imp', async () => {
 test('it leaves the imp’s removal to an interrupt from impz new on, and drops that step after', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.src, 'scripts/check-agent-image.ts'), '');
+  await writeFile(join(ctx.source, 'scripts/check-agent-image.ts'), '');
 
   // each registered step, bound to a runner that records what an interrupt would run
   const steps = new Set<() => unknown>();
@@ -128,7 +128,7 @@ test('it leaves the imp’s removal to an interrupt from impz new on, and drops 
         };
       },
     },
-    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', source: ctx.source, work: ctx.work },
   );
 
   expect(passed).toBe(true);
@@ -143,14 +143,14 @@ test('it leaves the imp’s removal to an interrupt from impz new on, and drops 
 test('it reports a check that outlives its timeout as failed', async () => {
   const ctx = await setupTest();
 
-  await writeFile(join(ctx.src, 'scripts/check-agent-image.ts'), '');
+  await writeFile(join(ctx.source, 'scripts/check-agent-image.ts'), '');
 
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler, () => ({ exitCode: 0, timedOut: true }));
 
   const passed = await runAgentImageCheck(
     { run: stub.run, printOut: () => {}, printErr: () => {}, registerCleanup: () => () => {} },
-    { image: 'agent-abc1234', check: 'agent-check-abc1234', src: ctx.src, work: ctx.work },
+    { image: 'agent-abc1234', check: 'agent-check-abc1234', source: ctx.source, work: ctx.work },
   );
 
   expect(passed).toBe(false);

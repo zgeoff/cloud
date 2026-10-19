@@ -5,30 +5,30 @@ import { join } from 'node:path';
 import { checkWorkflowSteps } from './check-workflow-steps.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'check-workflow-steps-'));
+  const directory = await mkdtemp(join(tmpdir(), 'check-workflow-steps-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  await mkdir(join(dir, '.github', 'workflows'), { recursive: true });
+  await mkdir(join(directory, '.github', 'workflows'), { recursive: true });
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { dir, printOut, printErr };
+  return { directory, printOut, printErr };
 }
 
 test('it accepts workflows whose run steps are setup or one bun run call each', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'package.json'),
+    join(ctx.directory, 'package.json'),
     JSON.stringify({
       scripts: { 'ci:decide': 'bash scripts/decide.sh', drift: 'bun run preview' },
     }),
   );
 
   await writeFile(
-    join(ctx.dir, '.github', 'workflows', 'ci.yml'),
+    join(ctx.directory, '.github', 'workflows', 'ci.yml'),
     `jobs:
   ci:
     steps:
@@ -46,14 +46,14 @@ test('it accepts workflows whose run steps are setup or one bun run call each', 
   );
 
   await writeFile(
-    join(ctx.dir, '.github', 'workflows', 'sync.yaml'),
+    join(ctx.directory, '.github', 'workflows', 'sync.yaml'),
     JSON.stringify({
       jobs: { sync: { uses: 'zgeoff/tools/.github/workflows/repo-sync.yml@main' } },
     }),
   );
 
   const exitCode = await checkWorkflowSteps({
-    args: [ctx.dir],
+    args: [ctx.directory],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -113,17 +113,17 @@ test.each([
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'package.json'),
+    join(ctx.directory, 'package.json'),
     JSON.stringify({ scripts: { 'ci:decide': 'bash scripts/decide.sh' } }),
   );
 
   await writeFile(
-    join(ctx.dir, '.github', 'workflows', 'ci.yml'),
+    join(ctx.directory, '.github', 'workflows', 'ci.yml'),
     JSON.stringify({ jobs: { ci: { steps: [{ name: 'Decide', run }] } } }),
   );
 
   const exitCode = await checkWorkflowSteps({
-    args: [ctx.dir],
+    args: [ctx.directory],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -142,12 +142,12 @@ test('it names every violation across files, jobs and unnamed steps, in file ord
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'package.json'),
+    join(ctx.directory, 'package.json'),
     JSON.stringify({ scripts: { 'ci:decide': 'bash scripts/decide.sh' } }),
   );
 
   await writeFile(
-    join(ctx.dir, '.github', 'workflows', 'b.yml'),
+    join(ctx.directory, '.github', 'workflows', 'b.yml'),
     JSON.stringify({
       jobs: {
         first: { steps: [{ uses: 'actions/checkout@v7' }, { run: 'echo one' }] },
@@ -162,14 +162,14 @@ test('it names every violation across files, jobs and unnamed steps, in file ord
   );
 
   await writeFile(
-    join(ctx.dir, '.github', 'workflows', 'a.yaml'),
+    join(ctx.directory, '.github', 'workflows', 'a.yaml'),
     JSON.stringify({ jobs: { only: { steps: [{ run: 'sudo udevadm trigger' }] } } }),
   );
 
-  await writeFile(join(ctx.dir, '.github', 'workflows', 'notes.txt'), 'run: echo ignored\n');
+  await writeFile(join(ctx.directory, '.github', 'workflows', 'notes.txt'), 'run: echo ignored\n');
 
   const exitCode = await checkWorkflowSteps({
-    args: [ctx.dir],
+    args: [ctx.directory],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -192,7 +192,7 @@ test('it rejects a second argument with its usage', async () => {
   const ctx = await setupTest();
 
   const exitCode = await checkWorkflowSteps({
-    args: [ctx.dir, 'extra'],
+    args: [ctx.directory, 'extra'],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });

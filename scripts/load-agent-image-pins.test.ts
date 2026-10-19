@@ -5,22 +5,22 @@ import { join } from 'node:path';
 import { loadAgentImagePins } from './load-agent-image-pins.ts';
 
 async function setupTest() {
-  const dir = await mkdtemp(join(tmpdir(), 'load-agent-image-pins-'));
+  const directory = await mkdtemp(join(tmpdir(), 'load-agent-image-pins-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
-  return { dir };
+  return { directory };
 }
 
 test('it reads every ARG pin by name, in the file’s order, and nothing else', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.dir, 'Dockerfile'),
+    join(ctx.directory, 'Dockerfile'),
     'FROM ubuntu:24.04\nARG GIT_VERSION=1:2.43.0-1ubuntu7.3\nRUN echo ARG FAKE=1\nARG BUN_VERSION=1.4.2\n  ARG INDENTED=1\nARG BUN_SHA256=36368f\n',
   );
 
-  const pins = await loadAgentImagePins(join(ctx.dir, 'Dockerfile'));
+  const pins = await loadAgentImagePins(join(ctx.directory, 'Dockerfile'));
 
   expect(Object.entries(pins)).toStrictEqual([
     ['GIT_VERSION', '1:2.43.0-1ubuntu7.3'],
