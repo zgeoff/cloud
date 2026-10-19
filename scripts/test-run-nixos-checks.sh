@@ -42,7 +42,7 @@ it_builds_every_check_the_flake_declares_from_a_snapshot_of_the_tracked_and_unig
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
-    STUB_CHECKS=$'atc-daemon\nimpd-restore\nimpd-restore-seams\n' KVM_DEVICE="$tree/kvm" \
+    STUB_CHECKS=$'atc-daemon\nimpd-restore\nimpd-restore-boundaries\n' KVM_DEVICE="$tree/kvm" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -54,8 +54,8 @@ it_builds_every_check_the_flake_declares_from_a_snapshot_of_the_tracked_and_unig
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
 ["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.impd-restore"]
-["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.impd-restore-seams"]
-["docker","run","--rm","--network","host","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","/nix/store/00000000000000000000000000000000-atc-daemon.drv^*","/nix/store/00000000000000000000000000000000-impd-restore.drv^*","/nix/store/00000000000000000000000000000000-impd-restore-seams.drv^*"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.impd-restore-boundaries"]
+["docker","run","--rm","--network","host","--device","$tree/kvm:/dev/kvm","-v","cloud-nixos-checks-store:/nix","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","/nix/store/00000000000000000000000000000000-atc-daemon.drv^*","/nix/store/00000000000000000000000000000000-impd-restore.drv^*","/nix/store/00000000000000000000000000000000-impd-restore-boundaries.drv^*"]
 EOF
   # the deleted nixos/gone.nix and the untracked, ignored notes.txt stay out
   find "$tree/source-saw" -type f -printf '%P\n' | sort > "$tree/source-saw-files"
@@ -174,10 +174,10 @@ it_builds_the_other_checks_then_fails_naming_every_restore_check_when_the_kvm_de
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
     KVM_DEVICE="$tree/no-kvm" \
-    bash "$script" impd-restore atc-daemon impd-restore-seams > "$tree/out" 2> "$tree/err" || status=$?
+    bash "$script" impd-restore atc-daemon impd-restore-boundaries > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-boundaries need KVM"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]
@@ -195,11 +195,11 @@ it_fails_naming_every_restore_check_and_leaves_no_temp_file_when_it_lists_the_ch
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
-    STUB_CHECKS=$'atc-daemon\nimpd-restore\nimpd-restore-seams\n' KVM_DEVICE="$tree/no-kvm" \
+    STUB_CHECKS=$'atc-daemon\nimpd-restore\nimpd-restore-boundaries\n' KVM_DEVICE="$tree/no-kvm" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-seams need KVM"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; impd-restore, impd-restore-boundaries need KVM"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
 ["git","rev-parse","--show-toplevel"]

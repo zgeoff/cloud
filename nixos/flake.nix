@@ -90,7 +90,7 @@
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.impd-restore = import ./checks/impd-restore.nix { inherit nixpkgs imp; };
-      checks.x86_64-linux.impd-restore-seams = import ./checks/impd-restore-seams.nix {
+      checks.x86_64-linux.impd-restore-boundaries = import ./checks/impd-restore-boundaries.nix {
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.impd-restore-saved-failures = import ./checks/impd-restore-saved-failures.nix {
