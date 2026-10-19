@@ -102,9 +102,12 @@ images repeats that step.
 nixie's public name, `nixie.geoff.cloud`, is a DNS-only record at the host's tailnet address, so it
 resolves anywhere and answers on the tailnet only, the pattern impd's names follow. Traefik serves
 the route as nixie's ingress controller. It holds the host's HTTPS port through a hostPort bound to
-the tailnet address alone, so no other interface answers. It watches nixie's namespace only and
-serves no dashboard. The NixOS firewall trusts the tailnet interface, and the tailnet policy lets
-every member's device reach the host on HTTPS ([firewalls](../network/firewalls.md)).
+the tailnet address alone, so no other interface answers. It runs in its own namespace,
+nixie-ingress, because Pod Security's `baseline` level refuses a host port, and that namespace alone
+goes without the level while nixie's own pods keep it
+([cross-cutting rules](../overview.md#cross-cutting)). It watches nixie's namespace only and serves
+no dashboard. The NixOS firewall trusts the tailnet interface, and the tailnet policy lets every
+member's device reach the host on HTTPS ([firewalls](../network/firewalls.md)).
 
 The Ingress sends `/rpc` to nixie and every other path to the web client. Its certificate comes from
 Let's Encrypt through a DNS-01 challenge that the Pulumi run answers with Pulumi's own Cloudflare

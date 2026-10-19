@@ -63,7 +63,6 @@ export function createNixie(
 
   const ingress = createNixieIngress(cluster, {
     namespace,
-    namespaceResource: ns,
     hostname: inputs.config.hostname,
     dnsToken: inputs.secrets.dnsToken,
     zoneID,

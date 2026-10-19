@@ -2,9 +2,9 @@ import { expect, test } from 'bun:test';
 import { buildNamespaceMetadata } from './build-namespace-metadata.ts';
 import { clusterNamespaceNames } from './cluster-namespaces.ts';
 
-test('it gives every namespace but observability and kube-system the baseline warn and audit labels', () => {
+test('it gives every namespace but observability, nixie-ingress and kube-system the baseline warn and audit labels', () => {
   const labelled = clusterNamespaceNames.filter(
-    (name) => name !== 'observability' && name !== 'kube-system',
+    (name) => name !== 'observability' && name !== 'nixie-ingress' && name !== 'kube-system',
   );
 
   expect(labelled.map((name) => buildNamespaceMetadata(name))).toSatisfyAll(
@@ -24,7 +24,7 @@ test('it names a namespace and gives it the baseline warn and audit labels', () 
   });
 });
 
-test.each([['observability'], ['kube-system']] as const)(
+test.each([['observability'], ['nixie-ingress'], ['kube-system']] as const)(
   'it gives %s no Pod Security label',
   (name) => {
     expect(buildNamespaceMetadata(name)).toStrictEqual({ name });
