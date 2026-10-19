@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { join } from 'node:path';
 import { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
 import type { ATCGatewayConfig, ATCGatewayRawConfig } from './types.ts';
 
@@ -457,4 +458,15 @@ test('it takes an empty trustForwardedFrom, which trusts no proxy', () => {
   };
 
   expect(atcGatewayConfigSchema.safeParse(payload).data).toStrictEqual(payload);
+});
+
+test("it reads the committed prod config's trusted proxies as the pod's loopback alone", async () => {
+  const text = await Bun.file(join(import.meta.dir, '..', 'Pulumi.prod.yaml')).text();
+
+  const stack = Bun.YAML.parse(text) as { config: Record<string, unknown> };
+
+  expect(
+    atcGatewayConfigSchema.safeParse(stack.config['geoff-cloud:atcGateway']).data
+      ?.trustForwardedFrom,
+  ).toStrictEqual(['127.0.0.1']);
 });

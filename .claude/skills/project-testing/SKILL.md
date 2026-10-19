@@ -108,7 +108,12 @@ live host.
 `infra/` is in the pure regime: every unit under test is a builder or a validator that returns a
 value. Resource-creating modules stay thin, and their logic lives in an exported `build*`,
 `require*`, `find*` or `to*` function in its own file, which the test calls directly. The
-health-check worker in `workers/health-check/` is HTTP-mocked.
+health-check worker in `workers/health-check/` is HTTP-mocked. One exception runs the real engine:
+[`create-cluster-provider.test.ts`](../../../infra/cluster/create-cluster-provider.test.ts) runs
+`pulumi preview` on a fixture program with a local state backend and a Kubernetes provider that
+renders to files, so the port-forward guard meets each Helm chart's rendered objects as in prod.
+It needs the Pulumi CLI and the Kubernetes plugin at infra's pins, which CI installs, and skips
+without the CLI.
 
 - Each package keeps its preload in its own Bun config, and Bun reads only the one in the directory
   it runs from. A comment in each lists what its preload loads:

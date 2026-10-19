@@ -1,7 +1,6 @@
 // the program's entry point: it reads the inputs once and wires each group through its entry module
-import { Provider } from '@pulumi/kubernetes';
 import { Config } from '@pulumi/pulumi';
-import { createCluster, registerPortForwardGuard } from './cluster/index.ts';
+import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
 import { createATCTunnel, createIngress } from './ingress/index.ts';
 import { buildATCDaemonEndpoints, loadInputs } from './inputs/index.ts';
@@ -11,10 +10,6 @@ import { createTailnet } from './tailnet/index.ts';
 // The one place the program reads its stack config and env (.env's op:// refs, through `op
 // run`); every value is checked before any resource registers.
 const inputs = loadInputs(new Config(), process.env);
-
-// before the first resource, so the guard sees every RBAC object the program and its charts declare
-registerPortForwardGuard();
-
 const accountID = inputs.accountID;
 const edge = createEdge({ accountID, hostOnTailnet: inputs.hostOnTailnet });
 
@@ -38,7 +33,7 @@ const k3s =
     ? undefined
     : {
         inputs: inputs.cluster,
-        provider: new Provider('geoffcloud', { kubeconfig: inputs.cluster.kubeconfig }),
+        provider: createClusterProvider('geoffcloud', { kubeconfig: inputs.cluster.kubeconfig }),
       };
 
 // the atc tunnel's connector runs in the gateway's pod, so the tunnel comes before the cluster

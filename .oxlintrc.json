@@ -162,6 +162,12 @@
                 "importNames": ["core"],
                 "allowTypeImports": true,
                 "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
+              },
+              {
+                "name": "@pulumi/kubernetes",
+                "importNames": ["Provider"],
+                "allowTypeImports": true,
+                "message": "take the cluster's provider from createClusterProvider (infra/cluster/), which registers the port-forward guard first"
               }
             ]
           }
@@ -207,11 +213,41 @@
                 "importNames": ["core"],
                 "allowTypeImports": true,
                 "message": "declare a namespace with createNamespace or createK3sNamespacePatches (infra/shared/), which give it its Pod Security labels"
+              },
+              {
+                "name": "@pulumi/kubernetes",
+                "importNames": ["Provider"],
+                "allowTypeImports": true,
+                "message": "take the cluster's provider from createClusterProvider (infra/cluster/), which registers the port-forward guard first"
               }
             ]
           }
         ]
       }
+    },
+    {
+      // the one module that builds the cluster's provider, after it registers the port-forward guard
+      "files": ["infra/cluster/create-cluster-provider.ts"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@pulumi/pulumi",
+                "importNames": ["Config"],
+                "allowTypeImports": true,
+                "message": "only infra/index.ts builds Config, once; take each value from loadInputs (infra/inputs/)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      // the guard's preview test hands this fixture program its case directory through the env
+      "files": ["infra/test-utils/port-forward-guard-program/index.ts"],
+      "rules": { "no-restricted-properties": "off" }
     }
   ]
 }
