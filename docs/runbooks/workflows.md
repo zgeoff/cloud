@@ -121,10 +121,10 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    would stop and restart. It holds the switch with exit 1 and those lines when either list holds
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
-7. It sets the system profile to the built store path and runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
-   is not evaluated again. Before the activation it appends the commit and the store path to
-   `/var/lib/host-build-lag/switches` on the host, because the store path does not name the commit
-   it was built from.
+7. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
+   under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
+   activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the
+   host, because the store path does not name the commit it was built from.
 8. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
 9. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
