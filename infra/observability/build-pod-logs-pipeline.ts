@@ -55,7 +55,8 @@ discovery.relabel "pods" {
 // a file with no read position is read from its first line, so a new container's first lines reach
 // Loki. With no positions file of its own, Alloy starts from the seed, which holds each file that
 // existed before the start at its size then, so a start with an empty store reads no history. A
-// running tailer reads a rotated log's old file to its end and the new file from its start.
+// running tailer reads a rotated log's old file to its end and the new file from its start; the
+// seed script resets a position that a stop after a rotation left past the new file's size.
 loki.source.file "pods" {
   targets               = discovery.relabel.pods.output
   legacy_positions_file = "${options.positionsSeedFile}"
