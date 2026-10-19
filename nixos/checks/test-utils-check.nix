@@ -629,7 +629,7 @@ let
     {
       title = "it buildStubImpHostImage holds to the pinned impz info: the version line first, each label padded to 12 characters";
       script = ''
-        info=${imp}/packages/cli/src/commands/info.ts
+        info=${imp}/packages/cli/src/commands/info-command.ts
         first=$(grep -A1 -F 'const lines = [' "$info" | tail -n1 | tr -d ' ')
         # impz prints each line through console.log, from 2.5 on behind its io.print
         pads=$(grep -cE '(console\.log|io\.print)\(`\$\{label\.padEnd\(12\)\}\$\{value\}`\);' "$info" || true)
