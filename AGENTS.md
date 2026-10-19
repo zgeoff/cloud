@@ -102,6 +102,9 @@ docs/
   roll the gateway out first. It refuses an impd that the running nixie's imp client cannot speak,
   so deploy that nixie first. It fails the switch when nixie's `/health/ready` does not report every
   part ready afterwards.
+- The script holds a switch whose activation would stop or restart k3s, because nixie can stay down
+  for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
+  approved.
 - The NixOS checks gate the switch, not the merge: the script refuses a commit that no green
   `NixOS checks` run on `main` covers. Dispatch one with
   `gh workflow run nixos-checks.yml --ref main` when the nightly run has not covered the commit, and

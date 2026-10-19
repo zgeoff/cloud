@@ -59,10 +59,13 @@ touches the host:
    infra and the scripts from `packages/topology`, beside `nixos/`. A failed build stops the script,
    and the host sees nothing.
 3. It copies the built system's closure to the host over Tailscale SSH.
-4. It points the host's system profile at the built system first, so a reboot after a failed
+4. It asks the copied system's dry activation which units the activation would stop or restart. It
+   holds the switch when k3s is one of them, because nixie can stay down for minutes after k3s
+   restarts. The operator lets that restart through only in a planned k3s window.
+5. It points the host's system profile at the built system first, so a reboot after a failed
    activation still boots the new system, and then activates it in a transient systemd unit, so a
    dropped SSH session cannot stop the activation halfway.
-5. It fails unless the host runs exactly the built system, and prints any failed unit.
+6. It fails unless the host runs exactly the built system, and prints any failed unit.
 
 The flake is evaluated once, by the build, so the host activates the exact store path that was built
 and checked. Every Nix command runs from a snapshot of the commit rather than from the working tree,

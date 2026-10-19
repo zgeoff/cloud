@@ -92,6 +92,7 @@ Run the script, which builds, then switches only after the build exits 0:
 ```sh
 bash scripts/switch-geoffcloud.sh               # build, switch, check the host runs the build
 bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
+bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s window
 ```
 
 1. It refuses a branch other than `main`, uncommitted changes, a `main` behind `origin/main`, or any
@@ -115,14 +116,18 @@ bash scripts/switch-geoffcloud.sh --build-only  # build and print the system pat
 5. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-6. It copies the built store path to the host with `nix copy`, sets the system profile to it and
-   runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
+6. It copies the built store path to the host with `nix copy`, then runs the copied system's
+   `switch-to-configuration dry-activate`, which changes nothing and lists the units the activation
+   would stop and restart. It holds the switch with exit 1 and those lines when either list holds
+   `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
+   window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
+7. It sets the system profile to the built store path and runs its `switch-to-configuration switch` under `systemd-run`, as `nixos-rebuild` does. The flake
    is not evaluated again. Before the activation it appends the commit and the store path to
    `/var/lib/host-build-lag/switches` on the host, because the store path does not name the commit
    it was built from.
-7. It fails unless the host's `/run/current-system` is the built path, then prints
+8. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
-8. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
+9. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
    part that is not ready and nixie's reason for it, since a host that switches cleanly can still
    leave nixie unable to start. It prints each advisory part that is not ready, such as
    `conversation_turns`, and passes, because nixie answers while its turns fail.

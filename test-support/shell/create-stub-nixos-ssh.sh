@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the six remote commands the switch runs:
+# answers the seven remote commands the switch runs:
 #
 # - the kubectl query for the atc gateway pods' images: prints STUB_GATEWAY_IMAGES (images
 #   separated by spaces, as jsonpath joins an `[*]` list) with no newline, as kubectl's jsonpath
@@ -17,6 +17,11 @@
 #   body as nixie's server sends it. With STUB_NIXIE_REPORTS unset, it fails as kubectl does for
 #   a pod that does not exist: "Error from server (NotFound): pods "nixie-0" not found" on
 #   stderr and exit 1;
+# - switch-to-configuration dry-activate: prints STUB_DRY_ACTIVATE, the lines of the units it
+#   would stop, reload, restart and start, on stderr, and "would activate the configuration..."
+#   when that is unset, the one line a dry-activate with no unit to change prints, then exits 0;
+#   or with STUB_DRY_ACTIVATE_LOCKED fails as switch-to-configuration-ng does while another
+#   switch holds its lock: "Could not acquire lock" on stderr and exit 11;
 # - the profile set, the switch record and switch-to-configuration: prints nothing, or with
 #   STUB_ACTIVATE_FAILED_UNITS (unit names separated by spaces) fails as
 #   switch-to-configuration-ng does when units failed: "warning: the following units
@@ -37,6 +42,15 @@
 # never one from the caller's PATH. A call without
 # `-o BatchMode=yes`, an unknown remote command, or a pass-through to any other
 # destination ends with exit 97 and "unexpected: <argv>" on stderr.
+#
+# The dry-activate lines were checked on 2026-10-19 against nixpkgs
+# 4feb8eb8bf30f323a8a5d285f14ee51d6a7197b1 (nixos/flake.lock): in
+# pkgs/by-name/sw/switch-to-configuration-ng/src/main.rs, dry-activate prints each unit list with
+# eprintln!("would <verb> the following units: {}", units.join(", ")) (lines 2049-2189), the
+# names sorted by their lower-case form, always prints "would activate the configuration...",
+# and exits 0. A held lock prints "Could not acquire lock" and calls die() (lines 1823-1827),
+# which exits with the errno of the failed non-blocking flock, EWOULDBLOCK, 11 on Linux. Not run
+# against a real host. Left open: what the activation script's own dry-activate snippets print.
 #
 # The dropped session's line was checked on 2026-10-08 against OpenSSH's source and a real
 # ssh: clientloop.c's quit_message("Connection to %s closed by remote host.") (line 805 at
@@ -109,6 +123,13 @@ case "${*:4}" in
     calls="$(grep -cF 'k3s kubectl -n nixie exec nixie-0' "$STUB_LOG")"
     total="$(printf '%s\n' "$STUB_NIXIE_REPORTS" | wc -l)"
     printf '%s\n' "$STUB_NIXIE_REPORTS" | sed -n "$((calls < total ? calls : total))p"
+    ;;
+  "NIXOS_INSTALL_BOOTLOADER=0 systemd-run "*"/bin/switch-to-configuration'"*" dry-activate")
+    if [ -n "${STUB_DRY_ACTIVATE_LOCKED:-}" ]; then
+      echo "Could not acquire lock" >&2
+      exit 11
+    fi
+    printf '%s\n' "${STUB_DRY_ACTIVATE:-would activate the configuration...}" >&2
     ;;
   "nix-env -p /nix/var/nix/profiles/system --set "*"/bin/switch-to-configuration' switch")
     if [ -n "${STUB_ACTIVATE_FAILED_UNITS:-}" ]; then
