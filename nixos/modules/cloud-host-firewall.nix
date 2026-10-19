@@ -30,8 +30,7 @@ let
     lib.concatMapStrings renderAccept (lib.filter (admission: admission.port == port) admissions)
     + "  tcp dport ${toString port} drop\n";
   # a line of the forward chain, indented as its other lines
-  renderForwardDrop =
-    drop: "  iifname \"${drop.interface}\" ip daddr ${drop.destinationCIDR} drop\n";
+  renderForwardDrop = drop: "  iifname \"${drop.interface}\" ip daddr ${drop.destinationCIDR} drop\n";
   inputChain = lib.optionalString (admissions != [ ]) ''
     chain input {
       type filter hook input priority filter - 10; policy accept;
