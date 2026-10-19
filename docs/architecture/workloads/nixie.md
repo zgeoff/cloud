@@ -45,8 +45,12 @@ that Service, and a Service that waited for ready pods would hold back the rollo
 Both containers run as their images' users on a read-only root, with writable volumes only for
 nixie's data and each container's temporary directory. nixie's health endpoint listens only once
 migrations and the integrity check finish, so the pod's startup probe waits on liveness before the
-readiness probe takes over. Readiness lists each part that nixie's slice 1 builds: the database, the
-definitions seed, impd, the conversation imp and the disk.
+readiness probe takes over. The readiness probe takes nixie out of its Service only when the
+database or the definitions seed fails, because nixie cannot serve without them. impd, the
+conversation imp and the disk are dependency parts: one that fails or answers slowly makes nixie
+answer 200 with the status degraded, because nixie is the only endpoint behind its Service and still
+serves its API. The NixieDegraded alert watches that status
+([alert rules](observability.md#alert-rules)).
 
 ## Configuration and definitions
 

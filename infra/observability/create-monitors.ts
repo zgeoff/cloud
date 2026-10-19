@@ -6,10 +6,10 @@ import type { AlertRuleInputs } from './build-alert-rules.ts';
 import { createAlertRules } from './create-alert-rules.ts';
 import { createATCDaemonProbe } from './create-atc-daemon-probe.ts';
 import { createImpHealthProbe } from './create-imp-health-probe.ts';
-import { createNixieTurnsProbe } from './create-nixie-turns-probe.ts';
+import { createNixieProbe } from './create-nixie-probe.ts';
 
 // Beyond the stack's own targets: cloudflared, geoff.cloud's alert rules, imp's /health, only
-// with the gateway a TCP probe per atc daemon, and only with nixie a probe of its readiness report.
+// with the gateway a TCP probe per atc daemon, and only with nixie the probes of its readiness report.
 // opts carries the cluster and the stack dependency that brings the CRDs.
 export function createMonitors(
   ns: Namespace,
@@ -25,7 +25,7 @@ export function createMonitors(
   }
 
   if (inputs.nixieReadinessURL !== undefined) {
-    createNixieTurnsProbe(ns, inputs.nixieReadinessURL, opts);
+    createNixieProbe(ns, inputs.nixieReadinessURL, opts);
   }
 }
 

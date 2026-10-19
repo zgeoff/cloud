@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Test for check-nixie-ready.sh: it passes once nixie's /health/ready reports every part ready,
-# pausing 10 s after each try that is not, ends a try that hangs after 20 s, and after 30 tries
-# fails naming each part that is not ready with nixie's reason, or the last error when no report
+# Test for check-nixie-ready.sh: it passes once nixie's /health/ready reports every readiness and
+# dependency part ready, pausing 10 s after each try that is not, ends a try that hangs after 20 s,
+# and after 30 tries fails naming each part that is not ready with nixie's reason, or the last error when no report
 # came back. ssh is the NixOS host stand-in (create-stub-nixos-ssh.sh), which answers the kubectl
 # exec with the reports a case names, and the pause is the fake clock's (create-stub-clock.sh),
 # first on PATH as sleep, so a case counts pauses instead of waiting them out. Each case runs the script under `env -i` and
@@ -26,6 +26,9 @@ ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady"
 # nixie's report while its turns keep failing: an advisory part, with the status ready
 ready_failing_turns='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}},"advisory":{"conversation_turns":{"isReady":false,"reason":"the last 3 turns failed"}}}'
 unready='{"status":"unready","parts":{"store":{"isReady":true},"imp_host":{"isReady":false,"reason":"impd 4.0.0 refuses imp client 3.2.1"},"model":{"isReady":false,"reason":"the check took longer than 2000 ms"}}}'
+# nixie's reports with dependency parts: degraded while impd fails, which answers 200, and ready
+degraded='{"status":"degraded","parts":{"store":{"isReady":true}},"dependencies":{"imp_host":{"isReady":false,"reason":"impd 4.0.0 refuses imp client 3.2.1"},"disk":{"isReady":true}}}'
+ready_dependencies='{"status":"ready","parts":{"store":{"isReady":true}},"dependencies":{"imp_host":{"isReady":true},"disk":{"isReady":true}}}'
 
 # setup_test <tree>: the ssh stand-in and its guard, the timeout stand-in, and the fake clock
 setup_test() {
@@ -142,6 +145,45 @@ it_fails_on_an_unready_status_even_when_every_part_reads_ready() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'nixie is not ready after 30 tries: status "unready"'
+  [ "$status" = 1 ] || {
+    echo "exit $status, want 1" >&2
+    exit 1
+  }
+}
+
+it_passes_naming_the_dependency_parts_once_a_degraded_nixie_reports_ready() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_NIXIE_REPORTS="$degraded"$'\n'"$ready_dependencies" bash "$script" root@geoffcloud \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '== nixie ready: store, imp_host, disk'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "$(repeat_line 2 "$exec_call")"
+  diff - "$tree/clock/pauses" <<< '10'
+  [ "$status" = 0 ] || {
+    echo "exit $status, want 0" >&2
+    exit 1
+  }
+}
+
+it_fails_after_30_tries_naming_each_dependency_part_that_is_not_ready() {
+  local status=0
+  tree="$(mktemp -d)"
+  trap 'rm -rf "$tree"' EXIT
+  setup_test "$tree"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_NIXIE_REPORTS="$degraded" bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'nixie is not ready after 30 tries: imp_host: impd 4.0.0 refuses imp client 3.2.1'
+  diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
+  diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
   [ "$status" = 1 ] || {
     echo "exit $status, want 1" >&2
     exit 1
