@@ -25,10 +25,11 @@ minimumReleaseAgeExcludes = [
 # The root run covers infra and scripts: it registers jest-extended matchers, seeds faker once
 # for the run, and runs the scripts' MSW server. The health-check worker is its own package with
 # its own preload, so `bun run test:health-check` runs it from its directory, and the preview
-# service likewise runs its own, with `bun run test:preview`.
+# service and the files service likewise run their own, with `bun run test:preview` and
+# `bun run test:files`.
 preload = [
   "@zgeoff/bun-test-extended",
   "./infra/test-utils/seed-faker.ts",
   "./scripts/mocks/register-mock-server.ts",
 ]
-pathIgnorePatterns = ["workers/**", "packages/preview/**"]
+pathIgnorePatterns = ["workers/**", "packages/preview/**", "packages/files/**"]

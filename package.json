@@ -25,6 +25,7 @@
     "test": "bun test",
     "test:health-check": "cd workers/health-check && bun test",
     "test:preview": "cd packages/preview && bun test",
+    "test:files": "cd packages/files && bun test",
     "test:related": "bun scripts/run-related-tests.ts",
     "test:scripts": "bash scripts/run-shell-suites.sh",
     "test:alert-rules": "bash scripts/run-shell-suites.sh alert-rules",

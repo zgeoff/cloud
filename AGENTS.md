@@ -29,6 +29,8 @@ sdk/onidel/        the provider's generated TypeScript SDK: never edit it by han
 packages/topology/ the constants that the host, infra, the scripts and the images share, such as
                    ports, CIDRs, tailnet addresses and tags: change one here, never at a reader
 packages/preview/  the preview service: one tailnet link per pull request, running in its own imp
+packages/files/    the file drop at files.geoff.cloud: token-gated uploads, public reads by an
+                   unguessable ID, and expiry
 workers/           Cloudflare Workers: the external health check
 images/            container images: the agent image and the atc gateway
 nixos/             the host flake

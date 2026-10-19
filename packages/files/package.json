@@ -1,0 +1,21 @@
+{
+  "name": "@zgeoff/cloud-files",
+  "private": true,
+  "description": "The file drop at files.geoff.cloud: token-gated uploads, public reads by an unguessable ID, and expiry",
+  "type": "module",
+  "exports": {
+    "./contract": "./files-contract.ts"
+  },
+  "dependencies": {
+    "@orpc/contract": "1.15.6",
+    "@orpc/openapi": "1.15.6",
+    "@orpc/server": "1.15.6",
+    "elysia": "1.4.30",
+    "zod": "4.6.6"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "10.6.0",
+    "@types/bun": "1.3.14",
+    "@zgeoff/bun-test-extended": "0.2.0"
+  }
+}

@@ -9,6 +9,10 @@
       "entry": ["index.ts"],
       "project": ["**/*.ts"]
     },
+    "packages/files": {
+      "entry": ["main.ts", "files-contract.ts"],
+      "project": ["**/*.ts"]
+    },
     "packages/preview": {
       "entry": ["main.ts"],
       "project": ["**/*.ts"]
