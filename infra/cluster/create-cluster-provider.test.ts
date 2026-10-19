@@ -10,7 +10,7 @@ import invariant from 'tiny-invariant';
 const pulumiPath = Bun.which('pulumi');
 
 async function setupTest() {
-  invariant(pulumiPath, 'the Pulumi CLI is not on PATH');
+  invariant(pulumiPath !== null, 'the Pulumi CLI is not on PATH');
 
   const dir = await mkdtemp(join(tmpdir(), 'port-forward-guard-'));
 
