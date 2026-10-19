@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Test for check-nixie-impd-major.sh: it passes an impd pin of the nixie imp client's major, and
+# Test for check-nixie-impd-major.sh: it passes an impd pin of the nixie imp client's major, from
+# @zgeoff/imp-client or @impz/client, with @impz/client's version when the lock names both, and
 # nixie 0.28.0 or later on a 1.x client beside impd 2, and refuses an impd major bump ahead of the
 # client, an older nixie on a 1.x client beside impd 2, no nixie pod, an image that is no nixie
 # release, a lock without the client, a failed lock read, and a configuration.nix without the
@@ -9,7 +10,9 @@
 #
 # The recorded locks in test-support/shell/gh-recordings hold `@zgeoff/imp-client` in the catalog
 # and the packages, in the line forms bun 1.4 writes (nixie's bun.lock at v0.28.0, read
-# 2026-10-16), or no such entry.
+# 2026-10-16), or no such entry. The `impz-client` locks hold `@impz/client` in a workspace's
+# dependencies, the catalog and the packages, in the line forms of lockfileVersion 2 (nixie's
+# bun.lock at v0.37.0, read 2026-10-20), and one of them holds an `@zgeoff/imp-client` beside it.
 #
 #   bash scripts/test-check-nixie-impd-major.sh
 # shellcheck source-path=SCRIPTDIR
@@ -64,6 +67,63 @@ it_passes_a_nixie_whose_imp_client_shares_the_impd_major() {
   diff - "$tree/out" <<< '== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster'
   diff /dev/null "$tree/err"
   diff - "$tree/calls" <<< "$(lock_call 0.31.4)"
+  assert_status 0 "$status"
+}
+
+it_passes_a_nixie_whose_impz_client_shares_the_impd_major() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  write_config "$tree" 2.1.0
+  jq -cn --arg lock "$recordings/nixie-bun-lock-impz-client-2.7.0.lock" '{
+    argv: ["gh", "api", "-H", "Accept: application/vnd.github.raw", "repos/zgeoff/nixie/contents/bun.lock?ref=v0.37.0"],
+    stdout_file: $lock}' > "$tree/gh-responses"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash "$script" "$tree/configuration.nix" "ghcr.io/zgeoff/nixie:0.37.0@$digest" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '== impd 2.1.0 on the host, nixie 0.37.0 (imp-client 2.7.0) in the cluster'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "$(lock_call 0.37.0)"
+  assert_status 0 "$status"
+}
+
+it_refuses_an_impd_major_other_than_the_impz_client_major() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  write_config "$tree" 3.0.0
+  jq -cn --arg lock "$recordings/nixie-bun-lock-impz-client-2.7.0.lock" '{
+    argv: ["gh", "api", "-H", "Accept: application/vnd.github.raw", "repos/zgeoff/nixie/contents/bun.lock?ref=v0.37.0"],
+    stdout_file: $lock}' > "$tree/gh-responses"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash "$script" "$tree/configuration.nix" "ghcr.io/zgeoff/nixie:0.37.0@$digest" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'the switch would run impd 3.0.0, but a nixie pod runs nixie 0.37.0, whose imp-client 2.7.0 refuses an impd of another major; deploy a nixie that speaks impd 3 first (docs/runbooks/workflows.md, Switch the host)'
+  diff - "$tree/calls" <<< "$(lock_call 0.37.0)"
+  assert_status 1 "$status"
+}
+
+it_takes_the_impz_client_version_from_a_lock_that_names_both_clients() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  write_config "$tree" 2.1.0
+  jq -cn --arg lock "$recordings/nixie-bun-lock-impz-client-2.7.0-and-imp-client-3.2.1.lock" '{
+    argv: ["gh", "api", "-H", "Accept: application/vnd.github.raw", "repos/zgeoff/nixie/contents/bun.lock?ref=v0.37.0"],
+    stdout_file: $lock}' > "$tree/gh-responses"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash "$script" "$tree/configuration.nix" "ghcr.io/zgeoff/nixie:0.37.0@$digest" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '== impd 2.1.0 on the host, nixie 0.37.0 (imp-client 2.7.0) in the cluster'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "$(lock_call 0.37.0)"
   assert_status 0 "$status"
 }
 
@@ -186,7 +246,7 @@ it_refuses_a_lock_without_the_imp_client() {
     bash "$script" "$tree/configuration.nix" ghcr.io/zgeoff/nixie:0.31.4 > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "nixie 0.31.4's bun.lock names no one @zgeoff/imp-client version"
+  diff - "$tree/err" <<< "nixie 0.31.4's bun.lock names no one @impz/client or @zgeoff/imp-client version"
   diff - "$tree/calls" <<< "$(lock_call 0.31.4)"
   assert_status 1 "$status"
 }

@@ -6,9 +6,13 @@
 #   bash scripts/check-nixie-impd-major.sh <configuration.nix> [<nixie image>...]
 #
 # The impd release is the imp-host image's tag, which the imp release bump moves with the imp
-# module. nixie talks to impd through @zgeoff/imp-client, whose checkServer refuses an impd of another major
-# release, and nixie's start then retries for ever while the host reports healthy. The image bundles
-# the client, so the check reads its version from bun.lock at the nixie release's tag, through gh.
+# module. nixie talks to impd through its imp client, whose checkServer refuses an impd of another
+# major release, and nixie's start then retries for ever while the host reports healthy. The image
+# bundles the client, so the check reads its version from bun.lock at the nixie release's tag,
+# through gh. The client is @impz/client from nixie 0.35.1 and @zgeoff/imp-client before it. A lock
+# that names both takes @impz/client's version, because the rename replaced the old package:
+# nixie's sandbox-imp adapter imports only @impz/client from v0.35.1, so an @zgeoff/imp-client entry
+# beside it is a leftover that nixie does not talk to impd through.
 # It prints one line and exits 0 when every nixie pod accepts the impd major. It exits 1 when one
 # does not, when no nixie pod runs, when the pin or an image holds no release version, or when the
 # lock names no one client version; a gh failure stops it with gh's exit code.
@@ -60,11 +64,16 @@ for image in "${images[@]}"; do
   fi
   nixie="${BASH_REMATCH[1]}"
   lock="$(gh api -H 'Accept: application/vnd.github.raw' "repos/zgeoff/nixie/contents/bun.lock?ref=v$nixie")"
-  # the lock's packages entry, `"@zgeoff/imp-client": ["@zgeoff/imp-client@X.Y.Z", …`
-  clients="$(grep -oE "\"@zgeoff/imp-client\": \[\"@zgeoff/imp-client@$version\"" <<< "$lock" |
-    sed -E 's/.*@([0-9.]+)"$/\1/' || true)"
+  # the lock's packages entry, `"@impz/client": ["@impz/client@X.Y.Z", …`, of the first client
+  # package that the lock names
+  clients=""
+  for package in @impz/client @zgeoff/imp-client; do
+    clients="$(grep -oE "\"$package\": \[\"$package@$version\"" <<< "$lock" |
+      sed -E 's/.*@([0-9.]+)"$/\1/' || true)"
+    if [ -n "$clients" ]; then break; fi
+  done
   if [[ ! "$clients" =~ ^$version$ ]]; then
-    echo "nixie $nixie's bun.lock names no one @zgeoff/imp-client version" >&2
+    echo "nixie $nixie's bun.lock names no one @impz/client or @zgeoff/imp-client version" >&2
     exit 1
   fi
   if ! accepts_impd_major "$nixie" "$clients"; then
