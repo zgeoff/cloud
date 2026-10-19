@@ -12,9 +12,14 @@ const pulumiPath = Bun.which('pulumi');
 async function setupTest() {
   invariant(pulumiPath !== null, 'the Pulumi CLI is not on PATH');
 
+  // a preview still running at the timeout stops before its directory goes
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const dir = await mkdtemp(join(tmpdir(), 'port-forward-guard-'));
 
-  onTestFinished(() => rm(dir, { recursive: true, force: true }));
+  stack.defer(() => rm(dir, { recursive: true, force: true }));
 
   const caseDir = join(dir, 'case');
 
@@ -54,6 +59,12 @@ async function setupTest() {
       env,
       stdout: 'pipe',
       stderr: 'pipe',
+    });
+
+    stack.defer(async () => {
+      preview.kill();
+
+      await preview.exited;
     });
 
     const [stdout, stderr, exitCode] = await Promise.all([
