@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { createFilesService } from './create-files-service.ts';
 import { createUploadStore } from './create-upload-store.ts';
 import { buildMockUpload } from './test-utils/build-mock-upload.ts';
+import { buildStubFullVolumeWrite } from './test-utils/build-stub-full-volume-write.ts';
 import { buildUploadRequest } from './test-utils/build-upload-request.ts';
 
 async function setupTest() {
@@ -33,6 +34,7 @@ async function setupTest() {
     publicURL: 'https://files.example.com',
     now: () => clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+    writeBytes: (path, file) => Bun.write(path, file),
   });
 
   return { dataDir, store, clock, service };
@@ -491,6 +493,7 @@ test('it refuses an upload with 507 when the volume is full', async () => {
     publicURL: 'https://files.example.com',
     now: () => ctx.clock.now,
     readFreeBytes: () => 1_000_000,
+    writeBytes: (path, file) => Bun.write(path, file),
   });
 
   const response = await service.handle(
@@ -731,6 +734,7 @@ test('it removes a file that a stopped run left half written', async () => {
     publicURL: 'https://files.example.com',
     now: () => ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+    writeBytes: (path, file) => Bun.write(path, file),
   });
 
   const incoming = await readdir(join(ctx.dataDir, 'incoming'));
@@ -756,6 +760,7 @@ test('it removes a file that a stopped run placed without its row, and keeps eac
     publicURL: 'https://files.example.com',
     now: () => ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+    writeBytes: (path, file) => Bun.write(path, file),
   });
 
   const files = await readdir(join(ctx.dataDir, 'files'));
@@ -781,6 +786,39 @@ test('it answers 500 and leaves no staged file and no row when the move into pla
   const incoming = await readdir(join(ctx.dataDir, 'incoming'));
 
   expect(incoming).toBeEmpty();
+  expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
+});
+
+test('it answers 507 and leaves no staged file, placed file or row when the file write fills the volume', async () => {
+  const ctx = await setupTest();
+
+  const service = createFilesService({
+    store: ctx.store,
+    dataDir: ctx.dataDir,
+    tokenHashes: {
+      agent: createHash('sha256').update('agent-token-5d2b').digest('hex'),
+      owner: createHash('sha256').update('owner-token-c81f').digest('hex'),
+    },
+    publicURL: 'https://files.example.com',
+    now: () => ctx.clock.now,
+    readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+    writeBytes: buildStubFullVolumeWrite(),
+  });
+
+  const response = await service.handle(
+    buildUploadRequest({
+      authorization: 'Bearer agent-token-5d2b',
+      file: new File(['bytes'], 'shot.png'),
+    }),
+  );
+
+  expect(response.status).toBe(507);
+
+  const incoming = await readdir(join(ctx.dataDir, 'incoming'));
+  const files = await readdir(join(ctx.dataDir, 'files'));
+
+  expect(incoming).toBeEmpty();
+  expect(files).toBeEmpty();
   expect(ctx.store.readUploads({ includeExpired: true, now: ctx.clock.now })).toBeEmpty();
 });
 
@@ -813,6 +851,7 @@ test('it answers 507 and removes the placed file when the metadata write finds t
     publicURL: 'https://files.example.com',
     now: () => ctx.clock.now,
     readFreeBytes: () => Number.MAX_SAFE_INTEGER,
+    writeBytes: (path, file) => Bun.write(path, file),
   });
 
   const response = await service.handle(

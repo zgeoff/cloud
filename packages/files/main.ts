@@ -17,6 +17,7 @@ const service = createFilesService({
   publicURL: config.publicURL,
   now: () => new Date(),
   readFreeBytes: () => readFreeBytes(config.dataDir),
+  writeBytes: (path, file) => Bun.write(path, file),
 }).listen({ port: config.port, hostname: '0.0.0.0' });
 
 const stopSweep = startExpirySweep({
