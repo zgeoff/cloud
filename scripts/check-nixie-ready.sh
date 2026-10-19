@@ -5,10 +5,10 @@
 #
 #   bash scripts/check-nixie-ready.sh <host>
 #
-# It asks nixie-0's own server, through kubectl exec over ssh, as docs/runbooks/nixie.md does by
-# hand; 8080 is nixieAPIPort (infra/cluster/build-nixie-spec.ts). nixie answers 503 while a
-# readiness part fails, and 200 with the status degraded while a dependency part such as impd fails,
-# with each part's report in the body either way, so the check reads the body. nixie retries its
+# It runs nixie's documented `nixie health` command in nixie-0 through kubectl exec over ssh, as
+# docs/runbooks/nixie.md does by hand. The command prints the server's readiness report either way
+# and exits 0 only on the status ready, so the check reads the report, not the exit code: the
+# status degraded, while a dependency part such as impd fails, exits 1 too. nixie retries its
 # start and impd restarts with the switch, so it tries 30 times, each try ended after 20 s, with a
 # 10 s pause after each try that is not ready, then fails (exit 1) and names each readiness or
 # dependency part that is not ready with nixie's reason, or the last error when no report came
@@ -24,18 +24,22 @@ if [ "$#" -ne 1 ]; then
 fi
 host="$1"
 tries=30
-fetch='console.log(await (await fetch("http://127.0.0.1:8080/health/ready")).text())'
+err="$(mktemp)"
+trap 'rm -f "$err"' EXIT
 
-# read_report: prints nixie's report body, or fails with the output of a try that got none. A try
-# that hangs, such as a stalled ssh or exec stream, ends after 20 s, or 25 s for one that ignores
-# TERM, so the 30 tries stay bounded.
+# read_report: prints what nixie health printed, its report when one came back, and leaves the
+# try's errors in $err. A try that hangs, such as a stalled ssh or exec stream, ends after 20 s, or
+# 25 s for one that ignores TERM, so the 30 tries stay bounded, and it fails, whatever it printed
+# first.
 read_report() {
   local status=0
-  timeout -k 5 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '$fetch'" 2>&1 ||
+  timeout -k 5 20 ssh -o BatchMode=yes "$host" "k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health" 2> "$err" ||
     status=$?
   # 124 when the TERM at 20 s ends the try, 137 when the KILL 5 s later must
-  if [ "$status" = 124 ] || [ "$status" = 137 ]; then echo "the try took longer than 20 s"; fi
-  return "$status"
+  if [ "$status" = 124 ] || [ "$status" = 137 ]; then
+    echo "the try took longer than 20 s" >> "$err"
+    return 1
+  fi
 }
 
 problem=""
@@ -51,7 +55,9 @@ for try in $(seq 1 "$tries"); do
       | "\(.key): \(.value.reason // "not ready")"] | join("; ")' <<< "$report")"
     if [ -z "$problem" ]; then problem="status $(jq -c .status <<< "$report")"; fi
   else
-    problem="no report from nixie-0: $(tail -n 1 <<< "$report")"
+    detail="$(tail -n 1 "$err")"
+    if [ -z "$detail" ]; then detail="$(tail -n 1 <<< "$report")"; fi
+    problem="no report from nixie-0: $detail"
   fi
   if [ "$try" -lt "$tries" ]; then sleep 10; fi
 done

@@ -239,28 +239,29 @@ it_prints_nothing_for_the_nixie_query_when_no_nixie_pod_is_named() {
 }
 
 it_prints_one_nixie_report_per_readiness_call_and_repeats_the_last() {
-  local status=0
   create_case_tree
   setup_test "$tree"
 
   for call in first second third; do
+    local status=0
     env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
       STUB_NIXIE_REPORTS=$'{"status":"unready"}\n{"status":"ready"}' \
       ssh -o BatchMode=yes root@geoffcloud \
-      "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'" \
+      "k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health" \
       > "$tree/out-$call" 2>> "$tree/err" || status=$?
+    echo "$status" >> "$tree/statuses"
   done
 
   diff - "$tree/out-first" <<< '{"status":"unready"}'
   diff - "$tree/out-second" <<< '{"status":"ready"}'
   diff - "$tree/out-third" <<< '{"status":"ready"}'
-  diff /dev/null "$tree/err"
+  diff - "$tree/err" <<< 'command terminated with exit code 1'
+  diff - "$tree/statuses" <<< $'1\n0\n0'
   diff - "$tree/calls" << 'CALLS'
-["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
-["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health"]
 CALLS
-  assert_status 0 "$status"
 }
 
 it_fails_the_readiness_call_as_kubectl_does_when_no_report_is_named() {
@@ -270,7 +271,7 @@ it_fails_the_readiness_call_as_kubectl_does_when_no_report_is_named() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     ssh -o BatchMode=yes root@geoffcloud \
-    "k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e 'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'" \
+    "k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"

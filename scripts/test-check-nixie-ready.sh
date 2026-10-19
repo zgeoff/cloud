@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for check-nixie-ready.sh: it passes once nixie's /health/ready reports every readiness and
+# Test for check-nixie-ready.sh: it passes once nixie health reports every readiness and
 # dependency part ready, pausing 10 s after each try that is not, ends a try that hangs after 20 s,
 # and after 30 tries fails naming each part that is not ready with nixie's reason, or the last error when no report
 # came back. ssh is the NixOS host stand-in (create-stub-nixos-ssh.sh), which answers the kubectl
@@ -23,7 +23,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-timeout
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool-stubs.sh"
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-nixie-ready.sh"
-exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- bun -e '"'"'console.log(await (await fetch(\"http://127.0.0.1:8080/health/ready\")).text())'"'"'"]'
+exec_call='["ssh","-o","BatchMode=yes","root@geoffcloud","k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health"]'
 ready='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}}}'
 # nixie's report while its turns keep failing: an advisory part, with the status ready
 ready_failing_turns='{"status":"ready","parts":{"store":{"isReady":true},"imp_host":{"isReady":true},"model":{"isReady":true}},"advisory":{"conversation_turns":{"isReady":false,"reason":"the last 3 turns failed"}}}'
@@ -193,6 +193,28 @@ it_ends_each_try_after_20_seconds_and_fails_naming_the_hang() {
   diff /dev/null "$tree/calls"
   diff - "$tree/timeouts" <<< "$(repeat_line 30 "$(jq -c '["timeout","-k","5","20"] + .' <<< "$exec_call")")"
   diff - "$tree/clock/pauses" <<< "$(repeat_line 29 10)"
+  assert_status 1 "$status"
+}
+
+it_rejects_a_ready_report_from_a_try_that_then_hangs() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  # a timeout that runs the command, so its report prints, then ends the try as the TERM at 20 s does
+  cat > "$tree/bin/timeout" << 'STUB'
+#!/usr/bin/env bash
+shift 3
+"$@" || true
+exit 124
+STUB
+  chmod +x "$tree/bin/timeout"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_NIXIE_REPORTS="$ready" bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'nixie is not ready after 30 tries: no report from nixie-0: the try took longer than 20 s'
+  diff - "$tree/calls" <<< "$(repeat_line 30 "$exec_call")"
   assert_status 1 "$status"
 }
 

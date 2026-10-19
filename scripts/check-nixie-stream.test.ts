@@ -42,7 +42,7 @@ test('it holds the stream open, reads the same record count before and after, an
   expect(printErr).not.toHaveBeenCalled();
 
   expect(runRemote.mock.calls).toStrictEqual([
-    ['k3s kubectl -n nixie exec nixie-0 -c nixie -- bun /app/main.js enrol-code'],
+    ['k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie enrol-code'],
   ]);
 
   expect(stub.sessions).toStrictEqual([{ sessionID: expect.toBeString(), revoked: true }]);

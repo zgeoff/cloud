@@ -127,10 +127,11 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    host, because the store path does not name the commit it was built from.
 8. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
-9. It asks nixie's `/health/ready` for its report, up to 30 times 10 s apart, and fails with each
-   readiness or dependency part that is not ready and nixie's reason for it, since a host that
-   switches cleanly can still leave nixie unable to start. It prints each advisory part that is not
-   ready, such as `conversation_turns`, and passes, because nixie answers while its turns fail.
+9. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
+   fails with each readiness or dependency part that is not ready and nixie's reason for it, since a
+   host that switches cleanly can still leave nixie unable to start. It prints each advisory part
+   that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
+   turns fail.
 
 A timer on the host checks every hour whether it runs an older system or imp than the latest green
 NixOS checks run on `main`, and after a day of that the `HostBehindLatestBuild` alert fires, as
