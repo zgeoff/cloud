@@ -294,7 +294,7 @@ test('it alerts on each daemon in order, at its own severity, any but geoffcloud
   ]);
 });
 
-test("it alerts on nixie's failing turns from the nixie-turns probe, after the imp health rule", () => {
+test("it alerts on nixie's failing turns and on a status other than ready from the nixie probes, after the imp health rule", () => {
   expect(
     buildAlertRules({
       nixieReadinessURL: 'http://nixie.nixie.svc.cluster.local:8080/health/ready',
@@ -367,6 +367,16 @@ test("it alerts on nixie's failing turns from the nixie-turns probe, after the i
           annotations: {
             summary:
               "nixie's turns keep failing, or http://nixie.nixie.svc.cluster.local:8080/health/ready does not report them passing.",
+          },
+        },
+        {
+          alert: 'NixieDegraded',
+          expr: 'probe_success{target="nixie-status"} == 0 or absent(probe_success{target="nixie-status"})',
+          for: '15m',
+          labels: { severity: 'warning' },
+          annotations: {
+            summary:
+              'nixie at http://nixie.nixie.svc.cluster.local:8080/health/ready reports degraded or unready, or does not answer; its body names the part.',
           },
         },
         {

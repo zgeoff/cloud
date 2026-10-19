@@ -36,7 +36,8 @@ The stack runs in the `observability` namespace:
 - **Three blackbox exporters** run the probes that need a network path: one opens a TCP connection
   to each atc daemon on the gateway's path to it, one fetches impd's health over HTTPS on the
   tailnet and requires a valid certificate and a ready answer, and one fetches nixie's readiness
-  report through its Service and requires the report's conversation turns part to pass.
+  report through its Service twice, once requiring the report's conversation turns part to pass and
+  once requiring its status to be ready.
 
 Grafana's admin password is a secret Pulumi generates, and Grafana's NodePort answers only on the
 tailnet. Its dashboards are provisioned from code. Metrics and logs sit on cluster volumes with no
@@ -62,6 +63,8 @@ only on a bad value, because a target that vanishes is no longer a target. They 
 - impd's health over HTTPS on the tailnet;
 - nixie's conversation turns, which fail without changing nixie's readiness status, so only the
   advisory part of nixie's readiness report shows them;
+- nixie's readiness status, which reads degraded while impd, the conversation imp or the disk fails
+  and leaves the pod ready, so the chart's pod readiness rule misses it;
 - how long the host has run an older system or imp than the latest green build of `main`, which a
   host timer compares with GitHub every hour, and the age of its last check, because a merged change
   to the host waits for a person to switch it;

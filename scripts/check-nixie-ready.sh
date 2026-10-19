@@ -6,12 +6,14 @@
 #   bash scripts/check-nixie-ready.sh <host>
 #
 # It asks nixie-0's own server, through kubectl exec over ssh, as docs/runbooks/nixie.md does by
-# hand; 8080 is nixieAPIPort (infra/cluster/build-nixie-spec.ts). nixie answers 200 with every part
-# ready and 503 otherwise, with each part's report in the body either way. nixie retries its start
-# and impd restarts with the switch, so it tries 30 times, each try ended after 20 s, with a 10 s
-# pause after each try that is not ready, then fails (exit 1) and names each part that is not
-# ready with nixie's reason, or the last error when no report came back. It prints the ready parts
-# when it passes, then each advisory part that is not ready, such as conversation_turns while
+# hand; 8080 is nixieAPIPort (infra/cluster/build-nixie-spec.ts). nixie answers 503 while a
+# readiness part fails, and 200 with the status degraded while a dependency part such as impd fails,
+# with each part's report in the body either way, so the check reads the body. nixie retries its
+# start and impd restarts with the switch, so it tries 30 times, each try ended after 20 s, with a
+# 10 s pause after each try that is not ready, then fails (exit 1) and names each readiness or
+# dependency part that is not ready with nixie's reason, or the last error when no report came
+# back. It prints the ready parts when it passes, then each advisory part that is not ready, such
+# as conversation_turns while
 # nixie's turns keep failing. An advisory part never fails the check, because nixie answers with
 # it failing; the NixieTurnsFailing alert (infra/observability/build-alert-rules.ts) watches it.
 set -euo pipefail
@@ -39,13 +41,13 @@ read_report() {
 problem=""
 for try in $(seq 1 "$tries"); do
   if report="$(read_report)" && jq -e '.parts | type == "object"' <<< "$report" > /dev/null 2>&1; then
-    if jq -e '.status == "ready" and ([.parts[] | .isReady == true] | all)' <<< "$report" > /dev/null; then
-      echo "== nixie ready: $(jq -r '.parts | keys_unsorted | join(", ")' <<< "$report")"
+    if jq -e '.status == "ready" and ([.parts[], (.dependencies // {})[] | .isReady == true] | all)' <<< "$report" > /dev/null; then
+      echo "== nixie ready: $(jq -r '.parts + (.dependencies // {}) | keys_unsorted | join(", ")' <<< "$report")"
       jq -r '(.advisory // {}) | to_entries[] | select(.value.isReady != true)
         | "== nixie advisory not ready: \(.key): \(.value.reason // "not ready")"' <<< "$report"
       exit 0
     fi
-    problem="$(jq -r '[.parts | to_entries[] | select(.value.isReady != true)
+    problem="$(jq -r '[.parts + (.dependencies // {}) | to_entries[] | select(.value.isReady != true)
       | "\(.key): \(.value.reason // "not ready")"] | join("; ")' <<< "$report")"
     if [ -z "$problem" ]; then problem="status $(jq -c .status <<< "$report")"; fi
   else
