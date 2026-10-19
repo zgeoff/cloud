@@ -10,7 +10,7 @@
       "project": ["**/*.ts"]
     },
     "packages/files": {
-      "entry": ["main.ts", "files-contract.ts"],
+      "entry": ["main.ts"],
       "project": ["**/*.ts"]
     },
     "packages/preview": {

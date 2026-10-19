@@ -1,6 +1,12 @@
 import { Database } from 'bun:sqlite';
 import type { Role, Upload } from './types.ts';
 
+interface UploadFilter {
+  readonly uploader?: Role;
+  readonly includeExpired: boolean;
+  readonly now: Date;
+}
+
 export interface UploadStore {
   // records a new upload; its id is unique
   readonly writeUpload: (upload: Upload) => void;
@@ -15,12 +21,6 @@ export interface UploadStore {
   // the ids of the uploads whose expiry is before now, for the sweep
   readonly collectExpiredIDs: (now: Date) => readonly string[];
   readonly close: () => void;
-}
-
-export interface UploadFilter {
-  readonly uploader?: Role;
-  readonly includeExpired: boolean;
-  readonly now: Date;
 }
 
 // The metadata file on the volume beside the files: one row per upload, with times in
