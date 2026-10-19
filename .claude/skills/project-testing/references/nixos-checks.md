@@ -35,8 +35,8 @@ builds in a `nixos/nix` container on the `cloud-nixos-checks-store` volume, neve
 
 ## Restore rehearsals
 
-- The restore rehearsals (`impd-restore`, `impd-restore-seams`, `impd-restore-saved-failures`) share
-  one VM definition,
+- The restore rehearsals (`impd-restore`, `impd-restore-boundaries`,
+  `impd-restore-saved-failures`) share one VM definition,
   [`build-restore-rehearsal.nix`](../../../../nixos/checks/test-utils/build-restore-rehearsal.nix),
   and one reset, `setup_test()`. Each check boots its own VM, and each subtest supplies its own
   scenario data. `impd-restore-reset` checks the reset itself: each subtest leaves one kind of state

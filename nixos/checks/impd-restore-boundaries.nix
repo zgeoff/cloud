@@ -1,4 +1,4 @@
-# The restore rehearsal's seam subtests for restore-impd-db, in a NixOS VM: the
+# The restore rehearsal's boundary subtests for restore-impd-db, in a NixOS VM: the
 # machine, its reset and its boot subtests are test-utils/build-restore-rehearsal.nix's, the same
 # as impd-restore's. These subtests reach the errors that no real state on the machine can
 # trigger, through the script's SYSTEMCTL and CMP: each puts one stand-in in place of the real
@@ -8,7 +8,7 @@
 # unit's state (build-stub-systemctl.nix), and a cmp that finds one comparison different
 # (build-stub-cmp.nix). Each subtest writes its own database, secret, copy and COPY-INFO, so
 # every subtest stands alone. It needs KVM, and it reads test-support/shell beside nixos/, so it
-# builds only from the repo root: run `bun run test:nixos impd-restore-seams`.
+# builds only from the repo root: run `bun run test:nixos impd-restore-boundaries`.
 { nixpkgs, imp }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -16,7 +16,7 @@ let
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
 in
 import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
-  name = "impd-restore-seams-rehearsal";
+  name = "impd-restore-boundaries-rehearsal";
   subtests =
     { image28, image29 }:
     ''
