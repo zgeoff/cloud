@@ -142,6 +142,114 @@ let
         '';
     }
     {
+      title = "it renders each input drop, sorted by port and interface, in an input chain with no forward chain";
+      script =
+        let
+          system = buildModuleSystem ../modules/cloud-host-firewall.nix {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            networking.cloudHost.inputDrops = [
+              {
+                port = 2222;
+                interface = "cni0";
+              }
+              {
+                port = 22;
+                interface = "flannel.1";
+              }
+              {
+                port = 22;
+                interface = "cni0";
+              }
+            ];
+          };
+          table = system.config.networking.nftables.tables.cloud_host;
+        in
+        ''
+          printf '%s' ${lib.escapeShellArg table.content} > actual
+
+          assert_equals inet ${lib.escapeShellArg table.family} "the table's family"
+          assert_files_equal - actual <<'EOF'
+          chain input {
+            type filter hook input priority filter - 10; policy accept;
+            tcp dport 22 iifname "cni0" drop
+            tcp dport 22 iifname "flannel.1" drop
+            tcp dport 2222 iifname "cni0" drop
+          }
+          EOF
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
+      title = "it renders the input drops before the admissions, whatever their ports";
+      script =
+        let
+          table =
+            (buildModuleSystem ../modules/cloud-host-firewall.nix {
+              networking.nftables = {
+                enable = true;
+                flushRuleset = false;
+              };
+              networking.cloudHost.admissions = [
+                {
+                  port = 8415;
+                  interface = "cni0";
+                  sourceCIDR = "10.42.0.0/16";
+                  destinationAddress = "100.64.0.1";
+                }
+              ];
+              networking.cloudHost.inputDrops = [
+                {
+                  port = 9022;
+                  interface = "cni0";
+                }
+              ];
+            }).config.networking.nftables.tables.cloud_host;
+        in
+        ''
+          printf '%s' ${lib.escapeShellArg table.content} > actual
+
+          assert_files_equal - actual <<'EOF'
+          chain input {
+            type filter hook input priority filter - 10; policy accept;
+            tcp dport 9022 iifname "cni0" drop
+            tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.64.0.1 accept
+            tcp dport 8415 drop
+          }
+          EOF
+        '';
+    }
+    {
+      title = "it fails both assertions for input drops alone without nftables and with a flushed ruleset";
+      script =
+        let
+          system = buildModuleSystem ../modules/cloud-host-firewall.nix {
+            networking.nftables = {
+              enable = false;
+              flushRuleset = true;
+            };
+            networking.cloudHost.inputDrops = [
+              {
+                port = 22;
+                interface = "cni0";
+              }
+            ];
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "networking.cloudHost needs networking.nftables.enable: inet cloud_host is an nftables table"
+                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and Docker"
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
       title = "it renders each forward drop, sorted by interface, in a forward chain with no input chain";
       script =
         let
@@ -248,7 +356,7 @@ let
         '';
     }
     {
-      title = "it drops forwarded traffic from geoffcloud pod interfaces to the Docker subnet, in a table nft accepts";
+      title = "it closes SSH on geoffcloud to the pod interfaces and drops their forwarded traffic to the Docker subnet, in a table nft accepts";
       script =
         let
           table = geoffcloud.config.networking.nftables.tables.cloud_host;
@@ -264,6 +372,8 @@ let
           assert_files_equal - actual <<'EOF'
           chain input {
             type filter hook input priority filter - 10; policy accept;
+            tcp dport 22 iifname "cni0" drop
+            tcp dport 22 iifname "flannel.1" drop
             tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.69.47.33 accept
             tcp dport 8415 iifname "tailscale0" ip saddr 100.67.122.120/32 ip daddr 100.69.47.33 accept
             tcp dport 8415 drop
