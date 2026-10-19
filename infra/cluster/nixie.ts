@@ -1,12 +1,13 @@
 import { readFileSync } from 'node:fs';
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
-import { ConfigMap, Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
+import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
 import type { Output } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { NixieInputs } from '../inputs/index.ts';
 import { buildNixieImpConfig } from '../shared/build-nixie-imp-config.ts';
+import { createNamespace } from '../shared/create-namespace.ts';
 import { renderNixieConfig } from '../shared/render-nixie-config.ts';
 import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
 import {
@@ -34,8 +35,7 @@ export function createNixie(
   inputs: NixieInputs,
   zoneID: Output<string>,
 ): NixieIngressOutputs {
-  const ns = new Namespace('nixie', { metadata: { name: 'nixie' } }, { provider: cluster });
-
+  const ns = createNamespace('nixie', cluster);
   const namespace = ns.metadata.name;
 
   const api = createService(cluster, namespace, {

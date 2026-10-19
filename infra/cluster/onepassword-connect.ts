@@ -1,10 +1,11 @@
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment } from '@pulumi/kubernetes/apps/v1';
 import type { DeploymentArgs } from '@pulumi/kubernetes/apps/v1';
-import { Namespace, Secret, Service } from '@pulumi/kubernetes/core/v1';
+import { Secret, Service } from '@pulumi/kubernetes/core/v1';
 import { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import type { Output } from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
+import { createNamespace } from '../shared/create-namespace.ts';
 import { buildOnePasswordConnectNetworkPolicySpec } from './build-onepassword-connect-network-policy-spec.ts';
 import {
   buildOnePasswordConnectServiceSpec,
@@ -33,12 +34,7 @@ export function createOnePasswordConnect(
   cluster: Provider,
   inputs: OnePasswordConnectInputs,
 ): OnePasswordConnectOutputs {
-  const ns = new Namespace(
-    'onepassword',
-    { metadata: { name: 'onepassword' } },
-    { provider: cluster },
-  );
-
+  const ns = createNamespace('onepassword', cluster);
   const namespace = ns.metadata.name;
 
   createDeployment(

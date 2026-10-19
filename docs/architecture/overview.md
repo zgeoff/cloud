@@ -145,6 +145,13 @@ plain form. Onidel never snapshots the second disk, so its data relies on each s
   as well as when it is bad, so a probe that stops reporting never reads as healthy, and a check
   from Cloudflare's edge covers the case where the host itself is down
   ([observability](./workloads/observability.md)).
+- **Pod Security at baseline.** Every namespace in k3s except observability and kube-system carries
+  Pod Security's `baseline` level in its warn and audit modes, so the API server reports a pod that
+  asks for the host's network, a hostPath or a host port. A NetworkPolicy never applies to a pod on
+  the host's network, which is why the level matters. The two exempt namespaces hold node-exporter,
+  which reads the host's network, and the local-path provisioner's helper pods, which mount a
+  hostPath for each new volume. The program's namespace registry lists every namespace with its
+  level, and Pulumi patches the labels onto the namespaces that k3s creates.
 - **Guards fail the preview.** An input that would make Pulumi plan to delete a whole subsystem
   fails the run instead of planning the delete
   ([infrastructure as code](./infrastructure-as-code.md#guards)).

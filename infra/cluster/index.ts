@@ -1,6 +1,7 @@
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
 import type { ATCGatewayInputs, NixieInputs } from '../inputs/index.ts';
+import { createK3sNamespacePatches } from '../shared/create-k3s-namespace-patches.ts';
 import { createATCGateway } from './atc-gateway.ts';
 import type { ATCGatewayRoute } from './build-atc-gateway-route-outputs.ts';
 import { buildATCGatewayRouteOutputs } from './build-atc-gateway-route-outputs.ts';
@@ -37,6 +38,8 @@ interface ClusterOutputs {
 // Workloads on the geoffcloud k3s cluster (#6, #7). index.ts builds the cluster's Provider, which
 // reaches the k3s API over the tailnet with the kubeconfig from op://cloud/k3s-kubeconfig.
 export function createCluster(cluster: Provider, inputs: ClusterInputs): ClusterOutputs {
+  createK3sNamespacePatches(cluster);
+
   const gateway =
     inputs.atcGateway === undefined ? undefined : createATCGateway(cluster, inputs.atcGateway);
 
