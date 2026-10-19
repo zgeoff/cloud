@@ -83,7 +83,8 @@ the host boots and answers SSH, with k3s, imp-host and the atc daemon stopped.
 **Desk check:** every step traced against the repo at `main` `14f6e3c`, with nothing run: the pool
 against the NixOS checks, the secret files against their install scripts, impd's secrets and tokens
 against the daemon's profiles, the credential installer and imp's token rules, and the image rebuild
-against its build script. impd's start on an empty pool stays unchecked.
+against its build script. Step 12 is traced against atc's imp target and impd's token store, with
+nothing run. impd's start on an empty pool stays unchecked.
 
 Run steps 1 to 4 on geoffcloud, as root, over `ssh root@geoffcloud`. Run the rest from a clean
 checkout of `main`.
@@ -122,7 +123,7 @@ checkout of `main`.
    pool. Then generate an auth key for imp's node on the console's Keys page: tag `tag:imp`, not
    reusable, not ephemeral, pre-approved. Do not mint it with `bun run up`: Pulumi's Kubernetes
    provider still points at the lost cluster, so an apply fails on the unreachable resources until
-   step 13 rebuilds the cluster.
+   step 14 rebuilds the cluster.
 6. Install imp-host's secret files from the console and 1Password, each on SSH's stdin, then install
    the DNS token:
 
@@ -184,7 +185,7 @@ checkout of `main`.
      [Set the service up](./preview.md#set-the-service-up), then only the `op read ... | ssh`
      commands of its steps 4 and 5, which send the stored GitHub token and webhook secret. Skip the
      switch in its step 6: the host already runs the current system, and the switch script queries
-     the cluster, which step 13 rebuilds. Start the unit with
+     the cluster, which step 14 rebuilds. Start the unit with
      `ssh root@geoffcloud systemctl restart preview`. The `preview-image` unit adds the preview
      imps' image at each start of imp-host, so that image needs no step.
 
@@ -214,9 +215,42 @@ Expect `ok`. Then mint `atc-cloud` with `bun scripts/install-atc-gateway-credent
 finds the two bearer copies equal and skips them. Start the daemon with
 `ssh root@geoffcloud systemctl start atc-daemon`.
 
-12. Mint nixie's token into its sops file, through
+12. Give the home-pc daemon's `cloud` target a new impd token. Its old token was in impd's database,
+    so each call the target makes to impd fails as unauthorized. Run the rest of this step on
+    home-pc, as the user that runs the daemon. Read the target's impd address, token source and imp
+    prefix, and the secrets the auth profiles name, from the daemon's config:
+
+    ```bash
+    jq '{target: .targets.cloud | {url, impPrefix, tokenFile, tokenEnv}, grantable: ([.authProfiles[]?.secret] | join(","))}' ~/.config/atc/config.json
+    ```
+
+    Mint the token `home-pc-cloud` in imp-host, for the imps under the target's prefix (`atc-` when
+    `impPrefix` is unset), and write it straight into the file in `tokenFile`:
+
+    ```bash
+    ssh root@geoffcloud docker exec imp-host impz token new home-pc-cloud --scope manage --imps '<imp_prefix>*' --grantable '<grantable>' < /dev/null \
+      | (umask 077 && cat > <token_file>)
+    ```
+
+    impd refuses the mint with `NOT_FOUND` for a secret that step 9 did not add, so add that secret
+    first. A rerun after a partial mint first removes the token with
+    `ssh root@geoffcloud docker exec imp-host impz token rm home-pc-cloud`. Keep the target's token
+    source as it is, because a change between a file and a variable changes the target's identity
+    and refuses its sessions with `target_changed`. The daemon reads the file before each call to
+    impd, so the new token needs no restart
+    ([imp targets](https://github.com/zgeoff/atc/blob/main/docs/guides/configuration/targets.md#imp-targets)).
+    A `tokenFile` under `/run/credentials` is a copy that systemd makes, so write the unit's source
+    file instead and restart the daemon. A target that sets `tokenEnv` reads the variable at startup
+    only, so write the token where the daemon's environment sets that variable, and restart the
+    daemon with `atc daemon restart`.
+
+    Expect `IMP_URL=<url> IMP_TOKEN="$(cat <token_file>)" impz token whoami` to print
+    `home-pc-cloud`. Then spawn a session on `cloud`, as step 3 of
+    [Switch the `cloud` target](./agent-image.md#switch-the-cloud-target) does.
+
+13. Mint nixie's token into its sops file, through
     [Mint nixie's impd token](./nixie.md#mint-nixies-impd-token), and land the file through a PR.
-13. Start a new cluster on the empty zvol. k3s refuses to start until the zvol holds a cluster's
+14. Start a new cluster on the empty zvol. k3s refuses to start until the zvol holds a cluster's
     certificate authority and datastore, so lift that guard for the first start alone:
 
     ```bash
@@ -226,10 +260,10 @@ finds the two bearer copies equal and skips them. Start the daemon with
     Expect `ok`. Then store the new kubeconfig with `bash scripts/connect-k3s.sh`, and rebuild the
     workloads through [Rebuild the cluster](./restore-geoff-cloud.md#5-rebuild-the-cluster).
 
-14. Restore the gateway's state through
+15. Restore the gateway's state through
     [the gateway's runbook](./atc-gateway-backup-restore.md#restore), and nixie's through
     [Restore from a backup](./nixie.md#restore-from-a-backup).
-15. Check as [After any restore](./restore-geoff-cloud.md#after-any-restore) lists.
+16. Check as [After any restore](./restore-geoff-cloud.md#after-any-restore) lists.
 
 The copies of impd's database, impd's named tokens and its grants do not come back. Each token
 consumer gets a new token in the steps above.

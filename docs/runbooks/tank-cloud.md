@@ -95,7 +95,7 @@ Run these on geoffcloud, as root, over `ssh root@geoffcloud`.
 
 ## Switch and check
 
-1. For a new cluster, start it before the switch, as step 13 of
+1. For a new cluster, start it before the switch, as step 14 of
    [Lose `vdb`](./lost-disk.md#lose-vdb) does. That step needs a host whose running system already
    enables `services.tank-cloud`, as a lost `vdb` leaves, because the guard and the mounts live in
    that system. The switch script cannot make the cluster: before it builds, it reads the cluster's
