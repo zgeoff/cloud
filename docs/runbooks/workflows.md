@@ -109,7 +109,7 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
 4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
    nixie pod's imp client refuses, or that finds no nixie pod, because nixie then retries its start
    without end while every host check passes. It reads the client's version from the `bun.lock` of
-   the pod's nixie release on GitHub: `@impz/client` from nixie 0.37.0, and `@zgeoff/imp-client`
+   the pod's nixie release on GitHub: `@impz/client` from nixie 0.35.1, and `@zgeoff/imp-client`
    before it. It accepts impd 2 beside a 1.x client from nixie 0.28.0 on, as nixie itself does. It
    checks again before the activation. For an impd major bump, deploy a nixie release whose client
    speaks the new major first. `--build-only` skips this gate too.

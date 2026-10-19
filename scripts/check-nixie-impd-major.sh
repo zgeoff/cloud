@@ -9,9 +9,9 @@
 # module. nixie talks to impd through its imp client, whose checkServer refuses an impd of another
 # major release, and nixie's start then retries for ever while the host reports healthy. The image
 # bundles the client, so the check reads its version from bun.lock at the nixie release's tag,
-# through gh. The client is @impz/client from nixie 0.37.0 and @zgeoff/imp-client before it. A lock
+# through gh. The client is @impz/client from nixie 0.35.1 and @zgeoff/imp-client before it. A lock
 # that names both takes @impz/client's version, because the rename replaced the old package:
-# nixie's sandbox-imp adapter imports only @impz/client from v0.37.0, so an @zgeoff/imp-client entry
+# nixie's sandbox-imp adapter imports only @impz/client from v0.35.1, so an @zgeoff/imp-client entry
 # beside it is a leftover that nixie does not talk to impd through.
 # It prints one line and exits 0 when every nixie pod accepts the impd major. It exits 1 when one
 # does not, when no nixie pod runs, when the pin or an image holds no release version, or when the
