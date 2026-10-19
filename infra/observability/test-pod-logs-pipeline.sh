@@ -46,7 +46,8 @@ setup_test() {
     const seedFile = '/storage/pod-log-positions.yml';
     const pipeline = buildPodLogsPipeline({ targets, podLogRoot: '/logs', positionsSeedFile: seedFile, forwardTo: 'loki.echo.loki.receiver' });
     await Bun.write(tree + '/config/config.alloy', pipeline + '\nloki.echo \"loki\" {}\n');
-    await Bun.write(tree + '/seed.sh', buildPodLogPositionsSeedScript({ podLogRoot: '/logs', seedFile }));
+    const positionsFile = '/storage/loki.source.file.pods/positions.yml';
+    await Bun.write(tree + '/seed.sh', buildPodLogPositionsSeedScript({ podLogRoot: '/logs', seedFile, positionsFile }));
   ")
 }
 
@@ -162,6 +163,44 @@ it_resumes_from_the_saved_position_after_a_restart_shipping_each_line_written_wh
 EOF
 
   # the seed script runs again and records the log at its new size, which Alloy must ignore
+  start_alloy "$tree/alloy-again" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
+
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the last line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 43 failed\""' _ "$(cat "$tree/alloy-again/container")"
+  docker logs "$(cat "$tree/alloy-again/container")" 2>&1 |
+    sed -n 's/.*component_id=loki\.echo\.loki labels=".*" entry="\(.*\)" entry_timestamp=.*/\1/p' > "$tree/entries"
+  diff - "$tree/entries" << 'EOF'
+order 42 placed
+order 43 failed
+EOF
+}
+
+it_ships_each_line_once_after_a_restart_that_follows_a_rotation_which_left_the_new_log_empty() {
+  local before now
+  tree="$(mktemp -d)"
+  trap teardown EXIT
+  setup_test "$tree"
+  before="$(date -u -d '-2 minutes' +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  sed "s/@BEFORE@/$before/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
+@BEFORE@ stdout F listening on :8080
+@BEFORE@ stderr F order 38 failed
+@BEFORE@ stderr F order 39 failed
+@BEFORE@ stderr F order 40 failed
+EOF
+  start_alloy "$tree/alloy" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
+  wait_for 60 "Alloy to tail the container's log" has_metric "$(cat "$tree/alloy/url")" '^loki_source_file_files_active_total{.*} 1$'
+  now="$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)"
+  echo "$now stdout F order 41 placed" >> "$tree/logs/$log_dir/0.log"
+  # shellcheck disable=SC2016 # expanded by the inner sh
+  wait_for 30 "Alloy to ship the first line" sh -c 'docker logs "$1" 2>&1 | grep -qF "entry=\"order 41 placed\""' _ "$(cat "$tree/alloy/container")"
+  mv "$tree/logs/$log_dir/0.log" "$tree/logs/$log_dir/0.log.20261019-052500"
+  : > "$tree/logs/$log_dir/0.log"
+  docker stop "$(cat "$tree/alloy/container")" > /dev/null
+  sed "s/@NOW@/$now/" >> "$tree/logs/$log_dir/0.log" << 'EOF'
+@NOW@ stdout F order 42 placed
+@NOW@ stderr F order 43 failed
+EOF
+
   start_alloy "$tree/alloy-again" "$tree/config" "$tree/logs" "$volume" "$(cat "$tree/seed.sh")"
 
   # shellcheck disable=SC2016 # expanded by the inner sh

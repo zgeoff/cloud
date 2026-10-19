@@ -25,6 +25,7 @@ test("it runs Alloy's config from saved positions, seeded before each start, as 
             buildPodLogPositionsSeedScript({
               podLogRoot: '/var/log/pods',
               seedFile: '/var/lib/alloy/pod-log-positions.yml',
+              positionsFile: '/var/lib/alloy/loki.source.file.pods/positions.yml',
             }),
           ],
           volumeMounts: [

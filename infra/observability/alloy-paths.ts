@@ -9,4 +9,7 @@ export const alloyPaths = {
 
   // the read positions that seed Alloy's pod-log source when it has none of its own
   podLogPositionsSeed: '/var/lib/alloy/pod-log-positions.yml',
+
+  // the positions file of loki.source.file "pods", in the directory Alloy names after it
+  podLogPositions: '/var/lib/alloy/loki.source.file.pods/positions.yml',
 };

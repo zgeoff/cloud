@@ -34,6 +34,7 @@ export const alloyValues = {
           buildPodLogPositionsSeedScript({
             podLogRoot: alloyPaths.podLogs,
             seedFile: alloyPaths.podLogPositionsSeed,
+            positionsFile: alloyPaths.podLogPositions,
           }),
         ],
         volumeMounts: [
