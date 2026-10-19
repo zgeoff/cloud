@@ -6,6 +6,7 @@ import { findJSONField } from '../scripts/find-json-field.ts';
 import { buildMockWorkflowRunContext } from '../scripts/test-utils/build-mock-workflow-run-context.ts';
 import { buildStubActionsScheduler } from '../scripts/test-utils/build-stub-actions-scheduler.ts';
 import { isActionsConditionMet } from '../scripts/test-utils/is-actions-condition-met.ts';
+import { renderActionsTemplate } from '../scripts/test-utils/render-actions-template.ts';
 import { runActionsStep } from '../scripts/test-utils/run-actions-step.ts';
 
 // The Deploy prod workflow's runs through a stand-in for GitHub's scheduler: each test plays the
@@ -72,6 +73,34 @@ test('it ends a held push s run green as held, from the workflow s own outcome s
     status: 'in_progress',
     jobs: { apply: 'success', alert: 'in_progress' },
   });
+});
+
+// main's tip, whose workflow runs, is a later merge than the commit whose CI run started it.
+// actions/checkout checks out the event's github.sha when a step names no ref (its README's ref
+// input).
+test('it checks out the workflow s revision for the control steps and the decided revision into program/', async () => {
+  const ctx = await setupTest();
+
+  const context = {
+    github: { ...buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }), sha: 'b'.repeat(40) },
+    inputs: {},
+    steps: { decide: { outputs: { apply: 'true', revision: 'a'.repeat(40) } } },
+  };
+
+  const checkouts = ctx.steps
+    .filter((step: unknown) => String(findJSONField(step, 'uses')).startsWith('actions/checkout@'))
+    .map((step: unknown) => ({
+      path: findJSONField(findJSONField(step, 'with'), 'path') ?? '.',
+      ref: renderActionsTemplate(
+        findJSONField(findJSONField(step, 'with'), 'ref') ?? `\${{ github.sha }}`,
+        context,
+      ),
+    }));
+
+  expect(checkouts).toStrictEqual([
+    { path: '.', ref: 'b'.repeat(40) },
+    { path: 'program', ref: 'a'.repeat(40) },
+  ]);
 });
 
 test('it runs the control steps from the workflow s own checkout and the Pulumi program from the revision in program/', async () => {
