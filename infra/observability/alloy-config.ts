@@ -5,8 +5,6 @@ import { lokiURL } from './loki-url.ts';
 // The kubelet's pod log directories, under /var/log, which the chart mounts: one directory per pod,
 // named <namespace>_<pod>_<uid>, and one per container inside it
 const podLogRoot = '/var/log/pods';
-
-// The log files of the atc gateway's container
 const atcGatewayLogPath = `${podLogRoot}/atc_atc-gateway-*/atc-gateway/*.log`;
 
 // Alloy's config: tail every pod's logs and the host's journal, and push them to Loki, and count
