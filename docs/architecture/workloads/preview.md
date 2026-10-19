@@ -190,6 +190,11 @@ that a stopped service left behind starts over at the next start's first retry, 
 service started without contract settings runs no suite, so the retry ends each run it still holds
 with an error status and removes its imp.
 
+The store holds a run's moves in a transition table of their own. A run waits for a slot, runs, and
+settles, and a stopped service's next start queues a running run again. A settled run passes or
+fails and never moves after that. One store function writes every change of a run's phase and
+refuses a move the table lacks, so a try, the retry and the startup sweep all follow the same rule.
+
 ## State
 
 The previews file holds no secret and nothing a preview needs to run, and it has no backup. Losing
