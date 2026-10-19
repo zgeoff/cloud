@@ -54,6 +54,28 @@ export interface PhaseChange {
 // its commit status; passed and failed: the commit status holds the result
 type ContractPhase = 'queued' | 'waiting' | 'running' | 'settling' | 'passed' | 'failed';
 
+// Every move a contract run's phase may make. updateContractPhase is the one writer of the phase,
+// and it refuses a move this table lacks.
+const contractPhaseMoves: Readonly<Record<ContractPhase, readonly ContractPhase[]>> = {
+  // a try finds the slots full, starts the run's imp, fails to start it, or finds the contract
+  // settings gone
+  queued: ['waiting', 'running', 'settling'],
+
+  // a retry starts the run's imp, fails to start it, or finds the contract settings gone
+  waiting: ['running', 'settling'],
+
+  // the suite's result arrives, the contract settings are gone, or the service stopped during the
+  // run and its next start queues it again
+  running: ['settling', 'queued'],
+
+  // the imp is gone and GitHub holds the result's status
+  settling: ['passed', 'failed'],
+
+  // a run that ended never moves again
+  passed: [],
+  failed: [],
+};
+
 // the state of the commit status that a run's result sets
 export type ContractOutcome = 'success' | 'failure' | 'error';
 
@@ -111,7 +133,8 @@ export interface PreviewStore {
   // the runs at one of `phases`, oldest claim first
   readonly collectContractRuns: (phases: readonly ContractPhase[]) => ContractRun[];
 
-  // moves the run to `to` only while it stands at one of `from`, and reports whether it moved
+  // moves the run to `to` only while it stands at one of `from`, and reports whether it moved;
+  // throws when a phase in `from` has no move to `to.phase` in the contract phase table
   readonly updateContractPhase: (
     key: ContractRunKey,
     from: readonly ContractPhase[],
@@ -284,6 +307,8 @@ type ContractRunMethods = Pick<
   | 'updateInterruptedContractRuns'
 >;
 
+// Only updateContractPhase writes the phase of a run that exists: the sweep of interrupted runs
+// moves a phase through it too. A claim inserts a new run at `queued`.
 function buildContractRunMethods(db: Database): ContractRunMethods {
   const claim = db.query(`INSERT INTO contract_runs (repo, head_sha, number, imp, phase)
     VALUES (?1, ?2, ?3, ?4, 'queued') ON CONFLICT (repo, head_sha) DO NOTHING`);
@@ -299,6 +324,32 @@ function buildContractRunMethods(db: Database): ContractRunMethods {
   const update = db.query(`UPDATE contract_runs SET phase = ?3, detail = ?4, outcome = ?5
     WHERE repo = ?1 AND head_sha = ?2 AND phase IN (SELECT value FROM json_each(?6))`);
 
+  const updateContractPhase: PreviewStore['updateContractPhase'] = (key, from, to) => {
+    assertContractPhaseMoves(from, to.phase);
+
+    const detail = to.detail ?? null;
+    const outcome = to.outcome ?? null;
+
+    const result = update.run(
+      key.repo,
+      key.headSHA,
+      to.phase,
+      detail,
+      outcome,
+      JSON.stringify(from),
+    );
+
+    return result.changes === 1;
+  };
+
+  const updateInterruptedContractRuns = db.transaction(
+    () =>
+      selectByPhase
+        .all(JSON.stringify(['running']))
+        .filter((row) => updateContractPhase(toContractRun(row), ['running'], { phase: 'queued' }))
+        .length,
+  );
+
   return {
     claimContractRun: (run) => claim.run(run.repo, run.headSHA, run.number, run.imp).changes === 1,
     findContractRun: (key) => {
@@ -308,19 +359,17 @@ function buildContractRunMethods(db: Database): ContractRunMethods {
     },
     collectContractRuns: (phases) =>
       selectByPhase.all(JSON.stringify(phases)).map((row) => toContractRun(row)),
-    updateContractPhase: (key, from, to) => {
-      const detail = to.detail ?? null;
-      const outcome = to.outcome ?? null;
-
-      return (
-        update.run(key.repo, key.headSHA, to.phase, detail, outcome, JSON.stringify(from))
-          .changes === 1
-      );
-    },
-    updateInterruptedContractRuns: () =>
-      db.run(`UPDATE contract_runs SET phase = 'queued', detail = NULL WHERE phase = 'running'`)
-        .changes,
+    updateContractPhase,
+    updateInterruptedContractRuns: () => updateInterruptedContractRuns(),
   };
+}
+
+function assertContractPhaseMoves(from: readonly ContractPhase[], to: ContractPhase): void {
+  const refused = from.find((phase) => !contractPhaseMoves[phase].includes(to));
+
+  if (refused !== undefined) {
+    throw new Error(`a contract run cannot move from ${refused} to ${to}`);
+  }
 }
 
 function toContractRun(row: ContractRunRow): ContractRun {

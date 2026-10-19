@@ -360,7 +360,13 @@ test('it starts nothing for a run that already ended', async () => {
   ctx.store.updateContractPhase(
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
     ['queued'],
-    { phase: 'passed', detail: '18 pass, 0 fail' },
+    { phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' },
+  );
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['settling'],
+    { phase: 'passed', detail: '18 pass, 0 fail', outcome: 'success' },
   );
 
   await runContractRun(ctx.deps, {
