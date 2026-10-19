@@ -4,7 +4,6 @@ export interface ReadinessLine {
   readonly text: string;
 }
 
-// one check's line, as `printf '%-8s %s'` prints it
 export function formatReadinessLine(line: Readonly<ReadinessLine>): string {
   return `${line.status.padEnd(8)} ${line.text}\n`;
 }

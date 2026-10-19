@@ -9,7 +9,6 @@ import { buildStubAgentImageGuest } from './test-utils/build-stub-agent-image-gu
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-release.ts';
 
-// a checkout holding the real guest checks and gitleaks config, which every run sends or copies
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-agent-image-'));
 
@@ -181,14 +180,12 @@ test('it leaves its work directory to an interrupt while the checks run, and dro
     `ARG GITLEAKS_VERSION=8.30.1\nARG GITLEAKS_SHA256=${sum}\n`,
   );
 
-  // each registered step, bound to a runner, as an interrupt would run it
   const steps = new Set<() => unknown>();
 
   const removedByInterrupt: boolean[] = [];
   const copied: string[] = [];
   const guest = buildStubAgentImageGuest({ guest: { stdout: '== 0 failed\n' } });
 
-  // runs the registered steps while the guest runs, then lets the guest answer
   const stub = buildStubRunner(
     buildRealProgramHandler(['tar']),
     async (call) => {

@@ -4,8 +4,6 @@ import { loadHostImpJSON } from './imp-cli.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { runOnHost } from './run-host-check.ts';
 
-// Prints what impd and the host now hold: names, limits and modes, never a value. A file that is
-// gone fails the run with stat's message.
 export async function printATCCredentials(context: Readonly<ATCCredentialsContext>): Promise<void> {
   context.printOut('\n== check\n');
 

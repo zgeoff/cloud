@@ -9,7 +9,6 @@ import { buildRealProgramHandler } from './test-utils/build-real-program-handler
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { startStubGitleaksRelease } from './test-utils/start-stub-gitleaks-release.ts';
 
-// a repo with the gitleaks config the check copies, and a work directory the caller owns
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'create-agent-image-check-dir-'));
 

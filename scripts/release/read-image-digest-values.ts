@@ -2,8 +2,6 @@ import { readImageDigest } from './read-image-digest.ts';
 import type { ReleaseRead, ReleaseReadResult } from './read-release-values.ts';
 import { runChecked } from './run-checked.ts';
 
-// Reads the tag's commit from GitHub, and the digest that each image's version tag names on
-// GHCR, as `docker buildx imagetools inspect` prints the manifest descriptor
 export async function readImageDigestValues(
   read: ReleaseRead,
   images: readonly string[],

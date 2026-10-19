@@ -132,9 +132,6 @@ test('it lists a deleted file when deletions are included', async () => {
   expect(files).toStrictEqual(['README.md']);
 });
 
-// A bare upstream plus a clone whose main holds one pushed commit, so each test starts
-// from history predating the branch. Env strips GIT_* and host git config, so the fixture
-// never reads the repository running the test.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
 
@@ -142,6 +139,7 @@ async function setupTest() {
     await rm(directory, { recursive: true, force: true });
   });
 
+  // strips GIT_* and host git config, so the fixture never reads the repository running the test
   const env = {
     ...Object.fromEntries(
       Object.entries(process.env).filter(

@@ -5,17 +5,13 @@ export interface PublishedImagesBodyInput {
   readonly record: ReleaseRecord;
   readonly version: string;
 
-  // each pin's values on main, and after the bump
   readonly held: PinValues;
   readonly planned: PinValues;
   readonly labels: readonly string[];
 
-  // the Actions run that published the images, when the bump runs in one
   readonly runURL: string | undefined;
 }
 
-// The body of the pull request that pins the images this repository published: the run, each
-// pin's move, why it merges on its own or waits for a review, and what rolls the merged pin out
 export function renderPublishedImagesBody(input: PublishedImagesBodyInput): string {
   const tag = `${input.record.tagPrefix}${input.version}`;
   const url = `https://github.com/${input.record.repo}/releases/tag/${encodeURIComponent(tag).replaceAll('%2F', '/')}`;
@@ -44,7 +40,6 @@ export function renderPublishedImagesBody(input: PublishedImagesBodyInput): stri
   ].join('\n');
 }
 
-// the group a row shows: the pin's version, or its image tag when it has no version
 function findShownGroup(pin: Pin) {
   const parts = pin.lines.flatMap((line) => Object.entries(line.parts));
 

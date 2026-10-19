@@ -9,8 +9,6 @@ import type { ReleaseRecord } from './release-registry.ts';
 import { releaseRegistry } from './release-registry.ts';
 import type { BumpContext } from './types.ts';
 
-// Pins one release by hand in the checkout it runs from, as the bump pull request pins it, and
-// opens no pull request: `bun scripts/release/run-release-pin.ts <dependency> <version>`
 export async function runReleasePin(
   context: BumpContext,
   args: readonly string[],

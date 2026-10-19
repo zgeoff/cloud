@@ -3,8 +3,6 @@ import { runChecked } from './run-checked.ts';
 import { toRunOptions } from './to-run-options.ts';
 import type { BumpContext, BumpPR } from './types.ts';
 
-// this repository's own open or closed pull requests for the bump's branch, newest first, since a
-// fork's pull request can have the same branch name
 export async function readBumpPRs(
   context: BumpContext,
   branch: string,
@@ -36,6 +34,7 @@ export async function readBumpPRs(
 
   const prs: unknown = JSON.parse(listed);
 
+  // a fork's pull request can have the same branch name
   return (Array.isArray(prs) ? prs : [])
     .filter((pr: unknown) => findJSONField(pr, 'isCrossRepository') === false)
     .map((pr: unknown) => toBumpPR(pr));

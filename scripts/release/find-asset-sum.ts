@@ -1,5 +1,3 @@
-// The sha256 that a release's SHA256SUMS lists for the asset, as `sha256sum` writes a line in text
-// or binary mode, or an Error unless exactly one line names it with a sum
 export function findAssetSum(sums: string, asset: string): string | Error {
   const lines = sums
     .split('\n')

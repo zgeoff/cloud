@@ -8,7 +8,6 @@ export interface BuildRequest {
   readonly timeoutMs: number;
 }
 
-// Parses `[--keep] [<commit on main>]`, where the commit defaults to origin/main
 export function parseBuildAgentImageArgs(args: readonly string[], timeout: string): BuildRequest {
   const keep = args[0] === '--keep';
   const rest = keep ? args.slice(1) : args;

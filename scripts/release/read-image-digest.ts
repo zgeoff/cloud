@@ -2,8 +2,6 @@ import { findJSONField } from '../find-json-field.ts';
 import type { Runner } from '../run-process.ts';
 import { runChecked } from './run-checked.ts';
 
-// Reads the digest that an image reference names on its registry, as
-// `docker buildx imagetools inspect` prints the manifest descriptor
 export async function readImageDigest(run: Runner, ref: string): Promise<string | Error> {
   const manifest = await runChecked(run, [
     'docker',

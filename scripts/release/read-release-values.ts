@@ -10,7 +10,6 @@ export interface ReleaseRead {
   readonly record: ReleaseRecord;
   readonly version: string;
 
-  // the pins' versions on main, in the record's order
   readonly pinned: readonly string[];
   readonly run: Runner;
 }
@@ -18,7 +17,6 @@ export interface ReleaseRead {
 export interface ReleaseReadResult {
   readonly values: ReleaseValues;
 
-  // the review flags that the release's own notes raise
   readonly flags: readonly string[];
 }
 
@@ -29,8 +27,6 @@ type SourceReader<Source extends ReleaseSource> = (
   source: Source,
 ) => Promise<ReleaseReadResult | Error>;
 
-// One reader per source kind. The release workflows run these scripts without node_modules, so a
-// keyed record branches here in place of ts-pattern's match, and its type still needs every kind.
 const sourceReaders: {
   readonly [Kind in ReleaseSource['kind']]: SourceReader<Extract<ReleaseSource, { kind: Kind }>>;
 } = {
@@ -46,9 +42,11 @@ const sourceReaders: {
     ),
 };
 
-// Reads what the release publishes for its pins, as its record's source kind says
 export function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
   const source = read.record.source;
+
+  // the release workflows run without node_modules, so a keyed record stands in for ts-pattern's
+  // match
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for source.kind reads that kind
   const reader = sourceReaders[source.kind] as SourceReader<typeof source> | undefined;
 

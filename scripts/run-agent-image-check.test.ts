@@ -7,7 +7,6 @@ import { buildStubCheckAgentImage } from './test-utils/build-stub-check-agent-im
 import { buildStubImp } from './test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
-// a work directory with the extracted source's scripts folder
 async function setupTest() {
   const work = await mkdtemp(join(tmpdir(), 'run-agent-image-check-'));
 
@@ -97,7 +96,6 @@ test('it leaves the imp’s removal to an interrupt from impz new on, and drops 
 
   await writeFile(join(ctx.source, 'scripts/check-agent-image.ts'), '');
 
-  // each registered step, bound to a runner that records what an interrupt would run
   const steps = new Set<() => unknown>();
 
   const interrupt = buildStubRunner(() => ({}));

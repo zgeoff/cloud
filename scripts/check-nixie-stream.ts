@@ -6,8 +6,6 @@ import type { StreamReport } from './read-nixie-stream.ts';
 import { readNixieStream } from './read-nixie-stream.ts';
 import { sendNixieRPC } from './send-nixie-rpc.ts';
 
-// Checks nixie's live stream through its ingress after a deploy, and writes nothing to the
-// conversation: it sends no message, and a record that arrives while it holds the stream fails it.
 interface RemoteResult {
   readonly exitCode: number;
   readonly stdout: string;
@@ -15,24 +13,18 @@ interface RemoteResult {
 }
 
 export interface CheckNixieStreamOptions {
-  // nixie's origin, such as https://nixie.geoff.cloud
   readonly url: string;
 
-  // how long the stream must stay open, the longest wait for a keepalive the check accepts, and
-  // the fewest keepalives the hold must carry
   readonly holdMs: number;
   readonly maxGapMs: number;
   readonly minKeepalives: number;
 
-  // runs one command line as root on geoffcloud; the line lands in the host's journal, so it never
-  // carries a secret
+  // the line lands in the host's journal, so it never carries a secret
   readonly runRemote: (command: string) => Promise<RemoteResult>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
 
-// Enrols a check session with a code from nixie's pod, counts the conversation's records, holds
-// the stream, counts again, and revokes the session. Returns 0 when the check passes, or 1.
 export async function checkNixieStream(
   options: Readonly<CheckNixieStreamOptions>,
 ): Promise<number> {
@@ -97,12 +89,11 @@ async function createCheckSession(
   return { url: options.url, token: enrolled.value.token, sessionID: enrolled.value.sessionID };
 }
 
-// a session the check can call with: its ID, and the bearer token that enrol returns once, which
-// the contract leaves optional because a cookie enrolment answers none
 function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>> | undefined {
   const sessionID = findJSONField(output, 'sessionID');
   const token = findJSONField(output, 'token');
 
+  // the contract leaves token optional because a cookie enrolment answers none
   return typeof sessionID === 'string' && typeof token === 'string'
     ? { sessionID, token }
     : undefined;
@@ -110,12 +101,12 @@ function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>
 
 const enrolCodeCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie enrol-code';
 
-// enrol-code prints the code on its first line, then a line that says until when it works
 async function readEnrolmentCode(
   options: Readonly<CheckNixieStreamOptions>,
 ): Promise<string | undefined> {
   const result = await options.runRemote(enrolCodeCommand);
 
+  // enrol-code prints the code on its first line, then a line that says until when it works
   const [firstLine = ''] = result.stdout.split('\n');
   const code = firstLine.trim();
 
@@ -130,7 +121,6 @@ async function readEnrolmentCode(
   return undefined;
 }
 
-// The stream follows from the sequence the first count read at, so any record it carries is new
 async function checkStream(
   options: Readonly<CheckNixieStreamOptions>,
   session: Readonly<CheckSession>,
@@ -143,6 +133,8 @@ async function checkStream(
 
   const stream = await readNixieStream({
     ...session,
+
+    // the stream follows from the first count's sequence, so any record it carries is new
     afterSequence: before.readAtSequence,
     holdMs: options.holdMs,
   });

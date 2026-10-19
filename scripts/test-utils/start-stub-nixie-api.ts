@@ -6,16 +6,12 @@ import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
 import type { StubStream } from './start-stub-nixie-stream.ts';
 import { startStubNixieStream } from './start-stub-nixie-stream.ts';
 
-// Stands in for nixie 0.3.0's API behind its ingress, at the procedures the stream check calls, in
-// the RPC protocol of @orpc/server 1.15.4: a POST to /rpc/<procedure> with {json} in, {json, meta}
-// out, and a defined error as its status with {json: {defined, code, status, message}}.
 export interface StubNixieAPIOptions {
   readonly url: string;
 
   // the codes enrol accepts, each once
   readonly enrolCodes: readonly string[];
 
-  // the sequences of the conversation's records, oldest first
   readonly sequences: readonly number[];
   readonly keepaliveMs: number | null;
   readonly closeAfterMs: number | null;
@@ -24,19 +20,14 @@ export interface StubNixieAPIOptions {
 export interface StubNixieAPI {
   readonly sessions: readonly { readonly sessionID: string; readonly revoked: boolean }[];
 
-  // each request's procedure, in order
   readonly calls: readonly string[];
   readonly waitForStream: () => Promise<void>;
 
-  // appends a record to the conversation and sends it on every open stream
   readonly appendRecord: () => void;
 
-  // signs a device in without an enrolment code, and returns its bearer token
   readonly createSession: () => string;
 }
 
-// Registers the handlers on the MSW server for the current test, and stops every open stream when
-// the test finishes
 export function startStubNixieAPI(options: StubNixieAPIOptions): StubNixieAPI {
   const state: StubState = {
     options,
@@ -79,7 +70,6 @@ interface StubState {
   readonly opened: PromiseWithResolvers<void>;
 }
 
-// a field of the call's input
 type Input = (key: string) => unknown;
 
 function buildHandlers(state: StubState) {
@@ -91,8 +81,6 @@ function buildHandlers(state: StubState) {
   ];
 }
 
-// nixie's API refuses a call without the client header before any procedure runs, and every
-// procedure but enrol needs a live session
 function makeRoute(
   state: StubState,
   procedure: string,
@@ -101,12 +89,14 @@ function makeRoute(
   return http.post(new URL(`/rpc/${procedure}`, state.options.url).href, async (info) => {
     state.calls.push(procedure);
 
+    // nixie's API refuses a call without the client header before any procedure runs
     if ((info.request.headers.get('x-nixie-client') ?? '') === '') {
       return new HttpResponse('the client header is missing', { status: 403 });
     }
 
     const body: unknown = await info.request.json();
 
+    // every procedure but enrol needs a live session
     if (procedure !== 'sessions/enrol' && findSession(state, info.request) === undefined) {
       return buildError(401, 'UNAUTHORIZED', 'The device session is missing, lapsed or revoked');
     }
@@ -122,6 +112,7 @@ function findSession(state: StubState, request: Request) {
 }
 
 function buildError(status: number, code: string, message: string): Response {
+  // a defined error in the RPC protocol of @orpc/server 1.15.4
   return HttpResponse.json({ json: { defined: true, code, status, message } }, { status });
 }
 
@@ -154,7 +145,6 @@ function updateRevoked(state: StubState, input: Input): Response {
   });
 }
 
-// a page holds the newest records before beforeSequence, oldest first
 function buildReadResponse(state: StubState, input: Input): Response {
   const beforeSequence = input('beforeSequence');
   const pageLimit = input('limit');
@@ -178,7 +168,6 @@ interface FollowCall {
   readonly input: Input;
 }
 
-// the stream starts with every record after afterSequence, then each record as it is appended
 function startFollow(state: StubState, call: FollowCall): Response {
   const stream = startStubNixieStream({
     keepaliveMs: state.options.keepaliveMs,

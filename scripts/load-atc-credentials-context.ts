@@ -14,7 +14,6 @@ export interface ATCCredentialsContext extends HostIO {
   readonly directory: string;
   readonly impdPort: string;
 
-  // op's environment, which carries the 1Password service account token
   readonly opEnv: Readonly<Record<string, string | undefined>>;
 }
 
@@ -22,8 +21,6 @@ export interface ATCCredentialsOptions extends ScriptIO {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
-// Reads the settings install-atc-gateway-credentials takes from its environment, each with the
-// production default
 export async function loadATCCredentialsContext(
   options: Readonly<ATCCredentialsOptions>,
 ): Promise<ATCCredentialsContext> {
@@ -36,13 +33,15 @@ export async function loadATCCredentialsContext(
     host: options.env['ATC_CREDENTIALS_HOST'] ?? 'geoffcloud',
     vault: options.env['ATC_CREDENTIALS_VAULT'] ?? 'cloud',
     item: options.env['ATC_DAEMON_TOKEN_ITEM'] ?? 'atc-daemon-token',
+
+    // outside /var/lib/atc-daemon, because systemd's StateDirectory would hand that tree to the
+    // atc user
     directory: options.env['ATC_CREDENTIALS_DIR'] ?? '/var/lib/atc-daemon-secrets',
     impdPort: options.env['ATC_IMPD_PORT'] ?? String(topology.imp.apiPort),
     opEnv: { ...options.env, OP_SERVICE_ACCOUNT_TOKEN: opToken },
   };
 }
 
-// The environment's token, or the one the cloud checkout's Claude Code settings file holds
 async function readOpToken(env: Readonly<Record<string, string | undefined>>) {
   const fromEnv = env['OP_SERVICE_ACCOUNT_TOKEN'] ?? '';
 

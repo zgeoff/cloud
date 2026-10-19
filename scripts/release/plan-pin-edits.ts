@@ -5,14 +5,12 @@ import { isNewerVersion } from './is-newer-version.ts';
 import { parseReleaseVersion } from './parse-release-version.ts';
 import type { Pin, PinPart, ReleaseRecord } from './release-registry.ts';
 
-// what the release publishes for its pins, as its source kind reads it
 export interface ReleaseValues {
   readonly sha256sums?: string;
   readonly digests?: Readonly<Record<string, string>>;
   readonly commit?: string;
   readonly tarballSum?: string;
 
-  // the tag of each image this repository publishes, by image
   readonly tags?: Readonly<Record<string, string>>;
 }
 
@@ -21,24 +19,17 @@ export interface PinEditsInput {
   readonly version: string;
   readonly values: ReleaseValues;
 
-  // the contents of every file the record's pins read, by path from the repo root
   readonly files: Readonly<Record<string, string>>;
 }
 
 export interface PinPlan {
-  // the new contents of each file that a pin changes
   readonly files: Readonly<Record<string, string>>;
 
-  // what happens to each pin, one line each, in the record's order
   readonly notes: readonly string[];
 
-  // the pins it moves, whose lock runs after the write
   readonly written: readonly Pin[];
 }
 
-// Plans the pins of a release: a pin older than the version moves to it with the release's
-// values, a pin at the version must already hold them, and a newer pin stays. Every check runs
-// before any file changes, so an Error leaves every file as it was.
 export function planPinEdits(input: PinEditsInput): PinPlan | Error {
   if (parseReleaseVersion(input.version) === undefined) {
     return new Error(`not a release version: '${input.version}'`);
@@ -140,12 +131,11 @@ function planPinStep(state: PinState): PinStep | Error {
   };
 }
 
-// A pin with no version, such as an image tag with its own revision, has no order to keep: it
-// moves to the release's values whenever they differ from the ones it holds.
 function planTagStep(state: PinState): PinStep {
   const keys = Object.keys(state.wanted);
   const to = keys.map((key) => state.wanted[key] ?? '').join(' ');
 
+  // a pin with no version, such as an image tag with its own revision, has no order to keep
   return keys.every((key) => state.held[key] === state.wanted[key])
     ? { pin: state.pin, note: `${state.pin.id} already pins ${to}`, edits: [] }
     : { pin: state.pin, note: `pinned ${state.pin.id} ${to}`, edits: planLineEdits(state) };
@@ -167,7 +157,6 @@ function collectMatches(pin: Pin, files: Readonly<Record<string, string>>) {
   return matches;
 }
 
-// each part's value at the release, keyed as the part's identity
 function collectWantedParts(pin: Pin, input: PinEditsInput) {
   const wanted: Record<string, string> = {};
 
@@ -186,8 +175,6 @@ function collectWantedParts(pin: Pin, input: PinEditsInput) {
 
 type PartResolver<Part extends PinPart> = (part: Part, input: PinEditsInput) => string | Error;
 
-// One resolver per part kind. The release workflows run these scripts without node_modules, so a
-// keyed record branches here in place of ts-pattern's match, and its type still needs every kind.
 const partResolvers: {
   readonly [Kind in PinPart['kind']]: PartResolver<Extract<PinPart, { kind: Kind }>>;
 } = {
@@ -205,6 +192,8 @@ const partResolvers: {
 };
 
 function resolvePart(part: PinPart, input: PinEditsInput): string | Error {
+  // the release workflows run without node_modules, so a keyed record stands in for ts-pattern's
+  // match
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for part.kind reads that kind
   const resolver = partResolvers[part.kind] as PartResolver<typeof part> | undefined;
 
@@ -226,8 +215,6 @@ function resolveSum(asset: Extract<PinPart, { kind: 'sum' }>['asset'], input: Pi
     : findAssetSum(input.values.sha256sums ?? '', named.groups['asset'] ?? '');
 }
 
-// the values the pin holds, keyed as the part's identity: every line that holds the version, a
-// sum or a digest must agree with the others
 function collectHeldParts(pin: Pin, matches: readonly PinMatch[]) {
   const held: Record<string, string> = {};
 
@@ -249,7 +236,6 @@ function collectHeldParts(pin: Pin, matches: readonly PinMatch[]) {
   return held;
 }
 
-// a pin at the release's version must already hold the release's values
 function findOtherValue(state: PinState) {
   const key = state.pin.lines
     .flatMap((line) => Object.values(line.parts))
@@ -314,7 +300,6 @@ function isPinnedNewer(pinned: string, version: string) {
   return held !== undefined && target !== undefined && isNewerVersion(held, target);
 }
 
-// parts of one kind and image hold one value across a pin's lines
 function toPartKey(part: PinPart) {
   return part.kind === 'digest' || part.kind === 'image-tag'
     ? `${part.kind}:${part.image}`

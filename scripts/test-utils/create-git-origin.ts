@@ -3,19 +3,14 @@ import { join } from 'node:path';
 import { runProcess } from '../run-process.ts';
 
 export interface GitOrigin {
-  // the bare repository, and a working repository whose origin it is
   readonly origin: string;
   readonly seed: string;
 
-  // the environment every git call of the test runs with: no global or system config
   readonly env: Readonly<Record<string, string>>;
 
-  // runs real git with that environment and returns its trimmed stdout; a failure throws
   readonly git: (args: readonly string[]) => Promise<string>;
 }
 
-// Creates a real bare repository at <dir>/origin.git and a working repository at <dir>/seed whose
-// origin it is, both on main, for a test whose script fetches from and pushes to an origin
 export async function createGitOrigin(directory: string): Promise<GitOrigin> {
   const home = join(directory, 'home');
 

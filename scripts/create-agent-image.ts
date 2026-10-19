@@ -11,19 +11,13 @@ import { withExitCode } from './with-exit-code.ts';
 import { withWorkDir } from './with-work-dir.ts';
 
 export interface CreateAgentImageOptions extends InterruptibleIO {
-  // `[--keep] [<commit on main>]`
   readonly args: readonly string[];
 
-  // the zgeoff/cloud clone that git runs in
   readonly cwd: string;
 
-  // AGENT_IMAGE_BUILD_TIMEOUT, a `timeout` duration, when set
   readonly buildTimeout?: string | undefined;
 }
 
-// Builds images/agent for one commit on origin's main as agent-<short sha>, then checks it on a
-// fresh imp with that commit's check. A failed check removes the image unless --keep is given,
-// and every failure exits 1. The last line on stdout names the image, its digest and the result.
 export function createAgentImage(options: Readonly<CreateAgentImageOptions>): Promise<number> {
   return withExitCode(options.printErr, async () => {
     const request = parseBuildAgentImageArgs(options.args, options.buildTimeout ?? '45m');
@@ -77,7 +71,6 @@ interface CheckResult {
   readonly passed: boolean;
 }
 
-// prints the last line, after removing an image whose check failed unless --keep keeps it
 async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
   if (result.passed) {
     io.printOut(`${result.image} ${result.digest} check passed\n`);

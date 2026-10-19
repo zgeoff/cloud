@@ -8,7 +8,6 @@ export interface AgentImageNames {
   readonly check: string;
 }
 
-// Refuses an image or check imp name that the imp host already holds
 export async function requireFreeAgentImageNames(
   io: Readonly<ScriptIO>,
   names: AgentImageNames,

@@ -2,8 +2,7 @@ import type { NixieProcedure, NixieRequest } from './nixie-api/nixie-rpc.ts';
 import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
 
 export interface NixieCall<Procedure extends NixieProcedure, T> extends NixieRequest<Procedure> {
-  // reads the output the check needs, or undefined when the output lacks it; the output is
-  // whatever nixie answered, so the check reads it at run time
+  // the output is whatever nixie answered, so the check reads it at run time
   readonly parse: (output: unknown) => T | undefined;
 }
 
@@ -11,8 +10,6 @@ export type RPCResult<T> =
   | { readonly ok: true; readonly value: T }
   | { readonly ok: false; readonly error: string };
 
-// Sends one call to nixie's API. A failed call answers an error status, with the error's code in
-// the body when nixie defines it.
 export async function sendNixieRPC<Procedure extends NixieProcedure, T>(
   call: Readonly<NixieCall<Procedure, T>>,
 ): Promise<RPCResult<T>> {

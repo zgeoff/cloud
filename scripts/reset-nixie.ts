@@ -1,6 +1,3 @@
-// Resets nixie's event log on geoffcloud through nixie's own reset command, which keeps every
-// signed-in device signed in. Only --confirm changes anything: --dry-run lists the sessions the reset
-// keeps and the steps, and no flag refuses before reaching the host.
 interface RemoteResult {
   readonly exitCode: number;
   readonly stdout: string;
@@ -8,11 +5,9 @@ interface RemoteResult {
 }
 
 interface ResetNixieOptions {
-  // the command-line arguments after the script name
   readonly args: readonly string[];
 
-  // runs one command line as root on geoffcloud; the line lands in the host's journal, so it never
-  // carries a secret
+  // the line lands in the host's journal, so it never carries a secret
   readonly runRemote: (command: string) => Promise<RemoteResult>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
@@ -20,8 +15,6 @@ interface ResetNixieOptions {
 
 const usage = 'usage: bun run nixie:reset --dry-run | --confirm\n';
 
-// Resets nixie's data and returns the exit code: 0 on success or a dry run, 1 on a refusal or a
-// failed step, 2 on bad arguments
 export async function resetNixie(options: Readonly<ResetNixieOptions>): Promise<number> {
   const mode = parseMode(options.args);
 
@@ -73,7 +66,6 @@ function printFailure(options: Readonly<ResetNixieOptions>, text: string, exitCo
 // nixie's documented host commands, run in nixie's container
 const nixie = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie';
 
-// Reads only: the live device sessions, which the reset keeps, from the running server
 async function readSessionCount(options: Readonly<ResetNixieOptions>): Promise<number | undefined> {
   const listed = await options.runRemote(`${nixie} sessions`);
 
@@ -98,6 +90,7 @@ function parseSessions(text: string): number | undefined {
   }
 }
 
+// nixie's own reset command keeps every signed-in device signed in
 const resetCommand = `${nixie} reset --keep-sessions --yes`;
 
 function renderPlan(sessions: number): string {
@@ -116,7 +109,6 @@ function printDryRunEnd(options: Readonly<ResetNixieOptions>): number {
   return 0;
 }
 
-// nixie answers once the reset finishes, then exits 0, and the kubelet starts it again
 async function runReset(options: Readonly<ResetNixieOptions>): Promise<number> {
   options.printOut(`==> 1. ${resetCommand}\n`);
 
@@ -132,6 +124,7 @@ async function runReset(options: Readonly<ResetNixieOptions>): Promise<number> {
 
   options.printOut(result.stdout);
 
+  // nixie answers once the reset finishes, then exits 0, and the kubelet starts it again
   options.printOut(
     'reset done: nixie restarts now; bash scripts/check-nixie-ready.sh root@geoffcloud reports when it is ready\n',
   );

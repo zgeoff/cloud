@@ -2,47 +2,33 @@ import { readFileSync } from 'node:fs';
 import { toShellArg } from '../to-shell-arg.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for ssh to geoffcloud at the commands install-atc-gateway-credentials sends. It runs
-// nothing: it answers as root's shell there would, from impd's state and the secrets directory's
-// files. It knows a scripts/host/ script by its text on stdin; real bash runs those in their tests.
 export interface StubCredentialsHostScenario {
-  // the host's tailnet name, which the script must reach as root
   readonly host: string;
   readonly directory: string;
   readonly impdPort: string;
 
-  // what `impz info --json` prints
   readonly info: unknown;
   readonly secrets: Record<string, unknown>[];
   readonly tokens: Record<string, unknown>[];
 
-  // the secrets directory's files, by name
   readonly files: Record<string, StubHostFile>;
 
-  // every call fails as ssh does when it cannot reach the host
   readonly unreachable?: boolean;
 
-  // that docker exec fails as it does when imp-host is stopped
   readonly stoppedAt?: 'info' | 'secret-ls' | 'token-ls';
   readonly installError?: string;
 
-  // impd refuses `secret add` with this message and exit 2
   readonly secretAddError?: string;
 
-  // the bearer's write fails with this message and exit 1
   readonly writeError?: string;
 
-  // the saved bearer reads back with this appended
   readonly alterBearer?: string;
 
-  // the saved token's check answers this, in place of a good identity
   readonly tokenCheck?: StubAnswer;
 
-  // what `impz token new` prints, a line by default; mintError fails it with exit 1
   readonly minted?: string;
   readonly mintError?: string;
 
-  // the files the final stat no longer finds
   readonly goneBeforeStat?: readonly string[];
 }
 
@@ -54,10 +40,8 @@ interface StubHostFile {
 export interface StubCredentialsHost {
   readonly handle: StubHandler;
 
-  // the value each `secret add` read on stdin, by secret name
   readonly secretValues: Readonly<Record<string, string>>;
 
-  // the scenario's files, as the calls left them
   readonly files: Readonly<Record<string, StubHostFile>>;
 }
 
@@ -79,8 +63,6 @@ interface HostState {
   readonly secretValues: Record<string, string>;
 }
 
-// the argv scripts/run-host-check.ts builds: a batch ssh with a connect timeout to root on the
-// host, and the remote command as one line of quoted words
 function buildSSHAnswer(state: HostState, call: StubCall) {
   const [, batchOption, batch, timeoutOption, timeout, destination, line, ...rest] = call.argv;
 
@@ -107,7 +89,6 @@ function buildHostAnswer(state: HostState, call: StubCall, line: string) {
   return buildDockerAnswer(state, line, call.stdin) ?? buildShellAnswer(state, line, call.stdin);
 }
 
-// the line the remote shell parses into these words, each quoted as one
 function toLine(words: readonly string[]): string {
   return words.map((word) => toShellArg(word)).join(' ');
 }
@@ -167,13 +148,13 @@ function buildReadAnswer(state: HostState, [step, value]: readonly [string, unkn
     : { stdout: `${JSON.stringify(value, null, 2)}\n` };
 }
 
-// imp 1.0.0 reads the value's line and prints the secret with droppedGrants (SecretAddedSchema);
-// it exits 2 for a usage error (packages/cli/src/run-action.ts)
 function createSecret(state: HostState, stdin: string) {
   if (state.scenario.secretAddError !== undefined) {
+    // imp 1.0.0 exits 2 for a usage error (packages/cli/src/run-action.ts)
     return { exitCode: 2, stderr: `${state.scenario.secretAddError}\n` };
   }
 
+  // imp 1.0.0 reads only the value's line
   state.secretValues['glm'] = stdin.split('\n')[0] ?? '';
 
   const secret = {
@@ -186,10 +167,12 @@ function createSecret(state: HostState, stdin: string) {
 
   state.scenario.secrets.push(secret);
 
+  // imp 1.0.0 prints the added secret with droppedGrants (SecretAddedSchema)
   return { stdout: `${JSON.stringify({ ...secret, droppedGrants: 0 }, null, 2)}\n` };
 }
 
 const hostScripts = {
+  // a host script is known by its text on stdin; real bash runs each in its own test
   write: readFileSync(new URL('../host/write-atc-gateway-token.sh', import.meta.url), 'utf8'),
   check: readFileSync(new URL('../host/check-atc-imp-token.sh', import.meta.url), 'utf8'),
   mint: readFileSync(new URL('../host/mint-atc-imp-token.sh', import.meta.url), 'utf8'),
@@ -269,13 +252,13 @@ function runHostScript(state: HostState, stdin: string): StubAnswer | undefined 
   return stdin === hostScripts.mint ? createImpToken(state) : undefined;
 }
 
-// the script's `read` takes the line after it, and writes it back with a newline
 function writeGatewayToken(state: HostState, rest: string) {
   if (state.scenario.writeError !== undefined) {
     return { exitCode: 1, stderr: `${state.scenario.writeError}\n` };
   }
 
   state.scenario.files['gateway-token'] = {
+    // the script's `read` takes the line after it, and writes it back with a newline
     content: `${rest.split('\n')[0] ?? ''}\n`,
     mode: '400',
   };
@@ -283,8 +266,8 @@ function writeGatewayToken(state: HostState, rest: string) {
   return {};
 }
 
-// the --grantable list of scripts/host/mint-atc-imp-token.sh, in its order
 const mintGrantable = [
+  // the host mint script's --grantable list, in its order
   'glm',
   'claude-setup-token',
   'github-imp-agents',
@@ -292,8 +275,6 @@ const mintGrantable = [
   'op-connect',
 ];
 
-// imp 1.0.0 prints the new token's secret alone on stdout, after its notice on stderr
-// (packages/cli/src/commands/tokens.ts); the script saves only a mint of exactly one line
 function createImpToken(state: HostState) {
   if (state.scenario.mintError !== undefined) {
     return { exitCode: 1, stderr: `${state.scenario.mintError}\n` };
@@ -327,12 +308,15 @@ function createImpToken(state: HostState) {
   const minted = state.scenario.minted ?? 'imp_fixture_minted_token\n';
   const notice = 'impz: token atc-cloud made; impd shows its secret only this once\n';
 
+  // the host script saves only a mint of exactly one line
   if (minted.split('\n').length !== 2) {
     return { exitCode: 1, stderr: notice };
   }
 
   state.scenario.files['imp-token'] = { content: minted, mode: '400' };
 
+  // imp 1.0.0 prints the new token's secret alone on stdout, after its notice on stderr
+  // (packages/cli/src/commands/tokens.ts)
   return { stderr: notice };
 }
 

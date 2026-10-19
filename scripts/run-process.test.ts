@@ -151,7 +151,6 @@ test('it stops reading the pipes that a descendant outside its group holds once 
   expect(result.exitCode).toBe(137);
 });
 
-// kills the descendant whose pid the file holds, should it outlive the test, and removes dir
 async function removeDescendant(directory: string, pidFile: string) {
   const text = await readFile(pidFile, 'utf8').catch(() => '');
 
@@ -169,7 +168,6 @@ async function removeDescendant(directory: string, pidFile: string) {
   await rm(directory, { recursive: true, force: true });
 }
 
-// polls until the program has written the file, which the test reads as its start
 async function waitForFile(path: string) {
   for (let text = ''; text === ''; ) {
     text = await readFile(path, 'utf8').catch(() => '');

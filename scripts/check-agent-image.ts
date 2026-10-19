@@ -1,6 +1,3 @@
-// Checks the agent image (images/agent) from inside a running copy of it: each pinned tool answers
-// with the version the Dockerfile pins, no login state or credential file exists, and gitleaks finds
-// no secret on the filesystem. scripts/agent-image-check-guest.sh holds the checks.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { buildAgentImageGuestScript } from './build-agent-image-guest-script.ts';
@@ -15,14 +12,11 @@ import { withExitCode } from './with-exit-code.ts';
 import { withWorkDir } from './with-work-dir.ts';
 
 export interface CheckAgentImageOptions extends InterruptibleIO {
-  // `--imp <name>` for a fresh imp from the image, or `--docker <image>` for a local build
   readonly args: readonly string[];
 
-  // the zgeoff/cloud checkout whose Dockerfile, gitleaks config and checks it uses
   readonly repo: string;
 }
 
-// Prints one line per check and returns the guest's exit code: 1 when any check fails
 export function checkAgentImage(options: Readonly<CheckAgentImageOptions>): Promise<number> {
   return withExitCode(options.printErr, () => {
     const target = parseTarget(options.args);
@@ -65,8 +59,6 @@ async function runCheck(options: Readonly<CheckAgentImageOptions>, target: Targe
   return result.exitCode;
 }
 
-// An imp gets the check directory copied to its /run, a tmpfs there; docker mounts it read-only.
-// Returns the command that runs bash in the image with the guest script on stdin.
 async function setupGuest(
   options: Readonly<CheckAgentImageOptions>,
   target: Target,

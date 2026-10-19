@@ -8,10 +8,8 @@ import type { InterruptibleIO } from './subscribe-to-interrupts.ts';
 export interface AgentImageCheck {
   readonly image: string;
 
-  // the imp the check boots from the image
   readonly check: string;
 
-  // the commit's extracted image and scripts, and the work directory that holds them
   readonly source: string;
   readonly work: string;
 }
@@ -19,9 +17,6 @@ export interface AgentImageCheck {
 // the check downloads gitleaks and sweeps the whole image, so it gets longer than a call's default
 const checkTimeoutMs = 1_800_000;
 
-// Runs the commit's own check on a fresh imp from the image, then removes the imp, passing every
-// output on to stderr. Returns whether the check passed. A commit from before the check moved to
-// Bun has only check-agent-image.sh.
 export async function runAgentImageCheck(
   io: Readonly<InterruptibleIO>,
   target: Readonly<AgentImageCheck>,
@@ -44,6 +39,7 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
 
   const script = join(target.source, 'scripts/check-agent-image.ts');
 
+  // a commit from before the check moved to Bun has only the shell check
   const argv = existsSync(script)
     ? ['bun', script, '--imp', target.check]
     : ['bash', join(target.source, 'scripts/check-agent-image.sh'), '--imp', target.check];
@@ -62,9 +58,8 @@ async function runCheckOnImp(io: Readonly<ScriptIO>, target: Readonly<AgentImage
   return result.exitCode === 0 && !result.timedOut;
 }
 
-// A commit from before imp's CLI took its new name has a check that calls `imp`: the shim on its
-// PATH hands each call to the CLI. Returns the shim's directory, inside the work directory.
 function createImpShim(work: string): string {
+  // a commit from before imp's CLI took its new name has a check that calls `imp`
   const directory = join(work, 'imp-shim');
   const shim = join(directory, 'imp');
 

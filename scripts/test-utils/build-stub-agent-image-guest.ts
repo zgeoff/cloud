@@ -1,11 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for the agent image that check-agent-image.ts runs its checks in: `docker run` with the
-// check directory mounted, or `impz cp` of it and then `impz exec`. It lists the directory when the
-// image receives it, since the check removes it after the run.
 export interface StubAgentImageGuestScenario {
-  // the guest's result for the `bash -s` run
   readonly guest: StubAnswer;
 
   // the result of `impz cp`; the copy succeeds silently when absent
@@ -15,7 +11,6 @@ export interface StubAgentImageGuestScenario {
 export interface StubAgentImageGuest {
   readonly handler: StubHandler;
 
-  // the sorted file names of each check directory the image received, in order
   readonly seen: readonly (readonly string[])[];
 }
 
@@ -29,6 +24,7 @@ export function buildStubAgentImageGuest(
       const directory = findCheckDir(call);
 
       if (directory !== undefined) {
+        // listed on receipt, since the check removes the directory after the run
         const files = await readdir(directory);
 
         seen.push(files.toSorted());
@@ -40,7 +36,6 @@ export function buildStubAgentImageGuest(
   };
 }
 
-// the host side of `-v <dir>:/run/agent-image-check:ro`, or the source of `impz cp`
 function findCheckDir(call: StubCall) {
   const [program, verb, source] = call.argv;
 

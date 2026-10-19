@@ -1,4 +1,4 @@
-// a pin callback reports success as undefined, as the PR opener's applyPins type says
+// a pin callback reports success as undefined, as its type says
 /* oxlint-disable unicorn/no-useless-undefined */
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';

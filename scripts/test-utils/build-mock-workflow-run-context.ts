@@ -8,7 +8,6 @@ export interface MockWorkflowRun {
   readonly head_repository: { readonly full_name: string };
 }
 
-// the github context of a workflow_run event: a CI run of a push to zgeoff/cloud's main that passed
 export function buildMockWorkflowRunContext(
   overrides: Partial<MockWorkflowRun> = {},
 ): StubGitHubContext {

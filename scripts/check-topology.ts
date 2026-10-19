@@ -3,9 +3,6 @@ import { join } from 'node:path';
 import { topology } from '@zgeoff/cloud-topology';
 import { findJSONField } from './find-json-field.ts';
 
-// Compares each copy of a shared constant that stays outside packages/topology with the constant,
-// and prints each mismatch with its file and field: 0 when every copy agrees, 1 on a mismatch or
-// an unreadable file.
 export interface CheckTopologyOptions {
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
@@ -41,7 +38,6 @@ export async function checkTopology(options: Readonly<CheckTopologyOptions>): Pr
   );
 }
 
-// one value that a file holds, and the value the constants give it
 interface Copy {
   readonly file: string;
   readonly field: string;
@@ -49,7 +45,6 @@ interface Copy {
   readonly expected: unknown;
 }
 
-// a file that holds copies, and the copies its parsed YAML holds
 interface Source {
   readonly file: string;
   readonly collectCopies: (parsed: unknown) => readonly Omit<Copy, 'file'>[];
@@ -88,7 +83,6 @@ const sources: readonly Source[] = [
   },
 ];
 
-// undefined for a file it cannot read, so the check stops before it compares anything
 async function loadCopies(root: string, source: Source): Promise<readonly Copy[] | undefined> {
   const text = await readFile(join(root, source.file), 'utf8').catch(() => null);
 
@@ -123,7 +117,6 @@ interface TailscaleStep {
   readonly tags: unknown;
 }
 
-// each tailscale/github-action step, by its job, with the tags it joins as
 function collectTailscaleSteps(jobs: unknown): readonly TailscaleStep[] {
   if (typeof jobs !== 'object' || jobs === null) {
     return [];

@@ -7,8 +7,6 @@ export interface MainCommit {
   readonly short: string;
 }
 
-// Resolves a commit in the clone at cwd after a fetch of origin's main, and refuses one that
-// origin's main does not hold
 export async function resolveMainCommit(
   io: Readonly<ScriptIO>,
   cwd: string,

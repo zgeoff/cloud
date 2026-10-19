@@ -1,8 +1,5 @@
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for `getent hosts <name>`, which would otherwise ask the machine's resolver and reach
-// DNS. glibc 2.39's nss/getent.c prints a found host as printf("%-15s %s", address, name) and
-// exits 2 for a key it cannot find.
 export function buildStubGetent(hosts: Readonly<Record<string, string>>): StubHandler {
   return (call) => (call.argv[0] === 'getent' ? buildGetentAnswer(hosts, call) : undefined);
 }
@@ -16,5 +13,7 @@ function buildGetentAnswer(hosts: Readonly<Record<string, string>>, call: StubCa
 
   const address = hosts[name];
 
+  // glibc 2.39's nss/getent.c prints a found host as printf("%-15s %s", address, name) and exits 2
+  // for a key it cannot find
   return address === undefined ? { exitCode: 2 } : { stdout: `${address.padEnd(15)} ${name}\n` };
 }

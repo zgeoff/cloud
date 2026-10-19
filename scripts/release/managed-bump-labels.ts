@@ -1,4 +1,3 @@
-// every label the release bump manages, with its color and description
 export const managedBumpLabels: ReadonlyMap<string, readonly [string, string]> = new Map([
   ['update:major', ['d73a4a', 'a major release']],
   ['update:minor', ['fbca04', 'a minor release']],

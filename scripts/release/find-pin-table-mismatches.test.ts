@@ -6,7 +6,6 @@ import { findPinTableMismatches } from './find-pin-table-mismatches.ts';
 import { parsePinTable } from './parse-pin-table.ts';
 import { releaseRegistry } from './release-registry.ts';
 
-// every file the registry's pins read in this checkout, with its committed pin table
 async function setupTest() {
   const root = join(import.meta.dir, '..', '..');
   const paths = [...new Set(releaseRegistry.flatMap((record) => collectPinFiles(record)))];

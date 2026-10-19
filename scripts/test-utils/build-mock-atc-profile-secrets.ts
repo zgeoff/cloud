@@ -1,9 +1,7 @@
 import { buildMockImpSecret } from './build-mock-imp-secret.ts';
 
-// The impd secrets that the geoffcloud atc daemon's auth profiles name, as `impz secret ls --json`
-// prints them, each a plain record as a host scenario holds it. Their names are fixed, since the
-// installer's preflight and impd's mint look them up by name.
 export function buildMockATCProfileSecrets(): Record<string, unknown>[] {
+  // the names are fixed, since the installer's preflight and impd's mint look them up by name
   return [
     {
       ...buildMockImpSecret({

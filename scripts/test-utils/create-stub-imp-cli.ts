@@ -5,17 +5,11 @@ import { toShellArg } from '../to-shell-arg.ts';
 import type { StubImpScenario } from './build-stub-imp.ts';
 import { buildStubImp } from './build-stub-imp.ts';
 
-// Writes <dir>/bin/impz, an executable stand-in for the impz CLI, for a test that runs a whole
-// script as a child process. Each call runs buildStubImp's answers over a state file in <dir>, so
-// the images and imps outlive the call, and logs its argv as a JSON line to <dir>/imp-calls.
 export interface StubImpCLI {
-  // the directory to put first on the script's PATH
   readonly bin: string;
 
-  // the images and imps as the calls left them
   readonly readState: () => Promise<Required<Pick<StubImpScenario, 'images' | 'imps'>>>;
 
-  // each call's argv after `impz`, in order
   readonly readCalls: () => Promise<readonly (readonly string[])[]>;
 }
 
@@ -28,6 +22,8 @@ export async function createStubImpCLI(
   const calls = join(directory, 'imp-calls');
 
   await mkdir(bin, { recursive: true });
+
+  // each call runs over the state file, so the images and imps outlive the call
   await writeFile(state, JSON.stringify({ images: scenario.images, imps: scenario.imps ?? [] }));
   await writeFile(calls, '');
 
@@ -56,7 +52,6 @@ exec bun ${toShellArg(import.meta.path)} "$@"
   };
 }
 
-// the state file and the log are the stand-in's own, so a value of another shape is a bug in it
 function parseState(text: string): Required<Pick<StubImpScenario, 'images' | 'imps'>> {
   const value: unknown = JSON.parse(text);
 
@@ -76,6 +71,7 @@ function toRecords(
   value: unknown,
   keys: readonly string[],
 ): readonly Readonly<Record<string, string>>[] {
+  // the state file is the stand-in's own, so a value of another shape is a bug in it
   if (!Array.isArray(value)) {
     throw new TypeError(`the stub imp state holds ${JSON.stringify(value)}, not a list`);
   }
@@ -103,7 +99,6 @@ function toText(value: unknown) {
   return value;
 }
 
-// the CLI that <dir>/bin/impz runs: one call over the state file
 async function runStubImpCall(argv: readonly string[]) {
   const statePath = process.env['STUB_IMP_STATE'] ?? '';
 
@@ -113,7 +108,7 @@ async function runStubImpCall(argv: readonly string[]) {
 
   const imp = buildStubImp(parseState(text));
 
-  // buildStubImp answers every imp call, so the answer is never undefined
+  // the stand-in answers every imp call, so the answer is never undefined
   const answer = await imp.handler({ argv: ['impz', ...argv], stdin: '', options: {} });
 
   await writeFile(statePath, JSON.stringify({ images: imp.images, imps: imp.imps }));

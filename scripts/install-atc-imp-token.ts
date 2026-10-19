@@ -9,9 +9,6 @@ import { pickImpTokenVerdict } from './pick-imp-token-verdict.ts';
 import { readHostScript } from './read-host-script.ts';
 import { runHostCheck, runOnHost } from './run-host-check.ts';
 
-// Mints impd's token atc-cloud (scope manage, imps harness-*, may grant atcCloudGrantable) on the
-// host, straight into a root-only file there, so it never reaches this machine. impd shows a token
-// once, so a rerun skips a token and file that match and stops at a lone one or a bad file.
 export async function installATCImpToken(
   context: Readonly<ATCCredentialsContext>,
   preflight: Readonly<ATCCredentialsPreflight>,
@@ -84,10 +81,8 @@ function requireTokenLimits(token: unknown) {
   }
 }
 
-// The metadata cannot show the file is right, so the host asks impd who the saved token is; only
-// impd's answer returns. Anything short of a clear verdict leaves the file unchecked and changes
-// nothing.
 async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: string) {
+  // the metadata cannot show the file is right, so the host asks impd who the saved token is
   const script = await readHostScript('check-atc-imp-token.sh');
 
   // the script sets the two variables, and docker passes them into imp's CLI, off every argv

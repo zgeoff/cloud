@@ -9,17 +9,13 @@ import { loadSandboxTargets } from './load-sandbox-targets.ts';
 import { parseTailnetTarget } from './parse-tailnet-target.ts';
 import { toShellArg } from './to-shell-arg.ts';
 
-// Checks, after a deploy, that a fetch sandbox on nixie's fetch image reaches a public page and no
-// address inside the cloud. It creates one imp under imp's public egress policy, as nixie does for
-// its web fetch tool, probes from it, and removes it; it reads nixie's pod and changes nothing else.
 export interface CheckFetchSandboxOptions {
   readonly args: readonly string[];
 
-  // the imp's name; outside nixie-*, so nixie's sandbox recovery never takes it for its own
+  // outside nixie-*, so nixie's sandbox recovery never takes it for its own
   readonly sandboxName: string;
 
-  // runs one command line as root on geoffcloud; the line lands in the host's journal, so it never
-  // carries a secret
+  // the line lands in the host's journal, so it never carries a secret
   readonly runRemote: (command: string) => Promise<RemoteResult>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
@@ -27,7 +23,6 @@ export interface CheckFetchSandboxOptions {
 
 const usage = 'usage: bun run nixie:check-sandbox <tailnet address>:<port>\n';
 
-// Runs the check and returns the exit code: 0 when it passes, 1 when it fails, 2 on bad arguments
 export async function checkNixieFetchSandbox(
   options: Readonly<CheckFetchSandboxOptions>,
 ): Promise<number> {
@@ -44,7 +39,6 @@ export async function checkNixieFetchSandbox(
   return plan === undefined ? 1 : runSandboxCheck(options, plan);
 }
 
-// Removes the sandbox once it exists, whatever the probes found and even when a probe throws
 async function runSandboxCheck(
   options: Readonly<CheckFetchSandboxOptions>,
   plan: Plan,
@@ -77,8 +71,6 @@ interface Plan {
   readonly targets: readonly SandboxTarget[];
 }
 
-// Reads only, and stops before the sandbox exists unless every target answers the host: a
-// target with no listener refuses every network alike, so the sandbox's refusal would prove nothing
 async function loadPlan(
   options: Readonly<CheckFetchSandboxOptions>,
   tailnet: ProbeTarget,
@@ -98,6 +90,8 @@ async function loadPlan(
 
   options.printOut(`fetch image: ${image}\n`);
 
+  // a target with no listener refuses every network alike, so the sandbox's refusal would prove
+  // nothing
   const answered = await checkHostReaches(options, loaded.targets);
 
   return answered ? { image, targets: loaded.targets } : undefined;
@@ -171,7 +165,6 @@ function printProbes(
 // the line runs as one shell line on the host, whose words hold no character to quote
 const impCommand = buildHostImpArgv([]).join(' ');
 
-// A failed create can still leave the imp, so the error names it for the CLI's ls
 async function createSandbox(
   options: Readonly<CheckFetchSandboxOptions>,
   image: string,
@@ -181,6 +174,7 @@ async function createSandbox(
   );
 
   if (created.exitCode !== 0) {
+    // a failed create can still leave the imp
     options.printErr(
       `check-nixie-fetch-sandbox: cannot create sandbox ${options.sandboxName}: ${created.stderr.trim()}; look for it with ${formatImpCommand(['ls'])}\n`,
     );

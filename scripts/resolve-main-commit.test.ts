@@ -7,7 +7,6 @@ import { buildRealProgramHandler } from './test-utils/build-real-program-handler
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
-// a real origin and seed for each case to commit to
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'resolve-main-commit-'));
 

@@ -13,7 +13,6 @@ async function setupTest() {
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 
-  // the folders of every pin file, which a case writes or leaves out
   await Promise.all(
     [
       'nixos/hosts/geoffcloud',
@@ -26,7 +25,6 @@ async function setupTest() {
     ].map((directory) => mkdir(join(root, directory), { recursive: true })),
   );
 
-  // the lock runs in the image that scripts/nix-image.sh pins, which the expected argv names
   const nixImageFile = await readFile(join(import.meta.dir, '../nix-image.sh'), 'utf8');
 
   return {

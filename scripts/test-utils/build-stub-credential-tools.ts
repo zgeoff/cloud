@@ -10,8 +10,6 @@ import { buildStubOp } from './build-stub-op.ts';
 import type { StubRunner } from './build-stub-runner.ts';
 import { buildStubRunner } from './build-stub-runner.ts';
 
-// Stands in for every tool install-atc-gateway-credentials runs: op, atc-key and ssh to the host,
-// in one runner. Any other call fails with the runner's exit 97.
 export interface StubCredentialToolsScenario {
   readonly op: StubOpScenario;
   readonly atcKey: StubATCKeyScenario;

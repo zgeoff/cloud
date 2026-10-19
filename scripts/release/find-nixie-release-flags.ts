@@ -1,6 +1,3 @@
-// The review flags of a nixie bump, from the release notes of the pinned release, the target and
-// each release between: `migrations` when a release after the pin adds migrations, and
-// `sandbox-images-changed` when the sandbox images differ between the pin and the target.
 export interface NixieReleaseNotes {
   readonly pinned: string;
   readonly target: string;
@@ -10,22 +7,22 @@ export interface NixieReleaseNotes {
 export function findNixieReleaseFlags(notes: NixieReleaseNotes): readonly string[] {
   const migrations = [notes.target, ...notes.between].some((each) => hasMigrations(each));
 
+  // impd does not add sandbox images itself, so a person adds changed ones before the rollout
   const changed =
     collectSandboxImages(notes.pinned).join('\n') !== collectSandboxImages(notes.target).join('\n');
 
   return [...(migrations ? ['migrations'] : []), ...(changed ? ['sandbox-images-changed'] : [])];
 }
 
-// each release lists only its own migrations, so a missing section, a blank one or any text but
-// the one sentence nixie writes for a release without one counts as migrations; a whole-line HTML
-// comment, such as the marker nixie puts above the next heading, is not text
 function hasMigrations(notes: string) {
   const section = findSection(notes, '## Migrations');
 
+  // each release lists only its own migrations, so a release whose notes lack the section counts
   if (section === null) {
     return true;
   }
 
+  // nixie puts a whole-line HTML comment above the next heading, which is not text
   const text = section
     .filter((line) => line.trim() !== '' && !/^\s*<!--.*-->\s*$/u.test(line))
     .join('\n');
@@ -33,8 +30,6 @@ function hasMigrations(notes: string) {
   return !/^This release adds no migration since v\d+\.\d+\.\d+\.$/u.test(text);
 }
 
-// the image references under `## Images`, sorted, except nixie's own two images; until impd adds
-// sandbox images itself (GEO-548), a person adds changed ones before the rollout
 function collectSandboxImages(notes: string) {
   return (findSection(notes, '## Images') ?? [])
     .filter(
@@ -43,7 +38,6 @@ function collectSandboxImages(notes: string) {
     .toSorted();
 }
 
-// the lines of the section with the heading, up to the next `## ` heading; null without one
 function findSection(notes: string, heading: string) {
   const lines = notes.split('\n');
   const start = lines.indexOf(heading);

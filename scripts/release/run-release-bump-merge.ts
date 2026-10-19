@@ -8,9 +8,6 @@ import { findEventBranch } from './find-event-branch.ts';
 import { findReleaseRecord } from './find-release-record.ts';
 import { parseBumpPullRequest } from './parse-bump-pull-request.ts';
 
-// The release bump merge workflow's step: reads the event, decides on the branch it names, and
-// squash-merges at the checked head with MERGE_TOKEN, the app's token, so the push starts main's
-// workflows. It prints the decision, and copies it to GITHUB_STEP_SUMMARY.
 export interface RunReleaseBumpMergeOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly run: Runner;
@@ -53,7 +50,6 @@ interface Settings {
   readonly mergeToken: string;
 }
 
-// the workflow's settings and the event's branch, or the exit code of a missing setting
 async function loadSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
   const env = options.env;
 
@@ -74,7 +70,6 @@ async function loadSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
   return requireTokens(options, { eventName, branch, summary: env['GITHUB_STEP_SUMMARY'] ?? '' });
 }
 
-// the runner sets each of these for every step; a missing one prints its name
 function hasRunnerSettings(options: Readonly<RunReleaseBumpMergeOptions>) {
   const missing = [
     'GITHUB_EVENT_NAME',
@@ -106,12 +101,13 @@ async function loadEvent(options: Readonly<RunReleaseBumpMergeOptions>, path: st
   }
 }
 
-// an event that starts a decision also needs the app's login and token
 function requireTokens(
   options: Readonly<RunReleaseBumpMergeOptions>,
   event: Pick<Settings, 'eventName' | 'branch' | 'summary'>,
 ): Settings | number {
   const appLogin = options.env['APP_LOGIN'] ?? '';
+
+  // the app's token, so the merge's push starts main's workflows
   const mergeToken = options.env['MERGE_TOKEN'] ?? '';
 
   if (event.branch !== undefined && appLogin === '') {
@@ -131,8 +127,6 @@ function requireTokens(
 
 const repo = 'zgeoff/cloud';
 
-// the branch's open pull request from this repository, since a fork's can have the same branch
-// name; undefined when it has none, or gh's exit code when gh fails
 async function readOpenPullRequest(
   options: Readonly<RunReleaseBumpMergeOptions>,
   branch: string,
@@ -166,6 +160,8 @@ async function readOpenPullRequest(
 function findOwnNumber(text: string) {
   const prs: unknown = JSON.parse(text);
   const list: readonly unknown[] = Array.isArray(prs) ? prs : [];
+
+  // a fork's pull request can have the same branch name
   const own = list.find((pr) => findJSONField(pr, 'isCrossRepository') === false);
   const number = findJSONField(own, 'number');
 
@@ -235,7 +231,6 @@ async function applyDecision(
   return printReport(options, settings, `merged #${decision.number} at ${decision.head}\n`);
 }
 
-// prints the text and copies it to the step summary
 async function printReport(
   options: Readonly<RunReleaseBumpMergeOptions>,
   settings: Settings,
@@ -248,8 +243,6 @@ async function printReport(
   return 0;
 }
 
-// runs gh with GH_TOKEN, or with the token given; a failure prints gh's stderr and gives its exit
-// code
 async function runGH(
   options: Readonly<RunReleaseBumpMergeOptions>,
   args: readonly string[],

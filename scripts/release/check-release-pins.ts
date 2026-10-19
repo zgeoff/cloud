@@ -7,15 +7,12 @@ import { planPinTable } from './plan-pin-table.ts';
 import { releaseRegistry } from './release-registry.ts';
 
 export interface CheckReleasePinsOptions {
-  // the root of the zgeoff/cloud checkout
   readonly root: string;
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
 
-// CI's check that every registry pin in the checkout matches the pin table. With --write it
-// rewrites the table from the pins instead, for a pin that a person edits by hand.
 export async function checkReleasePins(
   options: Readonly<CheckReleasePinsOptions>,
 ): Promise<number> {

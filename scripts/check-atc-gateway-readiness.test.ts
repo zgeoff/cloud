@@ -7,7 +7,6 @@ import { buildStubReadinessHost } from './test-utils/build-stub-readiness-host.t
 import type { StubAnswer, StubCall } from './test-utils/build-stub-runner.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
-// recorders for the output; the host, registry and route are each test's own
 function setupTest() {
   const out: string[] = [];
   const err: string[] = [];
@@ -24,7 +23,6 @@ function setupTest() {
   };
 }
 
-// gh prints the token it holds, as `gh auth token` does once signed in or with GH_TOKEN set
 function buildGHAuthTokenAnswer(call: StubCall): StubAnswer | undefined {
   return call.argv.join(' ') === 'gh auth token --hostname github.com'
     ? { stdout: 'gh-token-1\n' }

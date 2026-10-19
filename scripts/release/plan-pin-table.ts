@@ -5,8 +5,6 @@ import { pinTableFile } from './pin-table-file.ts';
 import type { ReleaseRecord } from './release-registry.ts';
 import { releaseRegistry } from './release-registry.ts';
 
-// The pin table's text with the given records' entries taken from the files, every other entry
-// kept, and the entries in the registry's order. Without a table, every record is taken.
 export function planPinTable(
   records: readonly ReleaseRecord[],
   files: Readonly<Record<string, string>>,
@@ -43,7 +41,6 @@ function collectTakenValues(
   return entries;
 }
 
-// the registry's pins first, in order, then any id the registry lacks, which the check reports
 function renderTable(entries: PinValues) {
   const ids = releaseRegistry.flatMap((record) => record.pins.map((pin) => pin.id));
   const others = Object.keys(entries).filter((id) => !ids.includes(id));

@@ -4,7 +4,6 @@ import { checkGatewayImage } from './check-gateway-image.ts';
 import { server } from './mocks/node.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
-// gh prints the token it holds, as `gh auth token` does once signed in or with GH_TOKEN set
 function setupTest() {
   return buildStubRunner((call) =>
     call.argv.join(' ') === 'gh auth token --hostname github.com'

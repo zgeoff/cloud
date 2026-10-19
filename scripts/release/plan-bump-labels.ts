@@ -1,9 +1,6 @@
 import { isNewerVersion } from './is-newer-version.ts';
 import { parseReleaseVersion } from './parse-release-version.ts';
 
-// The labels of a bump pull request, in order: its update type, the largest step from a pin older
-// than the version (a pin at the version or newer moves nothing); each review flag; and
-// needs-review or auto-merge, by the rules in docs/runbooks/release-check.md.
 export function planBumpLabels(
   version: string,
   pinned: readonly string[],

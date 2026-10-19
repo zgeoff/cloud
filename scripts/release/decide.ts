@@ -7,7 +7,6 @@ interface BumpCommit {
   readonly authorLogins: readonly string[];
 }
 
-// a GitHub Actions check run on the head; a commit status from another app is not one
 interface BumpCheckRun {
   readonly workflow: string;
   readonly name: string;
@@ -32,7 +31,6 @@ export interface DecideInput {
   // the release check app, as app/<slug>
   readonly appLogin: string;
 
-  // the branch's open pull request from this repository, or undefined when it has none
   readonly pr: BumpPullRequest | undefined;
 }
 
@@ -41,9 +39,6 @@ export type Decision =
   | { readonly action: 'hold'; readonly number: number; readonly reason: string }
   | { readonly action: 'skip'; readonly reason: string };
 
-// What the release bump merge does with a branch: merge its open bump pull request at the head it
-// checked, hold it open with the first rule it breaks, or skip it. The rules, in order, are the
-// runbook's (docs/runbooks/release-check.md, "When a bump merges on its own").
 export function decide(input: DecideInput): Decision {
   const record = findReleaseRecord(input.branch);
 
@@ -71,8 +66,6 @@ export function decide(input: DecideInput): Decision {
 
 const repo = 'zgeoff/cloud';
 
-// the app must open it from this repository, and its bot user must author every commit, so a
-// commit anyone else pushed waits for a person, whatever files it touches
 function findAuthorHoldReason(pr: BumpPullRequest, appLogin: string) {
   if (pr.authorLogin !== appLogin || pr.isCrossRepository) {
     return `${appLogin} did not open it from ${repo}`;
@@ -95,8 +88,6 @@ function findLabelHoldReason(pr: BumpPullRequest) {
     : undefined;
 }
 
-// A bump that leaves out the pin table predates it: its ci check passed before the table's check
-// existed, and only the next release check run, which rebuilds the branch, writes the table.
 function findFileHoldReason(pr: BumpPullRequest, pinFiles: readonly string[]) {
   const outside = pr.files.filter((file) => !pinFiles.includes(file)).toSorted();
 
@@ -104,6 +95,8 @@ function findFileHoldReason(pr: BumpPullRequest, pinFiles: readonly string[]) {
     return `it changes ${outside.join(' ')}, which no pin of its dependency writes`;
   }
 
+  // a bump without the table predates the table's check, so its ci check never compared them; the
+  // next release check run rebuilds the branch and writes the table
   return pr.files.includes(pinTableFile) ? undefined : `it does not update ${pinTableFile}`;
 }
 
@@ -123,11 +116,10 @@ function findCheckHoldReason(pr: BumpPullRequest) {
     : undefined;
 }
 
-// A path-triggered workflow can register its check after another workflow finishes, so a check
-// the changed files start must have passed. Two workflows name their job fixture, so the workflow
-// is part of the name. The ruleset requires only `ci`, and a person's pull request skips nixos.
 const requiredChecks: readonly {
   readonly prefix: string;
+
+  // two workflows name their job fixture
   readonly workflow: string;
   readonly name: string;
 }[] = [
@@ -139,6 +131,8 @@ const requiredChecks: readonly {
 ];
 
 function findRequiredCheckHoldReason(pr: BumpPullRequest) {
+  // a path-triggered workflow can register its check after another workflow finishes, and the
+  // ruleset requires only `ci`, so a check the changed files start must have passed
   const missing = requiredChecks.find(
     (check) =>
       (check.prefix === '' || pr.files.some((file) => file.startsWith(check.prefix))) &&

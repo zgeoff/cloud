@@ -6,8 +6,6 @@ import { buildHostImpArgv } from '../imp-cli.ts';
 import { runProcess } from '../run-process.ts';
 import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
 
-// The script runs as the host gets it, with real bash reading it on stdin; docker is a stand-in
-// first on PATH, which answers imp's CLI's whoami and logs the argv and environment it got
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-atc-imp-token-'));
 

@@ -13,9 +13,6 @@ export interface BumpPRInput extends BumpBranchInput {
   readonly labels: readonly string[];
 }
 
-// Opens or updates the pull request that bumps one dependency to a release, one per dependency
-// on release-check/<dependency>. A person's hold or rejection lasts while the bump targets the
-// same release (docs/runbooks/release-check.md). It gives the exit code.
 export async function openReleaseBumpPR(context: BumpContext, input: BumpPRInput): Promise<number> {
   const unmanaged = input.labels.find((label) => !managedBumpLabels.has(label));
 
@@ -59,11 +56,11 @@ async function openBranchPR(context: BumpContext, input: BumpPRInput, branch: Bu
     : updatePushedPR(context, { input, branch, pr });
 }
 
-// A person who closed the pull request for the branch's head rejected its release. A failed
-// lookup stops the bump, since it cannot tell a rejected release from a new one.
 async function isRejected(context: BumpContext, branch: BumpBranch): Promise<boolean | Error> {
   const closed = await readBumpPRs(context, branch.name, 'closed');
 
+  // closing the pull request at the branch's head rejects its release; a failed lookup stops the
+  // bump, since it cannot tell a rejected release from a new one
   const rejected =
     closed instanceof Error ? closed : closed.find((each) => each.head === branch.lease);
 
@@ -114,9 +111,8 @@ interface BumpPRState {
   readonly pr: BumpPR | undefined;
 }
 
-// the branch already holds this change: it opens the missing pull request, or brings the open
-// one's labels up to date, so a run that failed after its push is repaired by the next
 async function updateUnchangedPR(context: BumpContext, state: BumpPRState) {
+  // a run that failed after its push left the branch without its pull request or labels
   if (state.pr === undefined) {
     return createPR(context, state);
   }
@@ -135,9 +131,9 @@ async function updateUnchangedPR(context: BumpContext, state: BumpPRState) {
   return labelled;
 }
 
-// the open pull request loses auto-merge before the push, so a new head never merges under the
-// labels of the release it replaces, even when a later step fails
 async function updatePushedPR(context: BumpContext, state: BumpPRState) {
+  // before the push, so a new head never merges under the labels of the release it replaces, even
+  // when a later step fails
   const disarmed = state.pr === undefined ? undefined : await removeAutoMerge(context, state.pr);
   const ref = `refs/heads/${state.branch.name}`;
 
@@ -232,7 +228,6 @@ function createPR(context: BumpContext, state: BumpPRState) {
   );
 }
 
-// runs gh with the body on stdin and prints what it prints, the pull request's URL
 async function runGH(context: BumpContext, args: readonly string[], body: string) {
   const printed = await runChecked(context.run, ['gh', ...args], toRunOptions(context, body));
 

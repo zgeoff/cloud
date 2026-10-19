@@ -1,8 +1,5 @@
 import { buildStubNixieRecord } from './build-stub-nixie-record.ts';
 
-// An open stream of nixie's stand-in API, in the server-sent events oRPC 1.15.4 writes: an empty
-// comment at the open and at each keepalive, and a `message` event with the record's sequence as
-// its id and the record as {json, meta}.
 export interface StubStreamOptions {
   // how often the stream sends a keepalive; null sends only the one at the open
   readonly keepaliveMs: number | null;
@@ -20,7 +17,6 @@ export interface StubStream {
   readonly stop: () => void;
 }
 
-// Starts the stream's timers; the caller stops it when the test finishes
 export function startStubNixieStream(options: StubStreamOptions): StubStream {
   const state: StreamState = { controller: null, timers: [], encoder: new TextEncoder() };
 
@@ -28,6 +24,7 @@ export function startStubNixieStream(options: StubStreamOptions): StubStream {
     start: (controller) => {
       state.controller = controller;
 
+      // oRPC 1.15.4 writes an empty comment at the open and at each keepalive
       sendText(state, ': \n\n');
     },
     cancel: () => {
@@ -96,5 +93,6 @@ function renderRecordEvent(sequence: number): string {
   const record = buildStubNixieRecord(sequence);
   const data = JSON.stringify({ json: { record }, meta: [[1, 'record', 'recordedAt']] });
 
+  // oRPC 1.15.4's server-sent event: the record's sequence as its id, the record as {json, meta}
   return `event: message\nid: ${sequence}\ndata: ${data}\n\n`;
 }

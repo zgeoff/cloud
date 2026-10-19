@@ -2,8 +2,6 @@ import { readFile, readdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { findJSONField } from './find-json-field.ts';
 
-// Fails each workflow `run:` step that is not setup or one `bun run <root script>` call, so every
-// step's logic lives in a script its own tests cover. Prints each violation with its file and step.
 export interface CheckWorkflowStepsOptions {
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
@@ -138,7 +136,6 @@ function findCallViolation(command: string, scripts: readonly string[]): string 
   return findArgViolation(call?.groups?.['args'] ?? '');
 }
 
-// a plain word, a single-quoted literal, or one double-quoted "$VARIABLE"
 const plainArg = /^(?:[\w@%+=:,./~-]+|'[^']*'|"\$[A-Za-z_]\w*")$/u;
 
 function findArgViolation(args: string): string | undefined {

@@ -11,12 +11,9 @@ export interface NixieSession {
 export interface RecordCount {
   readonly records: number;
 
-  // the log sequence the newest page was read at, which a stream follows from
   readonly readAtSequence: number;
 }
 
-// Counts the records of nixie's conversation thread, reading it newest page first, each page
-// ending where the one before it began. It only reads.
 export function countNixieRecords(
   session: Readonly<NixieSession>,
 ): Promise<RPCResult<RecordCount>> {
@@ -61,11 +58,9 @@ async function countPages(
     : { ok: true, value: count };
 }
 
-// the fields a page reads from nixie's answer keep the contract's names and types
 interface Page extends Pick<NixieOutput<'conversation/read'>, 'hasEarlier' | 'readAtSequence'> {
   readonly records: number;
 
-  // the first record's sequence, which the next page ends before
   readonly oldestSequence: number | undefined;
 }
 

@@ -1,6 +1,5 @@
-// A record of nixie's conversation thread in the shape of nixie 0.3.0's contract: a message
-// record, recorded one second per sequence after a fixed start
 export function buildStubNixieRecord(sequence: number) {
+  // a message record in the shape of nixie 0.3.0's contract
   return {
     kind: 'message',
     message: { text: `record ${sequence}` },

@@ -5,8 +5,6 @@ import { join } from 'node:path';
 import { runProcess } from '../run-process.ts';
 import { startStubImpd } from '../test-utils/start-stub-impd.ts';
 
-// The script runs as the host gets it, with real bash reading it on stdin, and real curl asks the
-// impd stand-in on loopback
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'read-impd-health-'));
 

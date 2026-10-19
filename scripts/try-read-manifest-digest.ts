@@ -1,13 +1,8 @@
-// the registry's answer for one manifest: the digest it names, that it serves none, or why it
-// gave no answer
 export type RegistryAnswer =
   | { readonly digest: string }
   | { readonly missing: true }
   | { readonly error: string };
 
-// Asks an image's registry for the digest of one manifest, by tag or by digest, through the
-// distribution API's manifest HEAD, with a pull token when the registry asks for one: anonymous,
-// except that ghcr.io's realm alone gets the GitHub token, which private packages need.
 export async function tryReadManifestDigest(
   name: string,
   reference: string,
@@ -29,9 +24,6 @@ const manifestTypes = [
   'application/vnd.oci.image.manifest.v1+json',
 ].join(', ');
 
-// The distribution API's manifest HEAD. A registry that wants a token answers 401 with a Bearer
-// challenge, and its realm hands out a pull token: anonymous for a public image, and for ghcr.io's
-// private packages one the GitHub token pays for.
 async function readManifestDigest(
   name: string,
   reference: string,
@@ -45,6 +37,8 @@ async function readManifestDigest(
   // another registry may name ghcr.io's realm in its challenge, and would get the pull token
   const realmToken = location.host === 'ghcr.io' ? githubToken : undefined;
 
+  // a registry that wants a token answers 401 with a Bearer challenge, whose realm hands out a
+  // pull token
   const response =
     first.status === 401
       ? await sendManifestHeadWithToken(url, first.headers.get('www-authenticate'), realmToken)
@@ -70,7 +64,6 @@ function toRegistryAnswer(status: number, digest: string | null): RegistryAnswer
   return digest === null ? { error: 'the registry named no digest' } : { digest };
 }
 
-// Docker Hub's names carry no host, and an official image's name no namespace
 function resolveRegistry(name: string): { readonly host: string; readonly repository: string } {
   const [first = '', ...rest] = name.split('/');
 
@@ -78,6 +71,7 @@ function resolveRegistry(name: string): { readonly host: string; readonly reposi
     return { host: first, repository: rest.join('/') };
   }
 
+  // Docker Hub's names carry no host, and an official image's name no namespace
   return { host: 'registry-1.docker.io', repository: rest.length > 0 ? name : `library/${name}` };
 }
 
@@ -131,7 +125,6 @@ async function readPullToken(
   return token;
 }
 
-// the challenge's realm, asked for its service and scope
 function buildTokenURL(challenge: string): URL {
   const parameters = parseChallenge(challenge);
   const realm = parameters.get('realm');
@@ -153,7 +146,6 @@ function buildTokenURL(challenge: string): URL {
   return url;
 }
 
-// Bearer realm="…",service="…",scope="…" → its parameters; any other scheme has none
 function parseChallenge(challenge: string): ReadonlyMap<string, string> {
   if (!/^bearer\s/iu.test(challenge)) {
     return new Map();
@@ -161,6 +153,7 @@ function parseChallenge(challenge: string): ReadonlyMap<string, string> {
 
   const parameters = new Map<string, string>();
 
+  // Bearer realm="…",service="…",scope="…"
   for (const match of challenge.matchAll(/(?<key>\w+)="(?<value>[^"]*)"/gu)) {
     parameters.set(match.groups?.['key'] ?? '', match.groups?.['value'] ?? '');
   }
@@ -168,13 +161,14 @@ function parseChallenge(challenge: string): ReadonlyMap<string, string> {
   return parameters;
 }
 
-// a token realm answers with token, access_token, or both
 function findToken(body: unknown): string | undefined {
   if (typeof body !== 'object' || body === null) {
     return undefined;
   }
 
   const fields: Readonly<Record<string, unknown>> = { ...body };
+
+  // a token realm answers with token, access_token, or both
   const token = fields['token'] ?? fields['access_token'];
 
   return typeof token === 'string' && token !== '' ? token : undefined;

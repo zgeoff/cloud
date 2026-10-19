@@ -9,9 +9,6 @@ import { releaseRegistry } from './release-registry.ts';
 import { renderBumpBody } from './render-bump-body.ts';
 import type { BumpContext } from './types.ts';
 
-// Opens or updates the bump pull request for one bump line: reads what the release publishes for
-// the record's source kind, labels the bump, and pins it in the clone (BumpContext.cwd). The bump
-// job runs it once per line, with gh signed in to the app's token, a git identity and docker.
 export async function runReleaseBump(
   context: BumpContext,
   line: readonly string[],
@@ -70,7 +67,6 @@ interface Bump {
   readonly labels: readonly string[];
 }
 
-// what the release publishes for its pins, and the bump's labels
 async function readBump(read: ReleaseRead): Promise<Bump | Error> {
   const result = await readReleaseValues(read);
 

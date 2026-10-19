@@ -1,15 +1,10 @@
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
-// Stands in for ssh to the host that check-atc-gateway-readiness.ts inspects. It never runs a
-// command: it reads the one quoted command line the script sends and answers as the host would.
 export interface StubReadinessHostScenario {
-  // the ssh destination it answers, such as root@geoffcloud; any other fails closed
   readonly destination: string;
 
-  // every call fails as OpenSSH does when the host does not answer
   readonly isUnreachable?: boolean;
 
-  // the row `kubectl get nodes --no-headers` prints
   readonly nodeLine: string;
 
   // free -m's available column, in MiB
@@ -17,14 +12,12 @@ export interface StubReadinessHostScenario {
   readonly namespaces: readonly string[];
   readonly storageClasses: readonly string[];
 
-  // each Deployment's readyReplicas, by <namespace>/<name>
   readonly deployments: Readonly<Record<string, number>>;
   readonly isDaemonActive: boolean;
 
-  // what read-impd-health.sh prints: the status on its first line, and impd's body after it
+  // what the impd health script prints: the status on its first line, and impd's body after it
   readonly impdHealth: string;
 
-  // the status the probe pod's curl prints
   readonly probeCode: string;
 }
 
@@ -34,7 +27,6 @@ export function buildStubReadinessHost(scenario: Readonly<StubReadinessHostScena
 
 const sshOptions = ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15'];
 
-// OpenSSH 9.6p1's sshconnect.c error line, which log.c ends with CR LF, and its exit 255
 function buildSSHAnswer(scenario: Readonly<StubReadinessHostScenario>, call: StubCall) {
   const [destination, command, ...rest] = call.argv.slice(sshOptions.length);
   const isShape = sshOptions.every((word, index) => call.argv[index] === word) && rest.length === 0;
@@ -46,6 +38,7 @@ function buildSSHAnswer(scenario: Readonly<StubReadinessHostScenario>, call: Stu
   if (scenario.isUnreachable === true) {
     const name = destination.replace(/^.*@/u, '');
 
+    // OpenSSH 9.6p1's sshconnect.c error line, which log.c ends with CR LF, and its exit 255
     return {
       exitCode: 255,
       stderr: `ssh: connect to host ${name} port 22: Connection timed out\r\n`,
@@ -55,8 +48,6 @@ function buildSSHAnswer(scenario: Readonly<StubReadinessHostScenario>, call: Stu
   return buildCommandAnswer(scenario, call, splitShellWords(command));
 }
 
-// The words of a command line that quotes each word whole in single quotes, with a quote inside
-// one written as '\''; any other syntax is no command the script sends
 function splitShellWords(command: string): readonly string[] | undefined {
   const word = String.raw`'(?:[^']|'\\'')*'`;
 
@@ -74,8 +65,6 @@ type HostCommand = (
   words: readonly string[],
 ) => StubAnswer;
 
-// kubectl v1.35.8's NotFound error and exit 1, and its default columns, from its source; the
-// padding and AGE values are not from a real cluster
 const hostCommands: readonly (readonly [string, HostCommand])[] = [
   ['k3s kubectl get nodes --no-headers', (scenario) => ({ stdout: `${scenario.nodeLine}\n` })],
   ['free -m', buildFreeAnswer],
@@ -132,8 +121,8 @@ function isShapeOf(shape: string, words: readonly string[]) {
   );
 }
 
-// procps-ng's free -m layout, with the available column last
 function buildFreeAnswer(scenario: Readonly<StubReadinessHostScenario>): StubAnswer {
+  // procps-ng's free -m layout, with the available column last
   const mem = `Mem:            3915        1234         567          12        2113        ${scenario.availableMiB}`;
 
   return {
@@ -142,6 +131,8 @@ function buildFreeAnswer(scenario: Readonly<StubReadinessHostScenario>): StubAns
 }
 
 function findObject(names: readonly string[], kind: string, name = ''): StubAnswer {
+  // kubectl v1.35.8's default columns, from its source; the padding and AGE values are not from a
+  // real cluster
   return names.includes(name)
     ? { stdout: `NAME   STATUS   AGE\n${name}    Active   2d\n` }
     : buildNotFound(kind, name);
@@ -161,7 +152,6 @@ function buildDeployAnswer(
       };
 }
 
-// jsonpath prints the value with no newline
 function buildReadyReplicasAnswer(
   scenario: Readonly<StubReadinessHostScenario>,
   namespace = '',
@@ -169,10 +159,12 @@ function buildReadyReplicasAnswer(
 ): StubAnswer {
   const ready = scenario.deployments[`${namespace}/${name}`];
 
+  // jsonpath prints the value with no newline
   return ready === undefined ? buildNotFound('deployments.apps', name) : { stdout: String(ready) };
 }
 
 function buildNotFound(kind: string, name: string): StubAnswer {
+  // kubectl v1.35.8's NotFound error and exit 1, from its source
   return { exitCode: 1, stderr: `Error from server (NotFound): ${kind} "${name}" not found\n` };
 }
 

@@ -2,19 +2,16 @@ import { BlockList, isIP } from 'node:net';
 import { topology } from '@zgeoff/cloud-topology';
 import type { ProbeTarget } from './build-tcp-probe.ts';
 
-// the host's own tailnet address and HTTPS port, as the example target in each message
 const exampleTarget = `${topology.tailnet.nodes.geoffcloud.address}:443`;
 
 export type TailnetTargetResult =
   | { readonly ok: true; readonly target: ProbeTarget }
   | { readonly ok: false; readonly error: string };
 
-// Parses the check's arguments: exactly one tailnet address and port, such as the host's on 443, or
-// [fd7a:115c:a1e0::5]:443 for IPv6. It has no default, so the caller always names a listener that
-// is not on port 53.
 export function parseTailnetTarget(args: readonly string[]): TailnetTargetResult {
   const [arg] = args;
 
+  // no default, so the caller always names a listener that is not on port 53
   if (arg === undefined) {
     return {
       ok: false,
@@ -33,7 +30,6 @@ export function parseTailnetTarget(args: readonly string[]): TailnetTargetResult
   return refusal === undefined ? { ok: true, target } : { ok: false, error: refusal };
 }
 
-// an IP address and port, with an IPv6 address in brackets; undefined for anything else
 function findAddress(arg: string): ProbeTarget | undefined {
   const match = /^(?:\[(?<v6>[\da-f:]+)\]|(?<v4>[\d.]+)):(?<port>\d{1,5})$/iu.exec(arg);
   const host = match?.groups?.['v6'] ?? match?.groups?.['v4'] ?? '';
@@ -46,7 +42,6 @@ function findAddress(arg: string): ProbeTarget | undefined {
 // connect however well the sandbox is isolated, and the check would fail a correct deployment
 const dnsPort = 53;
 
-// why the check must not probe a well-formed target; undefined when it may
 function findRefusal(arg: string, target: ProbeTarget): string | undefined {
   if (!isTailnetAddress(target.host)) {
     return `cannot probe ${arg}: the address is outside the tailnet's ${topology.tailnet.cidr} and fd7a:115c:a1e0::/48, so the host and the sandbox can each reach a different listener on it and the probe would prove nothing`;

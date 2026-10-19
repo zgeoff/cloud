@@ -8,8 +8,6 @@ export interface WantedLabels {
   readonly keepHold: boolean;
 }
 
-// Adds the labels the open pull request lacks and removes the managed ones it no longer carries.
-// With keepHold, a person's needs-review stays, and auto-merge is not added beside it.
 export async function updateBumpLabels(
   context: BumpContext,
   pr: BumpPR,

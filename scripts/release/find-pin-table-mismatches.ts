@@ -4,9 +4,6 @@ import { parsePinTable } from './parse-pin-table.ts';
 import { pinTableFile } from './pin-table-file.ts';
 import { releaseRegistry } from './release-registry.ts';
 
-// Every disagreement between the pin lines in the files and the pin table, one line each: a part
-// that a line holds with another value than the table, a pin the table lacks, and an entry the
-// registry lacks. An empty list means every pin matches the table.
 export function findPinTableMismatches(files: Readonly<Record<string, string>>): readonly string[] {
   const table = loadTable(files[pinTableFile]);
 

@@ -1,4 +1,3 @@
-// Logs docker in to ghcr.io with the workflow token, for a CI job that pulls a private package.
 // The token goes to docker on stdin, never on its command line.
 const token = process.env['GH_TOKEN'];
 const actor = process.env['GITHUB_ACTOR'];

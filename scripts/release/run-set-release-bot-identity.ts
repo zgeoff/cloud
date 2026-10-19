@@ -3,9 +3,6 @@ import { runChecked } from './run-checked.ts';
 import { runGitSteps } from './run-git-steps.ts';
 import type { BumpContext } from './types.ts';
 
-// Sets the clone's git identity to a GitHub App's bot user, so the bump commits carry the app as
-// their author: user.name is "<slug>[bot]", and user.email the bot's noreply address with its id.
-// A failed id read fails it before it changes any setting.
 export async function runSetReleaseBotIdentity(
   context: BumpContext,
   args: readonly string[],

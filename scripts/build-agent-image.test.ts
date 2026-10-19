@@ -7,8 +7,6 @@ import { createGitOrigin } from './test-utils/create-git-origin.ts';
 import { createStubAgentImageCheck } from './test-utils/create-stub-agent-image-check.ts';
 import { createStubImpCLI } from './test-utils/create-stub-imp-cli.ts';
 
-// a real origin and clone, the TMPDIR the script makes its work tree in, the fifo the hanging
-// check writes to, and a way to start the script as a child process that the test stops
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'build-agent-image-'));
 

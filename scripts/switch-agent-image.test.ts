@@ -6,7 +6,6 @@ import { switchAgentImage } from './switch-agent-image.ts';
 import { buildStubImp } from './test-utils/build-stub-imp.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 
-// a home with the atc config directory the default config path names
 async function setupTest() {
   const home = await mkdtemp(join(tmpdir(), 'switch-agent-image-'));
 

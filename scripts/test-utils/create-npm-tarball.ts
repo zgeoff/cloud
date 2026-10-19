@@ -3,8 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runProcess } from '../run-process.ts';
 
-// Creates a real npm package tarball with real tar: package/package.json holding the manifest, as
-// `npm pack` lays it out. It works in a temp directory it removes, and gives the tarball's bytes.
 export async function createNPMTarball(
   manifest: Readonly<Record<string, string>>,
 ): Promise<Uint8Array> {

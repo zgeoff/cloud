@@ -1,12 +1,10 @@
-// The operator scripts run every subprocess through a Runner, so a test injects a stand-in and no
-// script builds a shell command line here. It imports nothing outside Bun: the agent image's git
-// archive runs scripts from a clone without node_modules.
+// It imports nothing outside Bun: the agent image's git archive runs scripts from a clone without
+// node_modules.
 
 export interface RunOptions {
   // the whole of the child's stdin; without it, the child reads /dev/null
   readonly stdin?: Buffer;
 
-  // the child gets SIGTERM after this long, as `timeout` sends it
   readonly timeoutMs?: number;
 
   // the child and its descendants get SIGTERM when this aborts, which no timeout reports
@@ -31,7 +29,6 @@ export interface RunResult {
 
 export type Runner = (argv: readonly string[], options?: RunOptions) => Promise<RunResult>;
 
-// Runs one program with its argv as given: no shell parses it
 export async function runProcess(
   argv: readonly string[],
   options: Readonly<RunOptions> = {},
@@ -92,7 +89,6 @@ interface Child {
   readonly ownGroup: boolean;
 }
 
-// signals the child's whole group when it leads one, and the child alone otherwise
 function sendSignal(child: Readonly<Child>, signal: 'SIGTERM' | 'SIGKILL') {
   if (!child.ownGroup) {
     child.spawned.kill(signal);
@@ -107,16 +103,12 @@ function sendSignal(child: Readonly<Child>, signal: 'SIGTERM' | 'SIGKILL') {
   }
 }
 
-// ten minutes, for a call that names no timeout of its own
 const defaultTimeoutMs = 600_000;
 
 // the group's pipes close as SIGKILL ends its processes; one still open this long after the child
 // exits belongs to a descendant that left the group
 const releaseDelayMs = 100;
 
-// Sends the group SIGTERM on the timeout or when signal aborts, and SIGKILL when forceStop aborts,
-// until the pipes close: a descendant that outlives the child holds them. release aborts after
-// SIGKILL to free the pipes that a descendant outside the group holds.
 function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>) {
   const release = new AbortController();
 
@@ -135,6 +127,8 @@ function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>)
 
   const onForceStop = () => {
     sendSignal(child, 'SIGKILL');
+
+    // release frees the pipes that a descendant outside the group holds
     void stopReadsAfterExit(child, release);
   };
 
@@ -152,7 +146,6 @@ function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>)
   };
 }
 
-// stops the pipe reads once the child has exited and the group's pipes have had time to close
 async function stopReadsAfterExit(child: Readonly<Child>, release: Readonly<AbortController>) {
   await child.spawned.exited;
 
@@ -161,7 +154,6 @@ async function stopReadsAfterExit(child: Readonly<Child>, release: Readonly<Abor
   release.abort();
 }
 
-// runs listener now when signal has already aborted, and on its abort otherwise
 function subscribeToAbort(signal: AbortSignal | undefined, listener: () => void) {
   if (signal?.aborted === true) {
     listener();
@@ -170,7 +162,6 @@ function subscribeToAbort(signal: AbortSignal | undefined, listener: () => void)
   }
 }
 
-// reads a pipe to its end, or to the point where release aborts
 async function readPipe(pipe: ReadableStream<Uint8Array>, release: AbortSignal) {
   const reader = pipe.getReader();
   const chunks: Uint8Array[] = [];
