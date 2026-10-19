@@ -82,6 +82,8 @@ test('it gives a job the outputs of the jobs it needs', () => {
   const scheduler = buildStubActionsScheduler(`
 jobs:
   decide:
+    outputs:
+      apply: \${{ steps.decide.outputs.apply }}
     runs-on: ubuntu-latest
   apply:
     needs: decide
@@ -95,11 +97,32 @@ jobs:
 
   const run = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
 
-  scheduler.finishJob(run, 'decide', { status: 'success', outputs: { apply: 'true' } });
+  scheduler.finishJob(run, 'decide', { status: 'success', steps: { decide: { apply: 'true' } } });
 
   expect(scheduler.getRun(run)).toStrictEqual({
     status: 'in_progress',
     jobs: { decide: 'success', apply: 'in_progress', skip: 'skipped' },
+  });
+});
+
+test('it gives a need no output its workflow does not declare', () => {
+  const scheduler = buildStubActionsScheduler(`
+jobs:
+  decide:
+    runs-on: ubuntu-latest
+  apply:
+    needs: decide
+    if: needs.decide.outputs.apply == 'true'
+    runs-on: ubuntu-latest
+`);
+
+  const run = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+
+  scheduler.finishJob(run, 'decide', { status: 'success', steps: { decide: { apply: 'true' } } });
+
+  expect(scheduler.getRun(run)).toStrictEqual({
+    status: 'completed',
+    jobs: { decide: 'success', apply: 'skipped' },
   });
 });
 

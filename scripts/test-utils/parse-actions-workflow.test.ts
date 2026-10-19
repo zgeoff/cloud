@@ -26,18 +26,20 @@ jobs:
   ).toStrictEqual({
     concurrency: { group: 'deploy', queue: 'single' },
     jobs: [
-      { name: 'build', needs: [], condition: undefined, concurrency: undefined },
+      { name: 'build', needs: [], condition: undefined, concurrency: undefined, outputs: {} },
       {
         name: 'test',
         needs: ['build'],
         condition: undefined,
         concurrency: { group: 'test', queue: 'single' },
+        outputs: {},
       },
       {
         name: 'ship',
         needs: ['build', 'test'],
         condition: "github.event_name == 'push'",
         concurrency: { group: 'ship', queue: 'max' },
+        outputs: {},
       },
     ],
   });
@@ -68,6 +70,41 @@ test.each([
   expect(() =>
     parseActionsWorkflow(`${concurrency}\njobs:\n  ship:\n    runs-on: ubuntu-latest\n`),
   ).toThrowWithMessage(Error, message);
+});
+
+test('it parses each job output that publishes a step s output', () => {
+  expect(
+    parseActionsWorkflow(`
+jobs:
+  ship:
+    outputs:
+      verdict: \${{ steps.guard.outputs.verdict }}
+      ship-id: \${{steps.ship-it.outputs.id}}
+    runs-on: ubuntu-latest
+`).jobs,
+  ).toStrictEqual([
+    {
+      name: 'ship',
+      needs: [],
+      condition: undefined,
+      concurrency: undefined,
+      outputs: {
+        verdict: { step: 'guard', output: 'verdict' },
+        'ship-id': { step: 'ship-it', output: 'id' },
+      },
+    },
+  ]);
+});
+
+test.each([
+  ['an output from another context', `\${{ needs.build.outputs.id }}`],
+  ['an output built from two steps', `\${{ steps.a.outputs.id || steps.b.outputs.id }}`],
+])('it rejects %s, which the stand-in does not model', (_label, output) => {
+  expect(() =>
+    parseActionsWorkflow(
+      `jobs:\n  ship:\n    outputs:\n      id: '${output}'\n    runs-on: ubuntu-latest\n`,
+    ),
+  ).toThrowWithMessage(Error, `job ship: unsupported output id: ${JSON.stringify(output)}`);
 });
 
 test('it rejects a condition that is not a string', () => {

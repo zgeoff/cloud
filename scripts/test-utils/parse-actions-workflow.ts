@@ -1,6 +1,6 @@
-// The parts of a GitHub Actions workflow that decide when its jobs run: each job's needs, `if` and
-// concurrency group, and the workflow's group. It throws on concurrency it does not model, so a
-// test never passes on a rule the scheduler stand-in ignores.
+// The parts of a GitHub Actions workflow that decide when its jobs run: each job's needs, `if`,
+// concurrency group and outputs, and the workflow's group. It throws on concurrency or an output
+// it does not model, so a test never passes on a rule the scheduler stand-in ignores.
 export interface ActionsConcurrency {
   // lowercased, since GitHub compares group names case-insensitively
   readonly group: string;
@@ -9,11 +9,18 @@ export interface ActionsConcurrency {
   readonly queue: 'single' | 'max';
 }
 
+// a job output that publishes one step's output, `${{ steps.<step>.outputs.<output> }}`
+export interface ActionsJobOutput {
+  readonly step: string;
+  readonly output: string;
+}
+
 export interface ActionsJob {
   readonly name: string;
   readonly needs: readonly string[];
   readonly condition: string | undefined;
   readonly concurrency: ActionsConcurrency | undefined;
+  readonly outputs: Readonly<Record<string, ActionsJobOutput>>;
 }
 
 export interface ActionsWorkflow {
@@ -100,7 +107,33 @@ function parseJob(name: string, definition: unknown): ActionsJob {
     needs: typeof needs === 'string' ? [needs] : needs,
     condition,
     concurrency: parseConcurrency(definition['concurrency']),
+    outputs: parseOutputs(name, definition['outputs']),
   };
+}
+
+const stepOutput =
+  /^\$\{\{\s*steps\.(?<step>[A-Za-z_][\w-]*)\.outputs\.(?<output>[A-Za-z_][\w-]*)\s*\}\}$/u;
+
+function parseOutputs(job: string, value: unknown): Record<string, ActionsJobOutput> {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    throw new Error(`job ${job}: unsupported outputs: ${JSON.stringify(value)}`);
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map((entry: readonly [string, unknown]) => {
+      const groups = typeof entry[1] === 'string' ? stepOutput.exec(entry[1])?.groups : undefined;
+
+      if (groups?.['step'] === undefined || groups['output'] === undefined) {
+        throw new Error(`job ${job}: unsupported output ${entry[0]}: ${JSON.stringify(entry[1])}`);
+      }
+
+      return [entry[0], { step: groups['step'], output: groups['output'] }];
+    }),
+  );
 }
 
 function isStringArray(value: unknown): value is readonly string[] {

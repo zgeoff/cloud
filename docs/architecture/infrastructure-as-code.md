@@ -146,7 +146,9 @@ takes the place of another. GitHub starts the waiting runs first in, first out, 
 guarantee that order, and a run starts when CI on its commit passes, so an older commit's run can
 start after a newer commit's. Each run reads the tag only once its turn comes, so the older run
 finds its commit already deployed and skips, and the tag moves only forward along `main` in any
-order.
+order. The job runs its own scripts from the workflow's revision and takes only the Pulumi program
+from the commit it applies, because GitHub runs `main`'s copy of the workflow for every run, and an
+older commit's scripts might not match it.
 
 The decision counts every commit since the tag that touches a Pulumi input, as the `prod-apply` gate
 of the repo's path-gate manifest lists them, not the difference between the two trees. A commit that

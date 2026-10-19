@@ -23,7 +23,10 @@ test('it ends a held run with the apply job a success and alerts the hold', asyn
 
   const held = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
 
-  ctx.scheduler.finishJob(held, 'apply', { status: 'success', outputs: { outcome: 'held' } });
+  ctx.scheduler.finishJob(held, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'held' } },
+  });
 
   expect(ctx.scheduler.getRun(held)).toStrictEqual({
     status: 'in_progress',
@@ -38,7 +41,10 @@ test('it starts a waiting push s run as soon as a held run ends', async () => {
   const later = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'b'.repeat(40) }));
   const laterBeforeTheHold = ctx.scheduler.getRun(later);
 
-  ctx.scheduler.finishJob(held, 'apply', { status: 'success', outputs: { outcome: 'held' } });
+  ctx.scheduler.finishJob(held, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'held' } },
+  });
 
   expect(laterBeforeTheHold).toStrictEqual({
     status: 'in_progress',
@@ -57,8 +63,15 @@ test('it completes a later push s run that applies after a held run, with no ale
   const held = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
   const later = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'b'.repeat(40) }));
 
-  ctx.scheduler.finishJob(held, 'apply', { status: 'success', outputs: { outcome: 'held' } });
-  ctx.scheduler.finishJob(later, 'apply', { status: 'success', outputs: { outcome: 'apply' } });
+  ctx.scheduler.finishJob(held, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'held' } },
+  });
+
+  ctx.scheduler.finishJob(later, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'apply' } },
+  });
 
   expect(ctx.scheduler.getRun(later)).toStrictEqual({
     status: 'completed',
@@ -71,7 +84,10 @@ test('it alerts a failed apply', async () => {
 
   const run = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
 
-  ctx.scheduler.finishJob(run, 'apply', { status: 'failure', outputs: { outcome: 'apply' } });
+  ctx.scheduler.finishJob(run, 'apply', {
+    status: 'failure',
+    steps: { outcome: { outcome: 'apply' } },
+  });
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'in_progress',
@@ -99,7 +115,10 @@ test('it keeps every waiting run in the order it joined, and cancels none', asyn
   const older = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'b'.repeat(40) }));
   const newer = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'c'.repeat(40) }));
 
-  ctx.scheduler.finishJob(running, 'apply', { status: 'success', outputs: { outcome: 'apply' } });
+  ctx.scheduler.finishJob(running, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'apply' } },
+  });
 
   expect(ctx.scheduler.getRun(older)).toStrictEqual({
     status: 'in_progress',
@@ -138,7 +157,6 @@ test('it starts nothing for the CI run of a pull request', async () => {
   });
 });
 
-// each step's `if` against the outputs of the decision and the outcome steps
 test.each([
   [
     'nothing to apply',
@@ -154,6 +172,7 @@ test.each([
       'Checkout',
       'Setup Bun',
       'Decide whether the commit needs an apply',
+      'Check out the revision to apply',
       'Point .env at the deploy vault',
       'Setup Go',
       'Setup Pulumi',
@@ -175,6 +194,7 @@ test.each([
       'Checkout',
       'Setup Bun',
       'Decide whether the commit needs an apply',
+      'Check out the revision to apply',
       'Point .env at the deploy vault',
       'Setup Go',
       'Setup Pulumi',
@@ -213,8 +233,8 @@ test.each([
       github: { event_name: 'workflow_run' },
       needs: {},
       steps: {
-        decide: { outcome: 'success', outputs: decision },
-        outcome: { outcome: 'success', outputs: outcome },
+        decide: { outcome: 'success', conclusion: 'success', outputs: decision },
+        outcome: { outcome: 'success', conclusion: 'success', outputs: outcome },
       },
     });
   });

@@ -66,12 +66,13 @@ jobs:
     # Every step after the decision runs only when it finds the commit needs an apply, and the apply
     # and the steps after it only when the outcome is apply.
     steps:
-      # the commit the run decides on, with the full history and tags, fetched after the job took
-      # the group, so the deployed/prod tag is the one the last apply left
+      # the workflow's own revision, whose scripts run every step, so a CI run that finishes late
+      # for an older commit never mixes this workflow with that commit's scripts. The full history
+      # and tags are fetched after the job took the group, so the deployed/prod tag is the one the
+      # last apply left.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.workflow_run.head_sha || inputs.revision }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -90,18 +91,28 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: bun run --silent ci:decide-prod-apply
 
+      # the commit to apply, in program/: the Pulumi program, its provider and its SDK come from
+      # here, and nothing else does
+      - name: Check out the revision to apply
+        if: steps.decide.outputs.apply == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.decide.outputs.revision }}
+          path: program
+          persist-credentials: false
+
       # the job's service account reads only the cloud-deploy vault
       - name: Point .env at the deploy vault
         if: steps.decide.outputs.apply == 'true'
-        run: bun run ci:write-deploy-env .env
+        run: bun run ci:write-deploy-env program/.env
 
       # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
       - name: Setup Go
         if: steps.decide.outputs.apply == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: provider/go.mod
-          cache-dependency-path: provider/go.sum
+          go-version-file: program/provider/go.mod
+          cache-dependency-path: program/provider/go.sum
 
       # the CLI release that matches the program's @pulumi/pulumi
       - name: Setup Pulumi
@@ -133,6 +144,7 @@ jobs:
 
       - name: Install
         if: steps.decide.outputs.apply == 'true'
+        working-directory: program
         run: bun install --frozen-lockfile
 
       - name: Check out the deployed revision
@@ -166,6 +178,7 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
           DRIFT: ${{ steps.drift.outcome }}
+          PROGRAM: program
         run: bun run --silent ci:preview-and-guard-prod
 
       # apply, or held for a manual dispatch: a held run ends here, green, with a notice that names
@@ -180,6 +193,7 @@ jobs:
 
       - name: Apply
         if: steps.outcome.outputs.outcome == 'apply'
+        working-directory: program
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
@@ -190,7 +204,7 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: bun run ci:retry-transient-pulumi bun run drift -- --suppress-outputs
+        run: bun run ci:retry-transient-pulumi -C program bun run drift -- --suppress-outputs
 
       # force=false refuses a move that is not forward along main
       - name: Move deployed/prod
