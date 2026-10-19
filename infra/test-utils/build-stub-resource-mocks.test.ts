@@ -13,6 +13,10 @@ test('it records each registration by type and name and returns its inputs as it
 
   expect(result).toStrictEqual({ id: 'atc-id', state: { name: 'atc.geoff.cloud' } });
   expect(stub.registered).toStrictEqual(['cloudflare:index/dnsRecord:DnsRecord::atc']);
+
+  expect(stub.inputs).toStrictEqual(
+    new Map([['cloudflare:index/dnsRecord:DnsRecord::atc', { name: 'atc.geoff.cloud' }]]),
+  );
 });
 
 test('it keeps a held registration pending until release, after it has started', async () => {

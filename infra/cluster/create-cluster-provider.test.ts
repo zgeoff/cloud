@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import invariant from 'tiny-invariant';
+import { runPulumiPreview } from '../test-utils/run-pulumi-preview.ts';
 
 // Each case previews the fixture program through the real Pulumi engine and the Kubernetes
 // provider's Helm renderer, with a local state backend and no cluster. Bun 1.4.2's skipIf takes a
@@ -12,7 +13,7 @@ const pulumiPath = Bun.which('pulumi');
 async function setupTest() {
   invariant(pulumiPath !== null, 'the Pulumi CLI is not on PATH');
 
-  // a preview still running at the timeout stops before its directory goes
+  // the stack stops a preview still running at the timeout before it removes the directory
   const stack = new AsyncDisposableStack();
 
   onTestFinished(() => stack.disposeAsync());
@@ -53,28 +54,7 @@ async function setupTest() {
 
   invariant(init.exitCode === 0, `pulumi stack init failed: ${init.stderr.toString()}`);
 
-  const runPreview = async (): Promise<{ exitCode: number; output: string }> => {
-    const preview = Bun.spawn([pulumiPath, 'preview', '--non-interactive'], {
-      cwd: dir,
-      env,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-
-    stack.defer(async () => {
-      preview.kill();
-
-      await preview.exited;
-    });
-
-    const [stdout, stderr, exitCode] = await Promise.all([
-      new Response(preview.stdout).text(),
-      new Response(preview.stderr).text(),
-      preview.exited,
-    ]);
-
-    return { exitCode, output: stdout + stderr };
-  };
+  const runPreview = () => runPulumiPreview({ pulumiPath, cwd: dir, env, cleanup: stack });
 
   return { caseDir, runPreview };
 }
