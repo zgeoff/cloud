@@ -1,9 +1,11 @@
 import type { ClusterNamespace } from './cluster-namespaces.ts';
 import { clusterNamespaces } from './cluster-namespaces.ts';
 
-// warn and audit report a pod that baseline forbids and still admit it
+// enforce refuses a pod that baseline forbids, such as one on the host's network, which no
+// NetworkPolicy covers; warn and audit report it too
 const podSecurityLabels = {
   'pod-security.kubernetes.io/audit': 'baseline',
+  'pod-security.kubernetes.io/enforce': 'baseline',
   'pod-security.kubernetes.io/warn': 'baseline',
 };
 

@@ -10,7 +10,6 @@ import { buildNixieIngressChartArgs } from './build-nixie-ingress-chart-args.ts'
 import { buildNixieIngressSpec } from './build-nixie-ingress-spec.ts';
 import { createNixieCertificate } from './create-nixie-certificate.ts';
 import { makeHostIPTransform } from './make-host-ip-transform.ts';
-import { makeMovedResourceTransform } from './make-moved-resource-transform.ts';
 
 interface Backend {
   readonly service: Output<string>;
@@ -51,13 +50,6 @@ export function createNixieIngress(
       transforms: [
         // 443 answers on the host's tailnet address and no other
         makeHostIPTransform(geoffcloudNode.ip, 'websecure', cluster),
-
-        // the controller moved out of nixie's namespace, which Pod Security's baseline covers
-        makeMovedResourceTransform(
-          'kubernetes:apps/v1:Deployment',
-          'nixie-ingress:nixie-ingress/nixie-ingress-traefik',
-          'nixie-ingress:nixie/nixie-ingress-traefik',
-        ),
       ],
     },
   );
