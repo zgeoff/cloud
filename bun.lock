@@ -15,7 +15,7 @@
         "@zgeoff/cloud-topology": "workspace:*",
         "@zgeoff/format-codemod": "0.3.1",
         "@zgeoff/oxlint-config": "0.5.2",
-        "@zgeoff/skill-gate": "0.2.2",
+        "@zgeoff/skill-gate": "0.2.3",
         "knip": "6.41.0",
         "lefthook": "2.2.1",
         "msw": "2.15.0",
@@ -651,7 +651,7 @@
 
     "@zgeoff/pulumi-onidel": ["@zgeoff/pulumi-onidel@workspace:sdk/onidel"],
 
-    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.2", "", {}, "sha512-aqOIse+F//NyMAkXSAAF/E0VstYsxoXiCYvh6d1MnuZshjWLcfW+NGBV0j4CW5vqEpH4/EfpL1EtfnB+hUg4uw=="],
+    "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.3", "", {}, "sha512-0L9xF2NtNHBvm0Z7PDoXsF5bOwpY9/Dep2b4IgzmWCCXtNUpsz/SOiGsQk7t4PxvaOg/f2kmOOYu3TgoThwXxg=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 
