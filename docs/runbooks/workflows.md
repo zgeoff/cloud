@@ -160,11 +160,10 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 ### Check the host before a switch
 
 The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
-without them. The `NixOS checks` workflow builds them on `main` every night, and skips the build
-when an earlier green run covers the commit. A green scheduled or dispatched run on `main` covers
-every later commit that changes no input of the checks, which the `nixos` gate of
-[`gates.yml`](../../.github/gates.yml) lists. An app's pull request that changes `nixos/`, such as a
-release bump, runs the checks before it merges; a person's pull request skips them.
+without them, a release bump included. The `NixOS checks` workflow builds them on `main` every
+night, and skips the build when an earlier green run covers the commit. A green scheduled or
+dispatched run on `main` covers every later commit that changes no input of the checks, which the
+`nixos` gate of [`gates.yml`](../../.github/gates.yml) lists. No pull request runs the checks.
 
 To switch before the nightly run covers the commit:
 
@@ -200,7 +199,7 @@ imp is pinned in three places, and `scripts/pin-imp.sh` moves all three together
 
 The [release check](./release-check.md) opens the bump pull request for each new imp release on the
 `release-check/imp` branch, with all three pins moved. The `release bump merge` workflow merges it
-once its checks pass, the NixOS checks included, unless its labels hold it for a person, as
+once its checks pass, unless its labels hold it for a person, as
 [When a bump merges on its own](./release-check.md#when-a-bump-merges-on-its-own) describes. The
 merge changes nothing on the host. The steps after it stay with a person, and the pull request's
 body lists them:

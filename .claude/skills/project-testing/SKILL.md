@@ -62,7 +62,7 @@ provider and the NixOS checks each have a reference.
   [`with-fixture-images.sh`](../../../test-support/shell/with-fixture-images.sh), and
   `fixture-images`, which tests that wrapper, from outside it.
 - The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main,
-  and on an app's pull request that changes `nixos/`. A person's pull request never runs it, so run
+  and never on a pull request, so run
   `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can break a
   check. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
   green run on main covers. The `nixos` gate of [`gates.yml`](../../../.github/gates.yml) lists

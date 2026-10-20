@@ -4,8 +4,9 @@ name: release bump merge
 # workflow, or by the atc-gateway images workflow for the images it publishes) once it may merge on its own: scripts/release/decide.ts holds the rules. It runs
 # each time a workflow that checks such a pull request finishes, so the last check to finish
 # merges it, and each time such a pull request gets the auto-merge label, so a label put back after
-# its checks finished still merges it (scripts/release/find-event-branch.ts). A run for any other
-# branch, label or event is skipped, which bills nothing.
+# its checks finished still merges it (scripts/release/find-event-branch.ts). The workflow_run
+# trigger's branches filter starts no run for a check on any other branch, and the job's condition
+# skips a run for any other label or event.
 #
 # pull_request_target runs this workflow and checks out main, never the pull request's head, so
 # the app's token never meets code from the pull request.
@@ -14,8 +15,9 @@ name: release bump merge
 # the push to main starts its workflows. The app and its secrets are the release check workflow's.
 on:
   workflow_run:
-    workflows: [CI, NixOS checks, agent image, atc-gateway images, nixie backup]
+    workflows: [CI, agent image, atc-gateway images, nixie backup]
     types: [completed]
+    branches: ['release-check/**']
   pull_request_target:
     types: [labeled]
 

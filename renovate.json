@@ -1,6 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>zgeoff/tools"],
+  "rebaseWhen": "conflicted",
   "packageRules": [
     {
       "description": "typescript-5 gives openapi-typescript 7 the TypeScript 5 compiler API that TypeScript 7 no longer ships (scripts/nixie-api/generate-nixie-api-types.ts), so it stays on 5",

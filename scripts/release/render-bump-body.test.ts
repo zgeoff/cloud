@@ -11,7 +11,7 @@ test('it says a bump that merges on its own does so once its checks pass', () =>
       labels: ['update:patch', 'auto-merge'],
     }),
   ).toBe(
-    'Bumps auto-mode to [0.19.4](https://github.com/zgeoff/auto-mode/releases/tag/auto-mode-v0.19.4). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| the agent image (`images/agent/Dockerfile`) | 0.19.3 | 0.19.4 |\n\nIt merges on its own once every check on its head passes, including the NixOS checks when it changes `nixos/`.\n\nAfter the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`). Gateway sessions load the new mod from `/opt/auto-mode/mods/auto-mode` once they start on the new image.\n',
+    'Bumps auto-mode to [0.19.4](https://github.com/zgeoff/auto-mode/releases/tag/auto-mode-v0.19.4). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| the agent image (`images/agent/Dockerfile`) | 0.19.3 | 0.19.4 |\n\nIt merges on its own once every check on its head passes. A change to `nixos/` gets its NixOS checks on `main`, which the host switch waits for.\n\nAfter the merge: Rebuild the agent image (`docs/runbooks/agent-image.md`). Gateway sessions load the new mod from `/opt/auto-mode/mods/auto-mode` once they start on the new image.\n',
   );
 });
 
@@ -76,6 +76,6 @@ test('it marks a pin at the version or newer as unchanged', () => {
       labels: ['update:patch', 'auto-merge'],
     }),
   ).toBe(
-    "Bumps imp to [1.0.1](https://github.com/zgeoff/impz/releases/tag/v1.0.1). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| imp's NixOS module and the imp-host image (`nixos/`) | 1.0.0 | 1.0.1 |\n| the imp-base image (`images/agent/Dockerfile`) | 1.0.2 | unchanged |\n\nIt merges on its own once every check on its head passes, including the NixOS checks when it changes `nixos/`.\n\nAfter the merge: Copy impd's database, then switch the host, as `docs/runbooks/workflows.md` (Upgrade imp) describes; rebuild the agent image for imp-base (`docs/runbooks/agent-image.md`).\n",
+    "Bumps imp to [1.0.1](https://github.com/zgeoff/impz/releases/tag/v1.0.1). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| imp's NixOS module and the imp-host image (`nixos/`) | 1.0.0 | 1.0.1 |\n| the imp-base image (`images/agent/Dockerfile`) | 1.0.2 | unchanged |\n\nIt merges on its own once every check on its head passes. A change to `nixos/` gets its NixOS checks on `main`, which the host switch waits for.\n\nAfter the merge: Copy impd's database, then switch the host, as `docs/runbooks/workflows.md` (Upgrade imp) describes; rebuild the agent image for imp-base (`docs/runbooks/agent-image.md`).\n",
   );
 });

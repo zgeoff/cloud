@@ -100,9 +100,8 @@ labelled `auto-merge` only when the release check app opened it and wrote every 
 changes no file outside its dependency's pins, and every GitHub Actions check on its head has
 passed. A commit anyone else pushes to the branch therefore holds the pull request for a person.
 Each check that its changed files start must also have passed, because a workflow can register its
-check after another one finishes: the NixOS checks for `nixos/`, which run on an app's pull request,
-the agent image check, the atc-gateway fixture and the nixie backup fixture. The merge uses the
-app's token, so the push to `main` starts its workflows.
+check after another one finishes: the agent image check, the atc-gateway fixture and the nixie
+backup fixture. The merge uses the app's token, so the push to `main` starts its workflows.
 
 ## Review a bump
 
