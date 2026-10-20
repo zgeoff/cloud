@@ -93,7 +93,12 @@ of three ways:
 2. Decide which side is right. When the live change is wrong, undo it at its source, or apply `main`
    by hand, as [Apply by hand](./workflows.md#apply-by-hand) describes. When the live change is
    right, change the code to match it in a PR.
-3. Dispatch the check again, and expect it to pass.
+3. When you changed the code, record the live change in the state. After the PR merges, the prod
+   apply job's first drift check finds the same change and holds the run. Read the held plan and
+   dispatch it, as [Answer a held run](./prod-apply.md#answer-a-held-run) describes. Its apply
+   refreshes first, so it writes the live value into the state. Until then, every scheduled check
+   reports the same drift.
+4. Dispatch the check again, and expect it to pass.
 
 A drift that the prod apply job finds first holds its run, as
 [the prod apply job](./prod-apply.md#answer-a-held-run) describes.
