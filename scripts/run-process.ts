@@ -192,9 +192,16 @@ const signalNumbers: Readonly<Record<string, number>> = {
   SIGTERM: 15,
 };
 
-function getExitCode(spawned: Readonly<{ exitCode: number | null; signalCode: string | null }>) {
+function getExitCode(
+  spawned: Readonly<{ exitCode: number | null; signalCode: NodeJS.Signals | number | null }>,
+) {
   if (spawned.exitCode !== null) {
     return spawned.exitCode;
+  }
+
+  // Bun gives a signal with no name, such as a real-time one, as its number
+  if (typeof spawned.signalCode === 'number') {
+    return 128 + spawned.signalCode;
   }
 
   return 128 + (signalNumbers[spawned.signalCode ?? ''] ?? 0);

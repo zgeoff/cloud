@@ -43,7 +43,7 @@ func NewWithOptions(opts Options) (p.Provider, error) {
 				"respectSchemaVersion": true,
 				// Exact versions: the repo bans ranges, and TypeScript matches the root.
 				"devDependencies": map[string]string{
-					"@types/node": "24.13.6",
+					"@types/node": "24.19.2",
 					"typescript":  "7.0.2",
 				},
 				"typescriptVersion": "7.0.2",
