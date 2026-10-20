@@ -197,9 +197,8 @@ jobs:
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-        run:
-          bun run ci:retry-transient-pulumi -C program bun run refresh -- --yes --skip-preview
-          --suppress-outputs
+          PROGRAM: program
+        run: bun run --silent ci:refresh-prod
 
       - name: Apply
         if: steps.outcome.outputs.outcome == 'apply'

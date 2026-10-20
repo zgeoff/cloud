@@ -241,8 +241,8 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       ref: undefined,
       path: undefined,
       workingDirectory: undefined,
-      program: undefined,
-      run: 'bun run ci:retry-transient-pulumi -C program bun run refresh -- --yes --skip-preview --suppress-outputs',
+      program: 'program',
+      run: 'bun run --silent ci:refresh-prod',
     },
     {
       name: 'Apply',
