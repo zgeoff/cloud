@@ -66,7 +66,7 @@ export interface ATCGatewayInputs {
 }
 
 // the stack config's nixie object; setting it approves the deploy
-export interface NixieConfig {
+interface NixieConfig {
   // the nixie and nixie-web images of one release, each by tag and digest
   readonly image: string;
   readonly webImage: string;
@@ -105,7 +105,7 @@ export interface NixieInputs {
 }
 
 // the stack config's files object; setting it approves the deploy
-export interface FilesConfig {
+interface FilesConfig {
   // the files service's image, by tag and digest
   readonly image: string;
 
