@@ -182,7 +182,7 @@ let
       '';
     }
     {
-      title = "it stops the loop with the writer's failure before its first pause";
+      title = "it stops the loop with the failure of the writer, before its first pause";
       script = ''
         mkdir home tmp out cg
 
@@ -196,7 +196,7 @@ let
       '';
     }
     {
-      title = "it serves the written series through node-exporter's textfile collector";
+      title = "it serves the written series through the textfile collector of node-exporter";
       script = ''
         mkdir home tmp out
         ${writeTree}
