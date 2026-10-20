@@ -3,7 +3,7 @@ import type { ClusterNamespace } from './cluster-namespaces.ts';
 import { getExposurePort } from './get-exposure-port.ts';
 import { podLabels } from './pod-labels.ts';
 
-export interface EgressDestination {
+interface EgressDestination {
   readonly address: string;
   readonly port: number;
 }

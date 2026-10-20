@@ -85,8 +85,12 @@ each workload selects its pods by label and gives them back one address and port
 | the PC's atc daemon                                  | the grant to the PC        | the atc gateway, the atc daemon probe |
 | impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pods    |
 | the preview webhook, on the host's tailnet address   | local delivery on the host | cloudflared                           |
-| the preview links, on the host's tailnet address     | local delivery on the host | nixie's pods only                     |
-| impd's plain API on Docker's subnet                  | the host's Docker bridge   | nixie's pods only                     |
+| the preview links, on the host's tailnet address     | local delivery on the host | nixie's pods                          |
+| impd's plain API on Docker's subnet                  | the host's Docker bridge   | none                                  |
+
+The host's own forward rule drops every pod's traffic to Docker's subnet, nixie's pods included,
+beside the deny ([firewalls](./firewalls.md)). A pod on the host's network, such as the node
+exporter, sends from the host's own addresses, so no NetworkPolicy applies to it.
 
 kube-router, the policy engine inside k3s, filters a pod's packets before the host masquerades them
 to its own address, so a policy sees which pod sent each packet on the tailnet and on the host's own
