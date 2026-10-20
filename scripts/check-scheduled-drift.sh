@@ -2,9 +2,10 @@
 # The scheduled drift check: a refresh of the prod stack that only previews, so it compares each
 # resource's live state with the state file and changes neither. It runs
 # `pulumi refresh --preview-only --expect-no-changes` in infra/, through retry-transient-pulumi.sh,
-# so an ACME server's 5xx or a failed plugin download runs it again. A refresh that does not run
-# the program needs no program input, only the state, the passphrase and each refreshed provider's
-# credentials, which scripts/run-host-drift-check.sh loads from the host's credentials file.
+# so an ACME server's 5xx, a Cloudflare API 5xx to a read or a failed plugin download runs it
+# again. A refresh that does not run the program needs no program input, only the state, the
+# passphrase and each refreshed provider's credentials, which scripts/run-host-drift-check.sh loads
+# from the host's credentials file.
 #
 # It leaves out every Onidel and every Kubernetes resource (--exclude), because without the program
 # Pulumi configures each provider from the state, not from the environment: Onidel's from the

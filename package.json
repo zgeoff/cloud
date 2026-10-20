@@ -56,6 +56,7 @@
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
     "preview": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi preview --stack prod",
     "drift": "bun run sdk:build && bun run preview --refresh --expect-no-changes",
+    "refresh": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi refresh --stack prod",
     "up": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi up --stack prod",
     "nixie:reset": "bun scripts/reset-nixie.ts",
     "nixie:check-stream": "bun scripts/check-nixie-stream.ts",
