@@ -10,6 +10,10 @@
 # provider/bin with the Onidel provider that the project file names. A refresh that runs no
 # program reads no other stack setting, so a change to the stack's config leaves the tree as it
 # is. Pulumi keeps the plugins it downloads under the service's state directory.
+#
+# systemd mounts a dynamic user's state directory as an ID-mapped mount with noexec, so a plugin
+# there fails to start with `fork/exec …: permission denied`. ExecPaths clears noexec on that mount,
+# which systemd makes at /var/lib/private/drift-check inside the service's namespace.
 {
   config,
   lib,
@@ -114,6 +118,7 @@ in
         DynamicUser = true;
         StateDirectory = "drift-check";
         StateDirectoryMode = "0700";
+        ExecPaths = [ "/var/lib/private/drift-check" ];
         NoNewPrivileges = true;
         ProtectSystem = "strict";
         ProtectHome = true;

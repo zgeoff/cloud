@@ -1,7 +1,7 @@
 # Checks services.drift-check: the units the module generates, the store tree the check runs
 # from, and the Pulumi CLI it ships, run in the build sandbox. scripts/test-run-host-drift-check.sh
-# tests the scripts themselves. Each case runs on its own, in a fresh directory, under
-# test-support/shell/run-cases.sh.
+# tests the scripts themselves, and checks/drift-check-vm.nix runs the unit on a booted VM. Each
+# case runs on its own, in a fresh directory, under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos drift-check
 { nixpkgs, imp }:
 let
@@ -75,6 +75,7 @@ let
                 DynamicUser = true;
                 StateDirectory = "drift-check";
                 StateDirectoryMode = "0700";
+                ExecPaths = [ "/var/lib/private/drift-check" ];
                 NoNewPrivileges = true;
                 ProtectSystem = "strict";
                 ProtectHome = true;
@@ -169,13 +170,14 @@ let
       '';
     }
     {
-      title = "it ships a Pulumi CLI that runs in the sandbox, with the Bun language host beside it";
+      title = "it ships a Pulumi CLI that runs in the sandbox, with the Bun language host and the Node.js host it runs beside it";
       script = ''
         mkdir home
         HOME="$PWD/home" PULUMI_HOME="$PWD/home/.pulumi" PULUMI_SKIP_UPDATE_CHECK=true \
           ${cfg.pulumi}/bin/pulumi version > version
         assert_equals v3.268.0 "$(cat version)" "pulumi version"
         test -x ${cfg.pulumi}/bin/pulumi-language-bun
+        test -x ${cfg.pulumi}/bin/pulumi-language-nodejs
       '';
     }
   ];
