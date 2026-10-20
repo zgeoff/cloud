@@ -146,14 +146,14 @@ plain form. Onidel never snapshots the second disk, so its data relies on each s
   from Cloudflare's edge covers the case where the host itself is down
   ([observability](./workloads/observability.md)).
 - **Pod Security at baseline.** Every namespace in k3s except three exempt ones carries Pod
-  Security's `baseline` level in its warn and audit modes, so the API server reports a pod that asks
-  for the host's network, a hostPath or a host port. A NetworkPolicy never applies to a pod on the
-  host's network, which is why the level matters. The exempt namespaces each hold one kind of pod
-  that needs the host: observability holds node-exporter, which reads the host's network,
-  nixie-ingress holds nixie's Traefik, which holds a host port, and kube-system holds the local-path
-  provisioner's helper pods, which mount a hostPath for each new volume. The program's namespace
-  registry lists every namespace with its level, and Pulumi patches the labels onto the namespaces
-  that k3s creates.
+  Security's `baseline` level in its enforce, warn and audit modes, so the API server refuses a pod
+  that asks for the host's network, a hostPath or a host port. A NetworkPolicy never applies to a
+  pod on the host's network, which is why the level matters. The exempt namespaces each hold one
+  kind of pod that needs the host: observability holds node-exporter, which reads the host's
+  network, nixie-ingress holds nixie's Traefik, which holds a host port, and kube-system holds the
+  local-path provisioner's helper pods, which mount a hostPath for each new volume. The program's
+  namespace registry lists every namespace with its level, and Pulumi patches the labels onto the
+  namespaces that k3s creates.
 - **Guards fail the preview.** An input that would make Pulumi plan to delete a whole subsystem
   fails the run instead of planning the delete
   ([infrastructure as code](./infrastructure-as-code.md#guards)).
