@@ -66,8 +66,19 @@ that was last applied. A clean `main` passes only when every merged change is ap
 merged change nobody has applied yet reads as drift too. An apply is therefore bracketed: a drift
 check from the last applied revision proves the baseline, a refreshed preview from the new `main`
 shows only the reviewed changes, and a second drift check proves the apply landed. The apply job
-runs that bracket on every apply. No scheduled check runs between applies, because Onidel offers
-only full-account API keys and a scheduled job would hold one around the clock.
+runs that bracket on every apply.
+
+A scheduled check catches drift between applies, such as a change made in a console, which no push
+shows. It runs a refresh that only previews and never runs the program, so it compares each
+resource's live state with the state file and needs none of the program's inputs. That refresh
+configures each provider from the state, not from the run's environment. The Onidel provider's
+config in the state holds the full-account API key, because Onidel offers no other kind, and the
+Kubernetes provider's holds the admin kubeconfig. The check therefore leaves out every Onidel and
+Kubernetes resource, and reads the rest with credentials that can only read: a read-only token for
+the state bucket, and read-only Cloudflare and Tailscale credentials. It still needs the passphrase,
+because Pulumi opens no state without it, so the vault that holds the check's credentials also opens
+every secret in the state. [The drift check runbook](../runbooks/drift-check.md) lists each
+credential and its scope.
 
 Some resources are declared to avoid drift on their own. The host's auth keys are single-use, so
 after the host joins they read as used, and the program never mints them again until a reinstall
