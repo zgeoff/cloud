@@ -201,6 +201,38 @@ test('#updateCommitStatus cuts a description to the 140 characters GitHub accept
   expect(commitStatuses.at(0)?.description).toBe('x'.repeat(140));
 });
 
+test('#updateCommitStatus rejects with the status and the permission when the refusal body breaks off', () => {
+  server.use(
+    http.post(
+      `${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`,
+      () =>
+        new HttpResponse(
+          new ReadableStream({
+            start: (controller) => {
+              controller.error(new Error('connection reset'));
+            },
+          }),
+          { status: 403, headers: { 'x-accepted-github-permissions': 'statuses=write' } },
+        ),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.updateCommitStatus({
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      context: 'sdk-contract',
+      state: 'success',
+      description: '18 pass, 0 fail',
+    }),
+  ).rejects.toThrowWithMessage(
+    Error,
+    'GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 403 (the token needs statuses=write)',
+  );
+});
+
 test("#updateCommitStatus sends the service's token to the pull request's repository and head commit", async () => {
   const recordRequest = mock((request: Request) => ({
     url: request.url,

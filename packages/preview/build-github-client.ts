@@ -109,7 +109,8 @@ async function sendGitHubRequest(
 }
 
 async function readGitHubRefusal(response: Response): Promise<string> {
-  const text = await response.text();
+  // a connection that drops mid-body still leaves the status and the headers to report
+  const text = await response.text().catch(() => '');
 
   const body = parseGitHubBody(text);
 
