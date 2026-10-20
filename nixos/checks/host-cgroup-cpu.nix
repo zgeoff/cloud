@@ -143,7 +143,9 @@ let
             .config;
         in
         ''
-          assert_equals false ${lib.boolToString (config.systemd.services ? host-cgroup-cpu)} "whether the module adds the unit"
+          assert_equals false ${
+            lib.boolToString (config.systemd.services ? host-cgroup-cpu)
+          } "whether the module adds the unit"
         '';
     }
     {

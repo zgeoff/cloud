@@ -96,7 +96,9 @@
       checks.x86_64-linux.host-cgroup-cpu = import ./checks/host-cgroup-cpu.nix {
         inherit nixpkgs imp;
       };
-      checks.x86_64-linux.host-cgroup-cpu-vm = import ./checks/host-cgroup-cpu-vm.nix { inherit nixpkgs; };
+      checks.x86_64-linux.host-cgroup-cpu-vm = import ./checks/host-cgroup-cpu-vm.nix {
+        inherit nixpkgs;
+      };
       checks.x86_64-linux.drift-check = import ./checks/drift-check.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.impd-restore = import ./checks/impd-restore.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.impd-restore-boundaries = import ./checks/impd-restore-boundaries.nix {
