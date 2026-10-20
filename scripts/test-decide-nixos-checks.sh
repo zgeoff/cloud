@@ -48,25 +48,6 @@ it_needs_the_checks_for_a_dispatch_without_asking_gh() {
   assert_status 0 "$status"
 }
 
-it_needs_the_checks_for_a_pull_request_without_asking_gh() {
-  local commit status=0
-  create_case_tree
-  setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
-
-  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GITHUB_EVENT_NAME=pull_request GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
-    GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff /dev/null "$tree/out"
-  diff /dev/null "$tree/err"
-  diff - "$tree/output" <<< 'needed=true'
-  diff /dev/null "$tree/summary"
-  diff /dev/null "$tree/calls"
-  assert_status 0 "$status"
-}
-
 it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
   local commit status=0
   create_case_tree
@@ -157,7 +138,7 @@ it_fails_without_a_github_output_file() {
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "$script: line 13: GITHUB_OUTPUT: parameter null or not set"
+  diff - "$tree/err" <<< "$script: line 12: GITHUB_OUTPUT: parameter null or not set"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
   assert_status 1 "$status"

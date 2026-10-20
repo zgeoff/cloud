@@ -7,20 +7,15 @@ name: NixOS checks
 #
 # - nightly on main, building the checks only when no green run covers the commit yet, which is
 #   when an input of the checks (the nixos gate of .github/gates.yml) changed since the last one;
-# - on workflow_dispatch, always building them, on main before a switch or on a branch;
-# - on a pull request that an app opened and that touches nixos/ or packages/topology/, such as
-#   a release check's imp or host atc bump, so the workflow that merges the bump can wait for a
-#   green run. The ruleset does not require this check. A person's pull request skips the job;
-#   the nightly run checks it once it lands.
+# - on workflow_dispatch, always building them, on main before a switch or on a branch.
+#
+# No pull request runs it, a bot's included, because the switch gate never reads a pull request's
+# run. The nightly run checks a change once it lands on main.
 on:
   schedule:
     # 03:17 UTC: GitHub's docs say scheduled runs queue at the start of each hour, so off the hour
     - cron: '17 3 * * *'
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'nixos/**'
-      - 'packages/topology/**'
 
 permissions:
   contents: read
@@ -28,13 +23,12 @@ permissions:
 
 jobs:
   nixos:
-    if: github.event_name != 'pull_request' || github.event.pull_request.user.type == 'Bot'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       # the full history, so a green run's commit can be compared with the commit under test; no
-      # token stays in .git/config, so the checks, which run a pull request's own code, never read
-      # it: only the decision step gets the token, through its own environment
+      # token stays in .git/config, so the checks, which run a dispatched branch's own code, never
+      # read it: only the decision step gets the token, through its own environment
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,8 +40,8 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # a nightly run skips a commit a green run already covers; a dispatch and an app's pull
-      # request always build. A gh failure fails the job rather than skipping the checks.
+      # a nightly run skips a commit a green run already covers; a dispatch always builds. A gh
+      # failure fails the job rather than skipping the checks.
       - name: Decide whether the commit needs the checks
         id: decide
         env:
