@@ -45,6 +45,8 @@ the VM's Secure Boot blocks, so Secure Boot stays off
   Connect in the cluster ([1Password Connect](../workloads/onepassword-connect.md)).
 - **impd's health probe** is a timer that asks impd's loopback health endpoint and writes the result
   where node-exporter reads it ([observability](../workloads/observability.md)).
+- **The cgroup CPU writer** is a service that writes the CPU time of the host's slices and units
+  where node-exporter reads it ([host CPU by cgroup](../workloads/observability.md#host-cpu-by-cgroup)).
 
 ## Build, then switch
 
