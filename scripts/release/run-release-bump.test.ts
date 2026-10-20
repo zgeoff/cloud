@@ -124,7 +124,7 @@ test('it opens an imp patch bump that merges on its own', async () => {
         'zgeoff/impz': [{ tag: 'v1.0.1', commit: 'c5bea94080fdde9e21e9720295c1ca727302662e' }],
       },
     }),
-    docker.handle,
+    docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
   );
 
@@ -205,7 +205,7 @@ test('it locks the imp commit with the github token by name, never in an argv', 
         'zgeoff/impz': [{ tag: 'v1.0.1', commit: 'c5bea94080fdde9e21e9720295c1ca727302662e' }],
       },
     }),
-    docker.handle,
+    docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
   );
 

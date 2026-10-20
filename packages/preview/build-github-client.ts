@@ -54,7 +54,7 @@ export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
     updatePreviewComment: async (comment) => {
       tokenUser.login ??= await readTokenLogin(send);
 
-      const id = await findPreviewCommentID(send, comment, tokenUser.login);
+      const id = await readPreviewCommentID(send, comment, tokenUser.login);
 
       const body = JSON.stringify({ body: `${previewCommentMarker}\n${comment.body}` });
 
@@ -112,7 +112,7 @@ interface IssueComment {
   readonly user?: { readonly login: string } | null;
 }
 
-async function findPreviewCommentID(
+async function readPreviewCommentID(
   send: (request: GitHubRequest) => Promise<Response>,
   comment: PreviewComment,
   login: string,

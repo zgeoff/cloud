@@ -2,7 +2,11 @@ import { runProcess } from '../run-process.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
 export function buildStubWordEchoHost(): StubHandler {
-  return (call) => (call.argv[0] === 'ssh' ? runWordEcho(call) : undefined);
+  return answerCall;
+}
+
+function answerCall(call: StubCall) {
+  return call.argv[0] === 'ssh' ? runWordEcho(call) : undefined;
 }
 
 async function runWordEcho(call: StubCall): Promise<StubAnswer> {

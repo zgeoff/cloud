@@ -73,36 +73,6 @@ export function createNixie(
   return ingress;
 }
 
-// Pulumi waits for readiness, and nixie turns ready only once impd has pulled its sandbox images
-// and booted the conversation imp, which a cold start takes longer than Pulumi's default wait
-const rolloutTimeouts = { create: '30m', update: '30m' };
-
-interface WebShape {
-  readonly image: string;
-  readonly api: Output<string>;
-  readonly statefulSet: StatefulSet;
-}
-
-function createWebDeployment(
-  cluster: Provider,
-  namespace: Output<string>,
-  shape: WebShape,
-): Deployment {
-  return new Deployment(
-    'nixie-web',
-    {
-      metadata: { name: 'nixie-web', namespace },
-      spec: buildNixieWebSpec({
-        image: shape.image,
-        apiURL: interpolate`http://${shape.api}.${namespace}.svc.cluster.local:${nixieAPIPort}`,
-      }),
-    },
-
-    // after nixie, so a first deploy starts the API before the client that calls it
-    { provider: cluster, dependsOn: [shape.statefulSet], customTimeouts: rolloutTimeouts },
-  );
-}
-
 interface ServiceShape {
   readonly name: string;
   readonly labels: Record<string, string>;
@@ -119,6 +89,10 @@ interface StatefulSetShape {
   readonly inputs: NixieInputs;
   readonly serviceName: Output<string>;
 }
+
+// Pulumi waits for readiness, and nixie turns ready only once impd has pulled its sandbox images
+// and booted the conversation imp, which a cold start takes longer than Pulumi's default wait
+const rolloutTimeouts = { create: '30m', update: '30m' };
 
 function createStatefulSet(
   cluster: Provider,
@@ -202,4 +176,30 @@ function createDefinitionsKey(
   );
 
   return key.metadata.name;
+}
+
+interface WebShape {
+  readonly image: string;
+  readonly api: Output<string>;
+  readonly statefulSet: StatefulSet;
+}
+
+function createWebDeployment(
+  cluster: Provider,
+  namespace: Output<string>,
+  shape: WebShape,
+): Deployment {
+  return new Deployment(
+    'nixie-web',
+    {
+      metadata: { name: 'nixie-web', namespace },
+      spec: buildNixieWebSpec({
+        image: shape.image,
+        apiURL: interpolate`http://${shape.api}.${namespace}.svc.cluster.local:${nixieAPIPort}`,
+      }),
+    },
+
+    // after nixie, so a first deploy starts the API before the client that calls it
+    { provider: cluster, dependsOn: [shape.statefulSet], customTimeouts: rolloutTimeouts },
+  );
 }

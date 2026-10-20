@@ -1,7 +1,5 @@
 import type { PullRequestFile } from './build-github-client.ts';
 
-const sdkPackage = '@anthropic-ai/claude-agent-sdk';
-
 export function hasSDKPinChange(files: readonly PullRequestFile[]): boolean {
   return files.some((file) => isManifest(file.path) && hasChangedSDKLine(file.patch));
 }
@@ -11,6 +9,8 @@ function isManifest(path: string): boolean {
 
   return name === 'package.json' || name === 'bun.lock';
 }
+
+const sdkPackage = '@anthropic-ai/claude-agent-sdk';
 
 function hasChangedSDKLine(patch: string | null): boolean {
   // GitHub leaves out a diff too large to show, and a needless run costs less than a missed one

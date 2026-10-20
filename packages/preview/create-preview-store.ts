@@ -2,20 +2,6 @@ import { Database } from 'bun:sqlite';
 
 type PreviewPhase = 'waiting' | 'booting' | 'ready' | 'failed' | 'ended';
 
-const phaseMoves: Readonly<Record<PreviewPhase, readonly PreviewPhase[]>> = {
-  waiting: ['booting', 'ended'],
-
-  booting: ['ready', 'failed', 'waiting', 'ended'],
-
-  ready: ['booting', 'ended'],
-
-  failed: ['booting', 'waiting', 'ended'],
-
-  ended: ['waiting'],
-};
-
-const firstPhase: PreviewPhase = 'waiting';
-
 export interface PreviewKey {
   readonly repo: string;
   readonly number: number;
@@ -37,19 +23,6 @@ export interface PhaseChange {
 }
 
 type ContractPhase = 'queued' | 'waiting' | 'running' | 'settling' | 'passed' | 'failed';
-
-const contractPhaseMoves: Readonly<Record<ContractPhase, readonly ContractPhase[]>> = {
-  queued: ['waiting', 'running', 'settling'],
-
-  waiting: ['running', 'settling'],
-
-  running: ['settling', 'queued'],
-
-  settling: ['passed', 'failed'],
-
-  passed: [],
-  failed: [],
-};
 
 export type ContractOutcome = 'success' | 'failure' | 'error';
 
@@ -110,6 +83,56 @@ export interface PreviewStore {
   readonly close: () => void;
 }
 
+export function createPreviewStore(path: string): PreviewStore {
+  const db = new Database(path, { create: true, strict: true });
+
+  createPreviewsTable(db);
+  createContractRunsTable(db);
+
+  return {
+    ...bindPreviewMethods(db),
+    ...bindContractRunMethods(db),
+    close: () => {
+      db.close();
+    },
+  };
+}
+
+function createPreviewsTable(db: Database): void {
+  db.run('PRAGMA journal_mode = WAL');
+
+  db.run(`CREATE TABLE IF NOT EXISTS previews (
+    repo TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    imp TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    built_sha TEXT,
+    phase TEXT NOT NULL,
+    detail TEXT,
+    PRIMARY KEY (repo, number)
+  ) STRICT`);
+}
+
+function createContractRunsTable(db: Database): void {
+  db.run(`CREATE TABLE IF NOT EXISTS contract_runs (
+    repo TEXT NOT NULL,
+    head_sha TEXT NOT NULL,
+    number INTEGER NOT NULL,
+    imp TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    detail TEXT,
+    outcome TEXT,
+    PRIMARY KEY (repo, head_sha)
+  ) STRICT`);
+}
+
+type PreviewMethods = Pick<
+  PreviewStore,
+  'findPreview' | 'upsertHead' | 'updatePhase' | 'updateInterruptedBoots'
+>;
+
+const firstPhase: PreviewPhase = 'waiting';
+
 interface PreviewRow {
   readonly repo: string;
   readonly number: number;
@@ -120,27 +143,7 @@ interface PreviewRow {
   readonly detail: string | null;
 }
 
-export function createPreviewStore(path: string): PreviewStore {
-  const db = new Database(path, { create: true, strict: true });
-
-  createPreviewsTable(db);
-  createContractRunsTable(db);
-
-  return {
-    ...buildPreviewMethods(db),
-    ...buildContractRunMethods(db),
-    close: () => {
-      db.close();
-    },
-  };
-}
-
-type PreviewMethods = Pick<
-  PreviewStore,
-  'findPreview' | 'upsertHead' | 'updatePhase' | 'updateInterruptedBoots'
->;
-
-function buildPreviewMethods(db: Database): PreviewMethods {
+function bindPreviewMethods(db: Database): PreviewMethods {
   const select = db.query<PreviewRow, [string, number]>(
     'SELECT * FROM previews WHERE repo = ?1 AND number = ?2',
   );
@@ -206,6 +209,18 @@ function buildPreviewMethods(db: Database): PreviewMethods {
   };
 }
 
+const phaseMoves: Readonly<Record<PreviewPhase, readonly PreviewPhase[]>> = {
+  waiting: ['booting', 'ended'],
+
+  booting: ['ready', 'failed', 'waiting', 'ended'],
+
+  ready: ['booting', 'ended'],
+
+  failed: ['booting', 'waiting', 'ended'],
+
+  ended: ['waiting'],
+};
+
 function assertPhaseMoves(from: readonly PreviewPhase[], to: PreviewPhase): void {
   const refused = from.find((phase) => !phaseMoves[phase].includes(to));
 
@@ -218,32 +233,16 @@ function shouldRestart(row: PreviewRow, headSHA: string): boolean {
   return row.phase === 'ended' || (row.phase === 'failed' && row.head_sha !== headSHA);
 }
 
-function createPreviewsTable(db: Database): void {
-  db.run('PRAGMA journal_mode = WAL');
-
-  db.run(`CREATE TABLE IF NOT EXISTS previews (
-    repo TEXT NOT NULL,
-    number INTEGER NOT NULL,
-    imp TEXT NOT NULL,
-    head_sha TEXT NOT NULL,
-    built_sha TEXT,
-    phase TEXT NOT NULL,
-    detail TEXT,
-    PRIMARY KEY (repo, number)
-  ) STRICT`);
-}
-
-function createContractRunsTable(db: Database): void {
-  db.run(`CREATE TABLE IF NOT EXISTS contract_runs (
-    repo TEXT NOT NULL,
-    head_sha TEXT NOT NULL,
-    number INTEGER NOT NULL,
-    imp TEXT NOT NULL,
-    phase TEXT NOT NULL,
-    detail TEXT,
-    outcome TEXT,
-    PRIMARY KEY (repo, head_sha)
-  ) STRICT`);
+function toPreview(row: PreviewRow): Preview {
+  return {
+    repo: row.repo,
+    number: row.number,
+    imp: row.imp,
+    headSHA: row.head_sha,
+    builtSHA: row.built_sha,
+    phase: row.phase,
+    detail: row.detail,
+  };
 }
 
 interface ContractRunRow {
@@ -265,7 +264,7 @@ type ContractRunMethods = Pick<
   | 'updateInterruptedContractRuns'
 >;
 
-function buildContractRunMethods(db: Database): ContractRunMethods {
+function bindContractRunMethods(db: Database): ContractRunMethods {
   const claim = db.query(`INSERT INTO contract_runs (repo, head_sha, number, imp, phase)
     VALUES (?1, ?2, ?3, ?4, 'queued') ON CONFLICT (repo, head_sha) DO NOTHING`);
 
@@ -320,6 +319,19 @@ function buildContractRunMethods(db: Database): ContractRunMethods {
   };
 }
 
+const contractPhaseMoves: Readonly<Record<ContractPhase, readonly ContractPhase[]>> = {
+  queued: ['waiting', 'running', 'settling'],
+
+  waiting: ['running', 'settling'],
+
+  running: ['settling', 'queued'],
+
+  settling: ['passed', 'failed'],
+
+  passed: [],
+  failed: [],
+};
+
 function assertContractPhaseMoves(from: readonly ContractPhase[], to: ContractPhase): void {
   const refused = from.find((phase) => !contractPhaseMoves[phase].includes(to));
 
@@ -337,17 +349,5 @@ function toContractRun(row: ContractRunRow): ContractRun {
     phase: row.phase,
     detail: row.detail,
     outcome: row.outcome,
-  };
-}
-
-function toPreview(row: PreviewRow): Preview {
-  return {
-    repo: row.repo,
-    number: row.number,
-    imp: row.imp,
-    headSHA: row.head_sha,
-    builtSHA: row.built_sha,
-    phase: row.phase,
-    detail: row.detail,
   };
 }

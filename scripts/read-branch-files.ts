@@ -11,7 +11,7 @@ interface CollectBranchFilesOptions {
   readonly includeDeleted?: boolean;
 }
 
-export async function collectBranchFiles(
+export async function readBranchFiles(
   options: Readonly<CollectBranchFilesOptions>,
 ): Promise<string[]> {
   const head = await runGit(options, ['rev-parse', '--abbrev-ref', 'origin/HEAD']);
@@ -63,14 +63,14 @@ async function runCLI(): Promise<void> {
   const includeDeleted = process.argv.includes('--include-deleted');
 
   try {
-    const files = await collectBranchFiles({ cwd: resolve('.'), includeDeleted });
+    const files = await readBranchFiles({ cwd: resolve('.'), includeDeleted });
 
     if (files.length > 0) {
       process.stdout.write(`${files.join('\n')}\n`);
     }
   } catch (error) {
     process.stderr.write(
-      `collect-branch-files: ${error instanceof Error ? error.message : String(error)}\n`,
+      `read-branch-files: ${error instanceof Error ? error.message : String(error)}\n`,
     );
 
     process.exit(1);

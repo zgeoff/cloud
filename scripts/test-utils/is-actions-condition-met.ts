@@ -27,6 +27,13 @@ export interface ActionsConditionContext {
 
 const statusFunction = /\b(?:success|failure|cancelled|always)\(\)/u;
 
+// the parser's cursor moves as it reads, by design
+interface Parser {
+  readonly tokens: readonly string[];
+  position: number;
+  readonly context: Readonly<ActionsConditionContext>;
+}
+
 // A condition with no status check function implies `success()`: every need and earlier step
 // succeeded.
 export function isActionsConditionMet(
@@ -66,11 +73,8 @@ function splitTokens(expression: string): string[] {
 
 type Value = string | number | boolean | null;
 
-// the parser's cursor moves as it reads, by design
-interface Parser {
-  readonly tokens: readonly string[];
-  position: number;
-  readonly context: Readonly<ActionsConditionContext>;
+function isTruthy(value: Value): boolean {
+  return value !== false && value !== null && value !== 0 && value !== '' && !Number.isNaN(value);
 }
 
 // GitHub's && and || return an operand, not a boolean
@@ -137,7 +141,7 @@ function parsePrimary(parser: Parser): Value {
   if (current !== undefined && call === '()') {
     parser.position += 2;
 
-    return resolveStatusFunction(current, parser.context);
+    return isStatusFunctionMet(current, parser.context);
   }
 
   return parseLiteralOrPath(current, parser.context);
@@ -159,7 +163,7 @@ function requireToken(parser: Parser, expected: string): void {
   parser.position += 1;
 }
 
-function resolveStatusFunction(name: string, context: Readonly<ActionsConditionContext>): boolean {
+function isStatusFunctionMet(name: string, context: Readonly<ActionsConditionContext>): boolean {
   // no test cancels a run, so cancelled() is always false
   return match(name)
     .with('success', () => isSuccess(context))
@@ -234,10 +238,6 @@ function toValue(value: unknown, path: string): Value {
   }
 
   throw new Error(`${path} is not a primitive`);
-}
-
-function isTruthy(value: Value): boolean {
-  return value !== false && value !== null && value !== 0 && value !== '' && !Number.isNaN(value);
 }
 
 // GitHub's loose equality: strings compare case-insensitively, other mixed types as numbers

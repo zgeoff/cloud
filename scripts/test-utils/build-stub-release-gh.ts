@@ -22,17 +22,6 @@ export interface StubReleaseGHScenario {
   readonly users?: Readonly<Record<string, number>>;
 }
 
-export function buildStubReleaseGH(scenario: StubReleaseGHScenario): StubHandler {
-  return (call) => {
-    const args = call.argv.slice(1);
-
-    const answers =
-      call.argv[0] === 'gh' ? commands.map((command) => command(scenario, args, call)) : [];
-
-    return answers.find((answer): answer is StubAnswer => answer !== null);
-  };
-}
-
 type Command = (
   scenario: StubReleaseGHScenario,
   args: readonly string[],
@@ -187,12 +176,29 @@ const commands: readonly Command[] = [
       : null,
 ];
 
+export function buildStubReleaseGH(scenario: StubReleaseGHScenario): StubHandler {
+  return (call) => {
+    const args = call.argv.slice(1);
+
+    const answers =
+      call.argv[0] === 'gh' ? commands.map((command) => command(scenario, args, call)) : [];
+
+    return answers.find((answer): answer is StubAnswer => answer !== null);
+  };
+}
+
 function findRelease(
   scenario: StubReleaseGHScenario,
   repo: string | undefined,
   tag: string | undefined,
 ) {
   return scenario.releases?.[repo ?? '']?.find((each) => each.tag === tag);
+}
+
+function pickFields(value: object, fields: readonly string[]): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).filter((entry: readonly [string, unknown]) => fields.includes(entry[0])),
+  );
 }
 
 function isFlagged(
@@ -203,10 +209,4 @@ function isFlagged(
   const at = args.indexOf(pair[0]);
 
   return at !== -1 && args[at + 1] === pair[1] && flags.every((flag) => args.includes(flag));
-}
-
-function pickFields(value: object, fields: readonly string[]): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(value).filter((entry: readonly [string, unknown]) => fields.includes(entry[0])),
-  );
 }

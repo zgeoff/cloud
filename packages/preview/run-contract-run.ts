@@ -3,8 +3,6 @@ import type { ContractOutcome, ContractRun, ContractRunKey } from './create-prev
 import { runContractSuite } from './run-contract-suite.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
-const contractStatusContext = 'sdk-contract';
-
 export async function runContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
   const contract = deps.settings.contract;
 
@@ -37,24 +35,7 @@ async function stopContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<
   await trySettleContractRun(deps, key);
 }
 
-interface Status {
-  readonly state: 'pending' | ContractOutcome;
-  readonly description: string;
-}
-
-async function applyContractStatus(
-  deps: PreviewDeps,
-  run: ContractRun,
-  status: Status & { readonly state: ContractOutcome },
-): Promise<void> {
-  deps.store.updateContractPhase(run, ['queued', 'waiting', 'running'], {
-    phase: 'settling',
-    detail: status.description,
-    outcome: status.state,
-  });
-
-  await trySettleContractRun(deps, run);
-}
+const contractStatusContext = 'sdk-contract';
 
 async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Promise<void> {
   const run = deps.store.findContractRun(key);
@@ -88,6 +69,12 @@ async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Pro
   }
 }
 
+async function removeContractImp(deps: PreviewDeps, imp: string): Promise<void> {
+  const existing = await deps.impd.readImp(imp);
+
+  await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
+}
+
 async function tryStartContractImp(
   deps: PreviewDeps,
   contract: ContractSettings,
@@ -113,8 +100,6 @@ async function tryStartContractImp(
     return null;
   }
 }
-
-const fullSlots: Status = { state: 'pending', description: 'Waiting for a free preview slot' };
 
 async function startContractImp(
   deps: PreviewDeps,
@@ -148,12 +133,37 @@ async function startContractImp(
   return run;
 }
 
+interface Status {
+  readonly state: 'pending' | ContractOutcome;
+  readonly description: string;
+}
+
+const fullSlots: Status = { state: 'pending', description: 'Waiting for a free preview slot' };
+
 async function updateContractWaiting(deps: PreviewDeps, run: ContractRun): Promise<void> {
   const waiting = { phase: 'waiting', detail: fullSlots.description } as const;
 
   // only the first try that finds the slots full says so, so a retry posts nothing new
   if (deps.store.updateContractPhase(run, ['queued'], waiting)) {
     await sendContractStatus(deps, run, fullSlots);
+  }
+}
+
+async function sendContractStatus(
+  deps: PreviewDeps,
+  run: ContractRun,
+  status: Status,
+): Promise<void> {
+  try {
+    await deps.github.updateCommitStatus({
+      repo: run.repo,
+      sha: run.headSHA,
+      context: contractStatusContext,
+      ...status,
+    });
+  } catch (error) {
+    // the run goes on, since the result's status replaces a refused pending one
+    deps.log(`${run.repo}@${run.headSHA}: the commit status was not set: ${String(error)}`);
   }
 }
 
@@ -187,26 +197,16 @@ async function createContractImp(
   }
 }
 
-async function removeContractImp(deps: PreviewDeps, imp: string): Promise<void> {
-  const existing = await deps.impd.findImp(imp);
-
-  await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
-}
-
-async function sendContractStatus(
+async function applyContractStatus(
   deps: PreviewDeps,
   run: ContractRun,
-  status: Status,
+  status: Status & { readonly state: ContractOutcome },
 ): Promise<void> {
-  try {
-    await deps.github.updateCommitStatus({
-      repo: run.repo,
-      sha: run.headSHA,
-      context: contractStatusContext,
-      ...status,
-    });
-  } catch (error) {
-    // the run goes on, since the result's status replaces a refused pending one
-    deps.log(`${run.repo}@${run.headSHA}: the commit status was not set: ${String(error)}`);
-  }
+  deps.store.updateContractPhase(run, ['queued', 'waiting', 'running'], {
+    phase: 'settling',
+    detail: status.description,
+    outcome: status.state,
+  });
+
+  await trySettleContractRun(deps, run);
 }

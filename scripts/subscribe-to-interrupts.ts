@@ -44,6 +44,12 @@ const processTrapOptions: InterruptTrapOptions = {
   },
 };
 
+interface Commands {
+  readonly stop: AbortController;
+  readonly force: AbortController;
+  readonly active: Set<Promise<RunResult>>;
+}
+
 export function subscribeToInterrupts(
   options: Readonly<InterruptTrapOptions> = processTrapOptions,
 ): InterruptTrap {
@@ -91,43 +97,6 @@ export function subscribeToInterrupts(
       }
     },
   };
-}
-
-interface Commands {
-  readonly stop: AbortController;
-  readonly force: AbortController;
-  readonly active: Set<Promise<RunResult>>;
-}
-
-function makeParkingRunner(run: Runner, commands: Readonly<Commands>): Runner {
-  const parked = Promise.withResolvers<RunResult>().promise;
-
-  return async (argv, options = {}) => {
-    // after an interrupt the script parks at its next command until the cleanup exits the process
-    if (commands.stop.signal.aborted) {
-      return parked;
-    }
-
-    const running = run(argv, {
-      ...options,
-      signal: commands.stop.signal,
-      forceStop: commands.force.signal,
-    });
-
-    const result = await waitForCommand(commands.active, running);
-
-    return commands.stop.signal.aborted ? parked : result;
-  };
-}
-
-async function waitForCommand(active: Set<Promise<RunResult>>, running: Promise<RunResult>) {
-  active.add(running);
-
-  try {
-    return await running;
-  } finally {
-    active.delete(running);
-  }
 }
 
 interface Cleanup {
@@ -183,5 +152,36 @@ async function tryCleanupStep(io: Readonly<ScriptIO>, step: CleanupStep) {
     if (!(error instanceof ExitError) || message !== '') {
       io.printErr(`${message}\n`);
     }
+  }
+}
+
+function makeParkingRunner(run: Runner, commands: Readonly<Commands>): Runner {
+  const parked = Promise.withResolvers<RunResult>().promise;
+
+  return async (argv, options = {}) => {
+    // after an interrupt the script parks at its next command until the cleanup exits the process
+    if (commands.stop.signal.aborted) {
+      return parked;
+    }
+
+    const running = run(argv, {
+      ...options,
+      signal: commands.stop.signal,
+      forceStop: commands.force.signal,
+    });
+
+    const result = await waitForCommand(commands.active, running);
+
+    return commands.stop.signal.aborted ? parked : result;
+  };
+}
+
+async function waitForCommand(active: Set<Promise<RunResult>>, running: Promise<RunResult>) {
+  active.add(running);
+
+  try {
+    return await running;
+  } finally {
+    active.delete(running);
   }
 }

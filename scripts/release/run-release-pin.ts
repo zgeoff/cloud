@@ -32,12 +32,6 @@ export async function runReleasePin(
   return applied instanceof Error ? printError(context, applied) : 0;
 }
 
-function printError(context: BumpContext, error: Readonly<Error>) {
-  context.printErr(`${error.message}\n`);
-
-  return 1;
-}
-
 async function applyReleasePin(context: BumpContext, record: ReleaseRecord, version: string) {
   const files = await loadPinFiles(context.cwd, collectPinFiles(record));
 
@@ -71,6 +65,12 @@ async function loadPinFiles(root: string, paths: readonly string[]) {
   );
 
   return Object.fromEntries(entries.flat());
+}
+
+function printError(context: BumpContext, error: Readonly<Error>) {
+  context.printErr(`${error.message}\n`);
+
+  return 1;
 }
 
 if (import.meta.main) {

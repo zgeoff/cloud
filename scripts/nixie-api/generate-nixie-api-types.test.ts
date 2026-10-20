@@ -1,9 +1,9 @@
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { renderNixieAPITypes } from './render-nixie-api-types.ts';
+import { generateNixieAPITypes } from './generate-nixie-api-types.ts';
 
 test('it renders one procedure of a contract document as its path, input and outputs', async () => {
-  const types = await renderNixieAPITypes(
+  const types = await generateNixieAPITypes(
     JSON.stringify({
       openapi: '3.1.1',
       info: { title: 'nixie', version: '0' },
@@ -93,7 +93,7 @@ test('it renders one procedure of a contract document as its path, input and out
 
 test('it keeps the committed types in step with the committed contract document', async () => {
   const document = await Bun.file(join(import.meta.dir, 'openapi.json')).text();
-  const types = await renderNixieAPITypes(document);
+  const types = await generateNixieAPITypes(document);
   const committed = await Bun.file(join(import.meta.dir, 'openapi.d.ts')).text();
 
   expect(types).toBe(committed);

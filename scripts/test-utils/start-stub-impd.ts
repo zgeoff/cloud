@@ -14,11 +14,6 @@ export interface StubImpd {
   readonly requests: readonly StubImpdRequest[];
 }
 
-// IdentitySchema in imp 1.0.0's packages/api/src/token-schema.ts, in the {"json": …} envelope of
-// @orpc/server 1.14.15; whether oRPC adds "meta" beside "json" needs an impd sample
-const identity =
-  '{"json":{"kind":"token","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}';
-
 export interface StubImpdHealth {
   readonly status: number;
   readonly body: string;
@@ -31,26 +26,20 @@ const readyHealth: StubImpdHealth = { status: 200, body: '{"ready":true}' };
 export function startStubImpd(goodToken: string, health: StubImpdHealth = readyHealth): StubImpd {
   const requests: StubImpdRequest[] = [];
 
-  const server = Bun.serve({
-    hostname: '127.0.0.1',
-    port: 0,
-    fetch: async (request): Promise<Response> => {
-      const url = new URL(request.url);
+  const answerRequest = async (request: Request): Promise<Response> => {
+    const url = new URL(request.url);
 
-      const authorization = request.headers.get('authorization');
+    const authorization = request.headers.get('authorization');
 
-      // a proxy request names a whole URL, which Bun hands on as the request's URL
-      const target: string = url.host === `127.0.0.1:${server.port}` ? url.pathname : request.url;
+    // a proxy request names a whole URL, which Bun hands on as the request's URL
+    const target: string = url.host === `127.0.0.1:${server.port}` ? url.pathname : request.url;
 
-      requests.push({ method: request.method, target, authorization, body: await request.text() });
+    requests.push({ method: request.method, target, authorization, body: await request.text() });
 
-      return buildImpdResponse(
-        { method: request.method, target, authorization },
-        goodToken,
-        health,
-      );
-    },
-  });
+    return buildImpdResponse({ method: request.method, target, authorization }, goodToken, health);
+  };
+
+  const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: answerRequest });
 
   onTestFinished(() => server.stop(true));
 
@@ -62,6 +51,11 @@ interface ImpdRoute {
   readonly target: string;
   readonly authorization: string | null;
 }
+
+// IdentitySchema in imp 1.0.0's packages/api/src/token-schema.ts, in the {"json": …} envelope of
+// @orpc/server 1.14.15; whether oRPC adds "meta" beside "json" needs an impd sample
+const identity =
+  '{"json":{"kind":"token","name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["glm"]}}';
 
 function buildImpdResponse(route: ImpdRoute, goodToken: string, health: StubImpdHealth) {
   if (route.method === 'GET' && route.target === '/health') {

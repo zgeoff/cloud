@@ -6,8 +6,6 @@ import { loadHostImpJSON } from './imp-cli.ts';
 import type { ATCCredentialsContext } from './load-atc-credentials-context.ts';
 import { runOrExit } from './run-or-exit.ts';
 
-const glmRules = [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }];
-
 const glmAddArgs = [
   'secret',
   'add',
@@ -44,16 +42,7 @@ export async function installATCGLMSecret(
   printSecret(context, added);
 }
 
-function printSecret(context: Readonly<ATCCredentialsContext>, secret: unknown) {
-  const summary = {
-    name: findJSONField(secret, 'name'),
-    kind: findJSONField(secret, 'kind'),
-    rules: findJSONField(secret, 'rules'),
-  };
-
-  context.printOut(`${JSON.stringify(summary)}
-`);
-}
+const glmRules = [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }];
 
 function requireGLMRules(glm: unknown) {
   if (
@@ -75,4 +64,15 @@ async function readZAIKey(context: Readonly<ATCCredentialsContext>) {
   }
 
   return key;
+}
+
+function printSecret(context: Readonly<ATCCredentialsContext>, secret: unknown) {
+  const summary = {
+    name: findJSONField(secret, 'name'),
+    kind: findJSONField(secret, 'kind'),
+    rules: findJSONField(secret, 'rules'),
+  };
+
+  context.printOut(`${JSON.stringify(summary)}
+`);
 }

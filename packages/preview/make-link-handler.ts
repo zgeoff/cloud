@@ -66,6 +66,30 @@ function pickPreviewPage(preview: Preview | null, url: URL): StatusPage | null {
   return null;
 }
 
+function formatPreview(preview: PreviewKey): string {
+  return `${preview.repo}#${preview.number}`;
+}
+
+function buildBootingPage(preview: Preview): StatusPage {
+  return {
+    status: 202,
+    title: 'Preview booting',
+    message: `Booting ${formatPreview(preview)} at ${preview.headSHA.slice(0, 7)}. This page reloads until the preview answers.`,
+    refresh: { seconds: 5, url: formatLinkPath(preview) },
+  };
+}
+
+function formatLinkPath(preview: PreviewKey): string {
+  return `/${preview.repo}/${preview.number}`;
+}
+
+function buildPageResponse(page: StatusPage): Response {
+  return new Response(renderPreviewPage(page), {
+    status: page.status,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+  });
+}
+
 function buildNoPreviewPage(key: PreviewKey): StatusPage {
   return {
     status: 404,
@@ -93,21 +117,17 @@ async function openPreview(deps: PreviewDeps, preview: Preview): Promise<Respons
   return buildPageResponse(buildBootingPage(preview));
 }
 
-function startPreviewBoot(deps: PreviewDeps, preview: Preview): void {
-  // a second open while the first one's boot starts finds the phase moved, and boots nothing
-  if (!deps.store.updatePhase(preview, [preview.phase], { phase: 'booting' })) {
-    return;
-  }
-
-  // the boot runs on after the response
-  const boot = runPreviewBoot(deps, { ...preview, phase: 'booting' });
-
-  deps.pendingBoots.add(boot);
-  void removeSettledBoot(deps.pendingBoots, boot);
+function buildWaitingPage(preview: Preview): StatusPage {
+  return {
+    status: 202,
+    title: 'Preview waiting for a slot',
+    message: `Another preview is booting. ${formatPreview(preview)} wakes once it settles; this page reloads until then.`,
+    refresh: { seconds: 5, url: formatLinkPath(preview) },
+  };
 }
 
 async function startReadyImp(deps: PreviewDeps, preview: Preview): Promise<boolean> {
-  const imp = await deps.impd.findImp(preview.imp);
+  const imp = await deps.impd.readImp(preview.imp);
 
   if (imp === null) {
     return false;
@@ -145,42 +165,22 @@ async function checkWokenStack(deps: PreviewDeps, preview: Preview): Promise<boo
   return health.healthy;
 }
 
+function startPreviewBoot(deps: PreviewDeps, preview: Preview): void {
+  // a second open while the first one's boot starts finds the phase moved, and boots nothing
+  if (!deps.store.updatePhase(preview, [preview.phase], { phase: 'booting' })) {
+    return;
+  }
+
+  // the boot runs on after the response
+  const boot = runPreviewBoot(deps, { ...preview, phase: 'booting' });
+
+  deps.pendingBoots.add(boot);
+  void removeSettledBoot(deps.pendingBoots, boot);
+}
+
 async function removeSettledBoot(pending: Set<Promise<void>>, boot: Promise<void>): Promise<void> {
   // a boot never rejects: it records its own failure
   await boot;
 
   pending.delete(boot);
-}
-
-function buildBootingPage(preview: Preview): StatusPage {
-  return {
-    status: 202,
-    title: 'Preview booting',
-    message: `Booting ${formatPreview(preview)} at ${preview.headSHA.slice(0, 7)}. This page reloads until the preview answers.`,
-    refresh: { seconds: 5, url: formatLinkPath(preview) },
-  };
-}
-
-function buildWaitingPage(preview: Preview): StatusPage {
-  return {
-    status: 202,
-    title: 'Preview waiting for a slot',
-    message: `Another preview is booting. ${formatPreview(preview)} wakes once it settles; this page reloads until then.`,
-    refresh: { seconds: 5, url: formatLinkPath(preview) },
-  };
-}
-
-function formatPreview(preview: PreviewKey): string {
-  return `${preview.repo}#${preview.number}`;
-}
-
-function formatLinkPath(preview: PreviewKey): string {
-  return `/${preview.repo}/${preview.number}`;
-}
-
-function buildPageResponse(page: StatusPage): Response {
-  return new Response(renderPreviewPage(page), {
-    status: page.status,
-    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
-  });
 }

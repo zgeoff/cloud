@@ -13,7 +13,7 @@ export interface StubReleaseDockerScenario {
 }
 
 export interface StubReleaseDocker {
-  readonly handle: StubHandler;
+  readonly answer: StubHandler;
 
   readonly nixConfigs: readonly (string | undefined)[];
 }
@@ -22,7 +22,7 @@ export function buildStubReleaseDocker(scenario: StubReleaseDockerScenario): Stu
   const nixConfigs: (string | undefined)[] = [];
 
   return {
-    handle: (call) =>
+    answer: (call) =>
       call.argv[0] === 'docker'
         ? (buildInspectAnswer(scenario, call) ??
           runLock(scenario, call, (nixConfig) => {

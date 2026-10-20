@@ -7,9 +7,11 @@ import { runPulumiPreview } from '../test-utils/run-pulumi-preview.ts';
 
 // Bun 1.4.2's skipIf takes a boolean, so the probe for the Pulumi CLI runs at collection; CI
 // installs the CLI and its plugin.
-const pulumiPath = Bun.which('pulumi');
+const isPulumiMissing = Bun.which('pulumi') === null;
 
 async function setupTest() {
+  const pulumiPath = Bun.which('pulumi');
+
   invariant(pulumiPath !== null, 'the Pulumi CLI is not on PATH');
 
   // the stack stops a preview still running at the timeout before it removes the directory
@@ -58,7 +60,7 @@ async function setupTest() {
   return { caseDir, runPreview };
 }
 
-test.skipIf(pulumiPath === null).each([
+test.skipIf(isPulumiMissing).each([
   [
     "a Helm chart's Role that creates pods/portforward",
     'chart/templates/rbac.yaml',
@@ -125,7 +127,7 @@ test.skipIf(pulumiPath === null).each([
   120_000,
 );
 
-test.skipIf(pulumiPath === null)(
+test.skipIf(isPulumiMissing)(
   "it passes the preview of a Helm chart's Role and a raw Role that read pods",
   async () => {
     const ctx = await setupTest();

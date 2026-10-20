@@ -52,12 +52,6 @@ function buildWithNested(
   return isFields(value) ? buildWithField(value, key, change) : value;
 }
 
-function buildMappedRecords(value: unknown, change: (record: Fields) => Fields): unknown {
-  return Array.isArray(value)
-    ? value.map((item: unknown) => (isFields(item) ? change(item) : item))
-    : value;
-}
-
 function isFields(value: unknown): value is Fields {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return false;
@@ -66,4 +60,10 @@ function isFields(value: unknown): value is Fields {
   const prototype: unknown = Object.getPrototypeOf(value);
 
   return prototype === Object.prototype || prototype === null;
+}
+
+function buildMappedRecords(value: unknown, change: (record: Fields) => Fields): unknown {
+  return Array.isArray(value)
+    ? value.map((item: unknown) => (isFields(item) ? change(item) : item))
+    : value;
 }

@@ -10,7 +10,6 @@ export interface ActionsTemplateContext {
 }
 
 const expression = /\$\{\{\s*(?<path>[^}]*?)\s*\}\}/gu;
-const contextPath = /^(?:github|inputs|steps)(?:\.[A-Za-z_][\w-]*)+$/u;
 
 // Renders a workflow value as the runner hands it to a step: a number or a boolean as its text, and
 // each `${{ <path> }}` in a string as the path's value, empty when the path is missing, as on
@@ -29,6 +28,8 @@ export function renderActionsTemplate(
 
   return value.replaceAll(expression, (_match: string, path: string) => resolvePath(path, context));
 }
+
+const contextPath = /^(?:github|inputs|steps)(?:\.[A-Za-z_][\w-]*)+$/u;
 
 function resolvePath(path: string, context: Readonly<ActionsTemplateContext>): string {
   if (!contextPath.test(path)) {

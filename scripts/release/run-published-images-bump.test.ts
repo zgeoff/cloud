@@ -31,7 +31,7 @@ test('it opens a gateway minor bump that merges on its own, at the digests the r
 
   const stub = buildStubRunner(
     buildStubReleaseGH({ releases: {} }),
-    docker.handle,
+    docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
   );
 
@@ -132,7 +132,7 @@ test('it opens a gateway major bump that waits for review', async () => {
 
   const stub = buildStubRunner(
     buildStubReleaseGH({ releases: {} }),
-    docker.handle,
+    docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
   );
 
@@ -170,7 +170,7 @@ test('it opens a backup image bump that waits for review, since no release versi
 
   const stub = buildStubRunner(
     buildStubReleaseGH({ releases: {} }),
-    docker.handle,
+    docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
   );
 
@@ -265,7 +265,7 @@ test('it opens a new backup revision after a person closed the one before it', a
     buildStubReleaseGH({
       closedPRs: [{ headRefOid: rejected, isCrossRepository: false, number: 31 }],
     }),
-    docker.handle,
+    docker.answer,
     buildRealProgramHandler(['git'], checkout.env),
   );
 
@@ -305,7 +305,7 @@ test('it opens no pull request when main already pins the published digests', as
     },
   });
 
-  const stub = buildStubRunner(docker.handle, buildRealProgramHandler(['git'], checkout.env));
+  const stub = buildStubRunner(docker.answer, buildRealProgramHandler(['git'], checkout.env));
 
   const status = await runPublishedImagesBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
@@ -333,7 +333,7 @@ test('it fails before any branch when a tag is not on the registry', async () =>
   });
 
   const docker = buildStubReleaseDocker({ manifests: {} });
-  const stub = buildStubRunner(docker.handle, buildRealProgramHandler(['git'], checkout.env));
+  const stub = buildStubRunner(docker.answer, buildRealProgramHandler(['git'], checkout.env));
 
   const status = await runPublishedImagesBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },
@@ -371,7 +371,7 @@ test('it leaves the branch to a newer push when main names other tags than the r
   await checkout.git(['-C', checkout.seed, 'push', '-q', 'origin', 'main']);
 
   const docker = buildStubReleaseDocker({ manifests: {} });
-  const stub = buildStubRunner(docker.handle, buildRealProgramHandler(['git'], checkout.env));
+  const stub = buildStubRunner(docker.answer, buildRealProgramHandler(['git'], checkout.env));
 
   const status = await runPublishedImagesBump(
     { cwd: checkout.clone, env: checkout.env, run: stub.run, ...ctx },

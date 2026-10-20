@@ -39,22 +39,6 @@ export function buildStubProxyResponse(proxy: StubProxy, request: Request): Resp
   return buildForwardedResponse(proxy, imp);
 }
 
-// the refused connection carries Bun's own message
-const refusedReason = 'Unable to connect. Is the computer able to access the url?';
-
-function buildForwardedResponse(proxy: StubProxy, imp: StubProxyImp): Response {
-  const app = proxy.apps.get(imp.name);
-
-  if (app?.address !== '0.0.0.0' || app.port !== imp.httpPort) {
-    return buildImpdErrorPage(
-      502,
-      `${imp.name} is awake, but nothing answered on port ${String(imp.httpPort)} (${refusedReason}).`,
-    );
-  }
-
-  return new Response('ok\n', { status: 200 });
-}
-
 const statusTitles: Readonly<Record<number, string>> = {
   404: 'No such imp',
   502: 'Nothing answers in the imp',
@@ -85,4 +69,20 @@ function encodeHTML(text: string): string {
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+}
+
+// the refused connection carries Bun's own message
+const refusedReason = 'Unable to connect. Is the computer able to access the url?';
+
+function buildForwardedResponse(proxy: StubProxy, imp: StubProxyImp): Response {
+  const app = proxy.apps.get(imp.name);
+
+  if (app?.address !== '0.0.0.0' || app.port !== imp.httpPort) {
+    return buildImpdErrorPage(
+      502,
+      `${imp.name} is awake, but nothing answered on port ${String(imp.httpPort)} (${refusedReason}).`,
+    );
+  }
+
+  return new Response('ok\n', { status: 200 });
 }

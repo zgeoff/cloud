@@ -89,18 +89,6 @@ async function createCheckSession(
   return { url: options.url, token: enrolled.value.token, sessionID: enrolled.value.sessionID };
 }
 
-function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>> | undefined {
-  const sessionID = findJSONField(output, 'sessionID');
-  const token = findJSONField(output, 'token');
-
-  // the contract leaves token optional because a cookie enrolment answers none
-  return typeof sessionID === 'string' && typeof token === 'string'
-    ? { sessionID, token }
-    : undefined;
-}
-
-const enrolCodeCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie enrol-code';
-
 async function readEnrolmentCode(
   options: Readonly<CheckNixieStreamOptions>,
 ): Promise<string | undefined> {
@@ -120,6 +108,18 @@ async function readEnrolmentCode(
 
   return undefined;
 }
+
+function parseEnrolment(output: unknown): Required<NixieOutput<'sessions/enrol'>> | undefined {
+  const sessionID = findJSONField(output, 'sessionID');
+  const token = findJSONField(output, 'token');
+
+  // the contract leaves token optional because a cookie enrolment answers none
+  return typeof sessionID === 'string' && typeof token === 'string'
+    ? { sessionID, token }
+    : undefined;
+}
+
+const enrolCodeCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie enrol-code';
 
 async function checkStream(
   options: Readonly<CheckNixieStreamOptions>,
@@ -151,7 +151,7 @@ async function checkStream(
 
   return (
     after !== undefined &&
-    printFailures(options, findFailures({ options, stream: stream.value, before, after }))
+    printFailures(options, collectFailures({ options, stream: stream.value, before, after }))
   );
 }
 
@@ -183,6 +183,17 @@ function formatSeconds(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(1)} s`;
 }
 
+function printFailures(
+  options: Readonly<CheckNixieStreamOptions>,
+  failures: readonly string[],
+): boolean {
+  for (const failure of failures) {
+    options.printErr(`check-nixie-stream: ${failure}\n`);
+  }
+
+  return failures.length === 0;
+}
+
 interface Outcome {
   readonly options: Readonly<CheckNixieStreamOptions>;
   readonly stream: StreamReport;
@@ -190,7 +201,7 @@ interface Outcome {
   readonly after: RecordCount;
 }
 
-function findFailures(outcome: Outcome): string[] {
+function collectFailures(outcome: Outcome): string[] {
   const failures = [
     outcome.stream.end === 'held' ? null : `the stream did not stay open: ${outcome.stream.end}`,
     outcome.stream.longestGapMs <= outcome.options.maxGapMs
@@ -208,17 +219,6 @@ function findFailures(outcome: Outcome): string[] {
   ];
 
   return failures.filter((failure) => failure !== null);
-}
-
-function printFailures(
-  options: Readonly<CheckNixieStreamOptions>,
-  failures: readonly string[],
-): boolean {
-  for (const failure of failures) {
-    options.printErr(`check-nixie-stream: ${failure}\n`);
-  }
-
-  return failures.length === 0;
 }
 
 async function removeCheckSession(

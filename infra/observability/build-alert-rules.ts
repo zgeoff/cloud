@@ -28,35 +28,6 @@ export interface AlertRuleInputs {
   readonly nixieReadinessURL?: string | undefined;
 }
 
-export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
-  const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
-
-  const nixieRules =
-    inputs.nixieReadinessURL === undefined
-      ? []
-      : [
-          buildNixieTurnsRule(inputs.nixieReadinessURL),
-          buildNixieDegradedRule(inputs.nixieReadinessURL),
-        ];
-
-  return [
-    {
-      name: 'geoff-cloud',
-      rules: [
-        ...impdRules,
-        ...hostBuildLagRules,
-        targetDownRule,
-        cloudflaredRule,
-        ...atcRules,
-        impHealthRule,
-        ...nixieRules,
-        oomKilledRule,
-      ],
-    },
-    buildATCSignInRules(),
-  ];
-}
-
 // written every minute by a host timer to node-exporter's textfile collector
 // (nixos/modules/impd-local-health.nix)
 const impdRules: readonly AlertRule[] = [
@@ -100,6 +71,30 @@ const hostBuildLagRules: readonly AlertRule[] = [
   },
 ];
 
+// per target, so one dead exporter is named; replaces the chart's ratio-based TargetDown
+const targetDownRule: AlertRule = {
+  alert: 'TargetDown',
+  expr: 'up == 0',
+  for: '5m',
+  labels: { severity: 'warning' },
+  annotations: { summary: 'Scrape target {{ $labels.job }} {{ $labels.instance }} is down.' },
+};
+
+// Summed over both cloudflared pods: the tunnel serves while either pod holds a
+// connection, so only zero across both is an outage. One pod down shows as TargetDown.
+// A dead exporter must not look healthy: no series, or no cloudflared target up, fires too.
+const cloudflaredRule: AlertRule = {
+  alert: 'CloudflaredNoConnections',
+  expr: [
+    'sum(cloudflared_tunnel_ha_connections) == 0',
+    'absent(cloudflared_tunnel_ha_connections)',
+    `absent(up{namespace="${cloudflaredNames.namespace}", pod=~"${cloudflaredNames.name}-.*"} == 1)`,
+  ].join(' or '),
+  for: '5m',
+  labels: { severity: 'critical' },
+  annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
+};
+
 // Clients cannot reach impd when this probe fails, though the loopback check may pass. A failed
 // TLS check or a body without "ready": true fails it too.
 const impHealthRule: AlertRule = {
@@ -130,29 +125,34 @@ const oomKilledRule: AlertRule = {
   },
 };
 
-// per target, so one dead exporter is named; replaces the chart's ratio-based TargetDown
-const targetDownRule: AlertRule = {
-  alert: 'TargetDown',
-  expr: 'up == 0',
-  for: '5m',
-  labels: { severity: 'warning' },
-  annotations: { summary: 'Scrape target {{ $labels.job }} {{ $labels.instance }} is down.' },
-};
+export function buildAlertRules(inputs: AlertRuleInputs = {}): readonly AlertRuleGroup[] {
+  const atcRules = (inputs.atcDaemons ?? []).map((daemon) => buildATCDaemonRule(daemon));
 
-// Summed over both cloudflared pods: the tunnel serves while either pod holds a
-// connection, so only zero across both is an outage. One pod down shows as TargetDown.
-// A dead exporter must not look healthy: no series, or no cloudflared target up, fires too.
-const cloudflaredRule: AlertRule = {
-  alert: 'CloudflaredNoConnections',
-  expr: [
-    'sum(cloudflared_tunnel_ha_connections) == 0',
-    'absent(cloudflared_tunnel_ha_connections)',
-    `absent(up{namespace="${cloudflaredNames.namespace}", pod=~"${cloudflaredNames.name}-.*"} == 1)`,
-  ].join(' or '),
-  for: '5m',
-  labels: { severity: 'critical' },
-  annotations: { summary: 'cloudflared holds no tunnel connection to Cloudflare.' },
-};
+  const nixieRules =
+    inputs.nixieReadinessURL === undefined
+      ? []
+      : [
+          buildNixieTurnsRule(inputs.nixieReadinessURL),
+          buildNixieDegradedRule(inputs.nixieReadinessURL),
+        ];
+
+  return [
+    {
+      name: 'geoff-cloud',
+      rules: [
+        ...impdRules,
+        ...hostBuildLagRules,
+        targetDownRule,
+        cloudflaredRule,
+        ...atcRules,
+        impHealthRule,
+        ...nixieRules,
+        oomKilledRule,
+      ],
+    },
+    buildATCSignInRules(),
+  ];
+}
 
 function buildATCDaemonRule(daemon: ATCDaemonEndpoint): AlertRule {
   const series = `probe_success{target="${toATCDaemonProbeTarget(daemon.name)}"}`;

@@ -46,6 +46,13 @@ export async function checkImagePins(options: Readonly<CheckImagePinsOptions>): 
   return printReport(loaded.pins, answers, options);
 }
 
+interface Pin {
+  readonly file: string;
+  readonly name: string;
+  readonly tag: string;
+  readonly digest: string;
+}
+
 async function loadPinsAndToken(
   root: string,
   run: Runner,
@@ -65,13 +72,6 @@ async function loadPinsAndToken(
   return githubToken === undefined
     ? { failures: [`check-image-pins: ${missingGitHubTokenText}\n`] }
     : { pins: loaded.pins, githubToken };
-}
-
-interface Pin {
-  readonly file: string;
-  readonly name: string;
-  readonly tag: string;
-  readonly digest: string;
 }
 
 async function loadPins(
@@ -154,27 +154,6 @@ function parseLine(prefix: string, file: string, line: string): Pin | string | u
   };
 }
 
-// The images this repo's release flows publish. A published release tag is never replaced, so a
-// tag that names another digest is a hand edit that moved the tag or the digest alone.
-const releasePrefix = 'ghcr.io/zgeoff/';
-
-// An upstream tag, such as Distroless's nonroot, moves when its publisher rebuilds the image, so
-// an upstream pin asks only that the registry still serves its digest.
-interface ManifestRequest {
-  readonly key: string;
-  readonly name: string;
-  readonly reference: string;
-  readonly release: boolean;
-}
-
-function toManifestRequest(pin: Pin): ManifestRequest {
-  const release = pin.name.startsWith(releasePrefix);
-
-  return release
-    ? { key: `${pin.name}:${pin.tag}`, name: pin.name, reference: pin.tag, release }
-    : { key: `${pin.name}@${pin.digest}`, name: pin.name, reference: pin.digest, release };
-}
-
 async function readRegistryDigests(
   pins: readonly Pin[],
   githubToken: string | undefined,
@@ -194,6 +173,27 @@ async function readRegistryDigests(
   );
 
   return Object.fromEntries(answers);
+}
+
+// The images this repo's release flows publish. A published release tag is never replaced, so a
+// tag that names another digest is a hand edit that moved the tag or the digest alone.
+const releasePrefix = 'ghcr.io/zgeoff/';
+
+// An upstream tag, such as Distroless's nonroot, moves when its publisher rebuilds the image, so
+// an upstream pin asks only that the registry still serves its digest.
+interface ManifestRequest {
+  readonly key: string;
+  readonly name: string;
+  readonly reference: string;
+  readonly release: boolean;
+}
+
+function toManifestRequest(pin: Pin): ManifestRequest {
+  const release = pin.name.startsWith(releasePrefix);
+
+  return release
+    ? { key: `${pin.name}:${pin.tag}`, name: pin.name, reference: pin.tag, release }
+    : { key: `${pin.name}@${pin.digest}`, name: pin.name, reference: pin.digest, release };
 }
 
 function printReport(

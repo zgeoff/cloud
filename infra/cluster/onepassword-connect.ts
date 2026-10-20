@@ -62,6 +62,25 @@ function createDeployment(
   );
 }
 
+function createCredentials(
+  cluster: Provider,
+  namespace: Output<string>,
+  inputs: OnePasswordConnectInputs,
+): Output<string> {
+  const credentials = new Secret(
+    'onepassword-connect-credentials',
+    {
+      // no fixed name: Pulumi replaces the Secret on a change, so the Deployment rolls and Connect
+      // picks the change up
+      metadata: { namespace },
+      stringData: { [onePasswordConnectCredentialsKey]: secret(inputs.credentials) },
+    },
+    { provider: cluster },
+  );
+
+  return credentials.metadata.name;
+}
+
 function createService(cluster: Provider, namespace: Output<string>): Service {
   return new Service(
     'onepassword-connect',
@@ -88,23 +107,4 @@ function createNetworkPolicy(cluster: Provider, namespace: Output<string>): Netw
     },
     { provider: cluster },
   );
-}
-
-function createCredentials(
-  cluster: Provider,
-  namespace: Output<string>,
-  inputs: OnePasswordConnectInputs,
-): Output<string> {
-  const credentials = new Secret(
-    'onepassword-connect-credentials',
-    {
-      // no fixed name: Pulumi replaces the Secret on a change, so the Deployment rolls and Connect
-      // picks the change up
-      metadata: { namespace },
-      stringData: { [onePasswordConnectCredentialsKey]: secret(inputs.credentials) },
-    },
-    { provider: cluster },
-  );
-
-  return credentials.metadata.name;
 }

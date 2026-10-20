@@ -45,7 +45,7 @@ async function openBranchPR(context: BumpContext, input: BumpPRInput, branch: Bu
   const [pr] = prs instanceof Error ? [] : prs;
 
   const rejected =
-    pr === undefined && branch.sameRelease ? await isRejected(context, branch) : false;
+    pr === undefined && branch.sameRelease ? await probeRejected(context, branch) : false;
 
   if (rejected !== false) {
     return rejected === true ? null : rejected;
@@ -54,25 +54,6 @@ async function openBranchPR(context: BumpContext, input: BumpPRInput, branch: Bu
   return branch.same
     ? updateUnchangedPR(context, { input, branch, pr })
     : updatePushedPR(context, { input, branch, pr });
-}
-
-async function isRejected(context: BumpContext, branch: BumpBranch): Promise<boolean | Error> {
-  const closed = await readBumpPRs(context, branch.name, 'closed');
-
-  // closing the pull request at the branch's head rejects its release; a failed lookup stops the
-  // bump, since it cannot tell a rejected release from a new one
-  const rejected =
-    closed instanceof Error ? closed : closed.find((each) => each.head === branch.lease);
-
-  if (rejected === undefined || rejected instanceof Error) {
-    return rejected ?? false;
-  }
-
-  context.printOut(
-    `#${rejected.number} was closed with this bump; delete ${branch.name} to open it again\n`,
-  );
-
-  return true;
 }
 
 async function createLabels(context: BumpContext, labels: readonly string[]) {
@@ -105,6 +86,25 @@ async function createLabels(context: BumpContext, labels: readonly string[]) {
   return null;
 }
 
+async function probeRejected(context: BumpContext, branch: BumpBranch): Promise<boolean | Error> {
+  const closed = await readBumpPRs(context, branch.name, 'closed');
+
+  // closing the pull request at the branch's head rejects its release; a failed lookup stops the
+  // bump, since it cannot tell a rejected release from a new one
+  const rejected =
+    closed instanceof Error ? closed : closed.find((each) => each.head === branch.lease);
+
+  if (rejected === undefined || rejected instanceof Error) {
+    return rejected ?? false;
+  }
+
+  context.printOut(
+    `#${rejected.number} was closed with this bump; delete ${branch.name} to open it again\n`,
+  );
+
+  return true;
+}
+
 interface BumpPRState {
   readonly input: BumpPRInput;
   readonly branch: BumpBranch;
@@ -129,6 +129,41 @@ async function updateUnchangedPR(context: BumpContext, state: BumpPRState) {
   }
 
   return labelled;
+}
+
+function createPR(context: BumpContext, state: BumpPRState) {
+  return runGH(
+    context,
+    [
+      'pr',
+      'create',
+      '--repo',
+      'zgeoff/cloud',
+      '--base',
+      'main',
+      '--head',
+      state.branch.name,
+      '--title',
+      state.branch.title,
+      '--body-file',
+      '-',
+      '--label',
+      state.input.labels.join(','),
+    ],
+    state.input.body,
+  );
+}
+
+async function runGH(context: BumpContext, args: readonly string[], body: string) {
+  const printed = await runChecked(context.run, ['gh', ...args], toRunOptions(context, body));
+
+  if (printed instanceof Error) {
+    return printed;
+  }
+
+  context.printOut(printed);
+
+  return null;
 }
 
 async function updatePushedPR(context: BumpContext, state: BumpPRState) {
@@ -203,41 +238,6 @@ async function updatePRText(context: BumpContext, state: BumpPRState & { readonl
   ];
 
   return runGH(context, args, state.input.body);
-}
-
-function createPR(context: BumpContext, state: BumpPRState) {
-  return runGH(
-    context,
-    [
-      'pr',
-      'create',
-      '--repo',
-      'zgeoff/cloud',
-      '--base',
-      'main',
-      '--head',
-      state.branch.name,
-      '--title',
-      state.branch.title,
-      '--body-file',
-      '-',
-      '--label',
-      state.input.labels.join(','),
-    ],
-    state.input.body,
-  );
-}
-
-async function runGH(context: BumpContext, args: readonly string[], body: string) {
-  const printed = await runChecked(context.run, ['gh', ...args], toRunOptions(context, body));
-
-  if (printed instanceof Error) {
-    return printed;
-  }
-
-  context.printOut(printed);
-
-  return null;
 }
 
 function printError(context: BumpContext, error: Readonly<Error>) {

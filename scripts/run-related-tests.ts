@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 
-export function collectRelatedTests(paths: readonly string[], cwd: string): string[] {
+export function resolveRelatedTests(paths: readonly string[], cwd: string): string[] {
   const selected = new Set<string>();
 
   for (const path of paths) {
@@ -22,7 +22,7 @@ export function collectRelatedTests(paths: readonly string[], cwd: string): stri
 }
 
 export async function runRelatedTests(paths: readonly string[], cwd: string): Promise<number> {
-  const tests = collectRelatedTests(paths, cwd);
+  const tests = resolveRelatedTests(paths, cwd);
 
   if (tests.length === 0) {
     process.stdout.write('run-related-tests: no related tests\n');
@@ -31,7 +31,7 @@ export async function runRelatedTests(paths: readonly string[], cwd: string): Pr
   }
 
   for (const [packageDir, packageTests] of Map.groupBy(tests, (test) =>
-    findPackageDir(test, cwd),
+    resolvePackageDir(test, cwd),
   )) {
     // one run at a time: the runs share the tree and its ports
     const exitCode = await runTests(cwd, packageDir, packageTests);
@@ -44,7 +44,7 @@ export async function runRelatedTests(paths: readonly string[], cwd: string): Pr
   return 0;
 }
 
-function findPackageDir(test: string, cwd: string): string | undefined {
+function resolvePackageDir(test: string, cwd: string): string | undefined {
   for (
     let directory = dirname(test);
     directory !== '.' && directory !== '/';

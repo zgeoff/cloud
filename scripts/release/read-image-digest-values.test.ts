@@ -15,7 +15,7 @@ test('it reads the tag commit and each image digest at the version tag', async (
         'ghcr.io/zgeoff/imp-host:1.0.1': `sha256:${'3'.repeat(64)}`,
         'ghcr.io/zgeoff/imp-base:1.0.1': `sha256:${'4'.repeat(64)}`,
       },
-    }).handle,
+    }).answer,
   );
 
   const read = await readImageDigestValues(
@@ -63,7 +63,7 @@ test('it gives the buildx error for an image the registry lacks', async () => {
     }),
     buildStubReleaseDocker({
       manifests: { 'ghcr.io/zgeoff/imp-host:1.0.1': `sha256:${'3'.repeat(64)}` },
-    }).handle,
+    }).answer,
   );
 
   const read = await readImageDigestValues(
@@ -85,7 +85,7 @@ test('it refuses a manifest whose digest is not a sha256 digest', async () => {
       releases: { 'zgeoff/impz': [{ tag: 'v1.0.1', commit: 'c'.repeat(40) }] },
     }),
     buildStubReleaseDocker({ manifests: { 'ghcr.io/zgeoff/imp-host:1.0.1': '4'.repeat(64) } })
-      .handle,
+      .answer,
   );
 
   const read = await readImageDigestValues(

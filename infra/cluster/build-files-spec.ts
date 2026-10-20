@@ -1,13 +1,7 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 
-// the files service's port in the pod, and its pod labels
-export const filesPort = 8080;
 export const filesLabels = { app: 'files' };
-
-// the keys of the Secret that holds each role token's SHA-256
-export const agentTokenHashKey = 'agent-token-sha256';
-export const ownerTokenHashKey = 'owner-token-sha256';
 
 // the image's nonroot user, which owns the volume through fsGroup
 const nonrootID = 65_532;
@@ -69,6 +63,13 @@ export function buildFilesSpec(inputs: FilesSpecInputs): input.apps.v1.StatefulS
     ],
   };
 }
+
+// the files service's port in the pod, and its pod labels
+export const filesPort = 8080;
+
+// the keys of the Secret that holds each role token's SHA-256
+export const agentTokenHashKey = 'agent-token-sha256';
+export const ownerTokenHashKey = 'owner-token-sha256';
 
 function buildFilesContainer(inputs: FilesSpecInputs): input.core.v1.Container {
   return {

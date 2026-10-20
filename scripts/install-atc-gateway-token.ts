@@ -37,6 +37,15 @@ export async function installATCGatewayToken(
   await createGatewayToken(context);
 }
 
+async function requireMatchingCopies(context: Readonly<ATCCredentialsContext>) {
+  const item = await readItem(context);
+  const hostSum = await readHostSum(context);
+
+  if (deriveSHA256(item) !== hostSum) {
+    throw new ExitError(1, 'the 1Password item and the host file differ; fix by hand, then rerun');
+  }
+}
+
 function readItem(context: Readonly<ATCCredentialsContext>) {
   // op read prints the field and a newline, as the host file holds it
   return runOp(context, ['read', `op://${context.vault}/${context.item}/credential`]);
@@ -46,15 +55,6 @@ async function readHostSum(context: Readonly<ATCCredentialsContext>) {
   const line = await runOnHost(context, ['sha256sum', `${context.directory}/gateway-token`]);
 
   return line.split(' ')[0] ?? '';
-}
-
-async function requireMatchingCopies(context: Readonly<ATCCredentialsContext>) {
-  const item = await readItem(context);
-  const hostSum = await readHostSum(context);
-
-  if (deriveSHA256(item) !== hostSum) {
-    throw new ExitError(1, 'the 1Password item and the host file differ; fix by hand, then rerun');
-  }
 }
 
 function deriveSHA256(value: string) {
@@ -74,17 +74,6 @@ async function createGatewayToken(context: Readonly<ATCCredentialsContext>) {
   await requireCopiesOf(context, bearer);
 
   context.printOut('ok: the 1Password item and the host file match\n');
-}
-
-async function requireCopiesOf(context: Readonly<ATCCredentialsContext>, bearer: string) {
-  const item = await readItem(context);
-  const hostSum = await readHostSum(context);
-
-  const localSum = deriveSHA256(`${bearer}\n`);
-
-  if (localSum !== deriveSHA256(item) || localSum !== hostSum) {
-    throw new ExitError(1, 'the copies differ; fix by hand before the gateway uses them');
-  }
 }
 
 async function createItem(context: Readonly<ATCCredentialsContext>, bearer: string) {
@@ -108,4 +97,15 @@ async function createItem(context: Readonly<ATCCredentialsContext>, bearer: stri
   context.printOut(
     `1Password: ${String(findJSONField(item, 'title'))} (${String(findJSONField(item, 'id'))})\n`,
   );
+}
+
+async function requireCopiesOf(context: Readonly<ATCCredentialsContext>, bearer: string) {
+  const item = await readItem(context);
+  const hostSum = await readHostSum(context);
+
+  const localSum = deriveSHA256(`${bearer}\n`);
+
+  if (localSum !== deriveSHA256(item) || localSum !== hostSum) {
+    throw new ExitError(1, 'the copies differ; fix by hand before the gateway uses them');
+  }
 }

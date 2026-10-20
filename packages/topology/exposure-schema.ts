@@ -65,7 +65,30 @@ export const exposureSchema = z
 
 export type Exposure = z.infer<typeof exposureSchema>;
 
-export type ExposureEntry = Exposure['entries'][number];
+function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
+  const names = exposure.entries.map((entry) => entry.name);
+
+  for (const [index, entry] of exposure.entries.entries()) {
+    if (names.indexOf(entry.name) !== index) {
+      context.addIssue({
+        code: 'custom',
+        path: ['entries', index, 'name'],
+        message: `${entry.name} names another entry`,
+      });
+    }
+
+    const issues =
+      entry.kind === 'host-port' ? collectHostPortIssues(entry) : collectRouteIssues(entry);
+
+    for (const issue of issues) {
+      context.addIssue({
+        code: 'custom',
+        path: ['entries', index, issue.field],
+        message: issue.message,
+      });
+    }
+  }
+}
 
 type HostPort = z.infer<typeof hostPortSchema>;
 
@@ -103,30 +126,7 @@ function collectHostPortIssues(entry: HostPort): readonly HostPortIssue[] {
   ];
 }
 
-function checkEntries(exposure: Exposure, context: z.RefinementCtx): void {
-  const names = exposure.entries.map((entry) => entry.name);
-
-  for (const [index, entry] of exposure.entries.entries()) {
-    if (names.indexOf(entry.name) !== index) {
-      context.addIssue({
-        code: 'custom',
-        path: ['entries', index, 'name'],
-        message: `${entry.name} names another entry`,
-      });
-    }
-
-    const issues =
-      entry.kind === 'host-port' ? collectHostPortIssues(entry) : collectRouteIssues(entry);
-
-    for (const issue of issues) {
-      context.addIssue({
-        code: 'custom',
-        path: ['entries', index, issue.field],
-        message: issue.message,
-      });
-    }
-  }
-}
+export type ExposureEntry = Exposure['entries'][number];
 
 type Route = Exclude<ExposureEntry, HostPort>;
 

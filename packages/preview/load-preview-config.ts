@@ -73,6 +73,21 @@ function requireValue(env: Readonly<Record<string, string | undefined>>, name: s
   return value;
 }
 
+function parseRepos(list: string, name: string): ReadonlySet<string> {
+  const repos = list
+    .split(',')
+    .map((repo) => repo.trim())
+    .filter((repo) => repo !== '');
+
+  const invalidRepo = repos.find((repo) => !/^[\w.-]+\/(?:[\w.-]+|\*)$/u.test(repo));
+
+  if (invalidRepo !== undefined) {
+    throw new Error(`${name} names ${invalidRepo}, which is not owner/name or owner/*`);
+  }
+
+  return new Set(repos);
+}
+
 function requireInteger(
   env: Readonly<Record<string, string | undefined>>,
   name: string,
@@ -86,17 +101,6 @@ function requireInteger(
   }
 
   return value;
-}
-
-function parseListener(address: string): Listener {
-  const match = /^(?<hostname>.+):(?<port>\d+)$/u.exec(address);
-  const hostname = match?.groups?.['hostname'];
-
-  if (hostname === undefined) {
-    throw new Error(`${address} is not host:port`);
-  }
-
-  return { hostname, port: Number(match?.groups?.['port']) };
 }
 
 function parseContractSettings(
@@ -117,17 +121,13 @@ function parseContractSettings(
   };
 }
 
-function parseRepos(list: string, name: string): ReadonlySet<string> {
-  const repos = list
-    .split(',')
-    .map((repo) => repo.trim())
-    .filter((repo) => repo !== '');
+function parseListener(address: string): Listener {
+  const match = /^(?<hostname>.+):(?<port>\d+)$/u.exec(address);
+  const hostname = match?.groups?.['hostname'];
 
-  const invalidRepo = repos.find((repo) => !/^[\w.-]+\/(?:[\w.-]+|\*)$/u.test(repo));
-
-  if (invalidRepo !== undefined) {
-    throw new Error(`${name} names ${invalidRepo}, which is not owner/name or owner/*`);
+  if (hostname === undefined) {
+    throw new Error(`${address} is not host:port`);
   }
 
-  return new Set(repos);
+  return { hostname, port: Number(match?.groups?.['port']) };
 }

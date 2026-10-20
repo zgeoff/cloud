@@ -40,25 +40,12 @@ export function buildStubRunner(...handlers: readonly StubHandler[]): StubRunner
 
       calls.push(call);
 
-      const answer = await findAnswer(handlers, call);
+      const answer = await runHandlers(handlers, call);
 
       return toRunResult(answer);
     },
     calls,
   };
-}
-
-async function findAnswer(handlers: readonly StubHandler[], call: StubCall) {
-  for (const handler of handlers) {
-    const answer = await handler(call);
-
-    if (answer !== undefined) {
-      return answer;
-    }
-  }
-
-  // a call no handler answers ends as a stand-in's unknown command does
-  return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
 }
 
 function toCallOptions(
@@ -69,6 +56,19 @@ function toCallOptions(
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     ...(options.env === undefined ? {} : { env: options.env }),
   };
+}
+
+async function runHandlers(handlers: readonly StubHandler[], call: StubCall) {
+  for (const handler of handlers) {
+    const answer = await handler(call);
+
+    if (answer !== undefined) {
+      return answer;
+    }
+  }
+
+  // a call no handler answers ends as a stand-in's unknown command does
+  return { exitCode: 97, stderr: `unexpected: ${JSON.stringify(call.argv)}\n` };
 }
 
 function toRunResult(answer: Readonly<StubAnswer>): RunResult {

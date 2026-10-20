@@ -53,6 +53,28 @@ export async function applyReleasePins(
   return undefined;
 }
 
+async function loadPinFiles(root: string, record: ReleaseRecord) {
+  const assetFiles = record.pins.flatMap((pin) =>
+    pin.lines.flatMap((line) =>
+      Object.values(line.parts).flatMap((part) =>
+        part.kind === 'sum' && typeof part.asset !== 'string' ? [part.asset.file] : [],
+      ),
+    ),
+  );
+
+  const paths = new Set([...collectPinFiles(record), ...assetFiles]);
+
+  const entries = await Promise.all(
+    [...paths].map(async (path) => {
+      const contents = await readFile(join(root, path), 'utf8').catch(() => null);
+
+      return contents === null ? [] : [[path, contents] as const];
+    }),
+  );
+
+  return Object.fromEntries(entries.flat());
+}
+
 function planTableWrite(
   record: ReleaseRecord,
   files: Readonly<Record<string, string>>,
@@ -104,23 +126,22 @@ async function writeLockedPins(
   return generated;
 }
 
-async function runGenerator(
-  options: Readonly<ApplyReleasePinsOptions>,
-): Promise<Error | undefined> {
-  const generator = options.record.generated;
+async function writePinFiles(
+  root: string,
+  contents: Readonly<Record<string, string>>,
+  paths: readonly string[],
+) {
+  await Promise.all(paths.map((path) => writePinFile(join(root, path), contents[path] ?? '')));
+}
 
-  if (generator === undefined) {
-    return undefined;
-  }
+async function writePinFile(path: string, contents: string) {
+  const stats = await stat(path);
 
-  const tag = `${options.record.tagPrefix}${options.version}`;
+  await writeFile(`${path}.new`, contents);
+  await chmod(`${path}.new`, stats.mode);
 
-  const ran = await runChecked(options.run, ['bun', join(options.root, generator.script), tag], {
-    cwd: options.root,
-    env: options.env,
-  });
-
-  return ran instanceof Error ? ran : undefined;
+  // only the rename replaces the file, so a failed write leaves it as it was
+  await rename(`${path}.new`, path);
 }
 
 async function runLocks(
@@ -138,46 +159,6 @@ async function runLocks(
   }
 
   return undefined;
-}
-
-async function loadPinFiles(root: string, record: ReleaseRecord) {
-  const assetFiles = record.pins.flatMap((pin) =>
-    pin.lines.flatMap((line) =>
-      Object.values(line.parts).flatMap((part) =>
-        part.kind === 'sum' && typeof part.asset !== 'string' ? [part.asset.file] : [],
-      ),
-    ),
-  );
-
-  const paths = new Set([...collectPinFiles(record), ...assetFiles]);
-
-  const entries = await Promise.all(
-    [...paths].map(async (path) => {
-      const contents = await readFile(join(root, path), 'utf8').catch(() => null);
-
-      return contents === null ? [] : [[path, contents] as const];
-    }),
-  );
-
-  return Object.fromEntries(entries.flat());
-}
-
-async function writePinFiles(
-  root: string,
-  contents: Readonly<Record<string, string>>,
-  paths: readonly string[],
-) {
-  await Promise.all(paths.map((path) => writePinFile(join(root, path), contents[path] ?? '')));
-}
-
-async function writePinFile(path: string, contents: string) {
-  const stats = await stat(path);
-
-  await writeFile(`${path}.new`, contents);
-  await chmod(`${path}.new`, stats.mode);
-
-  // only the rename replaces the file, so a failed write leaves it as it was
-  await rename(`${path}.new`, path);
 }
 
 const nixImageFile = new URL('../nix-image.sh', import.meta.url);
@@ -237,4 +218,23 @@ async function checkLockedCommit(options: Readonly<ApplyReleasePinsOptions>, loc
     : new Error(
         `${lock.lockFile} locks ${lock.input} at ${String(rev)}, want ${options.values.commit ?? 'the release commit'}`,
       );
+}
+
+async function runGenerator(
+  options: Readonly<ApplyReleasePinsOptions>,
+): Promise<Error | undefined> {
+  const generator = options.record.generated;
+
+  if (generator === undefined) {
+    return undefined;
+  }
+
+  const tag = `${options.record.tagPrefix}${options.version}`;
+
+  const ran = await runChecked(options.run, ['bun', join(options.root, generator.script), tag], {
+    cwd: options.root,
+    env: options.env,
+  });
+
+  return ran instanceof Error ? ran : undefined;
 }

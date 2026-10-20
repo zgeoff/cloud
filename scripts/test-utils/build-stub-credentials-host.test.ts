@@ -28,7 +28,7 @@ test('it saves the bearer as the real write script does', async () => {
     buildMockCredentialsHostScenario({ directory: ctx.directory, files: {} }),
   );
 
-  const stub = buildStubRunner(host.handle);
+  const stub = buildStubRunner(host.answer);
 
   await stub.run(
     [
@@ -58,7 +58,7 @@ test('it exits 120 for a missing saved token, as the real check script does', as
     buildMockCredentialsHostScenario({ directory: ctx.directory, files: {} }),
   );
 
-  const stub = buildStubRunner(host.handle);
+  const stub = buildStubRunner(host.answer);
 
   const modelled = await stub.run(
     [
@@ -86,7 +86,7 @@ test('it exits 120 for a missing saved token, as the real check script does', as
 
 test('it adds glm from the line on stdin and prints it with droppedGrants, as impz secret add does', async () => {
   const host = buildStubCredentialsHost(buildMockCredentialsHostScenario({ secrets: [] }));
-  const stub = buildStubRunner(host.handle);
+  const stub = buildStubRunner(host.answer);
 
   const result = await stub.run(
     [
@@ -122,7 +122,7 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
     minted: 'imp_fixture_minted_token\n',
   });
 
-  const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
+  const stub = buildStubRunner(buildStubCredentialsHost(scenario).answer);
 
   const result = await stub.run(
     [
@@ -167,7 +167,7 @@ test('it fails the mint as impd does, writing no file, when a secret atc-cloud m
     files: {},
   });
 
-  const stub = buildStubRunner(buildStubCredentialsHost(scenario).handle);
+  const stub = buildStubRunner(buildStubCredentialsHost(scenario).answer);
 
   const result = await stub.run(
     [
@@ -190,7 +190,7 @@ test('it fails the mint as impd does, writing no file, when a secret atc-cloud m
 
 test('it fails docker exec as docker does when imp-host is stopped', async () => {
   const stub = buildStubRunner(
-    buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'info' })).handle,
+    buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'info' })).answer,
   );
 
   const result = await stub.run([
@@ -216,7 +216,7 @@ test('it stats the secrets directory and its files as stat -c prints them, and f
       buildMockCredentialsHostScenario({
         files: { 'gateway-token': { content: 'fixture-bearer\n', mode: '400' } },
       }),
-    ).handle,
+    ).answer,
   );
 
   const result = await stub.run([
@@ -242,7 +242,7 @@ test('it stats the secrets directory and its files as stat -c prints them, and f
 });
 
 test('it refuses a call to another host, or without BatchMode', async () => {
-  const stub = buildStubRunner(buildStubCredentialsHost(buildMockCredentialsHostScenario()).handle);
+  const stub = buildStubRunner(buildStubCredentialsHost(buildMockCredentialsHostScenario()).answer);
 
   const other = await stub.run([
     'ssh',
@@ -268,7 +268,7 @@ test('it refuses a call to another host, or without BatchMode', async () => {
 
 test('it fails every call with ssh’s 255 when the host is unreachable', async () => {
   const stub = buildStubRunner(
-    buildStubCredentialsHost(buildMockCredentialsHostScenario({ unreachable: true })).handle,
+    buildStubCredentialsHost(buildMockCredentialsHostScenario({ unreachable: true })).answer,
   );
 
   const result = await stub.run([

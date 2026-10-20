@@ -9,7 +9,7 @@ export function buildStubConfig(
     getBoolean: (key) => {
       const raw = values[key];
 
-      return raw === undefined ? undefined : parseBoolean(key, raw);
+      return raw === undefined ? undefined : isConfigTrue(key, raw);
     },
     getObject: (key) => {
       const raw = values[key];
@@ -37,7 +37,7 @@ function findValue<K extends string>(
 // Pulumi.yaml's name, which a bare `new Config()` takes as its namespace
 const projectName = 'geoff-cloud';
 
-function parseBoolean(key: string, raw: string): boolean {
+function isConfigTrue(key: string, raw: string): boolean {
   if (raw === 'true' || raw === 'false') {
     return raw === 'true';
   }

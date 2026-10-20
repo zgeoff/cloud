@@ -1,16 +1,16 @@
 import type { ActionsConcurrency } from './parse-actions-workflow.ts';
 
+interface JoinResult<Holder> {
+  readonly started: boolean;
+  readonly cancelled: readonly Holder[];
+}
+
 // One GitHub Actions concurrency group, per GitHub's "Control the concurrency of workflows and
 // jobs" on 2026-10-13: one holder runs at a time, and the others wait in the order they joined.
 export interface StubConcurrencyGroup<Holder> {
   readonly join: (holder: Holder) => JoinResult<Holder>;
 
   readonly finish: () => Holder | undefined;
-}
-
-interface JoinResult<Holder> {
-  readonly started: boolean;
-  readonly cancelled: readonly Holder[];
 }
 
 export function buildStubConcurrencyGroup<Holder>(

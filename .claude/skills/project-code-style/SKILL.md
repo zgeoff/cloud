@@ -8,19 +8,19 @@ description:
 
 # cloud code style
 
-The shared `code-style` skill holds the rules and the shared verb list. This skill holds only what
+The shared `code-style` skill holds the rules and the shared verbs. This skill holds only what
 cloud adds to them, and never relaxes a rule there.
 
 ## Project verbs
 
-cloud adds these verbs to the shared taxonomy. Each sits close to a shared verb, so each carries
-the meaning that tells it apart: `decide` is a pure producer, and the others are effectful. A new verb goes here and into the `verbs` option of
-`zgeoff/function-verb` in [`.oxlintrc.json`](../../../.oxlintrc.json) in the same PR, and
-`check-project-verbs.sh` fails when the two lists differ.
+cloud gives each of these verbs a job that no shared verb names. Each sits close to a shared verb,
+so each says what tells it apart: `decide` is a pure producer, and the others are effectful.
 
-- `decide`: picks one outcome of a closed set, with its reason, from the facts it is given, as
-  opposed to `pick`, which selects among known alternatives and gives no reason, and `plan`, which
-  computes an action to perform. [`decide`](../../../scripts/release/decide.ts) is one.
+- `decide`: returns a verdict from the facts it is given. A verdict is one outcome of a closed set
+  with the data the caller acts on, such as the reason a run holds. A function that returns only
+  the chosen alternative makes a choice and starts with `pick`, and one that computes an action to
+  perform starts with `plan`.
+  [`decide`](../../../scripts/release/decide.ts) is one.
 - `install`: puts a credential or artifact where its consumer reads it, skipping each part that
   already exists, as opposed to `create`, which brings a new resource into existence, and `write`,
   which persists what it is given.

@@ -9,7 +9,7 @@ import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
 // Each test runs real git in its own repository, against a manifest it writes; the manifest's own
-// gates are covered by needs-gate.test.ts.
+// gates are covered by is-gate-needed.test.ts.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-decide-gates-'));
 

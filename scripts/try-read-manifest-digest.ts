@@ -15,15 +15,6 @@ export async function tryReadManifestDigest(
   }
 }
 
-// an image index or a single manifest, in OCI's or Docker's media type: the registry answers with
-// the digest of whichever the tag names, which is what a pin holds
-const manifestTypes = [
-  'application/vnd.oci.image.index.v1+json',
-  'application/vnd.docker.distribution.manifest.list.v2+json',
-  'application/vnd.docker.distribution.manifest.v2+json',
-  'application/vnd.oci.image.manifest.v1+json',
-].join(', ');
-
 async function readManifestDigest(
   name: string,
   reference: string,
@@ -47,23 +38,6 @@ async function readManifestDigest(
   return toRegistryAnswer(response.status, response.headers.get('docker-content-digest'));
 }
 
-function toRegistryAnswer(status: number, digest: string | null): RegistryAnswer {
-  if (status === 404) {
-    return { missing: true };
-  }
-
-  // ghcr.io answers 401 or 403 when the token cannot read a private package
-  if (status === 401 || status === 403) {
-    return { error: `the registry answered ${status}: the credential cannot read it` };
-  }
-
-  if (status !== 200) {
-    return { error: `the registry answered ${status}` };
-  }
-
-  return digest === null ? { error: 'the registry named no digest' } : { digest };
-}
-
 function resolveRegistry(name: string): { readonly host: string; readonly repository: string } {
   const [first = '', ...rest] = name.split('/');
 
@@ -74,6 +48,15 @@ function resolveRegistry(name: string): { readonly host: string; readonly reposi
   // Docker Hub's names carry no host, and an official image's name no namespace
   return { host: 'registry-1.docker.io', repository: rest.length > 0 ? name : `library/${name}` };
 }
+
+// an image index or a single manifest, in OCI's or Docker's media type: the registry answers with
+// the digest of whichever the tag names, which is what a pin holds
+const manifestTypes = [
+  'application/vnd.oci.image.index.v1+json',
+  'application/vnd.docker.distribution.manifest.list.v2+json',
+  'application/vnd.docker.distribution.manifest.v2+json',
+  'application/vnd.oci.image.manifest.v1+json',
+].join(', ');
 
 function sendManifestHead(url: string, token: string | undefined): Promise<Response> {
   return fetch(url, {
@@ -172,4 +155,21 @@ function findToken(body: unknown): string | undefined {
   const token = fields['token'] ?? fields['access_token'];
 
   return typeof token === 'string' && token !== '' ? token : undefined;
+}
+
+function toRegistryAnswer(status: number, digest: string | null): RegistryAnswer {
+  if (status === 404) {
+    return { missing: true };
+  }
+
+  // ghcr.io answers 401 or 403 when the token cannot read a private package
+  if (status === 401 || status === 403) {
+    return { error: `the registry answered ${status}: the credential cannot read it` };
+  }
+
+  if (status !== 200) {
+    return { error: `the registry answered ${status}` };
+  }
+
+  return digest === null ? { error: 'the registry named no digest' } : { digest };
 }

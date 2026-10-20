@@ -64,6 +64,10 @@ async function runBuildAndCheck(options: Readonly<CreateAgentImageOptions>, run:
   }
 }
 
+async function removeImage(io: Readonly<ScriptIO>, image: string) {
+  await runOrExit(io, buildImpArgv(['image', 'rm', image]));
+}
+
 interface CheckResult {
   readonly image: string;
   readonly digest: string;
@@ -89,8 +93,4 @@ async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
   io.printOut(`${result.image} check failed; removed the image\n`);
 
   return 1;
-}
-
-async function removeImage(io: Readonly<ScriptIO>, image: string) {
-  await runOrExit(io, buildImpArgv(['image', 'rm', image]));
 }

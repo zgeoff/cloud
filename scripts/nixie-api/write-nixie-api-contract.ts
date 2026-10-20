@@ -4,7 +4,7 @@ import type { ScriptIO } from '../run-or-exit.ts';
 import { runOrExit } from '../run-or-exit.ts';
 import { runProcess } from '../run-process.ts';
 import { withExitCode } from '../with-exit-code.ts';
-import { renderNixieAPITypes } from './render-nixie-api-types.ts';
+import { generateNixieAPITypes } from './generate-nixie-api-types.ts';
 
 export interface WriteNixieAPIContractOptions extends ScriptIO {
   readonly args: readonly string[];
@@ -44,7 +44,7 @@ export function writeNixieAPIContract(
 
     const document = Buffer.from(answer.stdout.toString(), 'base64').toString('utf8');
 
-    const types = await renderNixieAPITypes(document);
+    const types = await generateNixieAPITypes(document);
 
     await writeFile(join(options.directory, 'openapi.json'), document);
     await writeFile(join(options.directory, 'openapi.d.ts'), types);

@@ -37,7 +37,7 @@ export async function runPublishedImagesBump(
     return 2;
   }
 
-  const moved = await findMovedTags(context, images);
+  const moved = await readMovedTags(context, images);
 
   if (moved !== undefined) {
     const print = moved instanceof Error ? context.printErr : context.printOut;
@@ -84,7 +84,7 @@ export async function runPublishedImagesBump(
   });
 }
 
-async function findMovedTags(
+async function readMovedTags(
   context: BumpContext,
   images: readonly PublishedImage[],
 ): Promise<{ readonly message: string } | Error | undefined> {
@@ -141,6 +141,18 @@ async function readMainFiles(context: BumpContext, paths: readonly string[]) {
   }
 
   return files;
+}
+
+async function loadFiles(root: string, paths: readonly string[]) {
+  const entries = await Promise.all(
+    [...new Set(paths)].map(async (path) => {
+      const contents = await readFile(join(root, path), 'utf8').catch(() => null);
+
+      return contents === null ? [] : [[path, contents] as const];
+    }),
+  );
+
+  return Object.fromEntries(entries.flat());
 }
 
 function collectTags(files: Readonly<Record<string, string>>, images: readonly PublishedImage[]) {
@@ -252,18 +264,6 @@ function planLabels(version: string, record: ReleaseRecord, held: PinValues) {
   // a bump that moves no release version, such as a new backup image revision alone, has no update
   // type to rate
   return moves ? planBumpLabels(version, pinned, []) : ['needs-review'];
-}
-
-async function loadFiles(root: string, paths: readonly string[]) {
-  const entries = await Promise.all(
-    [...new Set(paths)].map(async (path) => {
-      const contents = await readFile(join(root, path), 'utf8').catch(() => null);
-
-      return contents === null ? [] : [[path, contents] as const];
-    }),
-  );
-
-  return Object.fromEntries(entries.flat());
 }
 
 function findRunURL(env: Readonly<Record<string, string | undefined>>) {

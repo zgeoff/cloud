@@ -30,6 +30,18 @@ export interface PinPlan {
   readonly written: readonly Pin[];
 }
 
+interface LineEdit {
+  readonly file: string;
+  readonly index: number;
+  readonly text: string;
+}
+
+interface PinStep {
+  readonly pin: Pin;
+  readonly note: string;
+  readonly edits: readonly LineEdit[];
+}
+
 export function planPinEdits(input: PinEditsInput): PinPlan | Error {
   if (parseReleaseVersion(input.version) === undefined) {
     return new Error(`not a release version: '${input.version}'`);
@@ -57,18 +69,6 @@ export function planPinEdits(input: PinEditsInput): PinPlan | Error {
   };
 }
 
-interface LineEdit {
-  readonly file: string;
-  readonly index: number;
-  readonly text: string;
-}
-
-interface PinStep {
-  readonly pin: Pin;
-  readonly note: string;
-  readonly edits: readonly LineEdit[];
-}
-
 function planPin(pin: Pin, input: PinEditsInput): PinStep | Error {
   const matches = collectMatches(pin, input.files);
   const wanted = collectWantedParts(pin, input);
@@ -88,57 +88,6 @@ function planPin(pin: Pin, input: PinEditsInput): PinStep | Error {
   }
 
   return planPinStep({ pin, matches, wanted, held, version: input.version });
-}
-
-interface PinState {
-  readonly pin: Pin;
-  readonly matches: readonly PinMatch[];
-  readonly wanted: Readonly<Record<string, string>>;
-  readonly held: Readonly<Record<string, string>>;
-  readonly version: string;
-}
-
-function planPinStep(state: PinState): PinStep | Error {
-  if (state.held['version'] === undefined) {
-    return planTagStep(state);
-  }
-
-  const pinned = state.held['version'];
-
-  if (pinned === state.version) {
-    return (
-      findOtherValue(state) ?? {
-        pin: state.pin,
-        note: `${state.pin.id} already pins ${state.version}`,
-        edits: [],
-      }
-    );
-  }
-
-  // a release job that finishes after a newer release's job must not move the pin back
-  if (isPinnedNewer(pinned, state.version)) {
-    return {
-      pin: state.pin,
-      note: `${state.pin.id} pins ${pinned}, which is newer than ${state.version}`,
-      edits: [],
-    };
-  }
-
-  return {
-    pin: state.pin,
-    note: `pinned ${state.pin.id} ${state.version}`,
-    edits: planLineEdits(state),
-  };
-}
-
-function planTagStep(state: PinState): PinStep {
-  const keys = Object.keys(state.wanted);
-  const to = keys.map((key) => state.wanted[key] ?? '').join(' ');
-
-  // a pin with no version, such as an image tag with its own revision, has no order to keep
-  return keys.every((key) => state.held[key] === state.wanted[key])
-    ? { pin: state.pin, note: `${state.pin.id} already pins ${to}`, edits: [] }
-    : { pin: state.pin, note: `pinned ${state.pin.id} ${to}`, edits: planLineEdits(state) };
 }
 
 function collectMatches(pin: Pin, files: Readonly<Record<string, string>>) {
@@ -215,6 +164,12 @@ function resolveSum(asset: Extract<PinPart, { kind: 'sum' }>['asset'], input: Pi
     : findAssetSum(input.values.sha256sums ?? '', named.groups['asset'] ?? '');
 }
 
+function toPartKey(part: PinPart) {
+  return part.kind === 'digest' || part.kind === 'image-tag'
+    ? `${part.kind}:${part.image}`
+    : part.kind;
+}
+
 function collectHeldParts(pin: Pin, matches: readonly PinMatch[]) {
   const held: Record<string, string> = {};
 
@@ -236,18 +191,55 @@ function collectHeldParts(pin: Pin, matches: readonly PinMatch[]) {
   return held;
 }
 
-function findOtherValue(state: PinState) {
-  const key = state.pin.lines
-    .flatMap((line) => Object.values(line.parts))
-    .filter((part) => part.kind === 'sum' || part.kind === 'digest' || part.kind === 'tarball-sum')
-    .map((part) => toPartKey(part))
-    .find((each) => state.held[each] !== state.wanted[each]);
+interface PinState {
+  readonly pin: Pin;
+  readonly matches: readonly PinMatch[];
+  readonly wanted: Readonly<Record<string, string>>;
+  readonly held: Readonly<Record<string, string>>;
+  readonly version: string;
+}
 
-  return key === undefined
-    ? undefined
-    : new Error(
-        `${state.pin.id} pins ${state.version} with ${state.held[key] ?? ''}, but the release lists ${state.wanted[key] ?? ''}`,
-      );
+function planPinStep(state: PinState): PinStep | Error {
+  if (state.held['version'] === undefined) {
+    return planTagStep(state);
+  }
+
+  const pinned = state.held['version'];
+
+  if (pinned === state.version) {
+    return (
+      findOtherValue(state) ?? {
+        pin: state.pin,
+        note: `${state.pin.id} already pins ${state.version}`,
+        edits: [],
+      }
+    );
+  }
+
+  // a release job that finishes after a newer release's job must not move the pin back
+  if (isPinnedNewer(pinned, state.version)) {
+    return {
+      pin: state.pin,
+      note: `${state.pin.id} pins ${pinned}, which is newer than ${state.version}`,
+      edits: [],
+    };
+  }
+
+  return {
+    pin: state.pin,
+    note: `pinned ${state.pin.id} ${state.version}`,
+    edits: planLineEdits(state),
+  };
+}
+
+function planTagStep(state: PinState): PinStep {
+  const keys = Object.keys(state.wanted);
+  const to = keys.map((key) => state.wanted[key] ?? '').join(' ');
+
+  // a pin with no version, such as an image tag with its own revision, has no order to keep
+  return keys.every((key) => state.held[key] === state.wanted[key])
+    ? { pin: state.pin, note: `${state.pin.id} already pins ${to}`, edits: [] }
+    : { pin: state.pin, note: `pinned ${state.pin.id} ${to}`, edits: planLineEdits(state) };
 }
 
 type Span = PinMatch['spans'][string];
@@ -278,6 +270,27 @@ function planLineEdits(state: PinState): LineEdit[] {
   });
 }
 
+function findOtherValue(state: PinState) {
+  const key = state.pin.lines
+    .flatMap((line) => Object.values(line.parts))
+    .filter((part) => part.kind === 'sum' || part.kind === 'digest' || part.kind === 'tarball-sum')
+    .map((part) => toPartKey(part))
+    .find((each) => state.held[each] !== state.wanted[each]);
+
+  return key === undefined
+    ? undefined
+    : new Error(
+        `${state.pin.id} pins ${state.version} with ${state.held[key] ?? ''}, but the release lists ${state.wanted[key] ?? ''}`,
+      );
+}
+
+function isPinnedNewer(pinned: string, version: string) {
+  const held = parseReleaseVersion(pinned);
+  const target = parseReleaseVersion(version);
+
+  return held !== undefined && target !== undefined && isNewerVersion(held, target);
+}
+
 function mergeLineEdits(files: Readonly<Record<string, string>>, edits: readonly LineEdit[]) {
   const lines: Record<string, string[]> = {};
 
@@ -291,17 +304,4 @@ function mergeLineEdits(files: Readonly<Record<string, string>>, edits: readonly
   return Object.fromEntries(
     Object.keys(lines).map((file) => [file, lines[file]?.join('\n') ?? '']),
   );
-}
-
-function isPinnedNewer(pinned: string, version: string) {
-  const held = parseReleaseVersion(pinned);
-  const target = parseReleaseVersion(version);
-
-  return held !== undefined && target !== undefined && isNewerVersion(held, target);
-}
-
-function toPartKey(part: PinPart) {
-  return part.kind === 'digest' || part.kind === 'image-tag'
-    ? `${part.kind}:${part.image}`
-    : part.kind;
 }

@@ -1,7 +1,7 @@
 import { appendFile } from 'node:fs/promises';
 import type { Runner } from '../run-process.ts';
 import { runProcess } from '../run-process.ts';
-import { findReleaseBumps } from './find-release-bumps.ts';
+import { readReleaseBumps } from './read-release-bumps.ts';
 
 export interface RunWriteReleaseBumpsOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -23,7 +23,7 @@ export async function runWriteReleaseBumps(
     return 2;
   }
 
-  const bumps = await findReleaseBumps(options.root, options.run);
+  const bumps = await readReleaseBumps(options.root, options.run);
 
   if (bumps instanceof Error) {
     options.printErr(`${bumps.message}\n`);

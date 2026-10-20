@@ -1,23 +1,12 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
 
-export const nixieAPIPort = 8080;
 export const nixieLabels = { app: 'nixie' };
-export const nixieSecretsFileKey = 'secrets.yaml';
-export const nixieAgeKeyKey = 'age-key.txt';
-export const definitionsDeployKeyKey = 'ssh';
-export const definitionsKnownHostsKey = 'known_hosts';
-export const nixieConfigKey = 'config.yaml';
 
 // from https://api.github.com/meta (ssh_keys). The host blocks outbound port 22, so git-sync
 // reaches GitHub's SSH on 443, which serves the same key
 export const githubKnownHosts =
   '[ssh.github.com]:443 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n';
-
-const gitSyncImage =
-  'registry.k8s.io/git-sync/git-sync:v4.7.1@sha256:c5e1976da735bf0b53979f079a07475d77174c51863cd084e928ff6074480717';
-
-const definitionsRoot = '/etc/nixie/definitions';
 
 export interface NixieSpecInputs {
   readonly image: string;
@@ -89,6 +78,12 @@ const lockedDown: input.core.v1.SecurityContext = {
   capabilities: { drop: ['ALL'] },
 };
 
+export const nixieAPIPort = 8080;
+export const nixieSecretsFileKey = 'secrets.yaml';
+export const nixieAgeKeyKey = 'age-key.txt';
+export const nixieConfigKey = 'config.yaml';
+const definitionsRoot = '/etc/nixie/definitions';
+
 function buildNixieContainer(image: string): input.core.v1.Container {
   return {
     name: 'nixie',
@@ -145,6 +140,12 @@ function buildNixieContainer(image: string): input.core.v1.Container {
     resources: { requests: { cpu: '100m', memory: '256Mi' }, limits: { memory: '1Gi' } },
   };
 }
+
+export const definitionsDeployKeyKey = 'ssh';
+export const definitionsKnownHostsKey = 'known_hosts';
+
+const gitSyncImage =
+  'registry.k8s.io/git-sync/git-sync:v4.7.1@sha256:c5e1976da735bf0b53979f079a07475d77174c51863cd084e928ff6074480717';
 
 function buildGitSyncContainer(): input.core.v1.Container {
   return {

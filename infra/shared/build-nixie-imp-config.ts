@@ -38,10 +38,10 @@ function splitCIDR(cidr: string): { readonly address: string; readonly prefixLen
   return { address, prefixLength: Number(prefixLength) };
 }
 
-function toIPv4Number(address: string): number {
-  return address.split('.').reduce((value, octet) => value * 256 + Number(octet), 0);
-}
-
 function toIPv4(value: number): string {
   return [24, 16, 8, 0].map((shift) => Math.floor(value / 2 ** shift) % 256).join('.');
+}
+
+function toIPv4Number(address: string): number {
+  return address.split('.').reduce((value, octet) => value * 256 + Number(octet), 0);
 }

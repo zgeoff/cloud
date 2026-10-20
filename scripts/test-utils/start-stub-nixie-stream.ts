@@ -17,6 +17,12 @@ export interface StubStream {
   readonly stop: () => void;
 }
 
+interface StreamState {
+  controller: ReadableStreamDefaultController<Uint8Array> | null;
+  readonly timers: ReturnType<typeof setTimeout>[];
+  readonly encoder: TextEncoder;
+}
+
 export function startStubNixieStream(options: StubStreamOptions): StubStream {
   const state: StreamState = { controller: null, timers: [], encoder: new TextEncoder() };
 
@@ -61,12 +67,6 @@ export function startStubNixieStream(options: StubStreamOptions): StubStream {
       stopStream(state);
     },
   };
-}
-
-interface StreamState {
-  controller: ReadableStreamDefaultController<Uint8Array> | null;
-  readonly timers: ReturnType<typeof setTimeout>[];
-  readonly encoder: TextEncoder;
 }
 
 function sendText(state: StreamState, text: string): void {

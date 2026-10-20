@@ -6,11 +6,14 @@ export interface StubNixieAPIContractScenario {
   readonly error?: string;
 }
 
-const script = 'scripts/nixie-api/write-nixie-api-contract.ts';
-
 export function buildStubNixieAPIContract(scenario: StubNixieAPIContractScenario): StubHandler {
-  return (call) => (isContractCall(call) ? writeContract(scenario, call) : undefined);
+  const answerCall: StubHandler = (call) =>
+    isContractCall(call) ? writeContract(scenario, call) : undefined;
+
+  return answerCall;
 }
+
+const script = 'scripts/nixie-api/write-nixie-api-contract.ts';
 
 function isContractCall(call: StubCall) {
   const cwd = call.options.cwd;

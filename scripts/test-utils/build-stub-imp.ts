@@ -30,6 +30,13 @@ export interface StubImp {
   readonly builtDockerfiles: readonly string[];
 }
 
+interface StubImpState {
+  readonly scenario: Readonly<StubImpScenario>;
+  readonly images: StubImpImage[];
+  readonly imps: StubImpInstance[];
+  readonly builtDockerfiles: string[];
+}
+
 export function buildStubImp(scenario: Readonly<StubImpScenario>): StubImp {
   const state: StubImpState = {
     scenario,
@@ -44,13 +51,6 @@ export function buildStubImp(scenario: Readonly<StubImpScenario>): StubImp {
     imps: state.imps,
     builtDockerfiles: state.builtDockerfiles,
   };
-}
-
-interface StubImpState {
-  readonly scenario: Readonly<StubImpScenario>;
-  readonly images: StubImpImage[];
-  readonly imps: StubImpInstance[];
-  readonly builtDockerfiles: string[];
 }
 
 type ImpCommand = (
@@ -76,15 +76,6 @@ function buildImpAnswer(state: StubImpState, call: StubCall): StubAnswer | Promi
   }
 
   return command[1](state, args);
-}
-
-function isShapeOf(shape: string, args: readonly string[]) {
-  const words = shape.split(' ');
-
-  return (
-    words.length === args.length &&
-    words.every((word, index) => word === '*' || word === args[index])
-  );
 }
 
 function buildImageList(state: StubImpState): StubAnswer {
@@ -158,4 +149,13 @@ function removeImp(state: StubImpState, name: string): StubAnswer {
   state.imps.splice(index, 1);
 
   return {};
+}
+
+function isShapeOf(shape: string, args: readonly string[]) {
+  const words = shape.split(' ');
+
+  return (
+    words.length === args.length &&
+    words.every((word, index) => word === '*' || word === args[index])
+  );
 }

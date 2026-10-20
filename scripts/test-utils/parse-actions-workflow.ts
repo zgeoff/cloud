@@ -111,6 +111,10 @@ function parseJob(name: string, definition: unknown): ActionsJob {
   };
 }
 
+function isStringArray(value: unknown): value is readonly string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
 const stepOutput =
   /^\$\{\{\s*steps\.(?<step>[A-Za-z_][\w-]*)\.outputs\.(?<output>[A-Za-z_][\w-]*)\s*\}\}$/u;
 
@@ -134,8 +138,4 @@ function parseOutputs(job: string, value: unknown): Record<string, ActionsJobOut
       return [entry[0], { step: groups['step'], output: groups['output'] }];
     }),
   );
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }

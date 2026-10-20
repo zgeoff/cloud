@@ -12,7 +12,7 @@ export interface StubOpScenario {
 }
 
 export interface StubOp {
-  readonly handle: StubHandler;
+  readonly answer: StubHandler;
 
   readonly vaults: Readonly<Record<string, Readonly<Record<string, string>>>>;
 
@@ -23,7 +23,7 @@ export function buildStubOp(scenario: StubOpScenario): StubOp {
   const tokensSeen: (string | undefined)[] = [];
 
   return {
-    handle: (call) => {
+    answer: (call) => {
       const isOp = call.argv[0] === 'op';
 
       if (isOp) {
@@ -68,17 +68,6 @@ function buildOpAnswer(scenario: StubOpScenario, call: StubCall) {
     : command[1](scenario, call, match.slice(1));
 }
 
-function buildNoVaultError(vault: string) {
-  return {
-    exitCode: 1,
-    stderr: `[ERROR] 2026/10/07 12:00:00 "${vault}" isn't a vault in this account. Specify the vault with its ID or name.\n`,
-  };
-}
-
-// the rate-limit text from www.1password.dev/service-accounts/rate-limits/
-const rateLimitError =
-  "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.\n";
-
 function buildVaultAnswer(scenario: StubOpScenario, args: readonly string[]) {
   const vault = args[0] ?? '';
 
@@ -89,16 +78,16 @@ function buildVaultAnswer(scenario: StubOpScenario, args: readonly string[]) {
   return { stdout: `${JSON.stringify({ id: 'fixture-vault-id', name: vault })}\n` };
 }
 
-function buildItem(vault: string, title: string) {
-  // the item JSON of www.1password.dev/cli/item-template-json/, without the timestamps
+function buildNoVaultError(vault: string) {
   return {
-    id: 'fixture-item-id',
-    title,
-    version: 1,
-    vault: { id: 'fixture-vault-id', name: vault },
-    category: 'API_CREDENTIAL',
+    exitCode: 1,
+    stderr: `[ERROR] 2026/10/07 12:00:00 "${vault}" isn't a vault in this account. Specify the vault with its ID or name.\n`,
   };
 }
+
+// the rate-limit text from www.1password.dev/service-accounts/rate-limits/
+const rateLimitError =
+  "[ERROR] 2026/10/07 12:00:00 (429) Too Many Requests: You've reached the maximum number of this type of requests this service account is allowed to make. Please retry in 59 minutes or try other requests.\n";
 
 function buildListAnswer(scenario: StubOpScenario, args: readonly string[]) {
   const vault = args[0] ?? '';
@@ -115,6 +104,17 @@ function buildListAnswer(scenario: StubOpScenario, args: readonly string[]) {
   const listed = Object.keys(items).map((title) => buildItem(vault, title));
 
   return { stdout: `${JSON.stringify(listed, null, 2)}\n` };
+}
+
+function buildItem(vault: string, title: string) {
+  // the item JSON of www.1password.dev/cli/item-template-json/, without the timestamps
+  return {
+    id: 'fixture-item-id',
+    title,
+    version: 1,
+    vault: { id: 'fixture-vault-id', name: vault },
+    category: 'API_CREDENTIAL',
+  };
 }
 
 function createItem(scenario: StubOpScenario, call: StubCall, args: readonly string[]) {

@@ -45,28 +45,25 @@ test('it fails on a pin file the checkout lacks', () => {
   );
 });
 
-const checkedRecords = releaseRegistry.filter(
-  (record) => record.source.kind !== 'published-images',
-);
+test.each(
+  releaseRegistry
+    .filter((record) => record.source.kind !== 'published-images')
+    .map((record) => [record.name, record] as const),
+)('it finds a release version for every %s pin in the real checkout', async (_name, record) => {
+  const checkout = join(import.meta.dir, '../..');
 
-test.each(checkedRecords.map((record) => [record.name, record] as const))(
-  'it finds a release version for every %s pin in the real checkout',
-  async (_name, record) => {
-    const checkout = join(import.meta.dir, '../..');
+  const entries = await Promise.all(
+    collectPinFiles(record).map(
+      async (path) => [path, await readFile(join(checkout, path), 'utf8')] as const,
+    ),
+  );
 
-    const entries = await Promise.all(
-      collectPinFiles(record).map(
-        async (path) => [path, await readFile(join(checkout, path), 'utf8')] as const,
-      ),
-    );
+  const versions = findPinnedVersions(record, Object.fromEntries(entries));
 
-    const versions = findPinnedVersions(record, Object.fromEntries(entries));
+  if (versions instanceof Error) {
+    throw versions;
+  }
 
-    if (versions instanceof Error) {
-      throw versions;
-    }
-
-    expect(versions).toHaveLength(record.pins.length);
-    expect(versions).toSatisfyAll((version: string) => /^\d+\.\d+\.\d+$/u.test(version));
-  },
-);
+  expect(versions).toHaveLength(record.pins.length);
+  expect(versions).toSatisfyAll((version: string) => /^\d+\.\d+\.\d+$/u.test(version));
+});

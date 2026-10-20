@@ -11,6 +11,18 @@ export interface CheckTopologyOptions {
 
 const usage = 'usage: check-topology.ts [repo root]\n';
 
+interface Copy {
+  readonly file: string;
+  readonly field: string;
+  readonly actual: unknown;
+  readonly expected: unknown;
+}
+
+interface Source {
+  readonly file: string;
+  readonly collectCopies: (parsed: unknown) => readonly Omit<Copy, 'file'>[];
+}
+
 export async function checkTopology(options: Readonly<CheckTopologyOptions>): Promise<number> {
   if (options.args.length > 1) {
     options.printErr(usage);
@@ -36,18 +48,6 @@ export async function checkTopology(options: Readonly<CheckTopologyOptions>): Pr
     loaded.flatMap((copies) => copies ?? []),
     options,
   );
-}
-
-interface Copy {
-  readonly file: string;
-  readonly field: string;
-  readonly actual: unknown;
-  readonly expected: unknown;
-}
-
-interface Source {
-  readonly file: string;
-  readonly collectCopies: (parsed: unknown) => readonly Omit<Copy, 'file'>[];
 }
 
 const daemonPort = topology.atc.daemonPort;
@@ -83,31 +83,6 @@ const sources: readonly Source[] = [
   },
 ];
 
-async function loadCopies(root: string, source: Source): Promise<readonly Copy[] | undefined> {
-  const text = await readFile(join(root, source.file), 'utf8').catch(() => null);
-
-  if (text === null) {
-    return undefined;
-  }
-
-  return source.collectCopies(parseYAML(text)).map((copy) => ({
-    file: source.file,
-    field: copy.field,
-    actual: copy.actual,
-    expected: copy.expected,
-  }));
-}
-
-function parseYAML(text: string): unknown {
-  try {
-    const parsed: unknown = Bun.YAML.parse(text);
-
-    return parsed;
-  } catch {
-    return undefined;
-  }
-}
-
 function findPath(value: unknown, keys: readonly string[]): unknown {
   return keys.reduce((field: unknown, key) => findJSONField(field, key), value);
 }
@@ -138,6 +113,31 @@ function isTailscaleStep(step: unknown): boolean {
   const uses = findJSONField(step, 'uses');
 
   return typeof uses === 'string' && uses.startsWith('tailscale/github-action@');
+}
+
+async function loadCopies(root: string, source: Source): Promise<readonly Copy[] | undefined> {
+  const text = await readFile(join(root, source.file), 'utf8').catch(() => null);
+
+  if (text === null) {
+    return undefined;
+  }
+
+  return source.collectCopies(parseYAML(text)).map((copy) => ({
+    file: source.file,
+    field: copy.field,
+    actual: copy.actual,
+    expected: copy.expected,
+  }));
+}
+
+function parseYAML(text: string): unknown {
+  try {
+    const parsed: unknown = Bun.YAML.parse(text);
+
+    return parsed;
+  } catch {
+    return undefined;
+  }
 }
 
 function printReport(copies: readonly Copy[], options: Readonly<CheckTopologyOptions>): number {

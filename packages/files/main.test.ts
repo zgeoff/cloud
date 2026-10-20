@@ -12,7 +12,7 @@ async function setupTest() {
   onTestFinished(() => rm(dataDir, { recursive: true, force: true }));
 
   // a port the kernel just handed out and nothing holds now
-  const probe = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: () => new Response() });
+  const probe = Bun.serve({ port: 0, hostname: '127.0.0.1', routes: { '/': new Response() } });
   const port = probe.port;
 
   await probe.stop(true);

@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { collectBranchFiles } from './collect-branch-files.ts';
+import { readBranchFiles } from './read-branch-files.ts';
 
 test('it lists the files a new branch with no upstream changes', async () => {
   const ctx = await setupTest();
@@ -17,7 +17,7 @@ test('it lists the files a new branch with no upstream changes', async () => {
   await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
   await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files.toSorted()).toStrictEqual(['a.ts', 'b.ts']);
 });
@@ -33,7 +33,7 @@ test('it lists only the branch files once the branch is pushed with an upstream'
   await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
   await $`git push --quiet -u origin feature`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -43,7 +43,7 @@ test('it lists nothing when the branch has no commits of its own', async () => {
 
   await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual([]);
 });
@@ -59,7 +59,7 @@ test('it leaves out a file the branch deleted', async () => {
   await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
   await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -75,7 +75,7 @@ test('it falls back to origin/main when origin/HEAD is unset', async () => {
   await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
   await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual(['a.ts']);
 });
@@ -85,7 +85,7 @@ test('it rejects a repository with no origin', async () => {
 
   await $`git remote remove origin`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  expect(collectBranchFiles({ cwd: ctx.repo, env: ctx.env })).rejects.toThrowWithMessage(
+  expect(readBranchFiles({ cwd: ctx.repo, env: ctx.env })).rejects.toThrowWithMessage(
     Error,
     /cannot find the base of this branch/u,
   );
@@ -96,7 +96,7 @@ test('it exits non-zero with a message when run in a repository with no origin',
 
   await $`git remote remove origin`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const run = Bun.spawnSync([process.execPath, join(import.meta.dir, 'collect-branch-files.ts')], {
+  const run = Bun.spawnSync([process.execPath, join(import.meta.dir, 'read-branch-files.ts')], {
     cwd: ctx.repo,
     env: ctx.env,
   });
@@ -104,7 +104,7 @@ test('it exits non-zero with a message when run in a repository with no origin',
   expect(run.exitCode).toBe(1);
 
   expect(run.stderr.toString()).toStartWith(
-    'collect-branch-files: cannot find the base of this branch',
+    'read-branch-files: cannot find the base of this branch',
   );
 });
 
@@ -115,7 +115,7 @@ test('it lists nothing when the branch only deletes a file', async () => {
   await $`git rm --quiet README.md`.env(ctx.env).cwd(ctx.repo).quiet();
   await $`git commit --quiet -m remove`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env });
 
   expect(files).toStrictEqual([]);
 });
@@ -127,13 +127,13 @@ test('it lists a deleted file when deletions are included', async () => {
   await $`git rm --quiet README.md`.env(ctx.env).cwd(ctx.repo).quiet();
   await $`git commit --quiet -m remove`.env(ctx.env).cwd(ctx.repo).quiet();
 
-  const files = await collectBranchFiles({ cwd: ctx.repo, env: ctx.env, includeDeleted: true });
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env, includeDeleted: true });
 
   expect(files).toStrictEqual(['README.md']);
 });
 
 async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'collect-branch-files-'));
+  const directory = await mkdtemp(join(tmpdir(), 'read-branch-files-'));
 
   onTestFinished(async () => {
     await rm(directory, { recursive: true, force: true });

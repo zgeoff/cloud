@@ -81,6 +81,14 @@ function toRecords(
   );
 }
 
+function toText(value: unknown) {
+  if (typeof value !== 'string') {
+    throw new TypeError(`the stub imp files hold ${JSON.stringify(value)}, not a string`);
+  }
+
+  return value;
+}
+
 function parseArgv(line: string): readonly string[] {
   const value: unknown = JSON.parse(line);
 
@@ -89,14 +97,6 @@ function parseArgv(line: string): readonly string[] {
   }
 
   return value.map((item: unknown) => toText(item));
-}
-
-function toText(value: unknown) {
-  if (typeof value !== 'string') {
-    throw new TypeError(`the stub imp files hold ${JSON.stringify(value)}, not a string`);
-  }
-
-  return value;
 }
 
 async function runStubImpCall(argv: readonly string[]) {

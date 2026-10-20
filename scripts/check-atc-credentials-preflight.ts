@@ -28,7 +28,7 @@ export async function checkATCCredentialsPreflight(
   requireGrantableSecrets(secrets);
 
   const tokens = await loadHostImpJSON(context, ['token', 'ls']);
-  const hasItem = await hasDaemonTokenItem(context);
+  const hasItem = await probeDaemonTokenItem(context);
   const hostFiles = await readHostFiles(context);
 
   context.printOut(
@@ -77,7 +77,7 @@ function requireGrantableSecrets(secrets: unknown) {
   }
 }
 
-async function hasDaemonTokenItem(context: Readonly<ATCCredentialsContext>) {
+async function probeDaemonTokenItem(context: Readonly<ATCCredentialsContext>) {
   const text = await runOp(context, ['item', 'list', '--vault', context.vault, '--format', 'json']);
 
   const items = parseJSONOutput(text, 'op item list');

@@ -72,18 +72,6 @@ export function createATCGateway(
   };
 }
 
-function createDeployment(
-  cluster: Provider,
-  namespace: Output<string>,
-  spec: DeploymentArgs['spec'],
-): Deployment {
-  return new Deployment(
-    'atc-gateway',
-    { metadata: { name: 'atc-gateway', namespace }, spec },
-    { provider: cluster },
-  );
-}
-
 function createStateVolume(cluster: Provider, namespace: Output<string>): Output<string> {
   const retain = new StorageClass(
     'local-path-retain',
@@ -171,4 +159,16 @@ function createConfigObjects(
     pullSecret: pull.metadata.name,
     tunnelToken: tunnel.metadata.name,
   };
+}
+
+function createDeployment(
+  cluster: Provider,
+  namespace: Output<string>,
+  spec: DeploymentArgs['spec'],
+): Deployment {
+  return new Deployment(
+    'atc-gateway',
+    { metadata: { name: 'atc-gateway', namespace }, spec },
+    { provider: cluster },
+  );
 }

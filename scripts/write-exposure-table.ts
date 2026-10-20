@@ -53,12 +53,6 @@ function parseArgs(args: readonly string[]): { check: boolean; root: string } | 
     : { check, root: rest[0] ?? '.' };
 }
 
-interface PageChange {
-  readonly path: string;
-  readonly written: string;
-  readonly check: boolean;
-}
-
 function renderPage(text: string, entries: readonly ExposureEntry[]): string | undefined {
   const start = text.indexOf(startMarker);
   const end = text.indexOf(endMarker);
@@ -66,25 +60,6 @@ function renderPage(text: string, entries: readonly ExposureEntry[]): string | u
   return start === -1 || end < start
     ? undefined
     : `${text.slice(0, start + startMarker.length)}\n\n${renderTable(entries)}\n${text.slice(end)}`;
-}
-
-async function applyPage(
-  change: PageChange,
-  options: Readonly<WriteExposureTableOptions>,
-): Promise<number> {
-  if (change.check) {
-    options.printErr(
-      `write-exposure-table: ${page} differs from packages/topology/exposure.json; run bun run docs:exposure\n`,
-    );
-
-    return 1;
-  }
-
-  await writeFile(change.path, change.written);
-
-  options.printOut(`write-exposure-table: wrote ${page}\n`);
-
-  return 0;
 }
 
 const header = ['Name', 'Kind', 'Exposes', 'Scope', 'Reason', 'Auth', 'Ticket'];
@@ -119,11 +94,6 @@ function renderRow(entry: ExposureEntry): readonly string[] {
   ];
 }
 
-function formatCell(text: string): string {
-  // a pipe would end the cell
-  return text.replaceAll('|', String.raw`\|`);
-}
-
 function formatExposes(entry: ExposureEntry): string {
   if (entry.kind === 'host-port') {
     const port = entry.port === undefined ? entry.protocol : `${entry.protocol} ${entry.port}`;
@@ -138,6 +108,36 @@ function formatExposes(entry: ExposureEntry): string {
   return entry.kind === 'tailnet-capability'
     ? `node attribute \`${entry.attr}\``
     : `\`${entry.script}\` on workers.dev`;
+}
+
+function formatCell(text: string): string {
+  // a pipe would end the cell
+  return text.replaceAll('|', String.raw`\|`);
+}
+
+interface PageChange {
+  readonly path: string;
+  readonly written: string;
+  readonly check: boolean;
+}
+
+async function applyPage(
+  change: PageChange,
+  options: Readonly<WriteExposureTableOptions>,
+): Promise<number> {
+  if (change.check) {
+    options.printErr(
+      `write-exposure-table: ${page} differs from packages/topology/exposure.json; run bun run docs:exposure\n`,
+    );
+
+    return 1;
+  }
+
+  await writeFile(change.path, change.written);
+
+  options.printOut(`write-exposure-table: wrote ${page}\n`);
+
+  return 0;
 }
 
 if (import.meta.main) {

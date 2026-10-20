@@ -1,5 +1,13 @@
 // This file imports nothing outside Bun, because the release workflows run it without node_modules.
 
+export interface PublishedImage {
+  readonly image: string;
+  readonly file: string;
+
+  // matches the one line of the file that names the image's tag in its tag group
+  readonly pattern: string;
+}
+
 type ReleaseSource =
   | { readonly kind: 'sha256sums' }
   | { readonly kind: 'image-digests'; readonly images: readonly string[] }
@@ -10,11 +18,8 @@ type ReleaseSource =
   // the bump's version
   | { readonly kind: 'published-images'; readonly images: readonly PublishedImage[] };
 
-export interface PublishedImage {
-  readonly image: string;
+export interface PinAssetLine {
   readonly file: string;
-
-  // matches the one line of the file that names the image's tag in its tag group
   readonly pattern: string;
 }
 
@@ -33,11 +38,6 @@ export type PinPart =
 
   // moves with that image's digest
   | { readonly kind: 'image-tag'; readonly image: string };
-
-export interface PinAssetLine {
-  readonly file: string;
-  readonly pattern: string;
-}
 
 export interface PinLine {
   readonly file: string;
@@ -65,6 +65,12 @@ export interface Pin {
   readonly lock?: PinLock;
 }
 
+interface GeneratedFiles {
+  // runs with bun and takes the release's tag as its one argument
+  readonly script: string;
+  readonly files: readonly string[];
+}
+
 export interface ReleaseRecord {
   readonly name: string;
   readonly repo: string;
@@ -81,12 +87,6 @@ export interface ReleaseRecord {
 
   // the bump pull request's "After the merge:" text, as Markdown
   readonly rollout: string;
-}
-
-interface GeneratedFiles {
-  // runs with bun and takes the release's tag as its one argument
-  readonly script: string;
-  readonly files: readonly string[];
 }
 
 const version = { kind: 'version' } as const;

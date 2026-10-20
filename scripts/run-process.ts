@@ -84,30 +84,12 @@ function trySpawn(argv: readonly string[], options: Readonly<RunOptions>, ownGro
   }
 }
 
+const defaultTimeoutMs = 600_000;
+
 interface Child {
   readonly spawned: Readonly<Pick<Bun.Subprocess, 'pid' | 'kill' | 'exited'>>;
   readonly ownGroup: boolean;
 }
-
-function sendSignal(child: Readonly<Child>, signal: 'SIGTERM' | 'SIGKILL') {
-  if (!child.ownGroup) {
-    child.spawned.kill(signal);
-
-    return;
-  }
-
-  try {
-    process.kill(-child.spawned.pid, signal);
-  } catch {
-    // ESRCH: every process of the group has exited
-  }
-}
-
-const defaultTimeoutMs = 600_000;
-
-// the group's pipes close as SIGKILL ends its processes; one still open this long after the child
-// exits belongs to a descendant that left the group
-const releaseDelayMs = 100;
 
 function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>) {
   const release = new AbortController();
@@ -145,6 +127,24 @@ function subscribeToStops(child: Readonly<Child>, options: Readonly<RunOptions>)
     },
   };
 }
+
+function sendSignal(child: Readonly<Child>, signal: 'SIGTERM' | 'SIGKILL') {
+  if (!child.ownGroup) {
+    child.spawned.kill(signal);
+
+    return;
+  }
+
+  try {
+    process.kill(-child.spawned.pid, signal);
+  } catch {
+    // ESRCH: every process of the group has exited
+  }
+}
+
+// the group's pipes close as SIGKILL ends its processes; one still open this long after the child
+// exits belongs to a descendant that left the group
+const releaseDelayMs = 100;
 
 async function stopReadsAfterExit(child: Readonly<Child>, release: Readonly<AbortController>) {
   await child.spawned.exited;

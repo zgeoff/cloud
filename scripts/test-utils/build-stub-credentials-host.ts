@@ -2,6 +2,11 @@ import { readFileSync } from 'node:fs';
 import { toShellArg } from '../to-shell-arg.ts';
 import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 
+interface StubHostFile {
+  readonly content: string;
+  readonly mode: string;
+}
+
 export interface StubCredentialsHostScenario {
   readonly host: string;
   readonly directory: string;
@@ -32,13 +37,8 @@ export interface StubCredentialsHostScenario {
   readonly goneBeforeStat?: readonly string[];
 }
 
-interface StubHostFile {
-  readonly content: string;
-  readonly mode: string;
-}
-
 export interface StubCredentialsHost {
-  readonly handle: StubHandler;
+  readonly answer: StubHandler;
 
   readonly secretValues: Readonly<Record<string, string>>;
 
@@ -51,8 +51,8 @@ export function buildStubCredentialsHost(
   const secretValues: Record<string, string> = {};
 
   return {
-    handle: (call) =>
-      call.argv[0] === 'ssh' ? buildSSHAnswer({ scenario, secretValues }, call) : undefined,
+    answer: (call) =>
+      call.argv[0] === 'ssh' ? answerSSHCall({ scenario, secretValues }, call) : undefined,
     secretValues,
     files: scenario.files,
   };
@@ -63,7 +63,7 @@ interface HostState {
   readonly secretValues: Record<string, string>;
 }
 
-function buildSSHAnswer(state: HostState, call: StubCall) {
+function answerSSHCall(state: HostState, call: StubCall) {
   const [, batchOption, batch, timeoutOption, timeout, destination, line, ...rest] = call.argv;
 
   const isHostCall =
@@ -74,10 +74,10 @@ function buildSSHAnswer(state: HostState, call: StubCall) {
     destination === `root@${state.scenario.host}` &&
     rest.length === 0;
 
-  return isHostCall && line !== undefined ? buildHostAnswer(state, call, line) : undefined;
+  return isHostCall && line !== undefined ? answerHostCall(state, call, line) : undefined;
 }
 
-function buildHostAnswer(state: HostState, call: StubCall, line: string) {
+function answerHostCall(state: HostState, call: StubCall, line: string) {
   // OpenSSH's message for a refused connection, with the CR LF its log function ends a line with
   if (state.scenario.unreachable === true) {
     return {
@@ -86,16 +86,8 @@ function buildHostAnswer(state: HostState, call: StubCall, line: string) {
     };
   }
 
-  return buildDockerAnswer(state, line, call.stdin) ?? buildShellAnswer(state, line, call.stdin);
+  return answerDockerCall(state, line, call.stdin) ?? answerShellCall(state, line, call.stdin);
 }
-
-function toLine(words: readonly string[]): string {
-  return words.map((word) => toShellArg(word)).join(' ');
-}
-
-// docker 29.7.2's message for an exec in a stopped container, from moby's daemon/errors.go
-const stoppedError =
-  'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n';
 
 const secretAdd = toLine([
   'docker',
@@ -117,7 +109,7 @@ const secretAdd = toLine([
   '--json',
 ]);
 
-function buildDockerAnswer(state: HostState, line: string, stdin: string) {
+function answerDockerCall(state: HostState, line: string, stdin: string) {
   if (line === secretAdd) {
     return createSecret(state, stdin);
   }
@@ -142,10 +134,8 @@ function buildDockerAnswer(state: HostState, line: string, stdin: string) {
   return read === undefined ? undefined : buildReadAnswer(state, read);
 }
 
-function buildReadAnswer(state: HostState, [step, value]: readonly [string, unknown]): StubAnswer {
-  return state.scenario.stoppedAt === step
-    ? { exitCode: 1, stderr: stoppedError }
-    : { stdout: `${JSON.stringify(value, null, 2)}\n` };
+function toLine(words: readonly string[]): string {
+  return words.map((word) => toShellArg(word)).join(' ');
 }
 
 function createSecret(state: HostState, stdin: string) {
@@ -171,6 +161,16 @@ function createSecret(state: HostState, stdin: string) {
   return { stdout: `${JSON.stringify({ ...secret, droppedGrants: 0 }, null, 2)}\n` };
 }
 
+// docker 29.7.2's message for an exec in a stopped container, from moby's daemon/errors.go
+const stoppedError =
+  'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n';
+
+function buildReadAnswer(state: HostState, [step, value]: readonly [string, unknown]): StubAnswer {
+  return state.scenario.stoppedAt === step
+    ? { exitCode: 1, stderr: stoppedError }
+    : { stdout: `${JSON.stringify(value, null, 2)}\n` };
+}
+
 const hostScripts = {
   // a host script is known by its text on stdin; real bash runs each in its own test
   write: readFileSync(new URL('../host/write-atc-gateway-token.sh', import.meta.url), 'utf8'),
@@ -178,7 +178,7 @@ const hostScripts = {
   mint: readFileSync(new URL('../host/mint-atc-imp-token.sh', import.meta.url), 'utf8'),
 };
 
-function buildShellAnswer(state: HostState, line: string, stdin: string): StubAnswer | undefined {
+function answerShellCall(state: HostState, line: string, stdin: string): StubAnswer | undefined {
   const directory = state.scenario.directory;
   const gatewayToken = `${directory}/gateway-token`;
   const impToken = `${directory}/imp-token`;

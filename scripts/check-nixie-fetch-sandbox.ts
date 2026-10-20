@@ -39,33 +39,6 @@ export async function checkNixieFetchSandbox(
   return plan === undefined ? 1 : runSandboxCheck(options, plan);
 }
 
-async function runSandboxCheck(
-  options: Readonly<CheckFetchSandboxOptions>,
-  plan: Plan,
-): Promise<number> {
-  const created = await createSandbox(options, plan.image);
-
-  if (!created) {
-    return 1;
-  }
-
-  const passed = await checkSandbox(options, plan).catch((error: unknown) => {
-    options.printErr(`check-nixie-fetch-sandbox: the check stopped: ${String(error)}\n`);
-
-    return false;
-  });
-
-  const removed = await removeSandbox(options);
-
-  if (!passed || !removed) {
-    return 1;
-  }
-
-  options.printOut('fetch sandbox check passed\n');
-
-  return 0;
-}
-
 interface Plan {
   readonly image: string;
   readonly targets: readonly SandboxTarget[];
@@ -97,6 +70,22 @@ async function loadPlan(
   return answered ? { image, targets: loaded.targets } : undefined;
 }
 
+async function readFetchImage(
+  options: Readonly<CheckFetchSandboxOptions>,
+): Promise<string | undefined> {
+  const manifest = await options.runRemote(manifestCommand);
+
+  const image = manifest.exitCode === 0 ? findFetchImage(manifest.stdout) : undefined;
+
+  if (image === undefined) {
+    options.printErr(
+      `check-nixie-fetch-sandbox: cannot read the fetch image from nixie's sandbox manifest: ${manifest.stderr.trim()}\n`,
+    );
+  }
+
+  return image;
+}
+
 async function checkHostReaches(
   options: Readonly<CheckFetchSandboxOptions>,
   targets: readonly SandboxTarget[],
@@ -119,22 +108,6 @@ async function checkHostReaches(
 }
 
 const manifestCommand = 'k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie sandbox-manifest';
-
-async function readFetchImage(
-  options: Readonly<CheckFetchSandboxOptions>,
-): Promise<string | undefined> {
-  const manifest = await options.runRemote(manifestCommand);
-
-  const image = manifest.exitCode === 0 ? findFetchImage(manifest.stdout) : undefined;
-
-  if (image === undefined) {
-    options.printErr(
-      `check-nixie-fetch-sandbox: cannot read the fetch image from nixie's sandbox manifest: ${manifest.stderr.trim()}\n`,
-    );
-  }
-
-  return image;
-}
 
 interface Probe {
   readonly target: SandboxTarget;
@@ -160,6 +133,33 @@ function printProbes(
   for (const answer of answers) {
     options.printOut(`${from}: ${formatProbeAnswer(answer)}\n`);
   }
+}
+
+async function runSandboxCheck(
+  options: Readonly<CheckFetchSandboxOptions>,
+  plan: Plan,
+): Promise<number> {
+  const created = await createSandbox(options, plan.image);
+
+  if (!created) {
+    return 1;
+  }
+
+  const passed = await checkSandbox(options, plan).catch((error: unknown) => {
+    options.printErr(`check-nixie-fetch-sandbox: the check stopped: ${String(error)}\n`);
+
+    return false;
+  });
+
+  const removed = await removeSandbox(options);
+
+  if (!passed || !removed) {
+    return 1;
+  }
+
+  options.printOut('fetch sandbox check passed\n');
+
+  return 0;
 }
 
 // the line runs as one shell line on the host, whose words hold no character to quote
@@ -204,13 +204,6 @@ async function checkSandbox(
   return printReached(options, answers) && reached;
 }
 
-function buildSandboxCommand(options: Readonly<CheckFetchSandboxOptions>, command: string): string {
-  return `${impCommand} exec ${options.sandboxName} -- bash -c ${toShellArg(command)}`;
-}
-
-const pageScript =
-  'const page = await fetch("https://example.com/"); console.log(page.status, (await page.text()).includes("Example Domain"));';
-
 async function checkPublicPage(options: Readonly<CheckFetchSandboxOptions>): Promise<boolean> {
   const result = await options.runRemote(
     buildSandboxCommand(options, `/usr/local/bin/bun -e ${toShellArg(pageScript)}`),
@@ -232,6 +225,13 @@ async function checkPublicPage(options: Readonly<CheckFetchSandboxOptions>): Pro
 
   return false;
 }
+
+function buildSandboxCommand(options: Readonly<CheckFetchSandboxOptions>, command: string): string {
+  return `${impCommand} exec ${options.sandboxName} -- bash -c ${toShellArg(command)}`;
+}
+
+const pageScript =
+  'const page = await fetch("https://example.com/"); console.log(page.status, (await page.text()).includes("Example Domain"));';
 
 function printReached(
   options: Readonly<CheckFetchSandboxOptions>,

@@ -15,7 +15,7 @@ const checkedRecords = releaseRegistry.filter(
   (record) => record.source.kind !== 'published-images',
 );
 
-export async function findReleaseBumps(
+export async function readReleaseBumps(
   root: string,
   run: Runner,
 ): Promise<readonly string[] | Error> {
@@ -28,7 +28,7 @@ export async function findReleaseBumps(
   const lines: string[] = [];
 
   for (const [index, record] of checkedRecords.entries()) {
-    const line = await findRecordBump(run, record, pins[index] ?? []);
+    const line = await readRecordBump(run, record, pins[index] ?? []);
 
     if (line instanceof Error) {
       return line;
@@ -58,18 +58,6 @@ async function loadAllPinnedVersions(root: string) {
   return pins;
 }
 
-async function findRecordBump(run: Runner, record: ReleaseRecord, pinned: readonly string[]) {
-  const newest = await readNewest(run, record.repo, record.tagPrefix);
-
-  if (newest instanceof Error) {
-    return newest;
-  }
-
-  return pinned.some((each) => isOlder(each, newest))
-    ? [record.name, newest, ...pinned].join(' ')
-    : null;
-}
-
 async function loadFiles(root: string, paths: readonly string[]) {
   const entries = await Promise.all(
     paths.map(async (path) => {
@@ -80,6 +68,18 @@ async function loadFiles(root: string, paths: readonly string[]) {
   );
 
   return Object.fromEntries(entries.flat());
+}
+
+async function readRecordBump(run: Runner, record: ReleaseRecord, pinned: readonly string[]) {
+  const newest = await readNewest(run, record.repo, record.tagPrefix);
+
+  if (newest instanceof Error) {
+    return newest;
+  }
+
+  return pinned.some((each) => isOlder(each, newest))
+    ? [record.name, newest, ...pinned].join(' ')
+    : null;
 }
 
 async function readNewest(run: Runner, repo: string, prefix: string) {

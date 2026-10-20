@@ -1,6 +1,6 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
 import { EventEmitter } from 'node:events';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -9,6 +9,8 @@ import type { RunResult, Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
 import { subscribeToInterrupts } from './subscribe-to-interrupts.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
+import { runGrandchildCommand } from './test-utils/run-grandchild-command.ts';
+import { waitForExit } from './test-utils/wait-for-exit.ts';
 
 interface TestConfig {
   readonly run: Runner;
@@ -231,62 +233,6 @@ test('it sends SIGKILL to a command that outlives its SIGTERM by the grace, then
     'a command outlived SIGTERM by 50 ms; killing it\n',
   ]);
 });
-
-function isAlive(pid: number) {
-  try {
-    const stat = readFileSync(`/proc/${pid}/stat`, 'utf8');
-
-    // an exited descendant stays a zombie until something reaps it, and a zombie holds no pipe
-    return stat.slice(stat.lastIndexOf(')') + 2, stat.lastIndexOf(')') + 3) !== 'Z';
-  } catch {
-    return false;
-  }
-}
-
-async function waitForExit(pid: number) {
-  // the kernel closes a dying process's pipes a moment before it becomes a zombie, so the test
-  // polls; a second is long enough for a SIGKILL and far short of the grandchild's sleep
-  const deadline = performance.now() + 1000;
-
-  while (isAlive(pid) && performance.now() < deadline) {
-    await Bun.sleep(5);
-  }
-
-  return !isAlive(pid);
-}
-
-async function runGrandchildCommand(run: Runner, prelude: string) {
-  const directory = await mkdtemp(join(tmpdir(), 'subscribe-to-interrupts-'));
-
-  const fifo = join(directory, 'started');
-  const pidFile = join(directory, 'pid');
-
-  await runProcess(['mkfifo', fifo]);
-
-  onTestFinished(async () => {
-    const text = await readFile(pidFile, 'utf8').catch(() => '0');
-
-    const pid = Number(text);
-
-    if (pid > 0 && isAlive(pid)) {
-      process.kill(pid, 'SIGKILL');
-    }
-
-    await rm(directory, { recursive: true, force: true });
-  });
-
-  // the grandchild holds the captured pipes, as an `impz exec` or a `curl` in an older commit's
-  // check does
-  const script = `(${prelude}echo $BASHPID > "$1"; echo > "$2"; exec sleep 30) & wait`;
-
-  void run(['bash', '-c', script, 'bash', pidFile, fifo]);
-
-  await readFile(fifo);
-
-  const text = await readFile(pidFile, 'utf8');
-
-  return Number(text);
-}
 
 test('it stops a grandchild that holds the command’s pipes, and runs the steps within the grace', async () => {
   const ctx = setupTest({ run: runProcess, graceMs: 2000 });

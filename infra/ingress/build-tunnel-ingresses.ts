@@ -1,6 +1,11 @@
 import type { Output } from '@pulumi/pulumi';
 import { exposure } from '@zgeoff/cloud-topology';
 
+export interface OriginAccess {
+  readonly teamName: Output<string>;
+  readonly audience: Output<string>;
+}
+
 export interface TunnelRoute {
   readonly hostname: string;
   readonly service: string | Output<string>;
@@ -10,11 +15,6 @@ export interface TunnelRoute {
   readonly path?: string;
 
   readonly access?: OriginAccess;
-}
-
-export interface OriginAccess {
-  readonly teamName: Output<string>;
-  readonly audience: Output<string>;
 }
 
 export interface TunnelIngress {

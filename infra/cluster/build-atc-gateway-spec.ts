@@ -4,15 +4,8 @@ import { topology } from '@zgeoff/cloud-topology';
 import type { ATCGatewayConfig } from '../inputs/index.ts';
 import { cloudflaredImage } from '../shared/cloudflared-image.ts';
 
-export const atcGatewayPort = topology.atc.gatewayPort;
 export const atcGatewayLabels = { app: 'atc-gateway' };
 const nonrootID = 65_532;
-
-export const atcGatewayRegistryFile = 'registry.json';
-const registryDir = '/etc/atc-gateway';
-
-// $HOME/.local/state/atc, until atc's packaging names the gateway's state path
-const defaultStateDir = '/home/nonroot/.local/state/atc';
 
 interface GatewaySpecInputs {
   readonly config: ATCGatewayConfig;
@@ -64,6 +57,14 @@ export function buildATCPodSecurity(): input.core.v1.PodSecurityContext {
     seccompProfile: { type: 'RuntimeDefault' },
   };
 }
+
+export const atcGatewayRegistryFile = 'registry.json';
+const registryDir = '/etc/atc-gateway';
+
+// $HOME/.local/state/atc, until atc's packaging names the gateway's state path
+const defaultStateDir = '/home/nonroot/.local/state/atc';
+
+export const atcGatewayPort = topology.atc.gatewayPort;
 
 function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Container {
   const stateDir = inputs.config.stateDir ?? defaultStateDir;
@@ -117,6 +118,13 @@ function buildGatewayContainer(inputs: GatewaySpecInputs): input.core.v1.Contain
   };
 }
 
+function buildProbe(path: string, host: string): input.core.v1.Probe {
+  return {
+    // the server answers only its public Host (403 otherwise), so every probe sends it
+    httpGet: { path, port: atcGatewayPort, httpHeaders: [{ name: 'Host', value: host }] },
+  };
+}
+
 const tunnelTokenDir = '/etc/cloudflared';
 
 function buildTunnelContainer(): input.core.v1.Container {
@@ -146,12 +154,5 @@ function buildTunnelContainer(): input.core.v1.Container {
       allowPrivilegeEscalation: false,
       capabilities: { drop: ['ALL'] },
     },
-  };
-}
-
-function buildProbe(path: string, host: string): input.core.v1.Probe {
-  return {
-    // the server answers only its public Host (403 otherwise), so every probe sends it
-    httpGet: { path, port: atcGatewayPort, httpHeaders: [{ name: 'Host', value: host }] },
   };
 }

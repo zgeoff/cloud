@@ -67,17 +67,11 @@ const reads: Record<string, (scenario: StubGeoffcloudScenario) => string> = {
 const hostProbe =
   /^timeout 5 bash -c 'exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)' 2>\/dev\/null; echo probe-exit:\$\?$/u;
 
-const sandboxProbe =
-  /^docker exec imp-host impz exec \S+ -- bash -c 'timeout 5 bash -c '\\''exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)'\\'' 2>\/dev\/null; echo probe-exit:\$\?'$/u;
-
-const pageFetch =
-  /^docker exec imp-host impz exec \S+ -- bash -c '\/usr\/local\/bin\/bun -e '\\''const page = await fetch\("https:\/\/example\.com\/"\); .*'\\'''$/u;
-
 function buildAnswer(state: StubState, command: string): RemoteResult {
-  const read = reads[command];
+  const stdoutOf = reads[command];
 
-  if (read !== undefined) {
-    return { exitCode: 0, stdout: read(state.scenario), stderr: '' };
+  if (stdoutOf !== undefined) {
+    return { exitCode: 0, stdout: stdoutOf(state.scenario), stderr: '' };
   }
 
   const imp = /^docker exec imp-host impz (?<verb>new|exec|rm) (?<name>\S+)/u.exec(command)?.groups;
@@ -109,6 +103,12 @@ interface ImpCall {
   readonly name: string;
   readonly command: string;
 }
+
+const sandboxProbe =
+  /^docker exec imp-host impz exec \S+ -- bash -c 'timeout 5 bash -c '\\''exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)'\\'' 2>\/dev\/null; echo probe-exit:\$\?'$/u;
+
+const pageFetch =
+  /^docker exec imp-host impz exec \S+ -- bash -c '\/usr\/local\/bin\/bun -e '\\''const page = await fetch\("https:\/\/example\.com\/"\); .*'\\'''$/u;
 
 function buildImpAnswer(state: StubState, call: ImpCall): RemoteResult {
   if (call.verb === 'new') {

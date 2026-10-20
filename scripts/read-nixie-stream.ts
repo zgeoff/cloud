@@ -126,6 +126,19 @@ async function readEvents(source: StreamSource, tally: Tally): Promise<StreamRep
   return buildReport(step.tally, `failed: ${step.failure}`);
 }
 
+function buildReport(tally: Tally, end: StreamReport['end']): StreamReport {
+  const openMs = performance.now() - tally.openedAt;
+  const times = [0, ...tally.keepaliveTimes, openMs];
+
+  return {
+    openMs,
+    keepalives: tally.keepaliveTimes.length,
+    longestGapMs: Math.max(...times.slice(1).map((time, index) => time - (times[index] ?? 0))),
+    records: tally.records,
+    end,
+  };
+}
+
 interface TallyStep {
   readonly tally: Tally;
 
@@ -165,17 +178,4 @@ function countEvent(tally: Tally, block: string): TallyStep {
   const name = event === undefined ? 'an event with no name' : `a ${event} event`;
 
   return { tally, failure: `the stream sent ${name}` };
-}
-
-function buildReport(tally: Tally, end: StreamReport['end']): StreamReport {
-  const openMs = performance.now() - tally.openedAt;
-  const times = [0, ...tally.keepaliveTimes, openMs];
-
-  return {
-    openMs,
-    keepalives: tally.keepaliveTimes.length,
-    longestGapMs: Math.max(...times.slice(1).map((time, index) => time - (times[index] ?? 0))),
-    records: tally.records,
-    end,
-  };
 }
