@@ -1,0 +1,24 @@
+#!/bin/sh
+# Claude Code's SessionStart hook on an agent imp, from /etc/claude-code/managed-settings.d: install
+# the packages that the session's checkout locks, so a hook or a script in it imports the version its
+# repo pins. Without node_modules, Bun auto-installs an imported package at the newest version, or at
+# the version its cache already holds, and it reads neither package.json nor bun.lock for that. So
+# a repo's .claude hook, such as the skill gate, would run another version than on a machine whose
+# checkout is installed.
+#
+# It runs `bun install --frozen-lockfile` in CLAUDE_PROJECT_DIR when that folder holds a bun.lock
+# and no node_modules. A checkout with node_modules keeps it, so a session never undoes a dependency
+# change in progress. Bun's output goes to stderr, because Claude Code adds a SessionStart hook's
+# stdout to the session's context. A failed install prints one line on stdout, which tells the
+# session to run the install itself, and the hook exits 0, because the session can still work
+# without the packages.
+set -u
+
+dir=${CLAUDE_PROJECT_DIR:-}
+[ -n "$dir" ] && [ -f "$dir/bun.lock" ] || exit 0
+[ -e "$dir/node_modules" ] && exit 0
+
+if ! (cd "$dir" && bun install --frozen-lockfile </dev/null >&2); then
+  echo "install-checkout-packages: \`bun install --frozen-lockfile\` failed in $dir, so its hooks may import other package versions than its bun.lock pins; run the install before you rely on them."
+fi
+exit 0

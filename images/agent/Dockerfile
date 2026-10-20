@@ -164,6 +164,14 @@ RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256"
 COPY bin/bun /usr/local/bin/bun
 RUN ln -s bun /usr/local/bin/bunx
 
+# A Claude Code SessionStart hook that installs the packages a checkout locks, when it has no
+# node_modules, so a repo's hooks import the versions its bun.lock pins and never the newest one
+# that Bun's auto-install takes. It is a managed settings drop-in, so it adds to the session's own
+# hooks and needs no change to the config that atc writes per session.
+COPY sbin/install-checkout-packages /usr/local/sbin/install-checkout-packages
+COPY claude-code/managed-settings.d/install-checkout-packages.json \
+     /etc/claude-code/managed-settings.d/install-checkout-packages.json
+
 # Go from go.dev. The sum is the sha256 that https://go.dev/dl/?mode=json
 # lists for the linux-amd64 tarball.
 ARG GO_VERSION=1.27.1

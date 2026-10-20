@@ -199,6 +199,14 @@ if [[ "$check_mode" == imp ]]; then
     fi
   fi
 fi
+# the Claude Code SessionStart hook that installs a checkout's locked packages
+session_start=/etc/claude-code/managed-settings.d/install-checkout-packages.json
+if [[ "$(jq -c '[.hooks.SessionStart[].hooks[] | [.type, .command]]' "$session_start" 2> /dev/null)" == '[["command","/usr/local/sbin/install-checkout-packages"]]' ]] &&
+  [[ -x /usr/local/sbin/install-checkout-packages ]]; then
+  pass session-start "$session_start"
+else
+  fail session-start "$session_start is missing or does not run /usr/local/sbin/install-checkout-packages"
+fi
 if [[ "${DISABLE_UPDATES:-}" == 1 ]]; then
   pass DISABLE_UPDATES "1"
 else
