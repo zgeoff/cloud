@@ -237,8 +237,9 @@ health check, and turning Discord alerts on or off.
 
 Store the new value in its 1Password item first, then deliver it. An item `.env` references has a
 copy in the vault `cloud-deploy` for the apply job: update both. The passphrase and the alert
-webhook have a third copy in the vault `cloud-ci`, for the
-[scheduled drift check](./drift-check.md#rotate-the-checks-credentials).
+webhook have a third copy in the host's credentials file for the
+[scheduled drift check](./drift-check.md#rotate-the-checks-credentials): install that file again
+after a change to either.
 
 | Credential                                                     | Deliver it with                                                                                       |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |

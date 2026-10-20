@@ -40,7 +40,8 @@ gates:
   # commit until one of these paths changes (scripts/find-nixos-check-run.sh). The inputs are the
   # flake, which holds the impd database tools the restore rehearsals run; the shared constants it
   # reads; the preview service's source, which the host's package copies, and bun.lock, from which
-  # that package fetches the service's dependencies; the shell test helpers that
+  # that package fetches the service's dependencies; the drift check's Onidel provider, project and
+  # stack files and scripts, which the host's drift check copies; the shell test helpers that
   # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them; the
   # scripts that run the checks, pin their image and open KVM to them; the scripts that
   # tank-cloud-host-secrets runs in its VM; .bun-version; the workflow; and the scripts that decide
@@ -53,6 +54,13 @@ gates:
       - packages/topology/**
       - packages/preview/**
       - bun.lock
+      - provider/**
+      - infra/Pulumi.yaml
+      - infra/Pulumi.prod.yaml
+      - scripts/run-host-drift-check.sh
+      - scripts/check-scheduled-drift.sh
+      - scripts/retry-transient-pulumi.sh
+      - scripts/alert-scheduled-drift.sh
       - test-support/shell/run-cases.sh
       - test-support/shell/test-run-cases.sh
       - test-support/shell/assert-equals.sh
