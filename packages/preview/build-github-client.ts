@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 export interface GitHubClient {
   readonly readComposeFile: (repo: string, sha: string) => Promise<string | null>;
 
@@ -108,19 +110,15 @@ async function sendGitHubRequest(
   return response;
 }
 
+// GitHub's error body (docs.github.com/en/rest: using-the-rest-api/troubleshooting-the-rest-api)
+const gitHubRefusalSchema = z.object({ message: z.string() });
+
 async function readGitHubRefusal(response: Response): Promise<string> {
   // a connection that drops mid-body still leaves the status and the headers to report
   const text = await response.text().catch(() => '');
 
-  const body = parseGitHubBody(text);
-
-  const message =
-    typeof body === 'object' &&
-    body !== null &&
-    'message' in body &&
-    typeof body.message === 'string'
-      ? `: ${body.message}`
-      : '';
+  const refusal = gitHubRefusalSchema.safeParse(parseGitHubBody(text));
+  const message = refusal.success ? `: ${refusal.data.message}` : '';
 
   // GitHub names the permission a fine-grained token or an app lacks in this header, and the
   // log is the only place an operator reads it

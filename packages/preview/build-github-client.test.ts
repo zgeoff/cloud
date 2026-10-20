@@ -201,6 +201,29 @@ test('#updateCommitStatus cuts a description to the 140 characters GitHub accept
   expect(commitStatuses.at(0)?.description).toBe('x'.repeat(140));
 });
 
+test('#updateCommitStatus rejects with the bare status when the refusal body holds no message', () => {
+  server.use(
+    http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, () =>
+      HttpResponse.json({ errors: [{ code: 'custom' }] }, { status: 422 }),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.updateCommitStatus({
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      context: 'sdk-contract',
+      state: 'success',
+      description: '18 pass, 0 fail',
+    }),
+  ).rejects.toThrowWithMessage(
+    Error,
+    'GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 422',
+  );
+});
+
 test('#updateCommitStatus rejects with the status and the permission when the refusal body breaks off', () => {
   server.use(
     http.post(

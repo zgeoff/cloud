@@ -68,6 +68,7 @@
       "name": "@zgeoff/cloud-preview",
       "dependencies": {
         "@impz/client": "2.8.1",
+        "zod": "4.6.6",
       },
       "devDependencies": {
         "@faker-js/faker": "10.6.0",
