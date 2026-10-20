@@ -5,3 +5,6 @@ paths:
   .github/workflows/deploy-prod.yml:
     ignore:
       - 'unexpected key "queue" for "concurrency" section'
+  .github/workflows/drift-check.yml:
+    ignore:
+      - 'unexpected key "queue" for "concurrency" section'
