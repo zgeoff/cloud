@@ -144,6 +144,34 @@ CALLS
   assert_status 1 "$status"
 }
 
+it_stops_with_exit_1_and_changes_nothing_when_a_value_ends_with_a_line_break() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir -p "$tree/vault/cloud/r2-pulumi-state-read" "$tree/vault/cloud/pulumi-passphrase"
+  printf '%s' 's3://example-state?endpoint=state.example.test' > "$tree/vault/cloud/r2-pulumi-state-read/backend-url"
+  printf '%s' example-key-id > "$tree/vault/cloud/r2-pulumi-state-read/access-key-id"
+  printf '%s' example-secret > "$tree/vault/cloud/r2-pulumi-state-read/secret-access-key"
+  printf 'example-passphrase\n' > "$tree/vault/cloud/pulumi-passphrase/credential"
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" \
+    DRIFT_CHECK_HOST=local DRIFT_CHECK_SECRETS_MOUNT= \
+    DRIFT_CHECK_CREDENTIALS_FILE="$tree/host/secrets/drift-check/credentials" \
+    bash install-drift-check-credentials.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'the value at op://cloud/pulumi-passphrase/credential is empty or holds a line break; nothing changed'
+  diff - "$tree/calls" << 'CALLS'
+["op","read","--no-newline","op://cloud/r2-pulumi-state-read/backend-url"]
+["op","read","--no-newline","op://cloud/r2-pulumi-state-read/access-key-id"]
+["op","read","--no-newline","op://cloud/r2-pulumi-state-read/secret-access-key"]
+["op","read","--no-newline","op://cloud/pulumi-passphrase/credential"]
+CALLS
+  ls -A "$tree/host/secrets" > "$tree/files"
+  diff /dev/null "$tree/files"
+  assert_status 1 "$status"
+}
+
 it_stops_with_exit_1_and_changes_nothing_when_a_value_is_empty() {
   local status=0
   create_case_tree

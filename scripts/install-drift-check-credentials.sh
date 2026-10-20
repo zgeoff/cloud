@@ -61,7 +61,10 @@ payload=""
 for field in "${fields[@]}"; do
   name="${field%%=*}"
   ref="op://$vault/${field#*=}"
-  value="$(op read --no-newline "$ref")"
+  # the sentinel keeps a trailing line break, which $(…) would strip, for the check below; with
+  # &&, a failed read still ends the run with op's status
+  value="$(op read --no-newline "$ref" && printf x)"
+  value="${value%x}"
   if [ -z "$value" ] || [[ "$value" == *$'\n'* ]] || [[ "$value" == *$'\r'* ]]; then
     unset value payload
     echo "the value at $ref is empty or holds a line break; nothing changed" >&2
