@@ -314,7 +314,20 @@ function runStubCommand(
   socket: ServerWebSocket<ExecSocketData>,
   raw: string | Buffer,
 ): void {
-  const message = execMessageSchema.parse(JSON.parse(String(raw)));
+  const parsed: unknown = JSON.parse(String(raw));
+  const result = execMessageSchema.safeParse(parsed);
+
+  if (!result.success) {
+    socket.send(
+      JSON.stringify({ type: 'error', code: 'BAD_REQUEST', message: 'not an exec message' }),
+    );
+
+    socket.close();
+
+    return;
+  }
+
+  const message = result.data;
 
   if (message.type !== 'start') {
     return;

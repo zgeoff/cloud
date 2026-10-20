@@ -337,6 +337,48 @@ test('it runs a guest command opened with the bearer token', async () => {
   expect(impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
 });
 
+test('it refuses an exec start whose argv is not a list of strings, and records no command', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: [],
+  });
+
+  const socket = new NativeWebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
+    headers: { authorization: `Bearer ${impd.token}` },
+  });
+
+  const messages: string[] = [];
+  const closed = Promise.withResolvers<void>();
+
+  socket.addEventListener('close', () => {
+    closed.resolve();
+  });
+
+  socket.addEventListener('open', () => {
+    socket.send(JSON.stringify({ type: 'start', name: 'pv-0a1b2c3d-17', argv: [42], tty: false }));
+  });
+
+  socket.addEventListener('message', (event) => {
+    messages.push(String(event.data));
+  });
+
+  await closed.promise;
+
+  expect(messages).toStrictEqual([
+    '{"type":"error","code":"BAD_REQUEST","message":"not an exec message"}',
+  ]);
+
+  expect(impd.commands).toStrictEqual([]);
+});
+
 test('it holds a command open without an exit until its imp is destroyed', async () => {
   const impd = startStubImpd();
 
