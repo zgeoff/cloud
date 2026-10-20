@@ -108,8 +108,9 @@ in
         Type = "oneshot";
         ExecStart = "${pkgs.bash}/bin/bash ${tree}/scripts/run-host-drift-check.sh";
         LoadCredential = [ "drift-check:${cfg.credentialsFile}" ];
-        # the wait for a Deploy prod run and the check's own limit, with room for the alert
-        TimeoutStartSec = "90min";
+        # two waits for a Deploy prod run and two checks, each under its own limit, with room for
+        # the alert
+        TimeoutStartSec = "3h";
         DynamicUser = true;
         StateDirectory = "drift-check";
         StateDirectoryMode = "0700";

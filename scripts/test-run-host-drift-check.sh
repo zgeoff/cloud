@@ -4,7 +4,8 @@
 # drift; it posts drift, a failed refresh and a check that ran out of time through the real
 # alert-scheduled-drift.sh, and keeps the check's status when the alert fails; it waits while a
 # Deploy prod run is queued or in progress, fails after its last ask, and checks anyway when GitHub
-# does not answer; and it fails before the check on a missing credentials file, a missing
+# does not answer; it checks once more when a Deploy prod run overlapped a check that failed, and
+# reports that second check; and it fails before the check on a missing credentials file, a missing
 # credential, a line with an unknown name, a missing input or an argument.
 #
 # pulumi is create-stub-scripted-command.sh, which logs the credentials it receives; timeout is
@@ -259,6 +260,90 @@ EOF
 EOF
   diff - "$tree/clock/pauses" <<< '300'
   assert_status 0 "$status"
+}
+
+it_checks_again_and_posts_nothing_when_a_deploy_prod_run_overlapped_a_check_that_found_drift() {
+  local status=0
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
+  setup_test "$tree" scripted-curl
+  cat > "$tree/credentials/drift-check" << EOF
+PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
+AWS_ACCESS_KEY_ID=example-key-id
+AWS_SECRET_ACCESS_KEY=example-secret
+PULUMI_CONFIG_PASSPHRASE=example-passphrase
+CLOUDFLARE_API_TOKEN=example-cloudflare-token
+TAILSCALE_OAUTH_CLIENT_ID=example-client-id
+TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
+TAILSCALE_TAILNET=example.test
+ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
+EOF
+  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2000-01-01T00:00:00Z"}]}' > "$tree/curl-answers/1.out"
+  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2999-01-01T00:00:00Z"}]}' > "$tree/curl-answers/2.out"
+  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2999-01-01T00:00:00Z"}]}' > "$tree/curl-answers/3.out"
+  printf 'Resources:\n    ~ 1 to update\n' > "$tree/answers/1.out"
+  echo 7 > "$tree/answers/1.status"
+  printf 'Resources:\n    61 unchanged\n' > "$tree/answers/2.out"
+
+  (cd "$tree" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
+    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
+    GITHUB_API_URL=https://api.github.test REPO=example/cloud \
+    bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+Resources:
+    ~ 1 to update
+Resources:
+    61 unchanged
+run-host-drift-check: no drift
+EOF
+  diff - "$tree/err" <<< 'run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends'
+  diff - "$tree/curl-calls" << EOF
+{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
+{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
+{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
+EOF
+  assert_missing "$tree/discord/requests" "an alert was posted"
+  assert_status 0 "$status"
+}
+
+it_posts_the_second_check_s_drift_when_a_deploy_prod_run_overlapped_both_checks() {
+  local status=0
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
+  setup_test "$tree"
+  cat > "$tree/credentials/drift-check" << EOF
+PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
+AWS_ACCESS_KEY_ID=example-key-id
+AWS_SECRET_ACCESS_KEY=example-secret
+PULUMI_CONFIG_PASSPHRASE=example-passphrase
+CLOUDFLARE_API_TOKEN=example-cloudflare-token
+TAILSCALE_OAUTH_CLIENT_ID=example-client-id
+TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
+TAILSCALE_TAILNET=example.test
+ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
+EOF
+  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2999-01-01T00:00:00Z"}]}' > "$tree/github/$runs_path"
+  printf 'Resources:\n    ~ 1 to update\n' > "$tree/answers/1.out"
+  echo 7 > "$tree/answers/1.status"
+  printf 'Resources:\n    ~ 2 to update\n' > "$tree/answers/2.out"
+  echo 7 > "$tree/answers/2.status"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
+    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
+    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+Resources:
+    ~ 1 to update
+Resources:
+    ~ 2 to update
+EOF
+  diff - "$tree/err" <<< 'run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends'
+  printf '%s' '{  "content": "The scheduled drift check found drift in prod: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
+    diff - "$tree/discord/bodies/1.json"
+  assert_status 7 "$status"
 }
 
 it_fails_and_posts_after_its_last_ask_when_a_deploy_prod_run_stays_queued() {

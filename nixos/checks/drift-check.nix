@@ -71,7 +71,7 @@ let
                 Type = "oneshot";
                 ExecStart = "${pkgs.bash}/bin/bash ${cfg.tree}/scripts/run-host-drift-check.sh";
                 LoadCredential = [ "drift-check:/var/lib/secrets/drift-check/credentials" ];
-                TimeoutStartSec = "90min";
+                TimeoutStartSec = "3h";
                 DynamicUser = true;
                 StateDirectory = "drift-check";
                 StateDirectoryMode = "0700";

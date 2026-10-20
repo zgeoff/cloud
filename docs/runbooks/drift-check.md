@@ -29,6 +29,14 @@ credentials. The check gets every value but the webhook in its environment, and 
 the webhook. Until the file exists, systemd skips the service, so a run before the setup leaves
 nothing in Discord.
 
+The check and the Deploy prod job share no lock, because GitHub's concurrency group cannot hold a
+service on the host. A run therefore guards against an apply by asking GitHub. Before the check, it
+waits while a Deploy prod run is queued or in progress. After a check that fails, it asks again, and
+when a Deploy prod run was queued, in progress or changed during the check, it waits and runs the
+check once more, then reports that second check. A drift alert therefore never comes from an apply
+that overlapped the first check. One overlap stays possible: a clean check during an apply reports
+clean, and the next day's run reads the state the apply left.
+
 ## Create the items
 
 The install script reads these items in `cloud` by their exact item and field names.
