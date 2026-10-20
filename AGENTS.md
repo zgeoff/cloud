@@ -68,11 +68,10 @@ docs/
   main checkout's, and without that checkout's `node_modules` knip exits 1 with
   `File '@tsconfig/strictest/tsconfig.json' not found.`
 
-## Private repo and secrets
+## Public repo and secrets
 
-- This repo is private, but it is treated as public, so it holds no secret. Secrets live in the
-  1Password `cloud` vault. `.env` holds only `op://` references, resolved with
-  `op run --env-file=.env -- <command>`.
+- This repo is public. Secrets live in the 1Password `cloud` vault. `.env` holds only `op://`
+  references, resolved with `op run --env-file=.env -- <command>`.
 - Never print a secret, and never log a whole Onidel VM object: the API returns the root password.
 - A new service in the cloud stays host-local or on the tailnet by default. A public route, such as
   a tunnel hostname or a public DNS record, needs a stated reason in its PR.

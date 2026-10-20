@@ -138,10 +138,9 @@ plain form. Onidel never snapshots the second disk, so its data relies on each s
 - **Public by exception.** A new service stays on the host or on the tailnet. A public route needs
   its own reason in its PR and an auth layer named in the exposure registry, and the tunnel is the
   only way in ([public ingress](./network/public-ingress.md)).
-- **Secrets never in the repo.** The repo is private, but it is treated as public. Every secret
-  reaches its user through 1Password, Pulumi's encrypted state or a root-only file on the host, and
-  never through a command line, because the host's journal records each SSH command line
-  ([secrets](./secrets.md)).
+- **Secrets never in the repo.** The repo is public. Every secret reaches its user through
+  1Password, Pulumi's encrypted state or a root-only file on the host, and never through a command
+  line, because the host's journal records each SSH command line ([secrets](./secrets.md)).
 - **A missing metric alerts.** Every rule built on a probe fires when the probe's metric is absent
   as well as when it is bad, so a probe that stops reporting never reads as healthy, and a check
   from Cloudflare's edge covers the case where the host itself is down
