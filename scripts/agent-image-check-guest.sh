@@ -109,7 +109,17 @@ check_package bash "$BASH_VERSION"
 check_tool bash "${BASH_VERSION%%-*}" bash --version
 check_tool node "v$NODE_VERSION" node --version
 check_tool npm "" npm --version
-check_tool bun "$BUN_VERSION" bun --version
+# bun is a shim that runs the Bun of the nearest .bun-version, and the default, BUN_VERSION, without
+# one. The check runs it from a folder with no .bun-version above it, then from one that pins each
+# version the image holds.
+bun_dir=$(mktemp -d /run/agent-image-bun.XXXXXX)
+check_tool bun "$BUN_VERSION" env -C "$bun_dir" bun --version
+for pinned in "$BUN_VERSION" "$BUN_OLDER_VERSION"; do
+  echo "$pinned" > "$bun_dir/.bun-version"
+  check_tool "bun $pinned" "$pinned" env -C "$bun_dir" bun --version
+  check_tool "bunx $pinned" "$pinned" env -C "$bun_dir" bunx --version
+done
+rm -rf "$bun_dir"
 check_package build-essential "$BUILD_ESSENTIAL_VERSION"
 check_tool gcc "" gcc --version
 check_tool make "" make --version
