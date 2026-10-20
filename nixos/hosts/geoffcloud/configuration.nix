@@ -46,6 +46,8 @@ in
   };
   # how long the host has run an older system or imp than the latest green main build
   services.host-build-lag.enable = true;
+  # each slice's and unit's CPU time, and the root cgroup's, as node-exporter textfile metrics
+  services.host-cgroup-cpu.enable = true;
   # the daily drift check of prod (docs/runbooks/drift-check.md). Its credentials file sits on
   # host-secrets, installed by scripts/install-drift-check-credentials.sh; until it exists, the
   # unit is skipped.

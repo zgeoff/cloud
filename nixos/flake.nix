@@ -29,6 +29,7 @@
         imp.nixosModules.imp
         ./modules/impd-local-health.nix
         ./modules/host-build-lag.nix
+        ./modules/host-cgroup-cpu.nix
         ./modules/drift-check.nix
         ./modules/atc-daemon.nix
         ./modules/cloud-host-firewall.nix
@@ -55,7 +56,8 @@
       # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock, tank-cloud-host-secrets
       # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
       # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk, and
-      # network-policy, which runs infra's egress NetworkPolicies on k3s
+      # network-policy, which runs infra's egress NetworkPolicies on k3s, and
+      # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -90,6 +92,12 @@
       };
       checks.x86_64-linux.host-build-lag = import ./checks/host-build-lag.nix {
         inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.host-cgroup-cpu = import ./checks/host-cgroup-cpu.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.host-cgroup-cpu-vm = import ./checks/host-cgroup-cpu-vm.nix {
+        inherit nixpkgs;
       };
       checks.x86_64-linux.drift-check = import ./checks/drift-check.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.impd-restore = import ./checks/impd-restore.nix { inherit nixpkgs imp; };
