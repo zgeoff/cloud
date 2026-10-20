@@ -3,8 +3,9 @@ import { impHealthProbeValues } from './imp-health-probe-values.ts';
 
 // test-imp-health-probe.sh runs the module in the pinned blackbox exporter against impd's ready
 // and not-ready bodies, since only the exporter evaluates its CEL expression
-test("it probes imp's /health over verified TLS every 30s, failing unless the JSON body says impd is ready", () => {
+test("it probes imp's /health over verified TLS every 30s from the pod its egress allow selects, failing unless the JSON body says impd is ready", () => {
   expect(impHealthProbeValues).toStrictEqual({
+    pod: { labels: { app: 'imp-health-probe' } },
     podSecurityContext: { seccompProfile: { type: 'RuntimeDefault' } },
     resources: { requests: { cpu: '10m', memory: '16Mi' }, limits: { memory: '64Mi' } },
     config: {

@@ -9,12 +9,16 @@ interface ProbeValuesInputs<Modules extends Readonly<Record<string, unknown>>> {
   readonly modules: Modules;
   readonly module: keyof Modules & string;
   readonly targets: readonly ProbeTarget<keyof Modules & string>[];
+
+  // the labels an egress allow selects the probe's pod by
+  readonly podLabels?: Readonly<Record<string, string>>;
 }
 
 export function buildProbeValues<Modules extends Readonly<Record<string, unknown>>>(
   inputs: ProbeValuesInputs<Modules>,
 ) {
   return {
+    ...(inputs.podLabels === undefined ? {} : { pod: { labels: inputs.podLabels } }),
     podSecurityContext: { seccompProfile: { type: 'RuntimeDefault' } },
     resources: { requests: { cpu: '10m', memory: '16Mi' }, limits: { memory: '64Mi' } },
     config: { modules: inputs.modules },

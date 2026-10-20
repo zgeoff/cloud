@@ -54,7 +54,8 @@
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
       # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock, tank-cloud-host-secrets
       # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
-      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk
+      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk, and
+      # network-policy, which runs infra's egress NetworkPolicies on k3s
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -113,6 +114,10 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.tank-cloud-rancher = import ./checks/tank-cloud-rancher.nix {
+        inherit nixpkgs;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.network-policy = import ./checks/network-policy.nix {
         inherit nixpkgs;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };

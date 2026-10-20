@@ -1,0 +1,404 @@
+[
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "atc"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "default"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "files"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "ingress"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "kube-node-lease"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "kube-public"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "kube-system"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "nixie-ingress"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "observability"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
+      "namespace": "onepassword"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "atc-gateway-egress",
+      "namespace": "atc"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "atc-gateway"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.69.47.33/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8415
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.67.122.120/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8415
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "atc-daemon-probe-egress",
+      "namespace": "observability"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "atc-daemon-probe"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.69.47.33/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8415
+            }
+          ]
+        },
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.67.122.120/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8415
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "imp-health-probe-egress",
+      "namespace": "observability"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "imp-health-probe"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.75.9.119/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 443
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "cloudflared-egress",
+      "namespace": "ingress"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "cloudflared"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.69.47.33/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 8418
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

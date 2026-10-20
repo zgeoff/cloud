@@ -327,6 +327,25 @@ EOF
   assert_status 1 "$status"
 }
 
+it_fails_naming_network_policy_and_builds_nothing_when_kvm_is_missing() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
+    KVM_DEVICE="$tree/no-kvm" \
+    bash "$script" network-policy > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "run-nixos-checks: $tree/no-kvm is missing or not readable and writable; network-policy needs KVM"
+  diff - "$tree/calls" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+EOF
+  assert_status 1 "$status"
+}
+
 it_stops_without_building_when_the_flake_fails_to_evaluate() {
   local status=0
   create_case_tree
