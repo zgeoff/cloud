@@ -146,12 +146,14 @@ first drift check fails and holds until a person repairs the stack.
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
 
-The drift checks and the preview run again when they fail on an error that a later try can pass: a
-server error from Let's Encrypt while the ACME provider refreshes nixie's certificate, or a failed
-plugin download. A preview changes nothing, so a second try is safe. The apply never runs twice,
-because a failed apply can leave the stack half changed. Pulumi's update plans would close that gap,
-but they are experimental, and a plan they reject stops the apply partway, which leaves the stack
-half changed.
+The drift checks, the preview and the refresh before the apply run again when they fail on an error
+that a later try can pass: a server error from Let's Encrypt while the ACME provider refreshes
+nixie's certificate, a server error from the Cloudflare API to a read, or a failed plugin download.
+A preview changes nothing, and a refresh writes only what it reads into the state, so a second try
+is safe. The refresh runs as a step of its own for that reason, and the apply that follows it skips
+its own refresh. The apply never runs twice, because a failed apply can leave the stack half
+changed. Pulumi's update plans would close that gap, but they are experimental, and a plan they
+reject stops the apply partway, which leaves the stack half changed.
 
 One run of the job runs at a time, and GitHub never cancels one in progress, because a cancelled
 apply leaves the stack half changed. The job's concurrency group holds the whole job, from its

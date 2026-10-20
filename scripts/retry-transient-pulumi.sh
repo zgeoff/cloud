@@ -1,15 +1,22 @@
 #!/usr/bin/env bash
-# Runs a read-only Pulumi command, a preview or a drift check, and runs it again when it fails on
-# an error that a later try can pass. The prod apply job's drift checks and its preview run
-# through it; the apply never does, because a second apply is not the same as the first.
+# Runs a Pulumi command that changes no resource, a preview, a drift check or a refresh, and runs it
+# again when it fails on an error that a later try can pass. The prod apply job's drift checks, its
+# preview and the refresh before its apply run through it; the apply never does, because a second
+# apply is not the same as the first.
 #
 # An error a later try can pass is one of these, matched in the command's output:
 # - a 5xx answer from the ACME server, such as Let's Encrypt's
 #   `503 :: POST :: …/acme/new-acct :: urn:ietf:params:acme:error:rateLimited :: Service busy;
 #   retry later.` while the acme provider refreshes the nixie certificate;
+# - a 5xx answer from the Cloudflare API to a read, such as
+#   `GET "https://api.cloudflare.com/client/v4/accounts/…/access/apps/…": 504 Gateway Timeout`
+#   while the cloudflare provider refreshes an Access application. A JSON preview escapes the
+#   quotes, so the match takes `GET \"…\": 504` too;
 # - `Could not automatically download and install resource plugin`, a plugin download that failed,
 #   such as on GitHub's API rate limit.
-# A 429 from the ACME server is a real rate limit, which lasts hours, so it fails at once.
+# A 429 from the ACME server is a real rate limit, which lasts hours, so it fails at once. A 5xx
+# answer from the Cloudflare API to any method other than GET fails at once too, because the write
+# it answers may have landed.
 #
 # It runs <command> in <dir> (-C, default the current one) up to RETRY_ATTEMPTS times (default
 # 3), and pauses RETRY_DELAY seconds (default 60) after each failed try it repeats, with a line on
@@ -45,7 +52,7 @@ attempts="${RETRY_ATTEMPTS:-3}"
 delay="${RETRY_DELAY:-60}"
 if ! [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || ! [[ "$delay" =~ ^[0-9]+$ ]]; then usage; fi
 
-transient='acme: error: 5[0-9][0-9] :: |Could not automatically download and install resource plugin'
+transient='acme: error: 5[0-9][0-9] :: |GET \\?"https://api\.cloudflare\.com/[^"]*\\?": 5[0-9][0-9] |Could not automatically download and install resource plugin'
 
 log="$(mktemp)"
 trap 'rm -f "$log"' EXIT

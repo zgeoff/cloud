@@ -71,6 +71,7 @@
     "ci:decide-prod-apply": "bash scripts/decide-prod-apply.sh",
     "ci:check-out-deployed-revision": "bash scripts/check-out-deployed-revision.sh",
     "ci:preview-and-guard-prod": "bash scripts/preview-and-guard-prod.sh",
+    "ci:refresh-prod": "bash scripts/refresh-prod.sh",
     "ci:retry-transient-pulumi": "bash scripts/retry-transient-pulumi.sh",
     "ci:wait-for-k3s-api": "bash scripts/wait-for-k3s-api.sh",
     "ci:decide-prod-outcome": "bash scripts/decide-prod-outcome.sh",

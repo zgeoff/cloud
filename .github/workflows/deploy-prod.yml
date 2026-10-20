@@ -154,8 +154,9 @@ jobs:
       # a failure here holds the apply rather than failing the run, so the plan still shows. Each
       # Pulumi step reads GITHUB_TOKEN, which Pulumi sends when it downloads a plugin from GitHub,
       # because GitHub limits the runners' shared address to 60 calls an hour without it. The drift
-      # checks and the preview run again after an ACME server's 5xx or a failed plugin download
-      # (retry-transient-pulumi.sh); the apply never does.
+      # checks, the preview and the refresh before the apply run again after an ACME server's 5xx, a
+      # Cloudflare API 5xx to a read or a failed plugin download (retry-transient-pulumi.sh); the
+      # apply never does.
       - name: Check drift from the deployed revision
         id: drift
         if: steps.decide.outputs.apply == 'true'
@@ -189,13 +190,23 @@ jobs:
           REVISION: ${{ steps.decide.outputs.revision }}
         run: bun run --silent ci:decide-prod-outcome
 
+      # the refresh writes only what it reads into the state and changes no resource, so it runs
+      # apart from the apply, where a second try is safe
+      - name: Refresh before the apply
+        if: steps.outcome.outputs.outcome == 'apply'
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PROGRAM: program
+        run: bun run --silent ci:refresh-prod
+
       - name: Apply
         if: steps.outcome.outputs.outcome == 'apply'
         working-directory: program
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: bun run up -- --yes --refresh --skip-preview --suppress-outputs
+        run: bun run up -- --yes --skip-preview --suppress-outputs
 
       - name: Check drift after the apply
         if: steps.outcome.outputs.outcome == 'apply'

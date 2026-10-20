@@ -1,7 +1,8 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { $ } from 'bun';
 import { findJSONField } from '../scripts/find-json-field.ts';
 import { buildMockWorkflowRunContext } from '../scripts/test-utils/build-mock-workflow-run-context.ts';
 import { buildStubActionsScheduler } from '../scripts/test-utils/build-stub-actions-scheduler.ts';
@@ -73,6 +74,92 @@ test('it ends a held push s run green as held, from the workflow s own outcome s
     status: 'in_progress',
     jobs: { apply: 'success', alert: 'in_progress' },
   });
+});
+
+// the refresh step runs its real command with real Bun, the real refresh-prod.sh and the real
+// retry, from a workspace that links this checkout's package.json and scripts/; only op, pulumi and
+// the retry's pause are stand-ins
+test('it refreshes the prod stack from the workflow s own refresh step, again after a cloudflare 502 to a get', async () => {
+  const ctx = await setupTest();
+
+  const repo = join(import.meta.dir, '..');
+  const workspace = join(ctx.directory, 'workspace');
+  const bin = join(ctx.directory, 'bin');
+  const clock = join(ctx.directory, 'clock');
+  const pulumiAnswers = join(ctx.directory, 'pulumi-answers');
+  const pulumiCalls = join(ctx.directory, 'pulumi-calls');
+  const opCalls = join(ctx.directory, 'op-calls');
+
+  await mkdir(join(workspace, 'program', 'infra'), { recursive: true });
+  await mkdir(bin);
+  await mkdir(clock);
+  await mkdir(pulumiAnswers);
+  await symlink(join(repo, 'package.json'), join(workspace, 'package.json'));
+  await symlink(join(repo, 'scripts'), join(workspace, 'scripts'));
+
+  // the revision to apply builds its provider with Go, which this test leaves out
+  await writeFile(
+    join(workspace, 'program', 'package.json'),
+    JSON.stringify({ scripts: { 'provider:build': 'echo built the provider' } }),
+  );
+
+  await writeFile(
+    join(workspace, 'program', '.env'),
+    'PULUMI_CONFIG_PASSPHRASE=op://example/passphrase/password\n',
+  );
+
+  await writeFile(
+    join(pulumiAnswers, '1.err'),
+    '    error: failed to make http request: GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c": 502 Bad Gateway\n',
+  );
+
+  await writeFile(join(pulumiAnswers, '1.status'), '255\n');
+  await writeFile(join(pulumiAnswers, '2.out'), 'Resources:\n    80 unchanged\n');
+  await writeFile(pulumiCalls, '');
+  await writeFile(opCalls, '');
+  await $`bash -c ${'source "$1"; source "$2"; source "$3"; create_stub_clock "$4"; create_stub_op_run "$5" "$6"; create_stub_scripted_command "$5" pulumi "$7" "$8"'} create-stubs ${join(repo, 'test-support', 'shell', 'create-stub-clock.sh')} ${join(repo, 'test-support', 'shell', 'create-stub-op-run.sh')} ${join(repo, 'test-support', 'shell', 'create-stub-scripted-command.sh')} ${clock} ${bin} ${opCalls} ${pulumiCalls} ${pulumiAnswers}`;
+
+  const step = ctx.steps.find(
+    (each: unknown) => findJSONField(each, 'name') === 'Refresh before the apply',
+  );
+
+  const result = await runActionsStep({
+    step,
+    jobEnv: findJSONField(ctx.job, 'env'),
+    context: {
+      github: buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }),
+      inputs: {},
+      steps: {},
+      secrets: { OP_SERVICE_ACCOUNT_TOKEN: 'ops_example' },
+    },
+    cwd: workspace,
+    directory: ctx.directory,
+    path: `${clock}:${bin}:${dirname(process.execPath)}:/usr/bin:/bin`,
+  });
+
+  const pulumiLog = await readFile(pulumiCalls, 'utf8');
+  const opLog = await readFile(opCalls, 'utf8');
+  const pauses = await readFile(join(clock, 'pauses'), 'utf8');
+
+  expect(result.status).toBe('success');
+
+  expect(result.stdout).toBe(
+    'built the provider\n    error: failed to make http request: GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c": 502 Bad Gateway\nResources:\n    80 unchanged\n',
+  );
+
+  expect(pulumiLog).toBe(
+    `${JSON.stringify({ cwd: join(workspace, 'program', 'infra'), argv: ['pulumi', 'refresh', '--stack', 'prod', '--yes', '--skip-preview', '--suppress-outputs'] })}\n`.repeat(
+      2,
+    ),
+  );
+
+  expect(opLog).toBe(
+    `${JSON.stringify({ cwd: join(workspace, 'program', 'infra'), argv: ['op', 'run', '--env-file=../.env', '--', 'pulumi', 'refresh', '--stack', 'prod', '--yes', '--skip-preview', '--suppress-outputs'] })}\n`.repeat(
+      2,
+    ),
+  );
+
+  expect(pauses).toBe('60\n');
 });
 
 // main's tip, whose workflow runs, is a later merge than the commit whose CI run started it.
@@ -237,12 +324,20 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       run: 'bun run --silent ci:decide-prod-outcome',
     },
     {
+      name: 'Refresh before the apply',
+      ref: undefined,
+      path: undefined,
+      workingDirectory: undefined,
+      program: 'program',
+      run: 'bun run --silent ci:refresh-prod',
+    },
+    {
       name: 'Apply',
       ref: undefined,
       path: undefined,
       workingDirectory: 'program',
       program: undefined,
-      run: 'bun run up -- --yes --refresh --skip-preview --suppress-outputs',
+      run: 'bun run up -- --yes --skip-preview --suppress-outputs',
     },
     {
       name: 'Check drift after the apply',
@@ -435,6 +530,7 @@ test.each([
       'Check drift from the deployed revision',
       'Preview and guard',
       'Decide the outcome',
+      'Refresh before the apply',
       'Apply',
       'Check drift after the apply',
       'Move deployed/prod',

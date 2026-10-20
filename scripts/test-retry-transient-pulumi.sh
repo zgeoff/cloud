@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Test for retry-transient-pulumi.sh: it passes a command that succeeds through once, runs it
-# again after a pause when it fails on an ACME server's 5xx or a failed plugin download, writes
-# only the last try's stdout to the --out file, fails at once with the command's status on any
-# other error or an ACME 429, gives up after RETRY_ATTEMPTS tries with the last status, and
+# again after a pause when it fails on an ACME server's 5xx, a Cloudflare API 5xx to a GET or a
+# failed plugin download, writes only the last try's stdout to the --out file, fails at once with
+# the command's status on any other error, an ACME 429, a Cloudflare API 5xx to a write or a
+# Cloudflare API 4xx, gives up after RETRY_ATTEMPTS tries with the last status, and
 # refuses a bad option. The command is a stand-in (create-stub-scripted-command.sh), and the pause
 # is create-stub-clock.sh's sleep, first on PATH, which records each pause. Each case runs the
 # script under `env -i` and compares its whole stdout, stderr, call log and pauses.
@@ -144,6 +145,112 @@ it_fails_at_once_on_an_acme_server_s_429_rate_limit() {
     bash "$script" bun run drift -- --suppress-outputs) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'acme: error: 429 :: POST :: https://acme-v02.api.letsencrypt.org/acme/new-order :: urn:ietf:params:acme:error:rateLimited :: too many certificates (5) already issued for this exact set of identifiers in the last 168h0m0s'
+  diff /dev/null "$tree/err"
+  [ ! -e "$tree/clock/pauses" ] || {
+    echo "it paused: $(cat "$tree/clock/pauses")" >&2
+    exit 1
+  }
+  assert_status 1 "$status"
+}
+
+it_runs_a_preview_again_after_a_cloudflare_api_504_to_a_get() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '%s\n' 'preview error: error: [ERROR] GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c-1111-2222-3333-444455556666": 504 Gateway Timeout {"title":"Error 504: Gateway time-out","status":504}' > "$tree/answers/1.err"
+  echo 1 > "$tree/answers/1.status"
+  printf '{"steps":[{"op":"same"}]}\n' > "$tree/answers/2.out"
+
+  (cd "$tree/repo" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" \
+    bash "$script" --out "$tree/plan.json" bun run --silent preview -- --refresh --json) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+preview error: error: [ERROR] GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c-1111-2222-3333-444455556666": 504 Gateway Timeout {"title":"Error 504: Gateway time-out","status":504}
+retry-transient-pulumi: try 1 of 3 failed (exit 1) on an error a later try can pass; trying again in 60s
+EOF
+  diff - "$tree/calls" << EOF
+{"cwd":"$tree/repo","argv":["bun","run","--silent","preview","--","--refresh","--json"]}
+{"cwd":"$tree/repo","argv":["bun","run","--silent","preview","--","--refresh","--json"]}
+EOF
+  diff - "$tree/plan.json" <<< '{"steps":[{"op":"same"}]}'
+  diff - "$tree/clock/pauses" <<< '60'
+  assert_status 0 "$status"
+}
+
+it_runs_a_refresh_again_after_a_cloudflare_api_502_to_a_get() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '%s\n' '    error: failed to make http request: GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/identity_providers/9a8b7c6d": 502 Bad Gateway' > "$tree/answers/1.err"
+  echo 255 > "$tree/answers/1.status"
+  printf 'Resources:\n    80 unchanged\n' > "$tree/answers/2.out"
+
+  (cd "$tree/repo" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" \
+    bash "$script" bun run refresh -- --yes --skip-preview --suppress-outputs) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+    error: failed to make http request: GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/identity_providers/9a8b7c6d": 502 Bad Gateway
+Resources:
+    80 unchanged
+EOF
+  diff - "$tree/err" <<< 'retry-transient-pulumi: try 1 of 3 failed (exit 255) on an error a later try can pass; trying again in 60s'
+  diff - "$tree/clock/pauses" <<< '60'
+  assert_status 0 "$status"
+}
+
+it_matches_a_cloudflare_api_503_that_a_json_preview_escapes_in_the_out_file() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '%s\n' '{"diagnostics":[{"message":"error: [ERROR] GET \"https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/policies/7e6d5c4b\": 503 Service Unavailable","severity":"error"}]}' > "$tree/answers/1.out"
+  echo 1 > "$tree/answers/1.status"
+  printf '{"steps":[{"op":"same"}]}\n' > "$tree/answers/2.out"
+
+  (cd "$tree/repo" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" \
+    bash "$script" --out "$tree/plan.json" bun run --silent preview -- --refresh --json) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'retry-transient-pulumi: try 1 of 3 failed (exit 1) on an error a later try can pass; trying again in 60s'
+  diff - "$tree/plan.json" <<< '{"steps":[{"op":"same"}]}'
+  assert_status 0 "$status"
+}
+
+it_fails_at_once_on_a_cloudflare_api_5xx_to_a_write() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '%s\n' 'error: [ERROR] PUT "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c": 504 Gateway Timeout' > "$tree/answers/1.err"
+  echo 1 > "$tree/answers/1.status"
+
+  (cd "$tree/repo" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" \
+    bash "$script" bun run drift -- --suppress-outputs) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'error: [ERROR] PUT "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c": 504 Gateway Timeout'
+  diff /dev/null "$tree/err"
+  [ ! -e "$tree/clock/pauses" ] || {
+    echo "it paused: $(cat "$tree/clock/pauses")" >&2
+    exit 1
+  }
+  assert_status 1 "$status"
+}
+
+it_fails_at_once_on_a_cloudflare_api_4xx_to_a_get() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '%s\n' 'error: [ERROR] GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c": 403 Forbidden' > "$tree/answers/1.err"
+  echo 1 > "$tree/answers/1.status"
+
+  (cd "$tree/repo" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" \
+    bash "$script" bun run drift -- --suppress-outputs) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'error: [ERROR] GET "https://api.cloudflare.com/client/v4/accounts/0a1b2c3d/access/apps/5f6e7d8c": 403 Forbidden'
   diff /dev/null "$tree/err"
   [ ! -e "$tree/clock/pauses" ] || {
     echo "it paused: $(cat "$tree/clock/pauses")" >&2
