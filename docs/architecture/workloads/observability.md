@@ -56,9 +56,17 @@ dead probe never reads as a healthy impd.
 ## Host CPU by cgroup
 
 The host's CPU time reaches Prometheus by cgroup, so a spike of system CPU shows which unit,
-container or kernel work took it. node-exporter reports the host's CPU by mode, such as user and system, but no unit. The kubelet's cAdvisor reads only the pods' cgroups, and node-exporter's systemd collector reports no CPU time. A service on the host reads the kernel's CPU accounting of the root cgroup, each slice and each unit in a slice, and writes it by mode where node-exporter's textfile collector reads it. The service loops rather than running from a timer, so the journal that Alloy ships to Loki gets no lines for each write.
+container or kernel work took it. node-exporter reports the host's CPU by mode, such as user and
+system, but no unit. The kubelet's cAdvisor reads only the pods' cgroups, and node-exporter's
+systemd collector reports no CPU time. A service on the host reads the kernel's CPU accounting of
+the root cgroup, each slice and each unit in a slice, and writes it by mode where node-exporter's
+textfile collector reads it. The service loops rather than running from a timer, so the journal that
+Alloy ships to Loki gets no lines for each write.
 
-The root cgroup's time is the whole host's. Its time less the sum of its slices' is the work that runs in the root cgroup itself: kernel threads, such as ZFS's threads that serve a zvol, and interrupts. A container that Docker runs shows as a scope in `system.slice`, and the pods show in the top-level cgroup that the kubelet makes for them.
+The root cgroup's time is the whole host's. Its time less the sum of its slices' is the work that
+runs in the root cgroup itself: kernel threads, such as ZFS's threads that serve a zvol, and
+interrupts. A container that Docker runs shows as a scope in `system.slice`, and the pods show in
+the top-level cgroup that the kubelet makes for them.
 
 ## Alert rules
 
