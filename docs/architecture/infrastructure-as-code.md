@@ -76,9 +76,13 @@ config in the state holds the full-account API key, because Onidel offers no oth
 Kubernetes provider's holds the admin kubeconfig. The check therefore leaves out every Onidel and
 Kubernetes resource, and reads the rest with credentials that can only read: a read-only token for
 the state bucket, and read-only Cloudflare and Tailscale credentials. It still needs the passphrase,
-because Pulumi opens no state without it, so the vault that holds the check's credentials also opens
-every secret in the state. [The drift check runbook](../runbooks/drift-check.md) lists each
-credential and its scope.
+because Pulumi opens no state without it, so whatever holds the check's credentials also opens every
+secret in the state. The check therefore runs on the host, from a root-only credentials file there,
+and never on a GitHub runner. Its scoped read tokens live only in that file and in their items in
+the vault `cloud`, so no workflow reads them. The passphrase and the alert webhook are shared: the
+apply job reads its own copies of both from `cloud-deploy`, because every apply needs the
+passphrase. [The drift check runbook](../runbooks/drift-check.md) lists each credential and its
+scope.
 
 Some resources are declared to avoid drift on their own. The host's auth keys are single-use, so
 after the host joins they read as used, and the program never mints them again until a reinstall

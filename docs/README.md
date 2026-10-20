@@ -50,8 +50,8 @@ call, the path of a change, the topology and the data.
 - [Observe](./runbooks/observe.md): Grafana, logs, metrics, the external health check, and Discord
   alerts.
 - [The prod apply job](./runbooks/prod-apply.md): set up the job, read a run, answer a held one.
-- [The scheduled drift check](./runbooks/drift-check.md): the `cloud-ci` vault, the schedule, and
-  how to answer drift.
+- [The scheduled drift check](./runbooks/drift-check.md): the host's daily check, its credentials, a
+  run by hand, and how to answer drift.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.

@@ -76,8 +76,6 @@
     "ci:decide-prod-outcome": "bash scripts/decide-prod-outcome.sh",
     "ci:move-deployed-prod": "bash scripts/move-deployed-prod.sh",
     "ci:alert-prod-apply": "bash scripts/alert-prod-apply.sh",
-    "ci:check-scheduled-drift": "bash scripts/check-scheduled-drift.sh",
-    "ci:alert-scheduled-drift": "bash scripts/alert-scheduled-drift.sh",
     "ci:decide-nixos-checks": "bash scripts/decide-nixos-checks.sh",
     "ci:open-kvm": "bash scripts/open-kvm.sh",
     "ci:write-release-bumps": "bun scripts/release/run-write-release-bumps.ts",

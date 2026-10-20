@@ -46,6 +46,13 @@ in
   };
   # how long the host has run an older system or imp than the latest green main build
   services.host-build-lag.enable = true;
+  # the daily drift check of prod (docs/runbooks/drift-check.md). Its credentials file sits on
+  # host-secrets, installed by scripts/install-drift-check-credentials.sh; until it exists, the
+  # unit is skipped.
+  services.drift-check = {
+    enable = true;
+    credentialsFile = "/var/lib/tank-cloud/host-secrets/drift-check/credentials";
+  };
   networking.hostName = "geoffcloud";
   # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
   # so NixOS imports tank without -f
@@ -304,6 +311,7 @@ in
       imp-host-dns-token = [ "imp-host-secrets" ];
       atc-daemon = [ "atc-daemon-secrets" ];
       preview = [ "host-secrets" ];
+      drift-check = [ "host-secrets" ];
     };
   };
 

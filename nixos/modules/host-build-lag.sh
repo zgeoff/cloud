@@ -6,8 +6,10 @@
 #
 # - The system lags when the host's $CURRENT_SYSTEM resolves to a store path that no line of
 #   $STATE_DIR/switches names, or when that line's commit is older than the green one and a file
-#   the system is built from (nixos/ outside its checks, packages/topology/, packages/preview/)
-#   changed between the two, or when GitHub no longer holds that commit.
+#   the system is built from (nixos/ outside its checks, packages/topology/, packages/preview/,
+#   and the drift check's provider/, infra/Pulumi.yaml and four scripts) changed between the two,
+#   or when GitHub no longer holds that commit. The drift check reads only the encryption salt of
+#   infra/Pulumi.prod.yaml, so a change to the stack's config is no system change.
 #   scripts/switch-geoffcloud.sh appends "<commit> <store path>" to that
 #   file before each activation.
 # - imp lags when the version that `impz info` in the imp-host container prints is not the
@@ -54,7 +56,8 @@ else
         if .status == "behind" or .status == "identical" then 0
         elif (.files | length) >= 300 then 1
         elif any(.files[] | .filename, (.previous_filename // empty);
-          test("^(nixos/|packages/topology/|packages/preview/)") and (test("^nixos/checks/") | not)) then 1
+          test("^(nixos/|packages/topology/|packages/preview/|provider/|infra/Pulumi\\.yaml$|scripts/(run-host-drift-check|check-scheduled-drift|retry-transient-pulumi|alert-scheduled-drift)\\.sh$)")
+          and (test("^nixos/checks/") | not)) then 1
         else 0 end' "$comparison")
       ;;
     # GitHub no longer holds the recorded commit, so nothing shows the system is current

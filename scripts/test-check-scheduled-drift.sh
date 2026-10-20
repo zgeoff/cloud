@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Test for check-scheduled-drift.sh: it runs a preview-only refresh of prod in infra/ that leaves
-# out the Onidel and Kubernetes resources and passes extra arguments on, writes outcome=clean for a
-# refresh that exits 0, outcome=drift for Pulumi's exit 7, and outcome=failed for any other
+# out the Onidel and Kubernetes resources and passes extra arguments on, writes clean for a
+# refresh that exits 0, drift for Pulumi's exit 7, and failed for any other
 # status, exits with the refresh's status, runs the refresh again after a failed plugin download,
-# and refuses to run without GITHUB_OUTPUT. pulumi is a stand-in
+# and refuses to run without OUTCOME_FILE. pulumi is a stand-in
 # (create-stub-scripted-command.sh), and the retry's pause is create-stub-clock.sh's sleep, first
 # on PATH. Each case runs the script under `env -i` and compares its whole stdout, stderr, call log
 # and output file.
@@ -29,7 +29,7 @@ it_writes_outcome_clean_and_exits_0_when_the_refresh_finds_no_change() {
   printf 'Resources:\n    61 unchanged\n' > "$tree/answers/1.out"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" GITHUB_OUTPUT="$tree/github-output" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" OUTCOME_FILE="$tree/outcome" \
     bash "$script" --suppress-outputs > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -40,7 +40,7 @@ EOF
   diff - "$tree/calls" << EOF
 {"cwd":"$infra","argv":["pulumi","refresh","--stack","prod","--preview-only","--expect-no-changes","--non-interactive","--exclude","urn:pulumi:prod::geoff-cloud::**onidel:index:**","--exclude","urn:pulumi:prod::geoff-cloud::**kubernetes:**","--suppress-outputs"]}
 EOF
-  diff - "$tree/github-output" <<< 'outcome=clean'
+  diff - "$tree/outcome" <<< 'clean'
   assert_status 0 "$status"
 }
 
@@ -53,7 +53,7 @@ it_writes_outcome_drift_and_exits_7_when_the_refresh_finds_a_change() {
   echo 7 > "$tree/answers/1.status"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" GITHUB_OUTPUT="$tree/github-output" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" OUTCOME_FILE="$tree/outcome" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -66,7 +66,7 @@ EOF
   diff - "$tree/calls" << EOF
 {"cwd":"$infra","argv":["pulumi","refresh","--stack","prod","--preview-only","--expect-no-changes","--non-interactive","--exclude","urn:pulumi:prod::geoff-cloud::**onidel:index:**","--exclude","urn:pulumi:prod::geoff-cloud::**kubernetes:**"]}
 EOF
-  diff - "$tree/github-output" <<< 'outcome=drift'
+  diff - "$tree/outcome" <<< 'drift'
   [ ! -e "$tree/clock/pauses" ] || {
     echo "it paused: $(cat "$tree/clock/pauses")" >&2
     exit 1
@@ -82,7 +82,7 @@ it_writes_outcome_failed_and_exits_with_the_refresh_s_status_on_any_other_error(
   echo 1 > "$tree/answers/1.status"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" GITHUB_OUTPUT="$tree/github-output" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" OUTCOME_FILE="$tree/outcome" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'error: get stack secrets manager: passphrase must be set with PULUMI_CONFIG_PASSPHRASE or PULUMI_CONFIG_PASSPHRASE_FILE environment variables'
@@ -90,7 +90,7 @@ it_writes_outcome_failed_and_exits_with_the_refresh_s_status_on_any_other_error(
   diff - "$tree/calls" << EOF
 {"cwd":"$infra","argv":["pulumi","refresh","--stack","prod","--preview-only","--expect-no-changes","--non-interactive","--exclude","urn:pulumi:prod::geoff-cloud::**onidel:index:**","--exclude","urn:pulumi:prod::geoff-cloud::**kubernetes:**"]}
 EOF
-  diff - "$tree/github-output" <<< 'outcome=failed'
+  diff - "$tree/outcome" <<< 'failed'
   assert_status 1 "$status"
 }
 
@@ -103,7 +103,7 @@ it_runs_the_refresh_again_after_a_failed_plugin_download_and_writes_the_last_try
   printf 'Resources:\n    61 unchanged\n' > "$tree/answers/2.out"
 
   env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" GITHUB_OUTPUT="$tree/github-output" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" OUTCOME_FILE="$tree/outcome" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -117,11 +117,11 @@ EOF
 {"cwd":"$infra","argv":["pulumi","refresh","--stack","prod","--preview-only","--expect-no-changes","--non-interactive","--exclude","urn:pulumi:prod::geoff-cloud::**onidel:index:**","--exclude","urn:pulumi:prod::geoff-cloud::**kubernetes:**"]}
 EOF
   diff - "$tree/clock/pauses" <<< '60'
-  diff - "$tree/github-output" <<< 'outcome=clean'
+  diff - "$tree/outcome" <<< 'clean'
   assert_status 0 "$status"
 }
 
-it_refuses_to_run_without_github_output() {
+it_refuses_to_run_without_an_outcome_file() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -131,7 +131,7 @@ it_refuses_to_run_without_github_output() {
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'check-scheduled-drift: set GITHUB_OUTPUT'
+  diff - "$tree/err" <<< 'check-scheduled-drift: set OUTCOME_FILE'
   diff /dev/null "$tree/calls"
   assert_status 2 "$status"
 }
