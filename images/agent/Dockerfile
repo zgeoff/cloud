@@ -11,7 +11,7 @@
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
-FROM ghcr.io/zgeoff/imp-base:2.8.0@sha256:8a09d7d5093e2b6b3086a2fec5d0c68795ded996da987d9264f9928d50c4058f
+FROM ghcr.io/zgeoff/imp-base:2.8.1@sha256:299830796933a3a8846db654f15cb0a23cea81127b649caf62f615520d7fc4eb
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -21,7 +21,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 #   apt-get update --snapshot <stamp> && apt-cache policy <package>
 # docker-compose-plugin comes from Docker's repository, which keeps old builds.
 ARG UBUNTU_SNAPSHOT=20261006T000000Z
-ARG GIT_VERSION=1:2.43.0-1ubuntu7.3
+ARG GIT_VERSION=1:2.43.0-1ubuntu7.4
 ARG BASH_VERSION=5.2.21-2ubuntu4
 ARG JQ_VERSION=1.7.1-3ubuntu0.24.04.2
 ARG BUILD_ESSENTIAL_VERSION=12.10ubuntu1
