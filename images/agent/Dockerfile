@@ -21,7 +21,7 @@ ARG DEBIAN_FRONTEND=noninteractive
 #   apt-get update --snapshot <stamp> && apt-cache policy <package>
 # docker-compose-plugin comes from Docker's repository, which keeps old builds.
 ARG UBUNTU_SNAPSHOT=20261006T000000Z
-ARG GIT_VERSION=1:2.43.0-1ubuntu7.3
+ARG GIT_VERSION=1:2.43.0-1ubuntu7.4
 ARG BASH_VERSION=5.2.21-2ubuntu4
 ARG JQ_VERSION=1.7.1-3ubuntu0.24.04.2
 ARG BUILD_ESSENTIAL_VERSION=12.10ubuntu1
