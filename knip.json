@@ -2,7 +2,11 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
     "infra": {
-      "entry": ["cluster/write-restore-jobs.ts", "test-utils/port-forward-guard-program/index.ts"],
+      "entry": [
+        "cluster/write-restore-jobs.ts",
+        "shared/write-network-policies.ts",
+        "test-utils/port-forward-guard-program/index.ts"
+      ],
       "project": ["**/*.ts"]
     },
     "packages/topology": {

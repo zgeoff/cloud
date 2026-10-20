@@ -29,11 +29,12 @@ port except the host's k3s API.
 | `tag:imp-e2e`      | impz's end-to-end and dev nodes; impz owns it | other `tag:imp-e2e` nodes' API only                                         |
 | `tag:cloud-deploy` | the prod apply job's ephemeral runner node    | the host's k3s API only                                                     |
 
-A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the cluster
-as a whole is `tag:cloud`, and every pod gains whatever the host is granted. The grants for
-`tag:cloud` are therefore single ports to single hosts: the PC's daemon port for the gateway, and
-impd's HTTPS port for the cluster's health probe. Each names its destination by a host alias for one
-node rather than by a tag, so a later node with the same tag gains nothing.
+A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the tailnet
+sees the cluster as a whole as `tag:cloud`, and only the cluster's own egress policies narrow which
+pod uses a grant ([which pod uses each grant](#which-pod-uses-each-grant)). The grants for
+`tag:cloud` are single ports to single hosts: the PC's daemon port for the gateway, and impd's HTTPS
+port for the cluster's health probe. Each names its destination by a host alias for one node rather
+than by a tag, so a later node with the same tag gains nothing.
 
 nixie's pod calls impd's API over the same route, so `tag:cloud` holds a second grant to impd's node
 for HTTPS, named in the policy as nixie's route to impd
@@ -69,6 +70,34 @@ Pulumi drives the cluster through, and no SSH rule lists it as a destination
 Each tag owns itself as well as being owned by the tailnet's admins, because Tailscale lets an OAuth
 client mint keys only for tags its own tags own. Pulumi's client carries `tag:cloud` and `tag:imp`,
 and mints the host's and impd's auth keys with it.
+
+## Which pod uses each grant
+
+Kubernetes NetworkPolicies, which Pulumi creates beside the workloads, decide which pod on the host
+uses each `tag:cloud` grant and each port on the host's tailnet address. Every namespace but nixie's
+holds a deny that refuses its pods the tailnet range and Docker's subnet, and leaves every other
+address open, because a pod reaches the Kubernetes API on the host's public address. An allow beside
+each workload selects its pods by label and gives them back one address and port per destination.
+
+| Destination                                          | Through                    | Pods that may reach it                |
+| ---------------------------------------------------- | -------------------------- | ------------------------------------- |
+| the host's atc daemon, on the host's tailnet address | local delivery on the host | the atc gateway, the atc daemon probe |
+| the PC's atc daemon                                  | the grant to the PC        | the atc gateway, the atc daemon probe |
+| impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pods    |
+| the preview webhook, on the host's tailnet address   | local delivery on the host | cloudflared                           |
+| the preview links, on the host's tailnet address     | local delivery on the host | nixie's pods                          |
+| impd's plain API on Docker's subnet                  | the host's Docker bridge   | none                                  |
+
+The host's own forward rule drops every pod's traffic to Docker's subnet, nixie's pods included,
+beside the deny ([firewalls](./firewalls.md)). A pod on the host's network, such as the node
+exporter, sends from the host's own addresses, so no NetworkPolicy applies to it.
+
+kube-router, the policy engine inside k3s, filters a pod's packets before the host masquerades them
+to its own address, so a policy sees which pod sent each packet on the tailnet and on the host's own
+ports alike. The policies narrow which pod uses a grant, and they are no identity: each daemon's
+bearer token and impd's token still check every call. The tokens alone guard the moment after a pod
+starts, before kube-router writes the pod's rules. The NixOS check `network-policy` runs the
+policies on k3s in a VM and dials each destination from an allowed pod and from a pod beside it.
 
 ## SSH
 

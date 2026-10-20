@@ -3,8 +3,9 @@ import type { Output } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { ATCGatewayConfig } from '../inputs/index.ts';
 import { cloudflaredImage } from '../shared/cloudflared-image.ts';
+import { podLabels } from '../shared/pod-labels.ts';
 
-export const atcGatewayLabels = { app: 'atc-gateway' };
+export const atcGatewayLabels = podLabels.atcGateway;
 const nonrootID = 65_532;
 
 interface GatewaySpecInputs {

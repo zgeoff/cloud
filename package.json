@@ -50,6 +50,7 @@
     "check:release-pins": "bun scripts/release/check-release-pins.ts",
     "check:restore-job": "bun infra/cluster/write-restore-jobs.ts --check",
     "write:restore-job": "bun infra/cluster/write-restore-jobs.ts",
+    "write:network-policies": "bun infra/shared/write-network-policies.ts && oxfmt nixos/checks/network-policies.json",
     "check:topology": "bun scripts/check-topology.ts && bun scripts/write-exposure-table.ts --check",
     "docs:exposure": "bun scripts/write-exposure-table.ts",
     "check:sdk": "bash scripts/check-sdk.sh",

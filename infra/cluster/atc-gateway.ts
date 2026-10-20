@@ -5,7 +5,9 @@ import { ConfigMap, PersistentVolumeClaim, Secret, Service } from '@pulumi/kuber
 import { StorageClass } from '@pulumi/kubernetes/storage/v1';
 import type { Output } from '@pulumi/pulumi';
 import type { ATCGatewayInputs } from '../inputs/index.ts';
+import { createEgressAllow } from '../shared/create-egress-allow.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
+import { egressAllows } from '../shared/egress-allows.ts';
 import { buildATCGatewayRegistry } from './build-atc-gateway-registry.ts';
 import {
   atcGatewayLabels,
@@ -40,6 +42,8 @@ export function createATCGateway(
     ns.metadata.name,
     buildATCGatewaySpec({ config: inputs.config, publicHost, claim, ...objects }),
   );
+
+  createEgressAllow(egressAllows.atcGateway, ns.metadata.name, { provider: cluster });
 
   const service = new Service(
     'atc-gateway',

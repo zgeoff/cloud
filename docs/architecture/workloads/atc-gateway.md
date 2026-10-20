@@ -33,6 +33,12 @@ A blackbox probe in the cluster opens a TCP connection to each daemon on the gat
 it, so the alert for a daemon fires when the gateway could not reach it either
 ([observability](./observability.md)).
 
+An egress NetworkPolicy lets the gateway's pod and the probe's pod reach the two daemons' addresses
+on the daemon port, and refuses every other pod in their namespaces, the gateway's backup job among
+them ([which pod uses each grant](../network/tailnet.md#which-pod-uses-each-grant)). The policy
+takes those addresses from the shared constants, not from the registry, so a daemon added to the
+stack config stays unreachable until its address joins the policy.
+
 ## The gateway pod
 
 The gateway is atc's released binary in a distroless image that this repo builds. CI builds the
