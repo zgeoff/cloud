@@ -182,3 +182,56 @@ test('#updateCommitStatus cuts a description to the 140 characters GitHub accept
 
   expect(commitStatuses.at(0)?.description).toBe('x'.repeat(140));
 });
+
+test('#readComposeFile rejects a contents answer whose content is not a string', () => {
+  server.use(
+    http.get(`${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml`, () =>
+      HttpResponse.json({ type: 'file', encoding: 'base64', content: 42 }),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+  ).rejects.toMatchObject({ name: 'ZodError', issues: [{ path: ['content'] }] });
+});
+
+test('#updatePreviewComment rejects a token user answer without a login', () => {
+  server.use(http.get(`${githubAPIURL}/user`, () => HttpResponse.json({ type: 'User' })));
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' }),
+  ).rejects.toMatchObject({ name: 'ZodError', issues: [{ path: ['login'] }] });
+});
+
+test('#updatePreviewComment rejects a comments page whose comment has no ID', () => {
+  server.use(
+    http.get(`${githubAPIURL}/repos/acme/greenhouse/issues/17/comments`, () =>
+      HttpResponse.json([{ body: 'hello', user: { login: 'preview-bot' } }]),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.updatePreviewComment({ repo: 'acme/greenhouse', number: 17, body: 'first' }),
+  ).rejects.toMatchObject({ name: 'ZodError', issues: [{ path: [0, 'id'] }] });
+});
+
+test('#readPullRequestFiles rejects a files page whose file has no filename', () => {
+  server.use(
+    http.get(`${githubAPIURL}/repos/acme/greenhouse/pulls/17/files`, () =>
+      HttpResponse.json([{ patch: '@@ -1 +1 @@' }]),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(client.readPullRequestFiles('acme/greenhouse', 17)).rejects.toMatchObject({
+    name: 'ZodError',
+    issues: [{ path: [0, 'filename'] }],
+  });
+});

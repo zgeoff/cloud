@@ -3,6 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
+import { z } from 'zod';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
@@ -524,8 +525,9 @@ test('it keeps the result settling when GitHub refuses the final status', async 
   // GitHub's answer to a status while it is down, for every status but the pending ones
   server.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, async (info) => {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's status request shape
-      const payload = (await info.request.clone().json()) as { readonly state: string };
+      const body = await info.request.clone().json();
+
+      const payload = z.object({ state: z.string() }).parse(body);
 
       return payload.state === 'pending'
         ? undefined

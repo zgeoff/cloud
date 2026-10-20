@@ -1,5 +1,5 @@
-/* oxlint-disable typescript/no-unsafe-type-assertion */
 import { expect, test } from 'bun:test';
+import { z } from 'zod';
 import { NativeWebSocket } from '../mocks/native-web-socket.ts';
 import { startStubImpd } from './start-stub-impd.ts';
 
@@ -52,7 +52,9 @@ test('it creates an imp active from its creation, as impd does', async () => {
     body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', image: 'base', memoryMib: 2048 } }),
   });
 
-  const result = (await response.json()) as { readonly json: { readonly lastActiveAt: string } };
+  const body = await response.json();
+
+  const result = z.object({ json: z.object({ lastActiveAt: z.string() }) }).parse(body);
 
   expect(new Date(result.json.lastActiveAt)).toBeBetween(new Date(before), new Date());
 });
@@ -151,6 +153,24 @@ test('it fails closed on a procedure it does not model', async () => {
   expect(text).toBe('not impd: start-stub-impd.ts has no imps/expose\n');
 });
 
+test('it refuses a procedure whose input is not an object with oRPC BAD_REQUEST error body', async () => {
+  const impd = startStubImpd();
+
+  const response = await fetch(`${impd.url}/rpc/imps/list`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: ['pv-0a1b2c3d-17'] }),
+  });
+
+  expect(response.status).toBe(400);
+
+  const result = await response.json();
+
+  expect(result).toStrictEqual({
+    json: { defined: true, code: 'BAD_REQUEST', status: 400, message: 'Input validation failed' },
+  });
+});
+
 test('it redeems an exec ticket once and refuses it with a 401 after', async () => {
   const impd = startStubImpd();
 
@@ -171,7 +191,9 @@ test('it redeems an exec ticket once and refuses it with a 401 after', async () 
     body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17' } }),
   });
 
-  const result = (await issued.json()) as { readonly json: { readonly ticket: string } };
+  const issuedBody = await issued.json();
+
+  const result = z.object({ json: z.object({ ticket: z.string() }) }).parse(issuedBody);
 
   const first = await fetch(`${impd.url}/exec?ticket=${result.json.ticket}`);
   const second = await fetch(`${impd.url}/exec?ticket=${result.json.ticket}`);
@@ -216,7 +238,9 @@ test('it runs a guest command opened with a ticket, with both streams, and wakes
     body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17' } }),
   });
 
-  const result = (await issued.json()) as { readonly json: { readonly ticket: string } };
+  const issuedBody = await issued.json();
+
+  const result = z.object({ json: z.object({ ticket: z.string() }) }).parse(issuedBody);
 
   const socket = new NativeWebSocket(
     `${impd.url.replace('http', 'ws')}/exec?ticket=${result.json.ticket}`,
@@ -239,9 +263,9 @@ test('it runs a guest command opened with a ticket, with both streams, and wakes
 
   socket.addEventListener('message', (event) => {
     const message =
-      typeof event.data === 'string'
-        ? event.data
-        : `frame ${new Uint8Array(event.data as ArrayBuffer)[0]}: ${new TextDecoder().decode(new Uint8Array(event.data as ArrayBuffer).subarray(1))}`;
+      event.data instanceof ArrayBuffer
+        ? `frame ${new Uint8Array(event.data)[0]}: ${new TextDecoder().decode(new Uint8Array(event.data).subarray(1))}`
+        : String(event.data);
 
     messages.push(message);
   });
@@ -295,9 +319,9 @@ test('it runs a guest command opened with the bearer token', async () => {
 
   socket.addEventListener('message', (event) => {
     const message =
-      typeof event.data === 'string'
-        ? event.data
-        : `frame ${new Uint8Array(event.data as ArrayBuffer)[0]}: ${new TextDecoder().decode(new Uint8Array(event.data as ArrayBuffer).subarray(1))}`;
+      event.data instanceof ArrayBuffer
+        ? `frame ${new Uint8Array(event.data)[0]}: ${new TextDecoder().decode(new Uint8Array(event.data).subarray(1))}`
+        : String(event.data);
 
     messages.push(message);
   });

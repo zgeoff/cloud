@@ -1,8 +1,8 @@
-/* oxlint-disable typescript/no-unsafe-type-assertion */
 import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { http, passthrough } from 'msw';
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { server as mockServer } from '../mocks/node.ts';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
@@ -66,6 +66,8 @@ export interface StubImpd {
   readonly tickets: Map<string, string>;
 }
 
+const procedureBodySchema = z.object({ json: z.record(z.string(), z.unknown()).optional() });
+
 export function startStubImpd(): StubImpd {
   const token = 'imp_stubpreview.stub-secret';
 
@@ -99,11 +101,14 @@ export function startStubImpd(): StubImpd {
     // a procedure without input, such as system.info, comes with no body
     const text = await request.text();
 
-    const body = (text === '' ? {} : JSON.parse(text)) as {
-      readonly json?: Record<string, unknown>;
-    };
+    const raw: unknown = text === '' ? {} : JSON.parse(text);
+    const body = procedureBodySchema.safeParse(raw);
 
-    return buildProcedureResponse(stub, procedure, body.json ?? {});
+    if (!body.success) {
+      return buildRPCError(400, 'BAD_REQUEST', 'Input validation failed');
+    }
+
+    return buildProcedureResponse(stub, procedure, body.data.json ?? {});
   };
 
   const server = Bun.serve<ExecSocketData>({
@@ -297,17 +302,19 @@ function toImpRecord(imp: StubImp) {
   };
 }
 
+const execMessageSchema = z.object({
+  type: z.string(),
+  name: z.string().optional(),
+  argv: z.array(z.string()).optional(),
+  require: z.array(z.string()).optional(),
+});
+
 function runStubCommand(
   stub: StubImpd,
   socket: ServerWebSocket<ExecSocketData>,
   raw: string | Buffer,
 ): void {
-  const message = JSON.parse(String(raw)) as {
-    readonly type: string;
-    readonly name?: string;
-    readonly argv?: string[];
-    readonly require?: string[];
-  };
+  const message = execMessageSchema.parse(JSON.parse(String(raw)));
 
   if (message.type !== 'start') {
     return;

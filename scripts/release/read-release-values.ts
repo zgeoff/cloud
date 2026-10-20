@@ -20,16 +20,28 @@ export interface ReleaseReadResult {
   readonly flags: readonly string[];
 }
 
+export function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
+  const source = read.record.source;
+
+  return readSourceValues(source.kind, read, source);
+}
+
 type ReleaseSource = ReleaseRecord['source'];
 
-type SourceReader<Source extends ReleaseSource> = (
-  read: ReleaseRead,
-  source: Source,
-) => Promise<ReleaseReadResult | Error>;
+type SourceByKind = {
+  readonly [Kind in ReleaseSource['kind']]: Extract<ReleaseSource, { kind: Kind }>;
+};
 
-const sourceReaders: {
-  readonly [Kind in ReleaseSource['kind']]: SourceReader<Extract<ReleaseSource, { kind: Kind }>>;
-} = {
+type SourceReaders = {
+  readonly [Kind in keyof SourceByKind]: (
+    read: ReleaseRead,
+    source: SourceByKind[Kind],
+  ) => Promise<ReleaseReadResult | Error>;
+};
+
+// the release workflows run without node_modules, so a keyed record stands in for ts-pattern's
+// match
+const sourceReaders: SourceReaders = {
   sha256sums: (read) => readSHA256SumsValues(read),
   'image-digests': (read, source) => readImageDigestValues(read, source.images),
   'release-notes': (read) => readReleaseNotesValues(read),
@@ -42,15 +54,15 @@ const sourceReaders: {
     ),
 };
 
-export function readReleaseValues(read: ReleaseRead): Promise<ReleaseReadResult | Error> {
-  const source = read.record.source;
-
-  // the release workflows run without node_modules, so a keyed record stands in for ts-pattern's
-  // match
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for source.kind reads that kind
-  const reader = sourceReaders[source.kind] as SourceReader<typeof source> | undefined;
-
+// TypeScript pairs each source with its reader only through a kind that is its own type parameter
+function readSourceValues<Kind extends keyof SourceByKind>(
+  kind: Kind,
+  read: ReleaseRead,
+  source: SourceByKind[Kind],
+): Promise<ReleaseReadResult | Error> {
   // the type check refuses a kind with no reader, so only a registry built outside it lands here
+  const reader: SourceReaders[Kind] | undefined = sourceReaders[kind];
+
   return reader === undefined
     ? Promise.resolve(new Error('the registry names a release source kind that no reader reads'))
     : reader(read, source);

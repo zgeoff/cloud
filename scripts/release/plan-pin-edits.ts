@@ -110,7 +110,7 @@ function collectWantedParts(pin: Pin, input: PinEditsInput) {
   const wanted: Record<string, string> = {};
 
   for (const part of pin.lines.flatMap((line) => Object.values(line.parts))) {
-    const value = resolvePart(part, input);
+    const value = resolvePart(part.kind, part, input);
 
     if (value instanceof Error) {
       return value;
@@ -122,11 +122,18 @@ function collectWantedParts(pin: Pin, input: PinEditsInput) {
   return wanted;
 }
 
-type PartResolver<Part extends PinPart> = (part: Part, input: PinEditsInput) => string | Error;
+type PartByKind = { readonly [Kind in PinPart['kind']]: Extract<PinPart, { kind: Kind }> };
 
-const partResolvers: {
-  readonly [Kind in PinPart['kind']]: PartResolver<Extract<PinPart, { kind: Kind }>>;
-} = {
+type PartResolvers = {
+  readonly [Kind in keyof PartByKind]: (
+    part: PartByKind[Kind],
+    input: PinEditsInput,
+  ) => string | Error;
+};
+
+// the release workflows run without node_modules, so a keyed record stands in for ts-pattern's
+// match
+const partResolvers: PartResolvers = {
   version: (_, input) => input.version,
   tag: (_, input) => input.version,
   commit: (part, input) =>
@@ -140,13 +147,15 @@ const partResolvers: {
     input.values.tags?.[part.image] ?? new Error(`the release names no ${part.image} tag`),
 };
 
-function resolvePart(part: PinPart, input: PinEditsInput): string | Error {
-  // the release workflows run without node_modules, so a keyed record stands in for ts-pattern's
-  // match
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the entry for part.kind reads that kind
-  const resolver = partResolvers[part.kind] as PartResolver<typeof part> | undefined;
-
+// TypeScript pairs each part with its resolver only through a kind that is its own type parameter
+function resolvePart<Kind extends keyof PartByKind>(
+  kind: Kind,
+  part: PartByKind[Kind],
+  input: PinEditsInput,
+): string | Error {
   // the type check refuses a kind with no resolver, so only a registry built outside it lands here
+  const resolver: PartResolvers[Kind] | undefined = partResolvers[kind];
+
   return resolver === undefined
     ? new Error('the registry names a pin part kind that no resolver reads')
     : resolver(part, input);
