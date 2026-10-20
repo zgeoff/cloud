@@ -27,7 +27,7 @@ Pulumi's own OAuth client (`op://cloud/tailscale-oauth`) has the scopes `devices
 `oauth_keys` scope, so it cannot create an OAuth client: the API answers `404 not found` to a
 `keyType: "client"` request (checked 2026-10-10). The pinned provider (`@pulumi/tailscale` 0.29.1)
 has an `OauthClient` resource, but it would need that wider credential. A hand-made client also
-keeps its secret out of this public repo's Pulumi state.
+keeps its secret out of the repo's Pulumi state, because the repo is treated as public.
 
 ## Create or replace the client
 

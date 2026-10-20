@@ -36,9 +36,10 @@ CLI differs, because another CLI version can generate a different SDK.
 
 ## Secrets
 
-The repo is public, so it holds no secret. Every deployment input lives in the 1Password vault
-`cloud`. Some secrets live elsewhere: see [secrets](../architecture/secrets.md). The committed
-`.env` holds only `op://` references, and each command that needs them runs through `op run`:
+The repo is private, but it is treated as public, so it holds no secret. Every deployment input
+lives in the 1Password vault `cloud`. Some secrets live elsewhere: see
+[secrets](../architecture/secrets.md). The committed `.env` holds only `op://` references, and each
+command that needs them runs through `op run`:
 
 ```sh
 op run --env-file=.env -- <command>
