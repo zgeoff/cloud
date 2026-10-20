@@ -20,3 +20,7 @@ space_redirects = true
 [images/agent/sbin/setup-swap]
 switch_case_indent = true
 space_redirects = true
+
+[images/agent/bin/bun]
+switch_case_indent = true
+space_redirects = true

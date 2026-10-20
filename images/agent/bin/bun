@@ -1,0 +1,50 @@
+#!/bin/sh
+# The agent image's bun and bunx: run the Bun version that the nearest .bun-version pins, so a
+# session in a checkout runs the Bun its repo pins, and its hooks and tests run on the same Bun as its
+# CI. It reads the first .bun-version from the current folder up to /. The image holds each version
+# that a zgeoff repo pins in /opt/bun/<version>, and /opt/bun/default links to the newest. With no
+# .bun-version, it runs the default. A pin the image lacks also runs the default, after a note on
+# stderr that names both versions, because a session that cannot run bun at all stops more work
+# than a test that fails on another Bun.
+#
+# Bun acts as bunx when its argv[0] is bunx, so /usr/local/bin/bunx links to this script, and the
+# script runs the binary of its own name: /opt/bun/<version>/bun or /opt/bun/<version>/bunx.
+# AGENT_BUN_ROOT moves /opt/bun, for the shell suite.
+set -eu
+
+root=${AGENT_BUN_ROOT:-/opt/bun}
+name=${0##*/}
+
+# the first line of the nearest .bun-version, less spaces and a leading v; empty for none
+pin=
+dir=${PWD:-/}
+while :; do
+  if [ -f "$dir/.bun-version" ]; then
+    IFS= read -r pin < "$dir/.bun-version" || true
+    pin=$(printf '%s' "$pin" | tr -d ' \t\r')
+    pin=${pin#v}
+    break
+  fi
+  [ "$dir" = / ] && break
+  dir=${dir%/*}
+  dir=${dir:-/}
+done
+
+version=default
+case "$pin" in
+  '') ;;
+  # a version names a folder, so a pin such as ../x never leaves the root
+  *[!0-9A-Za-z.+-]* | .*)
+    echo "bun: $dir/.bun-version pins '$pin', which is no version; running the image's default Bun" >&2
+    ;;
+  *)
+    if [ -x "$root/$pin/$name" ]; then
+      version=$pin
+    else
+      default=$(readlink "$root/default" 2> /dev/null || echo default)
+      echo "bun: $dir/.bun-version pins Bun $pin, which this image lacks; running ${default##*/}" >&2
+    fi
+    ;;
+esac
+
+exec "$root/$version/$name" "$@"

@@ -28,12 +28,25 @@ tool, because a tool can write state when it runs (`codex --version` creates `~/
 | `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files |
 | `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`      |
 | `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use  |
+| `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins              |
 | `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`     |
 | `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap` |
 
 Each image is named `agent-<short sha>`, after the zgeoff/cloud commit on `main` it builds from. So
 each build gets a new imp image name, and the image that ran before stays on the host for a
 rollback.
+
+## Bun versions
+
+A session runs the Bun version that its checkout pins, so a repo's hooks and tests run on the Bun
+its CI runs. The image holds each Bun version that a zgeoff repo pins in its `.bun-version`, one
+folder per version under `/opt/bun`. `bun` and `bunx` are a shim that reads the nearest
+`.bun-version` from the current folder up to `/` and runs that version. Without a `.bun-version`,
+the shim runs the newest version the image holds.
+
+A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
+so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
+that version to the Dockerfile's Bun pins, then build and switch the image.
 
 ## Build
 

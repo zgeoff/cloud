@@ -138,16 +138,31 @@ RUN curl -fsSL -o /tmp/node.tar.xz \
       --exclude='*.md' --exclude=LICENSE \
  && rm /tmp/node.tar.xz
 
-# Bun. The sum is bun-linux-x64.zip's line in the release's SHASUMS256.txt.
-ARG BUN_VERSION=1.4.2
-ARG BUN_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
-RUN curl -fsSL -o /tmp/bun.zip \
-      "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip" \
- && echo "${BUN_SHA256}  /tmp/bun.zip" | sha256sum -c - \
- && unzip -q /tmp/bun.zip -d /tmp \
- && install -m 0755 /tmp/bun-linux-x64/bun /usr/local/bin/bun \
- && ln -s bun /usr/local/bin/bunx \
- && rm -rf /tmp/bun.zip /tmp/bun-linux-x64
+# Bun, at each version that a zgeoff repo pins in its .bun-version, so a session
+# runs the Bun its checkout pins: each in /opt/bun/<version>, with
+# /opt/bun/default linked to BUN_VERSION, the newest. /usr/local/bin/bun and
+# bunx are bin/bun, which runs the version that the nearest .bun-version pins,
+# and the default without one. A repo that moves to a version no pin below
+# names adds a pin here. Each sum is bun-linux-x64.zip's line in the release's
+# SHASUMS256.txt.
+ARG BUN_VERSION=1.4.3
+ARG BUN_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18
+ARG BUN_OLDER_VERSION=1.4.2
+ARG BUN_OLDER_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
+RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256"; do \
+      version=${pin% *} sum=${pin#* } \
+   && curl -fsSL -o /tmp/bun.zip \
+        "https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip" \
+   && echo "${sum}  /tmp/bun.zip" | sha256sum -c - \
+   && unzip -q /tmp/bun.zip -d /tmp \
+   && install -D -m 0755 /tmp/bun-linux-x64/bun "/opt/bun/${version}/bun" \
+   && ln -s bun "/opt/bun/${version}/bunx" \
+   && rm -rf /tmp/bun.zip /tmp/bun-linux-x64 \
+   || exit 1; \
+    done \
+ && ln -s "$BUN_VERSION" /opt/bun/default
+COPY bin/bun /usr/local/bin/bun
+RUN ln -s bun /usr/local/bin/bunx
 
 # Go from go.dev. The sum is the sha256 that https://go.dev/dl/?mode=json
 # lists for the linux-amd64 tarball.
