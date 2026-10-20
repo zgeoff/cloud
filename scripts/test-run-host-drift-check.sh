@@ -26,6 +26,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-missing.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-one-of-outputs.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-scripted-command.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-timeout.sh"
@@ -415,12 +416,20 @@ Resources:
 run-host-drift-check: no drift
 EOF
   sed 's/after [0-9]* ms/after <ms> ms/' "$tree/err" > "$tree/err.masked"
-  diff - "$tree/err.masked" << 'EOF'
+  printf 'Resources:\n    61 unchanged\nrun-host-drift-check: no drift\n' > "$tree/out.expected"
+  # curl's connect error differs between Ubuntu 24.04's curl 8.5.0, which CI runs, and curl 8.22.0
+  cat > "$tree/err.curl-8.5" << 'EOF'
 curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
 run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway
 EOF
+  cat > "$tree/err.curl-8.22" << 'EOF'
+curl: (7) Failed to connect to 127.0.0.1:1 after <ms> ms: Could not connect to server
+run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway
+EOF
+  assert_one_of_outputs "the check without GitHub" "$tree/out" "$tree/err.masked" "$status" \
+    'curl 8.5.0' "$tree/out.expected" "$tree/err.curl-8.5" 0 \
+    'curl 8.22.0' "$tree/out.expected" "$tree/err.curl-8.22" 0
   assert_missing "$tree/discord/requests" "an alert was posted"
-  assert_status 0 "$status"
 }
 
 it_fails_before_the_check_and_posts_when_a_credential_is_missing() {
