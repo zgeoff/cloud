@@ -104,10 +104,40 @@ async function sendGitHubRequest(
   });
 
   if (!response.ok && !(request.allowMissing === true && response.status === 404)) {
-    throw new Error(`GitHub ${method} ${request.path}: HTTP ${response.status}`);
+    const refusal = await readGitHubRefusal(response);
+
+    throw new Error(`GitHub ${method} ${request.path}: HTTP ${response.status}${refusal}`);
   }
 
   return response;
+}
+
+// GitHub's error body (docs.github.com/en/rest: using-the-rest-api/troubleshooting-the-rest-api)
+const gitHubRefusalSchema = z.object({ message: z.string() });
+
+async function readGitHubRefusal(response: Response): Promise<string> {
+  // a connection that drops mid-body still leaves the status and the headers to report
+  const text = await response.text().catch(() => '');
+
+  const refusal = gitHubRefusalSchema.safeParse(parseGitHubBody(text));
+  const message = refusal.success ? `: ${refusal.data.message}` : '';
+
+  // GitHub names the permission a fine-grained token or an app lacks in this header, and the
+  // log is the only place an operator reads it
+  const permissions = response.headers.get('x-accepted-github-permissions');
+
+  return permissions === null || permissions === ''
+    ? message
+    : `${message} (the token needs ${permissions})`;
+}
+
+// a proxy in front of GitHub can answer an error with HTML instead of GitHub's JSON
+function parseGitHubBody(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 const commentUserSchema = z.object({ login: z.string() });
