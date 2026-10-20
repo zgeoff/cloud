@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, mock, test } from 'bun:test';
 import { HttpResponse, http } from 'msw';
 import { buildGitHubClient, previewCommentMarker } from './build-github-client.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
@@ -50,7 +50,25 @@ test('#readComposeFile rejects when GitHub fails', () => {
     client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
   ).rejects.toThrowWithMessage(
     Error,
-    'GitHub GET /repos/acme/greenhouse/contents/preview/compose.yaml?ref=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 401',
+    'GitHub GET /repos/acme/greenhouse/contents/preview/compose.yaml?ref=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 401: Bad credentials',
+  );
+});
+
+test('#readComposeFile rejects with the bare status when GitHub fails with a body that is not JSON', () => {
+  server.use(
+    http.get(
+      `${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml`,
+      () => new HttpResponse('<html>Bad gateway</html>', { status: 502 }),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+  ).rejects.toThrowWithMessage(
+    Error,
+    'GitHub GET /repos/acme/greenhouse/contents/preview/compose.yaml?ref=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 502',
   );
 });
 
@@ -181,4 +199,67 @@ test('#updateCommitStatus cuts a description to the 140 characters GitHub accept
   });
 
   expect(commitStatuses.at(0)?.description).toBe('x'.repeat(140));
+});
+
+test("#updateCommitStatus sends the service's token to the pull request's repository and head commit", async () => {
+  const recordRequest = mock((request: Request) => ({
+    url: request.url,
+    authorization: request.headers.get('authorization'),
+  }));
+
+  server.use(
+    http.post(`${githubAPIURL}/repos/:owner/:name/statuses/:sha`, (info) => {
+      recordRequest(info.request);
+
+      return HttpResponse.json({ state: 'pending', context: 'sdk-contract' }, { status: 201 });
+    }),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  await client.updateCommitStatus({
+    repo: 'acme/greenhouse',
+    sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+    context: 'sdk-contract',
+    state: 'pending',
+    description: 'Running the SDK contract suite',
+  });
+
+  expect(recordRequest.mock.results).toStrictEqual([
+    {
+      type: 'return',
+      value: {
+        url: `${githubAPIURL}/repos/acme/greenhouse/statuses/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb`,
+        authorization: 'Bearer ghp_stub-preview-token',
+      },
+    },
+  ]);
+});
+
+test('#updateCommitStatus rejects with the permission GitHub names when the token cannot write statuses', () => {
+  // GitHub's answer to a fine-grained token without Commit statuses write (docs.github.com/en/rest:
+  // authentication/permissions-required-for-fine-grained-personal-access-tokens)
+  server.use(
+    http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, () =>
+      HttpResponse.json(
+        { message: 'Resource not accessible by personal access token', status: '403' },
+        { status: 403, headers: { 'x-accepted-github-permissions': 'statuses=write' } },
+      ),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token');
+
+  expect(
+    client.updateCommitStatus({
+      repo: 'acme/greenhouse',
+      sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      context: 'sdk-contract',
+      state: 'success',
+      description: '18 pass, 0 fail',
+    }),
+  ).rejects.toThrowWithMessage(
+    Error,
+    'GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 403: Resource not accessible by personal access token (the token needs statuses=write)',
+  );
 });

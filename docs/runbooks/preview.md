@@ -171,6 +171,10 @@ means the token lacks `preview-model` in its grantable list. A run that fails be
 reports broke in the install or the fetch, such as a `bun.lock` that `bun install --frozen-lockfile`
 refuses.
 
+A journal line that ends `(the token needs statuses=write)` means the service's GitHub token lacks
+Commit statuses write, which GitHub needs for every status the service sets. Add that permission to
+the token in step 4. The run stays settling until then, and the next retry sets its status.
+
 ## Check a preview live
 
 Run these checks from a device on the tailnet, a phone among them, after the setup.

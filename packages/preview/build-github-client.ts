@@ -100,10 +100,43 @@ async function sendGitHubRequest(
   });
 
   if (!response.ok && !(request.allowMissing === true && response.status === 404)) {
-    throw new Error(`GitHub ${method} ${request.path}: HTTP ${response.status}`);
+    const refusal = await readGitHubRefusal(response);
+
+    throw new Error(`GitHub ${method} ${request.path}: HTTP ${response.status}${refusal}`);
   }
 
   return response;
+}
+
+async function readGitHubRefusal(response: Response): Promise<string> {
+  const text = await response.text();
+
+  const body = parseGitHubBody(text);
+
+  const message =
+    typeof body === 'object' &&
+    body !== null &&
+    'message' in body &&
+    typeof body.message === 'string'
+      ? `: ${body.message}`
+      : '';
+
+  // GitHub names the permission a fine-grained token or an app lacks in this header, and the
+  // log is the only place an operator reads it
+  const permissions = response.headers.get('x-accepted-github-permissions');
+
+  return permissions === null || permissions === ''
+    ? message
+    : `${message} (the token needs ${permissions})`;
+}
+
+// a proxy in front of GitHub can answer an error with HTML instead of GitHub's JSON
+function parseGitHubBody(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
 }
 
 interface IssueComment {
