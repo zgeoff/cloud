@@ -17,20 +17,22 @@ none, because the service keeps room free for the session's checkout and the bro
 service prints its choice and the free space it read, which `impz logs <name> swap` shows.
 `images/agent/sbin/setup-swap` holds the bounds and the reason for each.
 
-The image holds no other configuration, no login state and no secret: atc sets up grants,
-placeholder variables, the config bundle and the seed for each session at launch. Its build runs no
-tool, because a tool can write state when it runs (`codex --version` creates `~/.codex`).
+Beside them, the image holds one Claude Code hook, which [Locked packages](#locked-packages) covers.
+It holds no other configuration, no login state and no secret: atc sets up grants, placeholder
+variables, the config bundle and the seed for each session at launch. Its build runs no tool,
+because a tool can write state when it runs (`codex --version` creates `~/.codex`).
 
-| Path                                  | Holds                                                   |
-| ------------------------------------- | ------------------------------------------------------- |
-| `images/agent/Dockerfile`             | the pins, each with the command that checks its sum     |
-| `scripts/agent-image-check-guest.sh`  | the version sweep, login-state check and secret scan    |
-| `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files |
-| `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`      |
-| `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use  |
-| `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins              |
-| `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`     |
-| `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap` |
+| Path                                  | Holds                                                     |
+| ------------------------------------- | --------------------------------------------------------- |
+| `images/agent/Dockerfile`             | the pins, each with the command that checks its sum       |
+| `scripts/agent-image-check-guest.sh`  | the version sweep, login-state check and secret scan      |
+| `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files   |
+| `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`        |
+| `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use    |
+| `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins                |
+| `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`       |
+| `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap`   |
+| `/etc/claude-code/managed-settings.d` | the SessionStart hook that installs a checkout's packages |
 
 Each image is named `agent-<short sha>`, after the zgeoff/cloud commit on `main` it builds from. So
 each build gets a new imp image name, and the image that ran before stays on the host for a
@@ -47,6 +49,24 @@ the shim runs the newest version the image holds.
 A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
 so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
 that version to the Dockerfile's Bun pins, then build and switch the image.
+
+## Locked packages
+
+A session's hooks import the package versions that its checkout's `bun.lock` pins, as they do in an
+installed checkout on a person's machine. Without `node_modules`, Bun's auto-install would load the
+newest published version of an imported package, or whichever version its cache already holds,
+because it reads neither `package.json` nor `bun.lock`. A repo's `.claude` hook, such as the skill
+gate, would then run another version than the repo pins, and a broken version stays in the cache.
+
+So the image adds a Claude Code SessionStart hook as a managed settings drop-in, which Claude Code
+runs beside the hooks of the session's own settings. At each session start in a checkout with a
+`bun.lock` and no `node_modules`, `/usr/local/sbin/install-checkout-packages` runs
+`bun install --frozen-lockfile` there, before the session's first tool call. A checkout that holds
+`node_modules` keeps it. After a failed install, the hook adds one line to the session's context, so
+the session runs the install itself.
+
+Claude Code reads the managed settings file only while no server-managed settings apply to the
+session. If an organization policy reaches the imp's sessions, that policy needs the same hook.
 
 ## Build
 
