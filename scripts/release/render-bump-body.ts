@@ -44,7 +44,7 @@ function isOlder(pinned: string, version: string) {
 function renderMergeLines(input: BumpBodyInput) {
   if (input.labels.includes('auto-merge')) {
     return [
-      'It merges on its own once every check on its head passes, including the NixOS checks when it changes `nixos/`.',
+      'It merges on its own once every check on its head passes. A change to `nixos/` gets its NixOS checks on `main`, which the host switch waits for.',
     ];
   }
 

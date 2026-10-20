@@ -28,7 +28,6 @@ test('it merges a green atc bump at its head', () => {
         conclusion: 'SUCCESS',
       },
       { workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
-      { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'agent image', name: 'check', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'agent image', name: 'auto-merge', status: 'COMPLETED', conclusion: 'SKIPPED' },
     ],
@@ -39,7 +38,7 @@ test('it merges a green atc bump at its head', () => {
   ).toStrictEqual({ action: 'merge', number: 7, head: '1111111111111111111111111111111111111111' });
 });
 
-test('it merges an imp bump once the nixos checks passed', () => {
+test('it merges an imp bump that no nixos checks run covers', () => {
   const pr = buildMockBumpPullRequest({
     number: 9,
     authorLogin: 'app/cloud-release-check',
@@ -60,7 +59,6 @@ test('it merges an imp bump once the nixos checks passed', () => {
     ],
     checkRuns: [
       { workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' },
-      { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'agent image', name: 'check', status: 'COMPLETED', conclusion: 'SUCCESS' },
     ],
   });
@@ -498,31 +496,6 @@ test('it waits for ci before ci registers its check', () => {
   expect(
     decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
   ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for ci (CI)' });
-});
-
-test('it waits for the nixos checks when the pull request changes nixos', () => {
-  const pr = buildMockBumpPullRequest({
-    number: 9,
-    authorLogin: 'app/cloud-release-check',
-    labels: ['update:patch', 'auto-merge'],
-    files: [
-      'nixos/flake.lock',
-      'nixos/flake.nix',
-      'nixos/hosts/geoffcloud/configuration.nix',
-      'scripts/release/release-pins.json',
-    ],
-    commits: [
-      {
-        oid: '1111111111111111111111111111111111111111',
-        authorLogins: ['cloud-release-check[bot]'],
-      },
-    ],
-    checkRuns: [{ workflow: 'CI', name: 'ci', status: 'COMPLETED', conclusion: 'SUCCESS' }],
-  });
-
-  expect(
-    decide({ branch: 'release-check/imp', appLogin: 'app/cloud-release-check', pr }),
-  ).toStrictEqual({ action: 'hold', number: 9, reason: 'waiting for nixos (NixOS checks)' });
 });
 
 test('it waits for the agent image check when the pull request changes the agent image', () => {

@@ -124,7 +124,6 @@ const requiredChecks: readonly {
   readonly name: string;
 }[] = [
   { prefix: '', workflow: 'CI', name: 'ci' },
-  { prefix: 'nixos/', workflow: 'NixOS checks', name: 'nixos' },
   { prefix: 'images/agent/', workflow: 'agent image', name: 'check' },
   { prefix: 'images/atc-gateway/', workflow: 'atc-gateway images', name: 'fixture' },
   { prefix: 'infra/Pulumi.prod.yaml', workflow: 'nixie backup', name: 'fixture' },

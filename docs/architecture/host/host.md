@@ -80,11 +80,9 @@ checks boot a VM that stands in for the host and rehearse the restore script aga
 impd, so the script's failure paths run before it ever runs on the real host. They need KVM.
 
 The checks gate the host switch rather than the merge, because no merge changes the host: only the
-switch script does, and an operator runs it by hand. CI builds the checks on `main` every night, on
-a dispatch, and on an app's pull request that changes `nixos/` or the shared constants, so the
-workflow that merges an automatic bump can wait for a green run. The ruleset on `main` does not
-require the checks, so that wait belongs to the merging workflow. The switch script refuses a commit
-unless a green scheduled or dispatched run on `main` covers it: the run checked that commit, or an
-ancestor with no input of the checks changed since. A nightly run skips the build when an earlier
-green run covers the commit, so a quiet night costs no VM boot.
+switch script does, and an operator runs it by hand. CI builds the checks on `main` every night and
+on a dispatch, never on a pull request, so an automatic bump merges without them. The switch script
+refuses a commit unless a green scheduled or dispatched run on `main` covers it: the run checked
+that commit, or an ancestor with no input of the checks changed since. A nightly run skips the build
+when an earlier green run covers the commit, so a quiet night costs no VM boot.
 [The switch runbook](../../runbooks/workflows.md#check-the-host-before-a-switch) gives the commands.
