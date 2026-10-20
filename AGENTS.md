@@ -11,7 +11,7 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | Skill                | Load before                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `code-style`         | writing, reviewing, or renaming any TypeScript — the shared function-verb taxonomy |
-| `project-code-style` | the same, beside `code-style` — cloud's own verbs                                  |
+| `project-code-style` | the same, beside `code-style` — where a rule only cloud needs goes                 |
 | `testing`            | designing, writing, or reviewing tests                                             |
 | `project-testing`    | the same, beside `testing` — where each suite runs and cloud's stand-ins           |
 | `docs-writing`       | writing or editing any committed prose: `docs/`, READMEs, this file, skills        |
