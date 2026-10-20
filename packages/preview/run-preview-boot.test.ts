@@ -421,6 +421,7 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',
+    'system/features',
     'system/info',
   ]);
 
@@ -472,6 +473,7 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
     'grants/list pv-0a1b2c3d-17',
     'grants/add pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',
+    'system/features',
     'system/info',
   ]);
 
