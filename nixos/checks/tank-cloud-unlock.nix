@@ -176,7 +176,7 @@ pkgs.testers.runNixOSTest {
             machine.succeed(f"echo before-the-key-was-lost > {path}/data")
         listing = {path: machine.succeed(f"ls -A {path}").split() for path in mount_points + bind_paths}
         assert listing == {
-            "${mountPoint "host-secrets"}": ["atc-daemon", "data", "imp-host", "imp-host-started", "preview-started"],
+            "${mountPoint "host-secrets"}": ["atc-daemon", "data", "drift-check-started", "imp-host", "imp-host-started", "preview-started"],
             "${mountPoint "imp-db-backups"}": ["data"],
             "${mountPoint "rancher"}": ["data", "etc-rancher", "k3s-started", "lost+found"],
             "/var/lib/atc-daemon-secrets": ["atc-daemon-started"],
