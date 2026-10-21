@@ -27,16 +27,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1792551144,
-        "narHash": "sha256-/sJ4cBUIPjkjiJ4N0W7H9LbpmyTWLlQbGio1CXQBLPw=",
+        "lastModified": 1792583095,
+        "narHash": "sha256-eLFfN7baufwsfAQ8R5Bi8HbPjXcX5ICfr47+8jn1+ck=",
         "owner": "zgeoff",
         "repo": "impz",
-        "rev": "c1406875ca8e24a66b358a69b6a1ff55fb83ed5b",
+        "rev": "ca0de446694eed6dfa805090fa8a8401ab89862e",
         "type": "github"
       },
       "original": {
         "owner": "zgeoff",
-        "ref": "c1406875",
+        "ref": "ca0de446",
         "repo": "impz",
         "type": "github"
       }
