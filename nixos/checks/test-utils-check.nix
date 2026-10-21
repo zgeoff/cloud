@@ -339,19 +339,19 @@ let
     {
       title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
       script = ''
-        handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts || true)
-        grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts > handler || true
+        handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts || true)
+        grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts > handler || true
         # with no reboot reason and no storage warnings, the warnings are the empty list the
         # stand-in's bodies hold
-        grep -xF -A7 'function buildHealthWarnings(' ${imp}/packages/daemon/src/build-app.ts > warnings || true
-        # an Elysia onError hook would replace the default 404; build-app.ts's onError is oRPC's
-        error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/build-app.ts || true)
+        grep -xF -A7 'function buildHealthWarnings(' ${imp}/packages/daemon/src/surface/create-app.ts > warnings || true
+        # an Elysia onError hook would replace the default 404; create-app.ts's onError is oRPC's
+        error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/surface/create-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
         bun=$(grep -c '^FROM oven/bun:1\.4\.2@' ${imp}/host/Dockerfile || true)
         grep -oE '"(elysia|@sinclair/typebox|cookie|exact-mirror|fast-decode-uri-component|memoirist)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
-        assert_equals 1 "$handlers" "build-app.ts's /health handlers"
+        assert_equals 1 "$handlers" "create-app.ts's /health handlers"
         assert_files_equal - handler <<'EOF'
             .get('/health', () => ({
               status: 'ok',
@@ -369,7 +369,7 @@ let
           return [...reboot, ...storageWarnings];
         }
         EOF
-        assert_equals 0 "$error_hooks" "build-app.ts's Elysia onError hooks"
+        assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
         assert_equals 1.4.29 "$elysia" "imp's Elysia version"
         assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.2 stages"
         cat > expected <<'EOF'
@@ -449,8 +449,8 @@ let
           cat > $out/app.ts <<'EOF'
           import { Elysia } from 'elysia';
 
-          // packages/daemon/src/build-app.ts's /health handler, with impd ready, no reboot reason and
-          // no storage warnings
+          // packages/daemon/src/surface/create-app.ts's /health handler, with impd ready, no reboot
+          // reason and no storage warnings
           const app = new Elysia()
             .get('/health', () => ({ status: 'ok', ready: true, warnings: [] }))
             .listen({ hostname: '127.0.0.1', port: 0 });
