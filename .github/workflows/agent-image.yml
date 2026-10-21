@@ -9,11 +9,13 @@ on:
     paths:
       - images/agent/**
       - scripts/*agent-image*
+      - test-support/shell/*-stub-apt-*
       - .github/workflows/agent-image.yml
   pull_request:
     paths:
       - images/agent/**
       - scripts/*agent-image*
+      - test-support/shell/*-stub-apt-*
       - .github/workflows/agent-image.yml
 
 permissions:

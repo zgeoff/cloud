@@ -16,10 +16,11 @@ FROM ghcr.io/zgeoff/imp-base:2.10.0@sha256:7b5f05a5596c50c997e7c6437eae2b7c29258
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Ubuntu packages are pinned to exact versions, and UBUNTU_SNAPSHOT names a
-# snapshot.ubuntu.com moment that holds every one of them. apt-get install
-# runs without --snapshot, so it resolves the pins against the live archive,
-# and a pin stops installing once Ubuntu replaces that version there. A bump
-# moves the snapshot and the versions together; read the candidates with
+# snapshot.ubuntu.com moment that holds every one of them. sbin/install-ubuntu-packages
+# resolves the pins and their dependencies against that snapshot only, and fetches
+# each file from the live archive or the snapshot, so a pin keeps installing after
+# Ubuntu replaces that version in the live archive. A bump moves the snapshot and
+# the versions together; read the candidates with
 #   apt-get update --snapshot <stamp> && apt-cache --snapshot <stamp> policy <package>
 # docker-compose-plugin comes from Docker's repository, which keeps old builds.
 ARG UBUNTU_SNAPSHOT=20261021T120000Z
@@ -37,17 +38,15 @@ ARG DOCKER_COMPOSE_VERSION=5.6.0-1~ubuntu.24.04~noble
 
 # build-essential: native npm modules and Python wheels without a binary build
 # need a compiler. docker-compose-plugin: dev stacks use compose.
-RUN apt-get update --snapshot "$UBUNTU_SNAPSHOT" \
- && apt-get install -y --no-install-recommends \
+COPY sbin/install-ubuntu-packages /tmp/install-ubuntu-packages
+RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNAPSHOT/" \
       "git=$GIT_VERSION" "bash=$BASH_VERSION" "jq=$JQ_VERSION" \
       "build-essential=$BUILD_ESSENTIAL_VERSION" "pkg-config=$PKG_CONFIG_VERSION" \
       "python3=$PYTHON3_VERSION" "python3-venv=$PYTHON3_VERSION" \
       "python3-pip=$PYTHON3_PIP_VERSION" "python-is-python3=$PYTHON_IS_PYTHON3_VERSION" \
       "unzip=$UNZIP_VERSION" "xz-utils=$XZ_UTILS_VERSION" \
       "docker-compose-plugin=$DOCKER_COMPOSE_VERSION" \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin /var/log/apt /var/log/dpkg.log \
-      /var/log/alternatives.log /var/cache/debconf/*-old /var/lib/dpkg/*-old
+ && rm /tmp/install-ubuntu-packages
 
 # Each download below is checked against a sha256 taken from its publisher's
 # signed or attested release. The comment above each pin says where the sum
