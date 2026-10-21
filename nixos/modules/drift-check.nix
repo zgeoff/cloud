@@ -110,7 +110,12 @@ in
   config = lib.mkIf cfg.enable {
     systemd.services.drift-check = {
       description = "scheduled drift check of the prod stack";
-      after = [ "network-online.target" ];
+      # k3s's unit reports ready only once its API server answers, so a run that the timer starts
+      # at boot waits for the API the prod lock lives in
+      after = [
+        "network-online.target"
+        "k3s.service"
+      ];
       wants = [ "network-online.target" ];
       path = [
         cfg.pulumi

@@ -36,7 +36,10 @@ let
             service = {
               description = "scheduled drift check of the prod stack";
               wantedBy = [ ];
-              after = [ "network-online.target" ];
+              after = [
+                "network-online.target"
+                "k3s.service"
+              ];
               wants = [ "network-online.target" ];
               path = [
                 cfg.pulumi
@@ -64,7 +67,7 @@ let
               unitConfig = {
                 ConditionPathExists = "/var/lib/secrets/drift-check/credentials";
                 Description = "scheduled drift check of the prod stack";
-                After = "network-online.target";
+                After = "network-online.target k3s.service";
                 Wants = "network-online.target";
               };
               serviceConfig = {
