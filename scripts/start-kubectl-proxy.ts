@@ -33,7 +33,10 @@ export async function startKubectlProxy(
   const stderr = new Response(subprocess.stderr).text();
 
   const timer = Promise.withResolvers<null>();
-  const timeout = setTimeout(() => timer.resolve(null), options.timeoutMs);
+
+  const timeout = setTimeout(() => {
+    timer.resolve(null);
+  }, options.timeoutMs);
 
   const address = await Promise.race([readAddress(subprocess.stdout), timer.promise]);
 
