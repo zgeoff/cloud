@@ -86,7 +86,8 @@ jobs:
         if: steps.decide.outputs.full == 'true'
         run: bun run lint:py
 
-      # actionlint, then the check that every run step is setup or one bun run call
+      # actionlint, then the check that every run step is setup or one bun run call, then the check
+      # that a push to main cancels main's earlier CI run and never a Deploy prod apply
       - name: Lint Actions
         if: steps.decide.outputs.full == 'true'
         run: bun run lint:actions
