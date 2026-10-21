@@ -31,8 +31,9 @@ bun run test:scripts
 CI runs these plus the type-aware lint, gitleaks, the Go checks, and the shell, Nix, Python and
 Actions linters (`bun run lint:sh`, `lint:nix`, `lint:py`, `lint:actions`), which run their pinned
 tools in Docker. A change to Markdown files only skips `test:scripts` and those four linters, which
-take most of the job's time and read no Markdown. The NixOS checks run nightly and gate the host
-switch.
+take most of the job's time and read no Markdown. The Docker suites, such as the agent image check
+and the backup fixtures, run in the same job only when a change touches their inputs. The NixOS
+checks run nightly and gate the host switch.
 
 ## Layout
 

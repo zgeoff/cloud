@@ -1,23 +1,12 @@
 name: files image
 
-# Builds the files service's image and runs its image test on every change to the service or the
-# image. Only a push to main publishes, as ghcr.io/zgeoff/cloud-files:<commit>; a pull request
-# never does. Pin a published digest in the stack config's files.image to deploy it.
+# Builds the files service's image and runs its image test on every push to main that changes the
+# service or the image, then publishes it as ghcr.io/zgeoff/cloud-files:<commit>. CI's checks job
+# runs the image test on a pull request, which never publishes. Pin a published digest in the stack
+# config's files.image to deploy it.
 on:
   push:
     branches: [main]
-    paths:
-      - packages/files/**
-      - images/files/**
-      - images/atc-gateway/versions.env
-      - scripts/write-files-image-context.sh
-      - scripts/publish-files-image.sh
-      - scripts/run-shell-suites.sh
-      - test-support/shell/**
-      - bun.lock
-      - .bun-version
-      - .github/workflows/files-image.yml
-  pull_request:
     paths:
       - packages/files/**
       - images/files/**

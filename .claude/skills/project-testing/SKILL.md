@@ -40,17 +40,23 @@ provider and the NixOS checks each have a reference.
 
 ## Suites and where they run
 
-| Suite                                              | Command                             | Runs in CI                                |
-| -------------------------------------------------- | ----------------------------------- | ----------------------------------------- |
-| TypeScript unit tests in `infra/` and `scripts/`   | `bun run test`                      | `CI` → `ci`                               |
-| The health-check Worker's tests                    | `bun run test:health-check`         | `CI` → `ci`                               |
-| Go tests in `provider/`                            | `bun run provider:check`            | `CI` → `ci`, if `provider/` changed       |
-| Shell suites and `test-support/shell/` tests       | `bun run test:scripts`              | `CI` → `ci`, unless only Markdown changed |
-| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules` | `CI` → `ci` |
-| Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture`  | `atc-gateway images` → `fixture`          |
-| nixie's backup script in its pinned image (Docker) | `bun run test:nixie-backup-fixture` | `nixie backup` → `fixture`                |
-| The agent image's gitleaks allowlist (Docker)      | `bun run test:agent-image`          | `agent image` → `check`                   |
-| NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`       | `NixOS checks` → `nixos`                  |
+| Suite                                                     | Command                             | Runs in CI                                                     |
+| --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
+| TypeScript unit tests in `infra/` and `scripts/`          | `bun run test`                      | `CI` → `checks`                                                |
+| The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
+| Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
+| Shell suites and `test-support/shell/` tests              | `bun run test:scripts`              | `CI` → `checks`, unless only Markdown changed                  |
+| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules`          | `CI` → `checks`                                                |
+| Gateway image, backup and restore journey (Docker)        | `bun run test:atc-gateway-fixture`  | `CI` → `checks` on a PR, `atc-gateway images` → `fixture` on main |
+| The files service's image (Docker)                        | `bun run test:files-image`          | `CI` → `checks` on a PR, `files image` → `check` on main       |
+| The files backup script in its pinned image (Docker)      | `bun run test:files-backup-fixture` | `CI` → `checks`                                                |
+| nixie's backup script in its pinned image (Docker)        | `bun run test:nixie-backup-fixture` | `CI` → `checks`                                                |
+| The agent image's gitleaks allowlist (Docker)             | `bun run test:agent-image`          | `CI` → `checks`                                                |
+| NixOS checks and the restore rehearsals (KVM)             | `bun run test:nixos [check…]`       | `NixOS checks` → `nixos`                                       |
+
+- CI's one `checks` job runs every suite above but the NixOS checks. Each Docker suite is a step
+  that runs only when its gate in [`gates.yml`](../../../.github/gates.yml) says the change touches
+  its inputs; a new input of a Docker suite extends its gate.
 
 - CI calls a root [`package.json`](../../../package.json) script, never a suite file directly.
 - A new shell suite needs no list entry:

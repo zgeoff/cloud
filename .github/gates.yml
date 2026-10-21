@@ -35,6 +35,8 @@ gates:
       - scripts/run-decide-gates.ts
       - scripts/is-gate-needed.ts
       - scripts/load-gate-manifest.ts
+      - scripts/find-gate-base.sh
+      - scripts/decide-ci-gates.sh
 
   # The NixOS checks, which boot VMs and take minutes. A green run on main covers each later
   # commit until one of these paths changes (scripts/find-nixos-check-run.sh). The inputs are the
@@ -102,3 +104,71 @@ gates:
       - provider/**
       - sdk/**
       - packages/topology/**
+
+  # The lanes: the Docker suites that CI's checks job runs as steps, each only when a change
+  # touches its image, its scripts or its workflow. A push to main runs the atc gateway's fixture
+  # and the files image's test in their publish workflows, so CI runs those two on a pull request
+  # only.
+  agent-image:
+    skipped: Nothing the agent image builds from changed, so its build and check did not run.
+    paths:
+      - images/agent/**
+      - scripts/*agent-image*
+      - test-support/shell/*-stub-apt-*
+      - .github/workflows/ci.yml
+
+  atc-gateway:
+    skipped: Nothing the atc gateway's images build from changed, so their fixture test did not run.
+    paths:
+      - images/atc-gateway/**
+      - scripts/fetch-atc-release.sh
+      - scripts/publish-atc-gateway-images.sh
+      - scripts/run-shell-suites.sh
+      - e2e/test-atc-gateway-restore.sh
+      - infra/cluster/build-atc-gateway-spec.ts
+      - infra/cluster/create-atc-gateway-backup-job.ts
+      - infra/cluster/build-atc-gateway-backup-pod-spec.ts
+      - test-support/shell/**
+      - .github/workflows/ci.yml
+
+  files-image:
+    skipped: Nothing the files image builds from changed, so its image test did not run.
+    paths:
+      - packages/files/**
+      - images/files/**
+      - images/atc-gateway/versions.env
+      - scripts/write-files-image-context.sh
+      - scripts/publish-files-image.sh
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - bun.lock
+      - .bun-version
+      - .github/workflows/ci.yml
+
+  files-backup:
+    skipped: Nothing the files backup reads changed, so its fixture test did not run.
+    paths:
+      - deploy/files/backup/**
+      - scripts/run-shell-suites.sh
+      - test-support/shell/run-cases.sh
+      - test-support/shell/run-backup.sh
+      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/normalize-restic-output.sh
+      - infra/Pulumi.prod.yaml
+      - .bun-version
+      - package.json
+      - .github/workflows/ci.yml
+
+  nixie-backup:
+    skipped: Nothing the nixie backup reads changed, so its fixture test did not run.
+    paths:
+      - deploy/nixie/backup/**
+      - scripts/run-shell-suites.sh
+      - test-support/shell/run-cases.sh
+      - test-support/shell/run-backup.sh
+      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/normalize-restic-output.sh
+      - infra/Pulumi.prod.yaml
+      - .bun-version
+      - package.json
+      - .github/workflows/ci.yml
