@@ -200,7 +200,7 @@ pkgs.testers.runNixOSTest {
 
         status, invocation, journal = run_check()
 
-        assert status == 255, f"the check exited {status}"
+        assert status == 1, f"the check exited {status}"
         assert "fork/exec /var/lib/drift-check/pulumi/plugins/resource-random-v4.21.2/pulumi-resource-random: permission denied" in journal, "the plugin started"
         assert script_lines(journal) == [
             "run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway",
