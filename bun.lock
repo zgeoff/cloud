@@ -68,7 +68,7 @@
     "packages/preview": {
       "name": "@zgeoff/cloud-preview",
       "dependencies": {
-        "@impz/client": "2.10.0",
+        "@impz/client": "2.10.1",
         "@zgeoff/std": "0.3.0",
         "zod": "4.6.7",
       },
@@ -200,7 +200,7 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
-    "@impz/client": ["@impz/client@2.10.0", "", { "dependencies": { "@orpc/client": "^1.15.5", "@orpc/contract": "^1.15.5", "p-retry": "^8.0.1", "ts-pattern": "^5.9.0", "zod": "^4.6.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-MG2aikDoyuXCXmavtYkwLcRZhnRYhnfeItz9xksa0WdZPsPdFr+Q3Hmuz3QCoWfVhp4WQG98jBm1VnqqTUiHiA=="],
+    "@impz/client": ["@impz/client@2.10.1", "", { "dependencies": { "@orpc/client": "^1.15.5", "@orpc/contract": "^1.15.5", "p-retry": "^8.0.1", "ts-pattern": "^5.9.0", "zod": "^4.6.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-dn7ALv0siCuNxzyUOEgnhB7FTpE7RZqQ2kcf6QfMAifm3pcPjNWREqdsUk24N9O6VupPOH5U7RzarYnWlzVMBg=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.9", "", {}, "sha512-0Ywt3S8tqM6TWUcsRlBFQ1x+X3/o8kktX0ZiKAnByYb9GFDknnOhse1PVtfiD2BXPI8ar+BWx9PV9R0lQIcygw=="],
 
