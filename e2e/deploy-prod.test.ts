@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { findJSONField } from '../scripts/find-json-field.ts';
+import { buildActionsJobResult } from '../scripts/test-utils/build-actions-job-result.ts';
 import { buildMockWorkflowRunContext } from '../scripts/test-utils/build-mock-workflow-run-context.ts';
 import { buildStubActionsScheduler } from '../scripts/test-utils/build-stub-actions-scheduler.ts';
 import { isActionsConditionMet } from '../scripts/test-utils/is-actions-condition-met.ts';
@@ -447,15 +448,24 @@ test('it starts the check job once an apply job that applied ends', async () => 
   });
 });
 
-test('it alerts a failed check after a passed apply', async () => {
+// the apply job's result comes from its own steps, so a failed check step fails the apply job
+// unless the workflow lets that step fail
+test('it keeps the apply green and alerts when the check of nixie s API fails', async () => {
   const ctx = await setupTest();
 
   const run = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
 
+  const outcomes = {
+    decide: 'success',
+    guard: 'success',
+    outcome: 'success',
+    nixie_check: 'failure',
+  };
+
   ctx.scheduler.finishJob(run, 'apply', {
-    status: 'success',
+    status: buildActionsJobResult(ctx.steps, outcomes),
     steps: { outcome: { outcome: 'apply' } },
-    outcomes: { nixie_check: 'failure' },
+    outcomes,
   });
 
   ctx.scheduler.finishJob(run, 'check', { status: 'failure' });
