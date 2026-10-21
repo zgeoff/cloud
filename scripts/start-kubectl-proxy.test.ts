@@ -7,7 +7,7 @@ import { startKubectlProxy } from './start-kubectl-proxy.ts';
 
 test('it gives the URL that the proxy serves on', async () => {
   const started = await startKubectlProxy({
-    argv: ['bun', join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'), 'serve'],
+    argv: ['bun', join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'), '--mode', 'serve'],
     timeoutMs: 10_000,
     spawn: spawnPiped,
   });
@@ -32,7 +32,9 @@ test('it reports the error of a proxy that exits before it listens', async () =>
     argv: [
       'bun',
       join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'),
+      '--mode',
       'refuse',
+      '--error',
       'error: open /missing/kubeconfig: no such file or directory',
     ],
     timeoutMs: 10_000,
@@ -48,7 +50,7 @@ test('it reports the error of a proxy that exits before it listens', async () =>
 
 test('it reports a proxy that prints no address in time', async () => {
   const started = await startKubectlProxy({
-    argv: ['bun', join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'), 'quiet'],
+    argv: ['bun', join(import.meta.dir, 'test-utils/run-stub-kubectl-proxy.ts'), '--mode', 'quiet'],
     timeoutMs: 500,
     spawn: spawnPiped,
   });
