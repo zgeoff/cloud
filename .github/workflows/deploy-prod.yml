@@ -51,6 +51,7 @@ jobs:
       queue: max
     outputs:
       outcome: ${{ steps.outcome.outputs.outcome }}
+      nixie-check: ${{ steps.nixie_check.outcome }}
     # contents: write moves the deployed/prod tag; id-token: write joins the tailnet through the
     # federated identity; actions: read lists CI's runs for a dispatch
     permissions:
@@ -237,6 +238,19 @@ jobs:
           REVISION: ${{ steps.decide.outputs.revision }}
         run: bun run ci:move-deployed-prod "$REVISION"
 
+      # the applied commit's nixie adapter against the nixie this run deployed, through k3s's
+      # service proxy, with calls that read only and carry no session (run-nixie-api-check.ts). It
+      # runs inside the prod lock, so no later apply restarts nixie under it, and a failure fails
+      # the check job below, not this job, because the apply is done by now
+      - name: Check nixie's API
+        id: nixie_check
+        if: steps.outcome.outputs.outcome == 'apply'
+        continue-on-error: true
+        working-directory: program
+        env:
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+        run: bun run ci:check-nixie-api
+
       # whatever the run's outcome, a held, failed or cancelled run included; it releases only this
       # run's hold, and does nothing when the job never took the lock
       - name: Release the prod lock
@@ -246,17 +260,36 @@ jobs:
           KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
         run: bun run ci:hold-deploy-prod-lock release
 
-  # posts a held run, a failed one and a cancelled one to Discord
-  alert:
+  # the deploy's check stage, after an apply job that applied and passed: it fails when nixie's API
+  # check failed, so the run shows the check failing and the apply passing
+  check:
     needs: [apply]
+    if: needs.apply.outputs.outcome == 'apply'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check nixie's API
+        env:
+          NIXIE_CHECK: ${{ needs.apply.outputs.nixie-check }}
+        run: |
+          if [ "$NIXIE_CHECK" != success ]; then
+            echo "::error::nixie's API check ended $NIXIE_CHECK; the apply job's step Check nixie's API shows why"
+            exit 1
+          fi
+          echo "nixie's API check passed"
+
+  # posts a held run, a failed one, a cancelled one and a failed check to Discord
+  alert:
+    needs: [apply, check]
     if: >-
       always() && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled' ||
-      needs.apply.outputs.outcome == 'held')
+      needs.apply.outputs.outcome == 'held' || needs.check.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: prod
     env:
       OUTCOME: ${{ needs.apply.outputs.outcome }}
+      CHECK_RESULT: ${{ needs.check.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Checkout

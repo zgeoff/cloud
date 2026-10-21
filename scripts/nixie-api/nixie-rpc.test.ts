@@ -52,6 +52,19 @@ test('#encodeNixieRequest builds a log/follow call with the session token', asyn
   });
 });
 
+test('#encodeNixieRequest keeps the path of a base URL that a proxy serves nixie under', async () => {
+  const request = await encodeNixieRequest({
+    url: 'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
+    token: null,
+    procedure: 'sessions/list',
+    input: undefined,
+  });
+
+  expect(request.url).toBe(
+    'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy/rpc/sessions/list',
+  );
+});
+
 test('#encodeNixieRequest builds a request that the caller can stop', async () => {
   const stopping = new AbortController();
 

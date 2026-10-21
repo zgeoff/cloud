@@ -102,6 +102,14 @@ and waits. A run whose check never released the lock fails that step with
 `The prod apply failed`. [The drift check runbook](./drift-check.md) shows how to see the holder;
 dispatch the run again once the check ends.
 
+A run that applied and whose `check` job failed posts
+`The prod apply passed, but nixie's API check after it failed`. The apply job's step
+`Check nixie's API` logs a `check-nixie-api:` line for each call that nixie answered with anything
+other than `401 UNAUTHORIZED`, or a `run-nixie-api-check:` line when nixie's rollout did not finish
+or `kubectl proxy` did not start. A `404 with no error code` means the release dropped or renamed a
+procedure that the check calls, so vendor the release's contract as [nixie's runbook](./nixie.md)
+describes. Never send nixie a call by hand to reproduce the failure.
+
 A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
 most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
 that a newer run applied, because its apply covers every change of the cancelled one.

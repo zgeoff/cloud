@@ -15,11 +15,13 @@ export type NixieProcedure = ToProcedure<keyof paths>;
 
 type Operation<Procedure extends NixieProcedure> = paths[`/${Procedure}`]['post'];
 
-type NixieInput<Procedure extends NixieProcedure> = Operation<Procedure>['requestBody'] extends {
-  content: { 'application/json': infer Input };
-}
-  ? Input
-  : undefined;
+// it distributes over a union of procedures, so a request for any one of several procedures takes
+// any one of their inputs
+export type NixieInput<Procedure extends NixieProcedure> = Procedure extends NixieProcedure
+  ? Operation<Procedure>['requestBody'] extends { content: { 'application/json': infer Input } }
+    ? Input
+    : undefined
+  : never;
 
 // a stream's answer has no JSON output
 export type NixieOutput<Procedure extends NixieProcedure> =
@@ -44,11 +46,12 @@ interface NixieContext {
   readonly token: string | null;
 }
 
-// the procedure's path joins the base URL, so every call goes under /rpc
+// the procedure's path joins the base URL, so every call goes under rpc/ below the base URL's own
+// path, which a proxy such as the k3s API's service proxy puts in front of nixie's
 const codec = new StandardRPCLinkCodec<NixieContext>(
   new StandardRPCSerializer(new StandardRPCJsonSerializer()),
   {
-    url: (options) => new URL('/rpc', options.context.url),
+    url: (options) => new URL('rpc', toDirectoryURL(options.context.url)),
     headers: (options) => buildNixieHeaders(options.context.token),
   },
 );
@@ -85,6 +88,10 @@ export async function decodeNixieAnswer(status: number, text: string): Promise<N
 
     return { ok: false, code: typeof code === 'string' ? code : null };
   }
+}
+
+function toDirectoryURL(url: string): string {
+  return url.endsWith('/') ? url : `${url}/`;
 }
 
 function toHeaders(

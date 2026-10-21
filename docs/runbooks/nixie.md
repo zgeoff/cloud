@@ -128,7 +128,10 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    For an upgrade, set `image` and `webImage` in the stack config `nixie` to the new release's tag
    and digest, from its release notes, in one PR. In the same PR, vendor the release's API contract
    with `bun run nixie:openapi <release_tag>`, so the type check fails on a procedure that the
-   deploy checks call and the release dropped or renamed.
+   deploy checks call and the release dropped or renamed. The type check fails on a procedure that
+   the release added, too, until you mark it as a read or a write in
+   `scripts/nixie-api/nixie-procedure-kinds.ts`. Mark it a read only when nixie's contract describes
+   it as changing nothing.
 
 2. Add the release's sandbox images to impd, as above.
 3. Preview, then apply:
