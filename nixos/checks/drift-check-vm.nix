@@ -140,7 +140,7 @@ pkgs.testers.runNixOSTest {
 
 
     with subtest("it starts a binary from a dynamic user's state directory only with ExecPaths on it"):
-        probe = "cp ${pkgs.coreutils}/bin/true \"$STATE_DIRECTORY/probe\" && \"$STATE_DIRECTORY/probe\""
+        probe = "${pkgs.coreutils}/bin/cp ${pkgs.coreutils}/bin/true \"$STATE_DIRECTORY/probe\" && \"$STATE_DIRECTORY/probe\""
 
         status, out = machine.execute(f"systemd-run --wait --pipe --quiet -p DynamicUser=yes -p StateDirectory=noexec-probe ${pkgs.bash}/bin/bash -c '{probe}' 2>&1")
         assert status == 126, f"the probe without ExecPaths exited {status}: {out!r}"
