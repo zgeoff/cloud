@@ -50,26 +50,18 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # a push to main cancels main's earlier run, so a push compares with the newest commit that a
-      # green main run checked, not with the commit before it
-      - name: Find the last green commit on main
-        id: base
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bun run --silent ci:find-gate-base "$GITHUB_SHA"
-
-      # a pull request compares its base with the merge commit under test; a push compares the
-      # last green commit (all zeros when there is none, which needs every check)
+      # a pull request compares its base with the merge commit under test; a push compares main's
+      # last green commit, which it asks the GitHub API for
       - name: Decide which checks the change needs
         id: decide
         env:
-          BASE:
-            ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
-            steps.base.outputs.base }}
+          EVENT: ${{ github.event_name }}
+          HEAD: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: >-
-          bun run --silent ci:decide-gates --github "$BASE" "$GITHUB_SHA" provider full agent-image
-          atc-gateway files-image files-backup nixie-backup
+          bun run --silent ci:decide-ci-gates provider full agent-image atc-gateway files-image
+          files-backup nixie-backup
 
       - name: Install
         run: bun install --frozen-lockfile

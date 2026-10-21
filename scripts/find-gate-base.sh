@@ -5,8 +5,8 @@
 #   bash scripts/find-gate-base.sh <commit>
 set -euo pipefail
 
-if [ "$#" -ne 1 ] || [ -z "$1" ] || [ -z "${GITHUB_OUTPUT:-}" ]; then
-  echo "usage: GITHUB_OUTPUT=<file> find-gate-base.sh <commit>" >&2
+if [ "$#" -ne 1 ] || [ -z "$1" ]; then
+  echo "usage: find-gate-base.sh <commit>" >&2
   exit 2
 fi
 commit="$(git rev-parse --verify --quiet "$1^{commit}")" || {
@@ -30,4 +30,4 @@ while read -r head; do
     break
   fi
 done < "$heads"
-echo "base=$base" | tee -a "$GITHUB_OUTPUT"
+echo "$base"

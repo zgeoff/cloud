@@ -17,7 +17,7 @@ while read -r name; do unset "$name"; done < <(compgen -e GIT_)
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GIT_COMMITTER_NAME=test \
   GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_EMAIL=test@example.invalid
 
-it_writes_the_newest_green_commit_before_the_given_one() {
+it_prints_the_newest_green_commit_before_the_given_one() {
   local older green head status=0
   create_case_tree
   setup_test "$tree"
@@ -39,17 +39,16 @@ $older
     stdout: $stdout}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" <<< "base=$green"
+  diff - "$tree/out" <<< "$green"
   diff /dev/null "$tree/err"
-  diff - "$tree/output" <<< "base=$green"
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/ci.yml/runs","-f","event=push","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"]'
   assert_status 0 "$status"
 }
 
-it_writes_all_zeros_when_no_green_run_checked_an_ancestor() {
+it_prints_all_zeros_when_no_green_run_checked_an_ancestor() {
   local head status=0
   create_case_tree
   setup_test "$tree"
@@ -63,12 +62,11 @@ it_writes_all_zeros_when_no_green_run_checked_an_ancestor() {
     stdout: $stdout}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" "$head") > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" <<< 'base=0000000000000000000000000000000000000000'
+  diff - "$tree/out" <<< '0000000000000000000000000000000000000000'
   diff /dev/null "$tree/err"
-  diff - "$tree/output" <<< 'base=0000000000000000000000000000000000000000'
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/ci.yml/runs","-f","event=push","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"]'
   assert_status 0 "$status"
 }
@@ -86,12 +84,11 @@ it_fails_with_gh_error_and_exit_when_gh_fails() {
     stderr: "To get started with GitHub CLI, please run:  gh auth login\n", exit: 4}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
-  diff /dev/null "$tree/output"
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/ci.yml/runs","-f","event=push","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"]'
   assert_status 4 "$status"
 }
@@ -102,37 +99,35 @@ it_refuses_a_commit_git_cannot_resolve() {
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     bash "$script" 0123456789abcdef0123456789abcdef01234567) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'find-gate-base: 0123456789abcdef0123456789abcdef01234567 is not a commit'
-  diff /dev/null "$tree/output"
   diff /dev/null "$tree/calls"
   assert_status 1 "$status"
 }
 
-it_rejects_a_missing_output_file_with_its_usage() {
+it_rejects_a_missing_argument_with_its_usage() {
   local status=0
   create_case_tree
   setup_test "$tree"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    bash "$script" HEAD) > "$tree/out" 2> "$tree/err" || status=$?
+    bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'usage: GITHUB_OUTPUT=<file> find-gate-base.sh <commit>'
+  diff - "$tree/err" <<< 'usage: find-gate-base.sh <commit>'
   diff /dev/null "$tree/calls"
   assert_status 2 "$status"
 }
 
-# Runtime every case needs: the gh stand-in, an empty output file, and an empty git repository.
+# Runtime every case needs: the gh stand-in and an empty git repository.
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
   : > "$tree/calls"
-  : > "$tree/output"
   create_stub_gh "$tree/bin" "$tree/calls" "$tree/gh-responses"
   git -C "$tree/repo" init -q -b main
   # no auto maintenance: a commit's detached repack could still write into the repository while
