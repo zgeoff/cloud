@@ -34,8 +34,11 @@ let
 
   # a cgroup tree with the root, two slices, units in one of them, a cgroup a level deeper, a
   # unit name that systemd escapes, a name that needs a quote escaped, and a slice whose cpu.stat
-  # has no user and system time
+  # has no user and system time; and a /proc of two CPUs, 10 s after a boot at 2000
   writeTree = ''
+    mkdir proc
+    printf '10.00 15.00\n' > proc/uptime
+    printf 'cpu  100 0 100 600 50 0 0 20 0 0\ncpu0 50 0 50 300 25 0 0 10 0 0\ncpu1 50 0 50 300 25 0 0 10 0 0\nintr 0\nbtime 2000\n' > proc/stat
     mkdir -p cg/system.slice/k3s.service/kubepods.slice 'cg/system.slice/system-serial\x2dgetty.slice' \
       'cg/user.slice/odd"name.scope' cg/empty.slice
     printf 'usage_usec 9000000\nuser_usec 4000000\nsystem_usec 5000000\nnr_periods 0\n' > cg/cpu.stat
@@ -63,6 +66,12 @@ let
     host_cgroup_cpu_seconds_total{cgroup="/system.slice/system-serial\\x2dgetty.slice",mode="system"} 0.000000
     host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="user"} 0.000003
     host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="system"} 0.000004
+    # HELP host_kernel_cpu_seconds_total CPU time that was neither idle, iowait nor stolen, less the usage of the top-level cgroups: kernel threads in the root cgroup and interrupts.
+    # TYPE host_kernel_cpu_seconds_total counter
+    host_kernel_cpu_seconds_total 9.099750
+    # host_cgroup_cpu_removed_seconds 0.000000
+    # host_cgroup_cpu_id /system.slice <id>
+    # host_cgroup_cpu_id /user.slice <id>
   '';
 
   cases = [
@@ -149,13 +158,13 @@ let
         '';
     }
     {
-      title = "it writes the user and system time of the root, its slices and their units, and no deeper cgroup";
+      title = "it writes the user and system time of the root, its slices and their units, no deeper cgroup, and the kernel time";
       script = ''
         mkdir home tmp out
         ${writeTree}
 
         status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
 
         assert_equals 0 "$status" "the writer's exit status"
         assert_files_equal /dev/null stdout
@@ -164,7 +173,98 @@ let
         assert_equals 644 "$(stat -c %a out/host_cgroup_cpu.prom)" "the file's mode"
         cat > expected <<'EOF'
         ${treeMetrics}EOF
-        assert_files_equal expected out/host_cgroup_cpu.prom
+        # a directory's inode differs from run to run
+        sed -E 's/^(# host_cgroup_cpu_id [^ ]+) [0-9]+$/\1 <id>/' out/host_cgroup_cpu.prom > actual
+        assert_files_equal expected actual
+      '';
+    }
+    {
+      title = "it keeps the kernel time of the last file from this boot when the new reading is lower";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        printf 'host_kernel_cpu_seconds_total 50.000000\n' > out/host_cgroup_cpu.prom
+        touch -d @2005 out/host_cgroup_cpu.prom
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 0 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "host_kernel_cpu_seconds_total 50.000000" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+      '';
+    }
+    {
+      title = "it ignores the kernel time of a last file written before the boot";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        printf 'host_kernel_cpu_seconds_total 50.000000\n' > out/host_cgroup_cpu.prom
+        touch -d @1999 out/host_cgroup_cpu.prom
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 0 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "host_kernel_cpu_seconds_total 9.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+      '';
+    }
+    {
+      title = "it keeps subtracting the time of a top-level cgroup that is gone since the last write";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer}
+        rm -r cg/user.slice
+        printf '20.00 30.00\n' > proc/uptime
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 0 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "host_kernel_cpu_seconds_total 29.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
+      '';
+    }
+    {
+      title = "it subtracts the last time of a top-level cgroup made again under its name, though the new one has more";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer}
+        # the old directory stays, so the new one cannot take its inode
+        mv cg/user.slice old-user.slice
+        mkdir cg/user.slice
+        printf 'usage_usec 1000000\nuser_usec 900000\nsystem_usec 100000\n' > cg/user.slice/cpu.stat
+        printf '20.00 30.00\n' > proc/uptime
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 0 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "host_kernel_cpu_seconds_total 28.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
+      '';
+    }
+    {
+      title = "it fails and leaves the last file when /proc has no btime";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        sed -i '/^btime/d' proc/stat
+        echo previous > out/host_cgroup_cpu.prom
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 1 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stdout
+        assert_equals "host-cgroup-cpu: no uptime, CPUs and btime in $PWD/proc" "$(cat stderr)" "the writer's stderr"
+        assert_equals host_cgroup_cpu.prom "$(ls -A out)" "the textfile directory"
+        assert_equals previous "$(cat out/host_cgroup_cpu.prom)" "the last file"
       '';
     }
     {
@@ -202,7 +302,7 @@ let
       script = ''
         mkdir home tmp out
         ${writeTree}
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" TEXTFILE_DIR=out ${writer}
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer}
         # the sandbox has a network namespace of its own, so the fixed port is free
         env -i HOME="$PWD/home" ${pkgs.prometheus-node-exporter}/bin/node_exporter \
           --collector.disable-defaults --collector.textfile --collector.textfile.directory=out \
@@ -227,6 +327,7 @@ let
         host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="user"} 3e-06
         EOF
         assert_files_equal expected actual
+        assert_equals 9.09975 "$(sed -n 's/^host_kernel_cpu_seconds_total //p' metrics)" "the kernel time"
         assert_equals 0 "$(sed -n 's/^node_textfile_scrape_error //p' metrics)" "the collector's scrape error"
       '';
     }

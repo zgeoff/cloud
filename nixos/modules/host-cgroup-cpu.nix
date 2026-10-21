@@ -1,6 +1,6 @@
 # Host cgroup CPU: a service writes the user and system CPU time of the host's root cgroup, its
-# slices and the units in each slice as node-exporter textfile metrics (host-cgroup-cpu.sh), so a
-# spike of system CPU shows which unit, container or kernel work took it. The kubelet's cAdvisor
+# slices and the units in each slice, and the host's kernel time, as node-exporter textfile metrics
+# (host-cgroup-cpu.sh), so a spike of system CPU shows which unit, container or kernel work took it. The kubelet's cAdvisor
 # reads only the pods' cgroups, and node-exporter's systemd collector exports no CPU time.
 # A loop writes the file at each interval, rather than a timer, so the journal that Alloy ships to
 # Loki gets no start and stop lines for each write.
@@ -19,6 +19,7 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.gawk
+      pkgs.getconf
     ];
     text = builtins.readFile ./host-cgroup-cpu.sh;
   };
