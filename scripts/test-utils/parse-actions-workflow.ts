@@ -12,7 +12,7 @@ export interface ActionsConcurrency {
 // a job output that publishes one step's output, `${{ steps.<step>.outputs.<output> }}`
 // a step's output, or the outcome of a step, which continue-on-error leaves apart from its job's
 // result
-export type ActionsJobOutput =
+type ActionsJobOutput =
   | { readonly kind: 'output'; readonly step: string; readonly output: string }
   | { readonly kind: 'outcome'; readonly step: string };
 

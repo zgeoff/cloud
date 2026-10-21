@@ -1,4 +1,4 @@
-export interface KubectlProxy {
+interface KubectlProxy {
   // the proxy's base URL, such as http://127.0.0.1:41873, with no trailing slash
   readonly url: string;
 
