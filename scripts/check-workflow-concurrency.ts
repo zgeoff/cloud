@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { findJSONField } from './find-json-field.ts';
 
 export interface CheckWorkflowConcurrencyOptions {
@@ -13,13 +14,15 @@ const usage = 'usage: check-workflow-concurrency.ts [repo root]\n';
 export async function checkWorkflowConcurrency(
   options: Readonly<CheckWorkflowConcurrencyOptions>,
 ): Promise<number> {
-  if (options.args.length > 1) {
+  const root = parseRoot(options.args);
+
+  if (root === undefined) {
     options.printErr(usage);
 
     return 2;
   }
 
-  const workflowDir = join(options.args[0] ?? '.', '.github', 'workflows');
+  const workflowDir = join(root, '.github', 'workflows');
 
   const ci = await readWorkflow(join(workflowDir, 'ci.yml'));
   const deploy = await readWorkflow(join(workflowDir, 'deploy-prod.yml'));
@@ -42,6 +45,26 @@ export async function checkWorkflowConcurrency(
   );
 
   return 0;
+}
+
+function parseRoot(args: readonly string[]): string | undefined {
+  const positionals = tryParsePositionals(args);
+
+  if (positionals === null || positionals.length > 1) {
+    return undefined;
+  }
+
+  return positionals[0] ?? '.';
+}
+
+// util.parseArgs throws on an option it does not know, such as a misspelt flag
+function tryParsePositionals(args: readonly string[]): string[] | null {
+  try {
+    return parseArgs({ args: [...args], options: {}, allowPositionals: true, strict: true })
+      .positionals;
+  } catch {
+    return null;
+  }
 }
 
 async function readWorkflow(path: string): Promise<unknown> {

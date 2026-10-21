@@ -182,3 +182,19 @@ test('it rejects more than one argument with its usage', async () => {
     'usage: check-workflow-concurrency.ts [repo root]\n',
   );
 });
+
+test('it rejects an option it does not know with its usage', async () => {
+  const ctx = await setupTest();
+
+  const exitCode = await checkWorkflowConcurrency({
+    args: ['--fix', ctx.directory],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(2);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'usage: check-workflow-concurrency.ts [repo root]\n',
+  );
+});
