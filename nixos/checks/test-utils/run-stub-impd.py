@@ -10,9 +10,9 @@
 # with the headers alone. The shapes the check passes
 # are impd's, as the pinned imp answers them (Elysia 1.4.29 on Bun 1.4.2): /health is 200,
 # "application/json;charset=utf-8", {"status":"ok","ready":true,"warnings":[]} with no reboot
-# reason and no storage warnings (packages/daemon/src/build-app.ts, buildHealthWarnings), and a
-# route no handler matches is 404,
-# "text/plain;charset=utf-8", NOT_FOUND (Elysia's default, which build-app.ts keeps).
+# reason and no storage warnings (packages/daemon/src/surface/create-app.ts,
+# buildHealthWarnings), and a route no handler matches is 404,
+# "text/plain;charset=utf-8", NOT_FOUND (Elysia's default, which create-app.ts keeps).
 # nixos/checks/test-utils-check.nix tests it and pins those shapes to imp's source.
 import http.server
 import sys
