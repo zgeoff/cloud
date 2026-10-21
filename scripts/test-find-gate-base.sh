@@ -74,6 +74,7 @@ it_fails_with_gh_error_and_exit_when_gh_fails() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  git -C "$tree/repo" commit -q --allow-empty -m 'add the lantern service'
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 4 when gh needs
   # authentication
   jq -cn '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
@@ -123,8 +124,7 @@ it_rejects_a_missing_output_file_with_its_usage() {
   assert_status 2 "$status"
 }
 
-# Runtime every case needs: the gh stand-in, an empty output file, and a git repository with an
-# empty root commit.
+# Runtime every case needs: the gh stand-in, an empty output file, and an empty git repository.
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo"
@@ -135,8 +135,6 @@ setup_test() {
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it
   git -C "$tree/repo" config maintenance.auto false
-  # boot data: an empty root commit, so HEAD resolves
-  git -C "$tree/repo" commit -q --allow-empty -m 'start the history'
 }
 
 run_cases
