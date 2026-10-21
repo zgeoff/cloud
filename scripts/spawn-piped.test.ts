@@ -1,4 +1,4 @@
-import { expect, test } from 'bun:test';
+import { expect, onTestFinished, test } from 'bun:test';
 import { spawnPiped } from './spawn-piped.ts';
 
 test('it gives the process output on its pipes and its exit code', async () => {
@@ -19,6 +19,12 @@ test('it gives the process output on its pipes and its exit code', async () => {
 
 test('it ends a process that it kills with SIGTERM', async () => {
   const spawned = spawnPiped(['sleep', '30']);
+
+  onTestFinished(async () => {
+    spawned.kill();
+
+    await spawned.exited;
+  });
 
   spawned.kill();
 
