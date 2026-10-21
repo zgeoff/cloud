@@ -19,11 +19,18 @@ export function classifyNixieRefusal(reply: NixieReply): string | null {
 }
 
 function classifyAnswer(status: number, answer: NixieAnswer): string | null {
-  // the body itself never reaches the output, because a successful answer can hold private data
-  if (answer.ok) {
-    return `answered ${String(status)} with an output to a call without a session`;
-  }
+  return match(answer)
+    .with(
+      { ok: true },
 
+      // the body itself never reaches the output, because a successful answer can hold private data
+      () => `answered ${String(status)} with an output to a call without a session`,
+    )
+    .with({ ok: false }, (refusal) => classifyError(status, refusal))
+    .exhaustive();
+}
+
+function classifyError(status: number, answer: Extract<NixieAnswer, { ok: false }>): string | null {
   if (!answer.isDefined) {
     return `answered ${String(status)} with no error that nixie's contract defines, not 401 UNAUTHORIZED`;
   }
