@@ -27,8 +27,10 @@
 # The check runs under timeout, for CHECK_TIMEOUT seconds (default 2700), so a hung refresh ends
 # as a failed check that posts its alert, not as a unit that systemd kills without one. The alert
 # names where to read the run: `journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=<id>` on
-# RUN_HOST, from systemd's INVOCATION_ID. A failed alert prints its status on stderr and leaves
-# the exit status as the check's. An argument is a usage error (exit 2).
+# RUN_HOST, from systemd's INVOCATION_ID. A posted alert prints which alert it was on stderr. A
+# failed alert prints its status on stderr and leaves the exit status as the check's. Any other step
+# that fails once the inputs are set, such as an answer from GitHub that jq cannot read, posts the
+# failed alert as the run exits. An argument is a usage error (exit 2).
 #
 #   CREDENTIALS_DIRECTORY=<dir> INVOCATION_ID=<id> RUN_HOST=<host> GITHUB_API_URL=<url> \
 #     REPO=<owner/name> [DEPLOY_WAIT_ATTEMPTS=<n>] [DEPLOY_WAIT_DELAY=<seconds>] \
@@ -65,17 +67,39 @@ names=(
 declare -A credentials=() known=()
 for name in "${names[@]}"; do known[$name]=1; done
 
-# alert <outcome>: posts the alert with the webhook alone in its environment
+alerted=0
+
+# alert <outcome>: posts the alert with the webhook alone in its environment, and says which alert
+# it posted
 alert() {
-  local status=0
+  local status=0 kind=failed
+  alerted=1
+  if [ "$1" = drift ]; then kind=drift; fi
   (
     export ALERT_WEBHOOK_URL="${credentials[ALERT_WEBHOOK_URL]:-}"
     OUTCOME="$1" RUN_REF="$run_ref" bash "$root/scripts/alert-scheduled-drift.sh"
   ) || status=$?
   if [ "$status" != 0 ]; then
     echo "run-host-drift-check: the alert failed (exit $status)" >&2
+  else
+    echo "run-host-drift-check: posted the $kind alert" >&2
   fi
 }
+
+# finish: on exit, removes the outcome file, and posts the failed alert for a run that fails on a
+# step with no alert of its own
+outcome_file=
+# shellcheck disable=SC2329 # the EXIT trap below invokes it
+finish() {
+  local status=$?
+  if [ -n "$outcome_file" ]; then rm -f "$outcome_file"; fi
+  if [ "$status" != 0 ] && [ "$alerted" = 0 ]; then
+    echo "run-host-drift-check: the run failed (exit $status)" >&2
+    alert ""
+  fi
+  exit "$status"
+}
+trap finish EXIT
 
 # fail_run <message>: ends a run that never reached the check, with its alert
 fail_run() {
@@ -142,7 +166,6 @@ overlapped() {
 }
 
 outcome_file="$(mktemp)"
-trap 'rm -f "$outcome_file"' EXIT
 
 wait_for_deploy
 try=1

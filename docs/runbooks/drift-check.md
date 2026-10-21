@@ -26,8 +26,9 @@ generated. Never copy the file off the host, and never print it.
 
 The service runs as a dynamic user, with no capabilities, and reads the file through systemd's
 credentials. The check gets every value but the webhook in its environment, and the alert gets only
-the webhook. Until the file exists, systemd skips the service, so a run before the setup leaves
-nothing in Discord.
+the webhook. systemd mounts a dynamic user's state directory with noexec, so the unit lists that
+directory in `ExecPaths=`, and the plugins it downloads there can start. Until the file exists,
+systemd skips the service, so a run before the setup leaves nothing in Discord.
 
 The check and the Deploy prod job share no lock, because GitHub's concurrency group cannot hold a
 service on the host. A run therefore guards against an apply by asking GitHub. Before the check, it
@@ -118,11 +119,15 @@ The refresh's plan in the log shows each resource that differs. A run ends in on
 
 - It passes, with `run-host-drift-check: no drift`: the live state matches the state file for every
   resource the check reads.
-- It fails with status 7, and Discord shows `The scheduled drift check found drift in prod`: the
-  refresh found a change. [Answer drift](#answer-drift).
-- It fails with another status, and Discord shows `The scheduled drift check failed`: the refresh
-  failed, the check ran out of time (status 124), the credentials file is incomplete, or a Deploy
-  prod run stayed in progress past the check's wait. The lines before the alert give the cause.
+- It fails with status 7, the log ends with `run-host-drift-check: posted the drift alert`, and
+  Discord shows `The scheduled drift check found drift in prod`: the refresh found a change.
+  [Answer drift](#answer-drift).
+- It fails with another status, the log ends with `run-host-drift-check: posted the failed alert`,
+  and Discord shows `The scheduled drift check failed`: the refresh failed, a provider plugin could
+  not start, the check ran out of time (status 124), the credentials file is incomplete, a Deploy
+  prod run stayed in progress past the check's wait, or another step failed, with
+  `run-host-drift-check: the run failed (exit <status>)` in the log. The lines before the alert give
+  the cause.
 - It fails, and the log ends with `run-host-drift-check: the alert failed (exit <status>)`: Discord
   refused the post or the host could not reach it. Read the check's own result in the lines before.
 - It never starts, and `systemctl status drift-check.service` shows that its `ConditionPathExists=`

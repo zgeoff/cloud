@@ -42,9 +42,10 @@ gates:
   # reads; the preview service's source, which the host's package copies, and bun.lock, from which
   # that package fetches the service's dependencies; the drift check's Onidel provider, project and
   # stack files and scripts, which the host's drift check copies; the shell test helpers that
-  # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them; the
-  # scripts that run the checks, pin their image and open KVM to them; the scripts that
-  # tank-cloud-host-secrets runs in its VM; .bun-version; the workflow; and the scripts that decide
+  # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them, with
+  # the Discord webhook stand-in that the drift-check-vm check starts; the scripts that run the
+  # checks, pin their image and open KVM to them; the scripts that tank-cloud-host-secrets runs in
+  # its VM; .bun-version; the workflow; and the scripts that decide
   # when the checks run, with this file. The root package.json is no input, although its
   # test:nixos script runs the checks: a change to it alone runs at the next change to an input,
   # or on a dispatch.
@@ -74,6 +75,7 @@ gates:
       - test-support/shell/assert-missing.sh
       - test-support/shell/test-assert-missing.sh
       - test-support/shell/wait-for.sh
+      - test-support/shell/start-stub-discord-webhook.sh
       - scripts/run-nixos-checks.sh
       - scripts/nix-image.sh
       - scripts/open-kvm.sh

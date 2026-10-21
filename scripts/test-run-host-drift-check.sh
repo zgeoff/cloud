@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Test for run-host-drift-check.sh: it runs the real check-scheduled-drift.sh with every credential
 # but the webhook in its environment, under timeout, and posts nothing when the check finds no
-# drift; it posts drift, a failed refresh and a check that ran out of time through the real
-# alert-scheduled-drift.sh, and keeps the check's status when the alert fails; it waits while a
-# Deploy prod run is queued or in progress, fails after its last ask, and checks anyway when GitHub
-# does not answer; it checks once more when a Deploy prod run overlapped a check that failed, and
+# drift; it posts drift, a failed refresh, a provider plugin that cannot start and a check that ran
+# out of time through the real alert-scheduled-drift.sh, says which alert it posted, keeps the
+# check's status when the alert fails, and posts the failed alert for a step that fails with no
+# alert of its own; it waits while a Deploy prod run is queued or in progress, fails after its last
+# ask, and checks anyway when GitHub does not answer; it checks once more when a Deploy prod run overlapped a check that failed, and
 # reports that second check; and it fails before the check on a missing credentials file, a missing
 # credential, a line with an unknown name, a missing input or an argument.
 #
@@ -112,7 +113,7 @@ Resources:
     60 unchanged
 error: no changes were expected for refresh but changes were proposed
 EOF
-  diff /dev/null "$tree/err"
+  diff - "$tree/err" <<< 'run-host-drift-check: posted the drift alert'
   diff - "$tree/discord/requests" <<< 'POST /api/webhooks/1/example-token'
   printf '%s' '{  "content": "The scheduled drift check found drift in prod: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     diff - "$tree/discord/bodies/1.json"
@@ -145,10 +146,78 @@ EOF
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'error: failed to load checkpoint: blob (key ".pulumi/stacks/geoff-cloud/prod.json") (code=Unknown): AccessDenied'
-  diff /dev/null "$tree/err"
+  diff - "$tree/err" <<< 'run-host-drift-check: posted the failed alert'
   printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     diff - "$tree/discord/bodies/1.json"
   assert_status 255 "$status"
+}
+
+it_posts_that_the_check_failed_when_a_provider_plugin_cannot_start() {
+  local status=0
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
+  setup_test "$tree"
+  cat > "$tree/credentials/drift-check" << EOF
+PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
+AWS_ACCESS_KEY_ID=example-key-id
+AWS_SECRET_ACCESS_KEY=example-secret
+PULUMI_CONFIG_PASSPHRASE=example-passphrase
+CLOUDFLARE_API_TOKEN=example-cloudflare-token
+TAILSCALE_OAUTH_CLIENT_ID=example-client-id
+TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
+TAILSCALE_TAILNET=example.test
+ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
+EOF
+  echo '{"total_count":1,"workflow_runs":[{"status":"completed"}]}' > "$tree/github/$runs_path"
+  printf 'error: could not load provider for resource urn:pulumi:prod::geoff-cloud::example:index:Thing::example: failed to load plugin /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: fork/exec /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: permission denied\n' > "$tree/answers/1.err"
+  echo 255 > "$tree/answers/1.status"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
+    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
+    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'error: could not load provider for resource urn:pulumi:prod::geoff-cloud::example:index:Thing::example: failed to load plugin /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: fork/exec /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: permission denied'
+  diff - "$tree/err" <<< 'run-host-drift-check: posted the failed alert'
+  printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
+    diff - "$tree/discord/bodies/1.json"
+  assert_status 255 "$status"
+}
+
+it_posts_that_the_run_failed_when_a_step_without_its_own_alert_fails() {
+  local status=0
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
+  setup_test "$tree"
+  cat > "$tree/credentials/drift-check" << EOF
+PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
+AWS_ACCESS_KEY_ID=example-key-id
+AWS_SECRET_ACCESS_KEY=example-secret
+PULUMI_CONFIG_PASSPHRASE=example-passphrase
+CLOUDFLARE_API_TOKEN=example-cloudflare-token
+TAILSCALE_OAUTH_CLIENT_ID=example-client-id
+TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
+TAILSCALE_TAILNET=example.test
+ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
+EOF
+  # an answer with no workflow_runs, which jq cannot iterate
+  echo '{"message":"Example answer with no runs"}' > "$tree/github/$runs_path"
+
+  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
+    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
+    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+jq: error (at <stdin>:1): Cannot iterate over null (null)
+run-host-drift-check: the run failed (exit 5)
+run-host-drift-check: posted the failed alert
+EOF
+  diff /dev/null "$tree/calls"
+  printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
+    diff - "$tree/discord/bodies/1.json"
+  assert_status 5 "$status"
 }
 
 it_posts_that_the_check_failed_and_exits_124_when_the_check_runs_out_of_time() {
@@ -176,7 +245,7 @@ EOF
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff /dev/null "$tree/err"
+  diff - "$tree/err" <<< 'run-host-drift-check: posted the failed alert'
   diff /dev/null "$tree/calls"
   diff - "$tree/timeout-calls" << EOF
 ["timeout","60","bash","$check","--suppress-outputs"]
@@ -341,7 +410,10 @@ Resources:
 Resources:
     ~ 2 to update
 EOF
-  diff - "$tree/err" <<< 'run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends'
+  diff - "$tree/err" << 'EOF'
+run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends
+run-host-drift-check: posted the drift alert
+EOF
   printf '%s' '{  "content": "The scheduled drift check found drift in prod: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     diff - "$tree/discord/bodies/1.json"
   assert_status 7 "$status"
@@ -376,6 +448,7 @@ EOF
 run-host-drift-check: a Deploy prod run is in progress; asking again in 120s
 run-host-drift-check: a Deploy prod run is in progress; asking again in 120s
 run-host-drift-check: a Deploy prod run was still in progress after 3 asks
+run-host-drift-check: posted the failed alert
 EOF
   diff /dev/null "$tree/calls"
   diff - "$tree/clock/pauses" << 'EOF'
@@ -454,7 +527,10 @@ EOF
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'run-host-drift-check: the credentials file has no PULUMI_CONFIG_PASSPHRASE TAILSCALE_TAILNET'
+  diff - "$tree/err" << 'EOF'
+run-host-drift-check: the credentials file has no PULUMI_CONFIG_PASSPHRASE TAILSCALE_TAILNET
+run-host-drift-check: posted the failed alert
+EOF
   diff /dev/null "$tree/calls"
   printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     diff - "$tree/discord/bodies/1.json"
@@ -477,7 +553,10 @@ EOF
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'run-host-drift-check: line 2 of the credentials file holds no known name'
+  diff - "$tree/err" << 'EOF'
+run-host-drift-check: line 2 of the credentials file holds no known name
+run-host-drift-check: posted the failed alert
+EOF
   diff /dev/null "$tree/calls"
   diff - "$tree/discord/requests" <<< 'POST /api/webhooks/1/example-token'
   assert_status 1 "$status"
