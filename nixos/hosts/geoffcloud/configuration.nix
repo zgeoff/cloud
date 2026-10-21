@@ -252,7 +252,7 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:2.8.2@sha256:6c4d47c95106bae88c4057497a53620118d197d6683e0e0bd436dd272a849baf";
+    image = "ghcr.io/zgeoff/imp-host:2.8.3@sha256:56fa57187ddb0e2aab06514c743f7cf5897b4efe17fbafd8c46837719742e22f";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
@@ -432,7 +432,7 @@ in
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:2.8.2@sha256:695560dc35b1d02047660be4994daae8ed1e5227d5fc4f27d42da0e0d3972143";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:2.8.3@sha256:c6b2b50cb398ba5aa8b6e3ecdf9b6e175cef374820648f0e5af477f7754c0ec5";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubTokenFile = "/var/lib/tank-cloud/host-secrets/preview/github-token";
     impTokenFile = "/var/lib/tank-cloud/host-secrets/preview/imp-token";
