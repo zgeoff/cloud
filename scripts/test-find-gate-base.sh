@@ -18,18 +18,21 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
   GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_EMAIL=test@example.invalid
 
 it_writes_the_newest_green_commit_before_the_given_one() {
-  local green head status=0
+  local older green head status=0
   create_case_tree
   setup_test "$tree"
   git -C "$tree/repo" commit -q --allow-empty -m 'add the lantern service'
+  older="$(git -C "$tree/repo" rev-parse HEAD)"
+  git -C "$tree/repo" commit -q --allow-empty -m 'add the lantern alert'
   green="$(git -C "$tree/repo" rev-parse HEAD)"
   git -C "$tree/repo" commit -q --allow-empty -m 'tune the lantern probe'
   head="$(git -C "$tree/repo" rev-parse HEAD)"
   # the lines the call's --jq filter prints, newest first: a re-run on the commit itself, a commit
-  # this checkout lacks, then the green ancestor
+  # this checkout lacks, then two green ancestors
   jq -cn --arg stdout "$head
 0123456789abcdef0123456789abcdef01234567
 $green
+$older
 " '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
     "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
     "--jq", ".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"],
