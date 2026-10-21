@@ -140,11 +140,12 @@ pkgs.testers.runNixOSTest {
 
 
     with subtest("it starts a binary from a dynamic user's state directory only with ExecPaths on it"):
-        probe = "${pkgs.coreutils}/bin/cp ${pkgs.coreutils}/bin/true \"$STATE_DIRECTORY/probe\" && \"$STATE_DIRECTORY/probe\""
+        # coreutils is one binary that runs the program its name gives, so the copy keeps the name true
+        probe = "${pkgs.coreutils}/bin/cp ${pkgs.coreutils}/bin/true \"$STATE_DIRECTORY/true\" && \"$STATE_DIRECTORY/true\""
 
         status, out = machine.execute(f"systemd-run --wait --pipe --quiet -p DynamicUser=yes -p StateDirectory=noexec-probe ${pkgs.bash}/bin/bash -c '{probe}' 2>&1")
         assert status == 126, f"the probe without ExecPaths exited {status}: {out!r}"
-        assert out == "${pkgs.bash}/bin/bash: line 1: /var/lib/noexec-probe/probe: Permission denied\n", out
+        assert out == "${pkgs.bash}/bin/bash: line 1: /var/lib/noexec-probe/true: Permission denied\n", out
 
         status, out = machine.execute(f"systemd-run --wait --pipe --quiet -p DynamicUser=yes -p StateDirectory=exec-probe -p ExecPaths=/var/lib/private/exec-probe ${pkgs.bash}/bin/bash -c '{probe}' 2>&1")
         assert (status, out) == (0, ""), f"the probe with ExecPaths exited {status}: {out!r}"
