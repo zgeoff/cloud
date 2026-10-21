@@ -70,6 +70,8 @@ let
     # TYPE host_kernel_cpu_seconds_total counter
     host_kernel_cpu_seconds_total 9.099750
     # host_cgroup_cpu_removed_seconds 0.000000
+    # host_cgroup_cpu_id /system.slice <id>
+    # host_cgroup_cpu_id /user.slice <id>
   '';
 
   cases = [
@@ -171,7 +173,9 @@ let
         assert_equals 644 "$(stat -c %a out/host_cgroup_cpu.prom)" "the file's mode"
         cat > expected <<'EOF'
         ${treeMetrics}EOF
-        assert_files_equal expected out/host_cgroup_cpu.prom
+        # a directory's inode differs from run to run
+        sed -E 's/^(# host_cgroup_cpu_id [^ ]+) [0-9]+$/\1 <id>/' out/host_cgroup_cpu.prom > actual
+        assert_files_equal expected actual
       '';
     }
     {
@@ -221,6 +225,27 @@ let
         assert_equals 0 "$status" "the writer's exit status"
         assert_files_equal /dev/null stderr
         assert_equals "host_kernel_cpu_seconds_total 29.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
+      '';
+    }
+    {
+      title = "it subtracts the last time of a top-level cgroup made again under its name, though the new one has more";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer}
+        # the old directory stays, so the new one cannot take its inode
+        mv cg/user.slice old-user.slice
+        mkdir cg/user.slice
+        printf 'usage_usec 1000000\nuser_usec 900000\nsystem_usec 100000\n' > cg/user.slice/cpu.stat
+        printf '20.00 30.00\n' > proc/uptime
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 0 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "host_kernel_cpu_seconds_total 28.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
         assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
       '';
     }
