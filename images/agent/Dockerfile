@@ -15,12 +15,14 @@ FROM ghcr.io/zgeoff/imp-base:2.8.3@sha256:c6b2b50cb398ba5aa8b6e3ecdf9b6e175cef37
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Ubuntu packages come from snapshot.ubuntu.com at a fixed moment, so the
-# exact versions below stay installable after the archive moves on. A bump
+# Ubuntu packages are pinned to exact versions, and UBUNTU_SNAPSHOT names a
+# snapshot.ubuntu.com moment that holds every one of them. apt-get install
+# runs without --snapshot, so it resolves the pins against the live archive,
+# and a pin stops installing once Ubuntu replaces that version there. A bump
 # moves the snapshot and the versions together; read the candidates with
-#   apt-get update --snapshot <stamp> && apt-cache policy <package>
+#   apt-get update --snapshot <stamp> && apt-cache --snapshot <stamp> policy <package>
 # docker-compose-plugin comes from Docker's repository, which keeps old builds.
-ARG UBUNTU_SNAPSHOT=20261006T000000Z
+ARG UBUNTU_SNAPSHOT=20261021T120000Z
 ARG GIT_VERSION=1:2.43.0-1ubuntu7.4
 ARG BASH_VERSION=5.2.21-2ubuntu4
 ARG JQ_VERSION=1.7.1-3ubuntu0.24.04.2
@@ -30,7 +32,7 @@ ARG PYTHON3_VERSION=3.12.3-0ubuntu2.1
 ARG PYTHON3_PIP_VERSION=24.0+dfsg-1ubuntu1.3
 ARG PYTHON_IS_PYTHON3_VERSION=3.11.4-1
 ARG UNZIP_VERSION=6.0-28ubuntu4.1
-ARG XZ_UTILS_VERSION=5.6.1+really5.4.5-1ubuntu0.3
+ARG XZ_UTILS_VERSION=5.6.1+really5.4.5-1ubuntu0.4
 ARG DOCKER_COMPOSE_VERSION=5.6.0-1~ubuntu.24.04~noble
 
 # build-essential: native npm modules and Python wheels without a binary build
