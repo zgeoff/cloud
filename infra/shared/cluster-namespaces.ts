@@ -20,9 +20,8 @@ interface ClusterNamespaceEntry {
   readonly egress: 'deny' | 'open';
 }
 
-// Every namespace in the cluster, who creates it, and its Pod Security level (GEO-1246). Exempt:
-// node-exporter in observability needs hostNetwork, nixie's Traefik in nixie-ingress a hostPort,
-// and kube-system's local-path helper pods a hostPath.
+// exempt from Pod Security: node-exporter in observability needs hostNetwork, nixie's Traefik in
+// nixie-ingress a hostPort, and kube-system's local-path helper pods a hostPath
 export const clusterNamespaces = {
   atc: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
   default: { owner: 'k3s', podSecurity: 'baseline', egress: 'deny' },
@@ -37,7 +36,6 @@ export const clusterNamespaces = {
   onepassword: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
 } as const satisfies Record<ClusterNamespace, ClusterNamespaceEntry>;
 
-// the namespaces Pulumi declares as Namespace resources
 export type PulumiNamespace = {
   [Name in ClusterNamespace]: (typeof clusterNamespaces)[Name]['owner'] extends 'pulumi'
     ? Name

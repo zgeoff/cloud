@@ -3,8 +3,8 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isWorkflowTriggered } from '../scripts/test-utils/is-workflow-triggered.ts';
 
-// The NixOS checks workflow's triggers through a stand-in for GitHub's trigger filters: the
-// switch gate reads only the scheduled and dispatched runs on main, so no pull request starts one.
+// the switch gate reads only the scheduled and dispatched runs on main, so no pull request starts
+// one
 async function setupTest() {
   const workflowText = await readFile(
     join(import.meta.dir, '..', '.github', 'workflows', 'nixos-checks.yml'),

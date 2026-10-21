@@ -1,7 +1,6 @@
 import { faker } from '@faker-js/faker';
 import type { Upload } from '../types.ts';
 
-// an agent upload of a PNG that expires a week after it was made
 export function buildMockUpload(overrides: Partial<Upload> = {}): Upload {
   const createdAt = overrides.createdAt ?? faker.date.recent();
 

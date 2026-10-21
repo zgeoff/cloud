@@ -14,12 +14,8 @@ type ExpiryDecision =
   | { readonly outcome: 'forbidden'; readonly reason: string };
 
 const dayMs = 24 * 60 * 60 * 1000;
-
-// the agent role's longest expiry
 const agentLimitMs = 30 * dayMs;
 
-// When an upload expires, and whether the role may set it: owner may set any future time or
-// never, and agent a future time at most 30 days away.
 export function decideExpiry(facts: ExpiryFacts): ExpiryDecision {
   const expiresAt = parseExpires(facts.expires, facts.now);
 

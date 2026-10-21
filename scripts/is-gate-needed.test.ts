@@ -4,9 +4,6 @@ import { isGateNeeded } from './is-gate-needed.ts';
 import { loadGateManifest } from './load-gate-manifest.ts';
 import { runProcess } from './run-process.ts';
 
-// The manifest's own suite: it reads the real .github/gates.yml, so a change to a gate's paths
-// shows here as a changed answer.
-
 test.each([
   ['full', ['README.md', 'docs/runbooks/prod-apply.md'], false],
   ['full', ['README.md', 'scripts/lint.sh'], true],

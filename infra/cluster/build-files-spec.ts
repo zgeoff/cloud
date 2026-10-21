@@ -13,19 +13,17 @@ export interface FilesSpecInputs {
   // the public origin of the file URLs, such as https://files.geoff.cloud
   readonly publicURL: string;
 
-  // the Service that governs the StatefulSet
   readonly serviceName: Output<string>;
 
-  // the Secret with the token hashes, and the dockerconfigjson Secret that pulls the image
   readonly tokenSecret: Output<string>;
+
+  // a dockerconfigjson Secret
   readonly pullSecret: string;
 }
 
-// The files service's StatefulSet spec: one replica, because SQLite takes one writer, on a 20 GiB
-// ReadWriteOnce volume that outlives its claim and holds the files and the metadata file. The pod
-// reads only the token hashes, and runs as the image's nonroot user on a read-only root.
 export function buildFilesSpec(inputs: FilesSpecInputs): input.apps.v1.StatefulSetSpec {
   return {
+    // SQLite takes one writer
     replicas: 1,
 
     // a StatefulSet's rolling update stops files-0 before it starts the new one, so two pods never
@@ -64,10 +62,7 @@ export function buildFilesSpec(inputs: FilesSpecInputs): input.apps.v1.StatefulS
   };
 }
 
-// the files service's port in the pod, and its pod labels
 export const filesPort = 8080;
-
-// the keys of the Secret that holds each role token's SHA-256
 export const agentTokenHashKey = 'agent-token-sha256';
 export const ownerTokenHashKey = 'owner-token-sha256';
 

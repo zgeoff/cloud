@@ -23,9 +23,8 @@ interface ClusterConfigInputs {
   readonly onePasswordConnectCredentials: Output<string>;
 }
 
-// What a managed cluster needs, or nothing when "cluster" leaves it out. Checked at the top of
-// the program, so a missing value fails before any resource registers instead of planning to
-// delete the cluster's resources.
+// checked at the top of the program, so a missing value fails before any resource registers
+// instead of planning to delete the cluster's resources
 export function loadClusterInputs(
   stackConfig: Pick<StackConfig, 'get' | 'getObject' | 'getSecret'>,
   env: Environment,
@@ -40,7 +39,6 @@ export function loadClusterInputs(
   const onePasswordConnectCredentials = secret(requireOnePasswordConnectCredentials(env));
   const atcGateway = loadATCGatewayInputs(stackConfig, env);
 
-  // nixie's backup runs in the gateway's backup image, pulled with the gateway's credential
   const backupImage =
     atcGateway.atcGateway === undefined
       ? undefined

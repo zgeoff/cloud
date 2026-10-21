@@ -8,8 +8,6 @@ import { buildRealProgramHandler } from './test-utils/build-real-program-handler
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
 import { createGitOrigin } from './test-utils/create-git-origin.ts';
 
-// Each test runs real git in its own repository, against a manifest it writes; the manifest's own
-// gates are covered by is-gate-needed.test.ts.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'run-decide-gates-'));
 
@@ -503,8 +501,6 @@ test('it refuses --github without a step summary file', async () => {
   ]);
 });
 
-// the real entry point, with the repo's manifest and the step files from its environment, as CI
-// runs it
 test('it skips the provider and full gates for a docs-only commit when run as the CLI with --github', async () => {
   const ctx = await setupTest();
 

@@ -33,10 +33,8 @@ interface StubJobResult {
 }
 
 export interface StubActionsScheduler {
-  // starts a run of the workflow for the event, and returns its id
   readonly startRun: (github: StubGitHubContext) => number;
 
-  // ends a job the scheduler started
   readonly finishJob: (runID: number, job: string, result: StubJobResult) => void;
 
   readonly getRun: (runID: number) => StubRun;
@@ -176,8 +174,6 @@ function updateToCancelled(state: SchedulerState, holder: Holder): void {
   });
 }
 
-// starts each waiting job whose needs have ended, and ends each run whose jobs all have, until
-// nothing changes
 function updateRuns(state: SchedulerState): void {
   let changed = true;
 

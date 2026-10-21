@@ -15,7 +15,6 @@ interface StubR2Bucket {
   readonly put: (key: string, value: string) => Promise<R2ObjectFields>;
 }
 
-// Stand-in for R2 get/put over an in-memory text map, typed by @cloudflare/workers-types
 export function buildStubR2Bucket(initial: Readonly<Record<string, string>> = {}): StubR2Bucket {
   const objects = new Map(Object.entries(initial));
 

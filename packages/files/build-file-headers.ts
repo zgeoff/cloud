@@ -11,9 +11,8 @@ const inlineTypes = new Set([
   'video/webm',
 ]);
 
-// A file's response headers: an inline type keeps its type, and anything else, SVG and HTML too,
-// is an application/octet-stream attachment. Caches keep a file 5 minutes at most, so a removed or
-// expired file soon leaves Cloudflare's cache.
+// SVG and HTML can run script, so they go out as attachments. Caches keep a file 5 minutes at most,
+// so a removed or expired file soon leaves Cloudflare's cache.
 export function buildFileHeaders(upload: Pick<Upload, 'contentType' | 'filename'>) {
   const inline = inlineTypes.has(upload.contentType);
 

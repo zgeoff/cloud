@@ -9,7 +9,7 @@ async function setupTest() {
 
   onTestFinished(() => rm(root, { recursive: true, force: true }));
 
-  // the directories that hold the stack config and the three restore Jobs, which every checkout has
+  // every checkout has these directories, so the writer never creates them
   await mkdir(join(root, 'infra'));
   await mkdir(join(root, 'images', 'atc-gateway'), { recursive: true });
   await mkdir(join(root, 'deploy', 'nixie'), { recursive: true });

@@ -16,8 +16,7 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { createFilesBackupJob } from './create-files-backup-job.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
-// the tunnel ingress for the service's public hostname: cloudflared sends every path of it to the
-// service's in-cluster URL
+// cloudflared sends every path of hostname to service
 export interface FilesRoute {
   readonly hostname: string;
   readonly service: Output<string>;
@@ -27,8 +26,6 @@ interface FilesOutputs {
   readonly route: FilesRoute;
 }
 
-// The files service (GEO-1364): one pod on its own volume, behind a ClusterIP Service that the
-// tunnel's cloudflared sends files.geoff.cloud to.
 export function createFiles(cluster: Provider, inputs: FilesInputs): FilesOutputs {
   const ns = createNamespace('files', cluster);
   const namespace = ns.metadata.name;

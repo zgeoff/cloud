@@ -1,6 +1,5 @@
-// A stand-in for the service's writeBytes on a volume that fills during the write: it writes the
-// file's first byte to path, as a real write does before the volume runs out, then fails with the
-// real ENOSPC that a write to /dev/full raises.
+// a real write to a volume that fills puts its first bytes down before it fails, and a write to
+// /dev/full raises the real ENOSPC
 export function buildStubFullVolumeWrite(): (path: string, file: Blob) => Promise<unknown> {
   return writeToFullVolume;
 }

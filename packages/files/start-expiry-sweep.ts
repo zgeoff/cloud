@@ -1,7 +1,6 @@
 import type { UploadStore } from './create-upload-store.ts';
 import { runExpirySweep } from './run-expiry-sweep.ts';
 
-// how often the sweep runs after the one at start
 const sweepIntervalMs = 60 * 60 * 1000;
 
 interface ExpirySweepSchedule {

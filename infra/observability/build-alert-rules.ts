@@ -49,8 +49,8 @@ const impdRules: readonly AlertRule[] = [
   },
 ];
 
-// The hourly host build lag check (nixos/modules/host-build-lag.nix): a merged change to the host
-// waits for a person to switch it. Three missed checks, or no check metric, fire the stale rule.
+// written hourly by a host timer (nixos/modules/host-build-lag.nix), so 3 hours is three missed
+// checks
 const hostBuildLagRules: readonly AlertRule[] = [
   {
     alert: 'HostBehindLatestBuild',
@@ -107,9 +107,8 @@ const impHealthRule: AlertRule = {
   },
 };
 
-// A container restarted in the last 10 minutes and its last end was an OOM kill: Grafana
-// at its old 256Mi limit restarted 9 times this way with no alert, since KubePodCrashLooping
-// needs a back-off that spaced restarts never hold. One alert per container.
+// Grafana at a 256Mi limit restarted 9 times on OOM kills with no alert, since
+// KubePodCrashLooping needs a back-off that spaced restarts never hold.
 const oomKilledRule: AlertRule = {
   alert: 'ContainerOOMKilled',
   expr: [

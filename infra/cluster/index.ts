@@ -13,7 +13,6 @@ import { createNixie } from './nixie.ts';
 import type { OnePasswordConnectInputs } from './onepassword-connect.ts';
 import { createOnePasswordConnect } from './onepassword-connect.ts';
 
-// the cluster's Kubernetes provider, with the port-forward guard registered first
 export { createClusterProvider } from './create-cluster-provider.ts';
 
 interface ClusterInputs {
@@ -21,20 +20,18 @@ interface ClusterInputs {
   // gateway pod's cloudflared sidecar runs
   readonly atcGateway?: { readonly inputs: ATCGatewayInputs; readonly tunnelToken: Output<string> };
 
-  // 1Password Connect for imps (GEO-120)
   readonly onePasswordConnect: OnePasswordConnectInputs;
 
-  // set only after the owner approves the deploy (GEO-343)
+  // set only after the owner approves the deploy
   readonly nixie?: NixieInputs;
 
-  // set only after the owner approves the deploy (GEO-1364)
+  // set only after the owner approves the deploy
   readonly files?: FilesInputs;
 
   // geoff.cloud's zone, for nixie's DNS record
   readonly zoneID: Output<string>;
 }
 
-// the gateway's and Connect's outputs, and nixie's
 interface ClusterOutputs {
   readonly atcGatewayServiceURL?: Output<string>;
   readonly atcGatewayRoute?: ATCGatewayRoute;
@@ -43,13 +40,9 @@ interface ClusterOutputs {
 
   // the in-cluster URL of nixie's readiness report, for the probe of its advisory parts
   readonly nixieReadinessURL?: string;
-
-  // the files service's public hostname and in-cluster URL, for its tunnel route
   readonly filesRoute?: FilesRoute;
 }
 
-// Workloads on the geoffcloud k3s cluster (#6, #7). index.ts builds the cluster's Provider, which
-// reaches the k3s API over the tailnet with the kubeconfig from op://cloud/k3s-kubeconfig.
 export function createCluster(cluster: Provider, inputs: ClusterInputs): ClusterOutputs {
   createK3sNamespacePatches(cluster);
   createK3sNamespaceEgressDenies(cluster);

@@ -34,7 +34,6 @@ export async function checkNixieStream(
     return 1;
   }
 
-  // a check that throws still revokes its session
   const passed = await checkStream(options, session).catch((error: unknown) => {
     options.printErr(`check-nixie-stream: the check stopped: ${String(error)}\n`);
 

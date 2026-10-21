@@ -1,7 +1,5 @@
 import { readFile } from 'node:fs/promises';
 
-// One path gate of .github/gates.yml: the check it names runs when a changed file matches one of
-// its paths and none of its ignore globs.
 export interface Gate {
   readonly name: string;
   readonly paths: readonly string[];
@@ -13,8 +11,8 @@ export interface Gate {
 
 export type GateManifest = ReadonlyMap<string, Gate>;
 
-// Reads and checks the manifest, and throws on any shape it does not know, such as a gate with no
-// paths or a key it never reads, so a typo fails the caller instead of skipping a check.
+// throws on any shape it does not know, such as a gate with no paths or a key it never reads, so a
+// typo fails the caller instead of skipping a check
 export async function loadGateManifest(path: string): Promise<GateManifest> {
   const text = await readFile(path, 'utf8');
 

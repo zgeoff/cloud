@@ -5,7 +5,6 @@ import { bindingNames } from './binding-names.ts';
 import { targetsSchema } from './targets-schema.ts';
 import type { Target } from './targets-schema.ts';
 
-// the R2 binding's calls that the Worker makes
 interface StateBucket {
   readonly get: (key: string) => Promise<Pick<R2ObjectBody, 'text'> | null>;
   readonly put: (key: string, value: string) => Promise<unknown>;

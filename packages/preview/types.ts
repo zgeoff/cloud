@@ -5,7 +5,8 @@ import type { PreviewStore } from './create-preview-store.ts';
 export interface PreviewSettings {
   readonly baseURL: string;
 
-  // owner/name of each repository whose pull requests get previews, or owner/* for an owner's
+  // owner/name of each repository whose pull requests get previews, or owner/* for every
+  // repository of an owner
   readonly repos: ReadonlySet<string>;
 
   readonly slots: number;

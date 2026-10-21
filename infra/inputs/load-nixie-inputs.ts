@@ -13,7 +13,6 @@ import type {
   StackConfig,
 } from './types.ts';
 
-// why each of nixie's secrets is required, for requireVariable's error
 const nixieNeed = 'nixie needs it while stack config "nixie" is set';
 
 // a missing field reaches its own check below, which names what the field must hold
@@ -24,9 +23,7 @@ const nixieConfigSchema = z.object({
   backupImage: z.unknown().optional(),
 });
 
-// nixie's inputs, or nothing while nixie is unset (setting it approves the deploy). Secrets come
-// from .env, plus Pulumi's CLOUDFLARE_API_TOKEN for DNS-01. NIXIE_RESTIC_* and NIXIE_R2_* add the
-// backup, in the gateway's backup image and with the gateway's pull credential.
+// setting stack config "nixie" approves the deploy; NIXIE_RESTIC_* and NIXIE_R2_* add the backup
 export function loadNixieInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
@@ -69,7 +66,7 @@ export function loadNixieInputs(
   };
 }
 
-// all backup variables set, or no backup; findResticBackup throws on a partial set
+// all backup variables set, or no backup; a partial set throws
 function findBackup(
   env: Environment,
   backupImage: BackupImage | undefined,

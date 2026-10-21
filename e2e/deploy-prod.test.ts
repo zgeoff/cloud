@@ -11,9 +11,6 @@ import { isActionsConditionMet } from '../scripts/test-utils/is-actions-conditio
 import { renderActionsTemplate } from '../scripts/test-utils/render-actions-template.ts';
 import { runActionsStep } from '../scripts/test-utils/run-actions-step.ts';
 
-// The Deploy prod workflow's runs through a stand-in for GitHub's scheduler: each test plays the
-// runner, ending every job the scheduler starts with the result and outputs its steps give, which
-// the suites of decide-prod-apply.sh and decide-prod-outcome.sh cover.
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'deploy-prod-'));
 
@@ -44,8 +41,6 @@ async function setupTest() {
   };
 }
 
-// the outcome step runs its real command with the env the workflow gives it, after a guard that
-// held the plan of a push
 test('it ends a held push s run green as held, from the workflow s own outcome step, and alerts the hold', async () => {
   const ctx = await setupTest();
 
@@ -84,9 +79,6 @@ test('it ends a held push s run green as held, from the workflow s own outcome s
   });
 });
 
-// the refresh step runs its real command with real Bun, the real refresh-prod.sh and the real
-// retry, from a workspace that links this checkout's package.json and scripts/; only op, pulumi and
-// the retry's pause are stand-ins
 test('it refreshes the prod stack from the workflow s own refresh step, again after a cloudflare 502 to a get', async () => {
   const ctx = await setupTest();
 
@@ -483,8 +475,6 @@ test('it keeps the apply green and alerts when the check of nixie s API fails', 
   });
 });
 
-// the check job's own step runs its real command with the env the workflow gives it, from the
-// apply job's outputs
 test.each([
   ['success', 'success'],
   ['failure', 'failure'],

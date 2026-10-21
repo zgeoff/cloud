@@ -19,8 +19,6 @@ export interface FilesServiceInputs {
   // the public origin, such as https://files.geoff.cloud, with no trailing slash
   readonly publicURL: string;
   readonly now: () => Date;
-
-  // the bytes still free on the volume
   readonly readFreeBytes: () => number;
 
   // writes an upload's bytes to a path on the volume, as Bun.write does
@@ -41,9 +39,6 @@ interface RequestContext {
   readonly request: Request;
 }
 
-// The service: GET /<id>/<filename> serves a file that has not expired, GET /healthz answers ok,
-// and /api/files is the API (files-contract.ts). Every other path is 404. At start it removes what
-// a stopped run left: a half-written file in incoming/, and a file in files/ without a row.
 export function createFilesService(inputs: FilesServiceInputs) {
   const filesDir = join(inputs.dataDir, 'files');
   const incomingDir = join(inputs.dataDir, 'incoming');
@@ -107,7 +102,6 @@ interface FileParams {
   readonly filename: string;
 }
 
-// a live upload's file, or 404 for an unknown id, another filename, or an expired upload
 async function readFileResponse(inputs: FileReadInputs, params: FileParams): Promise<Response> {
   const upload = fileIDPattern.test(params.id) ? inputs.store.findUpload(params.id) : null;
   const file = Bun.file(join(inputs.filesDir, params.id));

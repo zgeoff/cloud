@@ -3,9 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { isWorkflowTriggered } from '../scripts/test-utils/is-workflow-triggered.ts';
 
-// The release bump merge workflow's workflow_run trigger through a stand-in for GitHub's trigger
-// filters: a finished check on a release check branch starts a run, and one on any other branch
-// starts none, so it bills nothing.
+// a run started by a check on any branch but a release check branch would bill for nothing
 async function setupTest() {
   const workflowText = await readFile(
     join(import.meta.dir, '..', '.github', 'workflows', 'release-bump-merge.yml'),

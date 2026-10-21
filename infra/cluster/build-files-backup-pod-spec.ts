@@ -4,7 +4,6 @@ interface FilesBackupPodInputs {
   // the image with restic and sqlite3 that runs the script
   readonly image: string;
 
-  // the files service's data claim, mounted at STATE_DIR
   readonly claim: string;
 
   // the ConfigMap that holds deploy/files/backup/backup.sh
@@ -17,12 +16,11 @@ interface FilesBackupPodInputs {
   readonly pullSecret: string;
 }
 
-// The backup Job's pod: deploy/files/backup/backup.sh's `backup`, run in the backup image with the
-// files service's claim at /state, as the service's own user, so a restore leaves files the service
-// can open. The command replaces the image's own entrypoint, which backs up the atc gateway.
 export function buildFilesBackupPodSpec(inputs: FilesBackupPodInputs) {
   return {
     restartPolicy: 'OnFailure',
+
+    // the files service's own user, so a restore leaves files the service can open
     securityContext: {
       runAsNonRoot: true,
       runAsUser: 65_532,
@@ -36,6 +34,8 @@ export function buildFilesBackupPodSpec(inputs: FilesBackupPodInputs) {
       {
         name: 'backup',
         image: inputs.image,
+
+        // the image's own entrypoint backs up the atc gateway
         command: ['/bin/sh', '/opt/files-backup/backup.sh'],
         args: ['backup'],
         env: [

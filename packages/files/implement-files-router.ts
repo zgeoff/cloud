@@ -17,32 +17,25 @@ const reserveBytes = 64 * 1024 * 1024;
 
 export interface FilesRouterInputs {
   readonly store: UploadStore;
-
-  // each upload's file, under its id
   readonly filesDir: string;
 
-  // an upload's file while it is written, before it moves into filesDir
+  // an upload's file while it is written, before it moves into place
   readonly incomingDir: string;
 
   // the public origin, such as https://files.geoff.cloud, with no trailing slash
   readonly publicURL: string;
   readonly now: () => Date;
-
-  // the bytes still free on the volume
   readonly readFreeBytes: () => number;
 
   // writes an upload's bytes to a path on the volume, as Bun.write does
   readonly writeBytes: (path: string, file: Blob) => Promise<unknown>;
 }
 
-// the role the request's bearer token names, or undefined for no token or an unknown one
+// role is undefined for no token or an unknown one
 export interface FilesContext {
   readonly role: Role | undefined;
 }
 
-// The API's procedures. Every call needs a role token: owner may do everything, and agent may
-// upload with an expiry of 30 days at most, and list, read and remove agent uploads only. An
-// owner upload is not found for agent, and expire is the owner's alone.
 export function implementFilesRouter(inputs: FilesRouterInputs) {
   const os = implement(filesContract)
     .$context<FilesContext>()
@@ -123,7 +116,7 @@ export function implementFilesRouter(inputs: FilesRouterInputs) {
     remove: os.remove.handler((options) => {
       const upload = requireVisibleUpload(inputs.store, options.input.id, options.context.role);
 
-      // the file first, then the row, as the sweep removes them
+      // the file first, then the row, so a stopped removal never leaves a file without a row
       rmSync(join(inputs.filesDir, upload.id), { force: true });
 
       inputs.store.removeUpload(upload.id);
@@ -171,8 +164,7 @@ interface WrittenFile {
   readonly sha256: string;
 }
 
-// Writes the file into incomingDir, hashes it and reads its type, then moves it into filesDir
-// under a new id, so filesDir never holds part of a file. A failed write leaves nothing behind.
+// the file moves into filesDir only once whole, so filesDir never holds part of a file
 async function writeFile(
   file: Blob,
   dirs: Pick<FilesRouterInputs, 'filesDir' | 'incomingDir' | 'writeBytes'>,

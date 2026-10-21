@@ -1,6 +1,5 @@
-// The parts of a GitHub Actions workflow that decide when its jobs run: each job's needs, `if`,
-// concurrency group and outputs, and the workflow's group. It throws on concurrency or an output
-// it does not model, so a test never passes on a rule the scheduler stand-in ignores.
+// It throws on concurrency or an output it does not model, so a test never passes on a rule the
+// scheduler stand-in ignores.
 export interface ActionsConcurrency {
   // lowercased, since GitHub compares group names case-insensitively
   readonly group: string;
@@ -9,9 +8,8 @@ export interface ActionsConcurrency {
   readonly queue: 'single' | 'max';
 }
 
-// a job output that publishes one step's output, `${{ steps.<step>.outputs.<output> }}`
-// a step's output, or the outcome of a step, which continue-on-error leaves apart from its job's
-// result
+// a step's output, `${{ steps.<step>.outputs.<output> }}`, or the outcome of a step, which
+// continue-on-error leaves apart from its job's result
 type ActionsJobOutput =
   | { readonly kind: 'output'; readonly step: string; readonly output: string }
   | { readonly kind: 'outcome'; readonly step: string };
