@@ -194,6 +194,11 @@ of the repo's path-gate manifest lists them, not the difference between the two 
 reverts an input change while that change applies therefore still gets its own apply, and a decision
 of nothing to apply stays right after the tag moves forward.
 
+A push to `main` cancels the CI run of the push before it, as on a pull request, and a cancelled CI
+run starts no apply. The next push's run holds the cancelled commit's changes, because its decision
+counts every commit since the tag. CI's group never holds the apply job, so a new push never cancels
+an apply in progress.
+
 The job prints only each held step's op and resource name, never a resource's state, and its Pulumi
 runs suppress the stack outputs, because the repo and its logs are public.
 

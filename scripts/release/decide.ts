@@ -116,32 +116,12 @@ function findCheckHoldReason(pr: BumpPullRequest) {
     : undefined;
 }
 
-const requiredChecks: readonly {
-  readonly prefix: string;
-
-  // two workflows name their job fixture
-  readonly workflow: string;
-  readonly name: string;
-}[] = [
-  { prefix: '', workflow: 'CI', name: 'ci' },
-  { prefix: 'images/agent/', workflow: 'agent image', name: 'check' },
-  { prefix: 'images/atc-gateway/', workflow: 'atc-gateway images', name: 'fixture' },
-  { prefix: 'infra/Pulumi.prod.yaml', workflow: 'nixie backup', name: 'fixture' },
-];
-
 function findRequiredCheckHoldReason(pr: BumpPullRequest) {
-  // a path-triggered workflow can register its check after another workflow finishes, and the
-  // ruleset requires only `ci`, so a check the changed files start must have passed
-  const missing = requiredChecks.find(
-    (check) =>
-      (check.prefix === '' || pr.files.some((file) => file.startsWith(check.prefix))) &&
-      !pr.checkRuns.some(
-        (run) =>
-          run.workflow === check.workflow &&
-          run.name === check.name &&
-          run.conclusion === 'SUCCESS',
-      ),
+  // CI's checks job holds every check, the lanes included, and the ruleset requires it, but it may
+  // not have registered its check run yet
+  const passedChecks = pr.checkRuns.some(
+    (run) => run.workflow === 'CI' && run.name === 'checks' && run.conclusion === 'SUCCESS',
   );
 
-  return missing === undefined ? undefined : `waiting for ${missing.name} (${missing.workflow})`;
+  return passedChecks ? undefined : 'waiting for checks (CI)';
 }

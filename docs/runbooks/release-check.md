@@ -92,16 +92,16 @@ it `needs-review` when any of these holds:
   impd before the merge, because the `Deploy prod` workflow applies the merged pin, as
   [the nixie runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd) describes.
 
-The merge workflow runs each time a check workflow finishes on a `release-check/` branch, and each
-time such a pull request gets the `auto-merge` label. The label event matters when a bump run fails
-after its push: the pull request loses the label, its checks can all finish before the next run puts
-the label back, and no later check finishes to start a merge. The workflow merges a pull request
-labelled `auto-merge` only when the release check app opened it and wrote every commit on it, it
-changes no file outside its dependency's pins, and every GitHub Actions check on its head has
-passed. A commit anyone else pushes to the branch therefore holds the pull request for a person.
-Each check that its changed files start must also have passed, because a workflow can register its
-check after another one finishes: the agent image check, the atc-gateway fixture and the nixie
-backup fixture. The merge uses the app's token, so the push to `main` starts its workflows.
+The merge workflow runs each time CI finishes on a `release-check/` branch, and each time such a
+pull request gets the `auto-merge` label. The label event matters when a bump run fails after its
+push: the pull request loses the label, its checks can all finish before the next run puts the label
+back, and no later check finishes to start a merge. The workflow merges a pull request labelled
+`auto-merge` only when the release check app opened it and wrote every commit on it, it changes no
+file outside its dependency's pins, and every GitHub Actions check on its head has passed. A commit
+anyone else pushes to the branch therefore holds the pull request for a person. CI's `checks` job
+must also have passed, because it holds every check, the agent image check and the fixtures
+included, and it can register its check run after the label event. The merge uses the app's token,
+so the push to `main` starts its workflows.
 
 ## Review a bump
 

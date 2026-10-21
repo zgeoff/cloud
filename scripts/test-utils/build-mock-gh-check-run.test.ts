@@ -13,11 +13,11 @@ test('it builds a default check run', () => {
 
 test('it applies overrides on top of the defaults', () => {
   expect(
-    buildMockGHCheckRun({ workflowName: 'CI', name: 'ci', status: 'QUEUED', conclusion: null }),
+    buildMockGHCheckRun({ workflowName: 'CI', name: 'checks', status: 'QUEUED', conclusion: null }),
   ).toStrictEqual({
     __typename: 'CheckRun',
     workflowName: 'CI',
-    name: 'ci',
+    name: 'checks',
     status: 'QUEUED',
     conclusion: null,
   });

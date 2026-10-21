@@ -242,8 +242,8 @@ entry.
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
    above its pin.
-2. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
-   its check; run it locally first to find a failure sooner.
+2. Open a PR. CI's `checks` job runs `bun run test:agent-image` on every change to the image or its
+   check; run it locally first to find a failure sooner.
 3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
