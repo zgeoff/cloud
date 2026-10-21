@@ -15,7 +15,8 @@
 # unsigned repository in apt's config, and removes apt's `is not signed` warning for each suite
 # from stderr before it compares it. It drops Docker's source, which the container cannot reach.
 # apt's stdout is its progress, whose order and timings change between runs, so no case compares
-# it. One case alone:
+# it. The suites are built on the host, so the host needs dpkg-deb; without it the suite fails
+# before any case. One case alone:
 #
 #   CASE='replaced' bash images/agent/test-install-ubuntu-packages.sh
 # shell-suite: agent-image
@@ -33,6 +34,11 @@ source "$repo/test-support/shell/create-case-tree.sh"
 source "$repo/test-support/shell/assert-status.sh"
 # shellcheck source=test-support/shell/create-stub-apt-suite.sh
 source "$repo/test-support/shell/create-stub-apt-suite.sh"
+
+if ! command -v dpkg-deb > /dev/null; then
+  echo "test-install-ubuntu-packages: dpkg-deb is not on PATH, and every case needs it" >&2
+  exit 1
+fi
 
 it_installs_a_pin_that_the_live_archive_replaced_as_the_snapshot_holds_it() {
   local image="$1" status=0 suite

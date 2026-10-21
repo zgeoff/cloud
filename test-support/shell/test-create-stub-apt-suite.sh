@@ -5,6 +5,10 @@
 # version and dependency; and one package and version is the same .deb byte for byte in two
 # archives. The agent image suite feeds these suites to the real apt.
 #
+# Every case builds a .deb with dpkg-deb. Without it on PATH the suite prints a notice and passes
+# with no case run, so a branch can push from a host that has none; CI sets CI and has dpkg-deb, so
+# there a missing dpkg-deb fails the suite instead of skipping it.
+#
 #   bash test-support/shell/test-create-stub-apt-suite.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
@@ -14,6 +18,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/create-stub-apt-suite.sh"
+
+if ! command -v dpkg-deb > /dev/null; then
+  if [ -n "${CI:-}" ]; then
+    echo "test-create-stub-apt-suite: dpkg-deb is not on PATH, and CI runs every case" >&2
+    exit 1
+  fi
+  echo "skip test-create-stub-apt-suite: dpkg-deb is not on PATH; CI runs its cases"
+  exit 0
+fi
 
 it_writes_a_packages_entry_for_each_package_with_its_deb_s_path_size_and_sha256() {
   local stub lib
