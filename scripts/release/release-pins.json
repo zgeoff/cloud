@@ -30,12 +30,12 @@
     "digest": "sha256:299830796933a3a8846db654f15cb0a23cea81127b649caf62f615520d7fc4eb"
   },
   "nixie": {
-    "version": "0.37.0",
-    "digest": "sha256:b73169ba10654cd1315672b3ff86604f453789e577ad7e0cc639b6fd269eae8c"
+    "version": "0.38.0",
+    "digest": "sha256:9248b176c2ae1a8ef0c3fca4af339d58cbe4d00443518fdd6c7f0b6188222478"
   },
   "nixie-web": {
-    "version": "0.37.0",
-    "digest": "sha256:9be02e8a3d9d0a123f3046e8f6fd31cad6f8ed5f481daef9bab76be5fa793a4a"
+    "version": "0.38.0",
+    "digest": "sha256:54f6ce291dee02b7211e85bc1f2ae7946c2a8709427b337aaec2c9ec376523b5"
   },
   "auto-mode": {
     "version": "2.0.2",
