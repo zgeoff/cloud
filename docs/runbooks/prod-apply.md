@@ -92,6 +92,16 @@ changed nothing, and so did a run whose decision printed
 `deployed/prod at <commit> already holds every Pulumi input of <revision>, so nothing applied.`
 after it waited behind a newer commit's apply.
 
+A run that has work holds the prod lock from its first drift check to its last step, so it never
+applies while the scheduled drift check reads the state
+([State and drift](../architecture/infrastructure-as-code.md#state-and-drift)). While the check
+holds the lock, the step `Take the prod lock` logs
+`hold-prod-lock: drift-check <invocation_id> holds the prod lock until <time>; asking again in 30s`
+and waits. A run whose check never released the lock fails that step with
+`hold-prod-lock: drift-check <invocation_id> still holds the prod lock after 3300s` and posts
+`The prod apply failed`. [The drift check runbook](./drift-check.md) shows how to see the holder;
+dispatch the run again once the check ends.
+
 A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
 most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
 that a newer run applied, because its apply covers every change of the cancelled one.

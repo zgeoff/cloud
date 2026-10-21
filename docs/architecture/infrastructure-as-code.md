@@ -84,6 +84,17 @@ apply job reads its own copies of both from `cloud-deploy`, because every apply 
 passphrase. [The drift check runbook](../runbooks/drift-check.md) lists each credential and its
 scope.
 
+The scheduled check and the apply job share one lock, the prod lock, so neither uses the state while
+the other does. An apply changes resources before it writes them into the state, so a check that
+refreshed during an apply would report the apply's own changes as drift. Pulumi's own state lock
+cannot serve, for two reasons: a refresh that only previews never takes it, and the check's token
+for the state bucket can only read. The prod lock is therefore a Kubernetes Lease in k3s, which both
+sides reach: the host as root, and the apply job over the tailnet with the admin kubeconfig it
+already holds. A side that finds the Lease held waits for the holder to release it. Each side holds
+the Lease for a set time, and the other side takes it over once that time runs out, so a runner that
+dies holding it blocks the scheduled check only until then. The apply job holds the lock from its
+first drift check to its last step, and the scheduled check holds it around its refresh.
+
 Some resources are declared to avoid drift on their own. The host's auth keys are single-use, so
 after the host joins they read as used, and the program never mints them again until a reinstall
 replaces them on purpose. A Service that the host dials by its cluster address pins that address and

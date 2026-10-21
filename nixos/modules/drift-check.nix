@@ -5,6 +5,14 @@
 # once that file exists, so a switch before scripts/install-drift-check-credentials.sh installs
 # it skips the check instead of failing it.
 #
+# The check holds the prod lock, which Deploy prod also takes, so neither uses the state while the
+# other does (scripts/hold-prod-lock.sh). The dynamic user cannot read k3s's admin kubeconfig, so
+# root takes the lock before the check and releases it after, with scripts/hold-host-prod-lock.sh
+# in ExecStartPre and ExecStopPost. The take writes its status to the service's runtime directory,
+# where scripts/run-host-drift-check.sh reads it. Both run with `-`, so a take that fails still
+# leaves the check to post the failed alert, and a release that fails leaves the run's status as
+# it is: the lease runs out on its own.
+#
 # The check runs from a tree in the store with the layout the scripts expect: scripts/, infra/
 # with the project file and a stack file that holds only the state's encryption salt, and
 # provider/bin with the Onidel provider that the project file names. A refresh that runs no
@@ -23,6 +31,11 @@
 let
   cfg = config.services.drift-check;
   stateDir = "/var/lib/drift-check";
+  lockStatusFile = "/run/drift-check/lock-status";
+  # root's HOME, so kubectl keeps its cache out of the dynamic user's state directory
+  holdLock =
+    verb:
+    "-+${pkgs.coreutils}/bin/env HOME=/root KUBECONFIG=${cfg.kubeconfig} ${pkgs.bash}/bin/bash ${tree}/scripts/hold-host-prod-lock.sh ${verb}";
 
   stackLines = lib.splitString "\n" (builtins.readFile ../../infra/Pulumi.prod.yaml);
   salt =
@@ -36,6 +49,8 @@ let
     cp ${../../scripts/check-scheduled-drift.sh} $out/scripts/check-scheduled-drift.sh
     cp ${../../scripts/retry-transient-pulumi.sh} $out/scripts/retry-transient-pulumi.sh
     cp ${../../scripts/alert-scheduled-drift.sh} $out/scripts/alert-scheduled-drift.sh
+    cp ${../../scripts/hold-prod-lock.sh} $out/scripts/hold-prod-lock.sh
+    cp ${../../scripts/hold-host-prod-lock.sh} $out/scripts/hold-host-prod-lock.sh
     cp ${../../infra/Pulumi.yaml} $out/infra/Pulumi.yaml
     printf '%s\n' ${lib.escapeShellArg salt} > $out/infra/Pulumi.prod.yaml
     ln -s ${cfg.onidelProvider}/bin/pulumi-resource-onidel $out/provider/bin/pulumi-resource-onidel
@@ -54,10 +69,16 @@ in
       '';
     };
 
-    repo = lib.mkOption {
+    kubeconfig = lib.mkOption {
       type = lib.types.str;
-      default = "zgeoff/cloud";
-      description = "The GitHub repository whose Deploy prod runs the check waits for.";
+      default = "/etc/rancher/k3s/k3s.yaml";
+      description = "The admin kubeconfig that root takes and releases the prod lock with.";
+    };
+
+    kubectl = lib.mkOption {
+      type = lib.types.package;
+      default = pkgs.kubectl;
+      description = "The kubectl that takes and releases the prod lock.";
     };
 
     schedule = lib.mkOption {
@@ -89,7 +110,12 @@ in
   config = lib.mkIf cfg.enable {
     systemd.services.drift-check = {
       description = "scheduled drift check of the prod stack";
-      after = [ "network-online.target" ];
+      # k3s's unit reports ready only once its API server answers, so a run that the timer starts
+      # at boot waits for the API the prod lock lives in
+      after = [
+        "network-online.target"
+        "k3s.service"
+      ];
       wants = [ "network-online.target" ];
       path = [
         cfg.pulumi
@@ -98,26 +124,29 @@ in
         pkgs.curl
         pkgs.gnugrep
         pkgs.jq
+        cfg.kubectl
       ];
       environment = {
         HOME = stateDir;
         PULUMI_HOME = "${stateDir}/pulumi";
         PULUMI_SKIP_UPDATE_CHECK = "true";
         RUN_HOST = config.networking.hostName;
-        GITHUB_API_URL = "https://api.github.com";
-        REPO = cfg.repo;
+        LOCK_STATUS_FILE = lockStatusFile;
       };
       unitConfig.ConditionPathExists = cfg.credentialsFile;
       serviceConfig = {
         Type = "oneshot";
+        ExecStartPre = holdLock "take";
         ExecStart = "${pkgs.bash}/bin/bash ${tree}/scripts/run-host-drift-check.sh";
+        ExecStopPost = holdLock "release";
         LoadCredential = [ "drift-check:${cfg.credentialsFile}" ];
-        # two waits for a Deploy prod run and two checks, each under its own limit, with room for
-        # the alert
+        # the wait for the prod lock, up to 6300 s, and the check, up to 2700 s, with room for the
+        # alert
         TimeoutStartSec = "3h";
         DynamicUser = true;
         StateDirectory = "drift-check";
         StateDirectoryMode = "0700";
+        RuntimeDirectory = "drift-check";
         ExecPaths = [ "/var/lib/private/drift-check" ];
         NoNewPrivileges = true;
         ProtectSystem = "strict";

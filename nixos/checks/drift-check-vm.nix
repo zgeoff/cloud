@@ -4,7 +4,8 @@
 # in the build sandbox, which never mounts the state directory as systemd does.
 #
 # No case reaches the internet: the state is a local backend in the store, the random provider's
-# plugin sits in the state directory as a download leaves it, and GitHub is a dead loopback port.
+# plugin sits in the state directory as a download leaves it, and kubectl is
+# test-support/shell/create-stub-kubectl.sh, whose store under /run/stub-kube holds the prod lock.
 # The check runs the module's tree with one change: its stack file holds the fixture's salt, which
 # matches the fixture's passphrase. Discord is test-support/shell/start-stub-discord-webhook.sh on loopback.
 # It needs KVM: run `bun run test:nixos drift-check-vm`.
@@ -21,6 +22,28 @@ let
       ../../test-support/shell/wait-for.sh
     ];
   };
+  # the kubectl stand-in, with the tools it runs on its PATH, since the unit's PATH has no flock
+  stubKubectl =
+    let
+      source = lib.fileset.toSource {
+        root = ../../test-support/shell;
+        fileset = ../../test-support/shell/create-stub-kubectl.sh;
+      };
+    in
+    pkgs.runCommand "stub-kubectl" { nativeBuildInputs = [ pkgs.makeWrapper ]; } ''
+      mkdir -p $out/bin $out/libexec
+      source ${source}/create-stub-kubectl.sh
+      create_stub_kubectl $out/libexec /run/stub-kube /run/stub-kube/calls
+      makeWrapper $out/libexec/kubectl $out/bin/kubectl --prefix PATH : ${
+        lib.makeBinPath [
+          pkgs.bash
+          pkgs.coreutils
+          pkgs.jq
+          pkgs.util-linux
+        ]
+      }
+    '';
+  lease = "/run/stub-kube/kube-system/cloud-prod-state.json";
   pulumi = pkgs.callPackage ../packages/pulumi.nix { };
   passphrase = "example-fixture-passphrase";
   invocationRef = "on machine: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=";
@@ -103,11 +126,11 @@ pkgs.testers.runNixOSTest {
       services.drift-check = {
         enable = true;
         credentialsFile = "/etc/drift-check/credentials";
+        kubectl = stubKubectl;
+        kubeconfig = "/etc/stub-kubeconfig";
       };
       systemd.services.drift-check.serviceConfig.ExecStart =
         lib.mkForce "${pkgs.bash}/bin/bash ${tree}/scripts/run-host-drift-check.sh";
-      # a dead loopback port, so GitHub never answers, whether or not the VM reaches the internet
-      systemd.services.drift-check.environment.GITHUB_API_URL = lib.mkForce "http://127.0.0.1:1";
       virtualisation.memorySize = 2048;
     };
 
@@ -129,7 +152,11 @@ pkgs.testers.runNixOSTest {
 
 
     def script_lines(journal):
-        return [line for line in journal.splitlines() if line.startswith("run-host-drift-check: ")]
+        return [line for line in journal.splitlines() if line.startswith(("run-host-drift-check: ", "hold-prod-lock: "))]
+
+
+    def lease():
+        return json.loads(machine.succeed("cat ${lease}"))
 
 
     machine.wait_for_unit("multi-user.target")
@@ -182,13 +209,15 @@ pkgs.testers.runNixOSTest {
             f"chmod 0755 {plugin}",
         )
 
-        status, _, journal = run_check()
+        status, invocation, journal = run_check()
 
         assert status == 0, f"the check exited {status}"
         assert script_lines(journal) == [
-            "run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway",
+            f"hold-prod-lock: took the prod lock as drift-check {invocation}",
             "run-host-drift-check: no drift",
+            f"hold-prod-lock: released the prod lock as drift-check {invocation}",
         ], script_lines(journal)
+        assert "holderIdentity" not in lease()["spec"], lease()
         assert "    2 unchanged" in journal.splitlines(), "the refresh did not read both resources"
         errors = [line for line in journal.splitlines() if "error" in line]
         assert errors == [], errors
@@ -203,12 +232,36 @@ pkgs.testers.runNixOSTest {
         assert status == 1, f"the check exited {status}"
         assert "fork/exec /var/lib/drift-check/pulumi/plugins/resource-random-v4.21.2/pulumi-resource-random: permission denied" in journal, "the plugin started"
         assert script_lines(journal) == [
-            "run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway",
-            "run-host-drift-check: GitHub did not list the Deploy prod runs; reporting the check as it ended",
+            f"hold-prod-lock: took the prod lock as drift-check {invocation}",
             "run-host-drift-check: posted the failed alert",
+            f"hold-prod-lock: released the prod lock as drift-check {invocation}",
         ], script_lines(journal)
         assert machine.succeed("cat /run/stub-discord/requests") == "POST /api/webhooks/1/example-token\n"
         body = json.loads(machine.succeed("cat /run/stub-discord/bodies/1.json"))
         assert body == {"content": f"The scheduled drift check failed: ${invocationRef}{invocation}"}, body
+        machine.succeed("rm -r /run/stub-discord/requests /run/stub-discord/bodies")
+
+
+    with subtest("it waits while a Deploy prod run holds the prod lock, then checks and posts no drift alert"):
+        machine.succeed(f"chmod 0755 {plugin}")
+        # a Deploy prod run's hold that runs out 10 s from now, so the check's first ask finds it held
+        machine.succeed(
+            "${pkgs.jq}/bin/jq --arg now \"$(date -u -d '-5990 seconds' +%Y-%m-%dT%H:%M:%S.000000Z)\" "
+            "'.spec = {holderIdentity: \"deploy-prod 4321\", leaseDurationSeconds: 6000, acquireTime: $now, renewTime: $now}' "
+            "${lease} > /run/held.json && mv /run/held.json ${lease}"
+        )
+
+        status, invocation, journal = run_check()
+
+        assert status == 0, f"the check exited {status}"
+        lines = script_lines(journal)
+        assert lines[0].startswith("hold-prod-lock: deploy-prod 4321 holds the prod lock until "), lines
+        assert lines[1:] == [
+            "hold-prod-lock: deploy-prod 4321 let the prod lock run out at " + lines[0].split(" until ")[1].split(";")[0] + "; taking it over",
+            f"hold-prod-lock: took the prod lock as drift-check {invocation}",
+            "run-host-drift-check: no drift",
+            f"hold-prod-lock: released the prod lock as drift-check {invocation}",
+        ], lines
+        machine.fail("test -e /run/stub-discord/requests")
   '';
 }
