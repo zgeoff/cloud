@@ -72,7 +72,7 @@ test('it ends a held push s run green as held, from the workflow s own outcome s
 
   expect(ctx.scheduler.getRun(held)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'success', alert: 'in_progress' },
+    jobs: { apply: 'success', check: 'skipped', alert: 'in_progress' },
   });
 });
 
@@ -364,6 +364,14 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       run: 'bun run ci:move-deployed-prod "$REVISION"',
     },
     {
+      name: "Check nixie's API",
+      ref: undefined,
+      path: undefined,
+      workingDirectory: 'program',
+      program: undefined,
+      run: 'bun run ci:check-nixie-api',
+    },
+    {
       name: 'Release the prod lock',
       ref: undefined,
       path: undefined,
@@ -388,12 +396,12 @@ test('it starts a waiting push s run as soon as a held run ends', async () => {
 
   expect(laterBeforeTheHold).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'pending', alert: 'waiting' },
+    jobs: { apply: 'pending', check: 'waiting', alert: 'waiting' },
   });
 
   expect(ctx.scheduler.getRun(later)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'in_progress', alert: 'waiting' },
+    jobs: { apply: 'in_progress', check: 'waiting', alert: 'waiting' },
   });
 });
 
@@ -411,11 +419,50 @@ test('it completes a later push s run that applies after a held run, with no ale
   ctx.scheduler.finishJob(later, 'apply', {
     status: 'success',
     steps: { outcome: { outcome: 'apply' } },
+    outcomes: { nixie_check: 'success' },
   });
+
+  ctx.scheduler.finishJob(later, 'check', { status: 'success' });
 
   expect(ctx.scheduler.getRun(later)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'success', alert: 'skipped' },
+    jobs: { apply: 'success', check: 'success', alert: 'skipped' },
+  });
+});
+
+test('it starts the check job once an apply job that applied ends', async () => {
+  const ctx = await setupTest();
+
+  const run = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
+
+  ctx.scheduler.finishJob(run, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'apply' } },
+    outcomes: { nixie_check: 'failure' },
+  });
+
+  expect(ctx.scheduler.getRun(run)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { apply: 'success', check: 'in_progress', alert: 'waiting' },
+  });
+});
+
+test('it alerts a failed check after a passed apply', async () => {
+  const ctx = await setupTest();
+
+  const run = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
+
+  ctx.scheduler.finishJob(run, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'apply' } },
+    outcomes: { nixie_check: 'failure' },
+  });
+
+  ctx.scheduler.finishJob(run, 'check', { status: 'failure' });
+
+  expect(ctx.scheduler.getRun(run)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { apply: 'success', check: 'failure', alert: 'in_progress' },
   });
 });
 
@@ -431,7 +478,7 @@ test('it alerts a failed apply', async () => {
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'failure', alert: 'in_progress' },
+    jobs: { apply: 'failure', check: 'skipped', alert: 'in_progress' },
   });
 });
 
@@ -444,7 +491,7 @@ test('it completes a run with nothing to apply, with no alert', async () => {
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'success', alert: 'skipped' },
+    jobs: { apply: 'success', check: 'skipped', alert: 'skipped' },
   });
 });
 
@@ -462,12 +509,12 @@ test('it keeps every waiting run in the order it joined, and cancels none', asyn
 
   expect(ctx.scheduler.getRun(older)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'in_progress', alert: 'waiting' },
+    jobs: { apply: 'in_progress', check: 'waiting', alert: 'waiting' },
   });
 
   expect(ctx.scheduler.getRun(newer)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'pending', alert: 'waiting' },
+    jobs: { apply: 'pending', check: 'waiting', alert: 'waiting' },
   });
 });
 
@@ -482,7 +529,7 @@ test('it never queues the run of a failed CI run behind a running apply', async 
 
   expect(ctx.scheduler.getRun(failed)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'skipped', alert: 'skipped' },
+    jobs: { apply: 'skipped', check: 'skipped', alert: 'skipped' },
   });
 });
 
@@ -519,7 +566,7 @@ test('it starts nothing for the CI run of a pull request', async () => {
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'skipped', alert: 'skipped' },
+    jobs: { apply: 'skipped', check: 'skipped', alert: 'skipped' },
   });
 });
 
@@ -579,6 +626,7 @@ test.each([
       'Apply',
       'Check drift after the apply',
       'Move deployed/prod',
+      "Check nixie's API",
       'Release the prod lock',
     ],
   ],

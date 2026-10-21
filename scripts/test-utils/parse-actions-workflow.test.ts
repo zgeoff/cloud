@@ -72,7 +72,7 @@ test.each([
   ).toThrowWithMessage(Error, message);
 });
 
-test('it parses each job output that publishes a step s output', () => {
+test('it parses each job output that publishes a step s output or a step s outcome', () => {
   expect(
     parseActionsWorkflow(`
 jobs:
@@ -80,6 +80,7 @@ jobs:
     outputs:
       verdict: \${{ steps.guard.outputs.verdict }}
       ship-id: \${{steps.ship-it.outputs.id}}
+      smoke: \${{ steps.smoke_test.outcome }}
     runs-on: ubuntu-latest
 `).jobs,
   ).toStrictEqual([
@@ -89,8 +90,9 @@ jobs:
       condition: undefined,
       concurrency: undefined,
       outputs: {
-        verdict: { step: 'guard', output: 'verdict' },
-        'ship-id': { step: 'ship-it', output: 'id' },
+        verdict: { kind: 'output', step: 'guard', output: 'verdict' },
+        'ship-id': { kind: 'output', step: 'ship-it', output: 'id' },
+        smoke: { kind: 'outcome', step: 'smoke_test' },
       },
     },
   ]);
@@ -99,6 +101,7 @@ jobs:
 test.each([
   ['an output from another context', `\${{ needs.build.outputs.id }}`],
   ['an output built from two steps', `\${{ steps.a.outputs.id || steps.b.outputs.id }}`],
+  ['a step s conclusion', `\${{ steps.a.conclusion }}`],
 ])('it rejects %s, which the stand-in does not model', (_label, output) => {
   expect(() =>
     parseActionsWorkflow(

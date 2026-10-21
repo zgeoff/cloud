@@ -105,6 +105,29 @@ jobs:
   });
 });
 
+test('it gives a job the outcome of a step that a job it needs publishes', () => {
+  const scheduler = buildStubActionsScheduler(`
+jobs:
+  ship:
+    outputs:
+      smoke: \${{ steps.smoke_test.outcome }}
+    runs-on: ubuntu-latest
+  report:
+    needs: ship
+    if: needs.ship.outputs.smoke == 'failure'
+    runs-on: ubuntu-latest
+`);
+
+  const run = scheduler.startRun({ event_name: 'push', repository: 'zgeoff/cloud', event: {} });
+
+  scheduler.finishJob(run, 'ship', { status: 'success', outcomes: { smoke_test: 'failure' } });
+
+  expect(scheduler.getRun(run)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { ship: 'success', report: 'in_progress' },
+  });
+});
+
 test('it gives a need no output its workflow does not declare', () => {
   const scheduler = buildStubActionsScheduler(`
 jobs:
