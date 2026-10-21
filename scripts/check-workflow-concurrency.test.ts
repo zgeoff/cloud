@@ -1,45 +1,40 @@
-import { expect, mock, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { expect, mock, test } from 'bun:test';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { checkWorkflowConcurrency } from './check-workflow-concurrency.ts';
 
-async function setupTest() {
-  const directory = await mkdtemp(join(tmpdir(), 'check-workflow-concurrency-'));
-
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
-
-  await mkdir(join(directory, '.github', 'workflows'), { recursive: true });
-
+function setupTest() {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { directory, printOut, printErr };
+  return { printOut, printErr };
 }
 
 test('it accepts CI runs that cancel within a branch and an apply group that never cancels', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'ci.yml'),
-    `concurrency:
+  const files = new Map([
+    [
+      '/repo/.github/workflows/ci.yml',
+      `concurrency:
   group: ci-\${{ github.event_name }}-\${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 `,
-  );
-
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'deploy-prod.yml'),
-    `jobs:
+    ],
+    [
+      '/repo/.github/workflows/deploy-prod.yml',
+      `jobs:
   apply:
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
 `,
-  );
+    ],
+  ]);
 
   const exitCode = await checkWorkflowConcurrency({
-    args: [ctx.directory],
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -54,10 +49,11 @@ test('it accepts CI runs that cancel within a branch and an apply group that nev
 });
 
 test('it accepts the repository own workflows', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
   const exitCode = await checkWorkflowConcurrency({
     args: [join(import.meta.dir, '..')],
+    readText: (path) => readFile(path, 'utf8'),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -67,28 +63,30 @@ test('it accepts the repository own workflows', async () => {
 });
 
 test('it reports CI that cancels only pull request runs', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'ci.yml'),
-    `concurrency:
+  const files = new Map([
+    [
+      '/repo/.github/workflows/ci.yml',
+      `concurrency:
   group: ci-\${{ github.event_name }}-\${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: \${{ github.event_name == 'pull_request' }}
 `,
-  );
-
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'deploy-prod.yml'),
-    `jobs:
+    ],
+    [
+      '/repo/.github/workflows/deploy-prod.yml',
+      `jobs:
   apply:
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
 `,
-  );
+    ],
+  ]);
 
   const exitCode = await checkWorkflowConcurrency({
-    args: [ctx.directory],
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -104,22 +102,24 @@ test('it reports CI that cancels only pull request runs', async () => {
 });
 
 test('it reports CI with no concurrency group', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeFile(join(ctx.directory, '.github', 'workflows', 'ci.yml'), 'name: CI\n');
-
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'deploy-prod.yml'),
-    `jobs:
+  const files = new Map([
+    ['/repo/.github/workflows/ci.yml', 'name: CI\n'],
+    [
+      '/repo/.github/workflows/deploy-prod.yml',
+      `jobs:
   apply:
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
 `,
-  );
+    ],
+  ]);
 
   const exitCode = await checkWorkflowConcurrency({
-    args: [ctx.directory],
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -133,28 +133,30 @@ test('it reports CI with no concurrency group', async () => {
 });
 
 test('it reports an apply job whose group a new run can cancel', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
 
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'ci.yml'),
-    `concurrency:
+  const files = new Map([
+    [
+      '/repo/.github/workflows/ci.yml',
+      `concurrency:
   group: ci-\${{ github.event_name }}-\${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 `,
-  );
-
-  await writeFile(
-    join(ctx.directory, '.github', 'workflows', 'deploy-prod.yml'),
-    `jobs:
+    ],
+    [
+      '/repo/.github/workflows/deploy-prod.yml',
+      `jobs:
   apply:
     concurrency:
       group: deploy-\${{ github.ref }}
       cancel-in-progress: true
 `,
-  );
+    ],
+  ]);
 
   const exitCode = await checkWorkflowConcurrency({
-    args: [ctx.directory],
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -168,10 +170,12 @@ test('it reports an apply job whose group a new run can cancel', async () => {
 });
 
 test('it rejects more than one argument with its usage', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
+  const readText = mock<(path: string) => Promise<string>>();
 
   const exitCode = await checkWorkflowConcurrency({
-    args: [ctx.directory, 'extra'],
+    args: ['/repo', 'extra'],
+    readText,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -181,13 +185,17 @@ test('it rejects more than one argument with its usage', async () => {
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
     'usage: check-workflow-concurrency.ts [repo root]\n',
   );
+
+  expect(readText).not.toHaveBeenCalled();
 });
 
 test('it rejects an option it does not know with its usage', async () => {
-  const ctx = await setupTest();
+  const ctx = setupTest();
+  const readText = mock<(path: string) => Promise<string>>();
 
   const exitCode = await checkWorkflowConcurrency({
-    args: ['--fix', ctx.directory],
+    args: ['--fix', '/repo'],
+    readText,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -197,4 +205,6 @@ test('it rejects an option it does not know with its usage', async () => {
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
     'usage: check-workflow-concurrency.ts [repo root]\n',
   );
+
+  expect(readText).not.toHaveBeenCalled();
 });

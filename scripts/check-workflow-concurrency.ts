@@ -5,6 +5,7 @@ import { findJSONField } from './find-json-field.ts';
 
 export interface CheckWorkflowConcurrencyOptions {
   readonly args: readonly string[];
+  readonly readText: (path: string) => Promise<string>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -24,8 +25,8 @@ export async function checkWorkflowConcurrency(
 
   const workflowDir = join(root, '.github', 'workflows');
 
-  const ci = await readWorkflow(join(workflowDir, 'ci.yml'));
-  const deploy = await readWorkflow(join(workflowDir, 'deploy-prod.yml'));
+  const ci = await readWorkflow(options.readText, join(workflowDir, 'ci.yml'));
+  const deploy = await readWorkflow(options.readText, join(workflowDir, 'deploy-prod.yml'));
 
   const apply = findJSONField(findJSONField(deploy, 'jobs'), 'apply');
 
@@ -67,8 +68,11 @@ function tryParsePositionals(args: readonly string[]): string[] | null {
   }
 }
 
-async function readWorkflow(path: string): Promise<unknown> {
-  const text = await readFile(path, 'utf8');
+async function readWorkflow(
+  readText: (path: string) => Promise<string>,
+  path: string,
+): Promise<unknown> {
+  const text = await readText(path);
 
   const workflow: unknown = Bun.YAML.parse(text);
 
@@ -116,6 +120,7 @@ function collectDeployViolations(concurrency: unknown): string[] {
 if (import.meta.main) {
   process.exitCode = await checkWorkflowConcurrency({
     args: process.argv.slice(2),
+    readText: (path) => readFile(path, 'utf8'),
     printOut: (text) => {
       process.stdout.write(text);
     },
