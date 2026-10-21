@@ -300,6 +300,14 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       run: 'bun run ci:check-out-deployed-revision',
     },
     {
+      name: 'Take the prod lock',
+      ref: undefined,
+      path: undefined,
+      workingDirectory: undefined,
+      program: undefined,
+      run: 'bun run ci:hold-deploy-prod-lock take',
+    },
+    {
       name: 'Check drift from the deployed revision',
       ref: undefined,
       path: undefined,
@@ -354,6 +362,14 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       workingDirectory: undefined,
       program: undefined,
       run: 'bun run ci:move-deployed-prod "$REVISION"',
+    },
+    {
+      name: 'Release the prod lock',
+      ref: undefined,
+      path: undefined,
+      workingDirectory: undefined,
+      program: undefined,
+      run: 'bun run ci:hold-deploy-prod-lock release',
     },
   ]);
 });
@@ -470,6 +486,32 @@ test('it never queues the run of a failed CI run behind a running apply', async 
   });
 });
 
+test('it releases the prod lock after a step fails', async () => {
+  const ctx = await setupTest();
+
+  // a step with no `if` runs on success()
+  const run = ctx.steps.filter((step: unknown) => {
+    const condition = findJSONField(step, 'if') ?? 'success()';
+
+    if (typeof condition !== 'string') {
+      throw new TypeError(`a step's if is not an expression: ${JSON.stringify(condition)}`);
+    }
+
+    return isActionsConditionMet(condition, {
+      github: { event_name: 'workflow_run' },
+      needs: {},
+      steps: {
+        decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
+        guard: { outcome: 'failure', conclusion: 'failure', outputs: {} },
+      },
+    });
+  });
+
+  expect(run.map((step: unknown) => findJSONField(step, 'name'))).toStrictEqual([
+    'Release the prod lock',
+  ]);
+});
+
 test('it starts nothing for the CI run of a pull request', async () => {
   const ctx = await setupTest();
 
@@ -505,9 +547,11 @@ test.each([
       'Wait for the k3s API',
       'Install',
       'Check out the deployed revision',
+      'Take the prod lock',
       'Check drift from the deployed revision',
       'Preview and guard',
       'Decide the outcome',
+      'Release the prod lock',
     ],
   ],
   [
@@ -527,6 +571,7 @@ test.each([
       'Wait for the k3s API',
       'Install',
       'Check out the deployed revision',
+      'Take the prod lock',
       'Check drift from the deployed revision',
       'Preview and guard',
       'Decide the outcome',
@@ -534,6 +579,7 @@ test.each([
       'Apply',
       'Check drift after the apply',
       'Move deployed/prod',
+      'Release the prod lock',
     ],
   ],
 ])('it runs only the steps %s needs', async (_label, decision, outcome, expected) => {
