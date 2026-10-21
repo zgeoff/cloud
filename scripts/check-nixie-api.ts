@@ -1,3 +1,5 @@
+import type { NixieReply } from './classify-nixie-refusal.ts';
+import { classifyNixieRefusal } from './classify-nixie-refusal.ts';
 import type { NixieAPICheckCall } from './nixie-api/nixie-api-check-calls.ts';
 import type { NixieReadProcedure } from './nixie-api/nixie-procedure-kinds.ts';
 import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
@@ -47,32 +49,28 @@ async function readRefusal(
     signal: AbortSignal.timeout(30_000),
   });
 
-  const response = await options.send(request).catch((error: unknown) => new Error(String(error)));
+  const reply = await readReply(options.send, request);
+
+  return classifyNixieRefusal(reply);
+}
+
+async function readReply(
+  send: (request: Request) => Promise<Response>,
+  request: Request,
+): Promise<NixieReply> {
+  const response = await send(request).catch((error: unknown) => new Error(String(error)));
 
   if (response instanceof Error) {
-    return `failed: ${response.message}`;
+    return { kind: 'unreached', error: response.message };
   }
 
   const text = await response.text().catch(() => null);
 
   if (text === null) {
-    return `answered ${response.status} with a body that broke off`;
+    return { kind: 'broken', status: response.status };
   }
 
   const answer = await decodeNixieAnswer(response.status, text);
 
-  // the body itself never reaches the output, because a successful answer can hold private data
-  if (answer.ok) {
-    return `answered ${response.status} with an output to a call without a session`;
-  }
-
-  if (!answer.isDefined) {
-    return `answered ${response.status} with no error that nixie's contract defines, not 401 UNAUTHORIZED`;
-  }
-
-  if (response.status === 401 && answer.code === 'UNAUTHORIZED') {
-    return null;
-  }
-
-  return `answered ${response.status} ${answer.code ?? 'with no error code'}, not 401 UNAUTHORIZED`;
+  return { kind: 'answered', status: response.status, answer };
 }
