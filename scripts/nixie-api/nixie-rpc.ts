@@ -39,7 +39,14 @@ export interface NixieRequest<Procedure extends NixieProcedure> {
 
 export type NixieAnswer =
   | { readonly ok: true; readonly output: unknown }
-  | { readonly ok: false; readonly code: string | null };
+  | {
+      readonly ok: false;
+      readonly code: string | null;
+
+      // false when the body is no error that nixie's contract defines, for which oRPC makes the
+      // code up from the HTTP status, as for a proxy's own 401
+      readonly isDefined: boolean;
+    };
 
 interface NixieContext {
   readonly url: string;
@@ -86,7 +93,11 @@ export async function decodeNixieAnswer(status: number, text: string): Promise<N
   } catch (error) {
     const code: unknown = error instanceof ORPCError ? error.code : null;
 
-    return { ok: false, code: typeof code === 'string' ? code : null };
+    return {
+      ok: false,
+      code: typeof code === 'string' ? code : null,
+      isDefined: error instanceof ORPCError && error.defined,
+    };
   }
 }
 

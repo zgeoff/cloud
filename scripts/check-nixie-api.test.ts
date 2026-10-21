@@ -76,7 +76,7 @@ test('it fails on a procedure that nixie no longer serves', async () => {
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'check-nixie-api: sessions/list answered 404 with no error code, not 401 UNAUTHORIZED\n',
+    "check-nixie-api: sessions/list answered 404 with no error that nixie's contract defines, not 401 UNAUTHORIZED\n",
   );
 
   expect(ctx.printOut).toHaveBeenCalledExactlyOnceWith(
@@ -105,6 +105,41 @@ test('it fails on a call that nixie answers without a session, and never prints 
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
     'check-nixie-api: sessions/list answered 200 with an output to a call without a session\n',
+  );
+});
+
+test("it fails on a 401 that the proxy gives instead of nixie's own refusal", async () => {
+  const ctx = setupTest();
+
+  // the Status object that the Kubernetes API server answers a request it cannot authenticate with
+  server.use(
+    http.post('https://nixie.test/rpc/sessions/list', () =>
+      HttpResponse.json(
+        {
+          kind: 'Status',
+          apiVersion: 'v1',
+          metadata: {},
+          status: 'Failure',
+          message: 'Unauthorized',
+          reason: 'Unauthorized',
+          code: 401,
+        },
+        { status: 401 },
+      ),
+    ),
+  );
+
+  const exitCode = await checkNixieAPI({
+    url: 'https://nixie.test',
+    calls: [{ procedure: 'sessions/list', input: undefined }],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    "check-nixie-api: sessions/list answered 401 with no error that nixie's contract defines, not 401 UNAUTHORIZED\n",
   );
 });
 

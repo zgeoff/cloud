@@ -63,6 +63,10 @@ async function readRefusal(url: string, call: NixieAPICheckCall): Promise<string
     return `answered ${response.status} with an output to a call without a session`;
   }
 
+  if (!answer.isDefined) {
+    return `answered ${response.status} with no error that nixie's contract defines, not 401 UNAUTHORIZED`;
+  }
+
   if (response.status === 401 && answer.code === 'UNAUTHORIZED') {
     return null;
   }
