@@ -11,17 +11,18 @@ secret the file ever held. Never print a decrypted value, and never put one on a
 
 ## What holds what
 
-| Where                                              | Holds                                                           |
-| -------------------------------------------------- | --------------------------------------------------------------- |
-| vault `cloud`, item `nixie-age-host`               | the age identity that the pod holds; its public half is in sops |
-| vault `cloud`, item `nixie-age-recovery`           | the age identity that stays off the host; restores need only it |
-| vault `cloud`, item `nixie-deployment-key`         | the deployment key, 32 random bytes in base64                   |
-| vault `cloud`, item `nixie-model-credential`       | the Claude setup token behind the model profile `opus`          |
-| vault `cloud`, item `nixie-definitions-deploy-key` | git-sync's read-only deploy key for `zgeoff/nixie-definitions`  |
-| vault `cloud`, item `nixie-restic`                 | the restic password of nixie's backup repository                |
-| vault `cloud`, item `r2-nixie-backup`              | the R2 key, endpoint and bucket of nixie's backup repository    |
-| `deploy/nixie/secrets.sops.yaml`                   | the deployment key, the model credential and nixie's impd token |
-| impd                                               | the token `nixie`, the model secret and nixie's sandbox images  |
+| Where                                                | Holds                                                                                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| vault `cloud`, item `nixie-age-host`                 | the age identity that the pod holds; its public half is in sops                                                     |
+| vault `cloud`, item `nixie-age-recovery`             | the age identity that stays off the host; restores need only it                                                     |
+| vault `cloud`, item `nixie-deployment-key`           | the deployment key, 32 random bytes in base64                                                                       |
+| vault `cloud`, item `nixie-model-credential`         | the Claude setup token behind the model profile `opus`                                                              |
+| vault `cloud`, item `nixie-definitions-deploy-key`   | git-sync's read-only deploy key for `zgeoff/nixie-definitions`                                                      |
+| vault `nixie`, item `nixie-definitions-export-token` | the token nixie opens skill pull requests in `zgeoff/nixie-definitions` with                                        |
+| vault `cloud`, item `nixie-restic`                   | the restic password of nixie's backup repository                                                                    |
+| vault `cloud`, item `r2-nixie-backup`                | the R2 key, endpoint and bucket of nixie's backup repository                                                        |
+| `deploy/nixie/secrets.sops.yaml`                     | the deployment key, the model credential, nixie's impd token, the definitions export token and the owner's settings |
+| impd                                                 | the token `nixie`, the model secret and nixie's sandbox images                                                      |
 
 ## Set up the helpers
 
@@ -108,8 +109,9 @@ Check that both recipients still decrypt the file, printing only its keys:
 sops_nixie decrypt --output-type json secrets.sops.yaml | jq -c 'keys'
 ```
 
-Expect `["deployment_key","impd_token","model_credentials"]`. A new host key goes in
-`deploy/nixie/.sops.yaml`, followed by `sops_nixie updatekeys -y secrets.sops.yaml`.
+Expect `["definitions_export_token","deployment_key","impd_token","model_credentials","settings"]`.
+A new host key goes in `deploy/nixie/.sops.yaml`, followed by
+`sops_nixie updatekeys -y secrets.sops.yaml`.
 
 ## Deploy or upgrade
 

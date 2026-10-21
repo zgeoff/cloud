@@ -68,6 +68,10 @@ checkout. On a first start the seed retries until the first clone arrives. The p
 group is a supplementary group of both containers, which is what lets git-sync read its key and
 nixie read git-sync's checkout.
 
+nixie never writes to that checkout. When nixie writes a skill, it opens a pull request in
+`zgeoff/nixie-definitions` with a token from its secrets file, and git-sync brings the skill back
+once the pull request merges.
+
 nixie, not this repo, owns the definitions format:
 [nixie's definitions doc](https://github.com/zgeoff/nixie/blob/main/docs/architecture/core/definitions.md#the-definitions-format)
 defines it, and each nixie release publishes the JSON Schema of the definitions manifest.
@@ -78,7 +82,8 @@ nixie decrypts its own secrets file in its own process at start and keeps the pl
 The file is `deploy/nixie/secrets.sops.yaml`, encrypted with sops to two age recipients: the host
 key, which the pod holds, and the recovery key, which stays in 1Password and off the host. The repo
 holds only the public halves, in the sops config beside the file. The file holds the deployment key
-that wraps every record key, the model credential, nixie's impd token, and the owner's name under
+that wraps every record key, the model credential, nixie's impd token, the token nixie opens a pull
+request in the definitions repo with for each skill it writes, and the owner's name under
 `settings`, which the configuration names as `deployment:owner_name` so the name stays out of this
 public repo.
 
