@@ -68,7 +68,8 @@ let
     host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="system"} 0.000004
     # HELP host_kernel_cpu_seconds_total CPU time that was neither idle, iowait nor stolen, less the usage of the top-level cgroups: kernel threads in the root cgroup and interrupts.
     # TYPE host_kernel_cpu_seconds_total counter
-    host_kernel_cpu_seconds_total 9.099745
+    host_kernel_cpu_seconds_total 9.099750
+    # host_cgroup_cpu_removed_seconds 0.000000
   '';
 
   cases = [
@@ -202,7 +203,25 @@ let
 
         assert_equals 0 "$status" "the writer's exit status"
         assert_files_equal /dev/null stderr
-        assert_equals "host_kernel_cpu_seconds_total 9.099745" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equals "host_kernel_cpu_seconds_total 9.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+      '';
+    }
+    {
+      title = "it keeps subtracting the time of a top-level cgroup that is gone since the last write";
+      script = ''
+        mkdir home tmp out
+        ${writeTree}
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer}
+        rm -r cg/user.slice
+        printf '20.00 30.00\n' > proc/uptime
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" CGROUP_ROOT="$PWD/cg" PROC_ROOT="$PWD/proc" TEXTFILE_DIR=out ${writer} > stdout 2> stderr || status=$?
+
+        assert_equals 0 "$status" "the writer's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "host_kernel_cpu_seconds_total 29.099750" "$(grep '^host_kernel_cpu_seconds_total ' out/host_cgroup_cpu.prom)" "the kernel time"
+        assert_equals "# host_cgroup_cpu_removed_seconds 0.700000" "$(grep '^# host_cgroup_cpu_removed_seconds ' out/host_cgroup_cpu.prom)" "the removed cgroups' time"
       '';
     }
     {
@@ -283,7 +302,7 @@ let
         host_cgroup_cpu_seconds_total{cgroup="/user.slice/odd\"name.scope",mode="user"} 3e-06
         EOF
         assert_files_equal expected actual
-        assert_equals 9.099745 "$(sed -n 's/^host_kernel_cpu_seconds_total //p' metrics)" "the kernel time"
+        assert_equals 9.09975 "$(sed -n 's/^host_kernel_cpu_seconds_total //p' metrics)" "the kernel time"
         assert_equals 0 "$(sed -n 's/^node_textfile_scrape_error //p' metrics)" "the collector's scrape error"
       '';
     }

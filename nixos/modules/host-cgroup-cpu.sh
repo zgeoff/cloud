@@ -31,17 +31,12 @@ awk -v root="$root" -v proc="$proc" -v ticks_per_second="$(getconf CLK_TCK)" \
       path = ARGV[i]
       user = ""
       sys = ""
-      usage = ""
       while ((getline line < path) > 0) {
         split(line, field, " ")
-        if (field[1] == "usage_usec") usage = field[2]
         if (field[1] == "user_usec") user = field[2]
         if (field[1] == "system_usec") sys = field[2]
       }
       close(path)
-      cgroup = substr(path, length(root) + 1)
-      sub(/\/cpu\.stat$/, "", cgroup)
-      if (i > 1 && cgroup !~ /^\/[^\/]+\/[^\/]/ && usage != "") top_level_usage += usage
       if (user == "" || sys == "") {
         if (i == 1) {
           print "host-cgroup-cpu: no user_usec and system_usec in " path > "/dev/stderr"
@@ -49,12 +44,18 @@ awk -v root="$root" -v proc="$proc" -v ticks_per_second="$(getconf CLK_TCK)" \
         }
         continue
       }
+      cgroup = substr(path, length(root) + 1)
+      sub(/\/cpu\.stat$/, "", cgroup)
       if (cgroup == "") cgroup = "/"
       # systemd escapes a unit name with backslashes, such as system-serial\x2dgetty.slice
       gsub(/\\/, "\\\\", cgroup)
       gsub(/"/, "\\\"", cgroup)
       printf "host_cgroup_cpu_seconds_total{cgroup=\"%s\",mode=\"user\"} %.6f\n", cgroup, user / 1000000
       printf "host_cgroup_cpu_seconds_total{cgroup=\"%s\",mode=\"system\"} %.6f\n", cgroup, sys / 1000000
+      if (cgroup ~ /^\/[^\/]+$/) {
+        usage[cgroup] = sprintf("%.6f", user / 1000000) + sprintf("%.6f", sys / 1000000)
+        top_level_usage += usage[cgroup]
+      }
     }
 
     if ((getline line < (proc "/uptime")) > 0) {
@@ -72,21 +73,37 @@ awk -v root="$root" -v proc="$proc" -v ticks_per_second="$(getconf CLK_TCK)" \
       print "host-cgroup-cpu: no uptime, CPUs and btime in " proc > "/dev/stderr"
       exit 1
     }
-    kernel = cpus * uptime - not_running / ticks_per_second - top_level_usage / 1000000
+
+    removed = 0
+    last_kernel = 0
+    if (last_written >= booted) {
+      while ((getline line < last) > 0) {
+        split(line, field, " ")
+        if (field[1] == "host_kernel_cpu_seconds_total") last_kernel = field[2] + 0
+        if (field[1] == "#" && field[2] == "host_cgroup_cpu_removed_seconds") removed = field[3] + 0
+        if (index(field[1], "host_cgroup_cpu_seconds_total{cgroup=\"") == 1) {
+          cgroup = substr(field[1], length("host_cgroup_cpu_seconds_total{cgroup=\"") + 1)
+          cgroup = substr(cgroup, 1, index(cgroup, "\",mode=\"") - 1)
+          if (cgroup ~ /^\/[^\/]+$/) last_usage[cgroup] += field[2]
+        }
+      }
+    }
+    # a top-level cgroup can go, such as user.slice after its last session, and its time goes with
+    # it, so the last time of each one gone or started afresh since the last write stays subtracted
+    for (cgroup in last_usage) {
+      if (!(cgroup in usage) || usage[cgroup] < last_usage[cgroup]) removed += last_usage[cgroup]
+    }
+    kernel = cpus * uptime - not_running / ticks_per_second - top_level_usage - removed
 
     # iowait can read lower than at the last read, and each column rounds to a tick, so the
     # difference can dip; a counter that drops reads as a reset, so the last count from this boot
     # holds until the reading passes it
-    if (last_written >= booted) {
-      while ((getline line < last) > 0) {
-        split(line, field, " ")
-        if (field[1] == "host_kernel_cpu_seconds_total" && field[2] + 0 > kernel) kernel = field[2] + 0
-      }
-    }
+    if (last_kernel > kernel) kernel = last_kernel
 
     print "# HELP host_kernel_cpu_seconds_total CPU time that was neither idle, iowait nor stolen, less the usage of the top-level cgroups: kernel threads in the root cgroup and interrupts."
     print "# TYPE host_kernel_cpu_seconds_total counter"
     printf "host_kernel_cpu_seconds_total %.6f\n", kernel
+    printf "# host_cgroup_cpu_removed_seconds %.6f\n", removed
   }
 ' "${stats[@]}" > "$tmp"
 
