@@ -120,6 +120,7 @@ flowchart LR
   G -->|pass| U["apply"]
   U --> D2["drift check<br>at the commit"]
   D2 --> T["move deployed/prod"]
+  T --> N["nixie API check"]
 ```
 
 The tag `deployed/prod` marks the last revision the job applied, and it moves only after an apply
@@ -153,6 +154,16 @@ guard. Until someone applies or reverts the held change, though, that plan still
 because the tag sits behind it and the preview covers the whole stack, so the later run ends held
 too. A failed apply or a failed second drift check leaves the tag where it was, so the next run's
 first drift check fails and holds until a person repairs the stack.
+
+After the tag moves, the job checks that the applied commit's nixie client still speaks the API of
+the nixie it deployed. It waits for nixie's rollout, then sends nixie a few calls through the k3s
+API's service proxy, because the job's tailnet grant reaches only k3s's API. Each call carries no
+session, and each names a procedure that the client's table of nixie's procedures marks as a read,
+so the check changes nothing in nixie even if nixie stopped asking for a session. The check passes
+when nixie refuses every call with the contract's unauthorized error, which shows that the route,
+the client header, the RPC encoding and each procedure still hold. A failed check fails the
+workflow's check job, not the apply job, because the apply is done by then, and Discord gets the
+failure.
 
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.

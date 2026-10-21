@@ -74,6 +74,7 @@ function declareRoutes(state: StubState) {
   return [
     makeRoute(state, 'sessions/enrol', (_request, input) => createSession(state, input)),
     makeRoute(state, 'sessions/revoke', (_request, input) => updateRevoked(state, input)),
+    makeRoute(state, 'sessions/list', (request) => buildSessionsResponse(state, request)),
     makeRoute(state, 'conversation/read', (_request, input) => buildReadResponse(state, input)),
     makeRoute(state, 'log/follow', (request, input) => startFollow(state, { request, input })),
   ];
@@ -86,7 +87,14 @@ function makeRoute(
   procedure: string,
   answer: (request: Request, input: Input) => Response,
 ) {
-  return http.post(new URL(`/rpc/${procedure}`, state.options.url).href, async (info) => {
+  const base = state.options.url.endsWith('/') ? state.options.url : `${state.options.url}/`;
+
+  const href = new URL(`rpc/${procedure}`, base).href;
+
+  // MSW reads a colon in a path as a parameter, and a service proxy's path holds colons
+  const route = new RegExp(`^${RegExp.escape(href)}$`, 'u');
+
+  return http.post(route, async (info) => {
     state.calls.push(procedure);
 
     // nixie's API refuses a call without the client header before any procedure runs
@@ -150,6 +158,27 @@ function updateRevoked(state: StubState, input: Input): Response {
   return HttpResponse.json({
     json: { revokedAt: new Date().toISOString() },
     meta: [[1, 'revokedAt']],
+  });
+}
+
+function buildSessionsResponse(state: StubState, request: Request): Response {
+  const current = findSession(state, request);
+  const live = state.sessions.filter((row) => !row.revoked);
+
+  return HttpResponse.json({
+    json: {
+      sessions: live.map((row) => ({
+        createdAt: '2026-10-17T09:30:00.000Z',
+        current: row === current,
+        deviceName: 'deploy check',
+        lastUsedAt: '2026-10-17T09:30:00.000Z',
+        sessionID: row.sessionID,
+      })),
+    },
+    meta: live.flatMap((_row, index) => [
+      [1, 'sessions', index, 'createdAt'],
+      [1, 'sessions', index, 'lastUsedAt'],
+    ]),
   });
 }
 

@@ -2,6 +2,7 @@ import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { findJSONField } from '../find-json-field.ts';
 import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
 import { generateNixieAPITypes } from './generate-nixie-api-types.ts';
 import { writeNixieAPIContract } from './write-nixie-api-contract.ts';
@@ -18,10 +19,18 @@ async function setupTest() {
   };
 }
 
-test('it writes the document that gh reads at the tag, and its types', async () => {
+test('it writes the document that gh reads at the tag with the release as its version, and its types', async () => {
   const ctx = await setupTest();
 
-  const document = '{"openapi":"3.1.1","info":{"title":"nixie","version":"0"},"paths":{}}\n';
+  const document = `{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "nixie",
+    "version": "0.31.0"
+  },
+  "paths": {}
+}
+`;
 
   // the contents API answers the file base64-encoded in lines of 60, and gh's --jq prints the
   // string with its newlines
@@ -77,6 +86,42 @@ test('it runs gh without its telemetry and update check', async () => {
     DO_NOT_TRACK: '1',
     GH_NO_UPDATE_NOTIFIER: '1',
   });
+});
+
+test('it writes nothing for a document without info', async () => {
+  const ctx = await setupTest();
+
+  // base64 of {"openapi":"3.1.1","paths":{}}
+  const stub = buildStubRunner(() => ({ stdout: 'eyJvcGVuYXBpIjoiMy4xLjEiLCJwYXRocyI6e319\n' }));
+
+  const exitCode = await writeNixieAPIContract({
+    args: ['v0.31.0'],
+    directory: ctx.directory,
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  const files = await readdir(ctx.directory);
+
+  expect(exitCode).toBe(1);
+  expect(files).toBeEmpty();
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    "write-nixie-api-contract: nixie v0.31.0's openapi.json has no info\n",
+  );
+});
+
+test('it keeps the vendored document at the version of the nixie pin', async () => {
+  const document: unknown = await Bun.file(join(import.meta.dir, 'openapi.json')).json();
+
+  const pins: unknown = await Bun.file(
+    join(import.meta.dir, '../release/release-pins.json'),
+  ).json();
+
+  expect(findJSONField(findJSONField(document, 'info'), 'version')).toBe(
+    findJSONField(findJSONField(pins, 'nixie'), 'version'),
+  );
 });
 
 test("it stops with gh's exit code and writes nothing when gh cannot read the tag", async () => {

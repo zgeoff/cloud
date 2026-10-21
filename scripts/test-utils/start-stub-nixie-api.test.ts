@@ -113,3 +113,77 @@ test('it reads the newest page before a sequence, oldest first, with the log seq
     json: { hasEarlier: true, readAtSequence: 5, records: [{ sequence: 3 }, { sequence: 4 }] },
   });
 });
+
+test("it lists the live sessions and marks the caller's as current", async () => {
+  const stub = startStubNixieAPI({
+    url: 'https://nixie.test',
+    enrolCodes: [],
+    sequences: [],
+    keepaliveMs: null,
+    closeAfterMs: null,
+  });
+
+  const other = stub.createSession();
+  const token = stub.createSession();
+
+  await fetch('https://nixie.test/rpc/sessions/revoke', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-nixie-client': 'deploy-check',
+      authorization: `Bearer ${other}`,
+    },
+    body: JSON.stringify({ json: { sessionID: stub.sessions[0]?.sessionID } }),
+  });
+
+  const response = await fetch('https://nixie.test/rpc/sessions/list', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-nixie-client': 'deploy-check',
+      authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  const body: unknown = await response.json();
+
+  expect(body).toStrictEqual({
+    json: {
+      sessions: [
+        {
+          createdAt: '2026-10-17T09:30:00.000Z',
+          current: true,
+          deviceName: 'deploy check',
+          lastUsedAt: '2026-10-17T09:30:00.000Z',
+          sessionID: stub.sessions[1]?.sessionID,
+        },
+      ],
+    },
+    meta: [
+      [1, 'sessions', 0, 'createdAt'],
+      [1, 'sessions', 0, 'lastUsedAt'],
+    ],
+  });
+});
+
+test('it serves the procedures under the path of a base URL that a proxy serves nixie under', async () => {
+  startStubNixieAPI({
+    url: 'https://proxy.test/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
+    enrolCodes: [],
+    sequences: [],
+    keepaliveMs: null,
+    closeAfterMs: null,
+  });
+
+  const response = await fetch(
+    'https://proxy.test/api/v1/namespaces/nixie/services/http:nixie:http/proxy/rpc/sessions/list',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-nixie-client': 'deploy-check' },
+      body: JSON.stringify({}),
+    },
+  );
+
+  expect(response.status).toBe(401);
+});

@@ -1,5 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { findJSONField } from '../find-json-field.ts';
 import type { ScriptIO } from '../run-or-exit.ts';
 import { runOrExit } from '../run-or-exit.ts';
 import { runProcess } from '../run-process.ts';
@@ -42,7 +43,23 @@ export function writeNixieAPIContract(
       },
     );
 
-    const document = Buffer.from(answer.stdout.toString(), 'base64').toString('utf8');
+    const fetched: unknown = JSON.parse(
+      Buffer.from(answer.stdout.toString(), 'base64').toString('utf8'),
+    );
+
+    const info = findJSONField(fetched, 'info');
+
+    if (typeof info !== 'object' || info === null) {
+      options.printErr(`write-nixie-api-contract: nixie ${tag}'s openapi.json has no info\n`);
+
+      return 1;
+    }
+
+    // nixie's document carries the version 0 whatever the release, so the vendored copy carries
+    // the release's version in its place, which a test compares with the nixie pin
+    Reflect.set(info, 'version', tag.replace(/^v/u, ''));
+
+    const document = `${JSON.stringify(fetched, null, 2)}\n`;
 
     const types = await generateNixieAPITypes(document);
 

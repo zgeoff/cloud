@@ -10,6 +10,11 @@ export interface ActionsTemplateContext {
 
   // a run without it refuses every secrets expression, so a step never runs a secret by accident
   readonly secrets?: Readonly<Record<string, string>>;
+
+  // the result and outputs of each job the step's job needs, by job id
+  readonly needs?: Readonly<
+    Record<string, { readonly result: string; readonly outputs: Readonly<Record<string, string>> }>
+  >;
 }
 
 const expression = /\$\{\{\s*(?<path>[^}]*?)\s*\}\}/gu;
@@ -32,7 +37,7 @@ export function renderActionsTemplate(
   return value.replaceAll(expression, (_match: string, path: string) => resolvePath(path, context));
 }
 
-const contextPath = /^(?:github|inputs|steps|secrets)(?:\.[A-Za-z_][\w-]*)+$/u;
+const contextPath = /^(?:github|inputs|steps|secrets|needs)(?:\.[A-Za-z_][\w-]*)+$/u;
 
 function resolvePath(path: string, context: Readonly<ActionsTemplateContext>): string {
   if (!contextPath.test(path) || (path.startsWith('secrets.') && context.secrets === undefined)) {

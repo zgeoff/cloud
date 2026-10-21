@@ -52,6 +52,19 @@ test('#encodeNixieRequest builds a log/follow call with the session token', asyn
   });
 });
 
+test('#encodeNixieRequest keeps the path of a base URL that a proxy serves nixie under', async () => {
+  const request = await encodeNixieRequest({
+    url: 'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy',
+    token: null,
+    procedure: 'sessions/list',
+    input: undefined,
+  });
+
+  expect(request.url).toBe(
+    'http://127.0.0.1:41873/api/v1/namespaces/nixie/services/http:nixie:http/proxy/rpc/sessions/list',
+  );
+});
+
 test('#encodeNixieRequest builds a request that the caller can stop', async () => {
   const stopping = new AbortController();
 
@@ -89,17 +102,27 @@ test('#decodeNixieAnswer reads the code of an error nixie defines', async () => 
     '{"json":{"defined":true,"code":"ENROLMENT_CODE_INVALID","status":400,"message":"The enrolment code is unknown, used or lapsed"}}',
   );
 
-  expect(answer).toStrictEqual({ ok: false, code: 'ENROLMENT_CODE_INVALID' });
+  expect(answer).toStrictEqual({ ok: false, code: 'ENROLMENT_CODE_INVALID', isDefined: true });
+});
+
+test('#decodeNixieAnswer marks as undefined the code that oRPC takes from the status of a body that is no RPC error', async () => {
+  // the Status object that the Kubernetes API server answers a request it cannot authenticate with
+  const answer = await decodeNixieAnswer(
+    401,
+    '{"kind":"Status","apiVersion":"v1","metadata":{},"status":"Failure","message":"Unauthorized","reason":"Unauthorized","code":401}',
+  );
+
+  expect(answer).toStrictEqual({ ok: false, code: 'UNAUTHORIZED', isDefined: false });
 });
 
 test('#decodeNixieAnswer reports no code for an error body that is not JSON', async () => {
   const answer = await decodeNixieAnswer(502, '<html>bad gateway</html>');
 
-  expect(answer).toStrictEqual({ ok: false, code: null });
+  expect(answer).toStrictEqual({ ok: false, code: null, isDefined: false });
 });
 
 test('#decodeNixieAnswer reports no code for a successful body that is not in the RPC protocol', async () => {
   const answer = await decodeNixieAnswer(200, 'null');
 
-  expect(answer).toStrictEqual({ ok: false, code: null });
+  expect(answer).toStrictEqual({ ok: false, code: null, isDefined: false });
 });

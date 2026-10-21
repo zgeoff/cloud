@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { $ } from 'bun';
 import { findJSONField } from '../scripts/find-json-field.ts';
+import { buildActionsJobResult } from '../scripts/test-utils/build-actions-job-result.ts';
 import { buildMockWorkflowRunContext } from '../scripts/test-utils/build-mock-workflow-run-context.ts';
 import { buildStubActionsScheduler } from '../scripts/test-utils/build-stub-actions-scheduler.ts';
 import { isActionsConditionMet } from '../scripts/test-utils/is-actions-condition-met.ts';
@@ -32,8 +33,15 @@ async function setupTest() {
   }
 
   const stepList: readonly unknown[] = steps;
+  const checkJob = findJSONField(findJSONField(workflow, 'jobs'), 'check');
 
-  return { directory, scheduler: buildStubActionsScheduler(workflowText), job, steps: stepList };
+  return {
+    directory,
+    scheduler: buildStubActionsScheduler(workflowText),
+    job,
+    steps: stepList,
+    checkJob,
+  };
 }
 
 // the outcome step runs its real command with the env the workflow gives it, after a guard that
@@ -72,7 +80,7 @@ test('it ends a held push s run green as held, from the workflow s own outcome s
 
   expect(ctx.scheduler.getRun(held)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'success', alert: 'in_progress' },
+    jobs: { apply: 'success', check: 'skipped', alert: 'in_progress' },
   });
 });
 
@@ -364,6 +372,14 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       run: 'bun run ci:move-deployed-prod "$REVISION"',
     },
     {
+      name: "Check nixie's API",
+      ref: undefined,
+      path: undefined,
+      workingDirectory: 'program',
+      program: undefined,
+      run: 'bun run ci:check-nixie-api',
+    },
+    {
       name: 'Release the prod lock',
       ref: undefined,
       path: undefined,
@@ -388,12 +404,12 @@ test('it starts a waiting push s run as soon as a held run ends', async () => {
 
   expect(laterBeforeTheHold).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'pending', alert: 'waiting' },
+    jobs: { apply: 'pending', check: 'waiting', alert: 'waiting' },
   });
 
   expect(ctx.scheduler.getRun(later)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'in_progress', alert: 'waiting' },
+    jobs: { apply: 'in_progress', check: 'waiting', alert: 'waiting' },
   });
 });
 
@@ -411,13 +427,105 @@ test('it completes a later push s run that applies after a held run, with no ale
   ctx.scheduler.finishJob(later, 'apply', {
     status: 'success',
     steps: { outcome: { outcome: 'apply' } },
+    outcomes: { nixie_check: 'success' },
   });
+
+  ctx.scheduler.finishJob(later, 'check', { status: 'success' });
 
   expect(ctx.scheduler.getRun(later)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'success', alert: 'skipped' },
+    jobs: { apply: 'success', check: 'success', alert: 'skipped' },
   });
 });
+
+test('it starts the check job once an apply job that applied ends', async () => {
+  const ctx = await setupTest();
+
+  const run = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
+
+  ctx.scheduler.finishJob(run, 'apply', {
+    status: 'success',
+    steps: { outcome: { outcome: 'apply' } },
+    outcomes: { nixie_check: 'failure' },
+  });
+
+  expect(ctx.scheduler.getRun(run)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { apply: 'success', check: 'in_progress', alert: 'waiting' },
+  });
+});
+
+// the apply job's result comes from its own steps, so a failed check step fails the apply job
+// unless the workflow lets that step fail
+test('it keeps the apply green and alerts when the check of nixie s API fails', async () => {
+  const ctx = await setupTest();
+
+  const run = ctx.scheduler.startRun(buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) }));
+
+  const outcomes = {
+    decide: 'success',
+    guard: 'success',
+    outcome: 'success',
+    nixie_check: 'failure',
+  };
+
+  ctx.scheduler.finishJob(run, 'apply', {
+    status: buildActionsJobResult(ctx.steps, outcomes),
+    steps: { outcome: { outcome: 'apply' } },
+    outcomes,
+  });
+
+  ctx.scheduler.finishJob(run, 'check', { status: 'failure' });
+
+  expect(ctx.scheduler.getRun(run)).toStrictEqual({
+    status: 'in_progress',
+    jobs: { apply: 'success', check: 'failure', alert: 'in_progress' },
+  });
+});
+
+// the check job's own step runs its real command with the env the workflow gives it, from the
+// apply job's outputs
+test.each([
+  ['success', 'success'],
+  ['failure', 'failure'],
+  ['cancelled', 'failure'],
+] as const)(
+  'it judges a check of nixie s API that ended %s as a %s of the check job s step',
+  async (outcome, expected) => {
+    const ctx = await setupTest();
+
+    const github = buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) });
+    const steps = findJSONField(ctx.checkJob, 'steps');
+
+    if (!Array.isArray(steps)) {
+      throw new TypeError('the check job has no steps');
+    }
+
+    const stepList: readonly unknown[] = steps;
+
+    const step = stepList.find(
+      (each: unknown) => findJSONField(each, 'name') === "Check nixie's API",
+    );
+
+    const result = await runActionsStep({
+      step,
+      jobEnv: findJSONField(ctx.checkJob, 'env'),
+      context: {
+        github,
+        inputs: {},
+        steps: {},
+        needs: {
+          apply: { result: 'success', outputs: { outcome: 'apply', 'nixie-check': outcome } },
+        },
+      },
+      cwd: join(import.meta.dir, '..'),
+      directory: ctx.directory,
+      path: process.env['PATH'] ?? '/usr/bin:/bin',
+    });
+
+    expect(result.status).toBe(expected);
+  },
+);
 
 test('it alerts a failed apply', async () => {
   const ctx = await setupTest();
@@ -431,7 +539,7 @@ test('it alerts a failed apply', async () => {
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'failure', alert: 'in_progress' },
+    jobs: { apply: 'failure', check: 'skipped', alert: 'in_progress' },
   });
 });
 
@@ -444,7 +552,7 @@ test('it completes a run with nothing to apply, with no alert', async () => {
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'success', alert: 'skipped' },
+    jobs: { apply: 'success', check: 'skipped', alert: 'skipped' },
   });
 });
 
@@ -462,12 +570,12 @@ test('it keeps every waiting run in the order it joined, and cancels none', asyn
 
   expect(ctx.scheduler.getRun(older)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'in_progress', alert: 'waiting' },
+    jobs: { apply: 'in_progress', check: 'waiting', alert: 'waiting' },
   });
 
   expect(ctx.scheduler.getRun(newer)).toStrictEqual({
     status: 'in_progress',
-    jobs: { apply: 'pending', alert: 'waiting' },
+    jobs: { apply: 'pending', check: 'waiting', alert: 'waiting' },
   });
 });
 
@@ -482,7 +590,7 @@ test('it never queues the run of a failed CI run behind a running apply', async 
 
   expect(ctx.scheduler.getRun(failed)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'skipped', alert: 'skipped' },
+    jobs: { apply: 'skipped', check: 'skipped', alert: 'skipped' },
   });
 });
 
@@ -519,7 +627,7 @@ test('it starts nothing for the CI run of a pull request', async () => {
 
   expect(ctx.scheduler.getRun(run)).toStrictEqual({
     status: 'completed',
-    jobs: { apply: 'skipped', alert: 'skipped' },
+    jobs: { apply: 'skipped', check: 'skipped', alert: 'skipped' },
   });
 });
 
@@ -579,6 +687,7 @@ test.each([
       'Apply',
       'Check drift after the apply',
       'Move deployed/prod',
+      "Check nixie's API",
       'Release the prod lock',
     ],
   ],

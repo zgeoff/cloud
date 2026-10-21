@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test for alert-prod-apply.sh: it resolves the webhook from the env file's ALERT_WEBHOOK_URL
 # reference, prints only its ::add-mask:: line, and posts "held for a manual dispatch" for a run
-# that ended held and "failed" for every other run; it fails with curl's status when the
+# that ended held, that nixie's API check failed for a run whose check job failed, and "failed" for
+# every other run; it fails with curl's status when the
 # webhook refuses the post, with op's when the reference does not resolve, and before op runs for
 # an env file without the variable, an empty 1Password token, a missing GitHub variable or a bad
 # argument. op and curl are stand-ins (create-stub-op-read.sh, create-stub-webhook-curl.sh). Each
@@ -91,6 +92,28 @@ EOF
   assert_status 0 "$status"
 }
 
+it_posts_that_the_nixie_api_check_failed_when_the_check_job_failed_after_the_apply() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir -p "$tree/vault/cloud-deploy/alert-webhook"
+  printf '%s' https://discord.example/api/webhooks/1/secret > "$tree/vault/cloud-deploy/alert-webhook/credential"
+  printf 'ALERT_WEBHOOK_URL=op://cloud-deploy/alert-webhook/credential\n' > "$tree/.env"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_TREE="$tree" OP_SERVICE_ACCOUNT_TOKEN=ops_stub \
+    OUTCOME=apply CHECK_RESULT=failure RUN_URL=https://github.com/zgeoff/cloud/actions/runs/7 \
+    bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '::add-mask::https://discord.example/api/webhooks/1/secret'
+  diff /dev/null "$tree/err"
+  diff - "$tree/webhook-body" << 'EOF'
+{
+  "content": "The prod apply passed, but nixie's API check after it failed: https://github.com/zgeoff/cloud/actions/runs/7"
+}
+EOF
+  assert_status 0 "$status"
+}
+
 it_fails_with_curls_status_when_the_webhook_refuses_the_post() {
   local status=0
   create_case_tree
@@ -173,7 +196,7 @@ it_fails_before_op_runs_without_the_run_url() {
     bash "$script" "$tree/.env" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "$script: line 21: RUN_URL: parameter null or not set"
+  diff - "$tree/err" <<< "$script: line 24: RUN_URL: parameter null or not set"
   diff /dev/null "$tree/calls"
   assert_status 1 "$status"
 }

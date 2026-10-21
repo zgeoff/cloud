@@ -26,7 +26,7 @@
       "project": ["**/*.ts"]
     },
     ".": {
-      "entry": ["scripts/build-agent-image.ts"],
+      "entry": ["scripts/build-agent-image.ts", "scripts/test-utils/run-stub-kubectl-proxy.ts"],
       "project": ["scripts/**/*.ts", "e2e/**/*.ts"]
     }
   },
