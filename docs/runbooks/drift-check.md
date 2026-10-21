@@ -16,7 +16,7 @@ a run, and answers drift.
 | the 1Password vault `cloud`                                | the items [Create the items](#create-the-items) lists                          |
 | `/var/lib/tank-cloud/host-secrets/drift-check/credentials` | the check's nine values, mode 0400 root, on the encrypted host-secrets dataset |
 | `drift-check.timer`                                        | the daily start time, which the host's NixOS module sets                       |
-| `drift-check.service`                                      | one run: the wait for a Deploy prod run, the refresh and the alert             |
+| `drift-check.service`                                      | one run: the wait for the prod lock, the refresh and the alert                 |
 | `/var/lib/drift-check`                                     | the service's state directory, which holds the Pulumi plugins it downloads     |
 
 **CAUTION:** The credentials file holds the passphrase, which decrypts every secret in the Pulumi
@@ -30,13 +30,20 @@ the webhook. systemd mounts a dynamic user's state directory with noexec, so the
 directory in `ExecPaths=`, and the plugins it downloads there can start. Until the file exists,
 systemd skips the service, so a run before the setup leaves nothing in Discord.
 
-The check and the Deploy prod job share no lock, because GitHub's concurrency group cannot hold a
-service on the host. A run therefore guards against an apply by asking GitHub. Before the check, it
-waits while a Deploy prod run is queued or in progress. After a check that fails, it asks again, and
-when a Deploy prod run was queued, in progress or changed during the check, it waits and runs the
-check once more, then reports that second check. A drift alert therefore never comes from an apply
-that overlapped the first check. One overlap stays possible: a clean check during an apply reports
-clean, and the next day's run reads the state the apply left.
+The check and the Deploy prod job share the prod lock, the Lease `cloud-prod-state` in k3s's
+`kube-system` namespace, so neither uses the state while the other does
+([State and drift](../architecture/infrastructure-as-code.md#state-and-drift) gives the reasons).
+The dynamic user cannot read k3s's admin kubeconfig, so systemd takes the lock as root before the
+check and releases it as root after. While a Deploy prod run holds the lock, the run waits; when the
+run cannot take the lock, it skips the check and posts the failed alert, never the drift alert. To
+see who holds the lock:
+
+```bash
+ssh -o BatchMode=yes root@geoffcloud kubectl --namespace kube-system get lease cloud-prod-state --output yaml
+```
+
+`spec.holderIdentity` names the holder, as `drift-check <invocation_id>` or `deploy-prod <run_id>`,
+and has no value when no one holds the lock.
 
 ## Create the items
 
@@ -124,10 +131,12 @@ The refresh's plan in the log shows each resource that differs. A run ends in on
   [Answer drift](#answer-drift).
 - It fails with another status, the log ends with `run-host-drift-check: posted the failed alert`,
   and Discord shows `The scheduled drift check failed`: the refresh failed, a provider plugin could
-  not start, the check ran out of time (status 124), the credentials file is incomplete, a Deploy
-  prod run stayed in progress past the check's wait, or another step failed, with
+  not start, the check ran out of time (status 124), the credentials file is incomplete, the run
+  could not take the prod lock, or another step failed, with
   `run-host-drift-check: the run failed (exit <status>)` in the log. The lines before the alert give
-  the cause.
+  the cause. A run that could not take the prod lock logs
+  `run-host-drift-check: a Deploy prod run held the prod lock past the wait`, or
+  `run-host-drift-check: taking the prod lock failed (exit <status>)` after kubectl's error.
 - It fails, and the log ends with `run-host-drift-check: the alert failed (exit <status>)`: Discord
   refused the post or the host could not reach it. Read the check's own result in the lines before.
 - It never starts, and `systemctl status drift-check.service` shows that its `ConditionPathExists=`

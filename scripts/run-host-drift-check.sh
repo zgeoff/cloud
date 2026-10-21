@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The scheduled drift check's run on geoffcloud, which drift-check.service starts each day
-# (nixos/modules/drift-check.nix). It loads the check's credentials, waits while a Deploy prod run
-# is in progress, runs check-scheduled-drift.sh, and posts drift or a failed run to Discord with
+# (nixos/modules/drift-check.nix). It loads the check's credentials, makes sure the run holds the
+# prod lock, runs check-scheduled-drift.sh, and posts drift or a failed run to Discord with
 # alert-scheduled-drift.sh. It exits 0 when the check finds no drift, and otherwise with the
 # check's status, or 1 for a run that never reached the check.
 #
@@ -12,28 +12,21 @@
 # never prints a value.
 #
 # A Deploy prod run writes the state that the check reads, so a check during one would report the
-# apply's own changes as drift. It asks GitHub's API, anonymously, for the newest Deploy prod runs
-# of REPO, and while one of them is queued or in progress, it pauses DEPLOY_WAIT_DELAY seconds
-# (default 300) and asks again, up to DEPLOY_WAIT_ATTEMPTS asks (default 6). A run still in progress
-# after the last ask fails the run. When GitHub does not answer, it says so on stderr and checks
-# anyway, because a missed check hides drift for a day and an unneeded alert costs a re-run.
-#
-# GitHub's concurrency group cannot hold this service, so a Deploy prod run can still start during
-# the refresh. A check that fails therefore asks again: when a Deploy prod run is queued or in
-# progress, or changed since the check started, it waits as before and runs the check once more,
-# and reports that second check. This is a guard after the fact, not a lock: a clean check that
-# overlapped an apply reports clean.
+# apply's own changes as drift. Both therefore hold the prod lock (hold-prod-lock.sh) while they
+# use the state. The unit takes it as root before this script, with hold-host-prod-lock.sh, which
+# writes the take's exit status to LOCK_STATUS_FILE, and releases it after. A status other than 0,
+# or no status, fails the run before the check, with the failed alert: 75 when a Deploy prod run
+# held the lock past the wait.
 #
 # The check runs under timeout, for CHECK_TIMEOUT seconds (default 2700), so a hung refresh ends
 # as a failed check that posts its alert, not as a unit that systemd kills without one. The alert
 # names where to read the run: `journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=<id>` on
 # RUN_HOST, from systemd's INVOCATION_ID. A posted alert prints which alert it was on stderr. A
 # failed alert prints its status on stderr and leaves the exit status as the check's. Any other step
-# that fails once the inputs are set, such as an answer from GitHub that jq cannot read, posts the
-# failed alert as the run exits. An argument is a usage error (exit 2).
+# that fails once the inputs are set posts the failed alert as the run exits. An argument is a usage
+# error (exit 2).
 #
-#   CREDENTIALS_DIRECTORY=<dir> INVOCATION_ID=<id> RUN_HOST=<host> GITHUB_API_URL=<url> \
-#     REPO=<owner/name> [DEPLOY_WAIT_ATTEMPTS=<n>] [DEPLOY_WAIT_DELAY=<seconds>] \
+#   CREDENTIALS_DIRECTORY=<dir> INVOCATION_ID=<id> RUN_HOST=<host> LOCK_STATUS_FILE=<file> \
 #     [CHECK_TIMEOUT=<seconds>] bash scripts/run-host-drift-check.sh
 set -euo pipefail
 
@@ -41,15 +34,13 @@ if [ "$#" -ne 0 ]; then
   echo "usage: run-host-drift-check.sh" >&2
   exit 2
 fi
-for name in CREDENTIALS_DIRECTORY INVOCATION_ID RUN_HOST GITHUB_API_URL REPO; do
+for name in CREDENTIALS_DIRECTORY INVOCATION_ID RUN_HOST LOCK_STATUS_FILE; do
   if [ -z "${!name:-}" ]; then
     echo "run-host-drift-check: set $name" >&2
     exit 2
   fi
 done
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-attempts="${DEPLOY_WAIT_ATTEMPTS:-6}"
-delay="${DEPLOY_WAIT_DELAY:-300}"
 check_timeout="${CHECK_TIMEOUT:-2700}"
 run_ref="on $RUN_HOST: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=$INVOCATION_ID"
 
@@ -130,63 +121,27 @@ if [ "${#missing[@]}" -gt 0 ]; then
   fail_run "the credentials file has no ${missing[*]}"
 fi
 
-runs_url="$GITHUB_API_URL/repos/$REPO/actions/workflows/deploy-prod.yml/runs?per_page=20"
-
-# wait_for_deploy: returns once no Deploy prod run is queued or in progress, or GitHub does not
-# answer, and fails the run after the last ask
-wait_for_deploy() {
-  local attempt=1 runs active
-  while :; do
-    if runs="$(curl -fsS --max-time 30 "$runs_url")"; then
-      active="$(jq '[.workflow_runs[] | select(.status == "queued" or .status == "in_progress")] | length' <<< "$runs")"
-    else
-      echo "run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway" >&2
-      active=0
-    fi
-    if [ "$active" = 0 ]; then return; fi
-    if [ "$attempt" -ge "$attempts" ]; then
-      fail_run "a Deploy prod run was still in progress after $attempts asks"
-    fi
-    echo "run-host-drift-check: a Deploy prod run is in progress; asking again in ${delay}s" >&2
-    sleep "$delay"
-    attempt=$((attempt + 1))
-  done
-}
-
-# overlapped <since>: succeeds when a Deploy prod run is queued or in progress, or changed at or
-# after <since>, an ISO 8601 UTC time, so it may have applied during the check; fails when none
-# did or GitHub does not answer
-overlapped() {
-  local runs
-  if ! runs="$(curl -fsS --max-time 30 "$runs_url")"; then
-    echo "run-host-drift-check: GitHub did not list the Deploy prod runs; reporting the check as it ended" >&2
-    return 1
-  fi
-  jq -e --arg since "$1" 'any(.workflow_runs[]; .status == "queued" or .status == "in_progress" or (.updated_at // "") >= $since)' <<< "$runs" > /dev/null
-}
+lock_status="$(cat "$LOCK_STATUS_FILE" 2> /dev/null || true)"
+case "$lock_status" in
+  0) ;;
+  75) fail_run "a Deploy prod run held the prod lock past the wait" ;;
+  '') fail_run "the run never took the prod lock" ;;
+  *) fail_run "taking the prod lock failed (exit $lock_status)" ;;
+esac
 
 outcome_file="$(mktemp)"
 
-wait_for_deploy
-try=1
-while :; do
-  started="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  status=0
-  (
-    for name in "${names[@]}"; do
-      if [ "$name" != ALERT_WEBHOOK_URL ]; then export "$name=${credentials[$name]}"; fi
-    done
-    export AWS_REGION=auto OUTCOME_FILE="$outcome_file"
-    timeout "$check_timeout" bash "$root/scripts/check-scheduled-drift.sh" --suppress-outputs
-  ) || status=$?
-  if [ "$status" = 0 ]; then
-    echo "run-host-drift-check: no drift"
-    exit 0
-  fi
-  if [ "$try" -ge 2 ] || ! overlapped "$started"; then break; fi
-  echo "run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends" >&2
-  wait_for_deploy
-  try=2
-done
+status=0
+(
+  for name in "${names[@]}"; do
+    if [ "$name" != ALERT_WEBHOOK_URL ]; then export "$name=${credentials[$name]}"; fi
+  done
+  export AWS_REGION=auto OUTCOME_FILE="$outcome_file"
+  timeout "$check_timeout" bash "$root/scripts/check-scheduled-drift.sh" --suppress-outputs
+) || status=$?
+if [ "$status" = 0 ]; then
+  echo "run-host-drift-check: no drift"
+  exit 0
+fi
 alert "$(cat "$outcome_file")"
 exit "$status"

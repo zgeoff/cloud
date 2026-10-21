@@ -4,18 +4,16 @@
 # drift; it posts drift, a failed refresh, a provider plugin that cannot start and a check that ran
 # out of time through the real alert-scheduled-drift.sh, says which alert it posted, keeps the
 # check's status when the alert fails, and posts the failed alert for a step that fails with no
-# alert of its own; it waits while a Deploy prod run is queued or in progress, fails after its last
-# ask, and checks anyway when GitHub does not answer; it checks once more when a Deploy prod run overlapped a check that failed, and
-# reports that second check; and it fails before the check on a missing credentials file, a missing
+# alert of its own; it fails before the check and posts the failed alert, never the drift alert,
+# when a Deploy prod run held the prod lock past the wait, when taking the lock failed and when the
+# run never took it; and it fails before the check on a missing credentials file, a missing
 # credential, a line with an unknown name, a missing input or an argument.
 #
 # pulumi is create-stub-scripted-command.sh, which logs the credentials it receives; timeout is
-# create-stub-timeout.sh; the pause is create-stub-clock.sh's sleep, first on PATH; and Discord is
-# start-stub-discord-webhook.sh on loopback, which the real curl posts to. GitHub's answers are
-# files the real curl reads through file:// URLs, and a GitHub that does not answer is a dead
-# loopback port. The case that waits for a run to end gets GitHub's two answers from a scripted
-# curl instead, since the answers change between asks. Each case runs the script under `env -i`
-# and compares its whole stdout, stderr, call logs and posted bodies.
+# create-stub-timeout.sh; and Discord is start-stub-discord-webhook.sh on loopback, which the real
+# curl posts to. The lock's status file is the case's own, as hold-host-prod-lock.sh writes it, and
+# test-hold-prod-lock.sh tests the wait for the lock. Each case runs the script under `env -i` and
+# compares its whole stdout, stderr, call logs and posted bodies.
 #
 #   bash scripts/test-run-host-drift-check.sh
 # shellcheck source-path=SCRIPTDIR
@@ -27,8 +25,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-missing.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-one-of-outputs.sh"
-source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-clock.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-scripted-command.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-timeout.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/start-stub-discord-webhook.sh"
@@ -37,7 +33,6 @@ script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-host-drift-check.sh"
 check="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-scheduled-drift.sh"
 infra="$(cd "$(dirname "${BASH_SOURCE[0]}")/../infra" && pwd)"
 logged_env='PULUMI_BACKEND_URL AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION PULUMI_CONFIG_PASSPHRASE CLOUDFLARE_API_TOKEN TAILSCALE_OAUTH_CLIENT_ID TAILSCALE_OAUTH_CLIENT_SECRET TAILSCALE_TAILNET ALERT_WEBHOOK_URL'
-runs_path='repos/example/cloud/actions/workflows/deploy-prod.yml/runs'
 
 it_runs_the_check_with_every_credential_but_the_webhook_and_posts_nothing_when_it_finds_no_drift() {
   local status=0
@@ -54,14 +49,14 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  echo '{"total_count":2,"workflow_runs":[{"status":"completed"},{"status":"waiting"}]}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
   printf 'Resources:\n    61 unchanged\n' > "$tree/answers/1.out"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" STUB_LOG_ENV="$logged_env" \
     STUB_TIMEOUT_LOG="$tree/timeout-calls" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -77,7 +72,6 @@ EOF
 ["timeout","2700","bash","$check","--suppress-outputs"]
 EOF
   assert_missing "$tree/discord/requests" "an alert was posted"
-  assert_missing "$tree/clock/pauses" "the run paused"
   assert_status 0 "$status"
 }
 
@@ -96,15 +90,15 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed"}]}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
   printf 'Resources:\n    ~ 1 to update\n    60 unchanged\n' > "$tree/answers/1.out"
   printf 'error: no changes were expected for refresh but changes were proposed\n' > "$tree/answers/1.err"
   echo 7 > "$tree/answers/1.status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -135,14 +129,14 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed"}]}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
   printf 'error: failed to load checkpoint: blob (key ".pulumi/stacks/geoff-cloud/prod.json") (code=Unknown): AccessDenied\n' > "$tree/answers/1.err"
   echo 255 > "$tree/answers/1.status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'error: failed to load checkpoint: blob (key ".pulumi/stacks/geoff-cloud/prod.json") (code=Unknown): AccessDenied'
@@ -167,14 +161,14 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed"}]}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
   printf 'error: could not load provider for resource urn:pulumi:prod::geoff-cloud::example:index:Thing::example: failed to load plugin /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: fork/exec /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: permission denied\n' > "$tree/answers/1.err"
   echo 255 > "$tree/answers/1.status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'error: could not load provider for resource urn:pulumi:prod::geoff-cloud::example:index:Thing::example: failed to load plugin /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: fork/exec /var/lib/example/plugins/resource-example-v1.2.3/pulumi-resource-example: permission denied'
@@ -199,25 +193,25 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  # an answer with no workflow_runs, which jq cannot iterate
-  echo '{"message":"Example answer with no runs"}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  # a TMPDIR that does not exist, so the outcome file's mktemp fails
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/missing" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" << 'EOF'
-jq: error (at <stdin>:1): Cannot iterate over null (null)
-run-host-drift-check: the run failed (exit 5)
+  diff - "$tree/err" << EOF
+mktemp: failed to create file via template '$tree/missing/tmp.XXXXXXXXXX': No such file or directory
+run-host-drift-check: the run failed (exit 1)
 run-host-drift-check: posted the failed alert
 EOF
   diff /dev/null "$tree/calls"
   printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     diff - "$tree/discord/bodies/1.json"
-  assert_status 5 "$status"
+  assert_status 1 "$status"
 }
 
 it_posts_that_the_check_failed_and_exits_124_when_the_check_runs_out_of_time() {
@@ -235,13 +229,13 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed"}]}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" STUB_TIMEOUT_LOG="$tree/timeout-calls" \
     STUB_TIMEOUT_EXPIRE=124 CREDENTIALS_DIRECTORY="$tree/credentials" CHECK_TIMEOUT=60 \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -271,14 +265,14 @@ TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
   echo 404 > "$tree/discord/status"
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed"}]}' > "$tree/github/$runs_path"
+  echo 0 > "$tree/lock-status"
   printf 'Resources:\n    ~ 1 to update\n' > "$tree/answers/1.out"
   echo 7 > "$tree/answers/1.status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -293,91 +287,7 @@ EOF
   assert_status 7 "$status"
 }
 
-it_waits_while_a_deploy_prod_run_is_in_progress_and_checks_once_it_ends() {
-  local status=0
-  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
-  setup_test "$tree" scripted-curl
-  cat > "$tree/credentials/drift-check" << EOF
-PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
-AWS_ACCESS_KEY_ID=example-key-id
-AWS_SECRET_ACCESS_KEY=example-secret
-PULUMI_CONFIG_PASSPHRASE=example-passphrase
-CLOUDFLARE_API_TOKEN=example-cloudflare-token
-TAILSCALE_OAUTH_CLIENT_ID=example-client-id
-TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
-TAILSCALE_TAILNET=example.test
-ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
-EOF
-  echo '{"total_count":2,"workflow_runs":[{"status":"in_progress"},{"status":"completed"}]}' > "$tree/curl-answers/1.out"
-  echo '{"total_count":2,"workflow_runs":[{"status":"completed"},{"status":"completed"}]}' > "$tree/curl-answers/2.out"
-  printf 'Resources:\n    61 unchanged\n' > "$tree/answers/1.out"
-
-  (cd "$tree" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
-    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL=https://api.github.test REPO=example/cloud \
-    bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/out" << 'EOF'
-Resources:
-    61 unchanged
-run-host-drift-check: no drift
-EOF
-  diff - "$tree/err" <<< 'run-host-drift-check: a Deploy prod run is in progress; asking again in 300s'
-  diff - "$tree/curl-calls" << EOF
-{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
-{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
-EOF
-  diff - "$tree/clock/pauses" <<< '300'
-  assert_status 0 "$status"
-}
-
-it_checks_again_and_posts_nothing_when_a_deploy_prod_run_overlapped_a_check_that_found_drift() {
-  local status=0
-  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
-  setup_test "$tree" scripted-curl
-  cat > "$tree/credentials/drift-check" << EOF
-PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
-AWS_ACCESS_KEY_ID=example-key-id
-AWS_SECRET_ACCESS_KEY=example-secret
-PULUMI_CONFIG_PASSPHRASE=example-passphrase
-CLOUDFLARE_API_TOKEN=example-cloudflare-token
-TAILSCALE_OAUTH_CLIENT_ID=example-client-id
-TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
-TAILSCALE_TAILNET=example.test
-ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
-EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2000-01-01T00:00:00Z"}]}' > "$tree/curl-answers/1.out"
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2999-01-01T00:00:00Z"}]}' > "$tree/curl-answers/2.out"
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2999-01-01T00:00:00Z"}]}' > "$tree/curl-answers/3.out"
-  printf 'Resources:\n    ~ 1 to update\n' > "$tree/answers/1.out"
-  echo 7 > "$tree/answers/1.status"
-  printf 'Resources:\n    61 unchanged\n' > "$tree/answers/2.out"
-
-  (cd "$tree" && env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
-    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL=https://api.github.test REPO=example/cloud \
-    bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/out" << 'EOF'
-Resources:
-    ~ 1 to update
-Resources:
-    61 unchanged
-run-host-drift-check: no drift
-EOF
-  diff - "$tree/err" <<< 'run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends'
-  diff - "$tree/curl-calls" << EOF
-{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
-{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
-{"cwd":"$tree","argv":["curl","-fsS","--max-time","30","https://api.github.test/repos/example/cloud/actions/workflows/deploy-prod.yml/runs?per_page=20"]}
-EOF
-  assert_missing "$tree/discord/requests" "an alert was posted"
-  assert_status 0 "$status"
-}
-
-it_posts_the_second_check_s_drift_when_a_deploy_prod_run_overlapped_both_checks() {
+it_fails_before_the_check_and_posts_the_failed_alert_not_drift_when_a_deploy_prod_run_held_the_lock_past_the_wait() {
   local status=0
   create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
@@ -392,75 +302,29 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"completed","updated_at":"2999-01-01T00:00:00Z"}]}' > "$tree/github/$runs_path"
-  printf 'Resources:\n    ~ 1 to update\n' > "$tree/answers/1.out"
-  echo 7 > "$tree/answers/1.status"
-  printf 'Resources:\n    ~ 2 to update\n' > "$tree/answers/2.out"
-  echo 7 > "$tree/answers/2.status"
+  echo 75 > "$tree/lock-status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" STUB_TIMEOUT_LOG="$tree/timeout-calls" \
+    CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
-    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
-
-  diff - "$tree/out" << 'EOF'
-Resources:
-    ~ 1 to update
-Resources:
-    ~ 2 to update
-EOF
-  diff - "$tree/err" << 'EOF'
-run-host-drift-check: a Deploy prod run overlapped the check; checking again once it ends
-run-host-drift-check: posted the drift alert
-EOF
-  printf '%s' '{  "content": "The scheduled drift check found drift in prod: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
-    diff - "$tree/discord/bodies/1.json"
-  assert_status 7 "$status"
-}
-
-it_fails_and_posts_after_its_last_ask_when_a_deploy_prod_run_stays_queued() {
-  local status=0
-  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
-  setup_test "$tree"
-  cat > "$tree/credentials/drift-check" << EOF
-PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
-AWS_ACCESS_KEY_ID=example-key-id
-AWS_SECRET_ACCESS_KEY=example-secret
-PULUMI_CONFIG_PASSPHRASE=example-passphrase
-CLOUDFLARE_API_TOKEN=example-cloudflare-token
-TAILSCALE_OAUTH_CLIENT_ID=example-client-id
-TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
-TAILSCALE_TAILNET=example.test
-ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
-EOF
-  echo '{"total_count":1,"workflow_runs":[{"status":"queued"}]}' > "$tree/github/$runs_path"
-
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
-    DEPLOY_WAIT_ATTEMPTS=3 DEPLOY_WAIT_DELAY=120 \
-    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'EOF'
-run-host-drift-check: a Deploy prod run is in progress; asking again in 120s
-run-host-drift-check: a Deploy prod run is in progress; asking again in 120s
-run-host-drift-check: a Deploy prod run was still in progress after 3 asks
+run-host-drift-check: a Deploy prod run held the prod lock past the wait
 run-host-drift-check: posted the failed alert
 EOF
   diff /dev/null "$tree/calls"
-  diff - "$tree/clock/pauses" << 'EOF'
-120
-120
-EOF
+  assert_missing "$tree/timeout-calls" "the check ran"
+  diff - "$tree/discord/requests" <<< 'POST /api/webhooks/1/example-token'
   printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
     diff - "$tree/discord/bodies/1.json"
   assert_status 1 "$status"
 }
 
-it_checks_anyway_when_github_does_not_answer() {
+it_fails_before_the_check_and_posts_when_taking_the_lock_failed() {
   local status=0
   create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
@@ -475,34 +339,56 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 TAILSCALE_TAILNET=example.test
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  printf 'Resources:\n    61 unchanged\n' > "$tree/answers/1.out"
+  echo 1 > "$tree/lock-status"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL=http://127.0.0.1:1 REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" << 'EOF'
-Resources:
-    61 unchanged
-run-host-drift-check: no drift
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+run-host-drift-check: taking the prod lock failed (exit 1)
+run-host-drift-check: posted the failed alert
 EOF
-  sed 's/after [0-9]* ms/after <ms> ms/' "$tree/err" > "$tree/err.masked"
-  printf 'Resources:\n    61 unchanged\nrun-host-drift-check: no drift\n' > "$tree/out.expected"
-  # curl's connect error differs between Ubuntu 24.04's curl 8.5.0, which CI runs, and curl 8.22.0
-  cat > "$tree/err.curl-8.5" << 'EOF'
-curl: (7) Failed to connect to 127.0.0.1 port 1 after <ms> ms: Couldn't connect to server
-run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway
+  diff /dev/null "$tree/calls"
+  printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
+    diff - "$tree/discord/bodies/1.json"
+  assert_status 1 "$status"
+}
+
+it_fails_before_the_check_and_posts_when_the_run_never_took_the_lock() {
+  local status=0
+  create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
+  setup_test "$tree"
+  cat > "$tree/credentials/drift-check" << EOF
+PULUMI_BACKEND_URL=s3://example-state?endpoint=state.example.test
+AWS_ACCESS_KEY_ID=example-key-id
+AWS_SECRET_ACCESS_KEY=example-secret
+PULUMI_CONFIG_PASSPHRASE=example-passphrase
+CLOUDFLARE_API_TOKEN=example-cloudflare-token
+TAILSCALE_OAUTH_CLIENT_ID=example-client-id
+TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
+TAILSCALE_TAILNET=example.test
+ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
-  cat > "$tree/err.curl-8.22" << 'EOF'
-curl: (7) Failed to connect to 127.0.0.1:1 after <ms> ms: Could not connect to server
-run-host-drift-check: GitHub did not list the Deploy prod runs; checking anyway
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
+    INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
+    bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+run-host-drift-check: the run never took the prod lock
+run-host-drift-check: posted the failed alert
 EOF
-  assert_one_of_outputs "the check without GitHub" "$tree/out" "$tree/err.masked" "$status" \
-    'curl 8.5.0' "$tree/out.expected" "$tree/err.curl-8.5" 0 \
-    'curl 8.22.0' "$tree/out.expected" "$tree/err.curl-8.22" 0
-  assert_missing "$tree/discord/requests" "an alert was posted"
+  diff /dev/null "$tree/calls"
+  printf '%s' '{  "content": "The scheduled drift check failed: on geoffcloud: journalctl -u drift-check.service _SYSTEMD_INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9"}' |
+    diff - "$tree/discord/bodies/1.json"
+  assert_status 1 "$status"
 }
 
 it_fails_before_the_check_and_posts_when_a_credential_is_missing() {
@@ -520,10 +406,10 @@ TAILSCALE_OAUTH_CLIENT_SECRET=example-client-secret
 ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/example-token
 EOF
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -546,10 +432,10 @@ ALERT_WEBHOOK_URL=http://127.0.0.1:$(cat "$tree/discord/port")/api/webhooks/1/ex
 ONIDEL_API_KEY=example-onidel-key
 EOF
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -567,10 +453,10 @@ it_fails_before_the_check_and_says_the_alert_failed_without_a_credentials_file()
   create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -589,9 +475,9 @@ it_refuses_to_run_without_its_invocation_id() {
   create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
-    RUN_HOST=geoffcloud GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    RUN_HOST=geoffcloud LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -605,10 +491,10 @@ it_rejects_an_argument_with_its_usage() {
   create_case_tree 'kill "$(cat "$tree/discord/pid" 2> /dev/null)" 2> /dev/null || true'
   setup_test "$tree"
 
-  env -i PATH="$tree/clock:$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     STUB_LOG="$tree/calls" STUB_ANSWERS="$tree/answers" CREDENTIALS_DIRECTORY="$tree/credentials" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 RUN_HOST=geoffcloud \
-    GITHUB_API_URL="file://$tree/github" REPO=example/cloud \
+    LOCK_STATUS_FILE="$tree/lock-status" \
     bash "$script" --dry-run > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -617,20 +503,12 @@ it_rejects_an_argument_with_its_usage() {
   assert_status 2 "$status"
 }
 
-# setup_test <tree> [scripted-curl]: scripted-curl puts a scripted curl, which answers from
-# <tree>/curl-answers and logs to <tree>/curl-calls, before the real one
 setup_test() {
-  local tree="$1" wiring="${2:-}"
-  mkdir -p "$tree/bin" "$tree/clock" "$tree/home" "$tree/tmp" "$tree/answers" "$tree/credentials" \
-    "$tree/discord" "$tree/github/$(dirname "$runs_path")"
+  local tree="$1"
+  mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/answers" "$tree/credentials" "$tree/discord"
   : > "$tree/calls"
-  create_stub_clock "$tree/clock"
   create_stub_scripted_command "$tree/bin" pulumi
   create_stub_timeout "$tree/bin"
-  if [ "$wiring" = scripted-curl ]; then
-    mkdir "$tree/curl-answers"
-    create_stub_scripted_command "$tree/bin" curl "$tree/curl-calls" "$tree/curl-answers"
-  fi
   start_stub_discord_webhook "$tree/discord"
 }
 

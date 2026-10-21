@@ -24,7 +24,7 @@ let
 
   cases = [
     {
-      title = "it checks every day as a dynamic user with its credentials file and the tree, once that file exists";
+      title = "it checks every day as a dynamic user with its credentials file and the tree, once that file exists, holding the prod lock as root around the check";
       script =
         let
           service = config.systemd.services.drift-check;
@@ -45,6 +45,7 @@ let
                 pkgs.curl
                 pkgs.gnugrep
                 pkgs.jq
+                pkgs.kubectl
                 # the path NixOS appends to every service's
                 pkgs.coreutils
                 pkgs.findutils
@@ -57,8 +58,7 @@ let
                 PULUMI_HOME = "/var/lib/drift-check/pulumi";
                 PULUMI_SKIP_UPDATE_CHECK = "true";
                 RUN_HOST = "drift-host";
-                GITHUB_API_URL = "https://api.github.com";
-                REPO = "zgeoff/cloud";
+                LOCK_STATUS_FILE = "/run/drift-check/lock-status";
               };
               # NixOS renders the description, after and wants into unitConfig too
               unitConfig = {
@@ -69,12 +69,15 @@ let
               };
               serviceConfig = {
                 Type = "oneshot";
+                ExecStartPre = "-+${pkgs.coreutils}/bin/env HOME=/root KUBECONFIG=/etc/rancher/k3s/k3s.yaml ${pkgs.bash}/bin/bash ${cfg.tree}/scripts/hold-host-prod-lock.sh take";
                 ExecStart = "${pkgs.bash}/bin/bash ${cfg.tree}/scripts/run-host-drift-check.sh";
+                ExecStopPost = "-+${pkgs.coreutils}/bin/env HOME=/root KUBECONFIG=/etc/rancher/k3s/k3s.yaml ${pkgs.bash}/bin/bash ${cfg.tree}/scripts/hold-host-prod-lock.sh release";
                 LoadCredential = [ "drift-check:/var/lib/secrets/drift-check/credentials" ];
                 TimeoutStartSec = "3h";
                 DynamicUser = true;
                 StateDirectory = "drift-check";
                 StateDirectoryMode = "0700";
+                RuntimeDirectory = "drift-check";
                 ExecPaths = [ "/var/lib/private/drift-check" ];
                 NoNewPrivileges = true;
                 ProtectSystem = "strict";
@@ -155,11 +158,15 @@ let
           ./scripts
           ./scripts/alert-scheduled-drift.sh
           ./scripts/check-scheduled-drift.sh
+          ./scripts/hold-host-prod-lock.sh
+          ./scripts/hold-prod-lock.sh
           ./scripts/retry-transient-pulumi.sh
           ./scripts/run-host-drift-check.sh
         ''} listing
         assert_files_equal ${../../scripts/alert-scheduled-drift.sh} ${cfg.tree}/scripts/alert-scheduled-drift.sh
         assert_files_equal ${../../scripts/check-scheduled-drift.sh} ${cfg.tree}/scripts/check-scheduled-drift.sh
+        assert_files_equal ${../../scripts/hold-host-prod-lock.sh} ${cfg.tree}/scripts/hold-host-prod-lock.sh
+        assert_files_equal ${../../scripts/hold-prod-lock.sh} ${cfg.tree}/scripts/hold-prod-lock.sh
         assert_files_equal ${../../scripts/retry-transient-pulumi.sh} ${cfg.tree}/scripts/retry-transient-pulumi.sh
         assert_files_equal ${../../scripts/run-host-drift-check.sh} ${cfg.tree}/scripts/run-host-drift-check.sh
         assert_files_equal ${../../infra/Pulumi.yaml} ${cfg.tree}/infra/Pulumi.yaml
