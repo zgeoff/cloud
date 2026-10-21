@@ -77,6 +77,10 @@ interface CheckResult {
 
 async function printCheckResult(io: Readonly<ScriptIO>, result: CheckResult) {
   if (result.passed) {
+    // impd's image eviction removes an unpinned image that no imp has used for an hour, and a
+    // daemon's target boots this one by name
+    await runOrExit(io, buildImpArgv(['image', 'pin', result.image]));
+
     io.printOut(`${result.image} ${result.digest} check passed\n`);
 
     return 0;

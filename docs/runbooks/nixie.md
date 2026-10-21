@@ -54,8 +54,14 @@ after a release that changes nixie's sandbox images, and after a model credentia
    ```bash
    docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest \
      | jq -r '.[] | "\(.ref) \(.name)"' \
-     | while read -r ref name; do host_imp image add "$ref" --name "$name" < /dev/null; done
+     | while read -r ref name; do
+       host_imp image add "$ref" --name "$name" < /dev/null && host_imp image pin "$name" < /dev/null
+     done
    ```
+
+   The pin keeps each image when impd's image eviction frees disk while no sandbox uses the image. A
+   later add under the same name keeps the name's pin. Expect `host_imp image ls < /dev/null` to
+   show `yes` in the `PINNED` column of each sandbox image.
 
 2. Add a model secret for each profile in `config.yaml`, under the name
    [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)

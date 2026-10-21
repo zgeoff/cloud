@@ -34,7 +34,7 @@ async function setupTest() {
   };
 }
 
-test('it builds the head of main from its archive, checks it on a fresh imp, and removes the imp', async () => {
+test('it builds the head of main from its archive, checks it on a fresh imp, removes the imp, and pins the image', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
@@ -90,7 +90,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
   expect(imp.builtDockerfiles).toStrictEqual(['FROM ghcr.io/zgeoff/imp-base:0.33.0\n']);
 
   expect(imp.images).toStrictEqual([
-    { name: `agent-${short}`, digest: `imp-build-stub-agent-${short}` },
+    { name: `agent-${short}`, digest: `imp-build-stub-agent-${short}`, isPinned: true },
   ]);
 
   expect(imp.imps).toStrictEqual([]);
@@ -103,6 +103,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, and
     ['impz', 'new', `agent-check-${short}`, '--image', `agent-${short}`],
     ['bun', join(source, 'scripts/check-agent-image.ts'), '--imp', `agent-check-${short}`],
     ['impz', 'rm', `agent-check-${short}`],
+    ['impz', 'image', 'pin', `agent-${short}`],
   ]);
 
   expect(source).toStartWith(join(tmpdir(), 'agent-image-build-'));

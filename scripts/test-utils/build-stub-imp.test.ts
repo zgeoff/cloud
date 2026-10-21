@@ -143,6 +143,45 @@ test('it refuses to remove an image an imp uses', async () => {
   expect(imp.images).toStrictEqual([{ name: 'agent-abc1234', digest: 'imp-build-2' }]);
 });
 
+test('it pins an image and leaves the other images alone', async () => {
+  const imp = buildStubImp({
+    images: [
+      { name: 'agent-abc1234', digest: 'imp-build-2' },
+      { name: 'agent-def5678', digest: 'imp-build-3' },
+    ],
+  });
+
+  const stub = buildStubRunner(imp.handler);
+
+  const result = await stub.run(['impz', 'image', 'pin', 'agent-abc1234']);
+
+  expect(result).toStrictEqual({
+    exitCode: 0,
+    stdout: Buffer.from(''),
+    stderr: Buffer.from(''),
+    timedOut: false,
+  });
+
+  expect(imp.images).toStrictEqual([
+    { name: 'agent-abc1234', digest: 'imp-build-2', isPinned: true },
+    { name: 'agent-def5678', digest: 'imp-build-3' },
+  ]);
+});
+
+test('it refuses to pin a missing image', async () => {
+  const imp = buildStubImp({ images: [] });
+  const stub = buildStubRunner(imp.handler);
+
+  const result = await stub.run(['impz', 'image', 'pin', 'agent-abc1234']);
+
+  expect(result).toStrictEqual({
+    exitCode: 1,
+    stdout: Buffer.from(''),
+    stderr: Buffer.from('impz: NOT_FOUND: image agent-abc1234 not found\n'),
+    timedOut: false,
+  });
+});
+
 test('it creates an imp on an image and prints its name', async () => {
   const imp = buildStubImp({ images: [{ name: 'agent-abc1234', digest: 'imp-build-2' }] });
   const stub = buildStubRunner(imp.handler);

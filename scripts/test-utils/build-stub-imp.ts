@@ -5,6 +5,8 @@ import type { StubAnswer, StubCall, StubHandler } from './build-stub-runner.ts';
 interface StubImpImage {
   readonly name: string;
   readonly digest: string;
+
+  readonly isPinned?: boolean;
 }
 
 interface StubImpInstance {
@@ -62,6 +64,7 @@ const impCommands: readonly (readonly [string, ImpCommand])[] = [
   ['image ls --json', buildImageList],
   ['image build * --name *', (state, args) => runBuild(state, args[2] ?? '', args[4] ?? '')],
   ['image rm *', (state, args) => removeImage(state, args[2] ?? '')],
+  ['image pin *', (state, args) => pinImage(state, args[2] ?? '')],
   ['new * --image *', (state, args) => createImp(state, args[1] ?? '', args[3] ?? '')],
   ['ls --json', (state) => ({ stdout: `${JSON.stringify(state.imps)}\n` })],
   ['rm *', (state, args) => removeImp(state, args[1] ?? '')],
@@ -121,6 +124,21 @@ function removeImage(state: StubImpState, name: string): StubAnswer {
   }
 
   state.images.splice(index, 1);
+
+  return {};
+}
+
+function pinImage(state: StubImpState, name: string): StubAnswer {
+  const index = state.images.findIndex((image) => image.name === name);
+  const image = state.images[index];
+
+  if (image === undefined) {
+    // imp 2.10.1's pin answers a missing name with the NOT_FOUND an rm gives
+    // (packages/daemon/src/imps/images/image-service.ts in zgeoff/impz); a pin prints nothing
+    return { exitCode: 1, stderr: `impz: NOT_FOUND: image ${name} not found\n` };
+  }
+
+  state.images[index] = { ...image, isPinned: true };
 
   return {};
 }
