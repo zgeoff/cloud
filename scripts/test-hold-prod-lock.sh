@@ -10,7 +10,8 @@
 # kubectl is create-stub-kubectl.sh, whose store holds the Lease. A case that waits runs the take
 # in the background with a short real pause, and releases the lock from the case once the take has
 # said who holds it. Each case runs the script under `env -i` and compares its whole stderr, the
-# stored Lease and the kubectl calls, with each Lease time checked for its form only.
+# stored Lease and the kubectl calls, with each Lease time a take writes checked for its form and
+# for falling between the clock's readings before and after the act.
 #
 #   bash scripts/test-hold-prod-lock.sh
 # shellcheck source-path=SCRIPTDIR
@@ -21,6 +22,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-between.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kubectl.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/wait-for.sh"
 
@@ -32,6 +34,7 @@ it_takes_the_lock_by_creating_the_lease_when_there_is_none() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     KUBECONFIG="$tree/kubeconfig" bash "$script" take 'deploy-prod 4321' 6000 3300 \
@@ -39,6 +42,9 @@ it_takes_the_lock_by_creating_the_lease_when_there_is_none() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'hold-prod-lock: took the prod lock as deploy-prod 4321'
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   jq -c "$masked" "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"1"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":true,"renewTime":true}}
@@ -54,6 +60,7 @@ it_takes_a_lease_that_no_one_holds_by_replacing_it_at_its_version() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"8","uid":"example-uid"},"spec":{"leaseDurationSeconds":3000,"acquireTime":"2026-10-20T05:41:00.000000Z","renewTime":"2026-10-20T05:41:00.000000Z"}}
 EOF
@@ -63,6 +70,9 @@ EOF
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< 'hold-prod-lock: took the prod lock as drift-check 0a1b2c3d'
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   jq -c "$masked" "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"9","uid":"example-uid"},"spec":{"holderIdentity":"drift-check 0a1b2c3d","leaseDurationSeconds":3000,"acquireTime":true,"renewTime":true}}
@@ -78,6 +88,7 @@ it_takes_the_lock_again_when_it_holds_it_already() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"3"},"spec":{"holderIdentity":"deploy-prod 4322","leaseDurationSeconds":6000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
 EOF
@@ -87,12 +98,13 @@ EOF
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" <<< 'hold-prod-lock: took the prod lock as deploy-prod 4322'
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   jq -c "$masked" "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"4"},"spec":{"holderIdentity":"deploy-prod 4322","leaseDurationSeconds":6000,"acquireTime":true,"renewTime":true}}
 EOF
-  jq -r '.spec.renewTime < "2099"' "$tree/store/kube-system/cloud-prod-state.json" > "$tree/renewed"
-  diff - "$tree/renewed" <<< 'true'
   assert_status 0 "$status"
 }
 
@@ -100,6 +112,7 @@ it_takes_over_a_lease_whose_holder_let_it_run_out() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"5"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2026-01-01T00:00:00.000000Z","renewTime":"2026-01-01T00:00:00.000000Z"}}
 EOF
@@ -112,6 +125,9 @@ EOF
 hold-prod-lock: deploy-prod 4321 let the prod lock run out at 2026-01-01T01:40:00.000000Z; taking it over
 hold-prod-lock: took the prod lock as drift-check 0a1b2c3d
 EOF
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   jq -c "$masked" "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"6"},"spec":{"holderIdentity":"drift-check 0a1b2c3d","leaseDurationSeconds":3000,"acquireTime":true,"renewTime":true}}
@@ -123,6 +139,7 @@ it_makes_a_deploy_prod_run_wait_while_a_drift_check_holds_the_lock_and_take_it_o
   local status=0
   create_case_tree 'kill "$taker" 2> /dev/null || true'
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"drift-check 0a1b2c3d","leaseDurationSeconds":3000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
 EOF
@@ -152,6 +169,7 @@ it_makes_a_drift_check_wait_while_a_deploy_prod_run_holds_the_lock_and_take_it_o
   local status=0
   create_case_tree 'kill "$taker" 2> /dev/null || true'
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
 EOF
@@ -181,6 +199,7 @@ it_exits_75_when_another_holder_still_holds_the_lock_after_the_wait() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
 EOF
@@ -199,6 +218,7 @@ it_reads_the_lease_again_after_another_taker_wins_the_race_for_it() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"leaseDurationSeconds":3000}}
 EOF
@@ -225,6 +245,7 @@ it_exits_1_with_kubectl_s_error_when_the_api_refuses_the_read() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   echo 'system:serviceaccount:example-ns:example-account' > "$tree/store/forbidden"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -240,6 +261,7 @@ it_releases_the_lock_it_holds_by_clearing_the_holder() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2026-10-21T05:41:00.000000Z","renewTime":"2026-10-21T05:41:00.000000Z"}}
 EOF
@@ -261,6 +283,7 @@ it_leaves_a_lock_that_another_holder_took_over() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"4"},"spec":{"holderIdentity":"drift-check 0a1b2c3d","leaseDurationSeconds":3000,"acquireTime":"2026-10-21T05:41:00.000000Z","renewTime":"2026-10-21T05:41:00.000000Z"}}
 EOF
@@ -279,6 +302,7 @@ it_leaves_a_lock_that_another_holder_took_while_it_released_it() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2026-01-01T00:00:00.000000Z","renewTime":"2026-01-01T00:00:00.000000Z"}}
 EOF
@@ -300,6 +324,7 @@ it_leaves_nothing_to_release_when_there_is_no_lease() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     KUBECONFIG="$tree/kubeconfig" bash "$script" release 'deploy-prod 4321' \
@@ -314,6 +339,7 @@ it_rejects_a_take_without_a_whole_number_of_lease_seconds_with_its_usage() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     KUBECONFIG="$tree/kubeconfig" bash "$script" take 'deploy-prod 4321' 10m 3300 \
@@ -328,6 +354,7 @@ it_rejects_a_release_with_an_empty_holder_with_its_usage() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     KUBECONFIG="$tree/kubeconfig" bash "$script" release '' \

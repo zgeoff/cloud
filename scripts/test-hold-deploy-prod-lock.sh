@@ -8,7 +8,8 @@
 # op is create-stub-op-read.sh, whose vault directory holds the kubeconfig, and kubectl is
 # create-stub-kubectl.sh, whose store holds the Lease and which logs apart from op. Each case runs
 # the script under `env -i` and compares its whole stderr, both call logs, the kubeconfig and the
-# stored Lease, with each Lease time checked for its form only.
+# stored Lease, with each Lease time a take writes checked for its form and for falling between the
+# clock's readings before and after the act.
 #
 #   bash scripts/test-hold-deploy-prod-lock.sh
 # shellcheck source-path=SCRIPTDIR
@@ -18,6 +19,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-between.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kubectl.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-op-read.sh"
@@ -30,6 +32,7 @@ it_writes_the_kubeconfig_privately_and_takes_the_lock_as_the_run_for_6000_second
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
   mkdir -p "$tree/vault/cloud-deploy/k3s-kubeconfig"
   printf 'apiVersion: v1\nkind: Config\n' > "$tree/vault/cloud-deploy/k3s-kubeconfig/kubeconfig.yaml"
 
@@ -43,6 +46,9 @@ it_writes_the_kubeconfig_privately_and_takes_the_lock_as_the_run_for_6000_second
   stat -c %a "$tree/runner/kubeconfig" > "$tree/mode"
   diff - "$tree/mode" <<< 600
   diff - "$tree/calls" <<< '["op","read","--no-newline","op://cloud-deploy/k3s-kubeconfig/kubeconfig.yaml"]'
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   jq -c "$masked" "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"1"},"spec":{"holderIdentity":"deploy-prod 18342","leaseDurationSeconds":6000,"acquireTime":true,"renewTime":true}}
@@ -56,6 +62,7 @@ it_takes_back_the_hold_that_an_earlier_attempt_of_the_run_left() {
   setup_test "$tree"
   mkdir -p "$tree/vault/cloud-deploy/k3s-kubeconfig"
   printf 'apiVersion: v1\nkind: Config\n' > "$tree/vault/cloud-deploy/k3s-kubeconfig/kubeconfig.yaml"
+  before="$(date -u +%s)"
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"6"},"spec":{"holderIdentity":"deploy-prod 18342","leaseDurationSeconds":6000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
 EOF
@@ -67,6 +74,9 @@ EOF
   diff - "$tree/err" <<< 'hold-prod-lock: took the prod lock as deploy-prod 18342'
   jq -r '"\(.metadata.resourceVersion) \(.spec.holderIdentity)"' "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" <<< '7 deploy-prod 18342'
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   assert_status 0 "$status"
 }
 

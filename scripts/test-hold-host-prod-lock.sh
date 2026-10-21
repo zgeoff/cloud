@@ -6,7 +6,8 @@
 #
 # kubectl is create-stub-kubectl.sh, whose store holds the Lease. Each case runs the script under
 # `env -i` and compares its whole stderr, the status file and the stored Lease, with each Lease
-# time checked for its form only.
+# time a take writes checked for its form and for falling between the clock's readings before and
+# after the act.
 #
 #   bash scripts/test-hold-host-prod-lock.sh
 # shellcheck source-path=SCRIPTDIR
@@ -16,6 +17,7 @@ umask 022
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/run-cases.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-case-tree.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-status.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-between.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/assert-missing.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/create-stub-kubectl.sh"
 
@@ -27,6 +29,7 @@ it_takes_the_lock_as_the_invocation_for_3000_seconds_and_writes_status_0() {
   local status=0
   create_case_tree
   setup_test "$tree"
+  before="$(date -u +%s)"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     INVOCATION_ID=0a1b2c3d4e5f60718293a4b5c6d7e8f9 LOCK_STATUS_FILE="$tree/lock-status" \
@@ -35,6 +38,9 @@ it_takes_the_lock_as_the_invocation_for_3000_seconds_and_writes_status_0() {
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'hold-prod-lock: took the prod lock as drift-check 0a1b2c3d4e5f60718293a4b5c6d7e8f9'
   diff - "$tree/lock-status" <<< 0
+  after="$(date -u +%s)"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.acquireTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the acquire time"
+  assert_between "$before" "$(date -u -d "$(jq -r .spec.renewTime "$tree/store/kube-system/cloud-prod-state.json")" +%s)" "$after" "the renew time"
   jq -c "$masked" "$tree/store/kube-system/cloud-prod-state.json" > "$tree/lease"
   diff - "$tree/lease" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"1"},"spec":{"holderIdentity":"drift-check 0a1b2c3d4e5f60718293a4b5c6d7e8f9","leaseDurationSeconds":3000,"acquireTime":true,"renewTime":true}}
