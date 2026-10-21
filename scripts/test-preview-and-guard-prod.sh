@@ -31,7 +31,7 @@ it_passes_the_plan_with_verdict_apply_and_shows_the_guard_s_text() {
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'The guard passes the plan: no held step.'
-  diff - "$tree/err" <<< '$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json'
+  diff - "$tree/err" <<< '$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json'
   diff - "$tree/output" <<< 'verdict=apply'
   diff - "$tree/summary" <<< 'The guard passes the plan: no held step.'
   diff - "$tree/runner/plan.json" <<< '{"steps":[{"op":"same"}]}'
@@ -54,7 +54,7 @@ it_holds_the_plan_with_verdict_hold_when_the_guard_exits_3() {
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'Held: the drift check failed.'
-  diff - "$tree/err" <<< '$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json'
+  diff - "$tree/err" <<< '$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json'
   diff - "$tree/output" <<< 'verdict=hold'
   diff - "$tree/summary" <<< 'Held: the drift check failed.'
   diff - "$tree/runner/plan.json" <<< '{"steps":[{"op":"replace"}]}'
@@ -78,7 +78,7 @@ it_shows_the_guard_s_text_then_fails_naming_the_preview_s_status_when_the_previe
 
   diff - "$tree/out" <<< 'The plan is not JSON.'
   diff - "$tree/err" << 'EOF'
-$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json
+$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json
 the preview failed (exit 255)
 EOF
   diff /dev/null "$tree/output"
@@ -103,7 +103,7 @@ it_fails_with_no_verdict_when_the_guard_fails_with_any_other_status() {
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'usage: check-prod-plan.ts <plan> <drift outcome>'
-  diff - "$tree/err" <<< '$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json'
+  diff - "$tree/err" <<< '$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json'
   diff /dev/null "$tree/output"
   diff - "$tree/summary" <<< 'usage: check-prod-plan.ts <plan> <drift outcome>'
   diff - "$tree/calls" << EOF
@@ -126,7 +126,7 @@ it_stops_before_the_preview_with_the_sdk_build_s_status_when_the_build_fails() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'EOF'
-$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json
+$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json
 error: script "sdk:build" exited with code 2
 EOF
   diff /dev/null "$tree/output"

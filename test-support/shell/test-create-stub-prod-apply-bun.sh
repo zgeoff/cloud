@@ -70,7 +70,7 @@ it_fails_the_sdk_build_with_bun_s_error_line_and_the_exit_the_case_sets() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'EOF'
-$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json
+$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json
 error: script "sdk:build" exited with code 2
 EOF
   diff - "$tree/calls" <<< "{\"cwd\":\"$tree\",\"argv\":[\"bun\",\"run\",\"sdk:build\"]}"
