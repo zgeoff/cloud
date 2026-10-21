@@ -1,3 +1,5 @@
+import type { PipedProcess } from './spawn-piped.ts';
+
 interface KubectlProxy {
   // the proxy's base URL, such as http://127.0.0.1:41873, with no trailing slash
   readonly url: string;
@@ -13,16 +15,13 @@ export interface StartKubectlProxyOptions {
   // kubectl proxy with --port=0, so the proxy takes a free port and prints it
   readonly argv: readonly string[];
   readonly timeoutMs: number;
+  readonly spawn: (argv: readonly string[]) => PipedProcess;
 }
 
 export async function startKubectlProxy(
   options: Readonly<StartKubectlProxyOptions>,
 ): Promise<KubectlProxyStart> {
-  const subprocess = Bun.spawn([...options.argv], {
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-  });
+  const subprocess = options.spawn(options.argv);
 
   const stop = async () => {
     subprocess.kill();

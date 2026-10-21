@@ -2,6 +2,7 @@ import { checkNixieAPI } from './check-nixie-api.ts';
 import { nixieAPICheckCalls } from './nixie-api/nixie-api-check-calls.ts';
 import type { Runner } from './run-process.ts';
 import { runProcess } from './run-process.ts';
+import { spawnPiped } from './spawn-piped.ts';
 import type { KubectlProxyStart } from './start-kubectl-proxy.ts';
 import { startKubectlProxy } from './start-kubectl-proxy.ts';
 
@@ -61,7 +62,11 @@ if (import.meta.main) {
     run: runProcess,
     send: (request) => fetch(request),
     startProxy: () =>
-      startKubectlProxy({ argv: ['kubectl', 'proxy', '--port=0'], timeoutMs: 30_000 }),
+      startKubectlProxy({
+        argv: ['kubectl', 'proxy', '--port=0'],
+        timeoutMs: 30_000,
+        spawn: spawnPiped,
+      }),
     printOut: (text) => {
       process.stdout.write(text);
     },
