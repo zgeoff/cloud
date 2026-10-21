@@ -39,6 +39,19 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
+## Images on the pool
+
+impd keeps its images on `tank/imp`, which shares the pool with the encrypted datasets and the k3s
+zvol, and it removes images under storage pressure. The host's configuration sets impd's two marks:
+once an image add, a build or a template leaves the dataset's usage at the high mark or above, impd
+removes unused images, least recently used first, until the usage falls under the low mark
+([imp's image eviction](https://github.com/zgeoff/impz/blob/main/docs/guides/images.md#evict-images-under-storage-pressure)).
+The high mark sits low enough that a builder imp's disk still fits above impd's disk reserve.
+
+impd never removes a pinned image, so each image that a config outside impd boots by name carries a
+pin. The preview service's image unit pins the preview image, the agent image build pins each image
+that passes its check, and nixie's runbook pins nixie's sandbox images as it adds them.
+
 ## DNS and certificates
 
 impd owns the DNS records for its hostnames. It writes DNS-only records for `imps.geoff.cloud` and

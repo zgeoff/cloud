@@ -385,7 +385,7 @@ let
       '';
     }
     {
-      title = "it adds the pinned image under the preview image name when impd holds no image of that name, and leaves the other impd images alone";
+      title = "it adds the digest-pinned image under the preview image name and pins the name when impd holds no image of that name, and leaves the other impd images alone";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/imp-base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
@@ -399,23 +399,25 @@ let
         assert_equals 0 "$status" "the exit status"
         assert_files_equal - out <<'EOF'
         preview-image: adding ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} to impd as pv-base
-        preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}
+        preview-image: pinning pv-base
+        preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned
         EOF
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","imp-host","impz","image","pin","pv-base"]
         EOF
-        assert_equals '[["base","ghcr.io/example/imp-base:1.0.0"],["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}"]]' \
-          "$(jq -c 'map([.name, .ref])' impd/images.json)" "impd's images"
+        assert_equals '[["base","ghcr.io/example/imp-base:1.0.0",false],["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
+          "$(jq -c 'map([.name, .ref, .pinned == true])' impd/images.json)" "impd's images"
         assert_missing sleep.log "the pauses"
       '';
     }
     {
-      title = "it points the name at the pinned image in place of an older pin";
+      title = "it points the pinned name at the new reference in place of an older one, and pins nothing again";
       script = ''
         mkdir home tmp impd
-        echo '[{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.2@sha256:${lib.strings.replicate 64 "b"}","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
+        echo '[{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.2@sha256:${lib.strings.replicate 64 "b"}","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":true}]' > impd/images.json
 
         status=0
         env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
@@ -426,18 +428,22 @@ let
         assert_equals 0 "$status" "the exit status"
         assert_files_equal - out <<'EOF'
         preview-image: adding ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} to impd as pv-base, in place of ghcr.io/example/imp-base:1.2.2@sha256:${lib.strings.replicate 64 "b"}
-        preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}
+        preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned
         EOF
         assert_files_equal /dev/null err
-        assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}"]]' \
-          "$(jq -c 'map([.name, .ref])' impd/images.json)" "impd's images"
+        assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        EOF
+        assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
+          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
       '';
     }
     {
-      title = "it adds nothing when the name already holds the pinned image";
+      title = "it adds and pins nothing when the name already holds the reference and a pin";
       script = ''
         mkdir home tmp impd
-        echo '[{"id":"img-3","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","digest":"imp-build-cc","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
+        echo '[{"id":"img-3","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","digest":"imp-build-cc","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":true}]' > impd/images.json
         cp impd/images.json before.json
 
         status=0
@@ -447,14 +453,40 @@ let
           ${imageScript} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
-        assert_equals "preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}" "$(cat out)" "the output"
+        assert_equals "preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned" "$(cat out)" "the output"
         assert_files_equal /dev/null err
         assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the calls"
         assert_files_equal before.json impd/images.json
       '';
     }
     {
-      title = "it waits for impd to answer, pausing between tries, before it adds the image";
+      title = "it pins the name, with no add, when the name holds the reference without a pin";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-3","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","digest":"imp-build-cc","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false}]' > impd/images.json
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal - out <<'EOF'
+        preview-image: pinning pv-base
+        preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned
+        EOF
+        assert_files_equal /dev/null err
+        assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","imp-host","impz","image","pin","pv-base"]
+        EOF
+        assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
+          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it waits for impd to answer, pausing between tries, before it adds and pins the image";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -477,6 +509,7 @@ let
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","imp-host","impz","image","pin","pv-base"]
         EOF
       '';
     }
