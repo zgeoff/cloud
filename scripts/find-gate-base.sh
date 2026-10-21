@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
-# The base that CI's checks job on a push to main compares <commit> with, to decide its path gates:
-# the newest commit before <commit> that a green CI run of a push to main checked. A push to main
-# cancels main's earlier run, so the commit before the push may never have passed its gated checks;
-# a green run's commit has, because that run compared with a green commit in turn. It writes
-# base=<commit> to $GITHUB_OUTPUT and stdout, and base=<40 zeros> when no green run checked an
-# ancestor, which runs every gated check.
-#
-# It asks gh, which resolves {owner}/{repo} from the checkout's remote, for the workflow's green
-# push runs on main, newest first. A gh failure fails the script with gh's exit and error, so a
-# caller never skips a check on an outage. A <commit> git cannot resolve fails with exit 1, and a
-# missing argument or GITHUB_OUTPUT is a usage error (exit 2).
+# A push to main cancels main's earlier CI run, so the commit before a push may never have passed
+# its gated checks. Only a commit that a green main run checked is a safe base for the path gates.
 #
 #   bash scripts/find-gate-base.sh <commit>
 set -euo pipefail
