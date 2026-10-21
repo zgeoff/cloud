@@ -63,10 +63,18 @@ the root cgroup, each slice and each unit in a slice, and writes it by mode wher
 textfile collector reads it. The service loops rather than running from a timer, so the journal that
 Alloy ships to Loki gets no lines for each write.
 
-The root cgroup's time is the whole host's. Its time less the sum of its slices' is the work that
-runs in the root cgroup itself: kernel threads, such as ZFS's threads that serve a zvol, and
-interrupts. A container that Docker runs shows as a scope in `system.slice`, and the pods show in
-the top-level cgroup that the kubelet makes for them.
+The same service writes the host's kernel time: the CPU time that was neither idle, iowait nor
+stolen, less the usage of the top-level cgroups. That remainder is the work that runs in the root
+cgroup itself: kernel threads, such as ZFS's threads that serve a zvol, and interrupts. The service
+never takes it from the root cgroup's own time less its slices', because the two differ in kind. The
+kernel samples the root's user and system time at each timer tick, while a child cgroup's usage is
+the scheduler's exact runtime, so that difference can read below zero. Idle, iowait and steal are
+measured rather than sampled, so the kernel time stays exact. The service holds the kernel count at
+its last value from the same boot when a new reading is lower, so a small dip in the measured idle
+time never reads as a counter reset.
+
+A container that Docker runs shows as a scope in `system.slice`, and the pods show in the top-level
+cgroup that the kubelet makes for them.
 
 ## Alert rules
 
