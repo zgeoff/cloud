@@ -21,6 +21,10 @@ space_redirects = true
 switch_case_indent = true
 space_redirects = true
 
+[images/agent/sbin/install-ubuntu-packages]
+switch_case_indent = true
+space_redirects = true
+
 [images/agent/bin/bun]
 switch_case_indent = true
 space_redirects = true
