@@ -143,7 +143,8 @@ jobs:
       - name: Test Files
         run: bun run test:files
 
-      # bash, git, jq, openssl, curl, python3, coreutils and gh, all on ubuntu-latest's image;
+      # bash, git, jq, openssl, curl, python3, coreutils, dpkg-deb and gh, all on ubuntu-latest's
+      # image; CI=true there, so the apt stand-in's suite fails rather than skip without dpkg-deb;
       # the ubuntu-24.04 image 20260927.320.1 readme lists GitHub CLI 2.101.0, which the GitHub
       # API stand-in's real-gh case (test-support/shell/test-start-stub-github-api.sh) runs
       - name: Test Scripts

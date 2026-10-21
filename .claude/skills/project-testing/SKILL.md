@@ -256,6 +256,12 @@ journey sits in `e2e/`, one file per journey. Each shared rule takes its shell f
   the host's environment file and the host stand-ins' own settings.
 - A guard's tests pass it a search path the case owns, so its expected text never depends on the
   host.
+- A `test:scripts` suite that needs a local tool that CI's image has and a developer's host may
+  lack, as [`test-create-stub-apt-suite.sh`](../../../test-support/shell/test-create-stub-apt-suite.sh)
+  needs `dpkg-deb`, checks for the tool before `run_cases`. Without it, the suite prints a `skip`
+  line and exits 0, so the pre-push hook passes. With `CI` set, as GitHub Actions sets it, the
+  suite exits 1 instead, so CI never skips the cases. A Docker suite has no skip: it fails before
+  any case and names the tool.
 - A producer whose output a case compares writes to a file under errexit first, so a failing
   producer fails the case instead of producing an empty match.
 - Every other helper in `test-support/shell/` exports one public function, named for its file, and
