@@ -69,14 +69,16 @@ cgroup itself: kernel threads, such as ZFS's threads that serve a zvol, and inte
 never takes it from the root cgroup's own time less its slices', because the two differ in kind. The
 kernel samples the root's user and system time at each timer tick, while a child cgroup's usage is
 the scheduler's exact runtime, so that difference can read below zero. Idle, iowait and steal are
-measured rather than sampled, so the kernel time stays exact. The service holds the kernel count at
-its last value from the same boot when a new reading is lower, so a small dip in the measured idle
-time never reads as a counter reset. A top-level cgroup can go, such as `user.slice` after its last
-session, so the service keeps subtracting the last time it read for each one that went or that
-systemd made again under the same name.
+measured rather than sampled, so the kernel time stays exact.
+
+The service holds the kernel count at its last value from the same boot when a new reading is lower,
+so a small dip in the measured idle time never reads as a counter reset. A top-level cgroup can go,
+such as `user.slice` after its last session, so the service keeps subtracting the last time it read
+for each one that went or that systemd made again under the same name.
 
 A container that Docker runs shows as a scope in `system.slice`, and the pods show in the top-level
-cgroup that the kubelet makes for them.
+cgroup that the kubelet makes for them. Grafana's `host-cpu` dashboard charts the kernel time beside
+the time of each top-level cgroup.
 
 ## Alert rules
 
