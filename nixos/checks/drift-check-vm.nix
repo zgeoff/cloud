@@ -3,10 +3,10 @@
 # plugin cannot start posts the failed alert. checks/drift-check.nix checks the units and the tree
 # in the build sandbox, which never mounts the state directory as systemd does.
 #
-# The VM has no internet, so the state is a local backend in the store with the random provider's
-# plugin in the state directory, as a download leaves it, and GitHub never answers. The check runs
-# the module's tree with one change: its stack file holds the fixture's salt, which matches the
-# fixture's passphrase. Discord is test-support/shell/start-stub-discord-webhook.sh on loopback.
+# No case reaches the internet: the state is a local backend in the store, the random provider's
+# plugin sits in the state directory as a download leaves it, and GitHub is a dead loopback port.
+# The check runs the module's tree with one change: its stack file holds the fixture's salt, which
+# matches the fixture's passphrase. Discord is test-support/shell/start-stub-discord-webhook.sh on loopback.
 # It needs KVM: run `bun run test:nixos drift-check-vm`.
 { nixpkgs }:
 let
@@ -106,6 +106,8 @@ pkgs.testers.runNixOSTest {
       };
       systemd.services.drift-check.serviceConfig.ExecStart =
         lib.mkForce "${pkgs.bash}/bin/bash ${tree}/scripts/run-host-drift-check.sh";
+      # a dead loopback port, so GitHub never answers, whether or not the VM reaches the internet
+      systemd.services.drift-check.environment.GITHUB_API_URL = lib.mkForce "http://127.0.0.1:1";
       virtualisation.memorySize = 2048;
     };
 
