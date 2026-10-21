@@ -15,7 +15,6 @@ import type {
   StackConfig,
 } from './types.ts';
 
-// why each role token is required, for requireVariable's error
 const tokenNeed = 'the files service needs it while stack config "files" is set';
 
 // a missing field reaches its own check below, which names what the field must hold
@@ -24,9 +23,7 @@ const filesConfigSchema = z.object({
   hostname: z.string().optional(),
 });
 
-// The files service's inputs, or nothing while "files" is unset (setting it approves the deploy).
-// The service reads only the SHA-256 of each role token, FILES_AGENT_TOKEN and FILES_OWNER_TOKEN.
-// FILES_RESTIC_* and FILES_R2_* add the backup, in the gateway's backup image.
+// setting stack config "files" approves the deploy; FILES_RESTIC_* and FILES_R2_* add the backup
 export function loadFilesInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
@@ -67,7 +64,6 @@ function deriveTokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-// all backup variables set, or no backup; findResticBackup throws on a partial set
 function findBackup(
   env: Environment,
   backupImage: BackupImage | undefined,

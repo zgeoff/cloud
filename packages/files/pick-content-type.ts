@@ -1,9 +1,5 @@
-// how many leading bytes pickContentType reads
 export const sniffLength = 64;
 
-// The file's media type from its first bytes, never from the uploader's claim: the seven types the
-// service serves inline, then PDF, SVG and HTML, which it records but only ever serves as a
-// download, and application/octet-stream for anything else.
 export function pickContentType(head: Uint8Array): string {
   // one character per byte, of the same value
   const text = String.fromCodePoint(...head);
@@ -52,8 +48,7 @@ function pickISOMediaType(brand: string): string {
   return mp4Brands.has(brand) ? 'video/mp4' : 'application/octet-stream';
 }
 
-// SVG and HTML, after an optional byte order mark and leading white space, so the metadata names
-// them; the service serves both as a download whatever this finds
+// the metadata names SVG and HTML, though the service serves both as a download whatever this finds
 function pickMarkupType(text: string): string {
   const start = text
     .replace(/^ï»¿/u, '')

@@ -62,7 +62,7 @@ export function buildATCPodSecurity(): input.core.v1.PodSecurityContext {
 export const atcGatewayRegistryFile = 'registry.json';
 const registryDir = '/etc/atc-gateway';
 
-// $HOME/.local/state/atc, until atc's packaging names the gateway's state path
+// atc's default, $HOME/.local/state/atc: atc's packaging names no state path for the gateway
 const defaultStateDir = '/home/nonroot/.local/state/atc';
 
 export const atcGatewayPort = topology.atc.gatewayPort;

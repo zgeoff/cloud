@@ -7,9 +7,6 @@ export interface FilesConfig {
   readonly tokenHashes: TokenHashes;
 }
 
-// The configuration from the environment: FILES_PORT (8080 by default), FILES_DATA_DIR,
-// FILES_PUBLIC_URL, and each role token's SHA-256 in hex. A missing or malformed value throws, so
-// the service never starts half-configured.
 export function loadFilesConfig(env: Readonly<Record<string, string | undefined>>): FilesConfig {
   const agent = requireHash(env, 'FILES_AGENT_TOKEN_SHA256');
   const owner = requireHash(env, 'FILES_OWNER_TOKEN_SHA256');

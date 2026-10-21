@@ -1,4 +1,3 @@
-// the program's entry point: it reads the inputs once and wires each group through its entry module
 import { Config } from '@pulumi/pulumi';
 import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
@@ -7,8 +6,7 @@ import { buildATCDaemonEndpoints, loadInputs } from './inputs/index.ts';
 import { createObservability } from './observability/index.ts';
 import { createTailnet } from './tailnet/index.ts';
 
-// The one place the program reads its stack config and env (.env's op:// refs, through `op
-// run`); every value is checked before any resource registers.
+// the env holds .env's op:// refs, resolved through `op run`
 const inputs = loadInputs(new Config(), process.env);
 const accountID = inputs.accountID;
 const edge = createEdge({ accountID, hostOnTailnet: inputs.hostOnTailnet });
@@ -26,8 +24,7 @@ export const hostAuthKey = tailnet.hostAuthKey;
 export const impKeySyncID = tailnet.impKeySyncID;
 export const impHostAuthKey = tailnet.impHostAuthKey;
 
-// k3s workloads (#6), with their inputs checked at the top of the program. Pulumi reaches the
-// k3s API over the tailnet with the kubeconfig from op://cloud/k3s-kubeconfig.
+// Pulumi reaches the k3s API over the tailnet with the kubeconfig from op://cloud/k3s-kubeconfig
 const k3s =
   inputs.cluster === undefined
     ? undefined

@@ -11,7 +11,7 @@ server.events.on('request:unhandled', (event) => {
   unhandledRequests.push(`${event.request.method} ${event.request.url}`);
 });
 
-// importing NativeWebSocket takes Bun's WebSocket before listen() replaces the global
+// the import takes Bun's WebSocket before listen() replaces the global
 void NativeWebSocket;
 
 // the only real traffic is loopback, to a test's stub impd through its own passthrough()

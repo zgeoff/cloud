@@ -1,7 +1,6 @@
 import { pinnedImagePattern } from './pinned-image-pattern.ts';
 
-// Throws unless the stack config value at key, such as "nixie.image", names an image by tag and
-// digest, so a deploy never pulls a tag that can move.
+// by tag and digest, so a deploy never pulls a tag that can move
 export function requirePinnedImage(
   key: string,
   image: string | undefined,

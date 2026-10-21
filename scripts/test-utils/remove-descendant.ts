@@ -1,6 +1,5 @@
 import { readFile, rm } from 'node:fs/promises';
 
-// kills the process whose pid a test's command wrote to pidFile, then removes the directory
 export async function removeDescendant(directory: string, pidFile: string): Promise<void> {
   const text = await readFile(pidFile, 'utf8').catch(() => '');
 

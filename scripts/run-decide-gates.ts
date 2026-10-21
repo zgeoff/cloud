@@ -1,6 +1,3 @@
-// The one path filter for CI, the NixOS checks and the prod apply, run as `bun
-// scripts/run-decide-gates.ts [--github] <base> <head> <gate>...`: it prints `<gate>=true` when a
-// commit after <base> up to <head> changes a file the gate's paths in .github/gates.yml match.
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -26,8 +23,7 @@ export interface RunDecideGatesOptions extends ScriptIO {
 const usage = 'usage: run-decide-gates.ts [--github] <base> <head> <gate>...';
 
 // A revision git cannot resolve fails with git's status, so a caller never skips a check on an
-// error. --github also appends the lines to the step outputs, and each false gate's skipped line
-// to stdout and the step summary, so every run reports a result.
+// error. With --github each false gate also reports a skipped line, so every run reports a result.
 export function runDecideGates(options: Readonly<RunDecideGatesOptions>): Promise<number> {
   return withExitCode(options.printErr, async () => {
     const args = parseDecideGatesArgs(options.args);

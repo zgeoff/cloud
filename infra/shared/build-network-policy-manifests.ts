@@ -14,7 +14,7 @@ interface NetworkPolicyManifest {
   readonly spec: input.networking.v1.NetworkPolicySpec;
 }
 
-// every egress deny and allow the program creates, as the manifests the NixOS check applies
+// the NixOS check applies these manifests
 export function buildNetworkPolicyManifests(): NetworkPolicyManifest[] {
   const denies = collectEgressDenyNamespaces().map((namespace) =>
     buildManifest(egressDenyPolicyName, namespace, buildEgressDenyNetworkPolicySpec()),

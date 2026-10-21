@@ -16,9 +16,6 @@ interface FilesBackupJobInputs {
   readonly backup: FilesBackupInputs;
 }
 
-// Nightly restic backup of the files service's volume to R2, from its claim beside the service (one
-// node, so ReadWriteOnce allows it). The Secret and the ConfigMap keep fixed names, because
-// deploy/files/restore-job.yaml names them; the namespace's pull Secret pulls the backup image too.
 export function createFilesBackupJob(cluster: Provider, inputs: FilesBackupJobInputs): CronJob {
   const env = createEnvSecret(cluster, inputs);
   const script = createScriptConfigMap(cluster, inputs.namespace);
@@ -39,7 +36,11 @@ export function createFilesBackupJob(cluster: Provider, inputs: FilesBackupJobIn
             template: {
               spec: buildFilesBackupPodSpec({
                 image: inputs.backup.image,
+
+                // one node, so ReadWriteOnce allows the claim beside the service
                 claim: 'data-files-0',
+
+                // fixed names, because deploy/files/restore-job.yaml names them
                 scriptConfigMap: 'files-backup-script',
                 envSecret: 'files-backup',
                 pullSecret: ghcrPullSecretName,

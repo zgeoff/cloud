@@ -25,8 +25,7 @@ const homePCDaemon = {
   port: topology.atc.daemonPort,
 };
 
-// The pods that may use a tag:cloud grant, each to the addresses and ports it dials. Every other
-// pod in a namespace with egress deny is refused the tailnet range and Docker's subnet.
+// every other pod in a namespace with egress deny is refused the tailnet range and Docker's subnet
 export const egressAllows = {
   atcGateway: {
     name: 'atc-gateway-egress',

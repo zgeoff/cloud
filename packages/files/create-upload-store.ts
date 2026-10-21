@@ -9,7 +9,7 @@ interface UploadFilter {
 }
 
 export interface UploadStore {
-  // records a new upload; its id is unique
+  // the upload's id must be new
   readonly writeUpload: (upload: Upload) => void;
   readonly findUpload: (id: string) => Upload | null;
 
@@ -53,9 +53,8 @@ const uploadRowSchema = z.object({
 
 const expiredRowsSchema = z.array(z.object({ id: z.string() }));
 
-// The metadata file on the volume beside the files: one row per upload, with times in
-// milliseconds since the epoch. WAL mode lets the backup's sqlite3 copy it while the service
-// writes.
+// Times are stored in milliseconds since the epoch. WAL mode lets the backup's sqlite3 copy the
+// file while the service writes.
 export function createUploadStore(path: string): UploadStore {
   const db = new Database(path, { create: true, strict: true });
 

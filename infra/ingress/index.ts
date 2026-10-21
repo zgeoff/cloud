@@ -12,32 +12,27 @@ import { createCloudflared } from './create-cloudflared.ts';
 import { createGatewayAccess } from './create-gateway-access.ts';
 import { createTunnelRoutes } from './create-tunnel-routes.ts';
 
-// the names observability's monitor and alert rule select cloudflared by
 export { cloudflaredNames } from './cloudflared-names.ts';
 
-// the atc tunnel, made before the cluster so the gateway pod's sidecar gets its token
+// made before the cluster, so the gateway pod's sidecar gets the tunnel's token
 export { createATCTunnel } from './create-atc-tunnel.ts';
 
 interface IngressInputs {
   readonly accountID: string;
-
-  // geoff.cloud's zone, from the edge, for each route's CNAME
   readonly zoneID: Output<string>;
-
-  // the k3s cluster cloudflared runs in; unset while the stack manages no cluster
   readonly cluster: Provider | undefined;
 
-  // the atc gateway's route, set only with the gateway
+  // set only with the gateway
   readonly atcRoute: TunnelRoute | undefined;
 
   // the one address the Access policy in front of the gateway's sign-in pages lets in, set with
   // the gateway
   readonly atcOwnerEmail: Output<string> | undefined;
 
-  // the atc tunnel, set with the gateway
+  // set only with the gateway
   readonly atcTunnel: ATCTunnel | undefined;
 
-  // the files service's route, set with the service
+  // set only with the files service
   readonly filesRoute: TunnelRoute | undefined;
 }
 
@@ -50,9 +45,6 @@ interface IngressOutputs {
   readonly previewWebhookURL: Output<string>;
 }
 
-// Public ingress (#7). The shared tunnel serves every public hostname under geoff.cloud but the
-// gateway's, which the atc tunnel serves; cloudflared runs in k3s with the token below. Each
-// workload brings its own auth, and Access fronts the gateway's sign-in pages on top of it.
 export function createIngress(inputs: IngressInputs): IngressOutputs {
   const tunnel = new ZeroTrustTunnelCloudflared('edge', {
     accountId: inputs.accountID,
@@ -60,7 +52,7 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     configSrc: 'cloudflare',
   });
 
-  // cloudflared's credential; it becomes a k3s Secret once the cluster exists (#6)
+  // cloudflared's credential; it becomes a k3s Secret once the cluster exists
   const tunnelToken = secret(
     getZeroTrustTunnelCloudflaredTokenOutput({ accountId: inputs.accountID, tunnelId: tunnel.id })
       .token,
@@ -70,8 +62,6 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
     createCloudflared(inputs.cluster, tunnelToken);
   }
 
-  // the routes: atc.geoff.cloud, a workload in k3s, on the atc tunnel, and the preview service's
-  // webhook listener on the host and the files service in k3s, on this one
   const routes = createTunnelRoutes({
     accountID: inputs.accountID,
     zoneID: inputs.zoneID,
@@ -92,7 +82,6 @@ export function createIngress(inputs: IngressInputs): IngressOutputs {
   };
 }
 
-// the gateway's route with its Access application and its tunnel, or nothing without the gateway;
 // the program sets the route, the owner address and the tunnel together, so one without the
 // others is a wiring fault
 function createGatewayIngress(inputs: IngressInputs): GatewayIngress | undefined {
