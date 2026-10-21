@@ -1,5 +1,5 @@
-/* oxlint-disable typescript/no-unsafe-type-assertion -- each body is GitHub's documented request shape */
 import { HttpResponse, http } from 'msw';
+import { z } from 'zod';
 import { githubAPIURL } from './github-api-url.ts';
 import {
   commitStatuses,
@@ -8,6 +8,15 @@ import {
   pullRequestFiles,
   tokenLogin,
 } from './github-state.ts';
+
+const commentRequestSchema = z.object({ body: z.string() });
+
+// GitHub answers 422 for a state outside its four and a description past 140 characters
+const commitStatusRequestSchema = z.object({
+  state: z.enum(['error', 'failure', 'pending', 'success']),
+  context: z.string().optional(),
+  description: z.string().max(140).optional(),
+});
 
 // GitHub's REST endpoints that the service calls (docs.github.com/en/rest: repos/contents,
 // issues/comments, users/users, pulls/pulls#list-pull-requests-files, commits/statuses), with
@@ -47,14 +56,20 @@ export const handlers = [
     return HttpResponse.json(comments);
   }),
   http.post(`${githubAPIURL}/repos/:owner/:name/issues/:number/comments`, async (info) => {
-    const payload = (await info.request.json()) as { readonly body: string };
+    const body = await info.request.json();
+
+    const payload = commentRequestSchema.safeParse(body);
+
+    if (!payload.success) {
+      return buildValidationFailedResponse();
+    }
 
     const comment = {
       id: 9000 + issueComments.length,
       author: tokenLogin,
       repo: `${String(info.params['owner'])}/${String(info.params['name'])}`,
       number: Number(info.params['number']),
-      body: payload.body,
+      body: payload.data.body,
     };
 
     issueComments.push(comment);
@@ -62,7 +77,14 @@ export const handlers = [
     return HttpResponse.json({ id: comment.id, body: comment.body }, { status: 201 });
   }),
   http.patch(`${githubAPIURL}/repos/:owner/:name/issues/comments/:id`, async (info) => {
-    const payload = (await info.request.json()) as { readonly body: string };
+    const body = await info.request.json();
+
+    const payload = commentRequestSchema.safeParse(body);
+
+    if (!payload.success) {
+      return buildValidationFailedResponse();
+    }
+
     const comment = issueComments.find((candidate) => candidate.id === Number(info.params['id']));
 
     if (comment === undefined) {
@@ -74,7 +96,7 @@ export const handlers = [
       return HttpResponse.json({ message: 'Forbidden', status: '403' }, { status: 403 });
     }
 
-    comment.body = payload.body;
+    comment.body = payload.data.body;
 
     return HttpResponse.json({ id: comment.id, body: comment.body });
   }),
@@ -89,19 +111,15 @@ export const handlers = [
     return HttpResponse.json(files);
   }),
   http.post(`${githubAPIURL}/repos/:owner/:name/statuses/:sha`, async (info) => {
-    const payload = (await info.request.json()) as {
-      readonly state: string;
-      readonly context?: string;
-      readonly description?: string;
-    };
+    const body = await info.request.json();
 
-    // GitHub answers 422 for a state outside its four and a description past 140 characters
-    if (
-      !['error', 'failure', 'pending', 'success'].includes(payload.state) ||
-      (payload.description ?? '').length > 140
-    ) {
-      return HttpResponse.json({ message: 'Validation Failed', status: '422' }, { status: 422 });
+    const parsed = commitStatusRequestSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return buildValidationFailedResponse();
     }
+
+    const payload = parsed.data;
 
     const status = {
       repo: `${String(info.params['owner'])}/${String(info.params['name'])}`,
@@ -119,3 +137,7 @@ export const handlers = [
     );
   }),
 ];
+
+function buildValidationFailedResponse(): Response {
+  return HttpResponse.json({ message: 'Validation Failed', status: '422' }, { status: 422 });
+}

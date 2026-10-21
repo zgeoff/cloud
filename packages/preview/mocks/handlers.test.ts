@@ -63,6 +63,32 @@ test('it stores a posted comment and answers 201', async () => {
   ]);
 });
 
+test('it refuses a posted comment without a body with 422', async () => {
+  const response = await fetch(`${githubAPIURL}/repos/acme/greenhouse/issues/17/comments`, {
+    method: 'POST',
+    body: JSON.stringify({ text: 'hello' }),
+  });
+
+  expect(response.status).toBe(422);
+});
+
+test('it refuses an edit without a body with 422', async () => {
+  issueComments.push({
+    id: 1,
+    author: 'preview-bot',
+    repo: 'acme/greenhouse',
+    number: 17,
+    body: 'a preview link',
+  });
+
+  const response = await fetch(`${githubAPIURL}/repos/acme/greenhouse/issues/comments/1`, {
+    method: 'PATCH',
+    body: JSON.stringify({ text: 'hello' }),
+  });
+
+  expect(response.status).toBe(422);
+});
+
 test("it refuses an edit of another user's comment with 403", async () => {
   issueComments.push({
     id: 1,

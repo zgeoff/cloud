@@ -31,6 +31,7 @@ interface PreviewComment {
 }
 
 export const previewCommentMarker = '<!-- cloud-preview -->';
+const contentsFileSchema = z.object({ content: z.string().optional() });
 
 export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
   const send = (request: GitHubRequest): Promise<Response> =>
@@ -48,8 +49,9 @@ export function buildGitHubClient(apiURL: string, token: string): GitHubClient {
         return null;
       }
 
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's contents API shape
-      const file = (await response.json()) as { readonly content?: string };
+      const body = await response.json();
+
+      const file = contentsFileSchema.parse(body);
 
       return Buffer.from(file.content ?? '', 'base64').toString('utf8');
     },
@@ -138,11 +140,11 @@ function parseGitHubBody(text: string): unknown {
   }
 }
 
-interface IssueComment {
-  readonly id: number;
-  readonly body?: string;
-  readonly user?: { readonly login: string } | null;
-}
+const commentUserSchema = z.object({ login: z.string() });
+
+const issueCommentsSchema = z.array(
+  z.object({ id: z.number(), body: z.string().optional(), user: commentUserSchema.nullish() }),
+);
 
 async function readPreviewCommentID(
   send: (request: GitHubRequest) => Promise<Response>,
@@ -153,9 +155,9 @@ async function readPreviewCommentID(
     const path = `/repos/${comment.repo}/issues/${comment.number}/comments?per_page=100&page=${page}`;
 
     const response = await send({ path });
+    const body = await response.json();
 
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same page, in GitHub's issue comments shape
-    const comments = (await response.json()) as readonly IssueComment[];
+    const comments = issueCommentsSchema.parse(body);
 
     // anyone can paste the marker, and GitHub lets the service edit only its own comments
     const match = comments.find(
@@ -169,13 +171,15 @@ async function readPreviewCommentID(
   }
 }
 
+const tokenUserSchema = z.object({ login: z.string() });
+
 async function readTokenLogin(
   send: (request: GitHubRequest) => Promise<Response>,
 ): Promise<string> {
   const response = await send({ path: '/user' });
+  const body = await response.json();
 
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's authenticated user shape
-  const user = (await response.json()) as { readonly login: string };
+  const user = tokenUserSchema.parse(body);
 
   return user.login;
 }
@@ -194,10 +198,9 @@ async function sendCommitStatus(
   });
 }
 
-interface PullRequestFileEntry {
-  readonly filename: string;
-  readonly patch?: string;
-}
+const pullRequestFileEntriesSchema = z.array(
+  z.object({ filename: z.string(), patch: z.string().optional() }),
+);
 
 async function readPullRequestFiles(
   send: (request: GitHubRequest) => Promise<Response>,
@@ -210,9 +213,9 @@ async function readPullRequestFiles(
     const path = `/repos/${repo}/pulls/${number}/files?per_page=100&page=${page}`;
 
     const response = await send({ path });
+    const body = await response.json();
 
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- the same page, in GitHub's pull request files shape
-    const entries = (await response.json()) as readonly PullRequestFileEntry[];
+    const entries = pullRequestFileEntriesSchema.parse(body);
 
     files.push(...entries.map((entry) => ({ path: entry.filename, patch: entry.patch ?? null })));
 

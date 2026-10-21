@@ -1,3 +1,5 @@
+import { isRecord } from '@zgeoff/std';
+
 export type PullRequestAction = 'open' | 'update' | 'close';
 
 export interface PullRequestEvent {
@@ -50,12 +52,11 @@ export function parsePullRequestEvent(payload: unknown): PullRequestEvent | null
 }
 
 function requireObject(value: unknown, field: string): Readonly<Record<string, unknown>> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new TypeError(`the payload has no ${field} object`);
   }
 
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked as an object above
-  return value as Readonly<Record<string, unknown>>;
+  return value;
 }
 
 function requireString(value: unknown, field: string): string {

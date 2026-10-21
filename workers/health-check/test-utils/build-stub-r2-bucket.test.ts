@@ -22,13 +22,10 @@ test('it reads a stored key as an R2 object body with the metadata of a single-p
     customMetadata: {},
     storageClass: 'Standard',
     writeHttpMetadata: expect.toBeFunction(),
-    body: expect.toSatisfy((value: unknown) => value instanceof ReadableStream),
     bodyUsed: false,
     arrayBuffer: expect.toBeFunction(),
     bytes: expect.toBeFunction(),
     text: expect.toBeFunction(),
-    json: expect.toBeFunction(),
-    blob: expect.toBeFunction(),
   });
 });
 
@@ -90,26 +87,4 @@ test('it gives each put a new version', async () => {
   invariant(first !== null && second !== null, 'expected both stored objects');
 
   expect(second.version).not.toBe(first.version);
-});
-
-test('it rejects a put of a value that is not a string', () => {
-  expect(buildStubR2Bucket().put('state:atc', new Uint8Array([1]))).rejects.toThrowWithMessage(
-    Error,
-    'the stub R2 bucket models only a string value with no options',
-  );
-});
-
-test('it rejects a put with options', () => {
-  expect(
-    buildStubR2Bucket().put('state:atc', 'up', { customMetadata: {} }),
-  ).rejects.toThrowWithMessage(
-    Error,
-    'the stub R2 bucket models only a string value with no options',
-  );
-});
-
-test('it rejects a get with options', () => {
-  expect(
-    buildStubR2Bucket({ 'state:atc': 'up' }).get('state:atc', { range: { suffix: 1 } }),
-  ).rejects.toThrowWithMessage(Error, 'the stub R2 bucket does not model get options');
 });

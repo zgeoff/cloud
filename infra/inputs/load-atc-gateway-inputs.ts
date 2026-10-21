@@ -14,7 +14,7 @@ export function loadATCGatewayInputs(
   stackConfig: Pick<StackConfig, 'getObject' | 'getSecret'>,
   env: Environment,
 ): { readonly atcGateway?: ATCGatewayInputs } {
-  const raw = stackConfig.getObject<unknown>('atcGateway');
+  const raw = stackConfig.getObject('atcGateway');
 
   if (raw === undefined) {
     return {};

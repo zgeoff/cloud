@@ -1,6 +1,9 @@
 import { Database } from 'bun:sqlite';
+import { z } from 'zod';
 
-type PreviewPhase = 'waiting' | 'booting' | 'ready' | 'failed' | 'ended';
+const previewPhaseSchema = z.enum(['waiting', 'booting', 'ready', 'failed', 'ended']);
+
+type PreviewPhase = z.infer<typeof previewPhaseSchema>;
 
 export interface PreviewKey {
   readonly repo: string;
@@ -22,9 +25,20 @@ export interface PhaseChange {
   readonly detail?: string;
 }
 
-type ContractPhase = 'queued' | 'waiting' | 'running' | 'settling' | 'passed' | 'failed';
+const contractPhaseSchema = z.enum([
+  'queued',
+  'waiting',
+  'running',
+  'settling',
+  'passed',
+  'failed',
+]);
 
-export type ContractOutcome = 'success' | 'failure' | 'error';
+type ContractPhase = z.infer<typeof contractPhaseSchema>;
+
+const contractOutcomeSchema = z.enum(['success', 'failure', 'error']);
+
+export type ContractOutcome = z.infer<typeof contractOutcomeSchema>;
 
 export interface ContractRunKey {
   readonly repo: string;
@@ -133,22 +147,24 @@ type PreviewMethods = Pick<
 
 const firstPhase: PreviewPhase = 'waiting';
 
-interface PreviewRow {
-  readonly repo: string;
-  readonly number: number;
-  readonly imp: string;
-  readonly head_sha: string;
-  readonly built_sha: string | null;
-  readonly phase: PreviewPhase;
-  readonly detail: string | null;
-}
+const previewRowSchema = z.object({
+  repo: z.string(),
+  number: z.number(),
+  imp: z.string(),
+  head_sha: z.string(),
+  built_sha: z.string().nullable(),
+  phase: previewPhaseSchema,
+  detail: z.string().nullable(),
+});
+
+type PreviewRow = z.infer<typeof previewRowSchema>;
 
 function bindPreviewMethods(db: Database): PreviewMethods {
-  const select = db.query<PreviewRow, [string, number]>(
-    'SELECT * FROM previews WHERE repo = ?1 AND number = ?2',
-  );
+  const select = db.query('SELECT * FROM previews WHERE repo = ?1 AND number = ?2');
+  const selectBooting = db.query(`SELECT * FROM previews WHERE phase = 'booting'`);
 
-  const selectBooting = db.query<PreviewRow, []>(`SELECT * FROM previews WHERE phase = 'booting'`);
+  const findRow = (key: PreviewKey): PreviewRow | null =>
+    previewRowSchema.nullable().parse(select.get(key.repo, key.number));
 
   const upsert = db.query(`INSERT INTO previews (repo, number, imp, head_sha, phase)
     VALUES (?1, ?2, ?3, ?4, ?5)
@@ -177,7 +193,7 @@ function bindPreviewMethods(db: Database): PreviewMethods {
   };
 
   const upsertHead = db.transaction((head: PreviewHead) => {
-    const before = select.get(head.repo, head.number);
+    const before = findRow(head);
 
     upsert.run(head.repo, head.number, head.imp, head.headSHA, firstPhase);
 
@@ -189,15 +205,16 @@ function bindPreviewMethods(db: Database): PreviewMethods {
   const updateInterruptedBoots = db.transaction(() => {
     const detail = 'the service stopped during the boot';
 
-    return selectBooting
-      .all()
+    return z
+      .array(previewRowSchema)
+      .parse(selectBooting.all())
       .filter((row) => updatePhase(toPreview(row), ['booting'], { phase: 'failed', detail }))
       .length;
   });
 
   return {
     findPreview: (key) => {
-      const row = select.get(key.repo, key.number);
+      const row = findRow(key);
 
       return row === null ? null : toPreview(row);
     },
@@ -245,15 +262,17 @@ function toPreview(row: PreviewRow): Preview {
   };
 }
 
-interface ContractRunRow {
-  readonly repo: string;
-  readonly head_sha: string;
-  readonly number: number;
-  readonly imp: string;
-  readonly phase: ContractPhase;
-  readonly detail: string | null;
-  readonly outcome: ContractOutcome | null;
-}
+const contractRunRowSchema = z.object({
+  repo: z.string(),
+  head_sha: z.string(),
+  number: z.number(),
+  imp: z.string(),
+  phase: contractPhaseSchema,
+  detail: z.string().nullable(),
+  outcome: contractOutcomeSchema.nullable(),
+});
+
+type ContractRunRow = z.infer<typeof contractRunRowSchema>;
 
 type ContractRunMethods = Pick<
   PreviewStore,
@@ -268,13 +287,14 @@ function bindContractRunMethods(db: Database): ContractRunMethods {
   const claim = db.query(`INSERT INTO contract_runs (repo, head_sha, number, imp, phase)
     VALUES (?1, ?2, ?3, ?4, 'queued') ON CONFLICT (repo, head_sha) DO NOTHING`);
 
-  const select = db.query<ContractRunRow, [string, string]>(
-    'SELECT * FROM contract_runs WHERE repo = ?1 AND head_sha = ?2',
-  );
+  const select = db.query('SELECT * FROM contract_runs WHERE repo = ?1 AND head_sha = ?2');
 
-  const selectByPhase = db.query<ContractRunRow, [string]>(
+  const selectByPhase = db.query(
     'SELECT * FROM contract_runs WHERE phase IN (SELECT value FROM json_each(?1)) ORDER BY rowid',
   );
+
+  const collectRows = (phases: readonly ContractPhase[]): ContractRunRow[] =>
+    z.array(contractRunRowSchema).parse(selectByPhase.all(JSON.stringify(phases)));
 
   const update = db.query(`UPDATE contract_runs SET phase = ?3, detail = ?4, outcome = ?5
     WHERE repo = ?1 AND head_sha = ?2 AND phase IN (SELECT value FROM json_each(?6))`);
@@ -299,21 +319,19 @@ function bindContractRunMethods(db: Database): ContractRunMethods {
 
   const updateInterruptedContractRuns = db.transaction(
     () =>
-      selectByPhase
-        .all(JSON.stringify(['running']))
-        .filter((row) => updateContractPhase(toContractRun(row), ['running'], { phase: 'queued' }))
-        .length,
+      collectRows(['running']).filter((row) =>
+        updateContractPhase(toContractRun(row), ['running'], { phase: 'queued' }),
+      ).length,
   );
 
   return {
     claimContractRun: (run) => claim.run(run.repo, run.headSHA, run.number, run.imp).changes === 1,
     findContractRun: (key) => {
-      const row = select.get(key.repo, key.headSHA);
+      const row = contractRunRowSchema.nullable().parse(select.get(key.repo, key.headSHA));
 
       return row === null ? null : toContractRun(row);
     },
-    collectContractRuns: (phases) =>
-      selectByPhase.all(JSON.stringify(phases)).map((row) => toContractRun(row)),
+    collectContractRuns: (phases) => collectRows(phases).map((row) => toContractRun(row)),
     updateContractPhase,
     updateInterruptedContractRuns: () => updateInterruptedContractRuns(),
   };

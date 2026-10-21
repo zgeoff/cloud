@@ -1,3 +1,5 @@
+import { isRecord } from '@zgeoff/std';
+
 export interface PreviewContract {
   readonly port: number;
   readonly healthPath: string;
@@ -23,10 +25,9 @@ export function parsePreviewContract(composeYAML: string): PreviewContract {
 }
 
 function requireMapping(value: unknown, what: string): Readonly<Record<string, unknown>> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new TypeError(`${what} is not a mapping`);
   }
 
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- checked as an object above
-  return value as Readonly<Record<string, unknown>>;
+  return value;
 }

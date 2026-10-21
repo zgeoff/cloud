@@ -1,12 +1,18 @@
-import type { Config, Output } from '@pulumi/pulumi';
+import type { Output } from '@pulumi/pulumi';
 import type { z } from 'zod';
 import type { atcGatewayConfigSchema } from './atc-gateway-config-schema.ts';
 
 // the process environment as index.ts reads it once: .env's values, resolved by `op run`
 export type Environment = Readonly<Record<string, string | undefined>>;
 
-// the stack config methods the inputs group reads: Pulumi's Config, or a stand-in in a test
-export type StackConfig = Pick<Config, 'get' | 'getBoolean' | 'getObject' | 'getSecret'>;
+// the stack config methods the inputs group reads: Pulumi's Config, or a stand-in in a test.
+// Config's methods take a type argument that they never check, so these take none.
+export interface StackConfig {
+  readonly get: (key: string) => string | undefined;
+  readonly getBoolean: (key: string) => boolean | undefined;
+  readonly getObject: (key: string) => unknown;
+  readonly getSecret: (key: string) => Output<string> | undefined;
+}
 
 // the atcGateway stack config as written, before the schema fills in each default
 export type ATCGatewayRawConfig = z.input<typeof atcGatewayConfigSchema>;
@@ -60,7 +66,7 @@ export interface ATCGatewayInputs {
 }
 
 // the stack config's nixie object; setting it approves the deploy
-export interface NixieConfig {
+interface NixieConfig {
   // the nixie and nixie-web images of one release, each by tag and digest
   readonly image: string;
   readonly webImage: string;
@@ -99,7 +105,7 @@ export interface NixieInputs {
 }
 
 // the stack config's files object; setting it approves the deploy
-export interface FilesConfig {
+interface FilesConfig {
   // the files service's image, by tag and digest
   readonly image: string;
 

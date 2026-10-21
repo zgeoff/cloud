@@ -1,5 +1,7 @@
 import { secret } from '@pulumi/pulumi';
+import { z } from 'zod';
 import { findResticBackup } from './find-restic-backup.ts';
+import { parseStackObject } from './parse-stack-object.ts';
 import { requireGeoffCloudHostname } from './require-geoff-cloud-hostname.ts';
 import { requirePinnedImage } from './require-pinned-image.ts';
 import { requireVariable } from './require-variable.ts';
@@ -7,13 +9,20 @@ import type {
   BackupImage,
   Environment,
   NixieBackupInputs,
-  NixieConfig,
   NixieInputs,
   StackConfig,
 } from './types.ts';
 
 // why each of nixie's secrets is required, for requireVariable's error
 const nixieNeed = 'nixie needs it while stack config "nixie" is set';
+
+// a missing field reaches its own check below, which names what the field must hold
+const nixieConfigSchema = z.object({
+  image: z.string().optional(),
+  webImage: z.string().optional(),
+  hostname: z.string().optional(),
+  backupImage: z.unknown().optional(),
+});
 
 // nixie's inputs, or nothing while nixie is unset (setting it approves the deploy). Secrets come
 // from .env, plus Pulumi's CLOUDFLARE_API_TOKEN for DNS-01. NIXIE_RESTIC_* and NIXIE_R2_* add the
@@ -23,13 +32,15 @@ export function loadNixieInputs(
   env: Environment,
   backupImage: BackupImage | undefined,
 ): { readonly nixie?: NixieInputs } {
-  const config = stackConfig.getObject<NixieConfig>('nixie');
+  const raw = stackConfig.getObject('nixie');
 
-  if (config === undefined) {
+  if (raw === undefined) {
     return {};
   }
 
-  if (Object.hasOwn(config, 'backupImage')) {
+  const config = parseStackObject('nixie', raw, nixieConfigSchema);
+
+  if (config.backupImage !== undefined) {
     throw new Error(
       'stack config "nixie.backupImage" is no longer read: nixie\'s backup runs in "atcGateway.backupImage", so remove it',
     );

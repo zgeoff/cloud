@@ -141,9 +141,9 @@ without the CLI.
   replacing the global console. [`index.test.ts`](../../../workers/health-check/index.test.ts)
   checks the module Workers loads: its default export's `scheduled`, wired to `console`.
   [`buildStubR2Bucket`](../../../workers/health-check/test-utils/build-stub-r2-bucket.ts) is an
-  in-memory R2 bucket. It implements `Pick<R2Bucket, 'get' | 'put'>` from
-  `@cloudflare/workers-types` with R2's full object shapes, and rejects options and non-string
-  values instead of modelling them. Its HTTP boundary is MSW handlers in
+  in-memory R2 bucket. It models only the two calls the Worker makes, a `get` of a key and a `put`
+  of a string, and answers each with R2's object shapes from `@cloudflare/workers-types`, leaving
+  out the body stream and the readers whose types differ from Bun's. Its HTTP boundary is MSW handlers in
   [`workers/health-check/mocks/`](../../../workers/health-check/mocks/) over two in-memory stores:
   the probe targets' statuses and the alerts sent. The server runs with
   `onUnhandledRequest: 'error'`, and the preload also fails the test on any `request:unhandled`
