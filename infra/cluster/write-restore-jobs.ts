@@ -13,7 +13,6 @@ export interface WriteRestoreJobsOptions {
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 
-  // a path to an oxfmt binary
   readonly formatter?: string;
 }
 

@@ -66,7 +66,6 @@ export function loadNixieInputs(
   };
 }
 
-// all backup variables set, or no backup; a partial set throws
 function findBackup(
   env: Environment,
   backupImage: BackupImage | undefined,

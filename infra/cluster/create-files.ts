@@ -16,7 +16,6 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { createFilesBackupJob } from './create-files-backup-job.ts';
 import { createGHCRPullSecret } from './create-ghcr-pull-secret.ts';
 
-// cloudflared sends every path of hostname to service
 export interface FilesRoute {
   readonly hostname: string;
   readonly service: Output<string>;

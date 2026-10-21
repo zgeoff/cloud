@@ -11,8 +11,6 @@ export interface Gate {
 
 export type GateManifest = ReadonlyMap<string, Gate>;
 
-// throws on any shape it does not know, such as a gate with no paths or a key it never reads, so a
-// typo fails the caller instead of skipping a check
 export async function loadGateManifest(path: string): Promise<GateManifest> {
   const text = await readFile(path, 'utf8');
 

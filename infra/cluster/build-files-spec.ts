@@ -16,8 +16,6 @@ export interface FilesSpecInputs {
   readonly serviceName: Output<string>;
 
   readonly tokenSecret: Output<string>;
-
-  // a dockerconfigjson Secret
   readonly pullSecret: string;
 }
 

@@ -19,7 +19,6 @@ export interface FilesRouterInputs {
   readonly store: UploadStore;
   readonly filesDir: string;
 
-  // an upload's file while it is written, before it moves into place
   readonly incomingDir: string;
 
   // the public origin, such as https://files.geoff.cloud, with no trailing slash
@@ -31,7 +30,6 @@ export interface FilesRouterInputs {
   readonly writeBytes: (path: string, file: Blob) => Promise<unknown>;
 }
 
-// role is undefined for no token or an unknown one
 export interface FilesContext {
   readonly role: Role | undefined;
 }

@@ -1,5 +1,3 @@
-// It throws on concurrency or an output it does not model, so a test never passes on a rule the
-// scheduler stand-in ignores.
 export interface ActionsConcurrency {
   // lowercased, since GitHub compares group names case-insensitively
   readonly group: string;

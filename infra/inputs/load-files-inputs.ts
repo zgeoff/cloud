@@ -64,7 +64,6 @@ function deriveTokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-// all backup variables set, or no backup; a partial set throws
 function findBackup(
   env: Environment,
   backupImage: BackupImage | undefined,

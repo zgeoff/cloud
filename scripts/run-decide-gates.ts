@@ -1,6 +1,3 @@
-// Run as `bun scripts/run-decide-gates.ts [--github] <base> <head> <gate>...`: it prints
-// `<gate>=true` when a commit after <base> up to <head> changes a file the gate's paths in
-// .github/gates.yml match.
 import { appendFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
