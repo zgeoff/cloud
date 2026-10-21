@@ -6,7 +6,7 @@
   "dependencies": {
     "@impz/client": "2.8.3",
     "@zgeoff/std": "0.3.0",
-    "zod": "4.6.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",
