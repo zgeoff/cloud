@@ -30,6 +30,7 @@ test('it passes when nixie refuses each call for want of a session', async () =>
     ],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(0);
@@ -71,6 +72,7 @@ test('it fails on a procedure that nixie no longer serves', async () => {
     ],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);
@@ -98,6 +100,7 @@ test('it fails on a call that nixie answers without a session, and never prints 
     calls: [{ procedure: 'sessions/list', input: undefined }],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);
@@ -134,6 +137,7 @@ test("it fails on a 401 that the proxy gives instead of nixie's own refusal", as
     calls: [{ procedure: 'sessions/list', input: undefined }],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);
@@ -153,6 +157,7 @@ test('it fails on a call that reaches no server', async () => {
     calls: [{ procedure: 'sessions/list', input: undefined }],
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);

@@ -8,6 +8,7 @@ import { startKubectlProxy } from './start-kubectl-proxy.ts';
 export interface RunNixieAPICheckOptions {
   readonly run: Runner;
   readonly startProxy: () => Promise<KubectlProxyStart>;
+  readonly send: (request: Request) => Promise<Response>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -45,6 +46,7 @@ export async function runNixieAPICheck(
   const exitCode = await checkNixieAPI({
     url: `${started.proxy.url}${nixieServicePath}`,
     calls: nixieAPICheckCalls,
+    send: options.send,
     printOut: options.printOut,
     printErr: options.printErr,
   });
@@ -57,6 +59,7 @@ export async function runNixieAPICheck(
 if (import.meta.main) {
   process.exitCode = await runNixieAPICheck({
     run: runProcess,
+    send: (request) => fetch(request),
     startProxy: () =>
       startKubectlProxy({ argv: ['kubectl', 'proxy', '--port=0'], timeoutMs: 30_000 }),
     printOut: (text) => {

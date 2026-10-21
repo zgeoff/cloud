@@ -5,6 +5,7 @@ import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/nixie-rpc.ts'
 export interface CheckNixieAPIOptions {
   readonly url: string;
   readonly calls: readonly NixieAPICheckCall[];
+  readonly send: (request: Request) => Promise<Response>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -13,7 +14,7 @@ export async function checkNixieAPI(options: Readonly<CheckNixieAPIOptions>): Pr
   const results = await Promise.all(
     options.calls.map(async (call) => ({
       procedure: call.procedure,
-      failure: await readRefusal(options.url, call),
+      failure: await readRefusal(options, call),
     })),
   );
 
@@ -34,17 +35,19 @@ export async function checkNixieAPI(options: Readonly<CheckNixieAPIOptions>): Pr
   return 0;
 }
 
-async function readRefusal(url: string, call: NixieAPICheckCall): Promise<string | null> {
+async function readRefusal(
+  options: Readonly<CheckNixieAPIOptions>,
+  call: NixieAPICheckCall,
+): Promise<string | null> {
   const request = await encodeNixieRequest<NixieReadProcedure>({
-    url,
+    url: options.url,
     token: null,
     procedure: call.procedure,
     input: call.input,
+    signal: AbortSignal.timeout(30_000),
   });
 
-  const response = await fetch(request, { signal: AbortSignal.timeout(30_000) }).catch(
-    (error: unknown) => new Error(String(error)),
-  );
+  const response = await options.send(request).catch((error: unknown) => new Error(String(error)));
 
   if (response instanceof Error) {
     return `failed: ${response.message}`;

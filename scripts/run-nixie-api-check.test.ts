@@ -42,6 +42,7 @@ test('it checks nixie through the service proxy once the rollout finishes, then 
       }),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(0);
@@ -87,6 +88,7 @@ test('it fails without a call to nixie when the rollout does not finish', async 
     startProxy,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);
@@ -125,6 +127,7 @@ test('it fails without a call to nixie when the proxy does not start', async () 
       }),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);
@@ -157,6 +160,7 @@ test('it fails and still stops the proxy when nixie fails the check', async () =
       }),
     printOut: ctx.printOut,
     printErr: ctx.printErr,
+    send: (request) => fetch(request),
   });
 
   expect(exitCode).toBe(1);
