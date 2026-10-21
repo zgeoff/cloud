@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-# Test for find-gate-base.sh: against a real git repository in the case tree and a gh stand-in
-# (test-support/shell/create-stub-gh.sh) that replays the runs each case records, it asks for the
-# green push runs on main, writes the newest green commit before the given one as the base, writes
-# all zeros when no green run checked an ancestor, fails with gh's error and exit when gh fails,
-# and refuses a commit git cannot resolve. Each case runs the script under `env -i` with git's
-# global and system config off, and compares its whole stdout, stderr, output file and gh call log.
-#
 #   bash scripts/test-find-gate-base.sh
 # shellcheck source-path=SCRIPTDIR
 set -euo pipefail
