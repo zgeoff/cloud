@@ -16,9 +16,10 @@ permissions:
   contents: read
 
 # A new push to a pull request cancels the CI run of its earlier head, and a new push to main
-# cancels main's earlier run. Deploy prod applies every Pulumi input from the deployed/prod tag up
-# to the commit whose run passed, so the next run's apply holds a cancelled run's change, and Deploy
-# prod's own deploy-prod group never cancels an apply in progress.
+# cancels main's earlier run. The next run's path gates compare with main's last green commit, so
+# it checks the cancelled run's changes too. Deploy prod applies every Pulumi input from the
+# deployed/prod tag up to the commit whose run passed, so the next run's apply holds a cancelled
+# run's change, and Deploy prod's own deploy-prod group never cancels an apply in progress.
 concurrency:
   group: ci-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
@@ -28,8 +29,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
-    # image pin check reads the private ghcr.io/zgeoff packages, which needs read on packages
+    # image pin check reads the private ghcr.io/zgeoff packages, which needs read on packages; a
+    # push lists CI's green runs on main, which needs read on actions
     permissions:
+      actions: read
       contents: read
       packages: read
       pull-requests: write
@@ -47,14 +50,23 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      # a push to main cancels main's earlier run, so a push compares with the newest commit that a
+      # green main run checked, not with the commit before it
+      - name: Find the last green commit on main
+        id: base
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run --silent ci:find-gate-base "$GITHUB_SHA"
+
       # a pull request compares its base with the merge commit under test; a push compares the
-      # commit before it (all zeros for a new branch, which needs the checks)
+      # last green commit (all zeros when there is none, which needs every check)
       - name: Decide which checks the change needs
         id: decide
         env:
           BASE:
             ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha ||
-            github.event.before }}
+            steps.base.outputs.base }}
         run: >-
           bun run --silent ci:decide-gates --github "$BASE" "$GITHUB_SHA" provider full agent-image
           atc-gateway files-image files-backup nixie-backup

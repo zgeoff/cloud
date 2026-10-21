@@ -35,6 +35,7 @@ gates:
       - scripts/run-decide-gates.ts
       - scripts/is-gate-needed.ts
       - scripts/load-gate-manifest.ts
+      - scripts/find-gate-base.sh
 
   # The NixOS checks, which boot VMs and take minutes. A green run on main covers each later
   # commit until one of these paths changes (scripts/find-nixos-check-run.sh). The inputs are the
