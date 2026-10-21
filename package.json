@@ -79,6 +79,7 @@
     "ci:decide-prod-outcome": "bash scripts/decide-prod-outcome.sh",
     "ci:move-deployed-prod": "bash scripts/move-deployed-prod.sh",
     "ci:check-nixie-api": "bun scripts/run-nixie-api-check.ts",
+    "ci:require-nixie-check": "bash scripts/require-nixie-check.sh",
     "ci:alert-prod-apply": "bash scripts/alert-prod-apply.sh",
     "ci:decide-nixos-checks": "bash scripts/decide-nixos-checks.sh",
     "ci:open-kvm": "bash scripts/open-kvm.sh",

@@ -268,15 +268,20 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
       - name: Check nixie's API
         env:
           NIXIE_CHECK: ${{ needs.apply.outputs.nixie-check }}
-        run: |
-          if [ "$NIXIE_CHECK" != success ]; then
-            echo "::error::nixie's API check ended $NIXIE_CHECK; the apply job's step Check nixie's API shows why"
-            exit 1
-          fi
-          echo "nixie's API check passed"
+        run: bun run ci:require-nixie-check
 
   # posts a held run, a failed one, a cancelled one and a failed check to Discord
   alert:
