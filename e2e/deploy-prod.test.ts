@@ -33,8 +33,15 @@ async function setupTest() {
   }
 
   const stepList: readonly unknown[] = steps;
+  const checkJob = findJSONField(findJSONField(workflow, 'jobs'), 'check');
 
-  return { directory, scheduler: buildStubActionsScheduler(workflowText), job, steps: stepList };
+  return {
+    directory,
+    scheduler: buildStubActionsScheduler(workflowText),
+    job,
+    steps: stepList,
+    checkJob,
+  };
 }
 
 // the outcome step runs its real command with the env the workflow gives it, after a guard that
@@ -475,6 +482,50 @@ test('it keeps the apply green and alerts when the check of nixie s API fails', 
     jobs: { apply: 'success', check: 'failure', alert: 'in_progress' },
   });
 });
+
+// the check job's own step runs its real command with the env the workflow gives it, from the
+// apply job's outputs
+test.each([
+  ['success', 'success'],
+  ['failure', 'failure'],
+  ['cancelled', 'failure'],
+] as const)(
+  'it judges a check of nixie s API that ended %s as a %s of the check job s step',
+  async (outcome, expected) => {
+    const ctx = await setupTest();
+
+    const github = buildMockWorkflowRunContext({ head_sha: 'a'.repeat(40) });
+    const steps = findJSONField(ctx.checkJob, 'steps');
+
+    if (!Array.isArray(steps)) {
+      throw new TypeError('the check job has no steps');
+    }
+
+    const stepList: readonly unknown[] = steps;
+
+    const step = stepList.find(
+      (each: unknown) => findJSONField(each, 'name') === "Check nixie's API",
+    );
+
+    const result = await runActionsStep({
+      step,
+      jobEnv: findJSONField(ctx.checkJob, 'env'),
+      context: {
+        github,
+        inputs: {},
+        steps: {},
+        needs: {
+          apply: { result: 'success', outputs: { outcome: 'apply', 'nixie-check': outcome } },
+        },
+      },
+      cwd: join(import.meta.dir, '..'),
+      directory: ctx.directory,
+      path: process.env['PATH'] ?? '/usr/bin:/bin',
+    });
+
+    expect(result.status).toBe(expected);
+  },
+);
 
 test('it alerts a failed apply', async () => {
   const ctx = await setupTest();
