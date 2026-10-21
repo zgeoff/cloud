@@ -2576,6 +2576,11 @@ export interface operations {
                                 sequence: number;
                                 start: number;
                             } | null;
+                            image: {
+                                position: number;
+                                sequence: number;
+                                thread: string;
+                            } | null;
                             isPinned: boolean;
                             itemID: string;
                             /** @enum {string} */
@@ -2589,7 +2594,7 @@ export interface operations {
                             proposalID: string;
                             quote: string | null;
                             /** @enum {string} */
-                            reason: "no_quote" | "quote_not_typed" | "quote_in_quoted_block" | "invisible_character" | "token_missing" | "checker_not_asserted" | "checker_unsure" | "checker_unreachable" | "forgotten_evidence" | "ambiguous_target" | "pinned" | "other" | "self_note";
+                            reason: "no_quote" | "quote_not_typed" | "quote_in_quoted_block" | "invisible_character" | "token_missing" | "checker_not_asserted" | "checker_unsure" | "checker_unreachable" | "forgotten_evidence" | "ambiguous_target" | "pinned" | "other" | "self_note" | "from_photo";
                             /** @enum {string} */
                             source: "owner" | "owner_data" | "untrusted";
                             sources: {
