@@ -95,10 +95,7 @@ jobs:
       - name: Doc links
         run: bun run check:doc-links
 
-      # Some READMEs and docs/ pages fail the shared length or prose rules, so this step reports
-      # its findings without failing the run.
       - name: Doc length and prose
-        continue-on-error: true
         run: bun run check:doc-length
 
       - name: Pulumi pins
