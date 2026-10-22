@@ -66,12 +66,6 @@ const reasonRenderers = new Map<string, (version: string) => string[]>([
     'migrations',
     () => ['- a release in the bump adds database migrations, which a revert does not undo.'],
   ],
-  [
-    'sandbox-images-changed',
-    () => [
-      "- the release changes nixie's sandbox images, which a person adds to impd before the merge, because the `Deploy prod` workflow applies the merged pin (`docs/runbooks/nixie.md`).",
-    ],
-  ],
 ]);
 
 function renderReason(label: string, version: string) {

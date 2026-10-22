@@ -1,5 +1,4 @@
 export interface NixieReleaseNotes {
-  readonly pinned: string;
   readonly target: string;
   readonly between: readonly string[];
 }
@@ -7,11 +6,7 @@ export interface NixieReleaseNotes {
 export function collectNixieReleaseFlags(notes: NixieReleaseNotes): readonly string[] {
   const migrations = [notes.target, ...notes.between].some((each) => hasMigrations(each));
 
-  // impd does not add sandbox images itself, so a person adds changed ones before the rollout
-  const changed =
-    collectSandboxImages(notes.pinned).join('\n') !== collectSandboxImages(notes.target).join('\n');
-
-  return [...(migrations ? ['migrations'] : []), ...(changed ? ['sandbox-images-changed'] : [])];
+  return migrations ? ['migrations'] : [];
 }
 
 function hasMigrations(notes: string) {
@@ -42,12 +37,4 @@ function findSection(notes: string, heading: string) {
   const end = rest.findIndex((line) => line.startsWith('## '));
 
   return end === -1 ? rest : rest.slice(0, end);
-}
-
-function collectSandboxImages(notes: string) {
-  return (findSection(notes, '## Images') ?? [])
-    .filter(
-      (line) => line.startsWith('- `') && !/^- `ghcr\.io\/zgeoff\/(?:nixie|nixie-web)@/u.test(line),
-    )
-    .toSorted();
 }

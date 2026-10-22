@@ -312,7 +312,6 @@ test('it flags a nixie bump with the migrations of a release between', async () 
       'gh release list -R zgeoff/nixie --exclude-drafts --exclude-pre-releases --limit 30 --json tagName',
       '',
     ],
-    ['gh release view v0.7.0 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.2 -R zgeoff/nixie --json body', ''],
     ['gh release view v0.7.1 -R zgeoff/nixie --json body', ''],
     [`bun ${checkout.clone}/scripts/nixie-api/write-nixie-api-contract.ts v0.7.2`, ''],

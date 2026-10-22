@@ -70,7 +70,7 @@ test('it flags the migrations of a release between the oldest pin and the target
   expect(read.flags).toStrictEqual(['migrations']);
 });
 
-test('it reads the notes of the oldest pin, the target and each release between, in that order', async () => {
+test('it reads the notes of the target and each release between, in that order, and never the oldest pin', async () => {
   const stub = buildStubRunner(
     buildStubReleaseGH({
       releases: {
@@ -99,7 +99,6 @@ test('it reads the notes of the oldest pin, the target and each release between,
 
   expect(stub.calls.map((call) => call.argv.slice(0, 4))).toStrictEqual([
     ['gh', 'release', 'list', '-R'],
-    ['gh', 'release', 'view', 'v0.31.0'],
     ['gh', 'release', 'view', 'v0.32.0'],
     ['gh', 'release', 'view', 'v0.31.1'],
   ]);

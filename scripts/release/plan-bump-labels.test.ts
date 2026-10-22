@@ -32,9 +32,11 @@ test('it counts 0.9 to 1.0 as a major update', () => {
 });
 
 test('it prints each flag and holds its patch update for review', () => {
-  expect(
-    planBumpLabels('2.3.1', ['2.3.0'], ['migrations', 'sandbox-images-changed']),
-  ).toStrictEqual(['update:patch', 'migrations', 'sandbox-images-changed', 'needs-review']);
+  expect(planBumpLabels('2.3.1', ['2.3.0'], ['migrations'])).toStrictEqual([
+    'update:patch',
+    'migrations',
+    'needs-review',
+  ]);
 });
 
 test('it labels the largest step across the pins', () => {
