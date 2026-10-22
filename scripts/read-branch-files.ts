@@ -1,5 +1,6 @@
 // Exits 1 with a message when no base commit is found, so a hook never checks an empty set.
 import { resolve } from 'node:path';
+import { parseArgs } from 'node:util';
 
 interface CollectBranchFilesOptions {
   readonly cwd: string;
@@ -9,6 +10,9 @@ interface CollectBranchFilesOptions {
 
   // Deleted files are listed too, so a hook can gate on a deletion-only change.
   readonly includeDeleted?: boolean;
+
+  // Only the files that match one of these are listed; left out, every file is.
+  readonly globs?: readonly string[];
 }
 
 export async function readBranchFiles(
@@ -38,7 +42,15 @@ export async function readBranchFiles(
     throw new Error(`git diff failed: ${diff.stderr.trim()}`);
   }
 
-  return diff.stdout.split('\n').filter((line) => line !== '');
+  const files = diff.stdout.split('\n').filter((line) => line !== '');
+
+  if (options.globs === undefined) {
+    return files;
+  }
+
+  const globs = options.globs.map((pattern) => new Bun.Glob(pattern));
+
+  return files.filter((file) => globs.some((glob) => glob.match(file)));
 }
 
 async function runGit(options: Readonly<CollectBranchFilesOptions>, args: readonly string[]) {
@@ -60,10 +72,19 @@ async function runGit(options: Readonly<CollectBranchFilesOptions>, args: readon
 }
 
 async function runCLI(): Promise<void> {
-  const includeDeleted = process.argv.includes('--include-deleted');
-
   try {
-    const files = await readBranchFiles({ cwd: resolve('.'), includeDeleted });
+    const args = parseArgs({
+      options: {
+        'include-deleted': { type: 'boolean', default: false },
+        glob: { type: 'string', multiple: true },
+      },
+    });
+
+    const files = await readBranchFiles({
+      cwd: resolve('.'),
+      includeDeleted: args.values['include-deleted'],
+      ...(args.values.glob === undefined ? {} : { globs: args.values.glob }),
+    });
 
     if (files.length > 0) {
       process.stdout.write(`${files.join('\n')}\n`);

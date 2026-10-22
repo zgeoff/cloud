@@ -1,5 +1,5 @@
 import { expect, onTestFinished, test } from 'bun:test';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -130,6 +130,111 @@ test('it lists a deleted file when deletions are included', async () => {
   const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env, includeDeleted: true });
 
   expect(files).toStrictEqual(['README.md']);
+});
+
+test('it lists only the files that match one of the globs', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  mkdirSync(join(ctx.repo, 'scripts', 'host'), { recursive: true });
+  writeFileSync(join(ctx.repo, 'deploy.sh'), 'echo deploy\n');
+  writeFileSync(join(ctx.repo, 'scripts', 'host', 'rotate.sh'), 'echo rotate\n');
+  writeFileSync(join(ctx.repo, 'scripts', 'rotate.ts'), 'export {};\n');
+  writeFileSync(join(ctx.repo, '.editorconfig'), 'root = true\n');
+
+  await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const files = await readBranchFiles({
+    cwd: ctx.repo,
+    env: ctx.env,
+    globs: ['**/*.sh', '.editorconfig'],
+  });
+
+  expect(files.toSorted()).toStrictEqual(['.editorconfig', 'deploy.sh', 'scripts/host/rotate.sh']);
+});
+
+test('it lists nothing when no branch file matches the globs', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  writeFileSync(join(ctx.repo, 'a.ts'), 'a');
+
+  await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env, globs: ['**/*.sh'] });
+
+  expect(files).toStrictEqual([]);
+});
+
+test('it lists only the branch files after the branch is rebased onto a moved main', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  writeFileSync(join(ctx.repo, 'deploy.sh'), 'echo deploy\n');
+
+  await $`git add -A && git commit --quiet -m feature && git push --quiet -u origin feature`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .quiet();
+
+  await $`git switch --quiet main`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  writeFileSync(join(ctx.repo, 'notes.md'), 'moved\n');
+
+  await $`git add -A && git commit --quiet -m moved && git push --quiet origin main && git switch --quiet feature && git rebase --quiet main`
+    .env(ctx.env)
+    .cwd(ctx.repo)
+    .quiet();
+
+  const files = await readBranchFiles({ cwd: ctx.repo, env: ctx.env, globs: ['**/*.sh'] });
+
+  expect(files).toStrictEqual(['deploy.sh']);
+});
+
+test('it prints the files that match each glob flag, deletions included', async () => {
+  const ctx = await setupTest();
+
+  await $`git switch --quiet -c feature`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git rm --quiet README.md`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  writeFileSync(join(ctx.repo, 'deploy.sh'), 'echo deploy\n');
+  writeFileSync(join(ctx.repo, 'a.ts'), 'a');
+
+  await $`git add -A`.env(ctx.env).cwd(ctx.repo).quiet();
+  await $`git commit --quiet -m feature`.env(ctx.env).cwd(ctx.repo).quiet();
+
+  const run = Bun.spawnSync(
+    [
+      process.execPath,
+      join(import.meta.dir, 'read-branch-files.ts'),
+      '--include-deleted',
+      '--glob',
+      '**/*.sh',
+      '--glob',
+      'README.md',
+    ],
+    { cwd: ctx.repo, env: ctx.env },
+  );
+
+  expect(run.exitCode).toBe(0);
+  expect(run.stdout.toString()).toBe('README.md\ndeploy.sh\n');
+});
+
+test('it exits non-zero with a message when given an option it does not know', async () => {
+  const ctx = await setupTest();
+
+  const run = Bun.spawnSync(
+    [process.execPath, join(import.meta.dir, 'read-branch-files.ts'), '--globs', '**/*.sh'],
+    { cwd: ctx.repo, env: ctx.env },
+  );
+
+  expect(run.exitCode).toBe(1);
+  expect(run.stderr.toString()).toBe("read-branch-files: Unknown option '--globs'\n");
 });
 
 async function setupTest() {
