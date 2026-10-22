@@ -595,7 +595,6 @@ test('it never queues the run of a failed CI run behind a running apply', async 
 test('it releases the prod lock, and cancels no Pulumi update, after a step fails', async () => {
   const ctx = await setupTest();
 
-  // a step with no `if` runs on success()
   const run = ctx.steps.filter((step: unknown) => {
     const condition = findJSONField(step, 'if') ?? 'success()';
 
@@ -621,38 +620,40 @@ test('it releases the prod lock, and cancels no Pulumi update, after a step fail
 
 test.each([
   [
-    'the apply',
+    'Apply',
     {
       decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
       outcome: { outcome: 'success', conclusion: 'success', outputs: { outcome: 'apply' } },
-      refresh: { outcome: 'success', conclusion: 'success', outputs: {} },
-      apply: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
     },
     ["Cancel this run's Pulumi update", 'Release the prod lock'],
   ],
   [
-    'the refresh',
+    'Refresh before the apply',
     {
       decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
       outcome: { outcome: 'success', conclusion: 'success', outputs: { outcome: 'apply' } },
-      refresh: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
     },
     ["Cancel this run's Pulumi update", 'Release the prod lock'],
   ],
   [
-    'the preview',
-    {
-      decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
-      guard: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
-    },
+    'Preview and guard',
+    { decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } } },
     ['Release the prod lock'],
   ],
 ])(
-  'it runs only the cleanup steps after a cancel or a timeout during %s',
-  async (_label, steps, expected) => {
+  'it runs only the cleanup steps after a cancel or a timeout during the step %s',
+  async (cancelledName, finished, expected) => {
     const ctx = await setupTest();
 
-    // a step with no `if` runs on success()
+    const cancelledID = findJSONField(
+      ctx.steps.find((step: unknown) => findJSONField(step, 'name') === cancelledName),
+      'id',
+    );
+
+    if (typeof cancelledID !== 'string') {
+      throw new TypeError(`the step ${cancelledName} has no id`);
+    }
+
     const run = ctx.steps.filter((step: unknown) => {
       const condition = findJSONField(step, 'if') ?? 'success()';
 
@@ -663,7 +664,10 @@ test.each([
       return isActionsConditionMet(condition, {
         github: { event_name: 'workflow_run' },
         needs: {},
-        steps,
+        steps: {
+          ...finished,
+          [cancelledID]: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
+        },
         cancelled: true,
       });
     });
@@ -746,7 +750,6 @@ test.each([
 ])('it runs only the steps %s needs', async (_label, decision, outcome, expected) => {
   const ctx = await setupTest();
 
-  // a step with no `if` runs on success()
   const run = ctx.steps.filter((step: unknown) => {
     const condition = findJSONField(step, 'if') ?? 'success()';
 
