@@ -153,7 +153,9 @@ function buildGitSyncContainer(): input.core.v1.Container {
     image: gitSyncImage,
     env: [
       { name: 'GITSYNC_REPO', value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git' },
-      { name: 'GITSYNC_REF', value: 'main' },
+
+      // production follows `live`, which moves only on a promote, so a merge to `main` changes nothing
+      { name: 'GITSYNC_REF', value: 'live' },
       { name: 'GITSYNC_ROOT', value: definitionsRoot },
 
       // nixie reads the `current` link, which git-sync swaps in one rename
