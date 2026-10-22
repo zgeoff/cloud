@@ -509,3 +509,59 @@ test('it removes the files of a proxy whose idle stop is under way only after it
     expect.toBeOneOf([0, 'SIGTERM']),
   ]);
 });
+
+test('it refuses a call that waits on an exited proxy when the preview closes, and starts none', async () => {
+  const ctx = await setupTest();
+
+  const io = buildSpendProxyIO();
+  const started: ReturnType<typeof io.runProxy>[] = [];
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    {
+      ...ctx.deps,
+      io: {
+        ...io,
+        runProxy: (argv) => {
+          const child = io.runProxy(argv);
+
+          started.push(child);
+
+          return child;
+        },
+      },
+    },
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const exited = await proxies.holdProxy('pv-0a1b2c3d-7');
+
+  exited.release();
+
+  await fetch(`${exited.origin}/exit`);
+  await waitForCondition(() => ctx.lines.includes('pv-0a1b2c3d-7: the counting proxy exited 0'));
+
+  // the hold finds the entry before the close takes it, and finds the exited proxy after
+  // settled at once, so the hold's refusal is held until the test reads it
+  const holding = Promise.allSettled([proxies.holdProxy('pv-0a1b2c3d-7')]);
+
+  await proxies.removeProxy('pv-0a1b2c3d-7');
+
+  const [refused] = await holding;
+
+  expect(refused).toMatchObject({
+    status: 'rejected',
+    reason: { message: 'the counting proxy for pv-0a1b2c3d-7 was stopped' },
+  });
+
+  expect(started).toHaveLength(1);
+});

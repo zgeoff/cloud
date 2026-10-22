@@ -114,6 +114,11 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
       // A proxy that exited on its own starts again, from the count it left on disk. Calls that
       // wait on one start share the start that replaces it.
       if (running.process.exitCode !== null || running.process.signalCode !== null) {
+        // a stop kills only the process it found, so a start after it would run untracked
+        if (entries.get(imp) !== entry) {
+          throw new Error(`the counting proxy for ${imp} was stopped`);
+        }
+
         if (entry.pending === pending) {
           entry.pending = startProxy(settings, deps, imp);
         }
