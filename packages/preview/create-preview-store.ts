@@ -67,6 +67,7 @@ interface PreviewHead extends PreviewKey {
 
 export interface PreviewStore {
   readonly findPreview: (key: PreviewKey) => Preview | null;
+  readonly findPreviewByImp: (imp: string) => Preview | null;
 
   readonly upsertHead: (head: PreviewHead) => void;
 
@@ -142,7 +143,7 @@ function createContractRunsTable(db: Database): void {
 
 type PreviewMethods = Pick<
   PreviewStore,
-  'findPreview' | 'upsertHead' | 'updatePhase' | 'updateInterruptedBoots'
+  'findPreview' | 'findPreviewByImp' | 'upsertHead' | 'updatePhase' | 'updateInterruptedBoots'
 >;
 
 const firstPhase: PreviewPhase = 'waiting';
@@ -162,6 +163,7 @@ type PreviewRow = z.infer<typeof previewRowSchema>;
 function bindPreviewMethods(db: Database): PreviewMethods {
   const select = db.query('SELECT * FROM previews WHERE repo = ?1 AND number = ?2');
   const selectBooting = db.query(`SELECT * FROM previews WHERE phase = 'booting'`);
+  const selectByImp = db.query('SELECT * FROM previews WHERE imp = ?1');
 
   const findRow = (key: PreviewKey): PreviewRow | null =>
     previewRowSchema.nullable().parse(select.get(key.repo, key.number));
@@ -215,6 +217,11 @@ function bindPreviewMethods(db: Database): PreviewMethods {
   return {
     findPreview: (key) => {
       const row = findRow(key);
+
+      return row === null ? null : toPreview(row);
+    },
+    findPreviewByImp: (imp) => {
+      const row = previewRowSchema.nullable().parse(selectByImp.get(imp));
 
       return row === null ? null : toPreview(row);
     },

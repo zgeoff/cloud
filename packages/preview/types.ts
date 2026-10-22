@@ -1,6 +1,7 @@
 import type { GitHubClient } from './build-github-client.ts';
 import type { ImpdClient } from './build-impd-client.ts';
 import type { PreviewStore } from './create-preview-store.ts';
+import type { SpendProxies } from './create-spend-proxies.ts';
 
 export interface PreviewSettings {
   readonly baseURL: string;
@@ -44,8 +45,40 @@ export interface ContractSettings {
   readonly timeoutMs: number;
 }
 
+export interface SpendSettings {
+  // the counting proxy's binary, which the service starts once for each preview
+  readonly proxyPath: string;
+
+  // each preview's proxy config and counter store
+  readonly directory: string;
+
+  // the model API's origin, which each proxy sends a preview's model calls to
+  readonly upstream: string;
+
+  // the one model each preview may call, priced per million tokens with the proxy's price keys
+  readonly model: string;
+  readonly prices: SpendPrices;
+
+  // the dollars a preview may spend over its pull request's life
+  readonly limitDollars: number;
+
+  // how long a proxy goes unused before the service stops it; its count stays on disk
+  readonly idleMs: number;
+}
+
+export interface SpendPrices {
+  readonly input: number;
+  readonly cache_write: number;
+  readonly cache_write_1h: number;
+  readonly cached_input: number;
+  readonly output: number;
+}
+
 export interface PreviewDeps {
   readonly settings: PreviewSettings;
+
+  // the counting proxies on each preview's model route; null runs the previews without a spend cap
+  readonly spendProxies: SpendProxies | null;
   readonly store: PreviewStore;
   readonly impd: ImpdClient;
   readonly github: GitHubClient;

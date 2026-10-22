@@ -119,6 +119,42 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
 9. Open the App's Advanced page and redeliver its ping from Recent Deliveries. Expect the redelivery
    to get a 204.
 
+## Cap each preview's model spend
+
+The spend cap puts a counting proxy on each preview's model route, as
+[the spend cap](../architecture/workloads/preview.md#the-spend-cap) describes. It needs a nixie
+release that ships `counting-proxy-linux-x64`, which the host pins by its sha256.
+
+1. Add the counted model secret, whose upstream is the service's model route listener:
+
+   ```bash
+   op read op://cloud/nixie-model-credential/credential | host_imp secret add preview-model-counted \
+     --kind custom --hosts api.anthropic.com --header authorization --scheme bearer \
+     --upstream http://172.17.0.1:18082
+   ```
+
+   Expect `host_imp secret ls` to list `preview-model-counted`. The SDK contract run keeps
+   `preview-model`, because its suite runs no preview code.
+
+2. Let the service's token grant it:
+   `host_imp token set preview --grantable gh,preview-model,preview-model-counted < /dev/null`.
+
+3. In the host config, set `services.preview.impModelSecret` to `preview-model-counted` and turn on
+   `services.preview.spendCap` with the pinned package, the model, its prices and the limit. Switch
+   the host as step 6 of [Set the service up](#set-the-service-up) does, and expect the unit's log
+   to hold `previews: model routes on 172.17.0.1:18082`, with the limit after it.
+
+4. Remove each preview imp that booted before the switch, because it keeps its uncounted
+   `preview-model` grant: `host_imp rm pv-<hash>-<number> < /dev/null` for each `pv-` name that
+   `host_imp ls --json < /dev/null` lists. Its next link open boots a new imp with the counted
+   grant.
+
+5. Open a preview of a repository whose stack takes the route, and ask its app for a model reply.
+   Expect `journalctl -u preview` to hold the proxy's `proxy.started` line under the imp's name.
+
+A preview past its limit gets a 403 from its proxy on every later model call until its pull request
+closes. Raise `limitDollars` and switch the host to let it go on; the count keeps what it spent.
+
 ## Opt a repository in
 
 A repository opts in with a `preview/` folder and an install of the preview GitHub App. The host's

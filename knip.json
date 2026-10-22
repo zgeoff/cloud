@@ -18,7 +18,7 @@
       "project": ["**/*.ts"]
     },
     "packages/preview": {
-      "entry": ["main.ts"],
+      "entry": ["main.ts", "test-utils/run-stub-counting-proxy.ts"],
       "project": ["**/*.ts"]
     },
     "workers/health-check": {

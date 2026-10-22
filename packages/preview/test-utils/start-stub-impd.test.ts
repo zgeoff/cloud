@@ -97,6 +97,39 @@ test('it lists the secrets granted to an imp, as impd grants.list does', async (
   expect(result).toStrictEqual({ json: ['gh'] });
 });
 
+test('it grants a secret once and records the path filter of each later grant, as impd grants.add does', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['preview-model-counted'],
+  });
+
+  await fetch(`${impd.url}/rpc/grants/add`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      json: {
+        name: 'pv-0a1b2c3d-17',
+        secret: 'preview-model-counted',
+        filter: { paths: ['/pv-0a1b2c3d-17/**'] },
+      },
+    }),
+  });
+
+  expect(impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['preview-model-counted']);
+
+  expect(impd.grantPaths).toStrictEqual(
+    new Map([['pv-0a1b2c3d-17 preview-model-counted', ['/pv-0a1b2c3d-17/**']]]),
+  );
+});
+
 test('it answers an unknown imp with oRPC NOT_FOUND error body', async () => {
   const impd = startStubImpd();
 

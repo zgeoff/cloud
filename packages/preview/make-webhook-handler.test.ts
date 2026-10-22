@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -59,6 +59,7 @@ async function setupTest() {
         timeoutMs: 600_000,
       },
     },
+    spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
@@ -704,6 +705,54 @@ test('it removes the imp and says the preview ended when the pull request closes
       body: expect.toInclude('**Preview ended.**'),
     },
   ]);
+});
+
+test('it removes the counting proxy and its count with the imp when the pull request closes', async () => {
+  const ctx = await setupTest();
+
+  const removeProxy = mock(async () => {});
+
+  const handler = makeWebhookHandler({
+    ...ctx.deps,
+    spendProxies: {
+      readOrigin: () => Promise.reject(new Error('a close starts no counting proxy')),
+      removeProxy,
+      removeIdle: () => Promise.resolve(),
+      removeAll: () => Promise.resolve(),
+    },
+  });
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0bcd7c17-17',
+    headSHA: '4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c',
+  });
+
+  const body = JSON.stringify({
+    action: 'closed',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: '4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  expect(removeProxy).toHaveBeenCalledExactlyOnceWith('pv-0bcd7c17-17');
 });
 
 test('it removes the imp of a closed pull request it holds no record of, and posts nothing', async () => {
