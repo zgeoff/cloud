@@ -23,5 +23,3 @@ export const countingProxyConfigSchema = z.strictObject({
   limits: z.strictObject({ dollars: z.number().positive() }),
   routes: z.record(z.string().regex(/^[a-z0-9][a-z0-9-]*$/u), routeSchema),
 });
-
-export type CountingProxyConfig = z.infer<typeof countingProxyConfigSchema>;
