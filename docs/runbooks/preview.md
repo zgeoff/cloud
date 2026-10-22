@@ -270,7 +270,11 @@ ssh root@geoffcloud journalctl -u preview -n 50 --no-pager
 
 A journal line that ends `/installation: HTTP 404: Not Found` names a repository that the App is not
 installed on, such as one removed from the installation's repository list while a preview of it ran.
-Add the repository to the installation again, or close its pull requests.
+Add the repository to the installation again before you close its pull requests. GitHub sends no
+delivery for a repository the App is not installed on, so a close without the installation never
+reaches the service, and the preview's record and imp stay. To retire such a repository, restore the
+installation, close or merge its open pull requests, and only then remove the repository from the
+installation.
 
 A boot that fails on `PRECONDITION_FAILED` ran without the broker: check step 1 and the token's
 grantable secret. A boot that times out reached `docker compose up` but never got an answer on the
