@@ -30,7 +30,7 @@ export const clusterNamespaces = {
   'kube-node-lease': { owner: 'k3s', podSecurity: 'baseline', egress: 'deny' },
   'kube-public': { owner: 'k3s', podSecurity: 'baseline', egress: 'deny' },
   'kube-system': { owner: 'k3s', podSecurity: 'exempt', egress: 'deny' },
-  nixie: { owner: 'pulumi', podSecurity: 'baseline', egress: 'open' },
+  nixie: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },
   'nixie-ingress': { owner: 'pulumi', podSecurity: 'exempt', egress: 'deny' },
   observability: { owner: 'pulumi', podSecurity: 'exempt', egress: 'deny' },
   onepassword: { owner: 'pulumi', podSecurity: 'baseline', egress: 'deny' },

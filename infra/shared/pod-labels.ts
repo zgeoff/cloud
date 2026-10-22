@@ -4,4 +4,5 @@ export const podLabels = {
   atcDaemonProbe: { app: 'atc-daemon-probe' },
   impHealthProbe: { app: 'imp-health-probe' },
   cloudflared: { app: 'cloudflared' },
+  nixie: { app: 'nixie' },
 } as const;

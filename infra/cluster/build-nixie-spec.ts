@@ -1,7 +1,8 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { podLabels } from '../shared/pod-labels.ts';
 
-export const nixieLabels = { app: 'nixie' };
+export const nixieLabels = podLabels.nixie;
 
 // from https://api.github.com/meta (ssh_keys). The host blocks outbound port 22, so git-sync
 // reaches GitHub's SSH on 443, which serves the same key

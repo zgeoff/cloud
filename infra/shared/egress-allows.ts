@@ -20,6 +20,9 @@ const hostDaemon = {
   port: topology.atc.daemonPort,
 };
 
+// impd's HTTPS API, on imp's own node
+const impd = { address: topology.tailnet.nodes.imp.address, port: 443 };
+
 const homePCDaemon = {
   address: topology.tailnet.nodes.homePC.address,
   port: topology.atc.daemonPort,
@@ -43,9 +46,13 @@ export const egressAllows = {
     name: 'imp-health-probe-egress',
     namespace: 'observability',
     podLabels: podLabels.impHealthProbe,
-
-    // impd's HTTPS API, on imp's own node
-    destinations: [{ address: topology.tailnet.nodes.imp.address, port: 443 }],
+    destinations: [impd],
+  },
+  nixie: {
+    name: 'nixie-egress',
+    namespace: 'nixie',
+    podLabels: podLabels.nixie,
+    destinations: [impd],
   },
   cloudflared: {
     name: 'cloudflared-egress',

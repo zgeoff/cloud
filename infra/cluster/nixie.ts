@@ -7,7 +7,9 @@ import { interpolate, secret } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { NixieInputs } from '../inputs/index.ts';
 import { buildNixieImpConfig } from '../shared/build-nixie-imp-config.ts';
+import { createEgressAllow } from '../shared/create-egress-allow.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
+import { egressAllows } from '../shared/egress-allows.ts';
 import { renderNixieConfig } from '../shared/render-nixie-config.ts';
 import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
 import {
@@ -33,6 +35,8 @@ export function createNixie(
 ): NixieIngressOutputs {
   const ns = createNamespace('nixie', cluster);
   const namespace = ns.metadata.name;
+
+  createEgressAllow(egressAllows.nixie, namespace, { provider: cluster });
 
   const api = createService(cluster, namespace, {
     name: 'nixie',
