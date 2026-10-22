@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -512,7 +512,7 @@ test('it ends a queued run with an error and removes its imp once the contract s
   ).toBe('failed');
 });
 
-test('it keeps the result settling when GitHub refuses the final status', async () => {
+test('it keeps the result settling when GitHub answers the final status with a server error', async () => {
   const ctx = await setupTest();
 
   ctx.store.claimContractRun({
@@ -550,6 +550,64 @@ test('it keeps the result settling when GitHub refuses the final status', async 
   ).toMatchObject({ phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' });
 
   expect(commitStatuses.map((status) => status.state)).toStrictEqual(['pending']);
+});
+
+test('it ends a settling run with the refusal and posts no status again when GitHub refuses the final status for good', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' },
+  );
+
+  const recordStatusPost = mock((sha: string) => sha);
+  const recordLog = mock((line: string) => line);
+
+  // GitHub's answer to an App without Commit statuses write (docs.github.com/en/rest:
+  // authentication/permissions-required-for-github-apps)
+  server.use(
+    http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, (info) => {
+      recordStatusPost(String(info.params['sha']));
+
+      return HttpResponse.json(
+        { message: 'Resource not accessible by integration', status: '403' },
+        { status: 403, headers: { 'x-accepted-github-permissions': 'statuses=write' } },
+      );
+    }),
+  );
+
+  const deps = { ...ctx.deps, log: recordLog };
+  const key = { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' };
+
+  await runContractRun(deps, key);
+  await runContractRun(deps, key);
+
+  expect(ctx.store.findContractRun(key)).toStrictEqual({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+    phase: 'passed',
+    detail:
+      '18 pass, 0 fail; the status was not posted: GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 403: Resource not accessible by integration (the App needs statuses=write)',
+    outcome: 'success',
+  });
+
+  expect(recordStatusPost.mock.calls).toStrictEqual([['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']]);
+
+  expect(recordLog.mock.calls).toStrictEqual([
+    [
+      'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: the SDK contract run ended: 18 pass, 0 fail; the status was not posted: GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 403: Resource not accessible by integration (the App needs statuses=write)',
+    ],
+  ]);
 });
 
 test('it keeps the result settling and the status unset when impd fails to remove the imp', async () => {

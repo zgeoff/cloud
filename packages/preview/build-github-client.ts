@@ -1,6 +1,7 @@
 import type { KeyObject } from 'node:crypto';
 import { sign } from 'node:crypto';
 import { z } from 'zod';
+import { GitHubRequestError } from './github-request-error.ts';
 
 export interface GitHubClient {
   readonly readComposeFile: (repo: string, sha: string) => Promise<string | null>;
@@ -174,10 +175,29 @@ async function sendGitHubRequest(
   if (!response.ok && !(request.allowMissing === true && response.status === 404)) {
     const refusal = await readGitHubRefusal(response);
 
-    throw new Error(`GitHub ${method} ${request.path}: HTTP ${response.status}${refusal}`);
+    throw new GitHubRequestError(
+      `GitHub ${method} ${request.path}: HTTP ${response.status}${refusal}`,
+      response.status,
+      isPermanentRefusal(response),
+    );
   }
 
   return response;
+}
+
+// GitHub answers a rate limit with a 403 or a 429 that sets x-ratelimit-remaining to 0 or sends
+// retry-after (docs.github.com/en/rest: using-the-rest-api/rate-limits-for-the-rest-api)
+function isPermanentRefusal(response: Response): boolean {
+  const rateLimited =
+    response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after');
+
+  return (
+    response.status >= 400 &&
+    response.status < 500 &&
+    response.status !== 408 &&
+    response.status !== 429 &&
+    !rateLimited
+  );
 }
 
 // GitHub's error body (docs.github.com/en/rest: using-the-rest-api/troubleshooting-the-rest-api)

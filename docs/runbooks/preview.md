@@ -234,8 +234,10 @@ refuses.
 
 A journal line that ends `(the App needs statuses=write)` means the preview GitHub App lacks Commit
 statuses write, which GitHub needs for every status the service sets. Add that permission on the
-App's Permissions page, as in step 5, then accept the new permission on the installation's page. The
-run stays settling until then, and the next retry sets its status.
+App's Permissions page, as in step 5, then accept the new permission on the installation's page. A
+run whose final status GitHub refuses this way ends at once, and the journal line that ends it holds
+the result, `the status was not posted` and the refusal. The commit's `sdk-contract` status stays as
+it was.
 
 ## Check a preview live
 

@@ -441,6 +441,40 @@ test('#updateCommitStatus rejects with the permission GitHub names when the App 
   );
 });
 
+// GitHub answers a rate limit with a 403 or a 429 that sets x-ratelimit-remaining to 0 or sends
+// retry-after (docs.github.com/en/rest: using-the-rest-api/rate-limits-for-the-rest-api)
+test.each([
+  ['a 403 for a missing permission', 403, {}, true],
+  ['a 404', 404, {}, true],
+  ['a 422', 422, {}, true],
+  ['a 408', 408, {}, false],
+  ['a 429', 429, {}, false],
+  ['a 403 with no rate limit left', 403, { 'x-ratelimit-remaining': '0' }, false],
+  ['a 403 with retry-after', 403, { 'retry-after': '60' }, false],
+  ['a 502', 502, {}, false],
+])(
+  '#updateCommitStatus rejects %s with its status and permanent set to %p',
+  (_, status, headers, permanent) => {
+    server.use(
+      http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, () =>
+        HttpResponse.json({ message: 'Refused' }, { status, headers }),
+      ),
+    );
+
+    const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+
+    expect(
+      client.updateCommitStatus({
+        repo: 'acme/greenhouse',
+        sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        context: 'sdk-contract',
+        state: 'success',
+        description: '18 pass, 0 fail',
+      }),
+    ).rejects.toMatchObject({ name: 'GitHubRequestError', status, permanent });
+  },
+);
+
 test('#readComposeFile rejects a contents answer whose content is not a string', () => {
   server.use(
     http.get(`${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml`, () =>
