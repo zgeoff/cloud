@@ -81,9 +81,20 @@ docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest | jq -r '.[].
   | while read -r name; do host_imp image pin "$name" < /dev/null; done
 ```
 
-Then unpin the sandbox images of the release 2 back, with `host_imp image unpin "$name"` over the
-names that release's `sandbox-manifest` prints. Expect `host_imp image ls < /dev/null` to show `yes`
-in the `PINNED` column of each image of the last 2 releases.
+Then unpin the sandbox images of the release 2 back that neither of the last 2 releases uses. An
+unchanged image keeps its name from one release to the next, so unpin only a name that the manifests
+of this release and the one before leave out:
+
+```bash
+PREVIOUS_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>' # the release before
+OLD_IMAGE='ghcr.io/zgeoff/nixie:<version>@sha256:<nixie_digest>'      # the release 2 back
+names() { docker run --rm --entrypoint nixie "$1" sandbox-manifest | jq -r '.[].name' | sort -u; }
+comm -23 <(names "$OLD_IMAGE") <(sort -u <(names "$NIXIE_IMAGE") <(names "$PREVIOUS_IMAGE")) \
+  | while read -r name; do host_imp image unpin "$name" < /dev/null; done
+```
+
+Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each image of the
+last 2 releases.
 
 ## Mint nixie's impd token
 
