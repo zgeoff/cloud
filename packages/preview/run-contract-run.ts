@@ -1,5 +1,6 @@
 import { buildContractStatus } from './build-contract-status.ts';
 import type { ContractOutcome, ContractRun, ContractRunKey } from './create-preview-store.ts';
+import { GitHubRequestError } from './github-request-error.ts';
 import { runContractSuite } from './run-contract-suite.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
@@ -65,7 +66,19 @@ async function trySettleContractRun(deps: PreviewDeps, key: ContractRunKey): Pro
     deps.store.updateContractPhase(run, ['settling'], ended);
     deps.log(`${run.repo}@${run.headSHA}: the SDK contract run ended: ${ended.detail}`);
   } catch (error) {
-    deps.log(`${run.repo}@${run.headSHA}: the next retry settles the run: ${String(error)}`);
+    if (!(error instanceof GitHubRequestError && error.permanent)) {
+      deps.log(`${run.repo}@${run.headSHA}: the next retry settles the run: ${String(error)}`);
+
+      return;
+    }
+
+    const unposted = {
+      ...ended,
+      detail: `${ended.detail}; the status was not posted: ${error.message}`,
+    };
+
+    deps.store.updateContractPhase(run, ['settling'], unposted);
+    deps.log(`${run.repo}@${run.headSHA}: the SDK contract run ended: ${unposted.detail}`);
   }
 }
 

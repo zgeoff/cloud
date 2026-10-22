@@ -217,7 +217,9 @@ runs the suite once however many deliveries name it, and each push to a new head
    with the suite's pass and fail counts. A failure to start the imp sets an error status instead.
    The record keeps the result until impd removes the imp and GitHub takes the status, and the
    sweep's timer retries either step that fails. A leftover imp therefore never holds a slot for
-   good, and a status never stays pending after its run ends.
+   good. One exception: a refusal of the status that a retry would meet again, such as a missing
+   permission, ends the run at once, and the record keeps the refusal beside the result. A rate
+   limit, a timeout or a server error leaves the run for the next retry.
 
 The guest's `timeout` bounds the whole run, and a deadline on the host backs it for a guest that
 never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A
