@@ -97,7 +97,7 @@ test('it names the owner as the uploader of an upload with the owner token', asy
   });
 });
 
-test('it serves a PNG inline with nosniff and the sandbox policy', async () => {
+test('it serves a PNG inline with nosniff, the sandbox policy and no-store', async () => {
   const ctx = await setupTest();
 
   const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x0d]);
@@ -124,6 +124,7 @@ test('it serves a PNG inline with nosniff and the sandbox policy', async () => {
     'content-disposition': `inline; filename="shot.png"; filename*=UTF-8''shot.png`,
     'x-content-type-options': 'nosniff',
     'content-security-policy': "default-src 'none'; sandbox",
+    'cache-control': 'no-store',
   });
 
   const served = await response.bytes();
@@ -182,7 +183,7 @@ test('it serves an SVG upload as an attachment', async () => {
   expect(response.headers.get('content-disposition')).toStartWith('attachment;');
 });
 
-test('it answers 404 for a file once its expiry has passed', async () => {
+test('it answers 404 with no-store for a file once its expiry has passed', async () => {
   const ctx = await setupTest();
 
   ctx.store.writeUpload(
@@ -203,6 +204,7 @@ test('it answers 404 for a file once its expiry has passed', async () => {
 
   expect(response.status).toBe(404);
   expect(response.headers.get('content-security-policy')).toBe("default-src 'none'; sandbox");
+  expect(response.headers.get('cache-control')).toBe('no-store');
 });
 
 test('it serves a file until its expiry', async () => {
@@ -648,6 +650,30 @@ test('it lets the agent token remove an agent upload, file and row', async () =>
 
   expect(files).toBeEmpty();
   expect(ctx.store.findUpload('Ag3ntAg3ntAg3ntAg3ntAg')).toBeNull();
+});
+
+test('it answers 404 with no-store at the plain URL of a removed upload', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.writeUpload(
+    buildMockUpload({ id: 'G0neG0neG0neG0neG0neG0', filename: 'map.png', expiresAt: null }),
+  );
+
+  await writeFile(join(ctx.dataDir, 'files', 'G0neG0neG0neG0neG0neG0'), 'png bytes');
+
+  await ctx.service.handle(
+    new Request('http://localhost/api/files/G0neG0neG0neG0neG0neG0', {
+      method: 'DELETE',
+      headers: { Authorization: 'Bearer agent-token-5d2b' },
+    }),
+  );
+
+  const response = await ctx.service.handle(
+    new Request('http://localhost/G0neG0neG0neG0neG0neG0/map.png'),
+  );
+
+  expect(response.status).toBe(404);
+  expect(response.headers.get('cache-control')).toBe('no-store');
 });
 
 test("it refuses the agent token's removal of an owner upload with 404 and keeps it", async () => {
