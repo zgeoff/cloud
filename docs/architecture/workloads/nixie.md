@@ -61,16 +61,19 @@ fixed name, so a change to any of them replaces it, and the StatefulSet rolls on
 nixie reads each file once at start, so a roll is how a change reaches it.
 
 nixie reads its definitions, the persona and the rules in the private repo
-`zgeoff/nixie-definitions`, from a directory. A git-sync sidecar clones that repo over SSH into a
-volume the two containers share, and pulls it again every minute. git-sync swaps a `current` link to
-each new checkout in one rename, and nixie reads through that link, so a seed never sees half a
-checkout. On a first start the seed retries until the first clone arrives. The pod's file-system
-group is a supplementary group of both containers, which is what lets git-sync read its key and
-nixie read git-sync's checkout.
+`zgeoff/nixie-definitions`, from a directory. A git-sync sidecar clones that repo's `live` branch
+over SSH into a volume the two containers share, and pulls it again every minute. A merge to the
+repo's `main` branch changes nothing in production: a commit reaches nixie only when someone
+promotes it to `live`, as
+[the definitions repo's readme](https://github.com/zgeoff/nixie-definitions#going-live) describes.
+git-sync swaps a `current` link to each new checkout in one rename, and nixie reads through that
+link, so a seed never sees half a checkout. On a first start the seed retries until the first clone
+arrives. The pod's file-system group is a supplementary group of both containers, which is what lets
+git-sync read its key and nixie read git-sync's checkout.
 
 nixie never writes to that checkout. When nixie writes a skill, it opens a pull request in
 `zgeoff/nixie-definitions` with a token from its secrets file, and git-sync brings the skill back
-once the pull request merges.
+once someone promotes the merged commit to `live`.
 
 nixie, not this repo, owns the definitions format:
 [nixie's definitions doc](https://github.com/zgeoff/nixie/blob/main/docs/architecture/core/definitions.md#the-definitions-format)

@@ -41,7 +41,7 @@ models:
 definitions:
   source:
     kind: path
-    # git-sync's link to its newest checkout of zgeoff/nixie-definitions
+    # git-sync's link to its newest checkout of zgeoff/nixie-definitions' `live` branch
     path: /etc/nixie/definitions/current
   # nixie opens a pull request here for each skill it writes, with the token in the sops file
   export:
