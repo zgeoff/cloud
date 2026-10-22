@@ -23,6 +23,7 @@ let
   atcDaemonHomePCExposure = getHostPort "atc-daemon-home-pc";
   previewLinkExposure = getHostPort "preview-link";
   previewWebhookExposure = getHostPort "preview-webhook";
+  previewModelRouteExposure = getHostPort "preview-model-route";
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -448,8 +449,30 @@ in
     impdURL = impdLoopbackURL;
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";
-    # nixie's preview stack sends its model calls through the broker with this grant
-    impModelSecret = "preview-model";
+    # nixie's preview stack sends its model calls through the broker with this grant, whose
+    # upstream is the spend cap's model route listener (docs/runbooks/preview.md)
+    impModelSecret = "preview-model-counted";
+    # each preview's model calls pass a counting proxy of their own, which refuses them past the
+    # module's default limit
+    spendCap = {
+      enable = true;
+      package = pkgs.callPackage ../../packages/counting-proxy.nix { };
+      address = topology.docker.bridgeAddress;
+      inherit (previewModelRouteExposure) port;
+      allowedSubnet = topology.docker.subnet;
+      # nixie's preview/config.yaml model profile
+      model = "claude-haiku-5-5";
+      # Haiku 5.5's list prices for a prompt up to 100,000 tokens, as nixie's
+      # research/turn-tokens/report.ts gives them: a 5-minute cache write is 1.25 times the input
+      # price and a 1-hour write 2 times
+      prices = {
+        input = 0.1;
+        cache_write = 0.125;
+        cache_write_1h = 0.2;
+        cached_input = 0.01;
+        output = 0.5;
+      };
+    };
     # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
