@@ -512,7 +512,7 @@ test('it removes the files of a proxy whose idle stop is under way only after it
   ]);
 });
 
-test('it refuses a call that waits on an exited proxy when the preview closes, and starts none', async () => {
+test('it refuses a call that waits on an exited proxy when the preview closes, and leaves no proxy running', async () => {
   const ctx = await setupTest();
 
   const io = buildSpendProxyIO();
@@ -552,11 +552,14 @@ test('it refuses a call that waits on an exited proxy when the preview closes, a
   await fetch(`${exited.origin}/exit`);
   await waitForCondition(() => ctx.lines.includes('pv-0a1b2c3d-7: the counting proxy exited 0'));
 
-  // the hold finds the entry before the close takes it, and finds the exited proxy after
-  // settled at once, so the hold's refusal is held until the test reads it
+  // the hold asks for a new proxy just before the close; settled at once, so the hold's refusal
+  // is held until the test reads it
   const holding = Promise.allSettled([proxies.holdProxy('pv-0a1b2c3d-7')]);
 
   await proxies.removeProxy('pv-0a1b2c3d-7');
+
+  // read at once, as the close resolves
+  const ended = started.map((child) => child.exitCode ?? child.signalCode);
 
   const [refused] = await holding;
 
@@ -565,7 +568,7 @@ test('it refuses a call that waits on an exited proxy when the preview closes, a
     reason: { message: 'the counting proxy for pv-0a1b2c3d-7 was stopped' },
   });
 
-  expect(started).toHaveLength(1);
+  expect(ended).toSatisfyAll((code: number | string | null) => code !== null);
 });
 
 test('it stops every proxy on shutdown, an idle stop under way included, before it resolves', async () => {

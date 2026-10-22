@@ -1,7 +1,11 @@
 import { join } from 'node:path';
+import type { Actor } from 'xstate';
+import { createActor } from 'xstate';
 import { z } from 'zod';
 import type { ProxyProcess, SpendProxyIO } from './build-spend-proxy-io.ts';
 import { countingProxyConfigSchema } from './counting-proxy-config-schema.ts';
+import type { RunningProxy } from './proxy-machine.ts';
+import { proxyMachine } from './proxy-machine.ts';
 import type { SpendSettings } from './types.ts';
 
 export interface ProxyHold {
@@ -29,125 +33,52 @@ export interface SpendProxyDeps {
   readonly io: SpendProxyIO;
 }
 
-interface RunningProxy {
-  readonly process: ProxyProcess;
-  readonly origin: string;
-}
-
-// One entry per imp, which a hold counts on before it waits for the start, so the idle sweep
-// sees every call that has asked for the proxy, started or not.
-interface ProxyEntry {
-  pending: Promise<RunningProxy>;
-  holds: number;
-  lastUsedMs: number;
-}
+type ProxyActor = Actor<typeof proxyMachine>;
 
 export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps): SpendProxies {
   deps.io.createDirectory(settings.directory);
 
-  const entries = new Map<string, ProxyEntry>();
+  // one machine per imp for the life of the service, which owns its proxy's starts and stops
+  const actors = new Map<string, ProxyActor>();
 
-  // the proxy of an imp whose stop is under way, which a new start waits out, so two proxies never
-  // write one count
-  const stopping = new Map<string, Promise<void>>();
-
-  const startAfterStop = async (imp: string): Promise<RunningProxy> => {
-    await stopping.get(imp);
-
-    return startProxy(settings, deps, imp);
-  };
-
-  const readEntry = (imp: string): ProxyEntry => {
-    const existing = entries.get(imp);
+  const readActor = (imp: string): ProxyActor => {
+    const existing = actors.get(imp);
 
     if (existing !== undefined) {
       return existing;
     }
 
-    const entry = {
-      pending: startAfterStop(imp),
-      holds: 0,
-      lastUsedMs: deps.now().getTime(),
-    };
+    const actor = createActor(proxyMachine, {
+      input: { imp, startProxy: () => startProxy(settings, deps, imp) },
+    });
 
-    entries.set(imp, entry);
+    actor.start();
+    actors.set(imp, actor);
 
-    return entry;
+    return actor;
   };
 
-  const killProxy = async (entry: ProxyEntry | undefined): Promise<void> => {
-    const running = await entry?.pending.catch(() => null);
+  const stopProxy = async (actor: ProxyActor): Promise<void> => {
+    const stopped = Promise.withResolvers<undefined>();
 
-    running?.process.kill();
+    actor.send({
+      type: 'stop',
+      done: () => {
+        stopped.resolve(undefined);
+      },
+    });
 
-    await running?.process.exited;
-  };
-
-  const stopProxy = async (imp: string): Promise<void> => {
-    const entry = entries.get(imp);
-
-    entries.delete(imp);
-
-    // a stop under way has already taken the entry, so a second stop waits for that one too
-    const earlier = stopping.get(imp);
-    const killed = killProxy(entry);
-
-    const stopped = (async () => {
-      await Promise.all([earlier, killed]);
-    })();
-
-    stopping.set(imp, stopped);
-
-    await stopped;
-
-    if (stopping.get(imp) === stopped) {
-      stopping.delete(imp);
-    }
-  };
-
-  const readRunning = async (imp: string, entry: ProxyEntry): Promise<RunningProxy> => {
-    const pending = entry.pending;
-
-    try {
-      const running = await pending;
-
-      // A proxy that exited on its own starts again, from the count it left on disk. Calls that
-      // wait on one start share the start that replaces it.
-      if (running.process.exitCode !== null || running.process.signalCode !== null) {
-        // a stop kills only the process it found, so a start after it would run untracked
-        if (entries.get(imp) !== entry) {
-          throw new Error(`the counting proxy for ${imp} was stopped`);
-        }
-
-        if (entry.pending === pending) {
-          entry.pending = startProxy(settings, deps, imp);
-        }
-
-        return await readRunning(imp, entry);
-      }
-
-      return running;
-    } catch (error) {
-      if (entries.get(imp) === entry && entry.pending === pending) {
-        entries.delete(imp);
-      }
-
-      throw error;
-    }
+    await stopped.promise;
   };
 
   return {
     holdProxy: async (imp) => {
-      const entry = readEntry(imp);
+      const actor = readActor(imp);
+      const waiter = Promise.withResolvers<RunningProxy>();
 
-      entry.holds += 1;
+      actor.send({ type: 'hold', waiter, nowMs: deps.now().getTime() });
 
-      const running = await readRunning(imp, entry).catch((error: unknown) => {
-        entry.holds -= 1;
-        throw error;
-      });
-
-      entry.lastUsedMs = deps.now().getTime();
+      const running = await waiter.promise;
 
       let released = false;
 
@@ -159,13 +90,13 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
           }
 
           released = true;
-          entry.holds -= 1;
-          entry.lastUsedMs = deps.now().getTime();
+
+          actor.send({ type: 'release', nowMs: deps.now().getTime() });
         },
       };
     },
     removeProxy: async (imp) => {
-      await stopProxy(imp);
+      await stopProxy(readActor(imp));
 
       const paths = buildProxyPaths(settings, imp);
 
@@ -176,32 +107,24 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
     removeIdle: async () => {
       const cutoffMs = deps.now().getTime() - settings.idleMs;
 
-      const settled = await Promise.all(
-        [...entries].map(async ([imp, entry]) => ({
-          imp,
-          entry,
-          running: await entry.pending.catch(() => null),
-        })),
-      );
+      await Promise.all(
+        [...actors.values()].map(async (actor) => {
+          const checked = Promise.withResolvers<undefined>();
 
-      // the check and the stop run with no wait between them, so a hold taken after the check
-      // finds the entry gone and starts a proxy of its own
-      const idle = settled.filter(
-        (each) =>
-          entries.get(each.imp) === each.entry &&
-          each.running !== null &&
-          each.entry.holds === 0 &&
-          each.entry.lastUsedMs < cutoffMs,
-      );
+          actor.send({
+            type: 'idle',
+            cutoffMs,
+            done: () => {
+              checked.resolve(undefined);
+            },
+          });
 
-      await Promise.all(idle.map((each) => stopProxy(each.imp)));
+          await checked.promise;
+        }),
+      );
     },
     removeAll: async () => {
-      // an idle stop under way has already taken its entry, so the stops it holds count as well
-      await Promise.all([
-        ...[...entries.keys()].map((imp) => stopProxy(imp)),
-        ...stopping.values(),
-      ]);
+      await Promise.all([...actors.values()].map((actor) => stopProxy(actor)));
     },
   };
 }

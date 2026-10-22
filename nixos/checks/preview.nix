@@ -757,6 +757,7 @@ let
         ./pick-spend-admission.ts
         ./plan-idle-sleeps.ts
         ./plan-slot-evictions.ts
+        ./proxy-machine.ts
         ./render-preview-comment.ts
         ./render-preview-page.ts
         ./render-spend-refusal.ts
