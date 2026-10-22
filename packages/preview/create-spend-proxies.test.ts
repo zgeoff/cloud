@@ -6,6 +6,7 @@ import { http, passthrough } from 'msw';
 import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { server as mockServer } from './mocks/node.ts';
+import { readProcessStatus } from './test-utils/read-process-status.ts';
 import { waitForCondition } from './test-utils/wait-for-condition.ts';
 
 async function setupTest() {
@@ -352,5 +353,82 @@ test('it keeps a proxy that a call asked for before an idle sweep, while its sta
   const hold = await holding;
   const answer = await fetch(`${hold.origin}/pv-0a1b2c3d-7/v1/models`);
 
+  expect(answer.status).toBe(200);
+});
+
+test('it starts the proxy for a call that arrives during an idle stop only after the old one exits', async () => {
+  const ctx = await setupTest();
+
+  const io = buildSpendProxyIO();
+  const started: ReturnType<typeof io.runProxy>[] = [];
+
+  // records, as each start writes its config, how the proxy started before it ended: its exit
+  // code, or the signal that stopped it, or null while it still runs
+  const endedBefore: (number | string | null | undefined)[] = [];
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    {
+      ...ctx.deps,
+      io: {
+        ...io,
+        writeFile: (path, text) => {
+          endedBefore.push(started.at(-1)?.exitCode ?? started.at(-1)?.signalCode);
+
+          return io.writeFile(path, text);
+        },
+        runProxy: (argv) => {
+          const child = io.runProxy(argv);
+
+          started.push(child);
+
+          return child;
+        },
+      },
+    },
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const first = await proxies.holdProxy('pv-0a1b2c3d-7');
+
+  first.release();
+
+  ctx.clock.now += 2_400_000;
+
+  // a stopped process holds its SIGTERM until it continues, so the old proxy stays up while the
+  // second call asks for one
+  const oldPID = started[0]?.pid ?? 0;
+
+  process.kill(oldPID, 'SIGSTOP');
+
+  onTestFinished(() => {
+    started[0]?.kill('SIGCONT');
+  });
+
+  await waitForCondition(() => readProcessStatus(oldPID).stopped);
+
+  const sweeping = proxies.removeIdle();
+
+  await waitForCondition(() => readProcessStatus(oldPID).pendingSignals.includes('SIGTERM'));
+
+  const holding = proxies.holdProxy('pv-0a1b2c3d-7');
+
+  process.kill(oldPID, 'SIGCONT');
+
+  await sweeping;
+
+  const second = await holding;
+  const answer = await fetch(`${second.origin}/pv-0a1b2c3d-7/v1/models`);
+
+  expect(endedBefore).toStrictEqual([undefined, expect.toBeOneOf([0, 'SIGTERM'])]);
   expect(answer.status).toBe(200);
 });

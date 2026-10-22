@@ -47,6 +47,16 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
 
   const entries = new Map<string, ProxyEntry>();
 
+  // the proxy of an imp whose stop is under way, which a new start waits out, so two proxies never
+  // write one count
+  const stopping = new Map<string, Promise<void>>();
+
+  const startAfterStop = async (imp: string): Promise<RunningProxy> => {
+    await stopping.get(imp);
+
+    return startProxy(settings, deps, imp);
+  };
+
   const readEntry = (imp: string): ProxyEntry => {
     const existing = entries.get(imp);
 
@@ -55,7 +65,7 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
     }
 
     const entry = {
-      pending: startProxy(settings, deps, imp),
+      pending: startAfterStop(imp),
       holds: 0,
       lastUsedMs: deps.now().getTime(),
     };
@@ -65,16 +75,28 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
     return entry;
   };
 
-  const stopProxy = async (imp: string): Promise<void> => {
-    const entry = entries.get(imp);
-
-    entries.delete(imp);
-
+  const killProxy = async (entry: ProxyEntry | undefined): Promise<void> => {
     const running = await entry?.pending.catch(() => null);
 
     running?.process.kill();
 
     await running?.process.exited;
+  };
+
+  const stopProxy = async (imp: string): Promise<void> => {
+    const entry = entries.get(imp);
+
+    entries.delete(imp);
+
+    const stopped = killProxy(entry);
+
+    stopping.set(imp, stopped);
+
+    await stopped;
+
+    if (stopping.get(imp) === stopped) {
+      stopping.delete(imp);
+    }
   };
 
   const readRunning = async (imp: string, entry: ProxyEntry): Promise<RunningProxy> => {
