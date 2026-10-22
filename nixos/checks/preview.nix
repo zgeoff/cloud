@@ -736,6 +736,7 @@ let
         ./apply-slot-evictions.ts
         ./build-contract-imp-name.ts
         ./build-contract-status.ts
+        ./build-forwarded-headers.ts
         ./build-github-client.ts
         ./build-imp-name.ts
         ./build-impd-client.ts
@@ -753,10 +754,12 @@ let
         ./model-route.ts
         ./parse-preview-contract.ts
         ./parse-pull-request-event.ts
+        ./pick-spend-admission.ts
         ./plan-idle-sleeps.ts
         ./plan-slot-evictions.ts
         ./render-preview-comment.ts
         ./render-preview-page.ts
+        ./render-spend-refusal.ts
         ./run-contract-retries.ts
         ./run-contract-run.ts
         ./run-contract-suite.ts

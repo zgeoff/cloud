@@ -1,6 +1,9 @@
+import { buildForwardedHeaders } from './build-forwarded-headers.ts';
 import type { PreviewStore } from './create-preview-store.ts';
 import type { ProxyHold, SpendProxies } from './create-spend-proxies.ts';
 import { modelRoute } from './model-route.ts';
+import { pickSpendAdmission } from './pick-spend-admission.ts';
+import { renderSpendRefusal } from './render-spend-refusal.ts';
 
 export interface SpendHandlerDeps {
   readonly store: PreviewStore;
@@ -9,55 +12,39 @@ export interface SpendHandlerDeps {
   readonly log: (line: string) => void;
 }
 
-// a hop-by-hop header, or one that describes a body this listener sends on as it arrived
-const DROPPED_HEADERS = ['host', 'connection', 'keep-alive', 'transfer-encoding', 'content-length'];
-
 // The broker sends a preview's model calls here on the preview's model route, and the imp's grant
 // filter lets it send no other, so the route picks the proxy.
 export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
-    const headers = new Headers(request.headers);
-
-    for (const name of DROPPED_HEADERS) {
-      headers.delete(name);
-    }
 
     const body = request.body === null ? null : await request.arrayBuffer();
 
     // A close marks the preview ended before it removes the proxy, and nothing awaits between
     // this check and the hold, so a closed preview never gets a proxy that the close missed.
     const route = modelRoute.parsePath(url.pathname);
-    const imp = route?.imp ?? '';
     const preview = route === null ? null : deps.store.findPreviewByImp(route.imp);
+    const admission = pickSpendAdmission(url.pathname, route, preview?.phase ?? null);
 
-    if (preview === null || preview.phase === 'ended') {
-      return renderAPIError(
-        404,
-        'not_found_error',
-        `no preview holds the model route ${url.pathname}`,
-      );
+    if (!admission.admitted) {
+      return renderSpendRefusal(admission.refusal);
     }
 
-    const hold = await deps.proxies.holdProxy(imp).catch((error: unknown) => {
-      deps.log(`${imp}: ${error instanceof Error ? error.message : String(error)}`);
+    const hold = await deps.proxies.holdProxy(admission.imp).catch((error: unknown) => {
+      deps.log(`${admission.imp}: ${error instanceof Error ? error.message : String(error)}`);
 
       return null;
     });
 
     // the proxy is the spend cap, so a preview whose proxy cannot start makes no model call
     if (hold === null) {
-      return renderAPIError(
-        503,
-        'api_error',
-        'the preview service could not start the counting proxy',
-      );
+      return renderSpendRefusal({ kind: 'no-proxy' });
     }
 
     const answer = await deps
       .sendRequest(`${hold.origin}${url.pathname}${url.search}`, {
         method: request.method,
-        headers,
+        headers: buildForwardedHeaders(request.headers, 'call'),
         body,
         redirect: 'manual',
       })
@@ -66,17 +53,11 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
     if (answer === null) {
       hold.release();
 
-      return renderAPIError(502, 'api_error', 'the counting proxy did not answer');
+      return renderSpendRefusal({ kind: 'no-answer' });
     }
 
     if (answer.body === null) {
       hold.release();
-    }
-
-    const answerHeaders = new Headers(answer.headers);
-
-    for (const name of [...DROPPED_HEADERS, 'content-encoding']) {
-      answerHeaders.delete(name);
     }
 
     // a streamed reply can outlast the idle time, so the hold lasts until its body ends
@@ -85,13 +66,9 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
     return new Response(answerBody, {
       status: answer.status,
       statusText: answer.statusText,
-      headers: answerHeaders,
+      headers: buildForwardedHeaders(answer.headers, 'answer'),
     });
   };
-}
-
-function renderAPIError(status: number, type: string, message: string): Response {
-  return Response.json({ type: 'error', error: { type, message } }, { status });
 }
 
 function buildReleasingBody(
