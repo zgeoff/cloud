@@ -23,7 +23,7 @@ config:
     webImage: ghcr.io/zgeoff/nixie-web:0.40.0@sha256:a6965f6909c75fcfc1b1bf669e0afa99c053d4680c4b58c428b78c47d02a3ad7
     hostname: nixie.geoff.cloud
   geoff-cloud:files:
-    image: ghcr.io/zgeoff/cloud-files:3d7a541cabcd25faa474c68a5b5a3ed4b453c8a2@sha256:af9411239556141dbdb4a157614bb0cdc4924783701642f2d471a1a089a86296
+    image: ghcr.io/zgeoff/cloud-files:33830cac231f4295a03516fe081d1a0cbd790452@sha256:0c3ecdf88e7a02ce1b80d17e3017757b79f49b9abc1986af7c3674e7574334f9
     hostname: files.geoff.cloud
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=
