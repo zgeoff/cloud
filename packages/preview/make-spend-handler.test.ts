@@ -66,7 +66,12 @@ test('it keeps a preview proxy through an idle sweep while the proxy reply is un
 
   onTestFinished(() => proxies.removeAll());
 
-  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
 
   const response = await handler(
     new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
@@ -110,7 +115,12 @@ test('it lets an idle sweep stop a preview proxy once the proxy reply is read', 
 
   onTestFinished(() => proxies.removeAll());
 
-  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
 
   const response = await handler(
     new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
@@ -155,7 +165,12 @@ test('it sends a preview model call to that preview proxy and answers with what 
 
   onTestFinished(() => proxies.removeAll());
 
-  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
 
   const response = await handler(
     new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages?beta=true', {
@@ -193,7 +208,12 @@ test('it answers a route that names no preview with a 404 and starts no proxy', 
 
   onTestFinished(() => proxies.removeAll());
 
-  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
 
   const response = await handler(
     new Request('http://172.17.0.1:18082/pv-0a1b2c3d-9/v1/messages', {
@@ -235,7 +255,12 @@ test('it answers the route of an ended preview with a 404', async () => {
 
   onTestFinished(() => proxies.removeAll());
 
-  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
 
   const response = await handler(
     new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
@@ -270,7 +295,12 @@ test('it refuses a preview model call with a 503 when its proxy cannot start', a
     ctx.deps,
   );
 
-  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
 
   const response = await handler(
     new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {

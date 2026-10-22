@@ -4,6 +4,7 @@ import type { ProxyHold, SpendProxies } from './create-spend-proxies.ts';
 export interface SpendHandlerDeps {
   readonly store: PreviewStore;
   readonly proxies: SpendProxies;
+  readonly sendRequest: (url: string, init: RequestInit) => Promise<Response>;
   readonly log: (line: string) => void;
 }
 
@@ -50,12 +51,14 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
       );
     }
 
-    const answer = await fetch(`${hold.origin}${url.pathname}${url.search}`, {
-      method: request.method,
-      headers,
-      body,
-      redirect: 'manual',
-    }).catch(() => null);
+    const answer = await deps
+      .sendRequest(`${hold.origin}${url.pathname}${url.search}`, {
+        method: request.method,
+        headers,
+        body,
+        redirect: 'manual',
+      })
+      .catch(() => null);
 
     if (answer === null) {
       hold.release();

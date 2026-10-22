@@ -53,7 +53,12 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
       : Bun.serve({
           ...config.spend.listener,
           idleTimeout: 0,
-          fetch: makeSpendHandler({ store, proxies: spendProxies, log: writeLog }),
+          fetch: makeSpendHandler({
+            store,
+            proxies: spendProxies,
+            sendRequest: fetch,
+            log: writeLog,
+          }),
         });
 
   const sweep = setInterval(() => {
