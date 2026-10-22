@@ -214,6 +214,8 @@ in
         "tailscaled.service"
       ];
       wants = [ "network-online.target" ];
+      # atc runs git on this host to resolve a git workspace's ref before an imp clones it
+      path = [ pkgs.git ];
       environment = {
         HOME = home;
         XDG_RUNTIME_DIR = "/run/atc-daemon";

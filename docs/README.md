@@ -64,6 +64,8 @@ call, the path of a change, the topology and the data.
   their measured times, and the untested root-disk snapshot restore.
 - [atc gateway backup and restore](./runbooks/atc-gateway-backup-restore.md): back up and restore
   the gateway's state.
+- [atc gateway smoke spawn](./runbooks/atc-gateway-smoke.md): spawn a Claude session through the
+  gateway onto an imp and check its first turn.
 - [The GHCR pull token](./runbooks/ghcr-pull-token.md): rotate the token k3s pulls the private
   images with, and check a pull.
 - [Agent image](./runbooks/agent-image.md): build, check, switch or roll back the agent image.
