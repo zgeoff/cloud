@@ -42,58 +42,48 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
 `host_imp` sends its standard input over SSH, so a secret piped into it never reaches the host's
 journal.
 
-## Add nixie's images and model secret to impd
+## Add nixie's model secret to impd
 
-nixie's token cannot add an image or a secret, so add them as impd's root before the first deploy,
-after a release that changes nixie's sandbox images, and after a model credential rotation.
+nixie's token cannot add a secret, so add the model secret as impd's root before the first deploy
+and after a model credential rotation. nixie adds its own sandbox images at start, because its token
+carries nixie's image ref prefix ([mint nixie's impd token](#mint-nixies-impd-token)).
 
-1. Add each sandbox image under the name nixie gives it, which
-   [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md)
-   defines. The nixie image's `nixie sandbox-manifest` command prints each image's ref and name:
+Add a model secret for each profile in `config.yaml`, under the name
+[nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
+defines:
+`model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`. Every
+profile uses the same credential, so the names differ only by profile:
 
-   ```bash
-   docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest \
-     | jq -r '.[] | "\(.ref) \(.name)"' \
-     | while read -r ref name; do
-       host_imp image add "$ref" --name "$name" < /dev/null && host_imp image pin "$name" < /dev/null
-     done
-   ```
+```bash
+hash=$(op read op://cloud/nixie-model-credential/credential \
+  | { IFS= read -r c; printf 'bearer\napi.anthropic.com\n%s' "$c"; } | sha256sum | cut -c1-16)
+secrets=model-opus-$hash,model-haiku-$hash,model-sonnet-$hash
+for secret in ${secrets//,/ }; do
+  op read op://cloud/nixie-model-credential/credential | host_imp secret add "$secret" \
+    --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
+done
+```
 
-   The pin keeps each image when impd's image eviction frees disk while no sandbox uses the image. A
-   later add under the same name keeps the name's pin. Expect `host_imp image ls < /dev/null` to
-   show `yes` in the `PINNED` column of each sandbox image.
-
-2. Add a model secret for each profile in `config.yaml`, under the name
-   [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
-   defines:
-   `model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`.
-   Every profile uses the same credential, so the names differ only by profile:
-
-   ```bash
-   hash=$(op read op://cloud/nixie-model-credential/credential \
-     | { IFS= read -r c; printf 'bearer\napi.anthropic.com\n%s' "$c"; } | sha256sum | cut -c1-16)
-   secrets=model-opus-$hash,model-haiku-$hash,model-sonnet-$hash
-   for secret in ${secrets//,/ }; do
-     op read op://cloud/nixie-model-credential/credential | host_imp secret add "$secret" \
-       --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
-   done
-   ```
-
-   Expect `host_imp secret ls` to list each name with the host `api.anthropic.com`. A profile
-   without its secret leaves its role's sandbox unmade, and `imp_host` unready.
+Expect `host_imp secret ls` to list each name with the host `api.anthropic.com`. A profile without
+its secret leaves its role's sandbox unmade, and `imp_host` unready.
 
 ## Mint nixie's impd token
 
-The token manages only nixie's imps and grants only the model secrets. Mint it straight into the
+The token manages only nixie's imps, grants only the model secrets, and adds only images from refs
+under `ghcr.io/zgeoff/nixie-`, under names that start with `nixie-`. Mint it straight into the
 secrets file, so its value never prints:
 
 ```bash
-host_imp token new nixie --scope manage --imps 'nixie-*' --grantable "$secrets" < /dev/null \
+host_imp token new nixie --scope manage --imps 'nixie-*' --grantable "$secrets" \
+  --image-ref-prefix ghcr.io/zgeoff/nixie- < /dev/null \
   | tr -d '\n' | jq -Rs . | sops_nixie set --value-stdin secrets.sops.yaml '["impd_token"]'
 ```
 
 impd shows the secret only once, so if the sops step fails, remove the token with
 `host_imp token rm nixie < /dev/null` and mint it again.
+
+To let a token minted without the prefix add nixie's images, set the prefix on it with
+`host_imp token set nixie --image-ref-prefix ghcr.io/zgeoff/nixie- < /dev/null`.
 
 After a model credential rotation, or after a profile joins `config.yaml`, point the token at the
 new list with `host_imp token set nixie --grantable "$secrets" < /dev/null`. The flag takes the
@@ -139,15 +129,14 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    `scripts/nixie-api/nixie-procedure-kinds.ts`. Mark it a read only when nixie's contract describes
    it as changing nothing.
 
-2. Add the release's sandbox images to impd, as above.
-3. Preview, then apply:
+2. Preview, then apply:
 
    ```bash
    bun run preview -- --refresh
    bun run up
    ```
 
-4. Check readiness from the host:
+3. Check readiness from the host:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n nixie exec nixie-0 -c nixie -- nixie health
@@ -156,10 +145,10 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    Expect every part ready and exit 0. The log line `writer.started` in
    `k3s kubectl -n nixie logs nixie-0 -c nixie` shows the database opened, with its schema version.
 
-5. Check the route from a tailnet device: `curl -sS https://nixie.geoff.cloud/health/live`. Expect
+4. Check the route from a tailnet device: `curl -sS https://nixie.geoff.cloud/health/live`. Expect
    HTTP 200.
 
-6. Run the deploy checks, as [Check a deploy](#check-a-deploy) describes.
+5. Run the deploy checks, as [Check a deploy](#check-a-deploy) describes.
 
 ## Replace nixie's StatefulSet
 
@@ -193,7 +182,7 @@ record the claim before you start, so that you can show the same volume came bac
    describes, and watch it finish.
 5. Run the three commands of step 3 again. Expect the same claim UID and volume, and `nixie.db` and
    `keys.db` at least as large as before.
-6. Check readiness and run the deploy checks, as steps 4 to 6 of
+6. Check readiness and run the deploy checks, as steps 3 to 5 of
    [Deploy or upgrade](#deploy-or-upgrade) describe. The log line `writer.started` shows the same
    schema version as before the replace.
 
@@ -363,7 +352,7 @@ device enrolled after the snapshot is lost. Back up first if the current data st
 
    Expect `restored nixie.db: integrity_check ok` and `restored keys.db: integrity_check ok`.
 
-3. Start nixie and check it, as step 4 of [Deploy or upgrade](#deploy-or-upgrade) describes:
+3. Start nixie and check it, as step 3 of [Deploy or upgrade](#deploy-or-upgrade) describes:
 
    ```bash
    ssh root@geoffcloud k3s kubectl -n nixie scale statefulset/nixie --replicas=1
@@ -379,11 +368,12 @@ an apply would renew it.
 
 ## Failures
 
-| Symptom                                           | Cause                                   | Fix                                             |
-| ------------------------------------------------- | --------------------------------------- | ----------------------------------------------- |
-| `imp_host` unready, `FORBIDDEN` in logs           | an image or the model secret is missing | add it, as above                                |
-| `definitions` unready                             | git-sync has no checkout yet            | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
-| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout | wait for nixie's next definitions probe         |
-| the pod restarts with `sops could not decrypt`    | the host key is not a recipient         | add it to `.sops.yaml` and run `updatekeys`     |
-| the pod restarts with `nixie refuses the secrets` | a key is missing from the file          | set it, as above                                |
-| TLS error on the name                             | the certificate expired                 | `bun run up`                                    |
+| Symptom                                           | Cause                                    | Fix                                             |
+| ------------------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
+| `imp_host` unready, `impd did not add the image`  | the token lacks nixie's image ref prefix | set it, as above                                |
+| `imp_host` unready, `FORBIDDEN` in logs           | the model secret is missing              | add it, as above                                |
+| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
+| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe         |
+| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
+| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
+| TLS error on the name                             | the certificate expired                  | `bun run up`                                    |

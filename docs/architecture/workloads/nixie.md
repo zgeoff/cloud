@@ -102,13 +102,13 @@ health probe's grant changes, and [the tailnet](../network/tailnet.md#identities
 two grants combine. impd delivers each tool call from an imp back over nixie's own connection, so
 the pod opens no inbound port for its tools.
 
-nixie's impd token can manage only imps whose names carry nixie's prefix, and grant only nixie's
-model secret to them. impd refuses an image add and a secret add to such a token, because both are
-host-wide, and nixie's start makes both calls unless impd already holds the image or the secret. The
-host owner therefore adds nixie's sandbox images and its model secret as root before a deploy that
-changes either, under the names nixie derives: each image's kind and the head of its digest, and the
-model profile with a digest of its credential. A credential rotation or a release with new sandbox
-images repeats that step.
+nixie's impd token can manage only imps whose names carry nixie's prefix, grant only nixie's model
+secret to them, and add images from nixie's registry path under names with nixie's prefix. nixie's
+start adds each sandbox image of its release under the name it derives from the image's kind and the
+head of its digest, so a release with new sandbox images deploys with no step on the host. impd
+refuses a secret add to such a token, because a secret is host-wide. The host owner therefore adds
+the model secret as root, under the name nixie derives from the model profile and a digest of its
+credential, before the first deploy and after each credential rotation.
 
 ## The route in
 

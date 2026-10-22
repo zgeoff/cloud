@@ -50,7 +50,8 @@ The high mark sits low enough that a builder imp's disk still fits above impd's 
 
 impd never removes a pinned image, so each image that a config outside impd boots by name carries a
 pin. The preview service's image unit pins the preview image, the agent image build pins each image
-that passes its check, and nixie's runbook pins nixie's sandbox images as it adds them.
+that passes its check. nixie's sandbox images carry no pin, because nixie adds them with its own
+token, which cannot pin. nixie adds an evicted image again before it creates a sandbox on it.
 
 ## DNS and certificates
 

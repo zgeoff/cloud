@@ -88,9 +88,9 @@ it `needs-review` when any of these holds:
 - The update is minor and the new release is 0.x, because a 0.x minor release is the breaking one.
 - A nixie release in the bump adds migrations (label `migrations`). nixie's migrations run forward
   only, so a revert does not undo them.
-- The bump changes nixie's sandbox images (label `sandbox-images-changed`), which a person adds to
-  impd before the merge, because the `Deploy prod` workflow applies the merged pin, as
-  [the nixie runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd) describes.
+
+A nixie bump that changes nixie's sandbox images needs no review for that change, because nixie adds
+its own images to impd at start.
 
 The merge workflow runs each time CI finishes on a `release-check/` branch, and each time such a
 pull request gets the `auto-merge` label. The label event matters when a bump run fails after its
@@ -106,9 +106,7 @@ so the push to `main` starts its workflows.
 ## Review a bump
 
 1. Read the release notes the pull request links, and every release between the pin and the bump.
-2. For a nixie bump with `sandbox-images-changed`, add the new sandbox images to impd before you
-   merge it, because the `Deploy prod` workflow applies the merged pin.
-3. Merge it once its checks pass. For a nixie bump, read the `Deploy prod` run it starts, and answer
+2. Merge it once its checks pass. For a nixie bump, read the `Deploy prod` run it starts, and answer
    it if its guard holds the plan, as [the prod apply job](./prod-apply.md) describes.
 
 A later release replaces the branch, the title, the body and the labels of the open pull request,
