@@ -67,6 +67,24 @@ done
 Expect `host_imp secret ls` to list each name with the host `api.anthropic.com`. A profile without
 its secret leaves its role's sandbox unmade, and `imp_host` unready.
 
+## Pin nixie's sandbox images
+
+nixie adds its sandbox images with its own token, which cannot pin an image. Delivery pins them with
+`impz image pin` as impd's root at each nixie release that adds sandbox images, so impd's image
+eviction never makes a sandbox create pull its image again. nixie adds an evicted image again before
+it creates a sandbox on it, so an image that misses its pin costs a pull, not a failed create.
+
+Once the release reports ready, pin each of its sandbox images by the name nixie gives it:
+
+```bash
+docker run --rm --entrypoint nixie "$NIXIE_IMAGE" sandbox-manifest | jq -r '.[].name' \
+  | while read -r name; do host_imp image pin "$name" < /dev/null; done
+```
+
+Then unpin the sandbox images of the release 2 back, with `host_imp image unpin "$name"` over the
+names that release's `sandbox-manifest` prints. Expect `host_imp image ls < /dev/null` to show `yes`
+in the `PINNED` column of each image of the last 2 releases.
+
 ## Mint nixie's impd token
 
 The token manages only nixie's imps, grants only the model secrets, and adds only images from refs
@@ -149,6 +167,9 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    HTTP 200.
 
 5. Run the deploy checks, as [Check a deploy](#check-a-deploy) describes.
+
+6. For a release that adds sandbox images, pin them, as
+   [Pin nixie's sandbox images](#pin-nixies-sandbox-images) describes.
 
 ## Replace nixie's StatefulSet
 
