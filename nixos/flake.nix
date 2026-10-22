@@ -58,6 +58,7 @@
       # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
       # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk, and
       # network-policy, which runs infra's egress NetworkPolicies on k3s, and
+      # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
       # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and
       # drift-check-vm, which runs the drift check's unit in its own sandbox
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
@@ -136,6 +137,10 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.network-policy = import ./checks/network-policy.nix {
+        inherit nixpkgs;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.imp-cpu-weight = import ./checks/imp-cpu-weight.nix {
         inherit nixpkgs;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };

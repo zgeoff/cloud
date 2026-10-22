@@ -76,7 +76,7 @@ so a small dip in the measured idle time never reads as a counter reset. A top-l
 such as `user.slice` after its last session, so the service keeps subtracting the last time it read
 for each one that went or that systemd made again under the same name.
 
-A container that Docker runs shows as a scope in `system.slice`, and the pods show in the top-level
+A container that Docker runs shows as a scope in `imp.slice`, and the pods show in the top-level
 cgroup that the kubelet makes for them. Grafana's `host-cpu` dashboard charts the kernel time beside
 the time of each top-level cgroup.
 

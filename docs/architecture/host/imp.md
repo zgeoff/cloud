@@ -39,6 +39,13 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
+The imps yield CPU to the cluster rather than hold a cap. Docker starts its containers, imp-host
+among them, in `imp.slice`, whose CPU weight of 10 sits below the weight of `system.slice`, where
+k3s runs, and of the kubelet's `kubepods.slice`. The kernel splits a busy CPU between sibling
+cgroups by weight, so under load the pods and k3s get the larger share, while on a quiet host the
+imps use every core. impd's own weights for each imp's cgroup, inside the container, only order the
+imps among themselves.
+
 ## Images on the pool
 
 impd keeps its images on `tank/imp`, which shares the pool with the encrypted datasets and the k3s
