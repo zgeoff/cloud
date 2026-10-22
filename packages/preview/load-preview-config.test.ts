@@ -64,7 +64,8 @@ test('it reads the settings from the environment and the secrets from the creden
 test('it reads the counting proxy settings when the environment names a model route listener', async () => {
   const files = new Map([
     ['/run/credentials/preview.service/webhook-secret', 'stub-webhook-secret\n'],
-    ['/run/credentials/preview.service/github-token', 'ghp_stub-preview-token\n'],
+    ['/run/credentials/preview.service/github-app-client-id', 'Iv23liStubPreviewApp\n'],
+    ['/run/credentials/preview.service/github-app-key', stubAppKeyPEM],
     ['/run/credentials/preview.service/imp-token', 'imp_stubpreview.stub-secret\n'],
   ]);
 
@@ -117,7 +118,8 @@ test.each([
 ])('it rejects counting proxy settings with %s', (_label, name, value) => {
   const files = new Map([
     ['/run/credentials/preview.service/webhook-secret', 'stub-webhook-secret\n'],
-    ['/run/credentials/preview.service/github-token', 'ghp_stub-preview-token\n'],
+    ['/run/credentials/preview.service/github-app-client-id', 'Iv23liStubPreviewApp\n'],
+    ['/run/credentials/preview.service/github-app-key', stubAppKeyPEM],
     ['/run/credentials/preview.service/imp-token', 'imp_stubpreview.stub-secret\n'],
   ]);
 

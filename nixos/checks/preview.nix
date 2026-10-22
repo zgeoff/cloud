@@ -345,7 +345,8 @@ let
                 limitDollars = 3;
               };
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };
@@ -408,7 +409,8 @@ let
               impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               impModelSecret = "preview-model";
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };
@@ -454,7 +456,8 @@ let
                 };
               };
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };

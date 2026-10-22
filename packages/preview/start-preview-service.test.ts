@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
 import { createPreviewStore } from './create-preview-store.ts';
+import { stubApp } from './mocks/github-app.ts';
 import { server as mockServer } from './mocks/node.ts';
 import { startPreviewService } from './start-preview-service.ts';
 
@@ -59,7 +60,7 @@ test("it sends a preview's model call from its route listener to that preview's 
     impdURL: 'http://127.0.0.1:1',
     databasePath: join(ctx.directory, 'previews.sqlite'),
     webhookSecret: 'whsec-example',
-    githubToken: 'github-token-example',
+    githubApp: stubApp,
     impdToken: 'imp_example.token',
     sweepIntervalMs: 3_600_000,
     spend: {
