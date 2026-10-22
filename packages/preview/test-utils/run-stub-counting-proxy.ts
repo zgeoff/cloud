@@ -3,19 +3,13 @@
 // kernel, and the proxy.started log line first on stdout. A request echoes back as JSON instead of
 // a model reply, and a request to /exit ends the process, as a crash would.
 import { parseArgs } from 'node:util';
-import { z } from 'zod';
-
-const configSchema = z.looseObject({
-  listen: z.object({ hostname: z.string(), port: z.int() }),
-  limits: z.object({ dollars: z.number() }),
-  routes: z.record(z.string(), z.unknown()),
-});
+import { countingProxyConfigSchema } from '../counting-proxy-config-schema.ts';
 
 const args = parseArgs({ options: { config: { type: 'string' } } });
 
 const stored: unknown = await Bun.file(args.values.config ?? '').json();
 
-const config = configSchema.parse(stored);
+const config = countingProxyConfigSchema.parse(stored);
 
 const server = Bun.serve({
   hostname: config.listen.hostname,

@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Subprocess } from 'bun';
 import { z } from 'zod';
+import { countingProxyConfigSchema } from './counting-proxy-config-schema.ts';
 import type { SpendSettings } from './types.ts';
 
 export interface ProxyHold {
@@ -179,17 +180,16 @@ async function startProxy(
   const paths = buildProxyPaths(settings, imp);
 
   // the route's ID is the imp's name, so the path the broker sends on reaches the proxy unchanged
-  await Bun.write(
-    paths.config,
-    JSON.stringify({
-      listen: { hostname: '127.0.0.1', port: 0 },
-      store: paths.store,
-      limits: { dollars: settings.limitDollars },
-      routes: {
-        [imp]: { upstream: settings.upstream, model: settings.model, prices: settings.prices },
-      },
-    }),
-  );
+  const config = countingProxyConfigSchema.parse({
+    listen: { hostname: '127.0.0.1', port: 0 },
+    store: paths.store,
+    limits: { dollars: settings.limitDollars },
+    routes: {
+      [imp]: { upstream: settings.upstream, model: settings.model, prices: settings.prices },
+    },
+  });
+
+  await Bun.write(paths.config, JSON.stringify(config));
 
   const child = Bun.spawn([settings.proxyPath, '--config', paths.config], {
     stdin: 'ignore',

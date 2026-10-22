@@ -1,8 +1,8 @@
 import type { KeyObject } from 'node:crypto';
 import { createPrivateKey } from 'node:crypto';
 import { join } from 'node:path';
-import { z } from 'zod';
 import type { GitHubApp } from './build-github-client.ts';
+import { spendPricesSchema } from './counting-proxy-config-schema.ts';
 import type { ContractSettings, PreviewSettings, SpendPrices, SpendSettings } from './types.ts';
 
 interface Listener {
@@ -182,16 +182,8 @@ function parseSpendConfig(
   };
 }
 
-const pricesSchema = z.strictObject({
-  input: z.number().nonnegative(),
-  cache_write: z.number().nonnegative(),
-  cache_write_1h: z.number().nonnegative(),
-  cached_input: z.number().nonnegative(),
-  output: z.number().nonnegative(),
-});
-
 function parsePrices(text: string): SpendPrices {
-  const parsed = pricesSchema.safeParse(parseJSONOrNull(text));
+  const parsed = spendPricesSchema.safeParse(parseJSONOrNull(text));
 
   if (!parsed.success) {
     throw new Error(

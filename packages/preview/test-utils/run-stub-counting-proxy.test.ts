@@ -26,7 +26,13 @@ test('it prints the proxy.started line with its port, then echoes each request',
       listen: { hostname: '127.0.0.1', port: 0 },
       store: join(ctx.directory, 'count.json'),
       limits: { dollars: 2 },
-      routes: { 'pv-0a1b2c3d-7': {} },
+      routes: {
+        'pv-0a1b2c3d-7': {
+          upstream: 'https://models.example.test',
+          model: 'model-small',
+          prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+        },
+      },
     }),
   );
 
@@ -76,8 +82,15 @@ test('it exits when a request asks it to', async () => {
     join(ctx.directory, 'proxy.json'),
     JSON.stringify({
       listen: { hostname: '127.0.0.1', port: 0 },
+      store: join(ctx.directory, 'count.json'),
       limits: { dollars: 2 },
-      routes: { 'pv-0a1b2c3d-7': {} },
+      routes: {
+        'pv-0a1b2c3d-7': {
+          upstream: 'https://models.example.test',
+          model: 'model-small',
+          prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+        },
+      },
     }),
   );
 
