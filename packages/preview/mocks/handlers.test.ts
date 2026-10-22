@@ -174,18 +174,24 @@ test('it refuses a repository call without an installation token with 401', asyn
   expect(response.status).toBe(401);
 });
 
-test('it refuses a repository call with an expired installation token with 401', async () => {
+test.each([
+  ['an empty authorization header', '', 3_600_000],
+  ['a token without the Bearer scheme', 'ghs_greenhouse', 3_600_000],
+  ['a token the stand-in never minted', 'Bearer ghs_unknown', 3_600_000],
+  ['an expired token', 'Bearer ghs_greenhouse', -1000],
+  ['a token that expires this instant', 'Bearer ghs_greenhouse', 0],
+])('it refuses a repository call with %s with 401', async (_label, authorization, expiresInMs) => {
   installationTokens.push({
-    token: 'ghs_lapsed',
+    token: 'ghs_greenhouse',
     repos: ['acme/greenhouse'],
-    expiresAt: new Date(Date.now() - 1000),
+    expiresAt: new Date(Date.now() + expiresInMs),
   });
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
 
   const response = await fetch(
     `${githubAPIURL}/repos/acme/greenhouse/contents/preview/compose.yaml?ref=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`,
-    { headers: { authorization: 'Bearer ghs_lapsed' } },
+    { headers: { authorization } },
   );
 
   expect(response.status).toBe(401);
