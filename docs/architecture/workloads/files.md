@@ -63,11 +63,14 @@ volume would keep less than a fixed reserve free, so a full volume never breaks 
 uploads at once can both pass that check, so a write that still finds the volume or the database
 full gets 507 as well.
 
-The service stops serving an expired upload at once, because each read checks the expiry. A response
-carries a short public cache lifetime, so Cloudflare or a browser can still return a copy it fetched
-before the expiry until that lifetime ends. An in-process sweep runs when the service starts and
-then every hour. It removes each expired file first and its row second, so a crash between the two
-leaves a row whose file is gone, which reads as 404, never a file that nothing lists.
+The service stops serving an expired or removed upload at once, because each read checks the row and
+the expiry. The service marks every response, a 404 included, `Cache-Control: no-store`, so neither
+Cloudflare nor a browser keeps a copy, and the service returns 404 at the plain URL from the moment
+of the removal or the expiry. Cloudflare's zone settings stretch any short public lifetime to hours,
+so a public lifetime would leave a removed file public for those hours. An in-process sweep runs
+when the service starts and then every hour. It removes each expired file first and its row second,
+so a crash between the two leaves a row whose file is gone, which reads as 404, never a file that
+nothing lists.
 
 ## Backup and restore
 

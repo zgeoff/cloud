@@ -11,15 +11,13 @@ const inlineTypes = new Set([
   'video/webm',
 ]);
 
-// SVG and HTML can run script, so they go out as attachments. Caches keep a file 5 minutes at most,
-// so a removed or expired file soon leaves Cloudflare's cache.
+// SVG and HTML can run script, so they go out as attachments.
 export function buildFileHeaders(upload: Pick<Upload, 'contentType' | 'filename'>) {
   const inline = inlineTypes.has(upload.contentType);
 
   return {
     'Content-Type': inline ? upload.contentType : 'application/octet-stream',
     'Content-Disposition': `${inline ? 'inline' : 'attachment'}; ${renderFilenameParameters(upload.filename)}`,
-    'Cache-Control': 'public, max-age=300',
   };
 }
 

@@ -25,11 +25,13 @@ export interface FilesServiceInputs {
   readonly writeBytes: (path: string, file: Blob) => Promise<unknown>;
 }
 
-// on every response, the API's and the 404s included: no browser guesses a type, and no response
-// runs script or loads anything
-const securityHeaders = {
+// On every response, the API's and the 404s included: no browser guesses a type, and no response
+// runs script or loads anything. Cloudflare's zone raises any shorter max-age to its 4-hour browser
+// TTL and caches a 404, but it never stores a no-store response, so a removal shows at once.
+const everyResponseHeaders = {
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; sandbox",
+  'Cache-Control': 'no-store',
 };
 
 // the largest request body Bun reads: the largest file, and room for the form around it
@@ -75,7 +77,7 @@ export function createFilesService(inputs: FilesServiceInputs) {
   // reads the body itself
   return new Elysia({ serve: { maxRequestBodySize: maxRequestBodyBytes } })
     .onRequest((context) => {
-      Object.assign(context.set.headers, securityHeaders);
+      Object.assign(context.set.headers, everyResponseHeaders);
     })
     .get('/healthz', () => 'ok')
     .all('/api/files', sendToAPI, { parse: 'none' })
