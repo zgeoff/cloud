@@ -1440,7 +1440,7 @@ let
       '';
     }
     {
-      title = "it buildStubAgentImageBun prints its stdout file for a build, and records the build's argv, directory, impd settings and impz";
+      title = "it buildStubAgentImageBun prints its stdout file for a build, and records the argv, directory, impd settings and impz of the build";
       script = ''
         mkdir home tmp build bin work
         printf '#!/bin/sh\n' > bin/impz
