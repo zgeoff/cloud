@@ -1,5 +1,5 @@
 import type { PreviewStore } from './create-preview-store.ts';
-import type { SpendProxies } from './create-spend-proxies.ts';
+import type { ProxyHold, SpendProxies } from './create-spend-proxies.ts';
 
 export interface SpendHandlerDeps {
   readonly store: PreviewStore;
@@ -27,21 +27,6 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
       );
     }
 
-    const origin = await deps.proxies.readOrigin(imp).catch((error: unknown) => {
-      deps.log(`${imp}: ${error instanceof Error ? error.message : String(error)}`);
-
-      return null;
-    });
-
-    // the proxy is the spend cap, so a preview whose proxy cannot start makes no model call
-    if (origin === null) {
-      return renderAPIError(
-        503,
-        'api_error',
-        'the preview service could not start the counting proxy',
-      );
-    }
-
     const headers = new Headers(request.headers);
 
     for (const name of DROPPED_HEADERS) {
@@ -50,7 +35,22 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
 
     const body = request.body === null ? null : await request.arrayBuffer();
 
-    const answer = await fetch(`${origin}${url.pathname}${url.search}`, {
+    const hold = await deps.proxies.holdProxy(imp).catch((error: unknown) => {
+      deps.log(`${imp}: ${error instanceof Error ? error.message : String(error)}`);
+
+      return null;
+    });
+
+    // the proxy is the spend cap, so a preview whose proxy cannot start makes no model call
+    if (hold === null) {
+      return renderAPIError(
+        503,
+        'api_error',
+        'the preview service could not start the counting proxy',
+      );
+    }
+
+    const answer = await fetch(`${hold.origin}${url.pathname}${url.search}`, {
       method: request.method,
       headers,
       body,
@@ -58,7 +58,13 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
     }).catch(() => null);
 
     if (answer === null) {
+      hold.release();
+
       return renderAPIError(502, 'api_error', 'the counting proxy did not answer');
+    }
+
+    if (answer.body === null) {
+      hold.release();
     }
 
     const answerHeaders = new Headers(answer.headers);
@@ -67,7 +73,10 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
       answerHeaders.delete(name);
     }
 
-    return new Response(answer.body, {
+    // a streamed reply can outlast the idle time, so the hold lasts until its body ends
+    const answerBody = answer.body === null ? null : buildReleasingBody(answer.body, hold);
+
+    return new Response(answerBody, {
       status: answer.status,
       statusText: answer.statusText,
       headers: answerHeaders,
@@ -77,4 +86,36 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
 
 function renderAPIError(status: number, type: string, message: string): Response {
   return Response.json({ type: 'error', error: { type, message } }, { status });
+}
+
+function buildReleasingBody(
+  body: ReadableStream<Uint8Array>,
+  hold: ProxyHold,
+): ReadableStream<Uint8Array> {
+  const reader = body.getReader();
+
+  return new ReadableStream({
+    pull: async (controller) => {
+      try {
+        const next = await reader.read();
+
+        if (next.done) {
+          hold.release();
+          controller.close();
+
+          return;
+        }
+
+        controller.enqueue(next.value);
+      } catch (error) {
+        hold.release();
+        controller.error(error);
+      }
+    },
+    cancel: async (reason) => {
+      hold.release();
+
+      await reader.cancel(reason);
+    },
+  });
 }

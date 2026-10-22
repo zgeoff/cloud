@@ -7,6 +7,7 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
 import { server as mockServer } from './mocks/node.ts';
+import { waitForCondition } from './test-utils/wait-for-condition.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'spend-handler-'));
@@ -22,13 +23,112 @@ async function setupTest() {
     store.close();
   });
 
+  const clock = { now: new Date('2026-10-15T09:00:00Z').getTime() };
+  const lines: string[] = [];
+
   return {
     directory,
     store,
+    clock,
+    lines,
     stubPath: join(import.meta.dir, 'test-utils', 'run-stub-counting-proxy.ts'),
-    deps: { now: () => new Date('2026-10-15T09:00:00Z'), log: () => {} },
+    deps: {
+      now: () => new Date(clock.now),
+      log: (line: string) => {
+        lines.push(line);
+      },
+    },
   };
 }
+
+test('it keeps a preview proxy through an idle sweep while the proxy reply is unread', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 7,
+    imp: 'pv-0a1b2c3d-7',
+    headSHA: 'c0ffee1',
+  });
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    ctx.deps,
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+
+  const response = await handler(
+    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+      method: 'POST',
+      body: '{"model":"model-small"}',
+    }),
+  );
+
+  ctx.clock.now += 2_400_000;
+
+  await proxies.removeIdle();
+
+  const body: unknown = await response.json();
+
+  expect(body).toMatchObject({ path: '/pv-0a1b2c3d-7/v1/messages' });
+  expect(ctx.lines).not.toContain('pv-0a1b2c3d-7: the counting proxy exited 0');
+});
+
+test('it lets an idle sweep stop a preview proxy once the proxy reply is read', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 7,
+    imp: 'pv-0a1b2c3d-7',
+    headSHA: 'c0ffee1',
+  });
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    ctx.deps,
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const handler = makeSpendHandler({ store: ctx.store, proxies, log: () => {} });
+
+  const response = await handler(
+    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+      method: 'POST',
+      body: '{"model":"model-small"}',
+    }),
+  );
+
+  await response.text();
+
+  ctx.clock.now += 2_400_000;
+
+  await proxies.removeIdle();
+
+  await waitForCondition(() => ctx.lines.includes('pv-0a1b2c3d-7: the counting proxy exited 0'));
+
+  expect(ctx.lines).toContain('pv-0a1b2c3d-7: the counting proxy exited 0');
+});
 
 test('it sends a preview model call to that preview proxy and answers with what the proxy answered', async () => {
   const ctx = await setupTest();

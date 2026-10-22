@@ -236,7 +236,7 @@ test('it grants the model secret for the preview own route only, and passes the 
       ...ctx.deps,
       settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
       spendProxies: {
-        readOrigin: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
         removeProxy: () => Promise.resolve(),
         removeIdle: () => Promise.resolve(),
         removeAll: () => Promise.resolve(),

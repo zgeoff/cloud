@@ -715,7 +715,7 @@ test('it removes the counting proxy and its count with the imp when the pull req
   const handler = makeWebhookHandler({
     ...ctx.deps,
     spendProxies: {
-      readOrigin: () => Promise.reject(new Error('a close starts no counting proxy')),
+      holdProxy: () => Promise.reject(new Error('a close starts no counting proxy')),
       removeProxy,
       removeIdle: () => Promise.resolve(),
       removeAll: () => Promise.resolve(),

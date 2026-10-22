@@ -164,9 +164,11 @@ unchanged. A proxy that fails to start gets the call a 503, so a preview without
 no model call.
 
 Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
-request's life. A proxy idle for the sleep time stops and keeps its count, and the next call starts
-it again from that count. Closing the pull request stops the proxy and removes its count with the
-imp. The proxy refuses a model other than the one the host config names, at the prices it names.
+request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
+its count, and the next call starts it again from that count. Calls that arrive together after a
+proxy exits share one new start, so two proxies never write one count. Closing the pull request
+stops the proxy and removes its count with the imp. The proxy refuses a model other than the one the
+host config names, at the prices it names.
 
 ## Slots and sleep
 
