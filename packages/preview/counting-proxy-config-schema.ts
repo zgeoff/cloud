@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { modelRoute } from './model-route.ts';
 
 // The config file that nixie's counting proxy reads, as nixie's proxy config schema defines it.
 // The service writes each proxy's file through this schema, and the stub proxy in the tests reads
@@ -21,5 +22,5 @@ export const countingProxyConfigSchema = z.strictObject({
   listen: z.strictObject({ hostname: z.string(), port: z.int().min(0).max(65_535) }),
   store: z.string().min(1),
   limits: z.strictObject({ dollars: z.number().positive() }),
-  routes: z.record(z.string().regex(/^[a-z0-9][a-z0-9-]*$/u), routeSchema),
+  routes: z.record(modelRoute.idSchema, routeSchema),
 });

@@ -1,5 +1,6 @@
 import type { PreviewStore } from './create-preview-store.ts';
 import type { ProxyHold, SpendProxies } from './create-spend-proxies.ts';
+import { modelRoute } from './model-route.ts';
 
 export interface SpendHandlerDeps {
   readonly store: PreviewStore;
@@ -11,8 +12,8 @@ export interface SpendHandlerDeps {
 // a hop-by-hop header, or one that describes a body this listener sends on as it arrived
 const DROPPED_HEADERS = ['host', 'connection', 'keep-alive', 'transfer-encoding', 'content-length'];
 
-// The broker sends a preview's model calls here with the preview imp's name as the first path
-// segment, and the imp's grant filter lets it send no other, so the segment picks the proxy.
+// The broker sends a preview's model calls here on the preview's model route, and the imp's grant
+// filter lets it send no other, so the route picks the proxy.
 export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
@@ -26,8 +27,9 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
 
     // A close marks the preview ended before it removes the proxy, and nothing awaits between
     // this check and the hold, so a closed preview never gets a proxy that the close missed.
-    const imp = url.pathname.split('/')[1] ?? '';
-    const preview = imp === '' ? null : deps.store.findPreviewByImp(imp);
+    const route = modelRoute.parsePath(url.pathname);
+    const imp = route?.imp ?? '';
+    const preview = route === null ? null : deps.store.findPreviewByImp(route.imp);
 
     if (preview === null || preview.phase === 'ended') {
       return renderAPIError(

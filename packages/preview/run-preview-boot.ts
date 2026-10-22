@@ -1,5 +1,6 @@
 import { applySlotEvictions } from './apply-slot-evictions.ts';
 import type { PhaseChange, Preview } from './create-preview-store.ts';
+import { modelRoute } from './model-route.ts';
 import type { PreviewContract } from './parse-preview-contract.ts';
 import { parsePreviewContract } from './parse-preview-contract.ts';
 import type { PreviewDeps } from './types.ts';
@@ -74,9 +75,11 @@ async function startImpInSlot(
   // filter keeps each imp on its own route, so one preview can neither skip nor spend another's cap
   await (deps.spendProxies === null
     ? deps.impd.installGrant(preview.imp, deps.settings.impModelSecret)
-    : deps.impd.installPathGrant(preview.imp, deps.settings.impModelSecret, [
-        `/${preview.imp}/**`,
-      ]));
+    : deps.impd.installPathGrant(
+        preview.imp,
+        deps.settings.impModelSecret,
+        modelRoute.buildGrantPaths(preview.imp),
+      ));
 }
 
 async function checkClosedDuringBoot(

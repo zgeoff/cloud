@@ -750,6 +750,7 @@ let
         ./make-slot-lock.ts
         ./make-spend-handler.ts
         ./make-webhook-handler.ts
+        ./model-route.ts
         ./parse-preview-contract.ts
         ./parse-pull-request-event.ts
         ./plan-idle-sleeps.ts
