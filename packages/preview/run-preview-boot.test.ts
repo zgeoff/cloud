@@ -49,6 +49,7 @@ async function setupTest() {
       buildTimeoutMs: 1_800_000,
       contract: null,
     },
+    spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
@@ -122,6 +123,7 @@ test('it creates the imp with the contract port and the grant, then builds and p
         'preview-boot',
         'acme/greenhouse',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '',
       ],
       require: ['broker'],
     },
@@ -178,6 +180,7 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
         'preview-boot',
         'acme/greenhouse',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        '',
       ],
       require: ['broker'],
     },
@@ -212,6 +215,69 @@ test('it grants the model secret beside the GitHub secret, so the stack reaches 
   );
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+});
+
+test('it grants the model secret for the preview own route only, and passes the route to the stack, when the previews have counting proxies', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  await runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
+      },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual([
+    'gh',
+    'preview-model-counted',
+  ]);
+
+  expect(ctx.impd.grantPaths).toStrictEqual(
+    new Map([['pv-0a1b2c3d-17 preview-model-counted', ['/pv-0a1b2c3d-17/**']]]),
+  );
+
+  expect(ctx.impd.commands).toMatchObject([
+    {
+      argv: [
+        'timeout',
+        '--kill-after=30',
+        '1800',
+        'sh',
+        '-c',
+        expect.toInclude('export PREVIEW_MODEL_ROUTE="$3"'),
+        'preview-boot',
+        'acme/greenhouse',
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+        'pv-0a1b2c3d-17',
+      ],
+    },
+  ]);
 });
 
 test('it requires the broker for the build when the model secret is the only grant', async () => {

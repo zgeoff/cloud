@@ -146,6 +146,31 @@ image's, so the previews and the agents run one release of imp's base image.
 A rebuild discards the old volumes, so every build seeds its data afresh, and the seed never needs
 to know whether it ran before.
 
+## The spend cap
+
+With the spend cap on, each preview's model calls pass through a counting proxy of its own, so a
+runaway preview stops at a small limit instead of using up the shared model credential. The cap sits
+outside the preview's imp, because the code under test runs its tools with no security boundary and
+could change anything inside the imp. The counting proxy is nixie's own program, a release binary
+that the host pins, and nixie's architecture docs own how it prices and counts a reply.
+
+The broker sends every preview's model calls to one listener of the service on the docker bridge,
+because an impd secret has one upstream for all the imps it is granted to. The first segment of each
+call's path names the imp, and the model grant's path filter admits only the imp's own segment, so
+one preview can neither spend from another's count nor skip its own. The repository's preview stack
+puts that segment on its model address when the boot passes it the route. The listener starts the
+imp's proxy on loopback on the first call, waits for the port the proxy names, and forwards the call
+unchanged. A proxy that fails to start gets the call a 503, so a preview without its counter makes
+no model call.
+
+Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
+request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
+its count, and the next call starts it again from that count. Calls that arrive together share one
+start, and a start waits until the imp's previous proxy has exited, so two proxies never write one
+count. Closing the pull request stops the proxy and removes its count with the imp, after the proxy
+has exited. The proxy refuses a model other than the one the host config names, at the prices it
+names.
+
 ## Slots and sleep
 
 The service runs at most a set number of previews at once, one by default, because each preview's

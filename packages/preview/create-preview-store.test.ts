@@ -40,6 +40,33 @@ test('it records a new pull request as waiting', async () => {
   });
 });
 
+test('#findPreviewByImp finds a preview by the name of its imp', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  expect(ctx.store.findPreviewByImp('pv-0a1b2c3d-17')).toStrictEqual({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    builtSHA: null,
+    phase: 'waiting',
+    detail: null,
+  });
+});
+
+test('#findPreviewByImp returns null for an imp no preview holds', async () => {
+  const ctx = await setupTest();
+
+  expect(ctx.store.findPreviewByImp('pv-0a1b2c3d-17')).toBeNull();
+});
+
 test('it moves the head of a ready preview and keeps the commit it built', async () => {
   const ctx = await setupTest();
 

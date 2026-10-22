@@ -74,6 +74,9 @@ async function removePreview(deps: PreviewDeps, event: PullRequestEvent): Promis
 
   await (existing === null ? Promise.resolve() : deps.impd.removeImp(imp));
 
+  // a reopened pull request starts its spend from zero
+  await deps.spendProxies?.removeProxy(imp);
+
   if (before === null || before.detail === unseenCloseDetail) {
     return;
   }

@@ -4,6 +4,8 @@
 # The unit starts only once its four secret files exist, so a switch before they are staged
 # skips it instead of failing. The preview-image unit adds the image each preview imp boots to
 # impd, from a reference pinned by digest, so a switch never leaves the service without it.
+# With spendCap on, a third listener on docker0 takes each preview's model calls from imp-host's
+# broker and hands them to that preview's own counting proxy.
 {
   config,
   lib,
@@ -30,6 +32,8 @@ let
   };
 in
 {
+  imports = [ ./cloud-host-firewall.nix ];
+
   options.services.preview = {
     enable = lib.mkEnableOption "the preview service, one imp per pull request";
 
@@ -147,6 +151,71 @@ in
       '';
     };
 
+    spendCap = {
+      enable = lib.mkEnableOption ''
+        a counting proxy on each preview's model route, which refuses the preview's model calls
+        once they cost the limit. impModelSecret must then be a custom secret for the model API's
+        host whose upstream is http://<address>:<port>
+      '';
+
+      package = lib.mkOption {
+        type = lib.types.package;
+        description = "The package whose bin/counting-proxy is nixie's counting proxy.";
+      };
+
+      address = lib.mkOption {
+        type = lib.types.str;
+        example = "172.17.0.1";
+        description = "docker0's host address, where the model route listener listens.";
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        example = 18082;
+        description = "The port of the model route listener.";
+      };
+
+      allowedSubnet = lib.mkOption {
+        type = lib.types.str;
+        example = "172.17.0.0/16";
+        description = "docker0's subnet, the only source cloud_host admits to the listener.";
+      };
+
+      upstream = lib.mkOption {
+        type = lib.types.str;
+        default = "https://api.anthropic.com";
+        description = "The model API's origin, which each proxy sends a preview's model calls to.";
+      };
+
+      model = lib.mkOption {
+        type = lib.types.str;
+        example = "claude-haiku-5-5";
+        description = "The one model a preview may call; each proxy refuses a call for another.";
+      };
+
+      prices = lib.mkOption {
+        type = lib.types.submodule {
+          options = lib.genAttrs [ "input" "cache_write" "cache_write_1h" "cached_input" "output" ] (
+            price:
+            lib.mkOption {
+              type = lib.types.either lib.types.ints.unsigned lib.types.float;
+              description = "The model's ${price} price, in dollars per million tokens.";
+            }
+          );
+        };
+        description = "The model's prices, which each proxy charges a reply's tokens at.";
+      };
+
+      limitDollars = lib.mkOption {
+        type = lib.types.either lib.types.ints.positive lib.types.float;
+        default = 2;
+        description = ''
+          The dollars, at the model's prices, that a preview's model calls may cost over its pull
+          request's life. A closed pull request's count goes with its imp.
+        '';
+      };
+    };
+
     contractRepos = lib.mkOption {
       type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\\*)");
       default = [ ];
@@ -201,6 +270,26 @@ in
         assertion = cfg.contractRepos == [ ] || cfg.contractModelSecret != null;
         message = "services.preview.contractModelSecret must name the model secret when contractRepos lists a repository.";
       }
+      {
+        assertion = !cfg.spendCap.enable || cfg.impModelSecret != null;
+        message = "services.preview.spendCap needs impModelSecret, whose upstream reaches the model route listener.";
+      }
+      {
+        assertion = !cfg.spendCap.enable || !(config.services.imp.ipv6.enable or false);
+        message = "the model route listener assumes imp-host on docker0; services.imp.ipv6.enable moves it to br-imphost";
+      }
+    ];
+
+    networking.cloudHost.admissions = lib.mkIf cfg.spendCap.enable [
+      {
+        inherit (cfg.spendCap) port;
+        interface = "docker0";
+        sourceCIDR = cfg.spendCap.allowedSubnet;
+        destinationAddress = cfg.spendCap.address;
+      }
+    ];
+    networking.firewall.interfaces.docker0.allowedTCPPorts = lib.mkIf cfg.spendCap.enable [
+      cfg.spendCap.port
     ];
 
     # A oneshot that each switch restarts when the reference changes, so impd holds the pinned
@@ -263,6 +352,15 @@ in
       }
       // lib.optionalAttrs (cfg.impModelSecret != null) {
         PREVIEW_IMP_MODEL_SECRET = cfg.impModelSecret;
+      }
+      // lib.optionalAttrs cfg.spendCap.enable {
+        PREVIEW_SPEND_LISTEN = "${cfg.spendCap.address}:${toString cfg.spendCap.port}";
+        PREVIEW_SPEND_PROXY = "${cfg.spendCap.package}/bin/counting-proxy";
+        PREVIEW_SPEND_DIRECTORY = "/var/lib/preview/spend";
+        PREVIEW_SPEND_UPSTREAM = cfg.spendCap.upstream;
+        PREVIEW_SPEND_MODEL = cfg.spendCap.model;
+        PREVIEW_SPEND_PRICES = builtins.toJSON cfg.spendCap.prices;
+        PREVIEW_SPEND_LIMIT_DOLLARS = toString cfg.spendCap.limitDollars;
       }
       // lib.optionalAttrs (cfg.contractRepos != [ ]) {
         PREVIEW_CONTRACT_REPOS = lib.concatStringsSep "," cfg.contractRepos;

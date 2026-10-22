@@ -2,7 +2,8 @@ import type { KeyObject } from 'node:crypto';
 import { createPrivateKey } from 'node:crypto';
 import { join } from 'node:path';
 import type { GitHubApp } from './build-github-client.ts';
-import type { ContractSettings, PreviewSettings } from './types.ts';
+import { spendPricesSchema } from './counting-proxy-config-schema.ts';
+import type { ContractSettings, PreviewSettings, SpendPrices, SpendSettings } from './types.ts';
 
 interface Listener {
   readonly hostname: string;
@@ -19,6 +20,10 @@ export interface PreviewConfig {
   readonly githubApp: GitHubApp;
   readonly impdToken: string;
   readonly sweepIntervalMs: number;
+
+  // the route listener on the docker bridge, which the model secret's upstream names, and the
+  // proxies behind it; null runs the previews without a spend cap
+  readonly spend: { readonly listener: Listener; readonly settings: SpendSettings } | null;
 }
 
 export async function loadPreviewConfig(
@@ -72,6 +77,7 @@ export async function loadPreviewConfig(
     },
     impdToken: await readCredential('imp-token'),
     sweepIntervalMs: 60_000,
+    spend: parseSpendConfig(env),
   };
 }
 
@@ -151,4 +157,61 @@ function parseListener(address: string): Listener {
   }
 
   return { hostname, port: Number(match?.groups?.['port']) };
+}
+
+function parseSpendConfig(
+  env: Readonly<Record<string, string | undefined>>,
+): PreviewConfig['spend'] {
+  const listen = env['PREVIEW_SPEND_LISTEN'] ?? '';
+
+  if (listen === '') {
+    return null;
+  }
+
+  return {
+    listener: parseListener(listen),
+    settings: {
+      proxyPath: requireValue(env, 'PREVIEW_SPEND_PROXY'),
+      directory: requireValue(env, 'PREVIEW_SPEND_DIRECTORY'),
+      upstream: requireValue(env, 'PREVIEW_SPEND_UPSTREAM').replace(/\/+$/u, ''),
+      model: requireValue(env, 'PREVIEW_SPEND_MODEL'),
+      prices: parsePrices(requireValue(env, 'PREVIEW_SPEND_PRICES')),
+      limitDollars: requirePositiveNumber(env, 'PREVIEW_SPEND_LIMIT_DOLLARS'),
+      idleMs: requireInteger(env, 'PREVIEW_IDLE_MINUTES', '30') * 60_000,
+    },
+  };
+}
+
+function parsePrices(text: string): SpendPrices {
+  const parsed = spendPricesSchema.safeParse(parseJSONOrNull(text));
+
+  if (!parsed.success) {
+    throw new Error(
+      'PREVIEW_SPEND_PRICES is not a JSON object of input, cache_write, cache_write_1h, cached_input and output prices',
+    );
+  }
+
+  return parsed.data;
+}
+
+function parseJSONOrNull(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function requirePositiveNumber(
+  env: Readonly<Record<string, string | undefined>>,
+  name: string,
+): number {
+  const text = requireValue(env, name);
+  const value = Number(text);
+
+  if (!/^\d+(?:\.\d+)?$/u.test(text) || value <= 0) {
+    throw new Error(`${name} is ${text}, not a positive number`);
+  }
+
+  return value;
 }

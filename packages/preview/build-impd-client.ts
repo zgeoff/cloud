@@ -35,6 +35,13 @@ export interface ImpdClient {
   readonly updateHTTPPort: (name: string, httpPort: number) => Promise<void>;
   readonly removeImp: (name: string) => Promise<void>;
   readonly installGrant: (name: string, secret: string) => Promise<void>;
+
+  // grants the secret for the given paths only, and narrows a grant the imp already holds to them
+  readonly installPathGrant: (
+    name: string,
+    secret: string,
+    paths: readonly string[],
+  ) => Promise<void>;
   readonly runCommand: (
     name: string,
     argv: readonly string[],
@@ -83,6 +90,12 @@ export function buildImpdClient(
         await client.imps.destroy({ name });
       }),
     installGrant: (name, secret) => withImpdErrors(() => installImpGrant(client, name, secret)),
+
+    // impd replaces the filter of a grant that exists, so every boot sets the paths again
+    installPathGrant: (name, secret, paths) =>
+      withImpdErrors(async () => {
+        await client.grants.add({ name, secret, filter: { paths: [...paths] } });
+      }),
     runCommand: (name, argv, options = {}) =>
       withImpdErrors(async () => {
         const require = options.requireBroker === true ? { require: ['broker'] as const } : {};

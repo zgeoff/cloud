@@ -123,6 +123,31 @@ test('#installGrant leaves an imp that holds the secret without a second grant',
   expect(ctx.impd.calls).toStrictEqual(['grants/list pv-0a1b2c3d-7']);
 });
 
+test('#installPathGrant narrows a grant the imp already holds to the paths it names', async () => {
+  const ctx = setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-7', {
+    name: 'pv-0a1b2c3d-7',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['preview-model-counted'],
+  });
+
+  await ctx.client.installPathGrant('pv-0a1b2c3d-7', 'preview-model-counted', [
+    '/pv-0a1b2c3d-7/**',
+  ]);
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-7')?.grants).toStrictEqual(['preview-model-counted']);
+
+  expect(ctx.impd.grantPaths.get('pv-0a1b2c3d-7 preview-model-counted')).toStrictEqual([
+    '/pv-0a1b2c3d-7/**',
+  ]);
+});
+
 test('#runCommand returns the exit code and output of a guest command that requires the broker', async () => {
   const ctx = setupTest();
 

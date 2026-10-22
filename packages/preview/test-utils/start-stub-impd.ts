@@ -64,6 +64,10 @@ export interface StubImpd {
 
   // live exec tickets, each to the imp it was issued for; a ticket redeems once
   readonly tickets: Map<string, string>;
+
+  // the path filter of each filtered grant, as `<imp> <secret>`; a grant again with a filter
+  // replaces it, as impd's does
+  readonly grantPaths: Map<string, readonly string[]>;
 }
 
 const procedureBodySchema = z.object({ json: z.record(z.string(), z.unknown()).optional() });
@@ -83,6 +87,7 @@ export function startStubImpd(): StubImpd {
     held: new Map(),
     answerCommand: () => ({ code: 0 }),
     tickets: new Map(),
+    grantPaths: new Map(),
   };
 
   const answerRequest = async (request: Request, bunServer: Bun.Server<ExecSocketData>) => {
@@ -167,6 +172,7 @@ function buildRPCError(status: number, code: string, message: string): Response 
 
 // the version system.info reports: the impd the host pins
 const stubImpdVersion = '2.3.0';
+const grantFilterSchema = z.object({ paths: z.array(z.string()).optional() });
 
 function buildProcedureResponse(
   stub: StubImpd,
@@ -241,7 +247,16 @@ function buildProcedureResponse(
     })
     .with('grants/list', () => buildRPCResult(imp.grants))
     .with('grants/add', () => {
-      imp.grants.push(String(input['secret']));
+      const secret = String(input['secret']);
+      const filter = grantFilterSchema.safeParse(input['filter']);
+
+      if (!imp.grants.includes(secret)) {
+        imp.grants.push(secret);
+      }
+
+      if (filter.success && filter.data.paths !== undefined) {
+        stub.grantPaths.set(`${imp.name} ${secret}`, filter.data.paths);
+      }
 
       return buildRPCResult({});
     })

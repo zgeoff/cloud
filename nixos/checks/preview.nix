@@ -17,6 +17,8 @@ let
   package = pkgs.callPackage ../packages/preview.nix { };
   stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
+  # the spendCap cases only read the proxy's path, so the binary never runs
+  stubCountingProxy = pkgs.writeShellScriptBin "counting-proxy" "exit 1";
 
   # the service's settings with impImage and impRegistryImage as given, for the preview-image cases
   buildImageSystem =
@@ -307,6 +309,170 @@ let
         '';
     }
     {
+      title = "it sets the counting proxy settings and admits the docker0 subnet to the model route listener once spendCap is on";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              impModelSecret = "preview-model-counted";
+              spendCap = {
+                enable = true;
+                package = stubCountingProxy;
+                address = "172.17.0.1";
+                port = 18082;
+                allowedSubnet = "172.17.0.0/16";
+                model = "claude-test-model";
+                prices = {
+                  input = 1;
+                  cache_write = 1.25;
+                  cache_write_1h = 2;
+                  cached_input = 0.1;
+                  output = 5;
+                };
+                limitDollars = 3;
+              };
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+          environment = system.config.systemd.services.preview.environment;
+        in
+        ''
+          jq -S . > expected <<'EOF'
+          ${builtins.toJSON {
+            PREVIEW_SPEND_LISTEN = "172.17.0.1:18082";
+            PREVIEW_SPEND_PROXY = "${stubCountingProxy}/bin/counting-proxy";
+            PREVIEW_SPEND_DIRECTORY = "/var/lib/preview/spend";
+            PREVIEW_SPEND_UPSTREAM = "https://api.anthropic.com";
+            PREVIEW_SPEND_MODEL = "claude-test-model";
+            PREVIEW_SPEND_PRICES = builtins.toJSON {
+              input = 1;
+              cache_write = 1.25;
+              cache_write_1h = 2;
+              cached_input = 0.1;
+              output = 5;
+            };
+            PREVIEW_SPEND_LIMIT_DOLLARS = "3";
+          }}
+          EOF
+
+          jq -S . > actual <<'EOF'
+          ${builtins.toJSON (lib.filterAttrs (name: _: lib.hasPrefix "PREVIEW_SPEND_" name) environment)}
+          EOF
+
+          assert_files_equal expected actual
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                {
+                  port = 18082;
+                  interface = "docker0";
+                  sourceCIDR = "172.17.0.0/16";
+                  destinationAddress = "172.17.0.1";
+                }
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
+          assert_equals '[18082]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.docker0.allowedTCPPorts)} "the ports nixos-fw opens on docker0"
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
+      title = "it leaves the counting proxy settings and the admission out when spendCap is off";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              impModelSecret = "preview-model";
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+          names = builtins.attrNames system.config.systemd.services.preview.environment;
+        in
+        ''
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_SPEND_") names))} "the counting proxy's variables"
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
+        '';
+    }
+    {
+      title = "it refuses spendCap without impModelSecret";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              spendCap = {
+                enable = true;
+                package = stubCountingProxy;
+                address = "172.17.0.1";
+                port = 18082;
+                allowedSubnet = "172.17.0.0/16";
+                model = "claude-test-model";
+                prices = {
+                  input = 1;
+                  cache_write = 1.25;
+                  cache_write_1h = 2;
+                  cached_input = 0.1;
+                  output = 5;
+                };
+              };
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "services.preview.spendCap needs impModelSecret, whose upstream reaches the model route listener."
+              ]
+            )
+          } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
       title = "it adds the pinned image to impd once imp-host runs, at each switch that changes the pin and each imp-host restart, before the service starts";
       script =
         let
@@ -570,22 +736,32 @@ let
         ./apply-slot-evictions.ts
         ./build-contract-imp-name.ts
         ./build-contract-status.ts
+        ./build-forwarded-headers.ts
         ./build-github-client.ts
         ./build-imp-name.ts
         ./build-impd-client.ts
+        ./build-spend-proxy-io.ts
+        ./counting-proxy-config-schema.ts
         ./create-preview-store.ts
+        ./create-spend-proxies.ts
         ./has-sdk-pin-change.ts
         ./load-preview-config.ts
         ./main.ts
         ./make-link-handler.ts
         ./make-slot-lock.ts
+        ./make-spend-handler.ts
         ./make-webhook-handler.ts
+        ./model-route.ts
         ./parse-preview-contract.ts
         ./parse-pull-request-event.ts
+        ./pick-proxy-outcome.ts
+        ./pick-spend-admission.ts
         ./plan-idle-sleeps.ts
         ./plan-slot-evictions.ts
+        ./proxy-machine.ts
         ./render-preview-comment.ts
         ./render-preview-page.ts
+        ./render-spend-refusal.ts
         ./run-contract-retries.ts
         ./run-contract-run.ts
         ./run-contract-suite.ts
@@ -616,7 +792,7 @@ let
 
         HOME="$PWD" ${pkgs.bun}/bin/bun --no-install run load.ts > out 2> err
 
-        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant runCommand" "$(cat out)" "the client's calls"
+        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant installPathGrant runCommand" "$(cat out)" "the client's calls"
         assert_equals "" "$(cat err)" "bun's errors"
       '';
     }

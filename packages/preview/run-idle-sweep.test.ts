@@ -46,6 +46,7 @@ async function setupTest() {
       buildTimeoutMs: 1_800_000,
       contract: null,
     },
+    spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
