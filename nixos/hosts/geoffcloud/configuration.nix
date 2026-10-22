@@ -287,6 +287,11 @@ in
     ];
   };
 
+  # imps yield CPU to k3s and its pods rather than hold a cap (docs/architecture/host/imp.md). A
+  # change of daemon.json restarts docker.service, and imp-host with it.
+  virtualisation.docker.daemon.settings.cgroup-parent = "imp.slice";
+  systemd.slices.imp.sliceConfig.CPUWeight = 10;
+
   # tank/cloud, the encrypted datasets on tank (modules/tank-cloud.nix, docs/runbooks/tank-cloud.md):
   # unlocked at boot from /var/lib/zfs-keys/tank.key. Each service here refuses to start while
   # its datasets are not mounted, instead of starting on the empty mount points on vda. The
