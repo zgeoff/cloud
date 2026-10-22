@@ -7,6 +7,13 @@
       "description": "typescript-5 gives openapi-typescript 7 the TypeScript 5 compiler API that TypeScript 7 no longer ships (scripts/nixie-api/generate-nixie-api-types.ts), so it stays on 5",
       "matchDepNames": ["typescript-5"],
       "allowedVersions": "<6"
+    },
+    {
+      "description": "nixos/packages/onidel-provider.nix pins the provider's Go modules with a vendorHash, which Renovate cannot recompute, and no required check builds it, so a provider/go.mod bump waits for review: the reviewer updates the hash and dispatches the NixOS checks. groupName null keeps it out of the weekly patch group, which would otherwise wait with it",
+      "matchManagers": ["gomod"],
+      "matchFileNames": ["provider/go.mod"],
+      "automerge": false,
+      "groupName": null
     }
   ]
 }
