@@ -47,6 +47,8 @@ call, the path of a change, the topology and the data.
 - [Development](./runbooks/development.md): set up a machine and run a first preview.
 - [Workflows](./runbooks/workflows.md): change infrastructure, switch the host, upgrade imp, rotate
   a credential.
+- [Operator verbs](./runbooks/ops.md): the `bun run ops:<verb>` scripts, what each wraps, and its
+  preconditions.
 - [Observe](./runbooks/observe.md): Grafana, logs, metrics, the external health check, and Discord
   alerts.
 - [The prod apply job](./runbooks/prod-apply.md): set up the job, read a run, answer a held one.
