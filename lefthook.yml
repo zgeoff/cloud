@@ -56,27 +56,30 @@ pre-push:
       run: bun run lint:files {files}
     # the four linters run their pinned tools in the Nix image, so they need Docker; each lints the
     # whole tree, and runs only for a branch that changes a file of its kind
+    #
+    # A job whose run takes no {files} skips when no pushed commit's file matches its glob, even
+    # with a files command, and after a rebase the pushed commits are main's. So each whole-tree
+    # job skips on the branch's own files instead, and runs when that listing fails.
     - name: lint:sh
-      files: bun run --silent files:branch
-      glob:
-        - '*.sh'
-        - 'images/agent/sbin/*'
-        - '.editorconfig'
+      skip:
+        - run:
+            files=$(bun run --silent files:branch --glob '**/*.sh' --glob 'images/agent/sbin/**'
+            --glob '.editorconfig') && test -z "$files"
       run: bun run lint:sh
     - name: lint:nix
-      files: bun run --silent files:branch
-      glob: '*.nix'
+      skip:
+        - run: files=$(bun run --silent files:branch --glob '**/*.nix') && test -z "$files"
       run: bun run lint:nix
     - name: lint:py
-      files: bun run --silent files:branch
-      glob: '*.py'
+      skip:
+        - run: files=$(bun run --silent files:branch --glob '**/*.py') && test -z "$files"
       run: bun run lint:py
     - name: lint:actions
       # package.json too: the step check reads its script names
-      files: bun run --silent files:branch
-      glob:
-        - '.github/workflows/*'
-        - 'package.json'
+      skip:
+        - run:
+            files=$(bun run --silent files:branch --glob '.github/workflows/**' --glob
+            'package.json') && test -z "$files"
       run: bun run lint:actions
     - name: pulumi pins
       run: bun run check:pulumi-pins
@@ -91,22 +94,24 @@ pre-push:
     - name: test:scripts
       # every shell suite, for a branch that changes a shell file; deletions count, so a branch
       # that deletes a script still runs the suites that may source it
-      files: bun run --silent files:branch --include-deleted
-      glob:
-        - '*.sh'
-        - 'images/agent/sbin/*'
+      skip:
+        - run:
+            files=$(bun run --silent files:branch --include-deleted --glob '**/*.sh' --glob
+            'images/agent/sbin/**') && test -z "$files"
       run: bun run test:scripts
     - name: provider
       # Deletions count: a branch that only deletes provider/ files must still
       # run the check, so this listing keeps them.
-      files: bun run --silent files:branch --include-deleted
-      glob: 'provider/**'
+      skip:
+        - run:
+            files=$(bun run --silent files:branch --include-deleted --glob 'provider/**') && test -z
+            "$files"
       run: bun run provider:check
     - name: sdk
       # sdk:gen builds the provider and needs the Pulumi CLI, so it runs only for a branch that
       # changes the provider or the SDK; deletions count, as for the provider job
-      files: bun run --silent files:branch --include-deleted
-      glob:
-        - 'provider/**'
-        - 'sdk/**'
+      skip:
+        - run:
+            files=$(bun run --silent files:branch --include-deleted --glob 'provider/**' --glob
+            'sdk/**') && test -z "$files"
       run: bun run check:sdk
