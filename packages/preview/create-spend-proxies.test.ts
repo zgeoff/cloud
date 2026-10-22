@@ -396,7 +396,12 @@ test('it starts the proxy for a call that arrives during an idle stop only after
     },
   );
 
-  onTestFinished(() => proxies.removeAll());
+  // a stopped proxy cannot exit on the removal's SIGTERM, so the cleanup continues it first
+  onTestFinished(async () => {
+    started[0]?.kill('SIGCONT');
+
+    await proxies.removeAll();
+  });
 
   const first = await proxies.holdProxy('pv-0a1b2c3d-7');
 
@@ -409,10 +414,6 @@ test('it starts the proxy for a call that arrives during an idle stop only after
   const oldPID = started[0]?.pid ?? 0;
 
   process.kill(oldPID, 'SIGSTOP');
-
-  onTestFinished(() => {
-    started[0]?.kill('SIGCONT');
-  });
 
   await waitForCondition(() => readProcessStatus(oldPID).stopped);
 
@@ -473,7 +474,12 @@ test('it removes the files of a proxy whose idle stop is under way only after it
     },
   );
 
-  onTestFinished(() => proxies.removeAll());
+  // a stopped proxy cannot exit on the removal's SIGTERM, so the cleanup continues it first
+  onTestFinished(async () => {
+    started[0]?.kill('SIGCONT');
+
+    await proxies.removeAll();
+  });
 
   const first = await proxies.holdProxy('pv-0a1b2c3d-7');
 
@@ -486,10 +492,6 @@ test('it removes the files of a proxy whose idle stop is under way only after it
   const oldPID = started[0]?.pid ?? 0;
 
   process.kill(oldPID, 'SIGSTOP');
-
-  onTestFinished(() => {
-    started[0]?.kill('SIGCONT');
-  });
 
   await waitForCondition(() => readProcessStatus(oldPID).stopped);
 
