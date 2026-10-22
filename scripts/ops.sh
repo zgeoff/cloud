@@ -30,15 +30,21 @@ usage() {
   exit 2
 }
 
-# require_no_deploy_prod_run: exits 1 naming each Deploy prod run that has not completed. GitHub
-# lists the newest runs first, and the deploy-prod group keeps at most 100 waiting.
+# require_no_deploy_prod_run: exits 1 naming each Deploy prod run that has not completed. It asks
+# GitHub for each status a run holds before it completes, rather than reading the newest runs,
+# because each CI run of a pull request starts a Deploy prod run that ends skipped, and those can
+# push a live run out of any window. The deploy-prod group keeps at most 100 waiting runs.
 require_no_deploy_prod_run() {
-  local runs active
-  runs="$(gh run list -R "$slug" --workflow deploy-prod.yml -L 100 --json status,url)"
-  active="$(jq -r '.[] | select(.status != "completed") | "\(.status) \(.url)"' <<< "$runs")"
+  local status runs found active=
+  for status in in_progress queued waiting pending requested; do
+    runs="$(gh run list -R "$slug" --workflow deploy-prod.yml --status "$status" -L 100 --json status,url)"
+    found="$(jq -r '.[] | "\(.status) \(.url)"' <<< "$runs")"
+    active+="${found:+$found$'\n'}"
+  done
+  active="${active%$'\n'}"
   if [ -n "$active" ]; then
     echo "ops: a Deploy prod run has not completed; wait for it, then run the verb again:" >&2
-    printf '  %s\n' "$active" >&2
+    echo "  ${active//$'\n'/$'\n'  }" >&2
     exit 1
   fi
 }

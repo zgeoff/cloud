@@ -127,13 +127,18 @@ OUT
   assert_status 0 "$status"
 }
 
-it_up_refuses_while_a_deploy_prod_run_is_in_progress() {
+it_up_refuses_naming_each_deploy_prod_run_that_is_in_progress_or_waiting() {
   local status=0
   create_case_tree
   setup_test "$tree"
-  # gh run list --json prints an array of the named fields, newest run first; gh help run list
+  # gh run list --status --json prints an array of the named fields of the runs in that status,
+  # an empty one when none is; gh help run list
   cat > "$tree/gh-responses" << 'JSON'
-{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"], "stdout": "[{\"status\":\"in_progress\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/42\"},{\"status\":\"completed\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/40\"}]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"], "stdout": "[{\"status\":\"in_progress\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/42\"}]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"], "stdout": "[{\"status\":\"waiting\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/46\"}]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"], "stdout": "[]\n"}
 JSON
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -143,18 +148,29 @@ JSON
   diff - "$tree/err" << 'ERR'
 ops: a Deploy prod run has not completed; wait for it, then run the verb again:
   in_progress https://github.com/zgeoff/cloud/actions/runs/42
+  waiting https://github.com/zgeoff/cloud/actions/runs/46
 ERR
-  diff - "$tree/calls" <<< '["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"]'
+  diff - "$tree/calls" << 'CALLS'
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"]
+CALLS
   assert_status 1 "$status"
 }
 
-it_up_runs_the_up_script_from_the_repo_root_once_every_deploy_prod_run_completed() {
+it_up_runs_the_up_script_from_the_repo_root_when_no_deploy_prod_run_is_unfinished() {
   local status=0
   create_case_tree
   setup_test "$tree"
-  # gh run list --json prints an array of the named fields, newest run first; gh help run list
+  # gh run list --status --json prints an empty array when no run is in that status; gh help run list
   cat > "$tree/gh-responses" << 'JSON'
-{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"], "stdout": "[{\"status\":\"completed\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/40\"}]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"], "stdout": "[]\n"}
 JSON
   echo 0 > "$tree/answers/bun/1.status"
   echo 'Update succeeded' > "$tree/answers/bun/1.out"
@@ -165,7 +181,11 @@ JSON
   diff - "$tree/out" <<< 'Update succeeded'
   diff /dev/null "$tree/err"
   diff - <(sed "s|$tree|<tree>|g" "$tree/calls") << 'CALLS'
-["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"]
 {"cwd":"<tree>/repo","argv":["bun","run","up","--","--yes"]}
 CALLS
   assert_status 0 "$status"
@@ -177,7 +197,7 @@ it_up_stops_with_gh_s_error_and_exit_when_gh_cannot_list_the_runs() {
   setup_test "$tree"
   # gh exits 4 with this message when it holds no token; gh help exit-codes, gh help environment
   cat > "$tree/gh-responses" << 'JSON'
-{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"], "stderr": "To get started with GitHub CLI, please run:  gh auth login\n", "exit": 4}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"], "stderr": "To get started with GitHub CLI, please run:  gh auth login\n", "exit": 4}
 JSON
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -185,7 +205,7 @@ JSON
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" <<< 'To get started with GitHub CLI, please run:  gh auth login'
-  diff - "$tree/calls" <<< '["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"]'
+  diff - "$tree/calls" <<< '["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"]'
   assert_status 4 "$status"
 }
 
@@ -250,13 +270,17 @@ it_host_exits_2_without_a_call_when_the_command_is_missing() {
   assert_status 2 "$status"
 }
 
-it_cancel_prod_lock_runs_pulumi_cancel_on_prod_from_infra_once_every_deploy_prod_run_completed() {
+it_cancel_prod_lock_runs_pulumi_cancel_on_prod_from_infra_when_no_deploy_prod_run_is_unfinished() {
   local status=0
   create_case_tree
   setup_test "$tree"
-  # gh run list --json prints an empty array for a workflow with no run; gh help run list
+  # gh run list --status --json prints an empty array when no run is in that status; gh help run list
   cat > "$tree/gh-responses" << 'JSON'
-{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"], "stdout": "[]\n"}
 JSON
   echo 0 > "$tree/answers/op/1.status"
   echo "The currently running update for 'prod' has been canceled!" > "$tree/answers/op/1.out"
@@ -267,7 +291,11 @@ JSON
   diff - "$tree/out" <<< "The currently running update for 'prod' has been canceled!"
   diff /dev/null "$tree/err"
   diff - <(sed "s|$tree|<tree>|g" "$tree/calls") << 'CALLS'
-["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"]
 {"cwd":"<tree>/repo/infra","argv":["op","run","--env-file=../.env","--","pulumi","cancel","--stack","prod","--yes"]}
 CALLS
   assert_status 0 "$status"
@@ -277,9 +305,14 @@ it_cancel_prod_lock_refuses_while_a_deploy_prod_run_is_queued() {
   local status=0
   create_case_tree
   setup_test "$tree"
-  # gh run list --json prints an array of the named fields, newest run first; gh help run list
+  # gh run list --status --json prints an array of the named fields of the runs in that status,
+  # an empty one when none is; gh help run list
   cat > "$tree/gh-responses" << 'JSON'
-{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"], "stdout": "[{\"status\":\"queued\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/43\"}]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"], "stdout": "[{\"status\":\"queued\",\"url\":\"https://github.com/zgeoff/cloud/actions/runs/43\"}]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"], "stdout": "[]\n"}
+{"argv": ["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"], "stdout": "[]\n"}
 JSON
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
@@ -290,7 +323,13 @@ JSON
 ops: a Deploy prod run has not completed; wait for it, then run the verb again:
   queued https://github.com/zgeoff/cloud/actions/runs/43
 ERR
-  diff - "$tree/calls" <<< '["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","-L","100","--json","status,url"]'
+  diff - "$tree/calls" << 'CALLS'
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","in_progress","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","queued","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","waiting","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","pending","-L","100","--json","status,url"]
+["gh","run","list","-R","zgeoff/cloud","--workflow","deploy-prod.yml","--status","requested","-L","100","--json","status,url"]
+CALLS
   assert_status 1 "$status"
 }
 

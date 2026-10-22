@@ -9,8 +9,9 @@ changes [`scripts/ops.sh`](../../scripts/ops.sh) and leaves the callers alone.
 A verb runs the command it wraps unchanged and passes its exit code through. Every check the wrapped
 script makes still runs, and this page lists the preconditions that no script checks. Two verbs add
 one check of their own: `up` and `cancel-prod-lock` refuse with exit 1, and name each run, while a
-`Deploy prod` run is queued or in progress, since either would fight that run for the prod stack. A
-usage error exits 2.
+`Deploy prod` run is queued or in progress, since either would fight that run for the prod stack.
+The check asks GitHub for each status that a run holds before it completes: in progress, queued,
+waiting, pending and requested. A usage error exits 2.
 
 **CAUTION:** Every verb but a dry run acts on the live estate or on GitHub. Read the preconditions
 of a verb before you run it.
