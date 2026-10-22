@@ -1,7 +1,7 @@
 // polls until the condition holds, so a test waits on a state rather than a fixed sleep
 export async function waitForCondition(
   condition: () => boolean,
-  options: { readonly timeoutMs?: number; readonly intervalMs?: number } = {},
+  options: { readonly timeoutMs?: number } = {},
 ): Promise<void> {
   const deadline = Date.now() + (options.timeoutMs ?? 5000);
 
@@ -10,6 +10,6 @@ export async function waitForCondition(
       throw new Error('the condition did not hold before the wait timed out');
     }
 
-    await Bun.sleep(options.intervalMs ?? 10);
+    await Bun.sleep(10);
   }
 }
