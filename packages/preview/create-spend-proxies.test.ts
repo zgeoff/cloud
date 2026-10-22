@@ -215,6 +215,54 @@ test('it fails a call whose proxy never prints its start line', async () => {
   );
 });
 
+test('it logs the proxy start line under the imp name', async () => {
+  const ctx = await setupTest();
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    ctx.deps,
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  await proxies.holdProxy('pv-0a1b2c3d-7');
+
+  expect(ctx.lines).toContainEqual(expect.toStartWith('pv-0a1b2c3d-7: {"event":"proxy.started"'));
+});
+
+test('it logs what a proxy prints before it exits without starting', async () => {
+  const ctx = await setupTest();
+
+  // echo prints the arguments it was given and exits, as a proxy that fails at start would print
+  // its error
+  const proxies = createSpendProxies(
+    {
+      proxyPath: '/bin/echo',
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    ctx.deps,
+  );
+
+  await Promise.allSettled([proxies.holdProxy('pv-0a1b2c3d-7')]);
+
+  expect(ctx.lines).toContain(
+    `pv-0a1b2c3d-7: --config ${join(ctx.directory, 'spend', 'pv-0a1b2c3d-7.json')}`,
+  );
+});
+
 test('it removes a closed preview proxy with its config and its count', async () => {
   const ctx = await setupTest();
 

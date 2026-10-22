@@ -154,7 +154,9 @@ async function startProxy(
   const lines = readLines(child.stdout);
   const timeout = AbortSignal.timeout(startTimeoutMs);
 
-  const port = await readStartedPort(lines, timeout);
+  const port = await readStartedPort(lines, timeout, (line) => {
+    deps.log(`${imp}: ${line}`);
+  });
 
   if (port === null) {
     child.kill();
@@ -207,6 +209,7 @@ const startedLineSchema = z.looseObject({
 async function readStartedPort(
   lines: AsyncGenerator<string>,
   timeout: AbortSignal,
+  logLine: (line: string) => void,
 ): Promise<number | null> {
   const timedOut = new Promise<null>((resolve) => {
     timeout.addEventListener('abort', () => {
@@ -220,6 +223,8 @@ async function readStartedPort(
     if (next === null || next.done === true) {
       return null;
     }
+
+    logLine(next.value);
 
     const started = startedLineSchema.safeParse(parseJSONOrNull(next.value));
 
