@@ -91,6 +91,34 @@ test("it signs the App's JWT with its key, issued by its client ID from a minute
   ).toBeTrue();
 });
 
+test('it rejects an installation answer whose ID is not a number', () => {
+  server.use(
+    http.get(`${githubAPIURL}/repos/acme/greenhouse/installation`, () =>
+      HttpResponse.json({ id: '7001', account: { login: 'acme' } }),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+
+  expect(
+    client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+  ).rejects.toMatchObject({ name: 'ZodError', issues: [{ path: ['id'] }] });
+});
+
+test('it rejects an access token answer without a token', () => {
+  server.use(
+    http.post(`${githubAPIURL}/app/installations/:id/access_tokens`, () =>
+      HttpResponse.json({}, { status: 201 }),
+    ),
+  );
+
+  const client = buildGitHubClient(githubAPIURL, stubApp, () => new Date());
+
+  expect(
+    client.readComposeFile('acme/greenhouse', 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'),
+  ).rejects.toMatchObject({ name: 'ZodError', issues: [{ path: ['token'] }] });
+});
+
 test('it rejects a call to a repository the App is not installed on', () => {
   uninstalledRepos.add('acme/greenhouse');
 
