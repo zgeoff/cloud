@@ -5,9 +5,9 @@
 # Deploy prod run), reads again after it loses a race, exits 75 when the lock stays held past the
 # wait, and exits 1 with kubectl's error on any other answer; `release` clears its own holder, and
 # leaves a Lease that another holder holds, that it lost in a race, or that does not exist; `check`
-# passes only while its holder's lease has not run out, exits 3 for a Lease that another holder
-# holds, that its holder let run out, or that does not exist, and exits 1 with kubectl's error; and
-# each rejects a bad argument with its usage.
+# passes while the Lease names its holder, a lease that ran out included, exits 3 for a Lease that
+# another holder holds or that does not exist, and exits 1 with kubectl's error; and each rejects a
+# bad argument with its usage.
 #
 # kubectl is create-stub-kubectl.sh, whose store holds the Lease. A case that waits runs the take
 # in the background with a short real pause, and releases the lock from the case once the take has
@@ -372,7 +372,7 @@ EOF
   assert_status 3 "$status"
 }
 
-it_exits_3_on_a_check_of_a_lock_whose_lease_its_holder_let_run_out() {
+it_passes_a_check_of_a_lock_whose_lease_ran_out_while_no_one_took_it_over() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -385,8 +385,8 @@ EOF
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 4321 let the prod lock run out at 2026-01-01T01:40:00.000000Z'
-  assert_status 3 "$status"
+  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 4321 holds the prod lock; its lease ran out at 2026-01-01T01:40:00.000000Z, and no one took it over'
+  assert_status 0 "$status"
 }
 
 it_exits_3_on_a_check_when_there_is_no_lease() {

@@ -15,8 +15,9 @@
 # `release` clears the holder when <holder> holds the lock, and otherwise leaves the Lease as it is,
 # so a release after a takeover never frees the new holder's lock.
 #
-# `check` exits 0 when <holder> holds the lock and its lease has not run out, and otherwise exits 3
-# and says who holds it, so a holder acts on the prod stack's state only while no one else can.
+# `check` exits 0 when the Lease names <holder> as its holder, and otherwise exits 3 and says who
+# holds it. A lease that ran out still counts, because a taker always replaces the holder, so while
+# the Lease names <holder> no one else has taken the lock.
 #
 # Each exits 1 with kubectl's error on any other answer from the API, and 2 on a usage error.
 #
@@ -131,8 +132,8 @@ check() {
   fi
   expires=$(($(date -u -d "$(jq -r .spec.renewTime <<< "$current")" +%s) + $(jq -r .spec.leaseDurationSeconds <<< "$current")))
   if [ "$(date -u +%s)" -ge "$expires" ]; then
-    echo "hold-prod-lock: $holder let the prod lock run out at $(to_time "$expires")" >&2
-    exit 3
+    echo "hold-prod-lock: $holder holds the prod lock; its lease ran out at $(to_time "$expires"), and no one took it over" >&2
+    return
   fi
   echo "hold-prod-lock: $holder holds the prod lock until $(to_time "$expires")" >&2
 }

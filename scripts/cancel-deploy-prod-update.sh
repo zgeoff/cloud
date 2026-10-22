@@ -5,11 +5,13 @@
 # `op run --env-file=../.env -- pulumi cancel --stack prod --yes` in PROGRAM/infra, the checkout of
 # the revision to apply. With no lock on the state, pulumi cancel changes nothing and exits 0.
 #
-# pulumi cancel ends whatever update holds the Pulumi lock, so the script cancels only while this
-# job holds the prod lock (hold-prod-lock.sh check), which no other Deploy prod run or scheduled
-# drift check holds at the same time. When the job's lease on the prod lock ran out, it cancels
-# nothing and exits 3. With no kubeconfig at KUBECONFIG, the job never reached the prod lock or any
-# Pulumi step, and it does nothing. A missing input is a usage error (exit 2).
+# pulumi cancel ends whatever update holds the Pulumi lock, so the script cancels only while the
+# prod lock names this job as its holder (hold-prod-lock.sh check), which no other Deploy prod run
+# can be while it does. A lease that ran out counts, because a job that hits its timeout outlasts its
+# lease by seconds and no one has taken the lock over. When another holder took the prod lock, it
+# cancels nothing and exits 3, and when kubectl fails, it cancels nothing and exits 1. With no
+# kubeconfig at KUBECONFIG, the job never reached the prod lock or any Pulumi step, and it does
+# nothing. A missing input is a usage error (exit 2).
 #
 #   RUN_ID=<id> KUBECONFIG=<file> PROGRAM=<dir> OP_SERVICE_ACCOUNT_TOKEN=<token> \
 #     bash scripts/cancel-deploy-prod-update.sh
@@ -29,9 +31,9 @@ if [ ! -f "$KUBECONFIG" ]; then
 fi
 status=0
 bash "$here/hold-prod-lock.sh" check "deploy-prod $RUN_ID" || status=$?
-if [ "$status" -ne 0 ]; then
+if [ "$status" -eq 3 ]; then
   echo "cancel-deploy-prod-update: the job does not hold the prod lock, so it leaves the Pulumi lock to its holder" >&2
-  exit "$status"
 fi
+if [ "$status" -ne 0 ]; then exit "$status"; fi
 cd "$PROGRAM/infra"
 op run --env-file=../.env -- pulumi cancel --stack prod --yes

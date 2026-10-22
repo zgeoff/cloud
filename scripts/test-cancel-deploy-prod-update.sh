@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Test for cancel-deploy-prod-update.sh: while the run holds the prod lock, it runs
 # `op run --env-file=../.env -- pulumi cancel --stack prod --yes` in the program checkout's infra/
-# and passes pulumi's status through; it cancels nothing and exits 3 when a drift check holds the
-# prod lock or the run let its lease run out; it does nothing when the job never wrote the
-# kubeconfig; and it refuses a missing input.
+# and passes pulumi's status through, a lease that ran out with no takeover included; it cancels
+# nothing and exits 3 when a drift check holds the prod lock, and exits 1 when kubectl fails; it
+# does nothing when the job never wrote the kubeconfig; and it refuses a missing input.
 #
 # kubectl is create-stub-kubectl.sh, whose store holds the Lease, and op is
 # create-stub-scripted-command.sh, which logs each call's working directory, argv and the token it
@@ -90,7 +90,7 @@ EOF
   assert_status 3 "$status"
 }
 
-it_cancels_nothing_when_the_run_let_its_lease_on_the_prod_lock_run_out() {
+it_cancels_the_update_when_the_run_s_lease_ran_out_and_no_one_took_the_prod_lock_over() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -98,18 +98,33 @@ it_cancels_nothing_when_the_run_let_its_lease_on_the_prod_lock_run_out() {
   cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
 {"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 18342","leaseDurationSeconds":6000,"acquireTime":"2026-03-04T08:21:58.000000Z","renewTime":"2026-03-04T08:21:58.000000Z"}}
 EOF
+  printf "The currently running update for 'prod' has been canceled!\n" > "$tree/op-answers/1.out"
+
+  (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
+    OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< "The currently running update for 'prod' has been canceled!"
+  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 18342 holds the prod lock; its lease ran out at 2026-03-04T10:01:58.000000Z, and no one took it over'
+  diff - "$tree/op-calls" <<< "{\"cwd\":\"$tree/runner/program/infra\",\"argv\":[\"op\",\"run\",\"--env-file=../.env\",\"--\",\"pulumi\",\"cancel\",\"--stack\",\"prod\",\"--yes\"]}"
+  assert_status 0 "$status"
+}
+
+it_cancels_nothing_and_exits_1_with_kubectl_s_error_when_the_api_refuses_the_read() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf 'apiVersion: v1\nkind: Config\n' > "$tree/runner/kubeconfig"
+  echo 'system:serviceaccount:example-ns:example-account' > "$tree/store/forbidden"
 
   (cd "$tree/runner" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     RUN_ID=18342 KUBECONFIG="$tree/runner/kubeconfig" PROGRAM=program \
     OP_SERVICE_ACCOUNT_TOKEN=example-op-token bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" << 'EOF'
-hold-prod-lock: deploy-prod 18342 let the prod lock run out at 2026-03-04T10:01:58.000000Z
-cancel-deploy-prod-update: the job does not hold the prod lock, so it leaves the Pulumi lock to its holder
-EOF
+  diff - "$tree/err" <<< 'Error from server (Forbidden): leases.coordination.k8s.io "cloud-prod-state" is forbidden: User "system:serviceaccount:example-ns:example-account" cannot get resource "leases" in API group "coordination.k8s.io" in the namespace "kube-system"'
   diff /dev/null "$tree/op-calls"
-  assert_status 3 "$status"
+  assert_status 1 "$status"
 }
 
 it_does_nothing_when_the_job_never_wrote_the_kubeconfig() {

@@ -259,7 +259,9 @@ jobs:
       # reports a job that its timeout ended as cancelled. The previews and drift checks take no
       # such lock, and a refresh or an apply that fails releases its own. pulumi cancel ends
       # whatever update holds the lock, so it runs only for a step of this run that the cancel
-      # stopped, and the script checks that the run still holds the prod lock. A runner that dies
+      # stopped, and never after a failure: a refresh that fails on the lock found another update
+      # holding it, such as an apply that a person started by hand. The script also checks that
+      # the run still holds the prod lock. A runner that dies
       # runs no step at all, and `bun run ops:cancel-prod-lock` clears what it leaves.
       - name: Cancel this run's Pulumi update
         if: >-
