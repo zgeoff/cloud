@@ -115,6 +115,15 @@ A run whose apply job ended cancelled before its first step found the queue full
 most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
 that a newer run applied, because its apply covers every change of the cancelled one.
 
+A run that someone cancelled, or that hit the job's time limit, during its refresh or apply clears
+the lock that step left on the prod stack's state. The step `Cancel this run's Pulumi update` runs
+`pulumi cancel` only while the run still holds the prod lock, then the run releases the prod lock.
+When the step logs
+`cancel-deploy-prod-update: the job does not hold the prod lock, so it leaves the Pulumi lock to its holder`,
+or a runner died and ran no step at all, the next run fails on `the stack is currently locked`.
+Clear that lock with `bun run ops:cancel-prod-lock`, whose preconditions
+[the operator verbs](./ops.md#bun-run-opscancel-prod-lock) list.
+
 ## Answer a held run
 
 A held run ends green after the step `Decide the outcome`, which prints

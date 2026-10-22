@@ -15,20 +15,24 @@
 # `release` clears the holder when <holder> holds the lock, and otherwise leaves the Lease as it is,
 # so a release after a takeover never frees the new holder's lock.
 #
-# Either exits 1 with kubectl's error on any other answer from the API, and 2 on a usage error.
+# `check` exits 0 when <holder> holds the lock and its lease has not run out, and otherwise exits 3
+# and says who holds it, so a holder acts on the prod stack's state only while no one else can.
+#
+# Each exits 1 with kubectl's error on any other answer from the API, and 2 on a usage error.
 #
 #   KUBECONFIG=<file> bash scripts/hold-prod-lock.sh take <holder> <lease seconds> <wait seconds>
 #   KUBECONFIG=<file> bash scripts/hold-prod-lock.sh release <holder>
+#   KUBECONFIG=<file> bash scripts/hold-prod-lock.sh check <holder>
 set -euo pipefail
 
 usage() {
-  echo "usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder>" >&2
+  echo "usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder> | check <holder>" >&2
   exit 2
 }
 
 case "${1:-}" in
   take) if [ "$#" -ne 4 ] || [[ ! "$3" =~ ^[1-9][0-9]*$ ]] || [[ ! "$4" =~ ^[0-9]+$ ]]; then usage; fi ;;
-  release) if [ "$#" -ne 2 ]; then usage; fi ;;
+  release | check) if [ "$#" -ne 2 ]; then usage; fi ;;
   *) usage ;;
 esac
 if [ -z "$2" ]; then usage; fi
@@ -117,7 +121,24 @@ release() {
   echo "hold-prod-lock: released the prod lock as $holder" >&2
 }
 
+check() {
+  local current current_holder='' expires
+  current="$(read_lease)"
+  if [ -n "$current" ]; then current_holder="$(jq -r '.spec.holderIdentity // ""' <<< "$current")"; fi
+  if [ "$current_holder" != "$holder" ]; then
+    echo "hold-prod-lock: $holder does not hold the prod lock; its holder is ${current_holder:-no one}" >&2
+    exit 3
+  fi
+  expires=$(($(date -u -d "$(jq -r .spec.renewTime <<< "$current")" +%s) + $(jq -r .spec.leaseDurationSeconds <<< "$current")))
+  if [ "$(date -u +%s)" -ge "$expires" ]; then
+    echo "hold-prod-lock: $holder let the prod lock run out at $(to_time "$expires")" >&2
+    exit 3
+  fi
+  echo "hold-prod-lock: $holder holds the prod lock until $(to_time "$expires")" >&2
+}
+
 case "$1" in
   take) take "$3" "$4" ;;
   release) release ;;
+  check) check ;;
 esac

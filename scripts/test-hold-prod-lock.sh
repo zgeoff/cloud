@@ -4,8 +4,10 @@
 # that holder releases it (a Deploy prod run behind a drift check, and a drift check behind a
 # Deploy prod run), reads again after it loses a race, exits 75 when the lock stays held past the
 # wait, and exits 1 with kubectl's error on any other answer; `release` clears its own holder, and
-# leaves a Lease that another holder holds, that it lost in a race, or that does not exist; and
-# either rejects a bad argument with its usage.
+# leaves a Lease that another holder holds, that it lost in a race, or that does not exist; `check`
+# passes only while its holder's lease has not run out, exits 3 for a Lease that another holder
+# holds, that its holder let run out, or that does not exist, and exits 1 with kubectl's error; and
+# each rejects a bad argument with its usage.
 #
 # kubectl is create-stub-kubectl.sh, whose store holds the Lease. A case that waits runs the take
 # in the background with a short real pause, and releases the lock from the case once the take has
@@ -335,6 +337,87 @@ it_leaves_nothing_to_release_when_there_is_no_lease() {
   assert_status 0 "$status"
 }
 
+it_checks_a_lock_that_it_holds_and_whose_lease_has_not_run_out() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
+{"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    KUBECONFIG="$tree/kubeconfig" bash "$script" check 'deploy-prod 4321' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 4321 holds the prod lock until 2099-01-01T01:40:00.000000Z'
+  diff - "$tree/calls" <<< '["kubectl","--request-timeout=30s","--namespace","kube-system","get","lease","cloud-prod-state","--output","json"]'
+  assert_status 0 "$status"
+}
+
+it_exits_3_on_a_check_of_a_lock_that_another_holder_holds() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
+{"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"4"},"spec":{"holderIdentity":"drift-check 0a1b2c3d","leaseDurationSeconds":3000,"acquireTime":"2099-01-01T00:00:00.000000Z","renewTime":"2099-01-01T00:00:00.000000Z"}}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    KUBECONFIG="$tree/kubeconfig" bash "$script" check 'deploy-prod 4321' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 4321 does not hold the prod lock; its holder is drift-check 0a1b2c3d'
+  assert_status 3 "$status"
+}
+
+it_exits_3_on_a_check_of_a_lock_whose_lease_its_holder_let_run_out() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  cat > "$tree/store/kube-system/cloud-prod-state.json" << 'EOF'
+{"apiVersion":"coordination.k8s.io/v1","kind":"Lease","metadata":{"namespace":"kube-system","name":"cloud-prod-state","resourceVersion":"2"},"spec":{"holderIdentity":"deploy-prod 4321","leaseDurationSeconds":6000,"acquireTime":"2026-01-01T00:00:00.000000Z","renewTime":"2026-01-01T00:00:00.000000Z"}}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    KUBECONFIG="$tree/kubeconfig" bash "$script" check 'deploy-prod 4321' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 4321 let the prod lock run out at 2026-01-01T01:40:00.000000Z'
+  assert_status 3 "$status"
+}
+
+it_exits_3_on_a_check_when_there_is_no_lease() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    KUBECONFIG="$tree/kubeconfig" bash "$script" check 'deploy-prod 4321' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'hold-prod-lock: deploy-prod 4321 does not hold the prod lock; its holder is no one'
+  assert_status 3 "$status"
+}
+
+it_exits_1_with_kubectl_s_error_when_the_api_refuses_a_check_s_read() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  echo 'system:serviceaccount:example-ns:example-account' > "$tree/store/forbidden"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    KUBECONFIG="$tree/kubeconfig" bash "$script" check 'deploy-prod 4321' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'Error from server (Forbidden): leases.coordination.k8s.io "cloud-prod-state" is forbidden: User "system:serviceaccount:example-ns:example-account" cannot get resource "leases" in API group "coordination.k8s.io" in the namespace "kube-system"'
+  assert_status 1 "$status"
+}
+
 it_rejects_a_take_without_a_whole_number_of_lease_seconds_with_its_usage() {
   local status=0
   create_case_tree
@@ -345,7 +428,7 @@ it_rejects_a_take_without_a_whole_number_of_lease_seconds_with_its_usage() {
     KUBECONFIG="$tree/kubeconfig" bash "$script" take 'deploy-prod 4321' 10m 3300 \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/err" <<< 'usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder>'
+  diff - "$tree/err" <<< 'usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder> | check <holder>'
   diff /dev/null "$tree/calls"
   assert_status 2 "$status"
 }
@@ -360,7 +443,21 @@ it_rejects_a_release_with_an_empty_holder_with_its_usage() {
     KUBECONFIG="$tree/kubeconfig" bash "$script" release '' \
     > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/err" <<< 'usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder>'
+  diff - "$tree/err" <<< 'usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder> | check <holder>'
+  diff /dev/null "$tree/calls"
+  assert_status 2 "$status"
+}
+
+it_rejects_a_check_without_a_holder_with_its_usage() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    KUBECONFIG="$tree/kubeconfig" bash "$script" check \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" <<< 'usage: hold-prod-lock.sh take <holder> <lease seconds> <wait seconds> | release <holder> | check <holder>'
   diff /dev/null "$tree/calls"
   assert_status 2 "$status"
 }

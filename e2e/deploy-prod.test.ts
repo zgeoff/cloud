@@ -372,6 +372,14 @@ test('it runs the control steps from the workflow s own checkout and the Pulumi 
       run: 'bun run ci:check-nixie-api',
     },
     {
+      name: "Cancel this run's Pulumi update",
+      ref: undefined,
+      path: undefined,
+      workingDirectory: undefined,
+      program: 'program',
+      run: 'bun run --silent ci:cancel-deploy-prod-update',
+    },
+    {
       name: 'Release the prod lock',
       ref: undefined,
       path: undefined,
@@ -584,7 +592,7 @@ test('it never queues the run of a failed CI run behind a running apply', async 
   });
 });
 
-test('it releases the prod lock after a step fails', async () => {
+test('it releases the prod lock, and cancels no Pulumi update, after a step fails', async () => {
   const ctx = await setupTest();
 
   // a step with no `if` runs on success()
@@ -600,7 +608,8 @@ test('it releases the prod lock after a step fails', async () => {
       needs: {},
       steps: {
         decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
-        guard: { outcome: 'failure', conclusion: 'failure', outputs: {} },
+        outcome: { outcome: 'success', conclusion: 'success', outputs: { outcome: 'apply' } },
+        apply: { outcome: 'failure', conclusion: 'failure', outputs: {} },
       },
     });
   });
@@ -609,6 +618,59 @@ test('it releases the prod lock after a step fails', async () => {
     'Release the prod lock',
   ]);
 });
+
+test.each([
+  [
+    'the apply',
+    {
+      decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
+      outcome: { outcome: 'success', conclusion: 'success', outputs: { outcome: 'apply' } },
+      refresh: { outcome: 'success', conclusion: 'success', outputs: {} },
+      apply: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
+    },
+    ["Cancel this run's Pulumi update", 'Release the prod lock'],
+  ],
+  [
+    'the refresh',
+    {
+      decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
+      outcome: { outcome: 'success', conclusion: 'success', outputs: { outcome: 'apply' } },
+      refresh: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
+    },
+    ["Cancel this run's Pulumi update", 'Release the prod lock'],
+  ],
+  [
+    'the preview',
+    {
+      decide: { outcome: 'success', conclusion: 'success', outputs: { apply: 'true' } },
+      guard: { outcome: 'cancelled', conclusion: 'cancelled', outputs: {} },
+    },
+    ['Release the prod lock'],
+  ],
+])(
+  'it runs only the cleanup steps after a cancel or a timeout during %s',
+  async (_label, steps, expected) => {
+    const ctx = await setupTest();
+
+    // a step with no `if` runs on success()
+    const run = ctx.steps.filter((step: unknown) => {
+      const condition = findJSONField(step, 'if') ?? 'success()';
+
+      if (typeof condition !== 'string') {
+        throw new TypeError(`a step's if is not an expression: ${JSON.stringify(condition)}`);
+      }
+
+      return isActionsConditionMet(condition, {
+        github: { event_name: 'workflow_run' },
+        needs: {},
+        steps,
+        cancelled: true,
+      });
+    });
+
+    expect(run.map((step: unknown) => findJSONField(step, 'name'))).toStrictEqual(expected);
+  },
+);
 
 test('it starts nothing for the CI run of a pull request', async () => {
   const ctx = await setupTest();

@@ -133,8 +133,10 @@ Never put a secret in the command. Send the secret on stdin, as the second examp
 
 ## `bun run ops:cancel-prod-lock`
 
-Clears a stale lock on the prod stack's Pulumi state, which an apply or a preview leaves when it
-dies before it finishes.
+Clears a stale lock on the prod stack's Pulumi state, which an apply or a refresh leaves when it
+dies before it finishes. A preview takes no lock. A `Deploy prod` run that is cancelled or times out
+during its refresh or apply clears its own lock, so this verb is for a lock that a run's runner left
+when it died, or that a command run by hand left.
 
 ```bash
 bun run ops:cancel-prod-lock -- --yes
@@ -143,10 +145,7 @@ bun run ops:cancel-prod-lock -- --yes
 - Wraps `pulumi cancel --stack prod` under `op run --env-file=../.env`, from `infra/`, with the
   flags you pass after `--`.
 - The verb refuses while a `Deploy prod` run is queued or in progress.
-- The scheduled drift check on the host also takes the Pulumi lock. Check that the host's
-  `drift-check` service is not active first, with
-  `bun run ops:host -- 'systemctl is-active drift-check'`.
-  [The scheduled drift check](./drift-check.md) describes the service.
+- The scheduled drift check on the host only previews, so it never holds the Pulumi lock.
 
 **CAUTION:** `pulumi cancel` ends the update that holds the lock, and a live update stops half
 applied. Cancel only a lock whose holder you know has died.
