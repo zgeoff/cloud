@@ -54,6 +54,7 @@
     "check:topology": "bun scripts/check-topology.ts && bun scripts/write-exposure-table.ts --check",
     "docs:exposure": "bun scripts/write-exposure-table.ts",
     "check:sdk": "bash scripts/check-sdk.sh",
+    "check:onidel-vendor": "bash scripts/run-nixos-checks.sh onidel-provider-vendor",
     "prepare": "command -v git > /dev/null 2>&1 && lefthook install --force || true",
     "preview": "bun run provider:build && cd infra && op run --env-file=../.env -- pulumi preview --stack prod",
     "drift": "bun run sdk:build && bun run preview --refresh --expect-no-changes",

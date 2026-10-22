@@ -16,6 +16,7 @@ bun run provider:check   # generated client freshness, gofmt, go vet, golangci-l
 op run --env-file=.env -- bun run onidel:snapshot pre-<change>   # snapshot geoffcloud's system disk
 bun run sdk:gen          # rebuilds the binary, regenerates sdk/onidel/ and links it
 bun run check:sdk        # fails when the committed SDK differs from a fresh sdk:gen
+bun run check:onidel-vendor   # fails when nixos/packages/onidel-provider.nix's vendorHash is stale
 ```
 
 `provider:check` runs golangci-lint with staticcheck and unused, and deadcode with the tests as roots, so code that nothing reaches fails the check. Both linters are Go tools pinned in `tools.mod`, apart from the provider's own `go.mod`.

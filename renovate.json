@@ -9,7 +9,7 @@
       "allowedVersions": "<6"
     },
     {
-      "description": "nixos/packages/onidel-provider.nix pins the provider's Go modules with a vendorHash, which Renovate cannot recompute, and no required check builds it, so a provider/go.mod bump waits for review: the reviewer updates the hash and dispatches the NixOS checks. groupName null keeps it out of the weekly patch group, which would otherwise wait with it",
+      "description": "A provider/go.mod bump changes the vendored Go modules, whose vendorHash in nixos/packages/onidel-provider.nix Renovate cannot recompute, so CI's onidel vendor hash check fails it until a reviewer commits the new hash. automerge false says so, and groupName null keeps it out of the weekly patch group, whose other bumps would otherwise wait on its failed check",
       "matchManagers": ["gomod"],
       "matchFileNames": ["provider/go.mod"],
       "automerge": false,

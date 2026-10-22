@@ -38,6 +38,35 @@ gates:
       - scripts/find-gate-base.sh
       - scripts/decide-ci-gates.sh
 
+  # The onidel provider's vendored Go modules, which the NixOS check onidel-provider-vendor builds
+  # in the pinned Nix image, so a stale vendorHash in nixos/packages/onidel-provider.nix fails the
+  # pull request that makes it stale. go mod vendor copies only the packages that the provider's
+  # non-test Go files import, from the modules that go.mod and go.sum pin, with the Go of
+  # nixos/flake.lock's nixpkgs. The other inputs are the check, the flake that declares it, the
+  # scripts that run it, the CI workflow, and the gate filter with this file.
+  onidel-vendor:
+    skipped:
+      No input of the onidel provider's vendored Go modules changed, so their build did not run.
+    paths:
+      - provider/go.mod
+      - provider/go.sum
+      - provider/**/*.go
+      - nixos/packages/onidel-provider.nix
+      - nixos/checks/onidel-provider-vendor.nix
+      - nixos/flake.nix
+      - nixos/flake.lock
+      - scripts/run-nixos-checks.sh
+      - scripts/nix-image.sh
+      - .github/workflows/ci.yml
+      - .github/gates.yml
+      - scripts/run-decide-gates.ts
+      - scripts/is-gate-needed.ts
+      - scripts/load-gate-manifest.ts
+      - scripts/find-gate-base.sh
+      - scripts/decide-ci-gates.sh
+    ignore:
+      - provider/**/*_test.go
+
   # The NixOS checks, which boot VMs and take minutes. A green run on main covers each later
   # commit until one of these paths changes (scripts/find-nixos-check-run.sh). The inputs are the
   # flake, which holds the impd database tools the restore rehearsals run; the shared constants it
