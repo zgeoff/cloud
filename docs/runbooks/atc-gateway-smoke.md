@@ -88,9 +88,20 @@ with the atc MCP tools.
    tool-permission prompt, read it with `atc_terminal_read` and answer it with
    `atc_terminal_choose`.
 
-6. Call `atc_session_forget` on the session, then run the command from step 3 again.
+6. Call `atc_session_forget` with the session's ID and `"stop": true`.
 
-   Expect the imp to be gone.
+   Forgetting a session on an imp destroys the imp, so this first call changes nothing. Expect a
+   `confirmToken`, which is valid for 60 seconds. atc refuses a live session without `stop: true`.
+
+7. Call `atc_session_forget` again within those 60 seconds, with the session's ID, `"stop": true`
+   and the `confirmToken`.
+
+   Expect `{ "forgotten": true, "destroyed": true }`. A refusal with `confirm_token_invalid` means
+   the token expired or was spent, so start again at step 6.
+
+8. Run the command from step 3 again.
+
+   Expect the smoke imp to be gone.
 
 ## When the spawn fails
 
