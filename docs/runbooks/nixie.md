@@ -94,8 +94,9 @@ comm -23 <(names "$OLD_IMAGE") <(sort -u <(names "$NIXIE_IMAGE") <(names "$PREVI
   | while read -r name; do host_imp image unpin "$name" < /dev/null; done
 ```
 
-Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each image of the
-last 2 releases.
+Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each image that
+either of the last 2 releases lists, an image the release 2 back shares with them included. Only a
+name outside both releases' manifests loses its pin.
 
 ## Mint nixie's impd token
 
