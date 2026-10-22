@@ -52,6 +52,11 @@ RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNA
 # signed or attested release. The comment above each pin says where the sum
 # comes from; a bump repeats that check.
 
+# Every download retries. Plain --retry skips a dropped connection (curl exit 56)
+# and an HTTP/2 stream that did not close cleanly (exit 92), so it needs
+# --retry-all-errors. The fixed delay keeps a retried 404 to about 10 seconds.
+ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2"
+
 # Claude Code's native linux-x64 binary. The sum is the linux-x64 checksum in
 # the release's manifest.json, whose signature names Anthropic's release key
 # (31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE):
@@ -62,7 +67,7 @@ RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNA
 #   jq -r '.platforms["linux-x64"].checksum' manifest.json
 ARG CLAUDE_CODE_VERSION=2.1.294
 ARG CLAUDE_CODE_SHA256=27122ca7b624f537546fbef35b80c66370d974ff258f3d9b10ac50bb8771f262
-RUN curl -fsSL -o /usr/local/bin/claude \
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/claude \
       "https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}/linux-x64/claude" \
  && echo "${CLAUDE_CODE_SHA256}  /usr/local/bin/claude" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/claude
@@ -78,7 +83,7 @@ ENV DISABLE_UPDATES=1
 #   sha256sum -c --ignore-missing SHA256SUMS
 ARG ATC_VERSION=7.1.0
 ARG ATC_SHA256=861c9f1d09304f3cd4310f3546d338044d24e603896582c2fce38bcaa3618d52
-RUN curl -fsSL -o /usr/local/bin/atc \
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
       "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/atc
@@ -89,7 +94,7 @@ RUN curl -fsSL -o /usr/local/bin/atc \
 #     --jq '.assets[] | select(.name=="codex-package-x86_64-unknown-linux-musl.tar.gz") | .digest'
 ARG CODEX_VERSION=0.160.1
 ARG CODEX_SHA256=340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0
-RUN curl -fsSL -o /tmp/codex.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/codex.tar.gz \
       "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-package-x86_64-unknown-linux-musl.tar.gz" \
  && echo "${CODEX_SHA256}  /tmp/codex.tar.gz" | sha256sum -c - \
  && mkdir -p /opt/codex \
@@ -104,7 +109,7 @@ RUN curl -fsSL -o /tmp/codex.tar.gz \
 #   sha256sum "gh_${VERSION}_linux_amd64.tar.gz"
 ARG GH_VERSION=2.102.0
 ARG GH_SHA256=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
-RUN curl -fsSL -o /tmp/gh.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/gh.tar.gz \
       "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
  && echo "${GH_SHA256}  /tmp/gh.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/gh.tar.gz -C /tmp \
@@ -120,7 +125,7 @@ ARG GH_STACK_VERSION=0.2.0
 ARG GH_STACK_SHA256=577065033b49d4505730ea0ad43ab1b0374b0d9b1308e9765647a6aa8eba3cb7
 RUN dir=/root/.local/share/gh/extensions/gh-stack \
  && mkdir -p "$dir" \
- && curl -fsSL -o "$dir/gh-stack" \
+ && curl -fsSL ${CURL_RETRY} -o "$dir/gh-stack" \
       "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" \
  && echo "${GH_STACK_SHA256}  $dir/gh-stack" | sha256sum -c - \
  && chmod 0755 "$dir/gh-stack" \
@@ -132,7 +137,7 @@ RUN dir=/root/.local/share/gh/extensions/gh-stack \
 # in the release's SHASUMS256.txt.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
-RUN curl -fsSL -o /tmp/node.tar.xz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
       "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
  && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
@@ -152,7 +157,7 @@ ARG BUN_OLDER_VERSION=1.4.2
 ARG BUN_OLDER_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
 RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256"; do \
       version=${pin% *} sum=${pin#* } \
-   && curl -fsSL -o /tmp/bun.zip \
+   && curl -fsSL ${CURL_RETRY} -o /tmp/bun.zip \
         "https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip" \
    && echo "${sum}  /tmp/bun.zip" | sha256sum -c - \
    && unzip -q /tmp/bun.zip -d /tmp \
@@ -177,7 +182,7 @@ COPY claude-code/managed-settings.d/install-checkout-packages.json \
 # lists for the linux-amd64 tarball.
 ARG GO_VERSION=1.27.1
 ARG GO_SHA256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
-RUN curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
  && echo "${GO_SHA256}  /tmp/go.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/go.tar.gz -C /usr/local \
  && rm /tmp/go.tar.gz
@@ -185,7 +190,7 @@ RUN curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.
 # uv and uvx. The sum is the release's uv-x86_64-unknown-linux-gnu.tar.gz.sha256.
 ARG UV_VERSION=0.12.23
 ARG UV_SHA256=9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6
-RUN curl -fsSL -o /tmp/uv.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/uv.tar.gz \
       "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz" \
  && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/uv.tar.gz -C /tmp \
@@ -202,7 +207,7 @@ RUN curl -fsSL -o /tmp/uv.tar.gz \
 #   gpg --verify op.sig op && sha256sum op_linux_amd64_v$VERSION.zip
 ARG OP_VERSION=2.40.0
 ARG OP_SHA256=74277219e8da60958c00f9aee9d2023225e98fdda8bfd2156a5d9e85e0edaab3
-RUN curl -fsSL -o /tmp/op.zip \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
       "https://cache.agilebits.com/dist/1P/op2/pkg/v${OP_VERSION}/op_linux_amd64_v${OP_VERSION}.zip" \
  && echo "${OP_SHA256}  /tmp/op.zip" | sha256sum -c - \
  && unzip -q /tmp/op.zip op -d /tmp/op \
@@ -216,7 +221,7 @@ RUN curl -fsSL -o /tmp/op.zip \
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
 ARG AUTO_MODE_VERSION=3.0.1
 ARG AUTO_MODE_SHA256=b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a
-RUN curl -fsSL -o /tmp/auto-mode.tgz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
  && mkdir -p /opt/auto-mode \
@@ -230,7 +235,7 @@ RUN curl -fsSL -o /tmp/auto-mode.tgz \
 #   gh release download v$VERSION -R gitleaks/gitleaks -p "gitleaks_${VERSION}_checksums.txt"
 ARG GITLEAKS_VERSION=8.30.1
 ARG GITLEAKS_SHA256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
-RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/gitleaks.tar.gz \
       "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
  && echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks \
@@ -246,7 +251,7 @@ RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
 #     --jq '.assets[] | select(.name=="shfmt_v'"$VERSION"'_linux_amd64") | .digest'
 ARG SHELLCHECK_VERSION=0.11.0
 ARG SHELLCHECK_SHA256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
-RUN curl -fsSL -o /tmp/shellcheck.tar.xz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/shellcheck.tar.xz \
       "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
  && echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/shellcheck.tar.xz -C /tmp "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" \
@@ -255,7 +260,7 @@ RUN curl -fsSL -o /tmp/shellcheck.tar.xz \
 
 ARG SHFMT_VERSION=3.13.1
 ARG SHFMT_SHA256=fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
-RUN curl -fsSL -o /usr/local/bin/shfmt \
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/shfmt \
       "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
  && echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/shfmt
