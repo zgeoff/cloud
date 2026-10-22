@@ -434,13 +434,14 @@ in
 
   # The preview service (docs/architecture/workloads/preview.md, docs/runbooks/preview.md). Its
   # secrets sit on host-secrets, staged by the runbook; until they exist, the unit is skipped.
-  # A repository opts in with preview/compose.yaml and a webhook to the public route.
+  # A repository opts in with preview/compose.yaml and the preview GitHub App's installation,
+  # which only the owner's account can install, so every repository of the owner is listed.
   services.preview = {
     enable = true;
     linkListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewLinkExposure.port}";
     webhookListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewWebhookExposure.port}";
     baseURL = "http://geoffcloud:${toString previewLinkExposure.port}";
-    repos = [ "zgeoff/nixie" ];
+    repos = [ "zgeoff/*" ];
     impdURL = impdLoopbackURL;
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";
@@ -452,7 +453,8 @@ in
     # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
     impRegistryImage = "ghcr.io/zgeoff/imp-base:2.10.2@sha256:20fb4f47114ffa4a0e7fa71f7c160f2c5224b8d4125c1391f83d22d55cd2760b";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
-    githubTokenFile = "/var/lib/tank-cloud/host-secrets/preview/github-token";
+    githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
+    githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";
     impTokenFile = "/var/lib/tank-cloud/host-secrets/preview/imp-token";
   };
 

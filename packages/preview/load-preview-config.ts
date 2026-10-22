@@ -1,4 +1,7 @@
+import type { KeyObject } from 'node:crypto';
+import { createPrivateKey } from 'node:crypto';
 import { join } from 'node:path';
+import type { GitHubApp } from './build-github-client.ts';
 import type { ContractSettings, PreviewSettings } from './types.ts';
 
 interface Listener {
@@ -13,7 +16,7 @@ export interface PreviewConfig {
   readonly impdURL: string;
   readonly databasePath: string;
   readonly webhookSecret: string;
-  readonly githubToken: string;
+  readonly githubApp: GitHubApp;
   readonly impdToken: string;
   readonly sweepIntervalMs: number;
 }
@@ -34,6 +37,12 @@ export async function loadPreviewConfig(
     }
 
     return value;
+  };
+
+  const readAppKey = async (): Promise<KeyObject> => {
+    const pem = await readCredential('github-app-key');
+
+    return parseAppKey(pem);
   };
 
   return {
@@ -57,7 +66,10 @@ export async function loadPreviewConfig(
     impdURL: requireValue(env, 'PREVIEW_IMPD_URL').replace(/\/+$/u, ''),
     databasePath: requireValue(env, 'PREVIEW_DATABASE'),
     webhookSecret: await readCredential('webhook-secret'),
-    githubToken: await readCredential('github-token'),
+    githubApp: {
+      clientID: await readCredential('github-app-client-id'),
+      privateKey: await readAppKey(),
+    },
     impdToken: await readCredential('imp-token'),
     sweepIntervalMs: 60_000,
   };
@@ -71,6 +83,15 @@ function requireValue(env: Readonly<Record<string, string | undefined>>, name: s
   }
 
   return value;
+}
+
+function parseAppKey(pem: string): KeyObject {
+  try {
+    return createPrivateKey(pem);
+  } catch {
+    // OpenSSL's message, such as `PEM routines:OPENSSL_internal:NO_START_LINE`, names no credential
+    throw new Error('the credential github-app-key is not a PEM private key');
+  }
 }
 
 function parseRepos(list: string, name: string): ReadonlySet<string> {

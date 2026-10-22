@@ -32,7 +32,8 @@ let
         impdURL = "http://127.0.0.1:7070";
         impDomain = "imps.example.org";
         webhookSecretFile = "/run/fixture/webhook-secret";
-        githubTokenFile = "/run/fixture/github-token";
+        githubAppClientIDFile = "/run/fixture/github-app-client-id";
+        githubAppKeyFile = "/run/fixture/github-app-key";
         impTokenFile = "/run/fixture/imp-token";
       }
       // imageSettings;
@@ -65,7 +66,8 @@ let
               impGitHubSecret = "gh";
               impModelSecret = "preview-model";
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };
@@ -87,7 +89,8 @@ let
             ];
             unitConfig.ConditionPathExists = [
               "/run/fixture/webhook-secret"
-              "/run/fixture/github-token"
+              "/run/fixture/github-app-client-id"
+              "/run/fixture/github-app-key"
               "/run/fixture/imp-token"
             ];
             environment = {
@@ -114,7 +117,8 @@ let
               StateDirectoryMode = "0700";
               LoadCredential = [
                 "webhook-secret:/run/fixture/webhook-secret"
-                "github-token:/run/fixture/github-token"
+                "github-app-client-id:/run/fixture/github-app-client-id"
+                "github-app-key:/run/fixture/github-app-key"
                 "imp-token:/run/fixture/imp-token"
               ];
               Restart = "on-failure";
@@ -174,7 +178,8 @@ let
               impDomain = "imps.example.org";
               impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };
@@ -210,7 +215,8 @@ let
               contractModelSecret = "preview-model";
               contractTimeoutMinutes = 15;
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };
@@ -256,7 +262,8 @@ let
               impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               contractModelSecret = "preview-model";
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };
@@ -283,7 +290,8 @@ let
               impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
               contractRepos = [ "acme/greenhouse" ];
               webhookSecretFile = "/run/fixture/webhook-secret";
-              githubTokenFile = "/run/fixture/github-token";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
               impTokenFile = "/run/fixture/imp-token";
             };
           };

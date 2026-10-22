@@ -2,7 +2,7 @@
 
 These steps set up the preview service on geoffcloud, opt a repository in, and check a preview live.
 [Previews](../architecture/workloads/preview.md) explains how the service works. The service's unit
-is skipped until its three secret files exist, so a host switch before the setup leaves it stopped
+is skipped until its four secret files exist, so a host switch before the setup leaves it stopped
 and changes nothing else.
 
 The steps use one helper, which runs imp's CLI in imp-host as impd's root. It sends its standard
@@ -46,22 +46,9 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
    Expect `ok`. A token minted before the contract run grants `gh` alone. Point it at both secrets
    with `host_imp token set preview --grantable gh,preview-model < /dev/null`.
 
-4. Make a fine-grained GitHub token for the service, scoped to the opted-in repositories, with
-   Contents read, Pull requests read and write, and Commit statuses read and write. The service
-   reads `preview/compose.yaml` and each pull request's changed files, writes one comment per pull
-   request, and sets the `sdk-contract` status with it. Store it in the 1Password item
-   `preview-github-token` of the `cloud` vault, then send it to the host on SSH's standard input:
-
-   ```bash
-   op read --no-newline op://cloud/preview-github-token/credential | ssh root@geoffcloud \
-     'cd /var/lib/tank-cloud/host-secrets/preview && (umask 077 && cat > github-token.new) && test -s github-token.new \
-       && mv github-token.new github-token && echo ok'
-   ```
-
-   The host keeps the old file when the read sends nothing, and the command prints `ok` only after
-   it replaces the file.
-
-5. Make the webhook secret, store it, and send it the same way:
+4. Make the webhook secret, store it in the 1Password item `preview-webhook-secret` of the `cloud`
+   vault, and send it to the host on SSH's standard input. Skip the `op item create` line when the
+   item exists:
 
    ```bash
    op item create --vault cloud --category password --title preview-webhook-secret \
@@ -71,7 +58,44 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
        && mv webhook-secret.new webhook-secret && echo ok'
    ```
 
-6. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:
+   The host keeps the old file when the read sends nothing, and the command prints `ok` only after
+   it replaces the file.
+
+5. Create the preview GitHub App on the owner's account, under Settings, Developer settings, GitHub
+   Apps, New GitHub App:
+   - Webhook: active, with the URL `https://preview-webhook.geoff.cloud/webhook`, which the stack
+     exports as `previewWebhookURL`, and the secret from step 4. Copy the secret from the 1Password
+     item into the form.
+   - Repository permissions: Contents read-only, Pull requests read and write, and Commit statuses
+     read and write. GitHub adds Metadata read-only itself. The service reads `preview/compose.yaml`
+     and each pull request's changed files, writes one comment per pull request, and sets the
+     `sdk-contract` status.
+   - Subscribe to events: Pull request, and no other event.
+   - Where can this GitHub App be installed: Only on this account.
+
+   Create the App, then copy the client ID from its General page.
+
+6. Generate the App's private key on the same page. GitHub downloads it as a `.pem` file. Store the
+   client ID and the key in the `cloud` vault, delete the downloaded file, and send both to the
+   host:
+
+   ```bash
+   op item create --vault cloud --category "API Credential" --title preview-github-app \
+     'client-id[text]=<client_id>' > /dev/null
+   op document create <downloaded_pem> --vault cloud --title preview-github-app-key > /dev/null \
+     && rm <downloaded_pem>
+   op read --no-newline op://cloud/preview-github-app/client-id | ssh root@geoffcloud \
+     'cd /var/lib/tank-cloud/host-secrets/preview && (umask 077 && cat > github-app-client-id.new) \
+       && test -s github-app-client-id.new && mv github-app-client-id.new github-app-client-id && echo ok'
+   op document get preview-github-app-key --vault cloud | ssh root@geoffcloud \
+     'cd /var/lib/tank-cloud/host-secrets/preview && (umask 077 && cat > github-app-key.new) \
+       && test -s github-app-key.new && mv github-app-key.new github-app-key && echo ok'
+   ```
+
+   Expect `ok` twice. The service refuses to start on a key file that is not a PEM private key, and
+   its journal says `the credential github-app-key is not a PEM private key`.
+
+7. Switch the host from a clean checkout of `main` that a green `NixOS checks` run covers:
    `bash scripts/switch-geoffcloud.sh`. Then start the unit, which the switch skipped while its
    secrets were missing, and read its first line:
 
@@ -81,7 +105,7 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
 
    Expect `previews: links on 100.69.47.33:8417, webhook on 100.69.47.33:8418`.
 
-7. Check the public route, which the Pulumi program declares: `preview-webhook.geoff.cloud` passes
+8. Check the public route, which the Pulumi program declares: `preview-webhook.geoff.cloud` passes
    only the path `/webhook` to the webhook listener. Once the apply has run, an unsigned call gets
    the service's refusal, and any other path gets the tunnel's 404:
 
@@ -92,17 +116,18 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
 
    Expect `401`, then `404`.
 
-8. Add a webhook to each opted-in repository, or once to the owner's account for every repository:
-   the payload URL `https://preview-webhook.geoff.cloud/webhook`, which the stack exports as
-   `previewWebhookURL`, content type `application/json`, the secret from step 5, and the "Pull
-   requests" event alone. Expect GitHub's ping delivery to get a 204.
+9. Open the App's Advanced page and redeliver its ping from Recent Deliveries. Expect the redelivery
+   to get a 204.
 
 ## Opt a repository in
 
-A repository opts in with a `preview/` folder, a webhook, and a place in the host's
-`services.preview.repos`, which names each opted-in repository, and in the `gh` token's repository
-list. The folder holds one Compose file, whose services start the app, seed it with invented data,
-and publish the app's HTTP port on the guest:
+A repository opts in with a `preview/` folder and an install of the preview GitHub App. The host's
+`services.preview.repos` lists every repository of the owner, and the App installs only on the
+owner's account, so the install is the only switch. Install the App from its public page, under
+Install App, and add the repository to the installation's repository list. A private repository
+needs a place in the `gh` token's repository list too, so that each preview imp can clone it. The
+folder holds one Compose file, whose services start the app, seed it with invented data, and publish
+the app's HTTP port on the guest:
 
 ```yaml
 x-preview:
@@ -143,11 +168,11 @@ stack on empty volumes, so the seed runs once per build. A preview of a push bui
 ## Run the SDK contract suite on a pull request
 
 A repository runs its SDK contract suite on each pull request that changes the Agent SDK's pin once
-the host's `services.preview.contractRepos` lists it and the service's webhook reaches it. The suite
-runs `NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract` at the head commit, so the repository needs
-that folder and a `bun.lock`. Each run's imp installs Bun's pinned build, so a repository that moves
-its package manager to another Bun release needs the pin in the service's contract run moved with
-it.
+the host's `services.preview.contractRepos` lists it and the preview GitHub App is installed on it.
+The suite runs `NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract` at the head commit, so the
+repository needs that folder and a `bun.lock`. Each run's imp installs Bun's pinned build, so a
+repository that moves its package manager to another Bun release needs the pin in the service's
+contract run moved with it.
 
 Check a run live once the setup and a host switch are done:
 
@@ -171,16 +196,17 @@ means the token lacks `preview-model` in its grantable list. A run that fails be
 reports broke in the install or the fetch, such as a `bun.lock` that `bun install --frozen-lockfile`
 refuses.
 
-A journal line that ends `(the token needs statuses=write)` means the service's GitHub token lacks
-Commit statuses write, which GitHub needs for every status the service sets. Add that permission to
-the token in step 4. The run stays settling until then, and the next retry sets its status.
+A journal line that ends `(the App needs statuses=write)` means the preview GitHub App lacks Commit
+statuses write, which GitHub needs for every status the service sets. Add that permission on the
+App's Permissions page, as in step 5, then accept the new permission on the installation's page. The
+run stays settling until then, and the next retry sets its status.
 
 ## Check a preview live
 
 Run these checks from a device on the tailnet, a phone among them, after the setup.
 
 1. Open a pull request in an opted-in repository whose head has `preview/compose.yaml`. Expect one
-   comment from the service's token that starts with
+   comment from the App's bot, `<app_slug>[bot]`, that starts with
    `**Preview:** http://geoffcloud:8417/<owner>/<repo>/<number>`.
 2. Open the link on the phone. Expect the page "Preview booting", which reloads, and then a redirect
    to `https://pv-<hash>-<number>.imps.geoff.cloud/` that shows the app with its invented data.
@@ -200,6 +226,39 @@ Run these checks from a device on the tailnet, a phone among them, after the set
 6. Close the pull request. Expect the comment to start with `**Preview ended.**`, the link to answer
    "Preview ended", and `host_imp ls` to list no imp of that pull request.
 
+## Retire the fine-grained token and the repository webhooks
+
+A host that ran the service before the preview GitHub App holds a fine-grained token,
+`preview-github-token`, and each opted-in repository has a webhook to the same URL as the App's. Run
+these steps once the switch to the App is done and the live check passes on one repository:
+
+1. Install the App on every repository that has a webhook to
+   `https://preview-webhook.geoff.cloud/webhook`. Until you remove the webhook, the service gets
+   each event twice and applies it twice, which posts nothing new.
+2. Remove each repository's webhook. List them, then remove the one whose `config.url` is the
+   preview URL:
+
+   ```bash
+   gh api repos/<owner>/<repo>/hooks --jq '.[] | [.id, .config.url] | @tsv'
+   gh api -X DELETE repos/<owner>/<repo>/hooks/<hook_id>
+   ```
+
+   Expect the second command to print nothing and exit 0.
+
+3. Delete the token in GitHub, under Settings, Developer settings, Personal access tokens,
+   Fine-grained tokens. Then delete its 1Password item and its host file:
+
+   ```bash
+   op item delete preview-github-token --vault cloud
+   ssh root@geoffcloud 'rm -f /var/lib/tank-cloud/host-secrets/preview/github-token && echo ok' < /dev/null
+   ```
+
+   Expect `ok`.
+
+A pull request that was open before the switch keeps the token's comment, and the App's bot posts a
+comment of its own on the next event, because GitHub lets the App edit only its own comments. Delete
+the old comment by hand.
+
 ## When a preview fails
 
 The link shows the tail of the build output and a retry link. The service's journal holds each phase
@@ -208,6 +267,10 @@ change:
 ```bash
 ssh root@geoffcloud journalctl -u preview -n 50 --no-pager
 ```
+
+A journal line that ends `/installation: HTTP 404: Not Found` names a repository that the App is not
+installed on, such as one removed from the installation's repository list while a preview of it ran.
+Add the repository to the installation again, or close its pull requests.
 
 A boot that fails on `PRECONDITION_FAILED` ran without the broker: check step 1 and the token's
 grantable secret. A boot that times out reached `docker compose up` but never got an answer on the
