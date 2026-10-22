@@ -424,3 +424,59 @@ test('it answers a 502 and releases its hold when the started proxy refuses the 
 
   expect(release).toHaveBeenCalledOnce();
 });
+
+test('it passes the proxy budget refusal through with its status and its body', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 7,
+    imp: 'pv-0a1b2c3d-7',
+    headSHA: 'c0ffee1',
+  });
+
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies: {
+      holdProxy: () => Promise.resolve({ origin: 'http://127.0.0.1:1', release: () => {} }),
+      removeProxy: () => Promise.resolve(),
+      removeIdle: () => Promise.resolve(),
+      removeAll: () => Promise.resolve(),
+    },
+    sendRequest: () =>
+      Promise.resolve(
+        Response.json(
+          {
+            type: 'error',
+            error: {
+              type: 'permission_error',
+              message:
+                'the counting proxy reached its spending limit ($2.0150 of $2), so it refuses every further request',
+            },
+          },
+          { status: 403 },
+        ),
+      ),
+    log: () => {},
+  });
+
+  const response = await handler(
+    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+      method: 'POST',
+      body: '{"model":"model-small"}',
+    }),
+  );
+
+  const body: unknown = await response.json();
+
+  expect(response.status).toBe(403);
+
+  expect(body).toStrictEqual({
+    type: 'error',
+    error: {
+      type: 'permission_error',
+      message:
+        'the counting proxy reached its spending limit ($2.0150 of $2), so it refuses every further request',
+    },
+  });
+});
