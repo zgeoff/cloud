@@ -197,7 +197,11 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
       await Promise.all(idle.map((each) => stopProxy(each.imp)));
     },
     removeAll: async () => {
-      await Promise.all([...entries.keys()].map((imp) => stopProxy(imp)));
+      // an idle stop under way has already taken its entry, so the stops it holds count as well
+      await Promise.all([
+        ...[...entries.keys()].map((imp) => stopProxy(imp)),
+        ...stopping.values(),
+      ]);
     },
   };
 }

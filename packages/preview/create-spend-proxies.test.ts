@@ -567,3 +567,73 @@ test('it refuses a call that waits on an exited proxy when the preview closes, a
 
   expect(started).toHaveLength(1);
 });
+
+test('it stops every proxy on shutdown, an idle stop under way included, before it resolves', async () => {
+  const ctx = await setupTest();
+
+  const io = buildSpendProxyIO();
+  const started: ReturnType<typeof io.runProxy>[] = [];
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    {
+      ...ctx.deps,
+      io: {
+        ...io,
+        runProxy: (argv) => {
+          const child = io.runProxy(argv);
+
+          started.push(child);
+
+          return child;
+        },
+      },
+    },
+  );
+
+  // a stopped proxy cannot exit on the removal's SIGTERM, so the cleanup continues it first
+  onTestFinished(async () => {
+    started[0]?.kill('SIGCONT');
+
+    await proxies.removeAll();
+  });
+
+  const first = await proxies.holdProxy('pv-0a1b2c3d-7');
+
+  first.release();
+
+  ctx.clock.now += 2_400_000;
+
+  // a stopped process holds its SIGTERM until it continues, so the idle stop stays under way
+  // while the shutdown starts
+  const oldPID = started[0]?.pid ?? 0;
+
+  process.kill(oldPID, 'SIGSTOP');
+
+  await waitForCondition(() => readProcessStatus(oldPID).stopped);
+
+  const sweeping = proxies.removeIdle();
+
+  await waitForCondition(() => readProcessStatus(oldPID).pendingSignals.includes('SIGTERM'));
+
+  const stopping = proxies.removeAll();
+
+  process.kill(oldPID, 'SIGCONT');
+
+  await stopping;
+
+  // read at once, before the sweep's own wait can see the exit
+  const ended = started[0]?.exitCode ?? started[0]?.signalCode;
+
+  await sweeping;
+
+  expect(ended).toBeOneOf([0, 'SIGTERM']);
+});
