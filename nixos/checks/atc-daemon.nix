@@ -121,6 +121,18 @@ let
         '';
     }
     {
+      title = "it puts git on the service PATH, which atc runs to resolve the ref of a git workspace";
+      script =
+        let
+          service = (buildDaemonSystem { }).config.systemd.services.atc-daemon;
+        in
+        ''
+          actual=$(PATH='${service.environment.PATH}' git --version)
+
+          assert_equals 'git version ${pkgs.git.version}' "$actual" "git on the service's PATH"
+        '';
+    }
+    {
       title = "it links a config.json of the targets, principals, default target, agents and auth profiles where atc reads it";
       script =
         let

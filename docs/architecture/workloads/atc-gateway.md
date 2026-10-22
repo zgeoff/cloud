@@ -120,3 +120,8 @@ or added profile changes both daemons' configs. The daemon's impd token lists ea
 as grantable, so the token, not the config, bounds what a session can reach. impd ties each entry of
 that list to the secret it named, so a secret made again under the same name needs a new grantable
 list on each daemon's token. A Codex session has no brokered sign-in.
+
+A Claude session runs its prompt only in a folder that Claude Code trusts, and the imp's Claude
+config trusts only the root of a workspace that the spawn cloned with trust opted in. The daemon
+resolves a git workspace's ref with git on the host before the imp clones it. The
+[smoke spawn](../../runbooks/atc-gateway-smoke.md) uses those settings.
