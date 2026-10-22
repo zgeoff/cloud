@@ -319,6 +319,67 @@ test('it refuses a preview model call with a 503 when its proxy cannot start', a
   });
 });
 
+test('it answers a 404 and starts no proxy when the preview closes while the call body arrives', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 7,
+    imp: 'pv-0a1b2c3d-7',
+    headSHA: 'c0ffee1',
+  });
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    ctx.deps,
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies,
+    sendRequest: fetch,
+    log: () => {},
+  });
+
+  const opened = Promise.withResolvers<ReadableStreamDefaultController<Uint8Array>>();
+
+  const body = new ReadableStream<Uint8Array>({
+    start: (controller) => {
+      opened.resolve(controller);
+    },
+  });
+
+  const pending = handler(
+    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+      method: 'POST',
+      body,
+      duplex: 'half',
+    }),
+  );
+
+  const controller = await opened.promise;
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 7 }, ['waiting'], { phase: 'ended' });
+  controller.enqueue(new TextEncoder().encode('{"model":"model-small"}'));
+  controller.close();
+
+  const response = await pending;
+  const files = await readdir(join(ctx.directory, 'spend'));
+
+  expect(response.status).toBe(404);
+  expect(files).toStrictEqual([]);
+});
+
 test('it answers a 502 and releases its hold when the started proxy refuses the call', async () => {
   const ctx = await setupTest();
 

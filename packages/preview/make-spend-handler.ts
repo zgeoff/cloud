@@ -16,7 +16,16 @@ const DROPPED_HEADERS = ['host', 'connection', 'keep-alive', 'transfer-encoding'
 export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => Promise<Response> {
   return async (request) => {
     const url = new URL(request.url);
+    const headers = new Headers(request.headers);
 
+    for (const name of DROPPED_HEADERS) {
+      headers.delete(name);
+    }
+
+    const body = request.body === null ? null : await request.arrayBuffer();
+
+    // A close marks the preview ended before it removes the proxy, and nothing awaits between
+    // this check and the hold, so a closed preview never gets a proxy that the close missed.
     const imp = url.pathname.split('/')[1] ?? '';
     const preview = imp === '' ? null : deps.store.findPreviewByImp(imp);
 
@@ -27,14 +36,6 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
         `no preview holds the model route ${url.pathname}`,
       );
     }
-
-    const headers = new Headers(request.headers);
-
-    for (const name of DROPPED_HEADERS) {
-      headers.delete(name);
-    }
-
-    const body = request.body === null ? null : await request.arrayBuffer();
 
     const hold = await deps.proxies.holdProxy(imp).catch((error: unknown) => {
       deps.log(`${imp}: ${error instanceof Error ? error.message : String(error)}`);
