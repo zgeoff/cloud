@@ -1,7 +1,9 @@
+import { match } from 'ts-pattern';
 import { buildForwardedHeaders } from './build-forwarded-headers.ts';
 import type { PreviewStore } from './create-preview-store.ts';
 import type { ProxyHold, SpendProxies } from './create-spend-proxies.ts';
 import { modelRoute } from './model-route.ts';
+import { pickProxyOutcome } from './pick-proxy-outcome.ts';
 import { pickSpendAdmission } from './pick-spend-admission.ts';
 import { renderSpendRefusal } from './render-spend-refusal.ts';
 
@@ -36,39 +38,52 @@ export function makeSpendHandler(deps: SpendHandlerDeps): (request: Request) => 
       return null;
     });
 
-    // the proxy is the spend cap, so a preview whose proxy cannot start makes no model call
-    if (hold === null) {
-      return renderSpendRefusal({ kind: 'no-proxy' });
-    }
+    const answer = await sendToProxy(deps, hold, request, body);
 
-    const answer = await deps
-      .sendRequest(`${hold.origin}${url.pathname}${url.search}`, {
-        method: request.method,
-        headers: buildForwardedHeaders(request.headers, 'call'),
-        body,
-        redirect: 'manual',
+    const outcome = pickProxyOutcome(hold, answer);
+
+    outcome.holdToRelease?.release();
+
+    return match(outcome)
+      .with({ kind: 'refuse' }, (refused) => renderSpendRefusal(refused.refusal))
+      .with({ kind: 'forward' }, (forwarded) => {
+        const forwardedBody =
+          forwarded.watchedBody === null
+            ? null
+            : buildReleasingBody(forwarded.watchedBody, forwarded.hold);
+
+        return new Response(forwardedBody, {
+          status: forwarded.answer.status,
+          statusText: forwarded.answer.statusText,
+          headers: buildForwardedHeaders(forwarded.answer.headers, 'answer'),
+        });
       })
-      .catch(() => null);
-
-    if (answer === null) {
-      hold.release();
-
-      return renderSpendRefusal({ kind: 'no-answer' });
-    }
-
-    if (answer.body === null) {
-      hold.release();
-    }
-
-    // a streamed reply can outlast the idle time, so the hold lasts until its body ends
-    const answerBody = answer.body === null ? null : buildReleasingBody(answer.body, hold);
-
-    return new Response(answerBody, {
-      status: answer.status,
-      statusText: answer.statusText,
-      headers: buildForwardedHeaders(answer.headers, 'answer'),
-    });
+      .exhaustive();
   };
+}
+
+async function sendToProxy(
+  deps: SpendHandlerDeps,
+  hold: ProxyHold | null,
+  request: Request,
+  body: ArrayBuffer | null,
+): Promise<Response | null> {
+  if (hold === null) {
+    return null;
+  }
+
+  const url = new URL(request.url);
+
+  try {
+    return await deps.sendRequest(`${hold.origin}${url.pathname}${url.search}`, {
+      method: request.method,
+      headers: buildForwardedHeaders(request.headers, 'call'),
+      body,
+      redirect: 'manual',
+    });
+  } catch {
+    return null;
+  }
 }
 
 function buildReleasingBody(

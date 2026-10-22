@@ -754,6 +754,7 @@ let
         ./model-route.ts
         ./parse-preview-contract.ts
         ./parse-pull-request-event.ts
+        ./pick-proxy-outcome.ts
         ./pick-spend-admission.ts
         ./plan-idle-sleeps.ts
         ./plan-slot-evictions.ts
