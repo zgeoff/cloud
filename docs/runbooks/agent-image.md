@@ -81,9 +81,11 @@ bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
 runs that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
-`agent-<short sha> <digest> check passed`; record that line on the PR. A failed check removes the
-image, unless `--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is
-not on `main`, and an image or check imp name that already exists.
+`agent-<short sha> <digest> check passed`; record that line on the PR. A passed check pins the image
+in impd, because a daemon's target boots it by name, and impd's image eviction would otherwise
+remove it while no imp uses it. A failed check removes the image, unless `--keep` keeps it for a
+look, and every failure exits 1. It refuses a commit that is not on `main`, and an image or check
+imp name that already exists.
 
 `impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
@@ -247,7 +249,9 @@ entry.
 3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
-   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
+   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses. The build
+   pinned it, so impd's image eviction never removes it: to leave an image that no target boots to
+   the eviction instead, unpin it with `impz image unpin agent-<short sha>`.
 
 ## Roll back
 

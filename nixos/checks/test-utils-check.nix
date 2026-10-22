@@ -1271,6 +1271,55 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostDocker keeps the pin of the image whose name an add points at a new ref";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":true}]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","pinned":true}' "$(jq -c '{name, ref, pinned}' out)" "the printed image"
+        assert_files_equal /dev/null err
+        assert_equals '[["pv-base","ghcr.io/example/base:1.0.0",true]]' \
+          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker pins the image of the name it is given, prints nothing, and leaves the other images alone";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false},{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false}]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image pin pv-base > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_equals '[["base",false],["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails a pin of a name that holds no image, as impz fails a call";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image pin pv-base > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "impz: NOT_FOUND: image pv-base not found" "$(cat err)" "the error"
+        assert_equals '[]' "$(cat impd/images.json)" "impd's images"
+      '';
+    }
+    {
       title = "it buildStubImpHostDocker fails the calls its unreachable count names as docker fails a missing container, then answers";
       script = ''
         mkdir home tmp impd
@@ -1369,11 +1418,12 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker holds to preview-image: it reaches impd only through the docker it is given, with the two calls the stand-in answers";
+      title = "it buildStubImpHostDocker holds to preview-image: it reaches impd only through the docker it is given, with the three calls the stand-in answers";
       script = ''
         docker_cmd=$(grep -cxF 'docker="''${DOCKER:-docker}"' ${../modules/preview-image.sh} || true)
         list=$(grep -cxF 'until images=$("$docker" exec imp-host impz image ls --json 2> "$err"); do' ${../modules/preview-image.sh} || true)
-        add=$(grep -cxF '"$docker" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        add=$(grep -cxF '  "$docker" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        pin=$(grep -cxF '  "$docker" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
         calls=$(grep -cF '"$docker"' ${../modules/preview-image.sh} || true)
         # a docker call by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ ;&|($])docker ' ${../modules/preview-image.sh} || true)
@@ -1381,7 +1431,8 @@ let
         assert_equals 1 "$docker_cmd" "the script's docker"
         assert_equals 1 "$list" "the script's image list"
         assert_equals 1 "$add" "the script's image add"
-        assert_equals 2 "$calls" "the script's calls through DOCKER"
+        assert_equals 1 "$pin" "the script's image pin"
+        assert_equals 3 "$calls" "the script's calls through DOCKER"
         assert_equals 0 "$direct" "the script's calls of docker by name"
       '';
     }

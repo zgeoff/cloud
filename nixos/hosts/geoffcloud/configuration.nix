@@ -265,6 +265,13 @@ in
     settings.IMP_DOMAIN = topology.imp.domain;
     dnsApiTokenFile = "/var/lib/imp-host/secrets/dns-api-token";
     settings.IMP_DNS_PROVIDER = "cloudflare";
+    # image eviction, in percent of tank/imp (docs/architecture/host/imp.md). tank/imp sees the
+    # 200 GB pool less ZFS's slop and the rancher zvol's reservation, about 160 GiB, and impd's disk
+    # reserve is 5 % of that, about 8 GiB. At 80 % a 20 GiB builder disk still fits above the
+    # reserve (85 % would refuse it), and eviction starts before impd's low-disk warning at twice
+    # the reserve. The 15-point gap frees about 24 GiB, so one eviction serves many adds.
+    settings.IMP_IMAGE_EVICT_HIGH_PERCENT = 80;
+    settings.IMP_IMAGE_EVICT_LOW_PERCENT = 65;
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
     forwardDeny = [
       k3sPodCIDR
