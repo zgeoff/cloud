@@ -309,7 +309,7 @@ let
         '';
     }
     {
-      title = "it sets the counting proxy's settings and admits docker0's subnet to the model route listener once spendCap is on";
+      title = "it sets the counting proxy settings and admits the docker0 subnet to the model route listener once spendCap is on";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
@@ -392,7 +392,7 @@ let
         '';
     }
     {
-      title = "it leaves the counting proxy's settings and the admission out when spendCap is off";
+      title = "it leaves the counting proxy settings and the admission out when spendCap is off";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
