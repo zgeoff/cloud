@@ -89,8 +89,10 @@ it `needs-review` when any of these holds:
 - A nixie release in the bump adds migrations (label `migrations`). nixie's migrations run forward
   only, so a revert does not undo them.
 
-A nixie bump that changes nixie's sandbox images needs no review for that change, because nixie adds
-its own images to impd at start.
+A nixie bump that changes nixie's sandbox images gets the label `sandbox-images-changed`, which
+never holds the merge: nixie adds its own images to impd at start. The label tells delivery to pin
+the new images once the release reports ready, as
+[Pin nixie's sandbox images](./nixie.md#pin-nixies-sandbox-images) describes.
 
 The merge workflow runs each time CI finishes on a `release-check/` branch, and each time such a
 pull request gets the `auto-merge` label. The label event matters when a bump run fails after its

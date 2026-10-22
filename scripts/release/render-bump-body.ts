@@ -30,6 +30,12 @@ export function renderBumpBody(input: BumpBodyInput): string {
     ...renderMergeLines(input),
     '',
     `After the merge: ${input.record.rollout}`,
+    ...(input.labels.includes('sandbox-images-changed')
+      ? [
+          '',
+          "The release changes nixie's sandbox images. nixie adds them to impd itself; pin them once it reports ready (`docs/runbooks/nixie.md`).",
+        ]
+      : []),
     '',
   ].join('\n');
 }

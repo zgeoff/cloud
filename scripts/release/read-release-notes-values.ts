@@ -22,12 +22,12 @@ export async function readReleaseNotesValues(
     return notes;
   }
 
-  const [target = '', ...between] = notes;
+  const [pinned = '', target = '', ...between] = notes;
   const digests = collectDigests(read.record, target);
 
   return digests instanceof Error
     ? digests
-    : { values: { digests }, flags: collectNixieReleaseFlags({ target, between }) };
+    : { values: { digests }, flags: collectNixieReleaseFlags({ pinned, target, between }) };
 }
 
 async function readNoteVersions(read: ReleaseRead) {
@@ -51,7 +51,7 @@ async function readNoteVersions(read: ReleaseRead) {
     .map((tag) => tag.slice(prefix.length))
     .filter((each) => tags.includes(`${prefix}${each}`) && isBetween(each, from, read.version));
 
-  return [read.version, ...between];
+  return [from, read.version, ...between];
 }
 
 function findOldest(pinned: readonly string[]) {

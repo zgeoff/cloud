@@ -54,16 +54,16 @@ test('it gives no reason for a minor release from 1.0 on', () => {
   );
 });
 
-test('it gives migrations as the reason', () => {
+test('it merges a bump with changed sandbox images on its own and asks for their pin after the merge', () => {
   expect(
     renderBumpBody({
       record: getReleaseRecord('nixie'),
       version: '0.7.3',
       pinned: ['0.7.2', '0.7.2'],
-      labels: ['update:patch', 'migrations', 'needs-review'],
+      labels: ['update:patch', 'sandbox-images-changed', 'auto-merge'],
     }),
   ).toBe(
-    'Bumps nixie to [0.7.3](https://github.com/zgeoff/nixie/releases/tag/v0.7.3). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.2 | 0.7.3 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.2 | 0.7.3 |\n\nIt waits for a review, because:\n\n- a release in the bump adds database migrations, which a revert does not undo.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n',
+    "Bumps nixie to [0.7.3](https://github.com/zgeoff/nixie/releases/tag/v0.7.3). The release check opened this pull request.\n\n| Pin | From | To |\n| --- | --- | --- |\n| nixie (`infra/Pulumi.prod.yaml`) | 0.7.2 | 0.7.3 |\n| nixie-web (`infra/Pulumi.prod.yaml`) | 0.7.2 | 0.7.3 |\n\nIt merges on its own once every check on its head passes. A change to `nixos/` gets its NixOS checks on `main`, which the host switch waits for.\n\nAfter the merge: The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).\n\nThe release changes nixie's sandbox images. nixie adds them to impd itself; pin them once it reports ready (`docs/runbooks/nixie.md`).\n",
   );
 });
 

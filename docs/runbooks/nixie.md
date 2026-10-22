@@ -70,9 +70,10 @@ its secret leaves its role's sandbox unmade, and `imp_host` unready.
 ## Pin nixie's sandbox images
 
 nixie adds its sandbox images with its own token, which cannot pin an image. Delivery pins them with
-`impz image pin` as impd's root at each nixie release that adds sandbox images, so impd's image
-eviction never makes a sandbox create pull its image again. nixie adds an evicted image again before
-it creates a sandbox on it, so an image that misses its pin costs a pull, not a failed create.
+`impz image pin` as impd's root at each nixie release that adds sandbox images, which the release
+check labels `sandbox-images-changed` on its bump, so impd's image eviction never makes a sandbox
+create pull its image again. nixie adds an evicted image again before it creates a sandbox on it, so
+an image that misses its pin costs a pull, not a failed create.
 
 Once the release reports ready, pin each of its sandbox images by the name nixie gives it:
 
@@ -93,8 +94,9 @@ comm -23 <(names "$OLD_IMAGE") <(sort -u <(names "$NIXIE_IMAGE") <(names "$PREVI
   | while read -r name; do host_imp image unpin "$name" < /dev/null; done
 ```
 
-Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each image of the
-last 2 releases.
+Expect `host_imp image ls < /dev/null` to show `yes` in the `PINNED` column of each image that
+either of the last 2 releases lists, an image the release 2 back shares with them included. Only a
+name outside both releases' manifests loses its pin.
 
 ## Mint nixie's impd token
 
