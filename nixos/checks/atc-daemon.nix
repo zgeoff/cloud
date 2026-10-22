@@ -418,7 +418,10 @@ let
             }
           },
           "defaultTarget": "geoffcloud",
-          "principals": { "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] } },
+          "principals": {
+            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
+            "oZN3LOON2xgw3OKaULXs8wgRzGST6o5i": { "targets": ["geoffcloud"] }
+          },
           "targets": {
             "geoffcloud": {
               "guestATC": "/usr/local/bin/atc",
