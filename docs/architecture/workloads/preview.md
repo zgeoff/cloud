@@ -32,12 +32,12 @@ flowchart LR
 ## Two listeners
 
 The service listens twice on the host's tailnet address, so the public route reaches only the part
-that checks signatures. The webhook listener takes GitHub's `pull_request` deliveries through a
-tunnel hostname, the one public endpoint, and the host admits its port only from pod addresses,
-because cloudflared dials it from its pod. The listener checks each delivery's HMAC signature
-against the webhook's secret before it parses the body, so an unsigned or wrongly signed call gets a
-401 and reaches no other code. The link listener serves the links on the tailnet only, and the
-tailnet policy lets only member devices reach it.
+that checks signatures. The webhook listener takes the preview GitHub App's `pull_request`
+deliveries through a tunnel hostname, the one public endpoint, and the host admits its port only
+from pod addresses, because cloudflared dials it from its pod. The listener checks each delivery's
+HMAC signature against the App's webhook secret before it parses the body, so an unsigned or wrongly
+signed call gets a 401 and reaches no other code. The link listener serves the links on the tailnet
+only, and the tailnet policy lets only member devices reach it.
 
 A signed delivery changes a preview only for a repository the service lists, by name or by its
 owner, and only when the pull request's head branch lives in that repository. A pull request from a
@@ -45,6 +45,17 @@ fork never gets a preview, because its code would run in an imp that holds the b
 credential. That credential is impd's `gh` secret, a fine-grained token that reads the contents of
 the listed repositories and nothing else, so a preview's code can clone its own repository but can
 neither push to it nor reach a repository the service does not list.
+
+## GitHub access
+
+The service reaches GitHub as the preview GitHub App, and an install of the App on a repository is
+that repository's opt-in: GitHub sends the App's deliveries only for the repositories it is
+installed on, and the comments post as the App's bot. The service holds the App's private key and no
+GitHub token. For each call, such as one comment update, it signs a short-lived JWT with the key,
+looks up the App's installation on the repository, and mints an installation token scoped to that
+one repository, which it drops when the call ends. A leaked installation token reaches one
+repository, and it expires at the end of the lifetime that GitHub fixes for it. The App is private
+to the owner's account, so no other account can install it and send the service deliveries.
 
 ## A pull request's preview
 
@@ -76,7 +87,7 @@ sweep of interrupted boots all follow the same rule.
 - **opened, reopened or synchronize.** The service reads `preview/compose.yaml` at the head commit.
   A commit without the file has not opted in, and the service does nothing. Otherwise it records the
   head commit and posts the pull request's comment, or edits it in place: a marker in the comment
-  body and the token's own login tell the service's comment from every other. A synchronize never
+  body and the App's bot login tell the service's comment from every other. A synchronize never
   brings an ended preview back; only an open or a reopen does.
 - **The link opens.** A ready preview whose built commit is the head wakes if it sleeps, and the
   link redirects to the imp's own HTTPS name, which impd's wake proxy serves on the tailnet. A wake

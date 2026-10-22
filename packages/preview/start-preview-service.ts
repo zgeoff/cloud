@@ -22,7 +22,7 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
     settings: config.settings,
     store,
     impd: buildImpdClient(config.impdURL, config.impdToken),
-    github: buildGitHubClient('https://api.github.com', config.githubToken),
+    github: buildGitHubClient('https://api.github.com', config.githubApp, () => new Date()),
     webhookSecret: config.webhookSecret,
     pendingBoots: new Set(),
     pendingRuns: new Set(),

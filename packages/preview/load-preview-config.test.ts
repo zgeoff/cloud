@@ -1,10 +1,13 @@
 import { expect, test } from 'bun:test';
+import { KeyObject } from 'node:crypto';
 import { loadPreviewConfig } from './load-preview-config.ts';
+import { stubApp, stubAppKeyPEM } from './mocks/github-app.ts';
 
 test('it reads the settings from the environment and the secrets from the credential files', async () => {
   const files = new Map([
     ['/run/credentials/preview.service/webhook-secret', 'stub-webhook-secret\n'],
-    ['/run/credentials/preview.service/github-token', 'ghp_stub-preview-token\n'],
+    ['/run/credentials/preview.service/github-app-client-id', 'Iv23liStubPreviewApp\n'],
+    ['/run/credentials/preview.service/github-app-key', stubAppKeyPEM],
     ['/run/credentials/preview.service/imp-token', 'imp_stubpreview.stub-secret\n'],
   ]);
 
@@ -46,7 +49,12 @@ test('it reads the settings from the environment and the secrets from the creden
     impdURL: 'http://127.0.0.1:7070',
     databasePath: '/var/lib/preview/previews.sqlite',
     webhookSecret: 'stub-webhook-secret',
-    githubToken: 'ghp_stub-preview-token',
+    githubApp: {
+      clientID: 'Iv23liStubPreviewApp',
+      privateKey: expect.toSatisfy(
+        (key: unknown) => key instanceof KeyObject && key.equals(stubApp.privateKey),
+      ),
+    },
     impdToken: 'imp_stubpreview.stub-secret',
     sweepIntervalMs: 60_000,
   });
@@ -69,6 +77,25 @@ test('it rejects an empty credential', () => {
       () => Promise.resolve('\n'),
     ),
   ).rejects.toThrowWithMessage(Error, 'the credential webhook-secret is empty');
+});
+
+test("it rejects an App key that is not a PEM private key, and leaves the key's text out", () => {
+  expect(
+    loadPreviewConfig(
+      {
+        CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+        PREVIEW_REPOS: 'acme/greenhouse',
+        PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+        PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+        PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+        PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+        PREVIEW_IMP_DOMAIN: 'imps.example.test',
+        PREVIEW_IMP_IMAGE: 'base',
+        PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+      },
+      () => Promise.resolve('ghp_pasted-in-place-of-the-key'),
+    ),
+  ).rejects.toThrowWithMessage(Error, 'the credential github-app-key is not a PEM private key');
 });
 
 test('it rejects a repository that is not owner/name', () => {
@@ -148,7 +175,11 @@ test('it reads the SDK contract settings when the environment names a contract r
       PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
       PREVIEW_CONTRACT_TIMEOUT_MINUTES: '15',
     },
-    () => Promise.resolve('a-secret'),
+    (path) =>
+      Promise.resolve(
+        new Map([['/run/credentials/preview.service/github-app-key', stubAppKeyPEM]]).get(path) ??
+          'a-secret',
+      ),
   );
 
   expect(config.settings.contract).toStrictEqual({
@@ -173,7 +204,11 @@ test('it gives an SDK contract run ten minutes by default', async () => {
       PREVIEW_CONTRACT_REPOS: 'acme/greenhouse',
       PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
     },
-    () => Promise.resolve('a-secret'),
+    (path) =>
+      Promise.resolve(
+        new Map([['/run/credentials/preview.service/github-app-key', stubAppKeyPEM]]).get(path) ??
+          'a-secret',
+      ),
   );
 
   expect(config.settings.contract?.timeoutMs).toBe(600_000);

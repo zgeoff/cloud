@@ -1,5 +1,12 @@
 import { afterAll, afterEach } from 'bun:test';
-import { commitStatuses, composeFiles, issueComments, pullRequestFiles } from './github-state.ts';
+import {
+  commitStatuses,
+  composeFiles,
+  installationTokens,
+  issueComments,
+  pullRequestFiles,
+  uninstalledRepos,
+} from './github-state.ts';
 import { NativeWebSocket } from './native-web-socket.ts';
 import { server } from './node.ts';
 
@@ -21,9 +28,11 @@ afterEach(() => {
   server.resetHandlers();
   composeFiles.clear();
   pullRequestFiles.clear();
+  uninstalledRepos.clear();
 
   issueComments.length = 0;
   commitStatuses.length = 0;
+  installationTokens.length = 0;
 
   const unhandled = unhandledRequests.splice(0);
 

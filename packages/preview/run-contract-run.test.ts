@@ -9,6 +9,7 @@ import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
+import { stubApp } from './mocks/github-app.ts';
 import { commitStatuses } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { server } from './mocks/node.ts';
@@ -53,7 +54,7 @@ async function setupTest() {
     },
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
-    github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
+    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),

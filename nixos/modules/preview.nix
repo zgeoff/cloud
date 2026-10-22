@@ -1,7 +1,7 @@
 # The preview service (docs/architecture/workloads/preview.md): a tailnet link per pull request
 # to that pull request's code, running in its own imp. It listens twice: the link listener on
 # the tailnet, and the webhook listener that cloudflared's pod dials for GitHub's deliveries.
-# The unit starts only once its three secret files exist, so a switch before they are staged
+# The unit starts only once its four secret files exist, so a switch before they are staged
 # skips it instead of failing. The preview-image unit adds the image each preview imp boots to
 # impd, from a reference pinned by digest, so a switch never leaves the service without it.
 {
@@ -14,7 +14,8 @@ let
   cfg = config.services.preview;
   secretFiles = [
     cfg.webhookSecretFile
-    cfg.githubTokenFile
+    cfg.githubAppClientIDFile
+    cfg.githubAppKeyFile
     cfg.impTokenFile
   ];
 
@@ -64,7 +65,8 @@ in
       example = [ "acme/greenhouse" ];
       description = ''
         The repositories whose pull requests get previews, as owner/name, or owner/* for every
-        repository of an owner. A repository opts in with a preview/compose.yaml and a webhook.
+        repository of an owner. A listed repository opts in with a preview/compose.yaml and the
+        GitHub App's installation.
       '';
     };
 
@@ -174,12 +176,17 @@ in
 
     webhookSecretFile = lib.mkOption {
       type = lib.types.str;
-      description = "A root-only file holding the GitHub webhook's secret.";
+      description = "A root-only file holding the webhook secret of the GitHub App.";
     };
 
-    githubTokenFile = lib.mkOption {
+    githubAppClientIDFile = lib.mkOption {
       type = lib.types.str;
-      description = "A root-only file holding the GitHub token that reads preview/ and comments.";
+      description = "A root-only file holding the client ID of the GitHub App that reads preview/ and comments.";
+    };
+
+    githubAppKeyFile = lib.mkOption {
+      type = lib.types.str;
+      description = "A root-only file holding that GitHub App's private key, as GitHub's PEM.";
     };
 
     impTokenFile = lib.mkOption {
@@ -269,7 +276,8 @@ in
         StateDirectoryMode = "0700";
         LoadCredential = [
           "webhook-secret:${cfg.webhookSecretFile}"
-          "github-token:${cfg.githubTokenFile}"
+          "github-app-client-id:${cfg.githubAppClientIDFile}"
+          "github-app-key:${cfg.githubAppKeyFile}"
           "imp-token:${cfg.impTokenFile}"
         ];
         Restart = "on-failure";
