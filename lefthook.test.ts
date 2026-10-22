@@ -115,7 +115,7 @@ async function setupTest() {
     'test:scripts',
     'provider:check',
     'check:sdk',
-  ].map((name) => [name, `echo ${name} >> ${ranLog}`]);
+  ].map((name): [string, string] => [name, `echo ${name} >> ${ranLog}`]);
 
   writeFileSync(
     join(repo, 'package.json'),
