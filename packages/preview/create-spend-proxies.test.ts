@@ -432,3 +432,80 @@ test('it starts the proxy for a call that arrives during an idle stop only after
   expect(endedBefore).toStrictEqual([undefined, expect.toBeOneOf([0, 'SIGTERM'])]);
   expect(answer.status).toBe(200);
 });
+
+test('it removes the files of a proxy whose idle stop is under way only after it exits', async () => {
+  const ctx = await setupTest();
+
+  const io = buildSpendProxyIO();
+  const started: ReturnType<typeof io.runProxy>[] = [];
+
+  // records, as each file goes, how the proxy ended: its exit code, or the signal that stopped
+  // it, or null while it still runs
+  const endedBefore: (number | string | null | undefined)[] = [];
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    {
+      ...ctx.deps,
+      io: {
+        ...io,
+        removeFile: (path) => {
+          endedBefore.push(started[0]?.exitCode ?? started[0]?.signalCode);
+
+          return io.removeFile(path);
+        },
+        runProxy: (argv) => {
+          const child = io.runProxy(argv);
+
+          started.push(child);
+
+          return child;
+        },
+      },
+    },
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const first = await proxies.holdProxy('pv-0a1b2c3d-7');
+
+  first.release();
+
+  ctx.clock.now += 2_400_000;
+
+  // a stopped process holds its SIGTERM until it continues, so the idle stop stays under way
+  // while the preview closes
+  const oldPID = started[0]?.pid ?? 0;
+
+  process.kill(oldPID, 'SIGSTOP');
+
+  onTestFinished(() => {
+    started[0]?.kill('SIGCONT');
+  });
+
+  await waitForCondition(() => readProcessStatus(oldPID).stopped);
+
+  const sweeping = proxies.removeIdle();
+
+  await waitForCondition(() => readProcessStatus(oldPID).pendingSignals.includes('SIGTERM'));
+
+  const removing = proxies.removeProxy('pv-0a1b2c3d-7');
+
+  process.kill(oldPID, 'SIGCONT');
+
+  await Promise.all([sweeping, removing]);
+
+  expect(endedBefore).toStrictEqual([
+    expect.toBeOneOf([0, 'SIGTERM']),
+    expect.toBeOneOf([0, 'SIGTERM']),
+    expect.toBeOneOf([0, 'SIGTERM']),
+  ]);
+});

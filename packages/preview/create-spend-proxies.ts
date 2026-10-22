@@ -88,7 +88,13 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
 
     entries.delete(imp);
 
-    const stopped = killProxy(entry);
+    // a stop under way has already taken the entry, so a second stop waits for that one too
+    const earlier = stopping.get(imp);
+    const killed = killProxy(entry);
+
+    const stopped = (async () => {
+      await Promise.all([earlier, killed]);
+    })();
 
     stopping.set(imp, stopped);
 
