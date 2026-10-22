@@ -46,6 +46,14 @@ in
   };
   # how long the host has run an older system or imp than the latest green main build
   services.host-build-lag.enable = true;
+  # builds and checks the agent image of each commit on main that changes images/agent
+  # (docs/runbooks/agent-image.md). Its impd token sits on host-secrets, staged by the runbook;
+  # until it exists, the unit is skipped.
+  services.agent-image-build = {
+    enable = true;
+    impdURL = impdLoopbackURL;
+    impTokenFile = "/var/lib/tank-cloud/host-secrets/agent-image-build/imp-token";
+  };
   # each slice's and unit's CPU time, the root cgroup's, and the kernel's, as node-exporter
   # textfile metrics
   services.host-cgroup-cpu.enable = true;

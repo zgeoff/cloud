@@ -48,6 +48,9 @@ the VM's Secure Boot blocks, so Secure Boot stays off
 - **The cgroup CPU writer** is a service that writes the CPU time of the host's slices and units
   where node-exporter reads it
   ([host CPU by cgroup](../workloads/observability.md#host-cpu-by-cgroup)).
+- **The agent image build** is a timer that builds and checks the agent image of each commit on
+  `main` that changes it, with an impd token that never leaves the host
+  ([the agent image](../workloads/agent-image.md#build-and-check)).
 
 ## Build, then switch
 
