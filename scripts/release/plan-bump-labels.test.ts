@@ -32,10 +32,16 @@ test('it counts 0.9 to 1.0 as a major update', () => {
 });
 
 test('it prints each flag and holds its patch update for review', () => {
-  expect(planBumpLabels('2.3.1', ['2.3.0'], ['migrations'])).toStrictEqual([
+  expect(
+    planBumpLabels('2.3.1', ['2.3.0'], ['migrations', 'sandbox-images-changed']),
+  ).toStrictEqual(['update:patch', 'migrations', 'sandbox-images-changed', 'needs-review']);
+});
+
+test('it prints the changed sandbox images flag and lets its patch update merge on its own', () => {
+  expect(planBumpLabels('2.3.1', ['2.3.0'], ['sandbox-images-changed'])).toStrictEqual([
     'update:patch',
-    'migrations',
-    'needs-review',
+    'sandbox-images-changed',
+    'auto-merge',
   ]);
 });
 

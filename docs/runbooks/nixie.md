@@ -70,9 +70,10 @@ its secret leaves its role's sandbox unmade, and `imp_host` unready.
 ## Pin nixie's sandbox images
 
 nixie adds its sandbox images with its own token, which cannot pin an image. Delivery pins them with
-`impz image pin` as impd's root at each nixie release that adds sandbox images, so impd's image
-eviction never makes a sandbox create pull its image again. nixie adds an evicted image again before
-it creates a sandbox on it, so an image that misses its pin costs a pull, not a failed create.
+`impz image pin` as impd's root at each nixie release that adds sandbox images, which the release
+check labels `sandbox-images-changed` on its bump, so impd's image eviction never makes a sandbox
+create pull its image again. nixie adds an evicted image again before it creates a sandbox on it, so
+an image that misses its pin costs a pull, not a failed create.
 
 Once the release reports ready, pin each of its sandbox images by the name nixie gives it:
 

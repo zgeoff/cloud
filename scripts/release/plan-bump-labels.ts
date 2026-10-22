@@ -1,6 +1,9 @@
 import { isNewerVersion } from './is-newer-version.ts';
 import { parseReleaseVersion } from './parse-release-version.ts';
 
+// nixie adds its own sandbox images at start, and delivery pins them after the rollout
+const mergingFlags = new Set(['sandbox-images-changed']);
+
 export function planBumpLabels(
   version: string,
   pinned: readonly string[],
@@ -28,7 +31,9 @@ export function planBumpLabels(
 
   // from 1.0 on, patch and minor updates merge on their own; a 0.x minor release is the breaking one
   const review =
-    update === 'major' || (update === 'minor' && target.major === 0) || flags.length > 0;
+    update === 'major' ||
+    (update === 'minor' && target.major === 0) ||
+    flags.some((flag) => !mergingFlags.has(flag));
 
   return [`update:${update}`, ...flags, review ? 'needs-review' : 'auto-merge'];
 }
