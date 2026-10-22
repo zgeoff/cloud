@@ -29,6 +29,7 @@
         imp.nixosModules.imp
         ./modules/impd-local-health.nix
         ./modules/host-build-lag.nix
+        ./modules/agent-image-build.nix
         ./modules/host-cgroup-cpu.nix
         ./modules/drift-check.nix
         ./modules/atc-daemon.nix
@@ -96,6 +97,9 @@
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.host-build-lag = import ./checks/host-build-lag.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.agent-image-build = import ./checks/agent-image-build.nix {
         inherit nixpkgs imp;
       };
       checks.x86_64-linux.host-cgroup-cpu = import ./checks/host-cgroup-cpu.nix {

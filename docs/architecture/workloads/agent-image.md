@@ -38,6 +38,14 @@ to the imp host, and impd builds it into an image named after that commit. The s
 the new image in a fresh imp and removes a failed image unless told to keep it, so the host holds
 only images that passed.
 
+A timer on the host runs that script for the newest commit on `main` that changes the image, once
+impd holds no image of that commit's name, so a merged pin reaches an image without a person. The
+timer fetches the public repository with no credential. Its impd token can manage every imp, grant
+and image on the host, so it stays in a root-only file on the host and never reaches the public
+repository's CI. A failed build records its commit, and the timer skips that commit until an
+operator clears the record, so a broken commit is not built again at every run
+([the agent image runbook](../../runbooks/agent-image.md#the-hosts-build)).
+
 The check runs the same way in CI against a Docker build of the image, and on the host against a
 live imp. It compares each tool's version with its pin, checks that no login state exists and that
 no environment variable looks like a credential, and runs gitleaks over the whole filesystem with a

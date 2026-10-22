@@ -23,6 +23,7 @@ let
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
   stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubAgentImageBun = import ./test-utils/build-stub-agent-image-bun.nix { inherit pkgs; };
   stubOpRead = import ./test-utils/build-stub-op-read.nix { inherit pkgs; } {
     "op://vault/item/field" = "a value with spaces";
     "op://vault/item/other" = "other";
@@ -1402,6 +1403,114 @@ let
         assert_equals 97 "$status" "the exit status"
         assert_files_equal /dev/null out
         assert_equals "unexpected: exec imp-host impz info" "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker copies a file out of its container directory with its mode, and records the call";
+      script = ''
+        mkdir home tmp impd impd/container impd/container/usr impd/container/usr/local impd/container/usr/local/bin
+        printf '#!/bin/sh\necho stand-in\n' > impd/container/usr/local/bin/impz
+        chmod 0755 impd/container/usr/local/bin/impz
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_files_equal impd/container/usr/local/bin/impz impz
+        assert_equals 755 "$(stat -c %a impz)" "the copy's mode"
+        assert_equals "[\"cp\",\"imp-host:/usr/local/bin/impz\",\"$PWD/impz\"]" "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails a copy of a path its container directory lacks, as docker fails it";
+      script = ''
+        mkdir home tmp impd
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "Error response from daemon: Could not find the file /usr/local/bin/impz in container imp-host" "$(cat err)" "the error"
+        assert_missing impz "the copy"
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun prints its stdout file for a build, and records the build's argv, directory, impd settings and impz";
+      script = ''
+        mkdir home tmp build bin work
+        printf '#!/bin/sh\n' > bin/impz
+        chmod 0755 bin/impz
+        echo 'agent-0123abc imp-build-aa check passed' > build/stdout
+
+        root=$PWD
+        status=0
+        (cd work && env -i PATH="$root/bin:$PATH" HOME="$root/home" TMPDIR="$root/tmp" BUILD_STATE="$root/build" \
+          IMP_URL=http://127.0.0.1:7070 IMP_TOKEN=imp_fixture_token \
+          ${stubAgentImageBun} scripts/build-agent-image.ts 0123abcdef0123abcdef0123abcdef0123abcdef > "$root/out" 2> "$root/err") || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals 'agent-0123abc imp-build-aa check passed' "$(cat out)" "the printed result"
+        assert_files_equal /dev/null err
+        jq -S . > expected <<EOF
+        {
+          "argv": ["scripts/build-agent-image.ts", "0123abcdef0123abcdef0123abcdef0123abcdef"],
+          "cwd": "$PWD/work",
+          "impURL": "http://127.0.0.1:7070",
+          "impToken": "imp_fixture_token",
+          "impz": "$PWD/bin/impz"
+        }
+        EOF
+        jq -S . build/calls > actual
+        assert_files_equal expected actual
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun exits with its status file, and records a null impz when PATH holds none";
+      script = ''
+        mkdir home tmp build
+        echo 1 > build/status
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
+          ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_equals '{"impURL":null,"impToken":null,"impz":null}' "$(jq -c '{impURL, impToken, impz}' build/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun fails another call as unexpected, and records none";
+      script = ''
+        mkdir home tmp build
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
+          ${stubAgentImageBun} scripts/build-agent-image.ts --keep 0123abc > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: scripts/build-agent-image.ts --keep 0123abc" "$(cat err)" "the error"
+        assert_missing build/calls "the call log"
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun refuses to run without the build state directory";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
+
+        assert_equals 2 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "bun-answering-build-agent-image: set BUILD_STATE to the directory that holds the build's answer" "$(cat err)" "the error"
       '';
     }
     {

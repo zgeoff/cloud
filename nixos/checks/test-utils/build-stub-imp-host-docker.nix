@@ -1,5 +1,6 @@
-# A stand-in docker for the preview-image script (nixos/modules/preview-image.sh) and the host build
-# lag check (nixos/modules/host-build-lag.sh): it answers their impd calls through
+# A stand-in docker for the preview-image script (nixos/modules/preview-image.sh), the host build
+# lag check (nixos/modules/host-build-lag.sh) and the agent image build
+# (nixos/modules/agent-image-build.sh): it answers their impd calls through
 # `docker exec imp-host impz` from a state directory, $IMPD_STATE, and records each call's argv as
 # one JSON line in $IMPD_STATE/calls.
 #
@@ -10,7 +11,8 @@
 #   - unreachable, optional: a count of calls still to fail, each as docker fails an exec while
 #     the imp-host container does not exist, which the stand-in counts down;
 #   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
-#   - version, optional: the imp version that `impz info` prints.
+#   - version, optional: the imp version that `impz info` prints;
+#   - container, optional: a directory that stands for the imp-host container's filesystem.
 #
 # `exec imp-host impz image ls --json` prints images.json, pretty-printed. `exec imp-host impz
 # image add <ref> --name <name> --json` points <name> at <ref> in images.json, in place of any
@@ -18,6 +20,9 @@
 # <name>` pins the image of that name and prints nothing, or fails with "impz: NOT_FOUND: image <name> not
 # found" when images.json holds none. `exec imp-host impz info`, with a version file, prints
 # the first line of `impz info`, the version, its label padded to 12 characters, and no other line.
+# `cp imp-host:<path> <dest>` copies container/<path> to <dest> with its mode and prints nothing,
+# or fails with "Error response from daemon: Could not find the file <path> in container imp-host"
+# when container/<path> is not a file.
 # Any other call fails with "unexpected: <argv>" and status 97. Without $IMPD_STATE it exits 2.
 #
 # What it assumes of docker and impd, from zgeoff/impz at the flake's imp input
@@ -27,8 +32,10 @@
 # id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
 # `impz: <message>`, and exits 1; an add under a name that exists points the name at the new image
 # and keeps the name's pin (packages/daemon/src/platform/db/images.ts). docker prints "Error response from daemon: No such container: <name>" and exits 1 for an
-# exec in a container that does not exist. The id, digest, time and size the stand-in writes are
-# its own, not impd's. nixos/checks/test-utils-check.nix tests it.
+# exec in a container that does not exist, and "Error response from daemon: Could not find the file
+# <path> in container <name>" and exits 1 for a cp of a path the container lacks (moby's
+# daemon/errors.go). The id, digest, time and size the stand-in writes are its own, not impd's.
+# nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
 pkgs.lib.getExe (
   pkgs.writeShellApplication {
@@ -81,6 +88,15 @@ pkgs.lib.getExe (
         fi
         jq --arg name "$6" 'map(if .name == $name then .pinned = true else . end)' "$IMPD_STATE/images.json" > "$IMPD_STATE/images.json.new"
         mv "$IMPD_STATE/images.json.new" "$IMPD_STATE/images.json"
+        exit 0
+      fi
+      if [ "$#" -eq 3 ] && [ "$1" = cp ] && [ "''${2#imp-host:/}" != "$2" ]; then
+        path="''${2#imp-host:}"
+        if [ ! -f "$IMPD_STATE/container$path" ]; then
+          echo "Error response from daemon: Could not find the file $path in container imp-host" >&2
+          exit 1
+        fi
+        cp --preserve=mode "$IMPD_STATE/container$path" "$3"
         exit 0
       fi
       echo "unexpected: $*" >&2

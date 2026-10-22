@@ -70,6 +70,11 @@ session. If an organization policy reaches the imp's sessions, that policy needs
 
 ## Build
 
+The host builds each image itself, as [The host's build](#the-hosts-build) describes: once a commit
+that changes `images/agent` lands on `main`, the `agent-image-build` timer runs the build script for
+that commit. Run the script yourself only to build another commit, or to build again after a failed
+build.
+
 Build and check in one command, from any zgeoff/cloud clone, on a machine whose `impz` CLI calls the
 geoffcloud host. The token needs `manage` scope with no imp patterns.
 
@@ -77,6 +82,9 @@ geoffcloud host. The token needs `manage` scope with no imp patterns.
 bun scripts/build-agent-image.ts            # origin/main's head, after a fetch
 bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 ```
+
+Name the commit that changed `images/agent`, as the timer does, so a build by hand and the timer
+make the same image name.
 
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
@@ -90,6 +98,41 @@ imp name that already exists.
 `impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
 build afterwards, so read `impz image ls` before a retry.
+
+## The host's build
+
+The `agent-image-build` timer on geoffcloud fetches `main` of the public zgeoff/cloud repository
+without a credential, into a clone under `/var/lib/agent-image-build`. It takes the newest commit on
+`main` that changes `images/agent`, and runs the build script for that commit when impd holds no
+image of its name. It copies `impz` out of the imp-host container for each build, so the CLI matches
+the impd it calls. The build's token is a `manage` token with no imp patterns, so it controls every
+imp, grant and image on the host. It lives in a root-only file on the host's encrypted secrets
+dataset, and never in a GitHub secret.
+
+Until the token file exists, systemd skips the unit. To stage the token, run this once from a
+machine that reaches the host:
+
+```bash
+ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/agent-image-build && docker exec imp-host impz token new agent-image-build --scope manage | (umask 377 && cat > /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token) && test -s /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token && echo ok' < /dev/null
+```
+
+Expect `ok`. impz prints the token on its stdout, which goes straight into the file with mode 0400,
+so the token never appears in a command line or the journal. To replace the token, remove the old
+one with `docker exec imp-host impz token rm agent-image-build` and run the command again.
+
+Each run writes its decision to the unit's journal, which Alloy ships to Loki, on a line that starts
+with `agent-image-build:`. A build adds the build script's progress, and its last line repeats the
+script's result line:
+
+```bash
+ssh root@geoffcloud journalctl -u agent-image-build --since -1d | grep 'agent-image-build:'
+```
+
+Expect `agent-image-build: agent-<short sha> <digest> check passed` after a pin merges. A failed
+build fails the unit and records its time in `/var/lib/agent-image-build/failed/<sha>`, and later
+runs skip that commit, so a broken commit is built once. Read the build's output in the journal, fix
+the cause, then remove that file: the next run builds the commit again. A failure before the build,
+such as an imp-host that does not answer, records nothing, and the next run tries again.
 
 ## Check
 
@@ -161,14 +204,15 @@ next wake. Restart the daemon when few imps are live, so few wakes pay for it.
 Run these steps on the machine that runs the daemon, after the pin pull request merges. `$VERSION`
 is the release, such as `4.5.0`.
 
-1. Build and check the image from `main`'s head:
+1. Wait for the host to build and check the image of the pin's commit, as
+   [The host's build](#the-hosts-build) describes:
 
    ```bash
-   bun scripts/build-agent-image.ts
+   ssh root@geoffcloud journalctl -u agent-image-build --since -2h | grep 'check passed'
    ```
 
-   Expect its last line to read `agent-<short sha> <digest> check passed`. Record that line on the
-   pin pull request.
+   Expect `agent-image-build: agent-<short sha> <digest> check passed`, where `<short sha>` is the
+   pin's commit on `main`. Record that line on the pin pull request.
 
 2. Check that the image's commit pins the release:
 
@@ -246,7 +290,8 @@ entry.
    above its pin.
 2. Open a PR. CI's `checks` job runs `bun run test:agent-image` on every change to the image or its
    check; run it locally first to find a failure sooner.
-3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
+3. After the PR merges, wait for the host's build line in the journal
+   ([The host's build](#the-hosts-build)), and record it on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
    `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses. The build
