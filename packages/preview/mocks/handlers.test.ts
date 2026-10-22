@@ -330,7 +330,7 @@ test('it refuses an edit without a body with 422', async () => {
   expect(response.status).toBe(422);
 });
 
-test("it refuses an edit of another user's comment with 403", async () => {
+test("it edits the App's bot's own comment", async () => {
   installationTokens.push({
     token: 'ghs_greenhouse',
     repos: ['acme/greenhouse'],
@@ -339,7 +339,40 @@ test("it refuses an edit of another user's comment with 403", async () => {
 
   issueComments.push({
     id: 1,
-    author: 'fern-reviewer',
+    author: 'acme-previews[bot]',
+    repo: 'acme/greenhouse',
+    number: 17,
+    body: 'a preview link',
+  });
+
+  const response = await fetch(`${githubAPIURL}/repos/acme/greenhouse/issues/comments/1`, {
+    method: 'PATCH',
+    headers: { authorization: 'Bearer ghs_greenhouse' },
+    body: JSON.stringify({ body: 'hello' }),
+  });
+
+  expect(response.status).toBe(200);
+  expect(issueComments.at(0)?.body).toBe('hello');
+});
+
+test.each([
+  ['another user', 'fern-reviewer'],
+  ['an empty login', ''],
+  ['a case variant of the bot', 'Acme-Previews[bot]'],
+  ['an upper-case variant of the bot', 'ACME-PREVIEWS[BOT]'],
+  ['the slug without the bot suffix', 'acme-previews'],
+  ['another bot with the same slug stem', 'acme-previews-staging[bot]'],
+  ['the bot with a suffix after it', 'acme-previews[bot]x'],
+])('it refuses an edit of a comment by %s with 403', async (_label, author) => {
+  installationTokens.push({
+    token: 'ghs_greenhouse',
+    repos: ['acme/greenhouse'],
+    expiresAt: new Date(Date.now() + 3_600_000),
+  });
+
+  issueComments.push({
+    id: 1,
+    author,
     repo: 'acme/greenhouse',
     number: 17,
     body: 'a review note',
