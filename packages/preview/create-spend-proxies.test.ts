@@ -322,3 +322,33 @@ test('it keeps a proxy that holds a call past the idle time', async () => {
 
   expect(answer.status).toBe(200);
 });
+
+test('it keeps a proxy that a call asked for before an idle sweep, while its start is still under way', async () => {
+  const ctx = await setupTest();
+
+  const proxies = createSpendProxies(
+    {
+      proxyPath: ctx.stubPath,
+      directory: join(ctx.directory, 'spend'),
+      upstream: 'https://models.example.test',
+      model: 'model-small',
+      prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+      limitDollars: 2,
+      idleMs: 1_800_000,
+    },
+    ctx.deps,
+  );
+
+  onTestFinished(() => proxies.removeAll());
+
+  const holding = proxies.holdProxy('pv-0a1b2c3d-7');
+
+  ctx.clock.now += 2_400_000;
+
+  await proxies.removeIdle();
+
+  const hold = await holding;
+  const answer = await fetch(`${hold.origin}/pv-0a1b2c3d-7/v1/models`);
+
+  expect(answer.status).toBe(200);
+});

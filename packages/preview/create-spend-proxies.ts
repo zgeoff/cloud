@@ -32,64 +32,89 @@ export interface SpendProxyDeps {
 interface RunningProxy {
   readonly process: Subprocess<'ignore', 'pipe', 'inherit'>;
   readonly origin: string;
-  lastUsedMs: number;
+}
+
+// One entry per imp, which a hold counts on before it waits for the start, so the idle sweep
+// sees every call that has asked for the proxy, started or not.
+interface ProxyEntry {
+  pending: Promise<RunningProxy>;
   holds: number;
+  lastUsedMs: number;
 }
 
 export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps): SpendProxies {
   mkdirSync(settings.directory, { recursive: true, mode: 0o700 });
 
-  // a start in flight is shared, so two requests at once start one proxy
-  const proxies = new Map<string, Promise<RunningProxy>>();
+  const entries = new Map<string, ProxyEntry>();
+
+  const readEntry = (imp: string): ProxyEntry => {
+    const existing = entries.get(imp);
+
+    if (existing !== undefined) {
+      return existing;
+    }
+
+    const entry = {
+      pending: startProxy(settings, deps, imp),
+      holds: 0,
+      lastUsedMs: deps.now().getTime(),
+    };
+
+    entries.set(imp, entry);
+
+    return entry;
+  };
 
   const stopProxy = async (imp: string): Promise<void> => {
-    const pending = proxies.get(imp);
+    const entry = entries.get(imp);
 
-    proxies.delete(imp);
+    entries.delete(imp);
 
-    const running = await pending?.catch(() => null);
+    const running = await entry?.pending.catch(() => null);
 
     running?.process.kill();
 
     await running?.process.exited;
   };
 
-  const readRunning = async (imp: string): Promise<RunningProxy> => {
-    const pending = proxies.get(imp) ?? startProxy(settings, deps, imp);
-
-    proxies.set(imp, pending);
-
-    // two calls can wait on one start, so only the first to see it fail or exit drops it, and the
-    // other takes the start that replaced it
-    const dropPending = () => {
-      if (proxies.get(imp) === pending) {
-        proxies.delete(imp);
-      }
-    };
+  const readRunning = async (imp: string, entry: ProxyEntry): Promise<RunningProxy> => {
+    const pending = entry.pending;
 
     try {
       const running = await pending;
 
-      // a proxy that exited on its own starts again, from the count it left on disk
+      // A proxy that exited on its own starts again, from the count it left on disk. Calls that
+      // wait on one start share the start that replaces it.
       if (running.process.exitCode !== null || running.process.signalCode !== null) {
-        dropPending();
+        if (entry.pending === pending) {
+          entry.pending = startProxy(settings, deps, imp);
+        }
 
-        return await readRunning(imp);
+        return await readRunning(imp, entry);
       }
 
       return running;
     } catch (error) {
-      dropPending();
+      if (entries.get(imp) === entry && entry.pending === pending) {
+        entries.delete(imp);
+      }
+
       throw error;
     }
   };
 
   return {
     holdProxy: async (imp) => {
-      const running = await readRunning(imp);
+      const entry = readEntry(imp);
 
-      running.lastUsedMs = deps.now().getTime();
-      running.holds += 1;
+      entry.holds += 1;
+
+      const running = await readRunning(imp, entry).catch((error: unknown) => {
+        entry.holds -= 1;
+        throw error;
+      });
+
+      entry.lastUsedMs = deps.now().getTime();
 
       let released = false;
 
@@ -101,8 +126,8 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
           }
 
           released = true;
-          running.holds -= 1;
-          running.lastUsedMs = deps.now().getTime();
+          entry.holds -= 1;
+          entry.lastUsedMs = deps.now().getTime();
         },
       };
     },
@@ -119,26 +144,27 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
       const cutoffMs = deps.now().getTime() - settings.idleMs;
 
       const settled = await Promise.all(
-        [...proxies].map(async ([imp, pending]) => ({
+        [...entries].map(async ([imp, entry]) => ({
           imp,
-          pending,
-          running: await pending.catch(() => null),
+          entry,
+          running: await entry.pending.catch(() => null),
         })),
       );
 
-      // a proxy that replaced the one this sweep read is left for the next sweep
+      // the check and the stop run with no wait between them, so a hold taken after the check
+      // finds the entry gone and starts a proxy of its own
       const idle = settled.filter(
-        (entry) =>
-          proxies.get(entry.imp) === entry.pending &&
-          entry.running !== null &&
-          entry.running.holds === 0 &&
-          entry.running.lastUsedMs < cutoffMs,
+        (each) =>
+          entries.get(each.imp) === each.entry &&
+          each.running !== null &&
+          each.entry.holds === 0 &&
+          each.entry.lastUsedMs < cutoffMs,
       );
 
-      await Promise.all(idle.map((entry) => stopProxy(entry.imp)));
+      await Promise.all(idle.map((each) => stopProxy(each.imp)));
     },
     removeAll: async () => {
-      await Promise.all([...proxies.keys()].map((imp) => stopProxy(imp)));
+      await Promise.all([...entries.keys()].map((imp) => stopProxy(imp)));
     },
   };
 }
@@ -188,12 +214,7 @@ async function startProxy(
   void logLines(lines, imp, deps);
   void logExit(child, imp, deps);
 
-  return {
-    process: child,
-    origin: `http://127.0.0.1:${port}`,
-    lastUsedMs: deps.now().getTime(),
-    holds: 0,
-  };
+  return { process: child, origin: `http://127.0.0.1:${port}` };
 }
 
 function buildProxyPaths(
