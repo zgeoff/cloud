@@ -1,22 +1,33 @@
-# cloud
+<div align="center">
+  <h1>cloud</h1>
 
-**cloud** is the infrastructure for `geoff.cloud`, a private cloud on a tailnet.
+  <p>
+    <a href="https://github.com/zgeoff/cloud/actions/workflows/ci.yml"><img src="https://github.com/zgeoff/cloud/actions/workflows/ci.yml/badge.svg" alt="CI workflow status"></a>
+    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license"></a>
+  </p>
 
-One Onidel VM runs NixOS, k3s and [imp](https://github.com/zgeoff/impz), and hosts coding agents:
-[atc](https://github.com/zgeoff/atc) runs each session in its own imp, and assistants reach atc
-through one public endpoint. Pulumi manages the cloud resources and the cluster, and a NixOS flake
-manages the host.
+  <p>
+    <a href="./docs/README.md">Documentation</a> •
+    <a href="./docs/architecture/overview.md">Architecture overview</a> •
+    <a href="./docs/runbooks/development.md">Development setup</a>
+  </p>
+</div>
+
+The infrastructure for `geoff.cloud`, a private cloud on a tailnet.
+
+One Onidel VM runs NixOS, k3s and [imp](https://github.com/zgeoff/impz), and hosts coding agents
+that [atc](https://github.com/zgeoff/atc) runs, each session in its own imp. Pulumi manages the
+cloud resources and the cluster, and a NixOS flake manages the host.
 
 ## Quick start
+
+Set up the tools and secrets that the development setup lists, then run:
 
 ```bash
 bun install
 bun run sdk:build
 bun run preview   # changes nothing; needs the tailnet and the 1Password `cloud` vault
 ```
-
-The [development runbook](./docs/runbooks/development.md) covers the tools and secrets you need
-first.
 
 ## Checks
 
@@ -28,22 +39,16 @@ bun run test
 bun run test:scripts
 ```
 
-CI runs these plus the type-aware lint, gitleaks, the Go checks, and the shell, Nix, Python and
-Actions linters (`bun run lint:sh`, `lint:nix`, `lint:py`, `lint:actions`), which run their pinned
-tools in Docker. A change to Markdown files only skips `test:scripts` and those four linters, which
-take most of the job's time and read no Markdown. The Docker suites, such as the agent image check
-and the backup fixtures, run in the same job only when a change touches their inputs. The NixOS
-checks run nightly and gate the host switch.
+CI runs these plus the type-aware lint, gitleaks, the Go checks and the Docker-based linters. The
+NixOS checks run nightly and gate the host switch.
 
 ## Layout
 
-- `infra/`: the Pulumi program
+- `infra/`, `nixos/`: the Pulumi program and the host flake
 - `provider/`, `sdk/onidel/`: the Onidel Pulumi provider and its generated SDK
-- `nixos/`: the host flake
-- `packages/topology/`: the constants that the host, infra, scripts and images share
-- `images/agent/`: the image agent sessions run on
-- `images/atc-gateway/`: the atc gateway's images
-- `workers/health-check/`: the external health-check Worker, its own package
+- `packages/`: the shared topology constants and the preview and files services
+- `images/`, `deploy/`: the container images and the cluster's workload manifests
+- `workers/`: the external health-check Worker
 - `scripts/`: repo and host tooling
 
 ## Documentation
