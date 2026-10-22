@@ -1,0 +1,19 @@
+# A proxy config that nixie's counting proxy accepts, copied at nixie commit 8a1018c: its proxy
+# config schema in apps/counting-proxy parses this file as it stands. Bump the commit here, and the
+# pinned field list in counting-proxy-config-schema.test.ts, when nixie's schema changes.
+listen:
+  hostname: 127.0.0.1
+  port: 0
+store: /var/lib/preview/spend/pv-0a1b2c3d-7.count.json
+limits:
+  dollars: 2
+routes:
+  pv-0a1b2c3d-7:
+    upstream: https://models.example.test
+    model: model-small
+    prices:
+      input: 1
+      cache_write: 1.25
+      cache_write_1h: 2
+      cached_input: 0.1
+      output: 5
