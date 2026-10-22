@@ -178,18 +178,21 @@ async function sendGitHubRequest(
     throw new GitHubRequestError(
       `GitHub ${method} ${request.path}: HTTP ${response.status}${refusal}`,
       response.status,
-      isPermanentRefusal(response),
+      isPermanentRefusal(response, refusal),
     );
   }
 
   return response;
 }
 
-// GitHub answers a rate limit with a 403 or a 429 that sets x-ratelimit-remaining to 0 or sends
-// retry-after (docs.github.com/en/rest: using-the-rest-api/rate-limits-for-the-rest-api)
-function isPermanentRefusal(response: Response): boolean {
+// GitHub answers a rate limit with a 403 or a 429 that sets x-ratelimit-remaining to 0, sends
+// retry-after, or only says so in its message, as a secondary limit can
+// (docs.github.com/en/rest: using-the-rest-api/rate-limits-for-the-rest-api)
+function isPermanentRefusal(response: Response, refusal: string): boolean {
   const rateLimited =
-    response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after');
+    response.headers.get('x-ratelimit-remaining') === '0' ||
+    response.headers.has('retry-after') ||
+    /rate limit/iu.test(refusal);
 
   return (
     response.status >= 400 &&
