@@ -736,12 +736,16 @@ let
         ./build-github-client.ts
         ./build-imp-name.ts
         ./build-impd-client.ts
+        ./build-spend-proxy-io.ts
+        ./counting-proxy-config-schema.ts
         ./create-preview-store.ts
+        ./create-spend-proxies.ts
         ./has-sdk-pin-change.ts
         ./load-preview-config.ts
         ./main.ts
         ./make-link-handler.ts
         ./make-slot-lock.ts
+        ./make-spend-handler.ts
         ./make-webhook-handler.ts
         ./parse-preview-contract.ts
         ./parse-pull-request-event.ts
@@ -779,7 +783,7 @@ let
 
         HOME="$PWD" ${pkgs.bun}/bin/bun --no-install run load.ts > out 2> err
 
-        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant runCommand" "$(cat out)" "the client's calls"
+        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant installPathGrant runCommand" "$(cat out)" "the client's calls"
         assert_equals "" "$(cat err)" "bun's errors"
       '';
     }
