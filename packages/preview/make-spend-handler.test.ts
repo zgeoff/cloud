@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -317,4 +317,47 @@ test('it refuses a preview model call with a 503 when its proxy cannot start', a
     type: 'error',
     error: { type: 'api_error', message: 'the preview service could not start the counting proxy' },
   });
+});
+
+test('it answers a 502 and releases its hold when the started proxy refuses the call', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 7,
+    imp: 'pv-0a1b2c3d-7',
+    headSHA: 'c0ffee1',
+  });
+
+  const release = mock(() => {});
+
+  const handler = makeSpendHandler({
+    store: ctx.store,
+    proxies: {
+      holdProxy: () => Promise.resolve({ origin: 'http://127.0.0.1:1', release }),
+      removeProxy: () => Promise.resolve(),
+      removeIdle: () => Promise.resolve(),
+      removeAll: () => Promise.resolve(),
+    },
+    sendRequest: fetch,
+    log: () => {},
+  });
+
+  const response = await handler(
+    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+      method: 'POST',
+      body: '{"model":"model-small"}',
+    }),
+  );
+
+  const body: unknown = await response.json();
+
+  expect(response.status).toBe(502);
+
+  expect(body).toStrictEqual({
+    type: 'error',
+    error: { type: 'api_error', message: 'the counting proxy did not answer' },
+  });
+
+  expect(release).toHaveBeenCalledOnce();
 });
