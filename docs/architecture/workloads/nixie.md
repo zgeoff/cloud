@@ -105,6 +105,13 @@ health probe's grant changes, and [the tailnet](../network/tailnet.md#identities
 two grants combine. impd delivers each tool call from an imp back over nixie's own connection, so
 the pod opens no inbound port for its tools.
 
+The grant belongs to the host's node, so an egress NetworkPolicy decides which pod in nixie's
+namespace may use it. nixie's pod alone reaches impd's node, on HTTPS only. The namespace's deny
+refuses the tailnet range to every other pod there, among them the web client, the backup and
+restore jobs, and the restore test's nixie, which carries no label of nixie's own. Traefik's
+namespace holds the same deny
+([which pod uses each grant](../network/tailnet.md#which-pod-uses-each-grant)).
+
 nixie's impd token can manage only imps whose names carry nixie's prefix, grant only nixie's model
 secret to them, and add images from nixie's registry path under names with nixie's prefix. nixie's
 start adds each sandbox image of its release under the name it derives from the image's kind and the

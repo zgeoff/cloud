@@ -74,9 +74,9 @@ reach impd's plain-HTTP API and imp-host's other listeners without the tailnet g
 forward chain accepts the pods' traffic, and kube-router accepts traffic that its network policies
 allow with a mark in iptables' forward chain, before Docker's isolation drop runs. The drop in this
 repo's table is final whatever those chains accept, because a drop in any base chain is final. The
-host loads it with the rest of its firewall, so it holds before kube-router programs a new pod.
-Every pod reaches impd at its tailnet name instead, and the Connect relay takes traffic from
-Docker's bridge to the host itself, so neither path crosses the drop.
+host loads it with the rest of its firewall, so it holds before kube-router programs a new pod. A
+pod that a NetworkPolicy lets use impd reaches it at its tailnet name instead, and the Connect relay
+takes traffic from Docker's bridge to the host itself, so neither path crosses the drop.
 
 ### imp's tables
 

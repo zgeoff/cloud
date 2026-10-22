@@ -74,23 +74,23 @@ and mints the host's and impd's auth keys with it.
 ## Which pod uses each grant
 
 Kubernetes NetworkPolicies, which Pulumi creates beside the workloads, decide which pod on the host
-uses each `tag:cloud` grant and each port on the host's tailnet address. Every namespace but nixie's
-holds a deny that refuses its pods the tailnet range and Docker's subnet, and leaves every other
-address open, because a pod reaches the Kubernetes API on the host's public address. An allow beside
-each workload selects its pods by label and gives them back one address and port per destination.
+uses each `tag:cloud` grant and each port on the host's tailnet address. Every namespace holds a
+deny that refuses its pods the tailnet range and Docker's subnet, and leaves every other address
+open, because a pod reaches the Kubernetes API on the host's public address. An allow beside each
+workload selects its pods by label and gives them back one address and port per destination.
 
 | Destination                                          | Through                    | Pods that may reach it                |
 | ---------------------------------------------------- | -------------------------- | ------------------------------------- |
 | the host's atc daemon, on the host's tailnet address | local delivery on the host | the atc gateway, the atc daemon probe |
 | the PC's atc daemon                                  | the grant to the PC        | the atc gateway, the atc daemon probe |
-| impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pods    |
+| impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pod     |
 | the preview webhook, on the host's tailnet address   | local delivery on the host | cloudflared                           |
-| the preview links, on the host's tailnet address     | local delivery on the host | nixie's pods                          |
+| the preview links, on the host's tailnet address     | local delivery on the host | none                                  |
 | impd's plain API on Docker's subnet                  | the host's Docker bridge   | none                                  |
 
-The host's own forward rule drops every pod's traffic to Docker's subnet, nixie's pods included,
-beside the deny ([firewalls](./firewalls.md)). A pod on the host's network, such as the node
-exporter, sends from the host's own addresses, so no NetworkPolicy applies to it.
+The host's own forward rule drops every pod's traffic to Docker's subnet beside the deny
+([firewalls](./firewalls.md)). A pod on the host's network, such as the node exporter, sends from
+the host's own addresses, so no NetworkPolicy applies to it.
 
 kube-router, the policy engine inside k3s, filters a pod's packets before the host masquerades them
 to its own address, so a policy sees which pod sent each packet on the tailnet and on the host's own

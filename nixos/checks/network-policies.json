@@ -172,6 +172,30 @@
     "kind": "NetworkPolicy",
     "metadata": {
       "name": "egress-deny",
+      "namespace": "nixie"
+    },
+    "spec": {
+      "podSelector": {},
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "0.0.0.0/0",
+                "except": ["100.64.0.0/10", "172.17.0.0/16"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "egress-deny",
       "namespace": "nixie-ingress"
     },
     "spec": {
@@ -346,6 +370,39 @@
       "podSelector": {
         "matchLabels": {
           "app": "imp-health-probe"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.75.9.119/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 443
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
+      "name": "nixie-egress",
+      "namespace": "nixie"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "nixie"
         }
       },
       "policyTypes": ["Egress"],

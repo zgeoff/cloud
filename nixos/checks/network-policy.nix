@@ -135,11 +135,26 @@ let
       name = "stranger";
       labels = { };
     }
-    # nixie has no deny yet, so its pod shows each path open beside the refusals
     {
       namespace = "nixie";
-      name = "control";
-      labels.role = "web";
+      name = "nixie";
+      labels.app = "nixie";
+    }
+    {
+      namespace = "nixie";
+      name = "web";
+      labels.app = "nixie-web";
+    }
+    # the backup and restore jobs carry no label that an allow selects
+    {
+      namespace = "nixie";
+      name = "stranger";
+      labels = { };
+    }
+    {
+      namespace = "nixie-ingress";
+      name = "traefik";
+      labels."app.kubernetes.io/name" = "traefik";
     }
   ];
 
@@ -188,7 +203,7 @@ let
               namespace = "nixie";
             };
             spec = {
-              selector.role = "web";
+              selector.app = "nixie-web";
               ports = [ { port = 8080; } ];
             };
           }
@@ -306,7 +321,7 @@ pkgs.testers.runNixOSTest {
     stand_ins = json.loads('${builtins.toJSON standIns}')
     pods = ["atc/gateway", "atc/stranger", "observability/daemon-probe", "observability/imp-probe",
             "observability/stranger", "ingress/cloudflared", "ingress/stranger", "kube-system/stranger",
-            "default/stranger", "nixie/control"]
+            "default/stranger", "nixie/nixie", "nixie/web", "nixie/stranger", "nixie-ingress/traefik"]
 
 
     def dial(pod, url):
@@ -361,12 +376,10 @@ pkgs.testers.runNixOSTest {
     with subtest("it lets each allowed pod reach only its own addresses and ports, and refuses every other pod in a namespace with the deny"):
         machine.succeed("kubectl apply -f ${policyList}")
         expected = expect_reach({
-            "host-daemon": {"atc/gateway", "observability/daemon-probe", "nixie/control"},
-            "home-pc-daemon": {"atc/gateway", "observability/daemon-probe", "nixie/control"},
-            "impd": {"observability/imp-probe", "nixie/control"},
-            "preview-webhook": {"ingress/cloudflared", "nixie/control"},
-            "preview-link": {"nixie/control"},
-            "impd-docker-api": {"nixie/control"},
+            "host-daemon": {"atc/gateway", "observability/daemon-probe"},
+            "home-pc-daemon": {"atc/gateway", "observability/daemon-probe"},
+            "impd": {"observability/imp-probe", "nixie/nixie"},
+            "preview-webhook": {"ingress/cloudflared"},
         })
         observed = {}
 
@@ -382,8 +395,8 @@ pkgs.testers.runNixOSTest {
 
 
     with subtest("it keeps pod-to-pod traffic, DNS through CoreDNS and the Kubernetes API for a pod under the deny"):
-        control_ip = machine.succeed("kubectl get pod -n nixie control -o jsonpath='{.status.podIP}'").strip()
-        by_address = dial("atc/stranger", f"http://{control_ip}:8080/")
+        web_ip = machine.succeed("kubectl get pod -n nixie web -o jsonpath='{.status.podIP}'").strip()
+        by_address = dial("atc/stranger", f"http://{web_ip}:8080/")
         by_name = dial("atc/stranger", "http://web.nixie.svc.cluster.local:8080/")
         token = "$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
         ca = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
