@@ -3,6 +3,7 @@ import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
+import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { server as mockServer } from './mocks/node.ts';
 import { waitForCondition } from './test-utils/wait-for-condition.ts';
@@ -28,6 +29,7 @@ async function setupTest() {
       log: (line: string) => {
         lines.push(line);
       },
+      io: buildSpendProxyIO(),
     },
   };
 }

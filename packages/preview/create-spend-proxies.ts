@@ -1,8 +1,6 @@
-import { mkdirSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Subprocess } from 'bun';
 import { z } from 'zod';
+import type { ProxyProcess, SpendProxyIO } from './build-spend-proxy-io.ts';
 import { countingProxyConfigSchema } from './counting-proxy-config-schema.ts';
 import type { SpendSettings } from './types.ts';
 
@@ -28,10 +26,11 @@ export interface SpendProxies {
 export interface SpendProxyDeps {
   readonly now: () => Date;
   readonly log: (line: string) => void;
+  readonly io: SpendProxyIO;
 }
 
 interface RunningProxy {
-  readonly process: Subprocess<'ignore', 'pipe', 'inherit'>;
+  readonly process: ProxyProcess;
   readonly origin: string;
 }
 
@@ -44,7 +43,7 @@ interface ProxyEntry {
 }
 
 export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps): SpendProxies {
-  mkdirSync(settings.directory, { recursive: true, mode: 0o700 });
+  deps.io.createDirectory(settings.directory);
 
   const entries = new Map<string, ProxyEntry>();
 
@@ -138,7 +137,7 @@ export function createSpendProxies(settings: SpendSettings, deps: SpendProxyDeps
       const paths = buildProxyPaths(settings, imp);
 
       await Promise.all(
-        [paths.config, paths.store, `${paths.store}.part`].map((path) => rm(path, { force: true })),
+        [paths.config, paths.store, `${paths.store}.part`].map((path) => deps.io.removeFile(path)),
       );
     },
     removeIdle: async () => {
@@ -189,14 +188,9 @@ async function startProxy(
     },
   });
 
-  await Bun.write(paths.config, JSON.stringify(config));
+  await deps.io.writeFile(paths.config, JSON.stringify(config));
 
-  const child = Bun.spawn([settings.proxyPath, '--config', paths.config], {
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'inherit',
-  });
-
+  const child = deps.io.runProxy([settings.proxyPath, '--config', paths.config]);
   const lines = readLines(child.stdout);
   const timeout = AbortSignal.timeout(startTimeoutMs);
 
@@ -293,11 +287,7 @@ async function logLines(
   }
 }
 
-async function logExit(
-  child: Subprocess<'ignore', 'pipe', 'inherit'>,
-  imp: string,
-  deps: SpendProxyDeps,
-): Promise<void> {
+async function logExit(child: ProxyProcess, imp: string, deps: SpendProxyDeps): Promise<void> {
   const code = await child.exited;
 
   deps.log(`${imp}: the counting proxy exited ${String(code)}`);

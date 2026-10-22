@@ -3,6 +3,7 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { http, passthrough } from 'msw';
+import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import { makeSpendHandler } from './make-spend-handler.ts';
@@ -37,6 +38,7 @@ async function setupTest() {
       log: (line: string) => {
         lines.push(line);
       },
+      io: buildSpendProxyIO(),
     },
   };
 }

@@ -1,5 +1,6 @@
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
+import { buildSpendProxyIO } from './build-spend-proxy-io.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { createSpendProxies } from './create-spend-proxies.ts';
 import type { PreviewConfig } from './load-preview-config.ts';
@@ -23,7 +24,11 @@ export function startPreviewService(config: PreviewConfig): { readonly stop: () 
   const spendProxies =
     config.spend === null
       ? null
-      : createSpendProxies(config.spend.settings, { now: readNow, log: writeLog });
+      : createSpendProxies(config.spend.settings, {
+          now: readNow,
+          log: writeLog,
+          io: buildSpendProxyIO(),
+        });
 
   const deps: PreviewDeps = {
     settings: config.settings,
