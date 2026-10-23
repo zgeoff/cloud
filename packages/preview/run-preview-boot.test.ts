@@ -15,9 +15,13 @@ import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), 'preview-boot-'));
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
   const store = createPreviewStore(join(directory, 'previews.sqlite'));
 
@@ -66,7 +70,7 @@ async function setupTest() {
     log: () => {},
   };
 
-  return { deps, store, impd };
+  return { deps, store, impd, directory, stack };
 }
 
 test('it creates the imp with the contract port and the grant, then builds and probes the head commit', async () => {
@@ -124,6 +128,7 @@ test('it creates the imp with the contract port and the grant, then builds and p
         'acme/greenhouse',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         '',
+        '/srv/preview',
       ],
       require: ['broker'],
     },
@@ -168,7 +173,7 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
         '-c',
         expect.toInclude(
           [
-            'cd preview',
+            'mv .env.part .env',
             'if [ -f compose.broker.yaml ]; then',
             `  export BROKER_CA_FILE="\${SSL_CERT_FILE:?the broker's CA bundle did not reach the boot}"`,
             '  docker compose -f compose.yaml -f compose.broker.yaml up --detach --build --wait',
@@ -181,6 +186,7 @@ test("it starts the stack with compose.yaml and compose.broker.yaml, with the br
         'acme/greenhouse',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         '',
+        '/srv/preview',
       ],
       require: ['broker'],
     },
@@ -275,9 +281,352 @@ test('it grants the model secret for the preview own route only, and passes the 
         'acme/greenhouse',
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         'pv-0a1b2c3d-17',
+        '/srv/preview',
       ],
     },
   ]);
+});
+
+test('it swaps the uncounted model grant of an imp that booted before the counting proxies for the counted one, which impd refuses beside it', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh', 'preview-model'],
+  });
+
+  ctx.impd.secretHosts.set('preview-model', 'api.anthropic.com');
+  ctx.impd.secretHosts.set('preview-model-counted', 'api.anthropic.com');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+
+  await runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
+      },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual([
+    'gh',
+    'preview-model-counted',
+  ]);
+
+  expect(ctx.impd.grantPaths).toStrictEqual(
+    new Map([['pv-0a1b2c3d-17 preview-model-counted', ['/pv-0a1b2c3d-17/**']]]),
+  );
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
+});
+
+test('it swaps the counted model grant of an imp for the uncounted one once the previews run without counting proxies', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh', 'preview-model-counted'],
+  });
+
+  ctx.impd.secretHosts.set('preview-model', 'api.anthropic.com');
+  ctx.impd.secretHosts.set('preview-model-counted', 'api.anthropic.com');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+
+  await runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
+});
+
+test("it writes the route into the stack's .env after the commit's own lines, so a compose run started by hand keeps it", async () => {
+  const ctx = await setupTest();
+
+  const origin = join(ctx.directory, 'origin');
+  const gitConfig = join(ctx.directory, 'gitconfig');
+  const checkout = join(ctx.directory, 'checkout');
+
+  await Bun.write(join(origin, 'preview', 'compose.yaml'), 'services: {}\n');
+  await Bun.write(join(origin, 'preview', '.env'), 'NIXIE_PREVIEW_BIND=0.0.0.0');
+
+  await Bun.write(
+    gitConfig,
+    `[user]\n  name = Preview Test\n  email = preview@example.test\n[maintenance]\n  auto = false\n[url "file://${origin}"]\n  insteadOf = https://github.com/acme/greenhouse.git\n`,
+  );
+
+  await Bun.write(join(ctx.directory, 'bin', 'docker'), '#!/bin/sh\nexit 0\n');
+
+  await Bun.$`chmod 0755 ${join(ctx.directory, 'bin', 'docker')}`;
+
+  const gitEnv = {
+    PATH: process.env['PATH'] ?? '',
+    GIT_CONFIG_GLOBAL: gitConfig,
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+
+  await Bun.$`git init -q && git add -A && git commit -q -m preview`.cwd(origin).env(gitEnv);
+
+  const revParsed = await Bun.$`git rev-parse HEAD`.cwd(origin).env(gitEnv).text();
+
+  const headSHA = revParsed.trim();
+
+  composeFiles.set(`acme/greenhouse@${headSHA}`, 'services: {}\n');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+  ctx.store.upsertHead({ repo: 'acme/greenhouse', number: 17, imp: 'pv-0a1b2c3d-17', headSHA });
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  await runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
+      },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA,
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+    env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  ctx.stack.defer(async () => {
+    guest.kill();
+
+    await guest.exited;
+  });
+
+  const exitCode = await guest.exited;
+  const written = await Bun.file(join(checkout, 'preview', '.env')).text();
+
+  expect(exitCode).toBe(0);
+  expect(written).toBe('NIXIE_PREVIEW_BIND=0.0.0.0\nPREVIEW_MODEL_ROUTE=pv-0a1b2c3d-17\n');
+});
+
+// Docker's CLI with its Compose plugin reads a project's config with no daemon; a host without the
+// CLI skips this case, and CI's runners hold it
+test.skipIf(Bun.which('docker') === null)(
+  "it keeps the route in nixie's environment for a compose command run without the boot's variables",
+  async () => {
+    const ctx = await setupTest();
+
+    const origin = join(ctx.directory, 'origin');
+    const gitConfig = join(ctx.directory, 'gitconfig');
+    const checkout = join(ctx.directory, 'checkout');
+    const compose = `services:\n  nixie:\n    image: nixie-preview:local\n    environment:\n      NIXIE_PREVIEW_MODEL_ROUTE: \${PREVIEW_MODEL_ROUTE:-}\n`;
+
+    await Bun.write(join(origin, 'preview', 'compose.yaml'), compose);
+
+    await Bun.write(
+      gitConfig,
+      `[user]\n  name = Preview Test\n  email = preview@example.test\n[maintenance]\n  auto = false\n[url "file://${origin}"]\n  insteadOf = https://github.com/acme/greenhouse.git\n`,
+    );
+
+    await Bun.write(join(ctx.directory, 'bin', 'docker'), '#!/bin/sh\nexit 0\n');
+
+    await Bun.$`chmod 0755 ${join(ctx.directory, 'bin', 'docker')}`;
+
+    const gitEnv = {
+      PATH: process.env['PATH'] ?? '',
+      GIT_CONFIG_GLOBAL: gitConfig,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+
+    await Bun.$`git init -q && git add -A && git commit -q -m preview`.cwd(origin).env(gitEnv);
+
+    const revParsed = await Bun.$`git rev-parse HEAD`.cwd(origin).env(gitEnv).text();
+
+    const headSHA = revParsed.trim();
+
+    composeFiles.set(`acme/greenhouse@${headSHA}`, compose);
+    ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+    ctx.store.upsertHead({ repo: 'acme/greenhouse', number: 17, imp: 'pv-0a1b2c3d-17', headSHA });
+
+    ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+      phase: 'booting',
+    });
+
+    await runPreviewBoot(
+      {
+        ...ctx.deps,
+        settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+        spendProxies: {
+          holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+          removeProxy: () => Promise.resolve(),
+          removeIdle: () => Promise.resolve(),
+          removeAll: () => Promise.resolve(),
+        },
+      },
+      {
+        repo: 'acme/greenhouse',
+        number: 17,
+        imp: 'pv-0a1b2c3d-17',
+        headSHA,
+        builtSHA: null,
+        phase: 'booting',
+        detail: null,
+      },
+    );
+
+    const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+      env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
+    });
+
+    ctx.stack.defer(async () => {
+      guest.kill();
+
+      await guest.exited;
+    });
+
+    await guest.exited;
+
+    const config: unknown = await Bun.$`docker compose config --format json`
+      .cwd(join(checkout, 'preview'))
+      .env({ PATH: process.env['PATH'] ?? '', HOME: ctx.directory })
+      .json();
+
+    expect(config).toMatchObject({
+      services: { nixie: { environment: { NIXIE_PREVIEW_MODEL_ROUTE: 'pv-0a1b2c3d-17' } } },
+    });
+  },
+);
+
+test("it leaves no route in the stack's .env once the previews run without counting proxies", async () => {
+  const ctx = await setupTest();
+
+  const origin = join(ctx.directory, 'origin');
+  const gitConfig = join(ctx.directory, 'gitconfig');
+  const checkout = join(ctx.directory, 'checkout');
+
+  await Bun.write(join(origin, 'preview', 'compose.yaml'), 'services: {}\n');
+  await Bun.write(join(checkout, 'preview', '.env'), '\nPREVIEW_MODEL_ROUTE=pv-0a1b2c3d-17\n');
+
+  await Bun.write(
+    gitConfig,
+    `[user]\n  name = Preview Test\n  email = preview@example.test\n[maintenance]\n  auto = false\n[url "file://${origin}"]\n  insteadOf = https://github.com/acme/greenhouse.git\n`,
+  );
+
+  await Bun.write(join(ctx.directory, 'bin', 'docker'), '#!/bin/sh\nexit 0\n');
+
+  await Bun.$`chmod 0755 ${join(ctx.directory, 'bin', 'docker')}`;
+
+  const gitEnv = {
+    PATH: process.env['PATH'] ?? '',
+    GIT_CONFIG_GLOBAL: gitConfig,
+    GIT_CONFIG_NOSYSTEM: '1',
+  };
+
+  await Bun.$`git init -q && git add -A && git commit -q -m preview`.cwd(origin).env(gitEnv);
+
+  const revParsed = await Bun.$`git rev-parse HEAD`.cwd(origin).env(gitEnv).text();
+
+  const headSHA = revParsed.trim();
+
+  composeFiles.set(`acme/greenhouse@${headSHA}`, 'services: {}\n');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+  ctx.store.upsertHead({ repo: 'acme/greenhouse', number: 17, imp: 'pv-0a1b2c3d-17', headSHA });
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  await runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA,
+      builtSHA: null,
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+    env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  ctx.stack.defer(async () => {
+    guest.kill();
+
+    await guest.exited;
+  });
+
+  const exitCode = await guest.exited;
+  const written = await Bun.file(join(checkout, 'preview', '.env')).text();
+
+  expect(exitCode).toBe(0);
+  expect(written).toBe('');
 });
 
 test('it requires the broker for the build when the model secret is the only grant', async () => {
@@ -487,6 +836,7 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
     'imps/list',
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
+    'grants/list pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',
     'system/features',
     'system/info',
@@ -537,6 +887,7 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
     'imps/get pv-0a1b2c3d-17',
     'imps/list',
     'imps/update pv-0a1b2c3d-17',
+    'grants/list pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
     'grants/add pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',

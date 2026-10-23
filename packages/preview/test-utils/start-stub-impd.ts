@@ -68,6 +68,10 @@ export interface StubImpd {
   // the path filter of each filtered grant, as `<imp> <secret>`; a grant again with a filter
   // replaces it, as impd's does
   readonly grantPaths: Map<string, readonly string[]>;
+
+  // the host each secret gives a credential for; impd refuses a grant whose host another of the
+  // imp's grants already covers, and a secret with no host here clashes with none
+  readonly secretHosts: Map<string, string>;
 }
 
 const procedureBodySchema = z.object({ json: z.record(z.string(), z.unknown()).optional() });
@@ -88,6 +92,7 @@ export function startStubImpd(): StubImpd {
     answerCommand: () => ({ code: 0 }),
     tickets: new Map(),
     grantPaths: new Map(),
+    secretHosts: new Map(),
   };
 
   const answerRequest = async (request: Request, bunServer: Bun.Server<ExecSocketData>) => {
@@ -249,6 +254,20 @@ function buildProcedureResponse(
     .with('grants/add', () => {
       const secret = String(input['secret']);
       const filter = grantFilterSchema.safeParse(input['filter']);
+      const host = stub.secretHosts.get(secret);
+
+      const clash = imp.grants.find(
+        (held) => held !== secret && host !== undefined && stub.secretHosts.get(held) === host,
+      );
+
+      // impd's message for a clash, from its broker service at the pinned release
+      if (clash !== undefined) {
+        return buildRPCError(
+          409,
+          'CONFLICT',
+          `secret ${clash} already gives ${imp.name} a credential for ${host}`,
+        );
+      }
 
       if (!imp.grants.includes(secret)) {
         imp.grants.push(secret);
@@ -257,6 +276,18 @@ function buildProcedureResponse(
       if (filter.success && filter.data.paths !== undefined) {
         stub.grantPaths.set(`${imp.name} ${secret}`, filter.data.paths);
       }
+
+      return buildRPCResult({});
+    })
+    .with('grants/delete', () => {
+      const secret = String(input['secret']);
+
+      if (!imp.grants.includes(secret)) {
+        return buildRPCError(404, 'NOT_FOUND', `${imp.name} holds no grant of ${secret}`);
+      }
+
+      imp.grants.splice(imp.grants.indexOf(secret), 1);
+      stub.grantPaths.delete(`${imp.name} ${secret}`);
 
       return buildRPCResult({});
     })
