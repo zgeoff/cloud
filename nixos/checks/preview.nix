@@ -196,7 +196,7 @@ let
         '';
     }
     {
-      title = "it sets the repositories, model secret and time limit of the contract run once contractRepos lists a repository";
+      title = "it sets the repositories, model secret, time limit and idle time of the contract run once contractRepos lists a repository";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
@@ -216,6 +216,7 @@ let
               ];
               contractModelSecret = "preview-model";
               contractTimeoutMinutes = 15;
+              contractIdleMinutes = 7;
               webhookSecretFile = "/run/fixture/webhook-secret";
               githubAppClientIDFile = "/run/fixture/github-app-client-id";
               githubAppKeyFile = "/run/fixture/github-app-key";
@@ -230,6 +231,7 @@ let
             PREVIEW_CONTRACT_REPOS = "acme/greenhouse,nursery/*";
             PREVIEW_CONTRACT_MODEL_SECRET = "preview-model";
             PREVIEW_CONTRACT_TIMEOUT_MINUTES = "15";
+            PREVIEW_CONTRACT_IDLE_MINUTES = "7";
           }}
           EOF
 
@@ -239,6 +241,7 @@ let
               PREVIEW_CONTRACT_REPOS
               PREVIEW_CONTRACT_MODEL_SECRET
               PREVIEW_CONTRACT_TIMEOUT_MINUTES
+              PREVIEW_CONTRACT_IDLE_MINUTES
               ;
           }}
           EOF
@@ -757,6 +760,7 @@ let
         ./parse-pull-request-event.ts
         ./pick-proxy-outcome.ts
         ./pick-spend-admission.ts
+        ./plan-contract-evictions.ts
         ./plan-idle-sleeps.ts
         ./plan-slot-evictions.ts
         ./proxy-machine.ts

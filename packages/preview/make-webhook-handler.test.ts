@@ -57,6 +57,7 @@ async function setupTest() {
         repos: new Set(['acme/greenhouse']),
         modelSecret: 'model-haiku',
         timeoutMs: 600_000,
+        idleMs: 300_000,
       },
     },
     spendProxies: null,

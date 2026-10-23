@@ -145,6 +145,7 @@ function parseContractSettings(
     // a run without the model secret would only fail
     modelSecret: requireValue(env, 'PREVIEW_CONTRACT_MODEL_SECRET'),
     timeoutMs: requireInteger(env, 'PREVIEW_CONTRACT_TIMEOUT_MINUTES', '10') * 60_000,
+    idleMs: requireInteger(env, 'PREVIEW_CONTRACT_IDLE_MINUTES', '5') * 60_000,
   };
 }
 

@@ -43,6 +43,9 @@ export interface ContractSettings {
   readonly modelSecret: string;
 
   readonly timeoutMs: number;
+
+  // how long a running preview goes unused before a waiting run puts it to sleep to take its slot
+  readonly idleMs: number;
 }
 
 export interface SpendSettings {

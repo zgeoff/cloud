@@ -1,6 +1,7 @@
 import { buildContractStatus } from './build-contract-status.ts';
 import type { ContractOutcome, ContractRun, ContractRunKey } from './create-preview-store.ts';
 import { GitHubRequestError } from './github-request-error.ts';
+import { planContractEvictions } from './plan-contract-evictions.ts';
 import { runContractSuite } from './run-contract-suite.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
@@ -121,11 +122,13 @@ async function startContractImp(
 ): Promise<ContractRun | null> {
   const imps = await deps.impd.readImps();
 
-  // a preview's imp and another run's hold a slot alike, and a run never puts a preview to sleep
-  // to take one, because the owner may be using it
-  const running = imps.filter((imp) => imp.state === 'running' && imp.name !== run.imp);
+  const evictions = planContractEvictions(imps, run.imp, {
+    slots: deps.settings.slots,
+    idleMs: contract.idleMs,
+    now: deps.now(),
+  });
 
-  if (running.length >= deps.settings.slots) {
+  if (evictions === null || !(await trySleepIdlePreviews(deps, run, evictions))) {
     await updateContractWaiting(deps, run);
 
     return null;
@@ -144,6 +147,29 @@ async function startContractImp(
   });
 
   return run;
+}
+
+async function trySleepIdlePreviews(
+  deps: PreviewDeps,
+  run: ContractRun,
+  names: readonly string[],
+): Promise<boolean> {
+  for (const name of names) {
+    try {
+      await deps.impd.sleepImp(name);
+
+      deps.log(
+        `${name}: asleep to free a slot for the SDK contract run of ${run.repo}@${run.headSHA}`,
+      );
+    } catch (error) {
+      // impd refuses to sleep a preview under a lease, which someone holds to keep it awake
+      deps.log(`${name}: could not sleep it to free a slot for a contract run: ${String(error)}`);
+
+      return false;
+    }
+  }
+
+  return true;
 }
 
 interface Status {
