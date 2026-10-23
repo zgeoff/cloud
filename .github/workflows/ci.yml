@@ -1,12 +1,13 @@
 name: CI
 
-# One job, checks, for the secret scan, the Bun checks, the provider's Go checks and the Docker
-# lanes, so a run bills one runner minute where a job per check billed one each. The job runs on
-# every pull request and every push to main, and the ruleset requires it.
-# scripts/run-decide-gates.ts decides, from the gates of .github/gates.yml, whether the change
-# touches an input of the Go checks and the SDK check, an input of each lane, and any file other
-# than Markdown, which the four Nix-image linters and the shell suites need; the job runs each only
-# then. A failed decision or a failed check fails the job.
+# One job, checks, for the secret scan, the Bun checks, the provider's Go checks, the build of its
+# vendored Go modules and the Docker lanes, so a run bills one runner minute where a job per check
+# billed one each. The job runs on every pull request and every push to main, and the ruleset
+# requires it. scripts/run-decide-gates.ts decides, from the gates of .github/gates.yml, whether the
+# change touches an input of the Go checks and the SDK check, an input of the vendored modules'
+# build, an input of each lane, and any file other than Markdown, which the four Nix-image linters
+# and the shell suites need; the job runs each only then. A failed decision or a failed check fails
+# the job.
 on:
   push:
     branches: [main]
@@ -60,8 +61,8 @@ jobs:
           PR_BASE: ${{ github.event.pull_request.base.sha }}
           GH_TOKEN: ${{ github.token }}
         run: >-
-          bun run --silent ci:decide-ci-gates provider full agent-image atc-gateway files-image
-          files-backup nixie-backup
+          bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
+          files-image files-backup nixie-backup
 
       - name: Install
         run: bun install --frozen-lockfile
@@ -216,3 +217,10 @@ jobs:
       - name: SDK check
         if: steps.decide.outputs.provider == 'true'
         run: bun run check:sdk
+
+      # the NixOS check that builds the provider's vendored Go modules in the pinned Nix image, so
+      # a Go module change that leaves nixos/packages/onidel-provider.nix's vendorHash stale fails
+      # the pull request, a Renovate bump's included
+      - name: Onidel vendor hash
+        if: steps.decide.outputs.onidel-vendor == 'true'
+        run: bun run check:onidel-vendor

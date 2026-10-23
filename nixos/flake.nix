@@ -60,7 +60,8 @@
       # network-policy, which runs infra's egress NetworkPolicies on k3s, and
       # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
       # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and
-      # drift-check-vm, which runs the drift check's unit in its own sandbox
+      # drift-check-vm, which runs the drift check's unit in its own sandbox. onidel-provider-vendor
+      # builds the provider's vendored Go modules, which CI's checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -108,6 +109,9 @@
       };
       checks.x86_64-linux.host-cgroup-cpu-vm = import ./checks/host-cgroup-cpu-vm.nix {
         inherit nixpkgs;
+      };
+      checks.x86_64-linux.onidel-provider-vendor = import ./checks/onidel-provider-vendor.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
       };
       checks.x86_64-linux.drift-check = import ./checks/drift-check.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.drift-check-vm = import ./checks/drift-check-vm.nix { inherit nixpkgs; };
