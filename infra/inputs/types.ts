@@ -129,3 +129,10 @@ export interface FilesInputs {
   // without it there is no backup CronJob
   readonly backup?: FilesBackupInputs;
 }
+
+export interface AlertWebhook {
+  readonly url: string;
+
+  // the Discord user a critical alert mentions, so the message pushes a notification
+  readonly mentionUserID: string;
+}

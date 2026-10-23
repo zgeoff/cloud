@@ -1,6 +1,6 @@
 import type { Provider } from '@pulumi/kubernetes';
 import type { Output } from '@pulumi/pulumi';
-import type { ATCDaemonEndpoint } from '../inputs/index.ts';
+import type { ATCDaemonEndpoint, AlertWebhook } from '../inputs/index.ts';
 import { createClusterObservability } from './create-cluster-observability.ts';
 import { createHealthCheck } from './health-check.ts';
 
@@ -9,7 +9,7 @@ interface ClusterObservabilityInputs {
 
   // In-cluster alerts reach Discord only after `pulumi config set discordAlerts true`; until
   // then no Secret holds the webhook and Alertmanager sends nothing.
-  readonly alertWebhookURL: string | undefined;
+  readonly alertWebhook: AlertWebhook | undefined;
 
   readonly atcDaemons: readonly ATCDaemonEndpoint[] | undefined;
 
@@ -39,7 +39,7 @@ export async function createObservability(
   const cluster =
     inputs.cluster === undefined
       ? undefined
-      : createClusterObservability(inputs.cluster.provider, inputs.cluster.alertWebhookURL, {
+      : createClusterObservability(inputs.cluster.provider, inputs.cluster.alertWebhook, {
           atcDaemons: inputs.cluster.atcDaemons,
           nixieReadinessURL: inputs.cluster.nixieReadinessURL,
         });

@@ -5,6 +5,7 @@ import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 import { topology } from '@zgeoff/cloud-topology';
+import type { AlertWebhook } from '../inputs/index.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
 import { alloyChart } from './alloy-chart.ts';
 import { buildAlloyValues } from './alloy-values.ts';
@@ -27,7 +28,7 @@ interface ClusterObservabilityOutputs {
 
 export function createClusterObservability(
   cluster: Provider,
-  alertWebhookURL: string | undefined,
+  alertWebhook: AlertWebhook | undefined,
   monitors: AlertRuleInputs,
 ): ClusterObservabilityOutputs {
   const opts = { provider: cluster };
@@ -37,7 +38,7 @@ export function createClusterObservability(
 
   const metrics = createMetrics(
     ns,
-    { grafanaPassword: adminPassword.result, grafanaNodePort, alertWebhookURL },
+    { grafanaPassword: adminPassword.result, grafanaNodePort, alertWebhook },
     cluster,
   );
 

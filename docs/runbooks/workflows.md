@@ -252,6 +252,7 @@ after a change to either.
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | a provider credential: Onidel, Cloudflare, Tailscale, R2 state | nothing: the next run reads the new value through `op run`. Revoke the old one at its source          |
 | `ALERT_WEBHOOK_URL`                                            | `bun run up`, which updates the Worker's secret, and Alertmanager's Secret when `discordAlerts` is on |
+| `ALERT_MENTION_USER_ID`                                        | `bun run up`, which updates Alertmanager's Secret when `discordAlerts` is on                          |
 | `PULUMI_CONFIG_PASSPHRASE`                                     | do not replace the item: the stack's secrets are encrypted with it. Changing it needs a migration     |
 | imp's Cloudflare DNS token                                     | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart                            |
 | the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                               |

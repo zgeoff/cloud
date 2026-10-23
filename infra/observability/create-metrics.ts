@@ -2,6 +2,7 @@ import type { Provider } from '@pulumi/kubernetes';
 import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Chart } from '@pulumi/kubernetes/helm/v4';
 import type { Output } from '@pulumi/pulumi';
+import type { AlertWebhook } from '../inputs/index.ts';
 import { buildAlertmanagerValues } from './build-alertmanager-values.ts';
 import { buildMetricsValues } from './build-metrics-values.ts';
 import { createAlertWebhook } from './create-alert-webhook.ts';
@@ -10,14 +11,14 @@ import { makeDeleteBeforeReplaceTransform } from './make-delete-before-replace-t
 interface MetricsInputs {
   readonly grafanaPassword: Output<string>;
   readonly grafanaNodePort: number;
-  readonly alertWebhookURL: string | undefined;
+  readonly alertWebhook: AlertWebhook | undefined;
 }
 
 export function createMetrics(ns: Namespace, inputs: MetricsInputs, cluster: Provider): Chart {
   const webhook =
-    inputs.alertWebhookURL === undefined
+    inputs.alertWebhook === undefined
       ? undefined
-      : createAlertWebhook(ns, inputs.alertWebhookURL, cluster);
+      : createAlertWebhook(ns, inputs.alertWebhook, cluster);
 
   return new Chart(
     'kube-prometheus-stack',

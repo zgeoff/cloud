@@ -37,10 +37,12 @@ setup_test() {
     import { buildATCSecurityPipeline } from './infra/observability/build-atc-security-pipeline.ts';
     import { buildATCSignInRules } from './infra/observability/build-atc-sign-in-rules.ts';
     import { buildAlertmanagerValues } from './infra/observability/build-alertmanager-values.ts';
+    import { renderMentionTemplate } from './infra/observability/render-mention-template.ts';
     const tree = process.env.TREE ?? '';
     await Bun.write(tree + '/config/config.alloy', buildATCSecurityPipeline('/logs/atc_atc-gateway-*/atc-gateway/*.log'));
     await Bun.write(tree + '/config/rules.json', JSON.stringify({ groups: [buildATCSignInRules()] }));
-    const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url' });
+    const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url', mentionTemplateFile: '/config/mention.tmpl' });
+    await Bun.write(tree + '/config/mention.tmpl', renderMentionTemplate('100000000000000001'));
     await Bun.write(tree + '/config/alertmanager.json', JSON.stringify(alertmanager.config));
   ")
 }

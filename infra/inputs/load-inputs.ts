@@ -1,11 +1,12 @@
 import { findAlertURL } from './find-alert-url.ts';
+import { findVariable } from './find-variable.ts';
 import { loadClusterInputs } from './load-cluster-inputs.ts';
 import { requireAlertWebhook } from './require-alert-webhook.ts';
 import { requireCloudflareAccountID } from './require-cloudflare-account-id.ts';
-import type { Environment, StackConfig } from './types.ts';
+import type { AlertWebhook, Environment, StackConfig } from './types.ts';
 
 type ClusterInputs = NonNullable<ReturnType<typeof loadClusterInputs>> & {
-  readonly alertWebhookURL: string | undefined;
+  readonly alertWebhook: AlertWebhook | undefined;
 };
 
 interface Inputs {
@@ -32,9 +33,10 @@ export function loadInputs(config: StackConfig, env: Environment): Inputs {
       : {
           cluster: {
             ...cluster,
-            alertWebhookURL: requireAlertWebhook(
+            alertWebhook: requireAlertWebhook(
               config.getBoolean('discordAlerts') ?? false,
               alertURL,
+              findVariable(env, 'ALERT_MENTION_USER_ID')?.trim(),
             ),
           },
         }),
