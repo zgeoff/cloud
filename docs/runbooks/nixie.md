@@ -51,13 +51,13 @@ carries nixie's image ref prefix ([mint nixie's impd token](#mint-nixies-impd-to
 Add a model secret for each profile in `config.yaml`, under the name
 [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
 defines:
-`model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`. Every
-profile uses the same credential, so the names differ only by profile:
+`nixie-model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`.
+Every profile uses the same credential, so the names differ only by profile:
 
 ```bash
 hash=$(op read op://cloud/nixie-model-credential/credential \
   | { IFS= read -r c; printf 'bearer\napi.anthropic.com\n%s' "$c"; } | sha256sum | cut -c1-16)
-secrets=model-opus-$hash,model-haiku-$hash,model-sonnet-$hash
+secrets=nixie-model-opus-$hash,nixie-model-haiku-$hash,nixie-model-sonnet-$hash
 for secret in ${secrets//,/ }; do
   op read op://cloud/nixie-model-credential/credential | host_imp secret add "$secret" \
     --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
@@ -66,6 +66,38 @@ done
 
 Expect `host_imp secret ls` to list each name with the host `api.anthropic.com`. A profile without
 its secret leaves its role's sandbox unmade, and `imp_host` unready.
+
+### Move the model secrets to their nixie- names
+
+nixie 0.42.0 names each model secret `nixie-model-<profile>-<hash>`, where earlier releases named it
+`model-<profile>-<hash>`. A nixie on the new names asks impd to grant secrets that do not exist yet,
+so its new sandboxes fail, and `imp_host` stays unready, until impd holds them. Running sandboxes
+keep their old grants until they are replaced. Move the secrets once, around the bump to that
+release.
+
+**CAUTION:** These steps change impd's live secrets and nixie's token. Run them only with the
+owner's approval, and in order: a token without the new names fails every new sandbox.
+
+1. Before the deployment moves to nixie 0.42.0, add each model secret again under its `nixie-model-`
+   name, with the same value, host and header, through the loop in
+   [Add nixie's model secret to impd](#add-nixies-model-secret-to-impd).
+2. Set nixie's token `--grantable` to the old and the new names:
+
+   ```bash
+   old=${secrets//nixie-model-/model-}
+   host_imp token set nixie --grantable "$old,$secrets" < /dev/null
+   ```
+
+3. Deploy the nixie release, and check that the `imp_host` readiness part is ready and new sandboxes
+   start, as [Check a deploy](#check-a-deploy) describes.
+4. Remove the old `model-*` secrets, and set `--grantable` to the new names only:
+
+   ```bash
+   for secret in ${old//,/ }; do host_imp secret rm "$secret" < /dev/null; done
+   host_imp token set nixie --grantable "$secrets" < /dev/null
+   ```
+
+   Expect `host_imp secret ls < /dev/null` to list only the `nixie-model-` names.
 
 ## Pin nixie's sandbox images
 
@@ -366,7 +398,7 @@ retention drops the last snapshot taken before the forget.
 
 ## Restore from a backup
 
-The `nixie-backup` CronJob backs up `nixie.db` and `keys.db` every night to R2, as
+The `nixie-backup` CronJob backs up nixie's data every night to R2, as
 [nixie's backup](./nixie-backup.md) describes. A restore also needs the deployment key from the
 secrets file, which wraps the record keys in `keys.db`.
 
@@ -382,15 +414,19 @@ device enrolled after the snapshot is lost. Back up first if the current data st
 
    Expect `pod/nixie-0 condition met`. nixie writes until its pod stops.
 
-2. Restore with `deploy/nixie/restore-job.yaml`, which checks both databases before it replaces
-   either. Set `args: ["ls"]` to list the snapshots first, and `SNAPSHOT` to pick one:
+2. Restore with `deploy/nixie/restore-job.yaml`, whose `nixie restore` checks both databases before
+   it replaces either. The Job runs the stopped StatefulSet's nixie image in place of `NIXIE_IMAGE`.
+   Set the `fetch` container's `args: ["ls"]` to list the snapshots first, and `SNAPSHOT` to pick
+   one:
 
    ```bash
-   ssh root@geoffcloud k3s kubectl create -f - < deploy/nixie/restore-job.yaml
-   ssh root@geoffcloud k3s kubectl -n nixie logs -f job/<job-name>
+   image=$(ssh root@geoffcloud 'k3s kubectl -n nixie get statefulset nixie -o "jsonpath={.spec.template.spec.containers[?(@.name==\"nixie\")].image}"')
+   sed "s#NIXIE_IMAGE#$image#" deploy/nixie/restore-job.yaml | ssh root@geoffcloud k3s kubectl create -f -
+   ssh root@geoffcloud k3s kubectl -n nixie logs -f job/<job-name> -c restore
    ```
 
-   Expect `restored nixie.db: integrity_check ok` and `restored keys.db: integrity_check ok`.
+   Expect `nixie restored nixie.db and keys.db from /tmp/nixie-backup`. A restore that stops before
+   that line leaves nixie refusing to start until a restore runs to the end, so run the Job again.
 
 3. Start nixie and check it, as step 3 of [Deploy or upgrade](#deploy-or-upgrade) describes:
 
