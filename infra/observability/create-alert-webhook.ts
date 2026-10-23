@@ -30,7 +30,10 @@ export function createAlertWebhook(
         [mentionKey]: secret(renderMentionTemplate(webhook.mentionUserID)),
       },
     },
-    { provider: cluster },
+
+    // The provider replaces a Secret when its data changes, and a create of the fixed name before
+    // the delete fails with "already exists".
+    { provider: cluster, deleteBeforeReplace: true },
   );
 
   // Alertmanager mounts the Secret at /etc/alertmanager/secrets/<name>/<key>.
