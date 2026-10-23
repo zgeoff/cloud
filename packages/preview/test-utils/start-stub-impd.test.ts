@@ -130,6 +130,67 @@ test('it grants a secret once and records the path filter of each later grant, a
   );
 });
 
+test('it removes a grant and its path filter, as impd grants.delete does', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh', 'model-sonnet'],
+  });
+
+  impd.grantPaths.set('pv-0a1b2c3d-17 model-sonnet', ['/pv-0a1b2c3d-17/**']);
+
+  const response = await fetch(`${impd.url}/rpc/grants/delete`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', secret: 'model-sonnet' } }),
+  });
+
+  expect(response.status).toBe(200);
+  expect(impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh']);
+  expect(impd.grantPaths).toStrictEqual(new Map());
+});
+
+test('it answers the removal of a grant the imp lacks with oRPC NOT_FOUND error body', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  const response = await fetch(`${impd.url}/rpc/grants/delete`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', secret: 'model-sonnet' } }),
+  });
+
+  const result = await response.json();
+
+  expect(response.status).toBe(404);
+
+  expect(result).toStrictEqual({
+    json: {
+      defined: true,
+      code: 'NOT_FOUND',
+      status: 404,
+      message: 'pv-0a1b2c3d-17 holds no grant of model-sonnet',
+    },
+  });
+});
+
 test('it answers an unknown imp with oRPC NOT_FOUND error body', async () => {
   const impd = startStubImpd();
 

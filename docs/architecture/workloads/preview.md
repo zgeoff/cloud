@@ -128,7 +128,9 @@ image's, so the previews and the agents run one release of imp's base image.
 2. A new imp gets that port as impd's HTTP port and no backup. An imp from an earlier build keeps
    its disk and takes the new commit's port. Either way, the boot adds the grants of the broker's
    GitHub secret and model secret when the imp lacks them, so an imp whose grant failed gets it on
-   the next boot.
+   the next boot. The boot then removes every other grant. impd's broker uses an imp's first grant
+   for a host in secret-name order, so a model secret left from an earlier setting would otherwise
+   win over the current one.
 3. A guest command installs Docker Compose's pinned release binary, checked against its sha256, when
    the image lacks the Compose plugin, as imp's base image does. It then fetches the head commit
    into a checkout in the imp, takes down the stack of the previous build with its volumes, and runs

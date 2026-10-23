@@ -260,6 +260,18 @@ function buildProcedureResponse(
 
       return buildRPCResult({});
     })
+    .with('grants/delete', () => {
+      const secret = String(input['secret']);
+
+      if (!imp.grants.includes(secret)) {
+        return buildRPCError(404, 'NOT_FOUND', `${imp.name} holds no grant of ${secret}`);
+      }
+
+      imp.grants.splice(imp.grants.indexOf(secret), 1);
+      stub.grantPaths.delete(`${imp.name} ${secret}`);
+
+      return buildRPCResult({});
+    })
     .with('exec/ticket', () => {
       const ticket = `stub-ticket.${crypto.randomUUID()}`;
 

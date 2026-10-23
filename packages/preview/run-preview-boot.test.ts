@@ -280,6 +280,100 @@ test('it grants the model secret for the preview own route only, and passes the 
   ]);
 });
 
+test('it removes an uncounted model grant from an imp that booted before the counting proxies, so the counted grant is its only model grant', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh', 'preview-model'],
+  });
+
+  await runPreviewBoot(
+    {
+      ...ctx.deps,
+      settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+      spendProxies: {
+        holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+        removeProxy: () => Promise.resolve(),
+        removeIdle: () => Promise.resolve(),
+        removeAll: () => Promise.resolve(),
+      },
+    },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual([
+    'gh',
+    'preview-model-counted',
+  ]);
+});
+
+test('it removes a counted model grant from an imp once the previews run without counting proxies', async () => {
+  const ctx = await setupTest();
+
+  composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0a1b2c3d-17',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  });
+
+  ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], { phase: 'booting' });
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['gh', 'preview-model-counted'],
+  });
+
+  await runPreviewBoot(
+    { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
+    {
+      repo: 'acme/greenhouse',
+      number: 17,
+      imp: 'pv-0a1b2c3d-17',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      builtSHA: 'cccccccccccccccccccccccccccccccccccccccc',
+      phase: 'booting',
+      detail: null,
+    },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+});
+
 test('it requires the broker for the build when the model secret is the only grant', async () => {
   const ctx = await setupTest();
 
@@ -487,6 +581,7 @@ test('it rebuilds an existing imp in place and takes the port of the new commit'
     'imps/list',
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
+    'grants/list pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',
     'system/features',
     'system/info',
@@ -539,6 +634,7 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
     'grants/add pv-0a1b2c3d-17',
+    'grants/list pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',
     'system/features',
     'system/info',

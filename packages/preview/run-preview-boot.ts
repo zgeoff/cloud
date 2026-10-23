@@ -67,19 +67,27 @@ async function startImpInSlot(
     await deps.impd.installGrant(preview.imp, deps.settings.impGitHubSecret);
   }
 
-  if (deps.settings.impModelSecret === null) {
-    return;
+  if (deps.settings.impModelSecret !== null) {
+    // with a counting proxy, the model secret's upstream is the service's route listener, and the
+    // filter keeps each imp on its own route, so one preview can neither skip nor spend another's cap
+    await (deps.spendProxies === null
+      ? deps.impd.installGrant(preview.imp, deps.settings.impModelSecret)
+      : deps.impd.installPathGrant(
+          preview.imp,
+          deps.settings.impModelSecret,
+          modelRoute.buildGrantPaths(preview.imp),
+        ));
   }
 
-  // with a counting proxy, the model secret's upstream is the service's route listener, and the
-  // filter keeps each imp on its own route, so one preview can neither skip nor spend another's cap
-  await (deps.spendProxies === null
-    ? deps.impd.installGrant(preview.imp, deps.settings.impModelSecret)
-    : deps.impd.installPathGrant(
-        preview.imp,
-        deps.settings.impModelSecret,
-        modelRoute.buildGrantPaths(preview.imp),
-      ));
+  // impd's broker takes an imp's first grant for a host in secret-name order, so a model secret
+  // left from an earlier setting would win over the current one and skip the counting proxy
+  await deps.impd.removeGrantsExcept(preview.imp, collectGrantSecrets(deps));
+}
+
+function collectGrantSecrets(deps: PreviewDeps): string[] {
+  return [deps.settings.impGitHubSecret, deps.settings.impModelSecret].filter(
+    (secret) => secret !== null,
+  );
 }
 
 async function checkClosedDuringBoot(
@@ -169,12 +177,6 @@ async function runBuild(
   }
 
   return waitForHealth(deps, preview, contract);
-}
-
-function collectGrantSecrets(deps: PreviewDeps): string[] {
-  return [deps.settings.impGitHubSecret, deps.settings.impModelSecret].filter(
-    (secret) => secret !== null,
-  );
 }
 
 async function waitForHealth(
