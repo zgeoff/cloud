@@ -62,26 +62,28 @@ async function startImpInSlot(
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
   }
 
+  // impd refuses a second grant for a host the imp already holds a credential for, so a model
+  // secret granted under an earlier setting goes before the current one is granted
+  await deps.impd.removeGrantsExcept(preview.imp, collectGrantSecrets(deps));
+
   // every boot installs the grants, so an imp whose grant failed or never came gets it now
   if (deps.settings.impGitHubSecret !== null) {
     await deps.impd.installGrant(preview.imp, deps.settings.impGitHubSecret);
   }
 
-  if (deps.settings.impModelSecret !== null) {
-    // with a counting proxy, the model secret's upstream is the service's route listener, and the
-    // filter keeps each imp on its own route, so one preview can neither skip nor spend another's cap
-    await (deps.spendProxies === null
-      ? deps.impd.installGrant(preview.imp, deps.settings.impModelSecret)
-      : deps.impd.installPathGrant(
-          preview.imp,
-          deps.settings.impModelSecret,
-          modelRoute.buildGrantPaths(preview.imp),
-        ));
+  if (deps.settings.impModelSecret === null) {
+    return;
   }
 
-  // impd's broker takes an imp's first grant for a host in secret-name order, so a model secret
-  // left from an earlier setting would win over the current one and skip the counting proxy
-  await deps.impd.removeGrantsExcept(preview.imp, collectGrantSecrets(deps));
+  // with a counting proxy, the model secret's upstream is the service's route listener, and the
+  // filter keeps each imp on its own route, so one preview can neither skip nor spend another's cap
+  await (deps.spendProxies === null
+    ? deps.impd.installGrant(preview.imp, deps.settings.impModelSecret)
+    : deps.impd.installPathGrant(
+        preview.imp,
+        deps.settings.impModelSecret,
+        modelRoute.buildGrantPaths(preview.imp),
+      ));
 }
 
 function collectGrantSecrets(deps: PreviewDeps): string[] {

@@ -280,7 +280,7 @@ test('it grants the model secret for the preview own route only, and passes the 
   ]);
 });
 
-test('it removes an uncounted model grant from an imp that booted before the counting proxies, so the counted grant is its only model grant', async () => {
+test('it swaps the uncounted model grant of an imp that booted before the counting proxies for the counted one, which impd refuses beside it', async () => {
   const ctx = await setupTest();
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
@@ -304,6 +304,10 @@ test('it removes an uncounted model grant from an imp that booted before the cou
     backup: false,
     grants: ['gh', 'preview-model'],
   });
+
+  ctx.impd.secretHosts.set('preview-model', 'api.anthropic.com');
+  ctx.impd.secretHosts.set('preview-model-counted', 'api.anthropic.com');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
 
   await runPreviewBoot(
     {
@@ -331,9 +335,15 @@ test('it removes an uncounted model grant from an imp that booted before the cou
     'gh',
     'preview-model-counted',
   ]);
+
+  expect(ctx.impd.grantPaths).toStrictEqual(
+    new Map([['pv-0a1b2c3d-17 preview-model-counted', ['/pv-0a1b2c3d-17/**']]]),
+  );
+
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
 });
 
-test('it removes a counted model grant from an imp once the previews run without counting proxies', async () => {
+test('it swaps the counted model grant of an imp for the uncounted one once the previews run without counting proxies', async () => {
   const ctx = await setupTest();
 
   composeFiles.set('acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'services: {}\n');
@@ -358,6 +368,10 @@ test('it removes a counted model grant from an imp once the previews run without
     grants: ['gh', 'preview-model-counted'],
   });
 
+  ctx.impd.secretHosts.set('preview-model', 'api.anthropic.com');
+  ctx.impd.secretHosts.set('preview-model-counted', 'api.anthropic.com');
+  ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+
   await runPreviewBoot(
     { ...ctx.deps, settings: { ...ctx.deps.settings, impModelSecret: 'preview-model' } },
     {
@@ -372,6 +386,7 @@ test('it removes a counted model grant from an imp once the previews run without
   );
 
   expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['gh', 'preview-model']);
+  expect(ctx.store.findPreview({ repo: 'acme/greenhouse', number: 17 })?.phase).toBe('ready');
 });
 
 test('it requires the broker for the build when the model secret is the only grant', async () => {
@@ -633,8 +648,8 @@ test('it adds the grant to an existing imp that lacks it, even after an earlier 
     'imps/list',
     'imps/update pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
-    'grants/add pv-0a1b2c3d-17',
     'grants/list pv-0a1b2c3d-17',
+    'grants/add pv-0a1b2c3d-17',
     'exec/ticket pv-0a1b2c3d-17',
     'system/features',
     'system/info',

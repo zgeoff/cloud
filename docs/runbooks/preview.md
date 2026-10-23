@@ -147,8 +147,8 @@ release that ships `counting-proxy-linux-x64`, which the host pins by its sha256
 4. Remove each preview imp that booted before the switch:
    `host_imp rm pv-<hash>-<number> < /dev/null` for each `pv-` name that
    `host_imp ls --json < /dev/null` lists. A link open only wakes a ready imp, so its stack keeps
-   running without the route until it boots again. Each boot removes every grant but the service's
-   own, so the next one leaves the imp with the counted grant alone.
+   running without the route and with the uncounted grant until it boots again. A boot swaps the
+   grant itself.
 
 5. Open a preview of a repository whose stack takes the route, and ask its app for a model reply.
    Expect `journalctl -u preview` to hold the proxy's `proxy.started` line under the imp's name.

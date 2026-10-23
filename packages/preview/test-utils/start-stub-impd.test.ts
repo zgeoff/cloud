@@ -130,6 +130,46 @@ test('it grants a secret once and records the path filter of each later grant, a
   );
 });
 
+test('it refuses a grant whose host another grant of the imp covers, as impd grants.add does', async () => {
+  const impd = startStubImpd();
+
+  impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'base',
+    memoryMib: 2048,
+    backup: false,
+    grants: ['model-sonnet'],
+  });
+
+  impd.secretHosts.set('model-sonnet', 'models.example.test');
+  impd.secretHosts.set('model-sonnet-counted', 'models.example.test');
+
+  const response = await fetch(`${impd.url}/rpc/grants/add`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${impd.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ json: { name: 'pv-0a1b2c3d-17', secret: 'model-sonnet-counted' } }),
+  });
+
+  const result = await response.json();
+
+  expect(response.status).toBe(409);
+
+  expect(result).toStrictEqual({
+    json: {
+      defined: true,
+      code: 'CONFLICT',
+      status: 409,
+      message:
+        'secret model-sonnet already gives pv-0a1b2c3d-17 a credential for models.example.test',
+    },
+  });
+
+  expect(impd.imps.get('pv-0a1b2c3d-17')?.grants).toStrictEqual(['model-sonnet']);
+});
+
 test('it removes a grant and its path filter, as impd grants.delete does', async () => {
   const impd = startStubImpd();
 
