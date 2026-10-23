@@ -56,7 +56,8 @@
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
       # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock, tank-cloud-host-secrets
       # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
-      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk, and
+      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk and maps hugetlb
+      # memory there, and
       # network-policy, which runs infra's egress NetworkPolicies on k3s, and
       # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
       # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and

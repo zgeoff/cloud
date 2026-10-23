@@ -9,7 +9,10 @@
 # imp-host-image fails its pull and host-build-lag fails its query of GitHub; the check allows
 # those two failures by name. tailscaled-autoconnect is off: the VM's tailscaled has no node state,
 # so tailscale up would wait out its start timeout, where the host's node state on vda logs it in.
-# It needs KVM: run `bun run test:nixos geoffcloud-no-pool`.
+#
+# The same boot checks the hugetlb cap for imp guest memory: a mapping with Firecracker's hugetlb
+# flags gets its 2 MiB pages on demand and frees them on exit, and without the cap it dies of
+# SIGBUS, as a Firecracker guest would. It needs KVM: run `bun run test:nixos geoffcloud-no-pool`.
 {
   nixpkgs,
   geoffcloud,
@@ -29,6 +32,22 @@ let
     "atc-daemon"
     "preview"
   ];
+  # maps PAGES 2 MiB pages as Firecracker maps hugetlb guest memory (MAP_PRIVATE, MAP_ANONYMOUS,
+  # MAP_NORESERVE, MAP_HUGETLB and MAP_HUGE_2MB), writes one byte to each, and prints the kernel's
+  # hugetlb counts while it holds them
+  mapHugetlb = pkgs.writeText "map-hugetlb.py" ''
+    import json
+    import mmap
+    import sys
+
+    size = int(sys.argv[1]) * 2 * 1024 * 1024
+    flags = 0x02 | 0x20 | 0x4000 | 0x40000 | (21 << 26)
+    memory = mmap.mmap(-1, size, flags=flags, prot=mmap.PROT_READ | mmap.PROT_WRITE)
+    for offset in range(0, size, 2 * 1024 * 1024):
+        memory[offset] = 1
+    counts = dict(line.split(":") for line in open("/proc/meminfo") if line.startswith("HugePages_"))
+    print(json.dumps({name: int(value) for name, value in counts.items()}, sort_keys=True))
+  '';
 in
 pkgs.testers.runNixOSTest {
   name = "geoffcloud-no-pool";
@@ -91,5 +110,28 @@ pkgs.testers.runNixOSTest {
 
         assert mounted == [], f"mounted: {mounted}"
         assert left == [], f"the root disk holds {left}"
+
+
+    with subtest("it caps on-demand 2 MiB hugetlb pages at the imps' 20 GiB RAM budget, with none made at boot"):
+        cap = machine.succeed("sysctl -n vm.nr_overcommit_hugepages").strip()
+        total = machine.succeed("sed -n 's/^HugePages_Total: *//p' /proc/meminfo").strip()
+
+        assert cap == "10240", f"the cap is {cap!r} pages"
+        assert total == "0", f"the boot made {total!r} hugetlb pages"
+
+
+    with subtest("it backs a Firecracker-style hugetlb mapping with on-demand pages and frees them on exit"):
+        held = machine.succeed("${pkgs.python3}/bin/python3 -I ${mapHugetlb} 64").strip()
+        total = machine.succeed("sed -n 's/^HugePages_Total: *//p' /proc/meminfo").strip()
+
+        assert held == '{"HugePages_Free": 0, "HugePages_Rsvd": 0, "HugePages_Surp": 64, "HugePages_Total": 64}', held
+        assert total == "0", f"{total!r} hugetlb pages outlive the mapping"
+
+
+    with subtest("it kills the same mapping with SIGBUS once the cap is 0"):
+        machine.succeed("sysctl -w vm.nr_overcommit_hugepages=0")
+        status, output = machine.execute("${pkgs.python3}/bin/python3 -I ${mapHugetlb} 64 2>&1")
+
+        assert status == 135, f"the mapping exited {status}: {output}"
   '';
 }
