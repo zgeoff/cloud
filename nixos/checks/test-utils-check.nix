@@ -527,7 +527,7 @@ let
       '';
     }
     {
-      title = "it run-stub-mcp-upstream records each request's method, target, host and authorization, and answers it as text";
+      title = "it run-stub-mcp-upstream records the method, target, host and authorization of each request, and answers it as text";
       script = ''
         mkdir home tmp
         start_stub_impd ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"

@@ -1006,7 +1006,7 @@ let
         '';
     }
     {
-      title = "it reports a TLS front route whose upstream and paths differ from its registry entry's";
+      title = "it reports a TLS front route whose upstream and paths differ from those of its registry entry";
       script =
         let
           system = buildModuleSystem firewallModules {

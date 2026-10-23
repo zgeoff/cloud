@@ -19,7 +19,7 @@ let
 
   cases = [
     {
-      title = "it writes geoffcloud's Caddyfile: the registry's impd-mcp paths to impd's loopback listener, a 404 for any other, and a certificate by TLS-ALPN-01 alone";
+      title = "it writes the Caddyfile of geoffcloud: the impd-mcp paths to the loopback listener of impd, a 404 for any other, and a certificate by TLS-ALPN-01 alone";
       script = ''
         assert_files_equal - ${caddy.configFile} <<'EOF'
         {
@@ -63,7 +63,7 @@ let
       '';
     }
     {
-      title = "it has the front's Caddy build validate geoffcloud's Caddyfile";
+      title = "it has the Caddy build of the front validate the Caddyfile of geoffcloud";
       script = ''
         mkdir home
         status=0
