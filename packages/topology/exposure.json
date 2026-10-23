@@ -76,16 +76,6 @@
       "reason": "cloudflared's pod dials the preview service's webhook listener on the host's tailnet address, and inet cloud_host admits only pod addresses on cni0; the service refuses every unsigned call"
     },
     {
-      "name": "preview-model-route",
-      "kind": "host-port",
-      "protocol": "tcp",
-      "port": 18082,
-      "scope": "host",
-      "interface": "docker0",
-      "admission": true,
-      "reason": "imp-host's broker sends each preview's model calls to the preview service's model route listener, which inet cloud_host admits from docker0's subnet only, so each call passes its preview's counting proxy"
-    },
-    {
       "name": "grafana",
       "kind": "host-port",
       "protocol": "tcp",
