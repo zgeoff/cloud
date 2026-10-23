@@ -82,6 +82,7 @@
     "ci:preview-and-guard-prod": "bash scripts/preview-and-guard-prod.sh",
     "ci:refresh-prod": "bash scripts/refresh-prod.sh",
     "ci:hold-deploy-prod-lock": "bash scripts/hold-deploy-prod-lock.sh",
+    "ci:cancel-deploy-prod-update": "bash scripts/cancel-deploy-prod-update.sh",
     "ci:retry-transient-pulumi": "bash scripts/retry-transient-pulumi.sh",
     "ci:wait-for-k3s-api": "bash scripts/wait-for-k3s-api.sh",
     "ci:decide-prod-outcome": "bash scripts/decide-prod-outcome.sh",

@@ -23,6 +23,9 @@ export interface ActionsConditionContext {
   // the earlier steps of the job, by id, for a step's `if`; their conclusions decide success() and
   // failure() beside the needs, and without them a `steps` path throws
   readonly steps?: Readonly<Record<string, ActionsStep>>;
+
+  // a person cancelled the run, or the job's timeout ended it, which GitHub reports as a cancel
+  readonly cancelled?: boolean;
 }
 
 const statusFunction = /\b(?:success|failure|cancelled|always)\(\)/u;
@@ -164,12 +167,11 @@ function requireToken(parser: Parser, expected: string): void {
 }
 
 function isStatusFunctionMet(name: string, context: Readonly<ActionsConditionContext>): boolean {
-  // no test cancels a run, so cancelled() is always false
   return match(name)
     .with('success', () => isSuccess(context))
     .with('failure', () => isFailure(context))
     .with('always', () => true)
-    .with('cancelled', () => false)
+    .with('cancelled', () => context.cancelled === true)
     .otherwise(() => {
       throw new Error(`unsupported function: ${name}()`);
     });
@@ -177,6 +179,7 @@ function isStatusFunctionMet(name: string, context: Readonly<ActionsConditionCon
 
 function isSuccess(context: Readonly<ActionsConditionContext>): boolean {
   return (
+    context.cancelled !== true &&
     Object.values(context.needs).every((need) => need.result === 'success') &&
     Object.values(context.steps ?? {}).every((step) => step.conclusion !== 'failure')
   );

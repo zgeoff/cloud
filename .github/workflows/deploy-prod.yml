@@ -6,7 +6,8 @@ name: Deploy prod
 # it does nothing unless a Pulumi input changed since that tag. It takes the prod lock, which the
 # scheduled drift check on the host also takes (scripts/hold-prod-lock.sh), checks drift from the
 # tag, previews the commit, and applies only when the guard passes the plan; then it checks drift
-# again, moves the tag and releases the lock. A held plan ends the run as held, not failed: the job succeeds, Discord gets
+# again, moves the tag and releases the lock. A run cancelled during its refresh or apply first
+# clears the lock that step left on the prod stack's Pulumi state. A held plan ends the run as held, not failed: the job succeeds, Discord gets
 # the hold, and the group passes to the next push's run. A manual dispatch of this workflow on
 # main applies whatever the guard found. docs/runbooks/prod-apply.md covers a held run and the
 # tag's first setting. The run's name holds the commit it decides on: the CI run's commit, or a
@@ -208,6 +209,7 @@ jobs:
       # the refresh writes only what it reads into the state and changes no resource, so it runs
       # apart from the apply, where a second try is safe
       - name: Refresh before the apply
+        id: refresh
         if: steps.outcome.outputs.outcome == 'apply'
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
@@ -216,6 +218,7 @@ jobs:
         run: bun run --silent ci:refresh-prod
 
       - name: Apply
+        id: apply
         if: steps.outcome.outputs.outcome == 'apply'
         working-directory: program
         env:
@@ -250,6 +253,27 @@ jobs:
         env:
           KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
         run: bun run ci:check-nixie-api
+
+      # a cancel or a timeout that stops the refresh or the apply leaves their lock on the prod
+      # stack's state, and the next run then fails on "the stack is currently locked"; the runner
+      # reports a job that its timeout ended as cancelled. The previews and drift checks take no
+      # such lock, and a refresh or an apply that fails releases its own. pulumi cancel ends
+      # whatever update holds the lock, so it runs only for a step of this run that the cancel
+      # stopped, and never after a failure: a refresh that fails on the lock found another update
+      # holding it, such as an apply that a person started by hand. The script also checks that
+      # the run still holds the prod lock. A runner that dies
+      # runs no step at all, and `bun run ops:cancel-prod-lock` clears what it leaves.
+      - name: Cancel this run's Pulumi update
+        if: >-
+          cancelled() && (steps.refresh.outcome == 'cancelled' || steps.apply.outcome ==
+          'cancelled')
+        timeout-minutes: 5
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+          PROGRAM: program
+        run: bun run --silent ci:cancel-deploy-prod-update
 
       # whatever the run's outcome, a held, failed or cancelled run included; it releases only this
       # run's hold, and does nothing when the job never took the lock
