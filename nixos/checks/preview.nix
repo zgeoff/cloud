@@ -744,6 +744,7 @@ let
         ./counting-proxy-config-schema.ts
         ./create-preview-store.ts
         ./create-spend-proxies.ts
+        ./github-request-error.ts
         ./has-sdk-pin-change.ts
         ./load-preview-config.ts
         ./main.ts
