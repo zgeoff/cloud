@@ -343,7 +343,7 @@ test('it puts a preview unused for the idle time to sleep and runs a waiting run
 
   ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
 
-  const log = mock();
+  const log = mock<(line: string) => void>();
 
   await runContractRun(
     { ...ctx.deps, log },
@@ -399,7 +399,7 @@ test('it keeps the run waiting and starts no imp when impd refuses to sleep the 
     ),
   );
 
-  const log = mock();
+  const log = mock<(line: string) => void>();
 
   await runContractRun(
     { ...ctx.deps, log },
