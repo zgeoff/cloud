@@ -2,7 +2,8 @@
 # Test for the route and receivers build-alertmanager-values.ts builds, in the pinned Alertmanager:
 # each case posts alerts to its API, with the mention template render-mention-template.ts renders
 # for an invented user beside the config, and compares what Alertmanager posts to the Discord
-# webhook stand-in.
+# webhook stand-in. Alertmanager holds a new group for 1 s in place of production's 30 s, which the
+# builder's own test pins.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
 #   CASE='mention' bash infra/observability/test-alertmanager-routes.sh
@@ -30,7 +31,7 @@ setup_test() {
     import { buildAlertmanagerValues } from './infra/observability/build-alertmanager-values.ts';
     import { renderMentionTemplate } from './infra/observability/render-mention-template.ts';
     const tree = process.env.TREE ?? '';
-    const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url', mentionTemplateFile: '/config/mention.tmpl' });
+    const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url', mentionTemplateFile: '/config/mention.tmpl' }, { groupWait: '1s' });
     await Bun.write(tree + '/config/alertmanager.json', JSON.stringify(alertmanager.config));
     await Bun.write(tree + '/config/mention.tmpl', renderMentionTemplate('100000000000000001'));
   ")

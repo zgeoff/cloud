@@ -1,11 +1,12 @@
+// lane: a real build-agent-image.ts process, signalled, with its exit code checked
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { runProcess } from './run-process.ts';
-import { createGitOrigin } from './test-utils/create-git-origin.ts';
-import { createStubAgentImageCheck } from './test-utils/create-stub-agent-image-check.ts';
-import { createStubImpCLI } from './test-utils/create-stub-imp-cli.ts';
+import { runProcess } from '../scripts/run-process.ts';
+import { createGitOrigin } from '../scripts/test-utils/create-git-origin.ts';
+import { createStubAgentImageCheck } from '../scripts/test-utils/create-stub-agent-image-check.ts';
+import { createStubImpCLI } from '../scripts/test-utils/create-stub-imp-cli.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'build-agent-image-'));
@@ -29,13 +30,16 @@ async function setupTest() {
     fifo,
     clone: join(directory, 'clone'),
     startBuild: (args: readonly string[], env: Readonly<Record<string, string>>) => {
-      const child = Bun.spawn(['bun', join(import.meta.dir, 'build-agent-image.ts'), ...args], {
-        cwd: join(directory, 'clone'),
-        env: { ...repo.env, TMPDIR: temporary, ...env },
-        stdin: 'ignore',
-        stdout: 'pipe',
-        stderr: 'pipe',
-      });
+      const child = Bun.spawn(
+        ['bun', join(import.meta.dir, '..', 'scripts', 'build-agent-image.ts'), ...args],
+        {
+          cwd: join(directory, 'clone'),
+          env: { ...repo.env, TMPDIR: temporary, ...env },
+          stdin: 'ignore',
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
 
       onTestFinished(() => {
         child.kill('SIGKILL');
@@ -117,7 +121,6 @@ test.each([
     expect(state).toStrictEqual({ images: [], imps: [] });
     expect(left).toStrictEqual([]);
   },
-  30_000,
 );
 
 test('it keeps the image on an interrupt with --keep, and still removes the check imp', async () => {
@@ -156,7 +159,7 @@ test('it keeps the image on an interrupt with --keep, and still removes the chec
   });
 
   expect(left).toStrictEqual([]);
-}, 30_000);
+});
 
 test('it lets a retry after an interrupt build and check the same commit', async () => {
   const ctx = await setupTest();
@@ -190,4 +193,4 @@ test('it lets a retry after an interrupt build and check the same commit', async
     exitCode: 0,
     stdout: `agent-${short} imp-build-stub-agent-${short} check passed\n`,
   });
-}, 30_000);
+});
