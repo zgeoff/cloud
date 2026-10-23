@@ -172,8 +172,9 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    reinstall does not stage. The script refuses to write while the bind is not mounted.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
-10. Turn Secure Boot on again, from step 7 of
-    [Turn Secure Boot on](./secure-boot.md#turn-secure-boot-on).
+10. Turn Secure Boot on again, as
+    [Switches and reinstalls](./secure-boot.md#switches-and-reinstalls) describes. Its first check
+    shows whether the firmware kept the enrolled keys, and so whether to enroll them again.
 
 ## Connect Pulumi to k3s
 
