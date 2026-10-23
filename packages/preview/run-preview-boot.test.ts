@@ -463,6 +463,88 @@ test("it writes the route into the stack's .env after the commit's own lines, so
   expect(written).toBe('NIXIE_PREVIEW_BIND=0.0.0.0\nPREVIEW_MODEL_ROUTE=pv-0a1b2c3d-17\n');
 });
 
+// Docker's CLI with its Compose plugin reads a project's config with no daemon; a host without the
+// CLI skips this case, and CI's runners hold it
+test.skipIf(Bun.which('docker') === null)(
+  "it keeps the route in nixie's environment for a compose command run without the boot's variables",
+  async () => {
+    const ctx = await setupTest();
+
+    const origin = join(ctx.directory, 'origin');
+    const gitConfig = join(ctx.directory, 'gitconfig');
+    const checkout = join(ctx.directory, 'checkout');
+    const compose = `services:\n  nixie:\n    image: nixie-preview:local\n    environment:\n      NIXIE_PREVIEW_MODEL_ROUTE: \${PREVIEW_MODEL_ROUTE:-}\n`;
+
+    await Bun.write(join(origin, 'preview', 'compose.yaml'), compose);
+
+    await Bun.write(
+      gitConfig,
+      `[user]\n  name = Preview Test\n  email = preview@example.test\n[maintenance]\n  auto = false\n[url "file://${origin}"]\n  insteadOf = https://github.com/acme/greenhouse.git\n`,
+    );
+
+    await Bun.write(join(ctx.directory, 'bin', 'docker'), '#!/bin/sh\nexit 0\n');
+
+    await Bun.$`chmod 0755 ${join(ctx.directory, 'bin', 'docker')}`;
+
+    const gitEnv = {
+      PATH: process.env['PATH'] ?? '',
+      GIT_CONFIG_GLOBAL: gitConfig,
+      GIT_CONFIG_NOSYSTEM: '1',
+    };
+
+    await Bun.$`git init -q && git add -A && git commit -q -m preview`.cwd(origin).env(gitEnv);
+
+    const revParsed = await Bun.$`git rev-parse HEAD`.cwd(origin).env(gitEnv).text();
+
+    const headSHA = revParsed.trim();
+
+    composeFiles.set(`acme/greenhouse@${headSHA}`, compose);
+    ctx.impd.apps.set('pv-0a1b2c3d-17', { address: '0.0.0.0', port: 8080 });
+    ctx.store.upsertHead({ repo: 'acme/greenhouse', number: 17, imp: 'pv-0a1b2c3d-17', headSHA });
+
+    ctx.store.updatePhase({ repo: 'acme/greenhouse', number: 17 }, ['waiting'], {
+      phase: 'booting',
+    });
+
+    await runPreviewBoot(
+      {
+        ...ctx.deps,
+        settings: { ...ctx.deps.settings, impModelSecret: 'preview-model-counted' },
+        spendProxies: {
+          holdProxy: () => Promise.reject(new Error('a boot starts no counting proxy')),
+          removeProxy: () => Promise.resolve(),
+          removeIdle: () => Promise.resolve(),
+          removeAll: () => Promise.resolve(),
+        },
+      },
+      {
+        repo: 'acme/greenhouse',
+        number: 17,
+        imp: 'pv-0a1b2c3d-17',
+        headSHA,
+        builtSHA: null,
+        phase: 'booting',
+        detail: null,
+      },
+    );
+
+    const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+      env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
+    });
+
+    await guest.exited;
+
+    const config = await Bun.$`docker compose config --format json`
+      .cwd(join(checkout, 'preview'))
+      .env({ PATH: process.env['PATH'] ?? '', HOME: ctx.directory })
+      .json();
+
+    expect(config).toMatchObject({
+      services: { nixie: { environment: { NIXIE_PREVIEW_MODEL_ROUTE: 'pv-0a1b2c3d-17' } } },
+    });
+  },
+);
+
 test("it leaves no route in the stack's .env once the previews run without counting proxies", async () => {
   const ctx = await setupTest();
 
