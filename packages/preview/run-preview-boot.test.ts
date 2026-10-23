@@ -15,9 +15,13 @@ import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
 async function setupTest() {
+  const stack = new AsyncDisposableStack();
+
+  onTestFinished(() => stack.disposeAsync());
+
   const directory = await mkdtemp(join(tmpdir(), 'preview-boot-'));
 
-  onTestFinished(() => rm(directory, { recursive: true, force: true }));
+  stack.defer(() => rm(directory, { recursive: true, force: true }));
 
   const store = createPreviewStore(join(directory, 'previews.sqlite'));
 
@@ -66,7 +70,7 @@ async function setupTest() {
     log: () => {},
   };
 
-  return { deps, store, impd, directory };
+  return { deps, store, impd, directory, stack };
 }
 
 test('it creates the imp with the contract port and the grant, then builds and probes the head commit', async () => {
@@ -456,6 +460,12 @@ test("it writes the route into the stack's .env after the commit's own lines, so
     stderr: 'pipe',
   });
 
+  ctx.stack.defer(async () => {
+    guest.kill();
+
+    await guest.exited;
+  });
+
   const exitCode = await guest.exited;
   const written = await Bun.file(join(checkout, 'preview', '.env')).text();
 
@@ -532,6 +542,12 @@ test.skipIf(Bun.which('docker') === null)(
       env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
     });
 
+    ctx.stack.defer(async () => {
+      guest.kill();
+
+      await guest.exited;
+    });
+
     await guest.exited;
 
     const config: unknown = await Bun.$`docker compose config --format json`
@@ -598,6 +614,12 @@ test("it leaves no route in the stack's .env once the previews run without count
     env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
     stdout: 'pipe',
     stderr: 'pipe',
+  });
+
+  ctx.stack.defer(async () => {
+    guest.kill();
+
+    await guest.exited;
   });
 
   const exitCode = await guest.exited;
