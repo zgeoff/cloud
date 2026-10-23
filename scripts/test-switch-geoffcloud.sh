@@ -5,7 +5,9 @@
 # before the activation, never follows a failed build, activates the exact store path the build
 # printed, built from the checked commit, records that commit beside the path on the host before
 # the activation, never activates a build whose dry-activate would stop or restart k3s unless
-# --allow-k3s-restart names a planned k3s window, and fails when nixie is not ready after it. Each case
+# --allow-k3s-restart names a planned k3s window, and fails when nixie is not ready after it. Only a
+# switch that passes every check moves origin's deployed/host tag to the switched commit, and one
+# whose push origin refuses fails with the command that moves the tag. Each case
 # that switches commits its own nixos/packages/atc.nix and imp-host pin. gh also serves the nixie
 # release's bun.lock, and the fake clock stands in for the readiness check's pause. It touches
 # no host and runs no Nix: gh replays recorded answers (create-stub-gh.sh), the bun.lock from
@@ -92,6 +94,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == switch root@geoffcloud
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -119,7 +122,108 @@ nixos/marker
 nixos/packages/atc.nix
 EOF
   diff - "$tree/build-saw/nixos/marker" <<< committed
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$commit"
   assert_status 0 "$status"
+}
+
+it_moves_deployed_host_from_an_earlier_commit_to_the_switched_one() {
+  local commit earlier status=0
+  create_case_tree
+  setup_test "$tree"
+  earlier="$(git -C "$tree/clone" rev-parse HEAD)"
+  git -C "$tree/clone" push -q origin "$earlier:refs/tags/deployed/host"
+  mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin atc'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== switch root@geoffcloud
+== root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== nixie ready: store, imp_host
+== deployed/host moved to $commit
+EOF
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$commit"
+  assert_status 0 "$status"
+}
+
+it_fails_naming_the_command_that_moves_deployed_host_when_origin_refuses_the_tag() {
+  local commit earlier status=0
+  create_case_tree
+  setup_test "$tree"
+  earlier="$(git -C "$tree/clone" rev-parse HEAD)"
+  git -C "$tree/clone" push -q origin "$earlier:refs/tags/deployed/host"
+  # a pre-receive hook that refuses every tag, as a ruleset on tags would
+  mkdir -p "$tree/origin.git/hooks"
+  cat > "$tree/origin.git/hooks/pre-receive" << 'EOF'
+#!/bin/sh
+while read -r _ _ ref; do case "$ref" in refs/tags/*) exit 1 ;; esac; done
+EOF
+  chmod +x "$tree/origin.git/hooks/pre-receive"
+  mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin atc'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << EOF
+To $tree/origin.git
+ ! [remote rejected] $commit -> deployed/host (pre-receive hook declined)
+error: failed to push some refs to '$tree/origin.git'
+root@geoffcloud runs ${commit:0:7}, but deployed/host did not move; move it with \`git push --force origin $commit:refs/tags/deployed/host\`
+EOF
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== switch root@geoffcloud
+== root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== nixie ready: store, imp_host
+EOF
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$earlier"
+  assert_status 1 "$status"
 }
 
 it_prints_the_failed_units_the_host_reports_after_the_switch() {
@@ -160,6 +264,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 alloy.service loaded failed failed Alloy
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -218,6 +323,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == switch root@geoffcloud
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -328,6 +434,7 @@ would restart the following units: k3s.service
 == switch root@geoffcloud
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -433,6 +540,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == switch root@geoffcloud
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -494,6 +602,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == switch root@geoffcloud
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -563,6 +672,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == switch root@geoffcloud
 == root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $checked
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -590,6 +700,8 @@ EOF
   git -C "$tree/clone" rev-parse HEAD~1 > "$tree/parent"
   diff - "$tree/parent" <<< "$checked"
   diff - "$tree/build-saw/nixos/marker" <<< committed
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$checked"
   assert_status 0 "$status"
 }
 
@@ -855,9 +967,11 @@ EOF
 }
 
 it_fails_the_switch_naming_each_part_when_nixie_is_not_ready_after_it() {
-  local commit status=0 unready
+  local commit earlier status=0 unready
   create_case_tree
   setup_test "$tree"
+  earlier="$(git -C "$tree/clone" rev-parse HEAD)"
+  git -C "$tree/clone" push -q origin "$earlier:refs/tags/deployed/host"
   mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
   echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
@@ -908,6 +1022,8 @@ $nixie_lock_call
 $(for _ in $(seq 1 30); do printf '%s\n' "$nixie_ready_call"; done)
 EOF
   diff - "$tree/clock/pauses" <<< "$(for _ in $(seq 1 29); do echo 10; done)"
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$earlier"
   assert_status 1 "$status"
 }
 
@@ -974,6 +1090,7 @@ built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.
 == switch root@other.test
 == root@other.test runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
 == nixie ready: store, imp_host
+== deployed/host moved to $commit
 EOF
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
   diff - "$tree/calls-masked" << EOF
@@ -1442,9 +1559,11 @@ EOF
 }
 
 it_stops_with_the_activation_exit_code_when_switch_to_configuration_fails() {
-  local commit status=0
+  local commit earlier status=0
   create_case_tree
   setup_test "$tree"
+  earlier="$(git -C "$tree/clone" rev-parse HEAD)"
+  git -C "$tree/clone" push -q origin "$earlier:refs/tags/deployed/host"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
   mkdir -p "$tree/clone/nixos/hosts/geoffcloud"
@@ -1496,6 +1615,8 @@ $dry_activate_call
 $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 EOF
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$earlier"
   assert_status 4 "$status"
 }
 
@@ -1556,9 +1677,11 @@ EOF
 }
 
 it_fails_when_the_host_runs_another_system_after_the_switch() {
-  local commit status=0
+  local commit earlier status=0
   create_case_tree
   setup_test "$tree"
+  earlier="$(git -C "$tree/clone" rev-parse HEAD)"
+  git -C "$tree/clone" push -q origin "$earlier:refs/tags/deployed/host"
   mkdir -p "$tree/clone/nixos/packages"
   echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
   mkdir -p "$tree/clone/nixos/hosts/geoffcloud"
@@ -1607,6 +1730,8 @@ $nixie_lock_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","nix-env -p /nix/var/nix/profiles/system --set '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test'   && mkdir -p /var/lib/host-build-lag && echo '$commit /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test' >> /var/lib/host-build-lag/switches   && NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE -E NIXOS_INSTALL_BOOTLOADER     -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration' switch"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","readlink","/run/current-system"]
 EOF
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$earlier"
   assert_status 1 "$status"
 }
 

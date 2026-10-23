@@ -16,6 +16,9 @@
 # (check-k3s-restart.sh).
 # After the activation it waits for nixie's /health/ready to report every part ready
 # (check-nixie-ready.sh), and fails with each part that is not, since nixie needs impd to start.
+# Once every check passes, it moves origin's deployed/host tag to the switched commit, so a change
+# that reaches the host only through a switch counts as shipped once the host runs it. A failed
+# switch leaves the tag where it was.
 # The switch runs only after the build
 # exits 0: a failed build stops the script before
 # anything reaches the host. The build reads a `git archive` snapshot of the checked commit,
@@ -192,3 +195,15 @@ fi
 echo "== $host runs $current"
 ssh -o BatchMode=yes "$host" systemctl --failed --no-legend --plain
 bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$host"
+
+# The tag records the commit the host runs, and the last activation decides that, so the push forces
+# the tag even when an earlier switch left it on a later commit. A failed push fails the switch with
+# git's exit code and the command that moves the tag by hand, because the host runs the commit.
+push_status=0
+git -C "$repo" push -q --force origin "$commit:refs/tags/deployed/host" || push_status=$?
+if [[ "$push_status" != 0 ]]; then
+  echo "$host runs ${commit:0:7}, but deployed/host did not move; move it with" \
+    "\`git push --force origin $commit:refs/tags/deployed/host\`" >&2
+  exit "$push_status"
+fi
+echo "== deployed/host moved to $commit"

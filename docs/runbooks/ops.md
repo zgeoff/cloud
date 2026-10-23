@@ -44,6 +44,8 @@ bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s 
   covers the commit, the atc daemon and gateway majors, nixie's imp client against impd, a k3s
   restart, and nixie's readiness after the switch. [Switch the host](./workflows.md#switch-the-host)
   explains each refusal.
+- After every check passes, the script pushes the tag `deployed/host` on `origin` to the switched
+  commit, so the caller needs push access to `zgeoff/cloud`.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`.
 - Pass `--allow-k3s-restart` only in a planned k3s window that the owner approved.

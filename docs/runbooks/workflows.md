@@ -132,6 +132,14 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    host that switches cleanly can still leave nixie unable to start. It prints each advisory part
    that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
    turns fail.
+10. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+    `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
+    marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
+    a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves
+    the tag where it was. The push forces the tag, because the last activation decides what the host
+    runs, even when it activates an older commit. When `origin` refuses the push, the script exits
+    with git's code and prints the `git push --force origin <commit>:refs/tags/deployed/host` that
+    moves the tag by hand.
 
 A timer on the host checks every hour whether it runs an older system or imp than the latest green
 NixOS checks run on `main`, and after a day of that the `HostBehindLatestBuild` alert fires, as
