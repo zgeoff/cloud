@@ -116,6 +116,15 @@ Prometheus and Alertmanager. Alertmanager keeps silences and notification state 
 storage, so a restart forgets them. Grafana does no alerting. The sign-in alerts take a route of
 their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
 
+A critical alert reaches Discord twice: once as every alert does, and once in a message that
+mentions the owner's Discord user, so the owner's phone gets a push. The mention goes with a firing
+alert only, and the resolved message comes without it. The user's ID reaches Alertmanager as a
+template file in the webhook's Secret, so the ID never appears in the repo or in Alertmanager's
+config. Alertmanager reads a template only when it loads its config, so a change to the Secret
+restarts Alertmanager through a checksum of the Secret on its pod. Each message's title holds the
+status, the alert name and the namespace, each cut to a length that keeps the title within Discord's
+title limit. The sign-in alerts keep Alertmanager's default title, which lists their labels.
+
 ## Sign-in alerts
 
 ```mermaid

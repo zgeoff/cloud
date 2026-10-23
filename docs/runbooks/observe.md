@@ -74,7 +74,7 @@ approval first.
    This adds `geoff-cloud:discordAlerts: 'true'` to `infra/Pulumi.prod.yaml`.
 
 2. `bun run preview` shows the new Secret `observability/alertmanager-discord`. The run fails if
-   `ALERT_WEBHOOK_URL` is empty.
+   `ALERT_WEBHOOK_URL` or `ALERT_MENTION_USER_ID` is empty.
 3. The merge applies it through the apply job. Alertmanager then sends every alert to Discord,
    except the chart's always-firing `Watchdog` and its `InfoInhibitor` helper.
 

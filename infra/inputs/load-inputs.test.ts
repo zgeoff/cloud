@@ -1,5 +1,6 @@
 import { expect, test } from 'bun:test';
 import { Output } from '@pulumi/pulumi';
+import invariant from 'tiny-invariant';
 import { buildStubConfig } from '../test-utils/build-stub-config.ts';
 import { loadInputs } from './load-inputs.ts';
 
@@ -32,12 +33,13 @@ test('it throws a clear error when CLOUDFLARE_ACCOUNT_ID is blank', () => {
   );
 });
 
-test('it gives the health check and Alertmanager the same trimmed webhook URL', () => {
+test('it gives the health check and Alertmanager the same trimmed webhook URL, and Alertmanager the trimmed user to mention', () => {
   const inputs = loadInputs(buildStubConfig({ cluster: 'managed', discordAlerts: 'true' }), {
     CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
     K3S_KUBECONFIG: 'apiVersion: v1',
     ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
     ALERT_WEBHOOK_URL: ' https://discord.com/api/webhooks/1/abc\n',
+    ALERT_MENTION_USER_ID: ' 100000000000000001\n',
   });
 
   expect(inputs).toStrictEqual({
@@ -47,20 +49,41 @@ test('it gives the health check and Alertmanager the same trimmed webhook URL', 
     cluster: {
       kubeconfig: 'apiVersion: v1',
       onePasswordConnectCredentials: expect.toSatisfy((value: unknown) => Output.isInstance(value)),
-      alertWebhookURL: 'https://discord.com/api/webhooks/1/abc',
+      alertWebhook: {
+        url: 'https://discord.com/api/webhooks/1/abc',
+        mentionUserID: '100000000000000001',
+      },
     },
   });
 });
 
 test('it leaves Alertmanager without the webhook while discordAlerts is off', () => {
-  expect(
-    loadInputs(buildStubConfig({ cluster: 'managed' }), {
+  const inputs = loadInputs(buildStubConfig({ cluster: 'managed' }), {
+    CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+    K3S_KUBECONFIG: 'apiVersion: v1',
+    ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
+    ALERT_WEBHOOK_URL: 'https://discord.com/api/webhooks/1/abc',
+    ALERT_MENTION_USER_ID: '100000000000000001',
+  });
+
+  invariant(inputs.cluster);
+
+  expect(inputs.cluster.alertWebhook).toBeUndefined();
+});
+
+test('it throws when discordAlerts is on for a managed cluster and the user to mention is blank', () => {
+  expect(() =>
+    loadInputs(buildStubConfig({ cluster: 'managed', discordAlerts: 'true' }), {
       CLOUDFLARE_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
       K3S_KUBECONFIG: 'apiVersion: v1',
       ONEPASSWORD_CONNECT_CREDENTIALS: '{"verifier":{}}',
       ALERT_WEBHOOK_URL: 'https://discord.com/api/webhooks/1/abc',
-    }).cluster?.alertWebhookURL,
-  ).toBeUndefined();
+      ALERT_MENTION_USER_ID: ' ',
+    }),
+  ).toThrowWithMessage(
+    Error,
+    'discordAlerts is on, but ALERT_MENTION_USER_ID is empty; run through `op run --env-file=../.env`',
+  );
 });
 
 test('it throws when discordAlerts is on for a managed cluster and the webhook is blank', () => {
