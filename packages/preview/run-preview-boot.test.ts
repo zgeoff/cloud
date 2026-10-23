@@ -534,7 +534,7 @@ test.skipIf(Bun.which('docker') === null)(
 
     await guest.exited;
 
-    const config = await Bun.$`docker compose config --format json`
+    const config: unknown = await Bun.$`docker compose config --format json`
       .cwd(join(checkout, 'preview'))
       .env({ PATH: process.env['PATH'] ?? '', HOME: ctx.directory })
       .json();
