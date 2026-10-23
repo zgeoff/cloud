@@ -30,6 +30,7 @@ let
   firewallModules = {
     imports = [
       ../modules/cloud-host-firewall.nix
+      ../modules/public-front.nix
       imp.nixosModules.imp
     ];
   };
@@ -797,7 +798,7 @@ let
         '';
     }
     {
-      title = "it reports each imp publicPorts spec without a public entry";
+      title = "it reports each imp publicPorts spec without a public entry, and a loopback one without a host-scope entry for lo";
       script =
         let
           system = buildModuleSystem firewallModules {
@@ -815,7 +816,7 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "imp's publicPorts publishes 104.250.100.18:80:7480 (tcp 80) with no public registry entry"
-                "imp's publicPorts publishes 127.0.0.1:5353:53/udp (udp 5353) with no public registry entry"
+                "imp's publicPorts publishes 127.0.0.1:5353:53/udp (udp 5353) with no host-scope registry entry for lo"
                 "imp's publicPorts publishes 8000-8001:8000-8001, whose host port the exposure check cannot read"
               ]
             )
@@ -867,6 +868,277 @@ let
                 kind = "host-port";
                 protocol = "tcp";
                 port = 443;
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it accepts a port open on every interface whose public entry follows a tailnet entry for the same port";
+      script =
+        let
+          system = buildModuleSystem firewallModules { networking.firewall.allowedTCPPorts = [ 443 ]; };
+        in
+        ''
+          assert_equals '[]' ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "ingress";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "tailnet";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a host-scope entry for lo that no imp publicPorts spec publishes";
+      script =
+        let
+          system = buildModuleSystem firewallModules { };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's listener entry is host scope on lo, but nothing opens or admits tcp 7071 there"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it finds no mismatch when the TLS front serves its registry route from a loopback publish";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "127.0.0.1:7071:7071" ];
+            services.public-front = {
+              enable = true;
+              routes = [
+                {
+                  hostname = "mcp.example.test";
+                  upstream = "127.0.0.1:7071";
+                  paths = [
+                    "/mcp"
+                    "/login"
+                  ];
+                }
+              ];
+              rateLimit = {
+                events = 10;
+                window = "1m";
+              };
+            };
+          };
+        in
+        ''
+          assert_equals '[]' ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+              {
+                name = "mcp";
+                kind = "front-route";
+                hostname = "mcp.example.test";
+                upstream = "127.0.0.1:7071";
+                paths = [
+                  "/login"
+                  "/mcp"
+                ];
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a TLS front route whose upstream and paths differ from its registry entry's";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "127.0.0.1:7071:7071" ];
+            services.public-front = {
+              enable = true;
+              routes = [
+                {
+                  hostname = "mcp.example.test";
+                  upstream = "127.0.0.1:7070";
+                  paths = [
+                    "/mcp"
+                    "/login"
+                    "/rpc"
+                  ];
+                }
+              ];
+              rateLimit = {
+                events = 10;
+                window = "1m";
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the TLS front serves mcp.example.test from 127.0.0.1:7070, with no host-scope registry entry for lo"
+                "the TLS front serves mcp.example.test to 127.0.0.1:7070, but the registry's mcp entry names 127.0.0.1:7071"
+                "the TLS front serves mcp.example.test for the paths /login /mcp /rpc, but the registry's mcp entry lists /login /mcp"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+              {
+                name = "mcp";
+                kind = "front-route";
+                hostname = "mcp.example.test";
+                upstream = "127.0.0.1:7071";
+                paths = [
+                  "/mcp"
+                  "/login"
+                ];
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a TLS front route without a registry entry, and a public front-route entry the front does not serve";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "127.0.0.1:7071:7071" ];
+            services.public-front = {
+              enable = true;
+              routes = [
+                {
+                  hostname = "mcp.example.test";
+                  upstream = "127.0.0.1:7071";
+                  paths = [ "/mcp" ];
+                }
+              ];
+              rateLimit = {
+                events = 10;
+                window = "1m";
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the TLS front serves mcp.example.test with no public front-route registry entry"
+                "the registry's notes entry is a public front route, but the TLS front does not serve notes.example.test"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+              {
+                name = "notes";
+                kind = "front-route";
+                hostname = "notes.example.test";
+                upstream = "127.0.0.1:7071";
+                paths = [ "/mcp" ];
                 scope = "public";
               }
             ]

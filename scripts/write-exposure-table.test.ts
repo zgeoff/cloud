@@ -64,6 +64,16 @@ test('it writes one row per entry between the markers, and keeps the rest of the
         reason: 'held',
       },
       {
+        name: 'notes',
+        kind: 'front-route',
+        hostname: 'notes.example.org',
+        upstream: '127.0.0.1:8080',
+        paths: ['/notes', '/login'],
+        scope: 'public',
+        reason: 'the notes API',
+        auth: 'a token',
+      },
+      {
         name: 'funnel',
         kind: 'tailnet-capability',
         attr: 'funnel',
@@ -93,14 +103,15 @@ The prose.
 
 <!-- exposure:start -->
 
-| Name        | Kind               | Exposes                       | Scope    | Reason            | Auth            | Ticket  |
-| ----------- | ------------------ | ----------------------------- | -------- | ----------------- | --------------- | ------- |
-| \`tailscale\` | host-port          | udp 41641                     | public   | direct \\| relayed |                 |         |
-| \`relay\`     | host-port          | tcp 18081 on \`docker0\`        | host     | the relay         |                 |         |
-| \`icmp\`      | host-port          | icmp                          | public   | ping              |                 |         |
-| \`imp\`       | tunnel-hostname    | \`imp.example.org\`             | reserved | held              |                 |         |
-| \`funnel\`    | tailnet-capability | node attribute \`funnel\`       | public   | f                 | signed \\| keyed | GEO-425 |
-| \`worker\`    | worker-url         | \`health-check\` on workers.dev | closed   | cron              |                 |         |
+| Name        | Kind               | Exposes                                                     | Scope    | Reason            | Auth            | Ticket  |
+| ----------- | ------------------ | ----------------------------------------------------------- | -------- | ----------------- | --------------- | ------- |
+| \`tailscale\` | host-port          | udp 41641                                                   | public   | direct \\| relayed |                 |         |
+| \`relay\`     | host-port          | tcp 18081 on \`docker0\`                                      | host     | the relay         |                 |         |
+| \`icmp\`      | host-port          | icmp                                                        | public   | ping              |                 |         |
+| \`imp\`       | tunnel-hostname    | \`imp.example.org\`                                           | reserved | held              |                 |         |
+| \`notes\`     | front-route        | \`notes.example.org\` to \`127.0.0.1:8080\`: \`/notes\`, \`/login\` | public   | the notes API     | a token         |         |
+| \`funnel\`    | tailnet-capability | node attribute \`funnel\`                                     | public   | f                 | signed \\| keyed | GEO-425 |
+| \`worker\`    | worker-url         | \`health-check\` on workers.dev                               | closed   | cron              |                 |         |
 
 <!-- exposure:end -->
 

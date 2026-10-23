@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { exposure } from '@zgeoff/cloud-topology';
 import type { ExposureEntry } from '@zgeoff/cloud-topology';
+import { match } from 'ts-pattern';
 
 export interface WriteExposureTableOptions {
   readonly args: readonly string[];
@@ -95,19 +96,22 @@ function renderRow(entry: ExposureEntry): readonly string[] {
 }
 
 function formatExposes(entry: ExposureEntry): string {
-  if (entry.kind === 'host-port') {
-    const port = entry.port === undefined ? entry.protocol : `${entry.protocol} ${entry.port}`;
+  return match(entry)
+    .with({ kind: 'host-port' }, (hostPort) => {
+      const port =
+        hostPort.port === undefined ? hostPort.protocol : `${hostPort.protocol} ${hostPort.port}`;
 
-    return entry.interface === undefined ? port : `${port} on \`${entry.interface}\``;
-  }
-
-  if (entry.kind === 'tunnel-hostname') {
-    return `\`${entry.hostname}\``;
-  }
-
-  return entry.kind === 'tailnet-capability'
-    ? `node attribute \`${entry.attr}\``
-    : `\`${entry.script}\` on workers.dev`;
+      return hostPort.interface === undefined ? port : `${port} on \`${hostPort.interface}\``;
+    })
+    .with({ kind: 'tunnel-hostname' }, (route) => `\`${route.hostname}\``)
+    .with(
+      { kind: 'front-route' },
+      (route) =>
+        `\`${route.hostname}\` to \`${route.upstream}\`: ${route.paths.map((path) => `\`${path}\``).join(', ')}`,
+    )
+    .with({ kind: 'tailnet-capability' }, (capability) => `node attribute \`${capability.attr}\``)
+    .with({ kind: 'worker-url' }, (worker) => `\`${worker.script}\` on workers.dev`)
+    .exhaustive();
 }
 
 function formatCell(text: string): string {
