@@ -381,8 +381,6 @@ let
             tcp dport 8418 drop
             tcp dport 18081 iifname "docker0" ip saddr 172.17.0.0/16 ip daddr 172.17.0.1 accept
             tcp dport 18081 drop
-            tcp dport 18082 iifname "docker0" ip saddr 172.17.0.0/16 ip daddr 172.17.0.1 accept
-            tcp dport 18082 drop
           }
           chain forward {
             type filter hook forward priority filter - 10; policy accept;
