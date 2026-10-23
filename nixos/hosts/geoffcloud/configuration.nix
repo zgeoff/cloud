@@ -72,7 +72,15 @@ in
   time.timeZone = "Australia/Melbourne";
 
   boot = {
-    loader.systemd-boot.enable = true;
+    # lanzaboote installs systemd-boot and signs it, each generation's unified kernel image and the
+    # fallback loader with the db key in pkiBundle, sbctl's default directory. The Secure Boot
+    # runbook creates the bundle on the host before the first switch to this config, because the
+    # switch fails at the boot loader install without it (docs/runbooks/secure-boot.md)
+    loader.systemd-boot.enable = false;
+    lanzaboote = {
+      enable = true;
+      pkiBundle = "/var/lib/sbctl";
+    };
     loader.efi.canTouchEfiVariables = true;
     kernelModules = [ "kvm-amd" ];
     supportedFilesystems = [ "zfs" ];
@@ -528,6 +536,8 @@ in
     htop
     k9s
     kubectl
+    # creates, checks and enrolls the Secure Boot keys (docs/runbooks/secure-boot.md)
+    sbctl
     zfs
   ];
 

@@ -20,7 +20,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
 1. Turn off Secure Boot for the VM in the Onidel panel, then reboot the VM through the API. With
    Secure Boot on, kernel lockdown blocks the kexec that `nixos-anywhere` uses.
-2. Check from the host: `mokutil --sb-state` prints `SecureBoot disabled`.
+2. Check from the host: `bootctl status` prints `Secure Boot: disabled`.
 3. Mint fresh host keys first. Both are single-use and keep their used or expired state
    (`recreateIfInvalid: 'never'`), so only a replace makes new ones:
 
@@ -79,8 +79,19 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
    Expect `ok`. Without it, check the item and stage the key again before you go on.
 
-   Without the key, the host boots and joins the tailnet, but k3s, imp-host and the atc daemon stay
-   stopped ([tank/cloud](./tank-cloud.md#if-the-key-fails-to-load-at-boot)).
+   Stage the Secure Boot key bundle from its copy in 1Password. The install signs the boot files
+   with it, and without it the install fails at the boot loader install
+   ([Secure Boot](./secure-boot.md)):
+
+   ```sh
+   op document get secure-boot-keys --vault cloud | tar -C $x/var/lib -xzf -
+   test -f $x/var/lib/sbctl/keys/db/db.key && echo ok
+   ```
+
+   Expect `ok`.
+
+   Without the ZFS key, the host boots and joins the tailnet, but k3s, imp-host and the atc daemon
+   stay stopped ([tank/cloud](./tank-cloud.md#if-the-key-fails-to-load-at-boot)).
 
 4. Stop imp on the old host, and export its pool, so that NixOS imports `tank` cleanly:
 
@@ -161,6 +172,8 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    reinstall does not stage. The script refuses to write while the bind is not mounted.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
+10. Turn Secure Boot on again, from step 6 of
+    [Turn Secure Boot on](./secure-boot.md#turn-secure-boot-on).
 
 ## Connect Pulumi to k3s
 

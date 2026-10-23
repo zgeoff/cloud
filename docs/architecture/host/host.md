@@ -24,9 +24,19 @@ The VM has two disks with different owners:
 ZFS encrypts every dataset on the pool that holds data, and the host loads the key from the root
 disk at boot, so neither disk alone exposes the data
 ([protection at rest](../secrets.md#protection-at-rest)). The ZFS kernel module must support the
-host's kernel, so a NixOS upgrade can wait on ZFS. The reinstall runs `nixos-anywhere`, whose kexec
-the VM's Secure Boot blocks, so Secure Boot stays off
-([the reinstall runbook](../../runbooks/reinstall-geoffcloud.md)).
+host's kernel, so a NixOS upgrade can wait on ZFS.
+
+## Secure Boot
+
+The host boots through lanzaboote, which signs systemd-boot and each generation's unified kernel
+image with the host's own Secure Boot keys at every switch. The firmware enforces those signatures
+once the keys are enrolled and Secure Boot is on for the VM in the Onidel panel. The key bundle sits
+on the root disk, readable by root only, because a switch signs the boot files and a switch must
+work while the pool is missing; 1Password holds a copy for a reinstall. A switch to this config
+fails at the boot loader install until the bundle exists on the host. A reinstall turns Secure Boot
+off first, because kernel lockdown blocks the kexec that `nixos-anywhere` uses.
+[Secure Boot](../../runbooks/secure-boot.md) gives the steps that create, enroll and recover the
+keys.
 
 ## Services
 

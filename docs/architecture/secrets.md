@@ -68,13 +68,15 @@ directory of it, at that path.
 
 ### What stays plain on the root disk
 
-Four things stay on `vda` in plain form, each for a reason:
+Five things stay on `vda` in plain form, each for a reason:
 
 - **The host's Tailscale node state**, because access to the host must never depend on the pool. A
   host whose pool fails to unlock still joins the tailnet and answers SSH.
 - **The ZFS key**, because the host unlocks the pool at boot with no one present.
 - **The OpenSSH host keys**, which identify the host to an SSH client.
 - **The atc daemon's state directory**, which holds neither of the daemon's tokens.
+- **The Secure Boot keys**, because each switch signs the boot files with them, and a switch must
+  work while the pool is missing ([Secure Boot](../runbooks/secure-boot.md)).
 
 ### The key and the unlock
 
@@ -137,7 +139,7 @@ loses them:
 
 ## Items outside `.env`
 
-The program reads the items `.env` references. Four more items in the vault serve other readers:
+The program reads the items `.env` references. Five more items in the vault serve other readers:
 
 | Item                    | Read by                                                                  |
 | ----------------------- | ------------------------------------------------------------------------ |
@@ -145,6 +147,7 @@ The program reads the items `.env` references. Four more items in the vault serv
 | `imp-restic`            | imp's backup password, placed on the host at reinstall                   |
 | `r2-backups`            | imp's backup repository and its R2 keys, placed on the host at reinstall |
 | `imp-dns-cloudflare`    | imp's DNS token and ACME email, which the DNS token script installs      |
+| `secure-boot-keys`      | the host's Secure Boot key bundle, placed on the host at reinstall       |
 
 ## The Onidel VM object
 

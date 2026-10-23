@@ -56,6 +56,8 @@ call, the path of a change, the topology and the data.
   run by hand, and how to answer drift.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
+- [Secure Boot](./runbooks/secure-boot.md): create and enroll the host's Secure Boot keys, turn
+  Secure Boot on, and recover a host that fails to boot.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.

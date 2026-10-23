@@ -56,10 +56,10 @@ holds no matching generation. Reinstall then, as the next bullet does.
      is on `tank/imp`, so imp's node rejoins with it and needs no key.
   3. Run reinstall step 3 with that key in `$x/var/lib/tailscale/authkey`, and skip its
      `bun run up`. Write the key from the clipboard, as step 6 of
-     [Lose both disks](#lose-both-disks) does. Stage the ZFS key as the step does, and stage none of
-     the imp files, so skip the step's `chmod` of them as well: the bind from the pool's
-     `host-secrets` dataset mounts imp-host's live files over `/var/lib/imp-host/secrets`, so a
-     staged copy would sit hidden on `vda`.
+     [Lose both disks](#lose-both-disks) does. Stage the ZFS key and the Secure Boot keys as the
+     step does, and stage none of the imp files, so skip the step's `chmod` of them as well: the
+     bind from the pool's `host-secrets` dataset mounts imp-host's live files over
+     `/var/lib/imp-host/secrets`, so a staged copy would sit hidden on `vda`.
   4. Run reinstall steps 5 to 7, with the VM's public address as the install target, as step 7 of
      [Lose both disks](#lose-both-disks) describes. Skip step 2, which needs the old host, step 4,
      because no running host holds the pool, and step 8, because nothing of imp's was staged.
@@ -72,6 +72,7 @@ holds no matching generation. Reinstall then, as the next bullet does.
      preview to show one change, the VM's firewall group. Apply with `bun run up -- --refresh`
      instead of its plain `bun run up`: the preview saves no state, so a plain apply plans no change
      and leaves the group detached.
+  7. Turn Secure Boot on again, as reinstall step 10 does.
 
 ## Lose `vdb`
 
@@ -330,3 +331,4 @@ runbook. The `geoffcloud-no-pool` NixOS check covers the boot without a pool.
    new, empty dataset shadows them, so the block takes its first branch, which deletes them through
    a bind of `/` and leaves the pool alone.
 10. Continue from step 6 of [Lose `vdb`](#lose-vdb), and paste the `tag:imp` key from step 5 here.
+11. Turn Secure Boot on again, as reinstall step 10 does.

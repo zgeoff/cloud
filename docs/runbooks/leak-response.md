@@ -28,6 +28,8 @@ A snapshot copies `vda`, which holds these in plain form:
 - the OpenSSH host keys, which let the holder pose as the host to an SSH client
 - the ZFS key, which opens nothing without a copy of `vdb`
 - the atc daemon's state directory, which holds neither of the daemon's tokens
+- the Secure Boot keys, which let the holder sign boot files that the VM's firmware accepts, and
+  which matter only to someone who can also write to `vda`
 
 A snapshot from before the encryption holds every host secret file and the cluster's datastore in
 plain form as well. No such snapshot remains, and the response for it is the account response,

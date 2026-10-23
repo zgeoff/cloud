@@ -12,6 +12,12 @@
       url = "github:zgeoff/impz/2690dc03";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # signs geoffcloud's boot files for Secure Boot (docs/runbooks/secure-boot.md); pinned to a
+    # release tag, and by flake.lock
+    lanzaboote = {
+      url = "github:nix-community/lanzaboote/v1.2.0";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -20,6 +26,7 @@
       nixpkgs,
       disko,
       imp,
+      lanzaboote,
       ...
     }:
     let
@@ -27,6 +34,7 @@
       geoffcloudModules = [
         disko.nixosModules.disko
         imp.nixosModules.imp
+        lanzaboote.nixosModules.lanzaboote
         ./modules/impd-local-health.nix
         ./modules/host-build-lag.nix
         ./modules/agent-image-build.nix
