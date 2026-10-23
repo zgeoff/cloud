@@ -22,7 +22,7 @@ test('it routes every alert to the null receiver and mounts nothing without a we
   });
 });
 
-test('it routes alerts to Discord through the mounted Secret, a critical alert also to a receiver that mentions the user, Watchdog and InfoInhibitor to null, and the atc sign-in alerts grouped by name without resolved messages, when a webhook is given', () => {
+test('it routes alerts to Discord through the mounted Secret, restarts the pod when the Secret changes, sends a critical alert also to a receiver that mentions the user, Watchdog and InfoInhibitor to null, and the atc sign-in alerts grouped by name without resolved messages, when a webhook is given', () => {
   const title =
     '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ with .CommonLabels.alertname }}{{ reReplaceAll "(?s)^(.{0,150}).*$" "$1" . }}{{ else }}{{ len .Alerts }} alerts{{ end }}{{ with .GroupLabels.namespace }} in {{ reReplaceAll "(?s)^(.{0,63}).*$" "$1" . }}{{ end }}';
 
@@ -31,6 +31,7 @@ test('it routes alerts to Discord through the mounted Secret, a critical alert a
       secretName: 'alertmanager-discord',
       file: '/etc/alertmanager/secrets/alertmanager-discord/webhook-url',
       mentionTemplateFile: '/etc/alertmanager/secrets/alertmanager-discord/mention.tmpl',
+      checksum: '5d41402abc4b2a76b9719d911017c592ae0b0b6f7a4e1c3f3b8d4f5c6a7b8c9d',
     }),
   ).toStrictEqual({
     enabled: true,
@@ -98,6 +99,12 @@ test('it routes alerts to Discord through the mounted Secret, a critical alert a
     alertmanagerSpec: {
       secrets: ['alertmanager-discord'],
       resources: { requests: { cpu: '10m', memory: '32Mi' }, limits: { memory: '128Mi' } },
+      podMetadata: {
+        annotations: {
+          'geoff.cloud/alert-webhook-checksum':
+            '5d41402abc4b2a76b9719d911017c592ae0b0b6f7a4e1c3f3b8d4f5c6a7b8c9d',
+        },
+      },
     },
   });
 });

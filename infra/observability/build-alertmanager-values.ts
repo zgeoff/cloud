@@ -17,6 +17,7 @@ interface AlertWebhookMount {
   readonly secretName: string;
   readonly file: string;
   readonly mentionTemplateFile: string;
+  readonly checksum: string;
 }
 
 interface Receiver {
@@ -49,8 +50,11 @@ interface AlertmanagerValues {
   readonly alertmanagerSpec: {
     readonly secrets: readonly string[];
     readonly resources: Record<string, Record<string, string>>;
+    readonly podMetadata?: { readonly annotations: Record<string, string> };
   };
 }
+
+const checksumAnnotation = 'geoff.cloud/alert-webhook-checksum';
 
 const rootGrouping = {
   group_by: ['namespace'],
@@ -123,6 +127,12 @@ export function buildAlertmanagerValues(
     alertmanagerSpec: {
       secrets: webhook === undefined ? [] : [webhook.secretName],
       resources: { requests: { cpu: '10m', memory: '32Mi' }, limits: { memory: '128Mi' } },
+
+      // Alertmanager reads a template only at a reload, and the config reloader watches the
+      // config alone, so a change to the Secret restarts the pod through this annotation.
+      ...(webhook === undefined
+        ? {}
+        : { podMetadata: { annotations: { [checksumAnnotation]: webhook.checksum } } }),
     },
   };
 }
