@@ -253,10 +253,10 @@ test('it posts pending with the reason, starts no imp, and leaves the preview aw
     imp: 'pv-sdk-0123456789abcdef',
   });
 
-  await runContractRun(ctx.deps, {
-    repo: 'acme/greenhouse',
-    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  });
+  await runContractRun(
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z') },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
 
   expect(commitStatuses).toStrictEqual([
     {
@@ -306,10 +306,10 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
     { phase: 'waiting', detail: 'Waiting for a free preview slot' },
   );
 
-  await runContractRun(ctx.deps, {
-    repo: 'acme/greenhouse',
-    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  });
+  await runContractRun(
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z') },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
 
   expect(commitStatuses).toStrictEqual([]);
 });
@@ -346,7 +346,7 @@ test('it puts a preview unused for the idle time to sleep and runs a waiting run
   const log = mock<(line: string) => void>();
 
   await runContractRun(
-    { ...ctx.deps, log },
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z'), log },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
@@ -402,7 +402,7 @@ test('it keeps the run waiting and starts no imp when impd refuses to sleep the 
   const log = mock<(line: string) => void>();
 
   await runContractRun(
-    { ...ctx.deps, log },
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z'), log },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
