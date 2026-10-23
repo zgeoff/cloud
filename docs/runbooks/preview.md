@@ -221,8 +221,11 @@ Check a run live once the setup and a host switch are done:
    suite's counts, such as `18 pass, 0 fail`, and `host_imp ls` to show no `pv-sdk-` imp.
 3. Push a commit that leaves the pin alone. Expect the new head to get no `sdk-contract` status.
 
-A run that waits reads `Waiting for a free preview slot`, and the service tries it again each minute
-until a preview sleeps or goes. The journal holds the tail of each run's output:
+A run that waits reads `Waiting for a free preview slot`, and the service tries it again each
+minute. A try that finds a preview unused for `services.preview.contractIdleMinutes`, 5 by default,
+puts that preview to sleep and starts the run in its slot. A preview in use keeps its slot until it
+goes unused that long. The journal line `asleep to free a slot for the SDK contract run` names each
+preview a run put to sleep. The journal holds the tail of each run's output too:
 
 ```bash
 ssh root@geoffcloud journalctl -u preview -n 100 --no-pager

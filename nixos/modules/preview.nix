@@ -243,6 +243,15 @@ in
       description = "How long one contract run may take before it fails.";
     };
 
+    contractIdleMinutes = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 5;
+      description = ''
+        How long a running preview goes unused before a contract run that finds every slot taken
+        puts it to sleep to take its slot.
+      '';
+    };
+
     webhookSecretFile = lib.mkOption {
       type = lib.types.str;
       description = "A root-only file holding the webhook secret of the GitHub App.";
@@ -366,6 +375,7 @@ in
         PREVIEW_CONTRACT_REPOS = lib.concatStringsSep "," cfg.contractRepos;
         PREVIEW_CONTRACT_MODEL_SECRET = toString cfg.contractModelSecret;
         PREVIEW_CONTRACT_TIMEOUT_MINUTES = toString cfg.contractTimeoutMinutes;
+        PREVIEW_CONTRACT_IDLE_MINUTES = toString cfg.contractIdleMinutes;
       };
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/preview-service";

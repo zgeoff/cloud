@@ -264,6 +264,7 @@ test('it reads the SDK contract settings when the environment names a contract r
       PREVIEW_CONTRACT_REPOS: 'acme/greenhouse, nursery/*',
       PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
       PREVIEW_CONTRACT_TIMEOUT_MINUTES: '15',
+      PREVIEW_CONTRACT_IDLE_MINUTES: '7',
     },
     (path) =>
       Promise.resolve(
@@ -276,7 +277,33 @@ test('it reads the SDK contract settings when the environment names a contract r
     repos: new Set(['acme/greenhouse', 'nursery/*']),
     modelSecret: 'model-haiku',
     timeoutMs: 900_000,
+    idleMs: 420_000,
   });
+});
+
+test('it lets an SDK contract run take the slot of a preview unused for five minutes by default', async () => {
+  const config = await loadPreviewConfig(
+    {
+      CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+      PREVIEW_REPOS: 'acme/greenhouse',
+      PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+      PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+      PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+      PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+      PREVIEW_IMP_DOMAIN: 'imps.example.test',
+      PREVIEW_IMP_IMAGE: 'base',
+      PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+      PREVIEW_CONTRACT_REPOS: 'acme/greenhouse',
+      PREVIEW_CONTRACT_MODEL_SECRET: 'model-haiku',
+    },
+    (path) =>
+      Promise.resolve(
+        new Map([['/run/credentials/preview.service/github-app-key', stubAppKeyPEM]]).get(path) ??
+          'a-secret',
+      ),
+  );
+
+  expect(config.settings.contract?.idleMs).toBe(300_000);
 });
 
 test('it gives an SDK contract run ten minutes by default', async () => {

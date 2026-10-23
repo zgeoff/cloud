@@ -182,8 +182,9 @@ The service runs at most a set number of previews at once, one by default, becau
 imp holds memory from impd's budget while it runs. Before a preview boots or wakes, the service
 lists the running preview imps and puts the least recently active to sleep until the opening one
 fits. A sleeping imp keeps its memory on disk, so its next open resumes it where it stopped. A sweep
-on a timer puts every preview to sleep that nobody used for the idle timeout, and impd counts each
-request through its wake proxy as use.
+on a timer puts every preview to sleep that nobody used for the idle timeout. impd records an imp's
+last use, and counts as use a request through its wake proxy, a guest session, an open TCP
+connection to or from the guest, or CPU load above its idle threshold.
 
 The slot rule runs under one lock, so two opens at once never both find a free slot. A boot holds
 the lock until it settles, because its build's guest commands would wake an imp that another open
@@ -210,9 +211,11 @@ file too large to show, and such a manifest counts as a change, because a needle
 than a missed one. The previews file holds one record per repository and head commit, so a commit
 runs the suite once however many deliveries name it, and each push to a new head runs it again.
 
-1. Under the slot lock, the service counts the running imps. A run never puts a preview to sleep,
-   because the owner may be using it, so with every slot taken the run waits. Its `sdk-contract`
-   status turns pending with that reason, and the sweep's timer tries the run again on each pass.
+1. Under the slot lock, the service counts the running imps. With every slot taken, the run puts the
+   least recently used previews to sleep to free one, but only previews that nobody used for the
+   contract idle time, which is shorter than the idle timeout. A preview in use keeps its slot, so
+   when too few previews are idle, or impd refuses a sleep, the run waits. Its `sdk-contract` status
+   turns pending with that reason, and the sweep's timer tries the run again on each pass.
 2. With a slot free, the service starts a new imp from the preview image, grants it the model secret
    and the GitHub secret, and sets the status to pending.
 3. A guest command installs Bun's pinned build, checked against its sha256, since imp's base image
