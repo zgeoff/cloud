@@ -24,7 +24,9 @@ permissions:
 jobs:
   nixos:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # twice the checks' 60-minute test budget plus the job's median 0.13 minutes outside them,
+    # rounded up; the budget holds every measured run, the slowest at 58.4 minutes
+    timeout-minutes: 121
     steps:
       # the full history, so a green run's commit can be compared with the commit under test; no
       # token stays in .git/config, so the checks, which run a dispatched branch's own code, never
