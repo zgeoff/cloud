@@ -793,7 +793,7 @@ let
 
         HOME="$PWD" ${pkgs.bun}/bin/bun --no-install run load.ts > out 2> err
 
-        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant installPathGrant runCommand" "$(cat out)" "the client's calls"
+        assert_equals "createImp readImp readImps sleepImp wakeImp updateHTTPPort removeImp installGrant installPathGrant removeGrantsExcept runCommand" "$(cat out)" "the client's calls"
         assert_equals "" "$(cat err)" "bun's errors"
       '';
     }
