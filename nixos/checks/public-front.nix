@@ -68,10 +68,10 @@ let
         mkdir home
         status=0
         env -i HOME="$PWD/home" XDG_DATA_HOME="$PWD/home/data" XDG_CONFIG_HOME="$PWD/home/config" \
-          ${lib.getExe caddy.package} validate --adapter caddyfile --config ${caddy.configFile} > out 2>&1 || status=$?
+          ${lib.getExe caddy.package} validate --adapter caddyfile --config ${caddy.configFile} > out 2> err || status=$?
 
-        assert_equals 0 "$status" "caddy validate's exit status"
-        assert_equals 1 "$(grep -c '"msg":"Valid configuration"' out)" "the valid configuration lines"
+        assert_equals 0 "$status" "the exit status of caddy validate"
+        assert_equals "Valid configuration" "$(cat out)" "the output of caddy validate"
       '';
     }
   ];
