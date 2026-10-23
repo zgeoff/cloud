@@ -139,7 +139,10 @@ image's, so the previews and the agents run one release of imp's base image.
    no key sits in the guest. When the commit has `preview/compose.broker.yaml`, the guest command
    adds it to `docker compose up` and passes it the broker's proxy and CA bundle, which impd sets on
    the command. The stack's model calls then go out through the broker, which adds the model
-   secret's credential.
+   secret's credential. With the spend cap on, the guest command writes the model route into
+   `preview/.env` after the commit's own lines. Compose reads that file on every command, so a
+   compose command run by hand in the imp keeps the route, where it would otherwise recreate a
+   service without it.
 4. The service probes the health path through the imp's own HTTPS name until it answers or the boot
    times out. The probe takes the route of impd's proxy, which reaches the app on the imp's own
    address and never on the guest's loopback, so an app that listens on the loopback alone fails its
