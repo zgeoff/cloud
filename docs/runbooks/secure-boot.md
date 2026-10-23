@@ -15,7 +15,7 @@ booting its previous system.
 ## Turn Secure Boot on
 
 The steps run in a host window that the owner approved, because the reboots stop k3s, imp-host and
-every imp. Each step names what to do when it fails. A failure before step 7 leaves the firmware's
+every imp. Each step names what to do when it fails. A failure before step 8 leaves the firmware's
 check off, so the host boots as it did before.
 
 Before you start:
@@ -24,8 +24,8 @@ Before you start:
   `op run --env-file=.env -- bun run onidel:snapshot pre-secure-boot`.
 - Keep the Onidel noVNC console at hand. It shows the systemd-boot menu and the firmware's messages,
   which SSH cannot.
-- Check that Secure Boot is off: `bun run ops:host -- 'bootctl status'` prints
-  `Secure Boot: disabled` or `Secure Boot: disabled (setup)`.
+- Check that Secure Boot is off: `bun run ops:host -- 'bootctl status'` prints a line that starts
+  with `Secure Boot: disabled`.
 
 1. Create the keys on the host:
 
@@ -58,7 +58,7 @@ Before you start:
    bun run ops:switch-host
    ```
 
-   Expect the script to finish without an error. lanzaboote signs an entry for each generation that
+   Expect the script to finish without an error. lanzaboote signs an image for each generation that
    the system profile holds, so an older generation stays bootable from the menu.
 
    **If the switch fails at the boot loader install:** the ESP keeps the previous systemd-boot
@@ -78,20 +78,31 @@ Before you start:
    **If a loader or an image under `EFI/Linux` is not signed:** stop. Reinstall the boot files with
    `bun run ops:host -- '/run/current-system/bin/switch-to-configuration boot'`, then check again.
 
-5. Reboot the host with Secure Boot still off, so the first boot through lanzaboote's files happens
-   while the firmware does not check them. Then check that it booted the switched system:
+5. Remove the entries that plain systemd-boot wrote before the switch. lanzaboote deletes every file
+   under `EFI/nixos/` that it did not install, so those entries point at kernels that are gone, and
+   the menu could still pick one:
+
+   ```bash
+   bun run ops:host -- 'rm -f /boot/loader/entries/nixos-generation-*.conf && bootctl list --no-pager | grep source:'
+   ```
+
+   Expect only `source:` lines under `/boot/EFI/Linux/`, besides any of the firmware's own entries.
+
+6. Reboot the host with Secure Boot still off, so the first boot through lanzaboote's files happens
+   while the firmware does not check them:
 
    ```bash
    bun run ops:host -- 'systemctl reboot'
    ```
 
-   Wait until `tailscale ping geoffcloud` answers, then check:
+   Wait until `tailscale ping geoffcloud` answers, then check that it booted the switched system
+   through a lanzaboote image:
 
    ```bash
-   bun run ops:host -- 'test "$(readlink -f /run/booted-system)" = "$(readlink -f /run/current-system)" && echo same'
+   bun run ops:host -- 'test "$(readlink -f /run/booted-system)" = "$(readlink -f /run/current-system)" && echo same; bootctl status --no-pager | grep "Current Entry"'
    ```
 
-   Expect `same`.
+   Expect `same`, and a `Current Entry` that ends in `.efi`.
 
    **If the host does not come back:** in the noVNC console, pick an older generation in the
    systemd-boot menu. Then follow
@@ -99,7 +110,7 @@ Before you start:
    from lanzaboote's troubleshooting guide if no generation boots, with the installer that
    [If kexec still fails](./reinstall-geoffcloud.md#if-kexec-still-fails) boots.
 
-6. Enroll the keys. The firmware accepts new keys only in Setup Mode, so check that first:
+7. Enroll the keys. The firmware accepts new keys only in Setup Mode, so check that first:
 
    ```bash
    bun run ops:host -- 'bootctl status' | grep 'Secure Boot'
@@ -114,9 +125,14 @@ Before you start:
 
    Expect `Enrolled keys to the EFI variables!`.
 
-   **If `bootctl` prints `Secure Boot: disabled` without `(setup)`:** the firmware holds a Platform
-   Key, and sbctl cannot enroll over it. Stop, and ask the owner to reset the VM's Secure Boot keys
-   to Setup Mode. Never clear the firmware's forbidden-signature database (dbx) to get there.
+   **If `bootctl` prints `Secure Boot: disabled` with no mode after it:** the firmware holds a
+   Platform Key, and sbctl cannot enroll over it. Stop, and ask the owner to reset the VM's Secure
+   Boot keys to Setup Mode. Never clear the firmware's forbidden-signature database (dbx) to get
+   there.
+
+   **If `bootctl` prints any other mode, such as `disabled (unsupported)`:** the firmware exposes no
+   Secure Boot variables to enroll into. Stop, and ask the owner to check the VM's firmware setting
+   in the panel.
 
    **If the enrollment fails:** the firmware stays in Setup Mode and checks nothing. Fix what the
    error names and enroll again.
@@ -125,25 +141,38 @@ Before you start:
    that fails the check stops the boot before Linux starts, and SSH and the tailnet stay down. Keep
    the noVNC console open, and have the owner ready to turn Secure Boot off again in the panel.
 
-7. Ask the owner to turn Secure Boot on for the VM in the Onidel panel and to reboot the VM.
+8. Ask the owner to turn Secure Boot on for the VM in the Onidel panel and to reboot the VM.
 
    **If the host does not boot:** have the owner turn Secure Boot off in the panel and reboot. The
    host then boots the same files without the check. Find the file that failed with `sbctl verify`
-   and `sbctl status`, fix it with steps 4 and 6, and run this step again.
+   and `sbctl status`, fix it with steps 4 and 7, and run this step again.
 
-8. Check that the firmware enforces Secure Boot with the host's keys:
+9. Check that the firmware enforces Secure Boot with the host's keys, and that the host loaded the
+   pool and started every unit:
 
    ```bash
    bun run ops:host -- 'bootctl status' | grep 'Secure Boot'
+   bun run ops:host -- 'zfs get -H -o value keystatus tank/cloud && systemctl --failed --no-legend'
    ```
 
-   Expect `Secure Boot: enabled (user)`.
+   Expect `Secure Boot: enabled (user)`, then `available` and no failed unit. The host answers SSH
+   even when the ZFS module fails to load, so the second check is what proves the boot.
+
+   **If the pool is not loaded or a unit failed:** read its journal with
+   `bun run ops:host -- 'journalctl -b -u <unit> --no-pager'`. When the cause is the firmware's
+   check, have the owner turn Secure Boot off and reboot, as step 8's recovery does.
 
 ## Switches and reinstalls
 
 Each later switch signs the new generation with the bundle on `vda`, so a switch needs no extra
-step. A reinstall needs Secure Boot off, because kernel lockdown blocks the kexec that
-`nixos-anywhere` uses, and it stages the bundle from `secure-boot-keys`
-([the reinstall runbook](./reinstall-geoffcloud.md)). After a reinstall, turn Secure Boot on again
-from step 6: its `bootctl` check shows whether the firmware kept the enrolled keys. With
-`Secure Boot: disabled (setup)`, enroll them again. With `Secure Boot: disabled`, go on to step 7.
+step. A reinstall needs Secure Boot off, because the installer that `nixos-anywhere` boots is not
+signed with the host's keys. The reinstall stages the bundle from `secure-boot-keys`
+([the reinstall runbook](./reinstall-geoffcloud.md)).
+
+After a reinstall, turn Secure Boot on again from step 7, whose `bootctl` check shows whether the
+firmware kept the enrolled keys:
+
+- `Secure Boot: disabled (setup)`: the firmware lost them. Enroll them again, as step 7 does.
+- `Secure Boot: disabled`: the firmware holds a Platform Key, which is the host's own when the
+  firmware kept the enrollment. Skip the enrollment and go on to step 8, whose recovery applies if
+  the key is another.

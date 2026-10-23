@@ -20,7 +20,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 
 1. Turn off Secure Boot for the VM in the Onidel panel, then reboot the VM through the API. With
    Secure Boot on, kernel lockdown blocks the kexec that `nixos-anywhere` uses.
-2. Check from the host: `bootctl status` prints `Secure Boot: disabled`.
+2. Check from the host: `bootctl status` prints a line that starts with `Secure Boot: disabled`.
 3. Mint fresh host keys first. Both are single-use and keep their used or expired state
    (`recreateIfInvalid: 'never'`), so only a replace makes new ones:
 
@@ -172,7 +172,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    reinstall does not stage. The script refuses to write while the bind is not mounted.
 
 9. Remove the stale Ubuntu-era Tailscale nodes in the admin console.
-10. Turn Secure Boot on again, from step 6 of
+10. Turn Secure Boot on again, from step 7 of
     [Turn Secure Boot on](./secure-boot.md#turn-secure-boot-on).
 
 ## Connect Pulumi to k3s

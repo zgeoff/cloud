@@ -32,11 +32,10 @@ The host boots through lanzaboote, which signs systemd-boot and each generation'
 image with the host's own Secure Boot keys at every switch. The firmware enforces those signatures
 once the keys are enrolled and Secure Boot is on for the VM in the Onidel panel. The key bundle sits
 on the root disk, readable by root only, because a switch signs the boot files and a switch must
-work while the pool is missing; 1Password holds a copy for a reinstall. A switch to this config
-fails at the boot loader install until the bundle exists on the host. A reinstall turns Secure Boot
-off first, because kernel lockdown blocks the kexec that `nixos-anywhere` uses.
-[Secure Boot](../../runbooks/secure-boot.md) gives the steps that create, enroll and recover the
-keys.
+work while the pool is missing. 1Password holds a copy, which a reinstall places on the new root
+disk. A reinstall turns Secure Boot off first, because the installer that `nixos-anywhere` boots is
+not signed with the host's keys. [Secure Boot](../../runbooks/secure-boot.md) gives the steps that
+create, enroll and recover the keys.
 
 ## Services
 
