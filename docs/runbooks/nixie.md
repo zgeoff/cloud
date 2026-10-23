@@ -51,13 +51,18 @@ carries nixie's image ref prefix ([mint nixie's impd token](#mint-nixies-impd-to
 Add a model secret for each profile in `config.yaml`, under the name
 [nixie's names in impd](https://github.com/zgeoff/nixie/blob/main/docs/architecture/deployment/impd-names.md#model-secrets)
 defines:
-`nixie-model-<profile>-<first 16 hex of the SHA-256 of "bearer", the API host and the credential>`.
-Every profile uses the same credential, so the names differ only by profile:
+`nixie-model-<first 19 hex of the SHA-256 of the profile, "bearer", the API host and the credential>`.
+Every profile uses the same credential, and the profile goes into the hash, so each profile gets its
+own name:
 
 ```bash
-hash=$(op read op://cloud/nixie-model-credential/credential \
-  | { IFS= read -r c; printf 'bearer\napi.anthropic.com\n%s' "$c"; } | sha256sum | cut -c1-16)
-secrets=nixie-model-opus-$hash,nixie-model-haiku-$hash,nixie-model-sonnet-$hash
+secrets=
+for profile in opus haiku sonnet; do
+  hash=$(op read op://cloud/nixie-model-credential/credential \
+    | { IFS= read -r c; printf '%s\nbearer\napi.anthropic.com\n%s' "$profile" "$c"; } \
+    | sha256sum | cut -c1-19)
+  secrets=${secrets:+$secrets,}nixie-model-$hash
+done
 for secret in ${secrets//,/ }; do
   op read op://cloud/nixie-model-credential/credential | host_imp secret add "$secret" \
     --kind custom --hosts api.anthropic.com --header authorization --scheme bearer
@@ -69,11 +74,11 @@ its secret leaves its role's sandbox unmade, and `imp_host` unready.
 
 ### Move the model secrets to their nixie- names
 
-nixie 0.42.0 names each model secret `nixie-model-<profile>-<hash>`, where earlier releases named it
-`model-<profile>-<hash>`. A nixie on the new names asks impd to grant secrets that do not exist yet,
-so its new sandboxes fail, and `imp_host` stays unready, until impd holds them. Running sandboxes
-keep their old grants until they are replaced. Move the secrets once, around the bump to that
-release.
+nixie 0.42.0 names each model secret `nixie-model-<hash>`, with the profile inside the hash, where
+earlier releases named it `model-<profile>-<hash>`. A nixie on the new names asks impd to grant
+secrets that do not exist yet, so its new sandboxes fail, and `imp_host` stays unready, until impd
+holds them. Running sandboxes keep their old grants until they are replaced. Move the secrets once,
+around the bump to that release.
 
 **CAUTION:** These steps change impd's live secrets and nixie's token. Run them only with the
 owner's approval, and in order: a token without the new names fails every new sandbox.
@@ -81,10 +86,13 @@ owner's approval, and in order: a token without the new names fails every new sa
 1. Before the deployment moves to nixie 0.42.0, add each model secret again under its `nixie-model-`
    name, with the same value, host and header, through the loop in
    [Add nixie's model secret to impd](#add-nixies-model-secret-to-impd).
-2. Set nixie's token `--grantable` to the old and the new names:
+2. Set nixie's token `--grantable` to the old and the new names. The old names hash only the header,
+   the host and the credential, and take the first 16 hex digits:
 
    ```bash
-   old=${secrets//nixie-model-/model-}
+   old_hash=$(op read op://cloud/nixie-model-credential/credential \
+     | { IFS= read -r c; printf 'bearer\napi.anthropic.com\n%s' "$c"; } | sha256sum | cut -c1-16)
+   old=model-opus-$old_hash,model-haiku-$old_hash,model-sonnet-$old_hash
    host_imp token set nixie --grantable "$old,$secrets" < /dev/null
    ```
 
