@@ -3,12 +3,10 @@ import type { Namespace } from '@pulumi/kubernetes/core/v1';
 import { Secret } from '@pulumi/kubernetes/core/v1';
 import { secret } from '@pulumi/pulumi';
 import type { AlertWebhook } from '../inputs/index.ts';
-import { buildSecretChecksum } from './build-secret-checksum.ts';
-import { renderMentionTemplate } from './render-mention-template.ts';
+import { buildAlertWebhookData } from './build-alert-webhook-data.ts';
 
 const secretName = 'alertmanager-discord';
-const urlKey = 'webhook-url';
-const mentionKey = 'mention.tmpl';
+const keys = { url: 'webhook-url', mention: 'mention.tmpl' };
 
 interface AlertWebhookResource {
   readonly resource: Secret;
@@ -23,19 +21,13 @@ export function createAlertWebhook(
   webhook: AlertWebhook,
   cluster: Provider,
 ): AlertWebhookResource {
-  const data = {
-    [urlKey]: webhook.url,
-    [mentionKey]: renderMentionTemplate(webhook.mentionUserID),
-  };
+  const built = buildAlertWebhookData(webhook, keys);
 
   const resource = new Secret(
     'alertmanager-discord',
     {
       metadata: { name: secretName, namespace: ns.metadata.name },
-      stringData: {
-        [urlKey]: secret(data[urlKey]),
-        [mentionKey]: secret(data[mentionKey]),
-      },
+      stringData: secret(built.data),
     },
 
     // The provider replaces a Secret when its data changes, and a create of the fixed name before
@@ -47,10 +39,8 @@ export function createAlertWebhook(
   return {
     resource,
     secretName,
-    file: `/etc/alertmanager/secrets/${secretName}/${urlKey}`,
-    mentionTemplateFile: `/etc/alertmanager/secrets/${secretName}/${mentionKey}`,
-
-    // the webhook's random token salts the hash, so the checksum shows nothing of the user's ID
-    checksum: buildSecretChecksum(data),
+    file: `/etc/alertmanager/secrets/${secretName}/${keys.url}`,
+    mentionTemplateFile: `/etc/alertmanager/secrets/${secretName}/${keys.mention}`,
+    checksum: built.checksum,
   };
 }
