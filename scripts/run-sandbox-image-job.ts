@@ -125,17 +125,24 @@ async function runJob(
     }
   }
 
-  try {
-    return await runCreatedJob(options, payload, kubectl);
-  } finally {
-    await kubectl([
-      'delete',
-      'configmap',
-      payload.configMap,
-      ...namespaceArgs,
-      '--ignore-not-found',
-    ]);
+  const exitCode = await runCreatedJob(options, payload, kubectl);
+
+  const removed = await kubectl([
+    'delete',
+    'configmap',
+    payload.configMap,
+    ...namespaceArgs,
+    '--ignore-not-found',
+  ]);
+
+  // the next run removes a ConfigMap that this one leaves, so a failed removal changes no outcome
+  if (removed.exitCode !== 0) {
+    options.printErr(
+      `run-sandbox-image-job: kubectl could not remove the ConfigMap ${payload.configMap} (exit ${removed.exitCode}), so the next run removes it: ${removed.stderr.toString()}`,
+    );
   }
+
+  return exitCode;
 }
 
 async function runCreatedJob(

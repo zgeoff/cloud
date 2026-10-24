@@ -222,6 +222,50 @@ test('it exits 1, prints the logs, and removes the ConfigMap when the Job fails'
   expect(kubectl.configMaps).toBeEmpty();
 });
 
+test("it reports a refused removal of the ConfigMap with kubectl's exit and error, and keeps the Job's outcome", async () => {
+  const ctx = await setupTest();
+
+  const clock = buildStubClock(0);
+
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[{ type: 'Complete', status: 'True' }]],
+    logs: 'added nixie-conversation-5c0ffee0aa11\n',
+    refusedDeletes: [1],
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+
+  const exitCode = await runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
+    now: clock.now,
+    sleep: clock.sleep,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    [
+      'run-sandbox-image-job: kubectl could not remove the ConfigMap nixie-sandbox-images (exit 1), so the next run removes it: Error from server (Forbidden): configmaps "nixie-sandbox-images" is forbidden: User "deploy" cannot delete resource "configmaps" in API group "" in the namespace "nixie"\n',
+    ],
+  ]);
+
+  expect([...kubectl.configMaps]).toStrictEqual(['nixie-sandbox-images']);
+});
+
 test('it exits 1 once the wait outlasts the Job deadline with no outcome', async () => {
   const ctx = await setupTest();
 

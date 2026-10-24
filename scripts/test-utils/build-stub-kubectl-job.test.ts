@@ -28,6 +28,35 @@ test('it refuses a ConfigMap create while one of that name exists, as kubectl do
   });
 });
 
+test('it refuses only the ConfigMap deletes it was told to refuse, as Forbidden, and keeps the ConfigMap', async () => {
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[]],
+    logs: '',
+    configMaps: ['nixie-sandbox-images'],
+    refusedDeletes: [0],
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+  const remove = ['kubectl', 'delete', 'configmap', 'nixie-sandbox-images', '--ignore-not-found'];
+
+  const refused = await runner.run(remove);
+
+  const keptAfterRefusal = [...kubectl.configMaps];
+
+  const removed = await runner.run(remove);
+
+  expect({ exitCode: refused.exitCode, stderr: refused.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr:
+      'Error from server (Forbidden): configmaps "nixie-sandbox-images" is forbidden: User "deploy" cannot delete resource "configmaps" in API group "" in the namespace "nixie"\n',
+  });
+
+  expect(keptAfterRefusal).toStrictEqual(['nixie-sandbox-images']);
+  expect(removed.stdout.toString()).toBe('configmap "nixie-sandbox-images" deleted\n');
+  expect(kubectl.configMaps).toBeEmpty();
+});
+
 test('it names a created Job by the name its generateName gives', async () => {
   const kubectl = buildStubKubectlJob({
     jobName: 'nixie-sandbox-images-x7k2p',

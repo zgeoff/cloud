@@ -16,6 +16,9 @@ export interface StubKubectlJobOptions {
   readonly conditions: readonly (readonly StubJobCondition[])[];
   readonly logs: string;
   readonly configMaps?: readonly string[];
+
+  // the ConfigMap deletes, counted from 0, that the API server refuses as Forbidden
+  readonly refusedDeletes?: readonly number[];
 }
 
 interface KubeconfigRead {
@@ -41,6 +44,7 @@ export function buildStubKubectlJob(options: Readonly<StubKubectlJobOptions>): S
   const createdObjects: unknown[] = [];
   const kubeconfigs: KubeconfigRead[] = [];
   let gets = 0;
+  let deletes = 0;
 
   const answer = (call: StubCall): StubAnswer | undefined => {
     const [command, verb, ...rest] = call.argv;
@@ -59,6 +63,17 @@ export function buildStubKubectlJob(options: Readonly<StubKubectlJobOptions>): S
     }
 
     if (verb === 'delete' && rest[0] === 'configmap' && rest[1] !== undefined) {
+      const deleteIndex = deletes;
+
+      deletes += 1;
+
+      if (options.refusedDeletes?.includes(deleteIndex) === true) {
+        return {
+          exitCode: 1,
+          stderr: `Error from server (Forbidden): configmaps "${rest[1]}" is forbidden: User "deploy" cannot delete resource "configmaps" in API group "" in the namespace "nixie"\n`,
+        };
+      }
+
       const isHeld = configMaps.delete(rest[1]);
 
       return { stdout: isHeld ? `configmap "${rest[1]}" deleted\n` : '' };
