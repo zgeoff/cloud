@@ -404,7 +404,9 @@ jobs:
       - test-atc-gateway-fixture
       - test-backup-fixtures
       - provider
-    if: ${{ !cancelled() }}
+    # always, not !cancelled(): a cancelled run would skip this job, and the ruleset counts a
+    # skipped required check as passed, so it runs and fails on the cancelled jobs instead
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
