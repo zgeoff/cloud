@@ -167,6 +167,13 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    bun run up
    ```
 
+   For a new nixie image, the apply first runs the Job that adds the release's sandbox images to
+   impd
+   ([sandbox images before a roll](../architecture/workloads/nixie.md#sandbox-images-before-a-roll)),
+   so the machine that applies needs `kubectl` and `bun`. Expect
+   `run-sandbox-image-job: job.batch/<job_name> added nixie's sandbox images` in the output of
+   `command:local:Command nixie-sandbox-images` before the StatefulSet updates.
+
 3. Check readiness from the host:
 
    ```bash
@@ -402,12 +409,13 @@ an apply would renew it.
 
 ## Failures
 
-| Symptom                                           | Cause                                    | Fix                                             |
-| ------------------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
-| `imp_host` unready, `impd did not add the image`  | the token lacks nixie's image ref prefix | set it, as above                                |
-| `imp_host` unready, `FORBIDDEN` in logs           | the model secret is missing              | add it, as above                                |
-| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
-| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe         |
-| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
-| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
-| TLS error on the name                             | the certificate expired                  | `bun run up`                                    |
+| Symptom                                           | Cause                                    | Fix                                                                  |
+| ------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
+| `imp_host` unready, `impd did not add the image`  | the token lacks nixie's image ref prefix | set it, as above                                                     |
+| `imp_host` unready, `FORBIDDEN` in logs           | the model secret is missing              | add it, as above                                                     |
+| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync`                      |
+| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe                              |
+| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`                          |
+| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                                     |
+| TLS error on the name                             | the certificate expired                  | `bun run up`                                                         |
+| the apply fails at `nixie-sandbox-images`         | the Job did not add every sandbox image  | read the Job's log above the failure, fix its cause, and apply again |

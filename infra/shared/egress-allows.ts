@@ -54,6 +54,12 @@ export const egressAllows = {
     podLabels: podLabels.nixie,
     destinations: [impd],
   },
+  nixieSandboxImages: {
+    name: 'nixie-sandbox-images-egress',
+    namespace: 'nixie',
+    podLabels: podLabels.nixieSandboxImages,
+    destinations: [impd],
+  },
   cloudflared: {
     name: 'cloudflared-egress',
     namespace: 'ingress',

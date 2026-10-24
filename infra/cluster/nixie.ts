@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
+import { Command } from '@pulumi/command/local';
 import type { Provider } from '@pulumi/kubernetes';
 import { Deployment, StatefulSet } from '@pulumi/kubernetes/apps/v1';
 import { ConfigMap, Secret, Service } from '@pulumi/kubernetes/core/v1';
+import type { NetworkPolicy } from '@pulumi/kubernetes/networking/v1';
 import type { Output } from '@pulumi/pulumi';
 import { interpolate, secret } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
@@ -11,6 +13,8 @@ import { createEgressAllow } from '../shared/create-egress-allow.ts';
 import { createNamespace } from '../shared/create-namespace.ts';
 import { egressAllows } from '../shared/egress-allows.ts';
 import { renderNixieConfig } from '../shared/render-nixie-config.ts';
+import { buildNixieSandboxImagesCommandArgs } from './build-nixie-sandbox-images-command-args.ts';
+import { buildNixieSandboxImagesPayload } from './build-nixie-sandbox-images-payload.ts';
 import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
 import {
   buildNixieSpec,
@@ -23,15 +27,24 @@ import {
   nixieLabels,
   nixieSecretsFileKey,
 } from './build-nixie-spec.ts';
+import {
+  buildNixieStatefulSetOptions,
+  nixieRolloutTimeouts,
+} from './build-nixie-stateful-set-options.ts';
 import { buildNixieWebSpec, nixieWebLabels, nixieWebPort } from './build-nixie-web-spec.ts';
 import { createNixieBackupJob } from './create-nixie-backup-job.ts';
 import type { NixieIngressOutputs } from './create-nixie-ingress.ts';
 import { createNixieIngress } from './create-nixie-ingress.ts';
 
+interface NixieClusterShape {
+  readonly zoneID: Output<string>;
+  readonly kubeconfig: Output<string>;
+}
+
 export function createNixie(
   cluster: Provider,
   inputs: NixieInputs,
-  zoneID: Output<string>,
+  shape: NixieClusterShape,
 ): NixieIngressOutputs {
   const ns = createNamespace('nixie', cluster);
   const namespace = ns.metadata.name;
@@ -44,9 +57,22 @@ export function createNixie(
     port: nixieAPIPort,
   });
 
+  const secrets = createSecrets(cluster, namespace, inputs);
+
+  const sandboxImages = createSandboxImagesCommand({
+    image: inputs.config.image,
+    secrets,
+    egressAllow: createEgressAllow(egressAllows.nixieSandboxImages, namespace, {
+      provider: cluster,
+    }),
+    kubeconfig: shape.kubeconfig,
+  });
+
   const statefulSet = createStatefulSet(cluster, namespace, {
     inputs,
     serviceName: api.metadata.name,
+    secret: secrets.metadata.name,
+    sandboxImages,
   });
 
   const webService = createService(cluster, namespace, {
@@ -65,7 +91,7 @@ export function createNixie(
     namespace,
     hostname: inputs.config.hostname,
     dnsToken: inputs.secrets.dnsToken,
-    zoneID,
+    zoneID: shape.zoneID,
     api: { service: api.metadata.name, port: nixieAPIPort },
     web: { service: webService.metadata.name, port: nixieWebPort },
   });
@@ -89,14 +115,51 @@ function createService(cluster: Provider, namespace: Output<string>, shape: Serv
   });
 }
 
+const deployDir = new URL('../../deploy/nixie/', import.meta.url);
+
+function createSecrets(cluster: Provider, namespace: Output<string>, inputs: NixieInputs): Secret {
+  return new Secret(
+    'nixie-secrets',
+    {
+      metadata: { namespace },
+      stringData: {
+        // the sops file is encrypted already; the age identity beside it is the secret
+        [nixieSecretsFileKey]: readFileSync(new URL('secrets.sops.yaml', deployDir), 'utf8'),
+        [nixieAgeKeyKey]: secret(inputs.secrets.ageHostKey),
+      },
+    },
+    { provider: cluster },
+  );
+}
+
+interface SandboxImagesShape {
+  readonly image: string;
+  readonly secrets: Secret;
+  readonly egressAllow: NetworkPolicy;
+  readonly kubeconfig: Output<string>;
+}
+
+// nixie adds its sandbox images at start and is unready until impd holds them, so the Job adds them
+// while the old nixie-0 still serves; a failed Job fails this Command, and Pulumi then leaves the
+// StatefulSet unchanged
+function createSandboxImagesCommand(shape: SandboxImagesShape): Command {
+  const payload = shape.secrets.metadata.name.apply((name) =>
+    JSON.stringify(buildNixieSandboxImagesPayload({ image: shape.image, secret: name })),
+  );
+
+  return new Command(
+    'nixie-sandbox-images',
+    buildNixieSandboxImagesCommandArgs({ payload, kubeconfig: shape.kubeconfig }),
+    { dependsOn: [shape.secrets, shape.egressAllow] },
+  );
+}
+
 interface StatefulSetShape {
   readonly inputs: NixieInputs;
   readonly serviceName: Output<string>;
+  readonly secret: Output<string>;
+  readonly sandboxImages: Command;
 }
-
-// Pulumi waits for readiness, and nixie turns ready only once impd has pulled its sandbox images
-// and booted the conversation imp, which a cold start takes longer than Pulumi's default wait
-const rolloutTimeouts = { create: '30m', update: '30m' };
 
 function createStatefulSet(
   cluster: Provider,
@@ -111,15 +174,13 @@ function createStatefulSet(
         image: shape.inputs.config.image,
         serviceName: shape.serviceName,
         configMap: createConfig(cluster, namespace),
-        secret: createSecrets(cluster, namespace, shape.inputs),
+        secret: shape.secret,
         definitionsSecret: createDefinitionsKey(cluster, namespace, shape.inputs),
       }),
     },
-    { provider: cluster, customTimeouts: rolloutTimeouts },
+    buildNixieStatefulSetOptions({ cluster, sandboxImages: shape.sandboxImages }),
   );
 }
-
-const deployDir = new URL('../../deploy/nixie/', import.meta.url);
 
 function createConfig(cluster: Provider, namespace: Output<string>): Output<string> {
   const text = readFileSync(new URL('config.yaml', deployDir), 'utf8');
@@ -136,27 +197,6 @@ function createConfig(cluster: Provider, namespace: Output<string>): Output<stri
   );
 
   return config.metadata.name;
-}
-
-function createSecrets(
-  cluster: Provider,
-  namespace: Output<string>,
-  inputs: NixieInputs,
-): Output<string> {
-  const secrets = new Secret(
-    'nixie-secrets',
-    {
-      metadata: { namespace },
-      stringData: {
-        // the sops file is encrypted already; the age identity beside it is the secret
-        [nixieSecretsFileKey]: readFileSync(new URL('secrets.sops.yaml', deployDir), 'utf8'),
-        [nixieAgeKeyKey]: secret(inputs.secrets.ageHostKey),
-      },
-    },
-    { provider: cluster },
-  );
-
-  return secrets.metadata.name;
 }
 
 function createDefinitionsKey(
@@ -204,6 +244,6 @@ function createWebDeployment(
     },
 
     // after nixie, so a first deploy starts the API before the client that calls it
-    { provider: cluster, dependsOn: [shape.statefulSet], customTimeouts: rolloutTimeouts },
+    { provider: cluster, dependsOn: [shape.statefulSet], customTimeouts: nixieRolloutTimeouts },
   );
 }

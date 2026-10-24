@@ -40,6 +40,7 @@ test('it places each allow in the namespace of the pods it selects', () => {
     ['observability', 'atc-daemon-probe-egress'],
     ['observability', 'imp-health-probe-egress'],
     ['nixie', 'nixie-egress'],
+    ['nixie', 'nixie-sandbox-images-egress'],
     ['ingress', 'cloudflared-egress'],
   ]);
 });

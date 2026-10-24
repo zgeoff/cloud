@@ -429,6 +429,39 @@
     "apiVersion": "networking.k8s.io/v1",
     "kind": "NetworkPolicy",
     "metadata": {
+      "name": "nixie-sandbox-images-egress",
+      "namespace": "nixie"
+    },
+    "spec": {
+      "podSelector": {
+        "matchLabels": {
+          "app": "nixie-sandbox-images"
+        }
+      },
+      "policyTypes": ["Egress"],
+      "egress": [
+        {
+          "to": [
+            {
+              "ipBlock": {
+                "cidr": "100.75.9.119/32"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "protocol": "TCP",
+              "port": 443
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "apiVersion": "networking.k8s.io/v1",
+    "kind": "NetworkPolicy",
+    "metadata": {
       "name": "cloudflared-egress",
       "namespace": "ingress"
     },

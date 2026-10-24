@@ -145,6 +145,11 @@ let
       name = "web";
       labels.app = "nixie-web";
     }
+    {
+      namespace = "nixie";
+      name = "sandbox-images";
+      labels.app = "nixie-sandbox-images";
+    }
     # the backup and restore jobs carry no label that an allow selects
     {
       namespace = "nixie";
@@ -321,7 +326,8 @@ pkgs.testers.runNixOSTest {
     stand_ins = json.loads('${builtins.toJSON standIns}')
     pods = ["atc/gateway", "atc/stranger", "observability/daemon-probe", "observability/imp-probe",
             "observability/stranger", "ingress/cloudflared", "ingress/stranger", "kube-system/stranger",
-            "default/stranger", "nixie/nixie", "nixie/web", "nixie/stranger", "nixie-ingress/traefik"]
+            "default/stranger", "nixie/nixie", "nixie/web", "nixie/sandbox-images", "nixie/stranger",
+            "nixie-ingress/traefik"]
 
 
     def dial(pod, url):
@@ -378,7 +384,7 @@ pkgs.testers.runNixOSTest {
         expected = expect_reach({
             "host-daemon": {"atc/gateway", "observability/daemon-probe"},
             "home-pc-daemon": {"atc/gateway", "observability/daemon-probe"},
-            "impd": {"observability/imp-probe", "nixie/nixie"},
+            "impd": {"observability/imp-probe", "nixie/nixie", "nixie/sandbox-images"},
             "preview-webhook": {"ingress/cloudflared"},
         })
         observed = {}
