@@ -121,6 +121,14 @@
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", "scripts/nixie-api/openapi.d.ts"],
   "overrides": [
     {
+      // an integration suite tests one flow across several modules, so no single module sits
+      // beside it; the shared rule exempts only e2e/ and evals/
+      "files": ["integration/**/*.test.ts"],
+      "rules": {
+        "zgeoff/test-beside-module": "off"
+      }
+    },
+    {
       "files": ["infra/**/*.ts", "workers/**/*.ts"],
       "rules": {
         "no-restricted-properties": [
