@@ -42,7 +42,7 @@ provider and the NixOS checks each have a reference.
 
 | Suite                                                     | Command                             | Runs in CI                                                     |
 | --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
-| TypeScript unit tests in `infra/` and `scripts/`          | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript tests in `infra/`, `scripts/` and `integration/` | `bun run test`                      | `CI` → `checks`                                                |
 | The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
 | Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
 | Shell suites and `test-support/shell/` tests              | `bun run test:scripts`              | `CI` → `checks`, unless only Markdown changed                  |
@@ -78,6 +78,37 @@ provider and the NixOS checks each have a reference.
   Cloudflare, the Pulumi state or the internet. The image and flake builds that run before the cases
   fetch only pinned inputs. `bun run drift` is a read-only check of a refactor, never part of a
   test.
+
+## Lanes in this repo
+
+The unit run, `bun run test`, holds `infra/`, `scripts/` and `integration/`, under the shared 5 s
+rule. `integration/` holds one flow across several scripts in process, such as
+[`deploy-prod.test.ts`](../../../integration/deploy-prod.test.ts), which runs the workflow's own
+steps against stand-ins. A check of config, such as which events start a workflow, is a script
+that `lint:actions` runs, as
+[`check-workflow-triggers.ts`](../../../scripts/check-workflow-triggers.ts) is, never a test.
+
+Each lane below needs a real system that the unit run cannot host.
+
+| Lane          | Scripts                                                                                | Real system                                                                   | Per case, p95 / max | Per run       |
+| ------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------- | ------------- |
+| `.nixos`      | `test:nixos [check…]`                                                                  | NixOS VMs under QEMU with KVM, built in the pinned Nix image                  | 1020 s / 1109 s     | 37–58 min     |
+| `alert-rules` | `test:alert-rules`                                                                     | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 31 s / 62 s   | 137–274 s     |
+| `images`      | `test:agent-image`, `test:files-image`                                                 | the agent image and the files service's image, built and run in Docker        | 1 s / 3 s           | 6–126 s       |
+| `fixtures`    | `test:atc-gateway-fixture`, `test:nixie-backup-fixture`, `test:files-backup-fixture` | the gateway, backup and restore images with restic, on Docker volumes          | 7 s / 9 s           | 42–91 s       |
+
+- `.nixos` is no file suffix. A check is an attribute of `checks.x86_64-linux` in
+  [`nixos/flake.nix`](../../../nixos/flake.nix), with its file in `nixos/checks/`, and
+  [`run-nixos-checks.sh`](../../../scripts/run-nixos-checks.sh) builds every check, or the ones it
+  is named. A case is one check's whole VM test script.
+- A shell suite joins `alert-rules` or a fixture group through its `# shell-suite: <group>` line;
+  each `images` script builds its image first, then runs its suites.
+- No lane sets a time limit per case. The CI job's `timeout-minutes` bounds each run: 20 for
+  `checks`, 121 for `nixos`.
+- The times come from the checks job logs of 8 CI runs and the `nixos` job logs of 5 runs, all on
+  2026-10-24. A shell case's time is the gap between its `ok` line and the line before it, so the
+  first case of a suite carries the suite's start-up. A NixOS case's time is the driver's
+  `test script finished in` line. Measure again the same way when a lane changes.
 
 ## No test reaches a real host
 
@@ -195,7 +226,7 @@ reaches a real tool.
 
 `scripts/test-<script>.sh` tests `scripts/<script>.sh`. A test of a deploy artifact sits beside it,
 as [`test-atc-gateway-image.sh`](../../../images/atc-gateway/test-atc-gateway-image.sh) does, and a
-journey sits in `e2e/`, one file per journey. Each shared rule takes its shell form:
+journey that drives real containers sits in `e2e/`, one file per journey. Each shared rule takes its shell form:
 
 | Shared rule                  | Shell form                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

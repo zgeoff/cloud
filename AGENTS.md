@@ -37,7 +37,8 @@ nixos/             the host flake
 deploy/            the manifests and config of the workloads the cluster runs, such as nixie
 scripts/           repo tooling, run through the root package.json scripts
 test-support/      the shell suites' assertions and stand-ins
-e2e/               whole-workflow suites
+integration/       flows across several scripts, in process, against stand-ins
+e2e/               journeys that drive real containers from outside
 docs/
   architecture/    what is built
   runbooks/        operator and contributor procedures
