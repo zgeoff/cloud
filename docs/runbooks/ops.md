@@ -41,7 +41,7 @@ bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s 
 - Wraps `bash scripts/switch-geoffcloud.sh`, which reaches the host in `GEOFFCLOUD_HOST`, or
   `root@geoffcloud`.
 - The script checks a clean `main` that matches `origin/main`, a green `NixOS checks` run that
-  covers the commit, the atc daemon and gateway majors, nixie's imp client against impd, a k3s
+  covers the commit, the atc daemon and gateway majors, the impd majors nixie accepts, a k3s
   restart, and nixie's readiness after the switch. [Switch the host](./workflows.md#switch-the-host)
   explains each refusal.
 - After every check passes, the script pushes the tag `deployed/host` on `origin` to the switched

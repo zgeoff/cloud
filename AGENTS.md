@@ -105,9 +105,9 @@ docs/
 - Never use `nixos-rebuild build`, because the repo mounts read-only. Never switch by hand after a
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
-  roll the gateway out first. It refuses an impd that the running nixie's imp client cannot speak,
-  so deploy that nixie first. It fails the switch when nixie's `/health/ready` does not report every
-  part ready afterwards.
+  roll the gateway out first. It refuses an impd major that the running nixie does not accept, so
+  deploy a nixie that accepts it first. It fails the switch when nixie's `/health/ready` does not
+  report every part ready afterwards.
 - The script holds a switch whose activation would stop or restart k3s, because nixie can stay down
   for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
   approved.

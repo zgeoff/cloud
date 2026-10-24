@@ -10,7 +10,7 @@
 # before the build and names the command that starts one. It also stops, before the build and
 # again before the activation, when the commit's atc daemon pin and a running atc gateway pod's
 # image differ in atc major version, since atc breaks its daemon protocol only in a major release,
-# and when the running nixie's imp client refuses the commit's impd major (check-nixie-impd-major.sh).
+# and when the running nixie refuses the commit's impd major (check-nixie-impd-major.sh).
 # After the copy it holds a switch whose activation would stop or restart k3s, which can keep
 # nixie down for minutes, unless --allow-k3s-restart names a planned k3s window
 # (check-k3s-restart.sh).
@@ -96,8 +96,8 @@ require_gateway_major() {
   bash "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$snapshot/nixos/packages/atc.nix" $images
 }
 
-# nixie talks to impd with an imp client that refuses another impd major, so a switch takes only an
-# impd that each running nixie pod speaks (scripts/check-nixie-impd-major.sh). It reads the pods,
+# nixie refuses an impd of a major it does not accept, so a switch takes only an impd whose major
+# each running nixie pod accepts (scripts/check-nixie-impd-major.sh). It reads the pods,
 # runs at the same two points, and fails on an ssh, kubectl or gh failure, as the gateway check does.
 require_nixie_impd_major() {
   local images
