@@ -5,8 +5,9 @@ name: CI
 # .github/gates.yml, whether the change touches an input of the Go checks and the SDK check, an
 # input of the vendored modules' build, an input of each lane, and any file other than Markdown,
 # which the four Nix-image linters and the shell suites need; each later job or step runs only
-# then. The checks job needs every other job and passes only when each one passed or its gate
-# skipped it, and the ruleset requires it. A failed decision or a failed check fails the checks job.
+# then. A failed decision leaves the gates empty, so every gated job and step runs, the secret scan
+# included. The checks job needs every other job and passes only when each one passed or its gate
+# skipped it, and the ruleset requires it, so a failed decision or a failed check fails it.
 on:
   push:
     branches: [main]
@@ -69,6 +70,7 @@ jobs:
   # the Bun checks and tests, the shell suites and the secret scan
   bun:
     needs: decide
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
@@ -156,13 +158,13 @@ jobs:
       # the ubuntu-24.04 image 20260927.320.1 readme lists GitHub CLI 2.101.0, which the GitHub
       # API stand-in's real-gh case (test-support/shell/test-start-stub-github-api.sh) runs
       - name: Test Scripts
-        if: needs.decide.outputs.full == 'true'
+        if: needs.decide.outputs.full != 'false'
         run: bun run test:scripts
 
       # A push to main runs the files image's test in its publish workflow, before it publishes, so
       # this job runs it on a pull request only.
       - name: Test Files Image
-        if: github.event_name == 'pull_request' && needs.decide.outputs.files-image == 'true'
+        if: github.event_name == 'pull_request' && needs.decide.outputs.files-image != 'false'
         run: bun run test:files-image
 
       - name: Dead Code
@@ -181,7 +183,9 @@ jobs:
   # the job pulls the image once
   nix-image:
     needs: decide
-    if: needs.decide.outputs.full == 'true' || needs.decide.outputs.onidel-vendor == 'true'
+    if: >-
+      ${{ !cancelled() && (needs.decide.outputs.full != 'false' ||
+      needs.decide.outputs.onidel-vendor != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -202,28 +206,28 @@ jobs:
 
       # the first of the four linters fills the job's Nix store volume for the others
       - name: Lint shell
-        if: needs.decide.outputs.full == 'true'
+        if: needs.decide.outputs.full != 'false'
         run: bun run lint:sh
 
       - name: Lint Nix
-        if: needs.decide.outputs.full == 'true'
+        if: needs.decide.outputs.full != 'false'
         run: bun run lint:nix
 
       - name: Lint Python
-        if: needs.decide.outputs.full == 'true'
+        if: needs.decide.outputs.full != 'false'
         run: bun run lint:py
 
       # actionlint, then the check that every run step is setup or one bun run call, then the check
       # that a push to main cancels main's earlier CI run and never a Deploy prod apply
       - name: Lint Actions
-        if: needs.decide.outputs.full == 'true'
+        if: needs.decide.outputs.full != 'false'
         run: bun run lint:actions
 
       # the NixOS check that builds the provider's vendored Go modules in the pinned Nix image, so
       # a Go module change that leaves nixos/packages/onidel-provider.nix's vendorHash stale fails
       # the pull request, a Renovate bump's included
       - name: Onidel vendor hash
-        if: needs.decide.outputs.onidel-vendor == 'true'
+        if: needs.decide.outputs.onidel-vendor != 'false'
         run: bun run check:onidel-vendor
 
   # the pinned blackbox exporter and promtool in Docker, against the probe and the rules the repo
@@ -253,7 +257,7 @@ jobs:
   # The lanes: each Docker suite runs only when its gate says the change touches its inputs.
   test-agent-image:
     needs: decide
-    if: needs.decide.outputs.agent-image == 'true'
+    if: ${{ !cancelled() && needs.decide.outputs.agent-image != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -279,7 +283,9 @@ jobs:
   # this job runs it on a pull request only.
   test-atc-gateway-fixture:
     needs: decide
-    if: github.event_name == 'pull_request' && needs.decide.outputs.atc-gateway == 'true'
+    if: >-
+      ${{ !cancelled() && github.event_name == 'pull_request' && needs.decide.outputs.atc-gateway !=
+      'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -305,7 +311,9 @@ jobs:
 
   test-backup-fixtures:
     needs: decide
-    if: needs.decide.outputs.files-backup == 'true' || needs.decide.outputs.nixie-backup == 'true'
+    if: >-
+      ${{ !cancelled() && (needs.decide.outputs.files-backup != 'false' ||
+      needs.decide.outputs.nixie-backup != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # the backup images are private GHCR packages, which needs read on packages
@@ -333,18 +341,18 @@ jobs:
         run: bun run login:ghcr
 
       - name: Test Files Backup Fixture
-        if: needs.decide.outputs.files-backup == 'true'
+        if: needs.decide.outputs.files-backup != 'false'
         run: bun run test:files-backup-fixture
 
       - name: Test nixie Backup Fixture
-        if: needs.decide.outputs.nixie-backup == 'true'
+        if: needs.decide.outputs.nixie-backup != 'false'
         run: bun run test:nixie-backup-fixture
 
   # the provider's Go checks and the SDK check, which builds the provider and regenerates
   # sdk/onidel
   provider:
     needs: decide
-    if: needs.decide.outputs.provider == 'true'
+    if: ${{ !cancelled() && needs.decide.outputs.provider != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
