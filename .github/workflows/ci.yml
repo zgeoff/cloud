@@ -1,13 +1,13 @@
 name: CI
 
-# One job, checks, for the secret scan, the Bun checks, the provider's Go checks, the build of its
-# vendored Go modules and the Docker lanes, so a run bills one runner minute where a job per check
-# billed one each. The job runs on every pull request and every push to main, and the ruleset
-# requires it. scripts/run-decide-gates.ts decides, from the gates of .github/gates.yml, whether the
-# change touches an input of the Go checks and the SDK check, an input of the vendored modules'
-# build, an input of each lane, and any file other than Markdown, which the four Nix-image linters
-# and the shell suites need; the job runs each only then. A failed decision or a failed check fails
-# the job.
+# The checks run as parallel jobs, so the slowest job sets the run's wall time, not the sum of every
+# check. The decide job runs scripts/run-decide-gates.ts, which decides, from the gates of
+# .github/gates.yml, whether the change touches an input of the Go checks and the SDK check, an
+# input of the vendored modules' build, an input of each lane, and any file other than Markdown,
+# which the four Nix-image linters and the shell suites need; each later job or step runs only
+# then. A failed decision leaves the gates empty, so every gated job and step runs, the secret scan
+# included. The checks job needs every other job and passes only when each one passed or its gate
+# skipped it, and the ruleset requires it, so a failed decision or a failed check fails it.
 on:
   push:
     branches: [main]
@@ -26,21 +26,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  checks:
+  decide:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
-    # image pin check reads the private ghcr.io/zgeoff packages, which needs read on packages; a
-    # push lists CI's green runs on main, which needs read on actions
+    timeout-minutes: 5
+    # a push lists CI's green runs on main, which needs read on actions
     permissions:
       actions: read
       contents: read
-      packages: read
-      pull-requests: write
-    env:
-      LEFTHOOK: 0
+    outputs:
+      provider: ${{ steps.decide.outputs.provider }}
+      onidel-vendor: ${{ steps.decide.outputs.onidel-vendor }}
+      full: ${{ steps.decide.outputs.full }}
+      agent-image: ${{ steps.decide.outputs.agent-image }}
+      atc-gateway: ${{ steps.decide.outputs.atc-gateway }}
+      files-image: ${{ steps.decide.outputs.files-image }}
+      files-backup: ${{ steps.decide.outputs.files-backup }}
+      nixie-backup: ${{ steps.decide.outputs.nixie-backup }}
     steps:
-      # the full history, for gitleaks' commit range and the provider decision's merge base
+      # the full history, for the decision's merge base
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -64,6 +67,32 @@ jobs:
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
           files-image files-backup nixie-backup
 
+  # the Bun checks and tests, the shell suites and the secret scan
+  bun:
+    needs: decide
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
+    # image pin check reads the private ghcr.io/zgeoff packages, which needs read on packages
+    permissions:
+      contents: read
+      packages: read
+      pull-requests: write
+    env:
+      LEFTHOOK: 0
+    steps:
+      # the full history, for gitleaks' commit range
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
       - name: Install
         run: bun install --frozen-lockfile
 
@@ -72,26 +101,6 @@ jobs:
 
       - name: Lint
         run: bun run lint:full
-
-      # the four linters run tools from nixos/flake.lock's nixpkgs in the pinned Nix image; the
-      # first one fills the job's Nix store volume for the others
-      - name: Lint shell
-        if: steps.decide.outputs.full == 'true'
-        run: bun run lint:sh
-
-      - name: Lint Nix
-        if: steps.decide.outputs.full == 'true'
-        run: bun run lint:nix
-
-      - name: Lint Python
-        if: steps.decide.outputs.full == 'true'
-        run: bun run lint:py
-
-      # actionlint, then the check that every run step is setup or one bun run call, then the check
-      # that a push to main cancels main's earlier CI run and never a Deploy prod apply
-      - name: Lint Actions
-        if: steps.decide.outputs.full == 'true'
-        run: bun run lint:actions
 
       - name: Doc links
         run: bun run check:doc-links
@@ -124,8 +133,8 @@ jobs:
         run: bun run typecheck
 
       # the Pulumi CLI at infra's @pulumi/pulumi pin, with the Kubernetes plugin at infra's pin,
-      # for the port-forward guard's preview test and the SDK check; the tarball is checked
-      # against the release's checksum file
+      # for the port-forward guard's preview test; the tarball is checked against the release's
+      # checksum file
       - name: Setup Pulumi CLI
         run: bun run ci:install-pulumi-cli
 
@@ -149,46 +158,14 @@ jobs:
       # the ubuntu-24.04 image 20260927.320.1 readme lists GitHub CLI 2.101.0, which the GitHub
       # API stand-in's real-gh case (test-support/shell/test-start-stub-github-api.sh) runs
       - name: Test Scripts
-        if: steps.decide.outputs.full == 'true'
+        if: needs.decide.outputs.full != 'false'
         run: bun run test:scripts
 
-      # the pinned blackbox exporter and promtool in Docker, against the probe and the rules the
-      # repo builds, so a body with failing turns fires NixieTurnsFailing and a clear one does not
-      - name: Test Alert Rules
-        run: bun run test:alert-rules
-
-      # The lanes: each Docker suite runs only when its gate says the change touches its inputs.
-      # A push to main runs the atc gateway's fixture and the files image's test in their publish
-      # workflows, before they publish, so this job runs those two on a pull request only.
-      - name: Test Agent Image
-        if: steps.decide.outputs.agent-image == 'true'
-        run: bun run test:agent-image
-
-      - name: Test atc Gateway Fixture
-        if: github.event_name == 'pull_request' && steps.decide.outputs.atc-gateway == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: bun run test:atc-gateway-fixture
-
+      # A push to main runs the files image's test in its publish workflow, before it publishes, so
+      # this job runs it on a pull request only.
       - name: Test Files Image
-        if: github.event_name == 'pull_request' && steps.decide.outputs.files-image == 'true'
+        if: github.event_name == 'pull_request' && needs.decide.outputs.files-image != 'false'
         run: bun run test:files-image
-
-      # the backup images are private GHCR packages, so docker pulls them with the workflow token
-      - name: Log in to GHCR
-        if: >-
-          steps.decide.outputs.files-backup == 'true' || steps.decide.outputs.nixie-backup == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bun run login:ghcr
-
-      - name: Test Files Backup Fixture
-        if: steps.decide.outputs.files-backup == 'true'
-        run: bun run test:files-backup-fixture
-
-      - name: Test nixie Backup Fixture
-        if: steps.decide.outputs.nixie-backup == 'true'
-        run: bun run test:nixie-backup-fixture
 
       - name: Dead Code
         run: bun run deadcode
@@ -202,9 +179,201 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_VERSION: 8.30.1
 
+  # the checks that run tools from nixos/flake.lock's nixpkgs in the pinned Nix image, together, so
+  # the job pulls the image once
+  nix-image:
+    needs: decide
+    if: >-
+      ${{ !cancelled() && (needs.decide.outputs.full != 'false' ||
+      needs.decide.outputs.onidel-vendor != 'false') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # the first of the four linters fills the job's Nix store volume for the others
+      - name: Lint shell
+        if: needs.decide.outputs.full != 'false'
+        run: bun run lint:sh
+
+      - name: Lint Nix
+        if: needs.decide.outputs.full != 'false'
+        run: bun run lint:nix
+
+      - name: Lint Python
+        if: needs.decide.outputs.full != 'false'
+        run: bun run lint:py
+
+      # actionlint, then the check that every run step is setup or one bun run call, then the check
+      # that a push to main cancels main's earlier CI run and never a Deploy prod apply
+      - name: Lint Actions
+        if: needs.decide.outputs.full != 'false'
+        run: bun run lint:actions
+
+      # the NixOS check that builds the provider's vendored Go modules in the pinned Nix image, so
+      # a Go module change that leaves nixos/packages/onidel-provider.nix's vendorHash stale fails
+      # the pull request, a Renovate bump's included
+      - name: Onidel vendor hash
+        if: needs.decide.outputs.onidel-vendor != 'false'
+        run: bun run check:onidel-vendor
+
+  # the pinned blackbox exporter and promtool in Docker, against the probe and the rules the repo
+  # builds, so a body with failing turns fires NixieTurnsFailing and a clear one does not
+  test-alert-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Test Alert Rules
+        run: bun run test:alert-rules
+
+  # The lanes: each Docker suite runs only when its gate says the change touches its inputs.
+  test-agent-image:
+    needs: decide
+    if: ${{ !cancelled() && needs.decide.outputs.agent-image != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Test Agent Image
+        run: bun run test:agent-image
+
+  # A push to main runs the atc gateway's fixture in its publish workflow, before it publishes, so
+  # this job runs it on a pull request only.
+  test-atc-gateway-fixture:
+    needs: decide
+    if: >-
+      ${{ !cancelled() && github.event_name == 'pull_request' && needs.decide.outputs.atc-gateway !=
+      'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Test atc Gateway Fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run test:atc-gateway-fixture
+
+  test-backup-fixtures:
+    needs: decide
+    if: >-
+      ${{ !cancelled() && (needs.decide.outputs.files-backup != 'false' ||
+      needs.decide.outputs.nixie-backup != 'false') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # the backup images are private GHCR packages, which needs read on packages
+    permissions:
+      contents: read
+      packages: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # docker pulls the backup images with the workflow token
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun run login:ghcr
+
+      - name: Test Files Backup Fixture
+        if: needs.decide.outputs.files-backup != 'false'
+        run: bun run test:files-backup-fixture
+
+      - name: Test nixie Backup Fixture
+        if: needs.decide.outputs.nixie-backup != 'false'
+        run: bun run test:nixie-backup-fixture
+
+  # the provider's Go checks and the SDK check, which builds the provider and regenerates
+  # sdk/onidel
+  provider:
+    needs: decide
+    if: ${{ !cancelled() && needs.decide.outputs.provider != 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      LEFTHOOK: 0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
       # go.sum sits in provider/, not at the root, so the cache needs its path to find its key
       - name: Setup Go
-        if: steps.decide.outputs.provider == 'true' && hashFiles('provider/go.mod') != ''
+        if: hashFiles('provider/go.mod') != ''
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: provider/go.mod
@@ -213,17 +382,45 @@ jobs:
             provider/go.sum
             provider/tools.sum
 
+      # the Pulumi CLI at infra's @pulumi/pulumi pin, for the SDK check; the tarball is checked
+      # against the release's checksum file
+      - name: Setup Pulumi CLI
+        run: bun run ci:install-pulumi-cli
+
       - name: Provider checks
-        if: steps.decide.outputs.provider == 'true'
         run: bun run provider:check
 
       - name: SDK check
-        if: steps.decide.outputs.provider == 'true'
         run: bun run check:sdk
 
-      # the NixOS check that builds the provider's vendored Go modules in the pinned Nix image, so
-      # a Go module change that leaves nixos/packages/onidel-provider.nix's vendorHash stale fails
-      # the pull request, a Renovate bump's included
-      - name: Onidel vendor hash
-        if: steps.decide.outputs.onidel-vendor == 'true'
-        run: bun run check:onidel-vendor
+  # the required check: it passes only when every other job passed or its gate skipped it
+  checks:
+    needs:
+      - decide
+      - bun
+      - nix-image
+      - test-alert-rules
+      - test-agent-image
+      - test-atc-gateway-fixture
+      - test-backup-fixtures
+      - provider
+    # always, not !cancelled(): a cancelled run would skip this job, and the ruleset counts a
+    # skipped required check as passed, so it runs and fails on the cancelled jobs instead
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Check every job passed
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: bun run ci:check-needs
