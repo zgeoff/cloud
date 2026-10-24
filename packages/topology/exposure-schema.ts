@@ -38,6 +38,19 @@ const tunnelHostnameSchema = z.strictObject({
   hostname: z.hostname(),
 });
 
+// a route that the host's TLS front serves: upstream is the loopback address it proxies to, and
+// paths are the exact request paths it passes there
+const frontRouteSchema = z.strictObject({
+  ...routeFields,
+  kind: z.literal('front-route'),
+  hostname: z.hostname(),
+  upstream: z.string().regex(/^127\.0\.0\.1:\d{1,5}$/u),
+  paths: z
+    .array(z.string().regex(/^\/\S*$/u))
+    .min(1)
+    .readonly(),
+});
+
 const tailnetCapabilitySchema = z.strictObject({
   ...routeFields,
   kind: z.literal('tailnet-capability'),
@@ -53,6 +66,7 @@ const workerURLSchema = z.strictObject({
 const entrySchema = z.discriminatedUnion('kind', [
   hostPortSchema,
   tunnelHostnameSchema,
+  frontRouteSchema,
   tailnetCapabilitySchema,
   workerURLSchema,
 ]);
@@ -131,12 +145,17 @@ export type ExposureEntry = Exposure['entries'][number];
 type Route = Exclude<ExposureEntry, HostPort>;
 
 interface RouteIssue {
-  readonly field: 'auth';
+  readonly field: 'auth' | 'paths';
   readonly message: string;
 }
 
 function collectRouteIssues(entry: Route): readonly RouteIssue[] {
+  const paths = entry.kind === 'front-route' ? entry.paths : [];
+
   return [
+    ...(new Set(paths).size === paths.length
+      ? []
+      : [{ field: 'paths' as const, message: 'a front route lists each path once' }]),
     ...(entry.scope === 'public' && entry.auth === undefined
       ? [{ field: 'auth' as const, message: 'a public route needs its auth layer' }]
       : []),

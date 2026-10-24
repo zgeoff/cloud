@@ -7,7 +7,7 @@
 #
 # impd-restore, every other check named impd-restore-*, tank-cloud-unlock, tank-cloud-host-secrets,
 # tank-cloud-rancher, imp-dataset-key, geoffcloud-no-pool, network-policy, imp-cpu-weight,
-# host-cgroup-cpu-vm and drift-check-vm boot a NixOS VM, so they need KVM: unless /dev/kvm (or
+# host-cgroup-cpu-vm, drift-check-vm and public-front-vm boot a NixOS VM, so they need KVM: unless /dev/kvm (or
 # KVM_DEVICE, which the script's own test sets) is readable and writable, the script builds every
 # other check it was asked for and then fails, naming those checks. Each such
 # check itself fails if QEMU still falls back to emulation. A container for each check evaluates it to
@@ -84,7 +84,7 @@ for check in "${checks[@]}"; do
   case "$check" in
     impd-restore | impd-restore-* | tank-cloud-unlock | tank-cloud-host-secrets | tank-cloud-rancher | \
       imp-dataset-key | geoffcloud-no-pool | network-policy | imp-cpu-weight | host-cgroup-cpu-vm | \
-      drift-check-vm)
+      drift-check-vm | public-front-vm)
       # QEMU opens the device read-write, and falls back to emulation when it cannot
       if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
         missing_kvm+=("$check")

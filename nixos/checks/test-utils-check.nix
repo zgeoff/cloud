@@ -526,6 +526,51 @@ let
         assert_missing stub.body "the stand-in's body"
       '';
     }
+    {
+      title = "it run-stub-mcp-upstream records the method, target, host and authorization of each request, and answers it as text";
+      script = ''
+        mkdir home tmp
+        start_stub_impd ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+
+        authorization='Authorization: Bearer example-token'
+        curl -s -D headers -o body -X POST -H 'Host: mcp.example.test' -H "$authorization" \
+          --data '{}' --path-as-is "http://127.0.0.1:$port/oauth2/../oauth2/token?client=a"
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals " text/plain" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
+        assert_equals "POST /oauth2/../oauth2/token?client=a" "$(cat body)" "the body"
+        assert_files_equal - requests <<'EOF'
+        {"method": "POST", "path": "/oauth2/../oauth2/token?client=a", "host": "mcp.example.test", "authorization": "Bearer example-token"}
+        EOF
+      '';
+    }
+    {
+      title = "it run-stub-mcp-upstream holds a GET of /mcp open after its first event until the release file exists";
+      script = ''
+        source ${testLib}/wait-for.sh
+        mkdir home tmp
+        start_stub_impd ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+
+        curl -s -N -D headers -o stream "http://127.0.0.1:$port/mcp" &
+        curl_pid=$!
+        wait_for 5 "the first event" grep -qx 'data: first' stream
+        held=$(cat stream)
+        kill -0 "$curl_pid"
+        touch release
+        wait "$curl_pid"
+
+        assert_equals "data: first" "$(printf '%s' "$held" | sed '/^$/d')" "the stream before the release"
+        assert_equals " text/event-stream" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
+        assert_files_equal - stream <<'EOF'
+        data: first
+
+        data: second
+
+        EOF
+        assert_equals "{\"method\": \"GET\", \"path\": \"/mcp\", \"host\": \"127.0.0.1:$port\", \"authorization\": null}" \
+          "$(cat requests)" "the requests"
+      '';
+    }
     (
       let
         stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";

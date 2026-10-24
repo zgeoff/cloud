@@ -1,16 +1,41 @@
 # Public ingress
 
-The estate has one way in from the internet: two Cloudflare tunnels that cloudflared holds open from
-inside the cluster. The host opens no inbound port for them, so a public route exists only as a rule
-in a tunnel's configuration and a DNS record that points at that tunnel, and Pulumi declares both.
-Each workload behind a tunnel brings its own authentication. The atc tunnel serves
-`atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel serves two
-hostnames. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which
-checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which
-serves each file to anyone who holds its link and checks a role token on every write. Cloudflare
-Access adds an owner-only login in front of the gateway's sign-in pages, and nowhere else.
+The estate has two ways in from the internet: two Cloudflare tunnels that cloudflared holds open
+from inside the cluster, and a TLS front on the host's public HTTPS port. The host opens no inbound
+port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
+record that points at that tunnel, and Pulumi declares both. The TLS front serves `mcp.geoff.cloud`,
+imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly. Each
+workload behind a route brings its own authentication. The atc tunnel serves `atc.geoff.cloud`, the
+atc gateway, which runs its own OAuth server. The shared tunnel serves two hostnames.
+`preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which checks the
+signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which serves each
+file to anyone who holds its link and checks a role token on every write. Cloudflare Access adds an
+owner-only login in front of the gateway's sign-in pages, and nowhere else.
 [The atc gateway](../workloads/atc-gateway.md), [the preview service](../workloads/preview.md) and
 [the files service](../workloads/files.md) cover what answers behind each route.
+
+## The host's TLS front
+
+Caddy on the host serves each front route of the
+[exposure registry](./firewalls.md#the-exposure-registry) on the public addresses' port 443, and
+`mcp.geoff.cloud` is its one route. The hostname's A and AAAA records point straight at the host and
+are not proxied, for two reasons. Caddy gets the certificate itself, through Let's Encrypt's
+TLS-ALPN-01 challenge on port 443, so port 80 stays shut and the host holds no DNS credential for
+it. And Cloudflare's proxy would end an MCP event stream that stays quiet past its read timeout.
+
+The front passes only the route's listed paths, which are impd's MCP, OAuth and discovery paths, to
+impd's public listener. A path matches only as the request sends it, so a case change, a trailing
+slash or a dot segment that would resolve to a listed path gets a 404 from Caddy and never reaches
+impd. imp-host publishes the listener on the host's loopback alone, and impd's public listener
+answers no other route, the API and the dashboard included
+([imp's guide to the public route](https://github.com/zgeoff/impz/blob/main/docs/guides/mcp.md#public-route)).
+Caddy keeps the request's `Host` and `Authorization`, caches nothing and flushes each write at once,
+and it sets no timeout on a response, so the `/mcp` event stream lasts as long as the client and
+impd keep it open.
+
+impd counts its limits per client and grant, never per address, because every request reaches it
+from the front. Caddy therefore limits the requests of each client address, and of each IPv6 /64,
+and answers 429 past the limit. HTTP/3 stays off, so the front needs no UDP port.
 
 ## The tunnels
 
@@ -55,11 +80,12 @@ other name gets a 403.
 
 ## HTTPS and the edge
 
-The zone redirects plain HTTP to HTTPS on every hostname, so a client that names an `http://` URL is
-sent to the encrypted one. The redirect cannot protect a bearer token or an authorization code in
-that first plain request, because the request already holds it by the time the edge answers. A
-client must therefore use `https://` URLs from the start; the redirect is for a client that gets it
-wrong once.
+The zone redirects plain HTTP to HTTPS on every proxied hostname, so a client that names an
+`http://` URL is sent to the encrypted one. The TLS front's hostname is not proxied, and the host
+keeps port 80 shut, so a plain request to it gets no answer at all. The redirect cannot protect a
+bearer token or an authorization code in that first plain request, because the request already holds
+it by the time the edge answers. A client must therefore use `https://` URLs from the start; the
+redirect is for a client that gets it wrong once.
 
 ## Authentication belongs to the workload
 
@@ -143,7 +169,8 @@ A new public route is the exception in this estate. A service stays on the host 
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
 catch-all and a proxied record for its hostname, reviewed in the same preview. The hostname needs a
 public entry in the [exposure registry](./firewalls.md#the-exposure-registry) that names its auth
-layer, and the Pulumi program refuses a route to any other hostname. `imp.geoff.cloud` has a
-reserved entry, held free for imp's own public endpoint, and impd's tailnet names under
-`imps.geoff.cloud` never pass through the tunnel
+layer, and the Pulumi program refuses a route to any other hostname. A route that must hold a stream
+open longer than Cloudflare's proxy allows goes through the host's TLS front instead, as a
+front-route entry, which gives the front its hostname, upstream and paths and Pulumi its DNS
+records. impd's tailnet names under `imps.geoff.cloud` never pass through either way in
 ([imp on the host](../host/imp.md#dns-and-certificates)).
