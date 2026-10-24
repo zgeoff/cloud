@@ -40,6 +40,16 @@ test("it lets the imp health probe's pod reach impd's tailnet address on 443 onl
   });
 });
 
+test("it lets the nixie sandbox image Job's pod reach impd's tailnet address on 443 only", () => {
+  expect(buildEgressAllowNetworkPolicySpec(egressAllows.nixieSandboxImages)).toStrictEqual({
+    podSelector: { matchLabels: { app: 'nixie-sandbox-images' } },
+    policyTypes: ['Egress'],
+    egress: [
+      { to: [{ ipBlock: { cidr: '100.75.9.119/32' } }], ports: [{ protocol: 'TCP', port: 443 }] },
+    ],
+  });
+});
+
 test("it lets cloudflared's pod reach the preview webhook on the host's tailnet address only", () => {
   expect(buildEgressAllowNetworkPolicySpec(egressAllows.cloudflared)).toStrictEqual({
     podSelector: { matchLabels: { app: 'cloudflared' } },

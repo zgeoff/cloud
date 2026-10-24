@@ -111,6 +111,17 @@ release dropped or renamed a procedure that the check calls, so vendor the relea
 [nixie's runbook](./nixie.md) describes. A 401 with no such error comes from the k3s API server, not
 nixie, so check the deploy kubeconfig. Never send nixie a call by hand to reproduce the failure.
 
+A run that applies a new nixie image runs the Job that adds the release's sandbox images to impd
+before it rolls nixie
+([sandbox images before a roll](../architecture/workloads/nixie.md#sandbox-images-before-a-roll)).
+The step `Apply` shows `run-sandbox-image-job: started job.batch/<job_name>`, the Job's `added` and
+`held` lines, and `run-sandbox-image-job: job.batch/<job_name> added nixie's sandbox images` before
+the update of `kubernetes:apps/v1:StatefulSet nixie`. When the Job fails, the step logs
+`run-sandbox-image-job: job.batch/<job_name> failed (<reason>), so nixie's sandbox images are not all in impd and nixie does not roll`,
+the apply fails with nixie still on its old release, and the run posts `The prod apply failed`. Fix
+the cause that the Job's log names, as [nixie's runbook](./nixie.md#failures) describes, then
+dispatch the run again.
+
 A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
 most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
 that a newer run applied, because its apply covers every change of the cancelled one.

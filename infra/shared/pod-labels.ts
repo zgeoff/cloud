@@ -5,4 +5,5 @@ export const podLabels = {
   impHealthProbe: { app: 'imp-health-probe' },
   cloudflared: { app: 'cloudflared' },
   nixie: { app: 'nixie' },
+  nixieSandboxImages: { app: 'nixie-sandbox-images' },
 } as const;

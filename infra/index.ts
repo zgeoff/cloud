@@ -1,4 +1,4 @@
-import { Config } from '@pulumi/pulumi';
+import { Config, secret } from '@pulumi/pulumi';
 import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
 import { createATCTunnel, createIngress } from './ingress/index.ts';
@@ -51,6 +51,7 @@ const workloads =
         ...(k3s.inputs.nixie === undefined ? {} : { nixie: k3s.inputs.nixie }),
         ...(k3s.inputs.files === undefined ? {} : { files: k3s.inputs.files }),
         zoneID: edge.zoneID,
+        kubeconfig: secret(k3s.inputs.kubeconfig),
       });
 
 const ingress = createIngress({
