@@ -1,5 +1,6 @@
 import { expect, mock, test } from 'bun:test';
 import { createImpClient } from '@impz/client';
+import { HttpResponse, http } from 'msw';
 import { server } from './mocks/node.ts';
 import { runSandboxImageAdd } from './run-sandbox-image-add.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
@@ -227,6 +228,67 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
     [
       'run-sandbox-image-add: sops could not read impd_token (exit 128): Failed to get the data key required to decrypt the SOPS file.\n',
     ],
+  ]);
+});
+
+test('it exits 1 with no add when impd refuses to list its images', async () => {
+  const ctx = setupTest();
+
+  const impd = startStubImpdImages({
+    url: 'https://impd.test',
+    token: 'nixie-impd-token-for-tests',
+    images: [],
+  });
+
+  server.use(...impd.handlers);
+
+  // oRPC's answer to a procedure that threw an undefined error, which server.use puts first
+  server.use(
+    http.post('https://impd.test/rpc/images/list', () =>
+      HttpResponse.json(
+        {
+          json: {
+            defined: false,
+            code: 'INTERNAL_SERVER_ERROR',
+            status: 500,
+            message: 'Internal server error',
+          },
+          meta: [],
+        },
+        { status: 500 },
+      ),
+    ),
+  );
+
+  const runner = buildStubRunner(
+    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),
+    (call) =>
+      call.argv.join(' ') === 'nixie sandbox-manifest'
+        ? {
+            stdout: JSON.stringify({
+              fetch: {
+                name: 'nixie-fetch-77aa88bb99cc',
+                ref: 'ghcr.io/zgeoff/nixie-fetch@sha256:77aa88bb99cc00dd11ee22ff33004455667788990011223344556677889900aa',
+              },
+            }),
+          }
+        : undefined,
+  );
+
+  const exitCode = await runSandboxImageAdd({
+    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    run: runner.run,
+    createImpClient,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(impd.calls).toStrictEqual([]);
+  expect(impd.images).toStrictEqual([]);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['run-sandbox-image-add: impd did not list its images: Internal server error\n'],
   ]);
 });
 
