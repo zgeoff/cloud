@@ -230,6 +230,43 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
   ]);
 });
 
+test('it exits 1 with no impd call when nixie cannot print its sandbox manifest', async () => {
+  const ctx = setupTest();
+
+  const impd = startStubImpdImages({
+    url: 'https://impd.test',
+    token: 'nixie-impd-token-for-tests',
+    images: [],
+  });
+
+  server.use(...impd.handlers);
+
+  const runner = buildStubRunner(
+    (call) => (call.argv[0] === 'sops' ? { stdout: 'nixie-impd-token-for-tests' } : undefined),
+    (call) =>
+      call.argv.join(' ') === 'nixie sandbox-manifest'
+        ? { exitCode: 1, stderr: 'nixie: the sandbox manifest is missing from this build\n' }
+        : undefined,
+  );
+
+  const exitCode = await runSandboxImageAdd({
+    env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
+    run: runner.run,
+    createImpClient,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(impd.calls).toStrictEqual([]);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    [
+      'run-sandbox-image-add: nixie sandbox-manifest exited 1: nixie: the sandbox manifest is missing from this build\n',
+    ],
+  ]);
+});
+
 test("it exits 1 with no impd call when the manifest holds a ref outside nixie's registry path", async () => {
   const ctx = setupTest();
 
