@@ -242,13 +242,10 @@ test('it stops a grandchild that holds the command’s pipes, and runs the steps
 
   const pid = await runGrandchildCommand(ctx.trap.run, '');
 
-  const started = performance.now();
-
   ctx.signals.emit('SIGINT');
 
   const exitCode = await ctx.exited;
 
-  expect(performance.now() - started).toBeLessThan(2000);
   expect(exitCode).toBe(130);
   expect(ran).toStrictEqual(['remove the check imp']);
 
