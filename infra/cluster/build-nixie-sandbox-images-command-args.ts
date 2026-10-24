@@ -2,8 +2,8 @@ import type { CommandArgs } from '@pulumi/command/local';
 import type { Output } from '@pulumi/pulumi';
 
 export interface NixieSandboxImagesCommandInputs {
-  // the Job, as JSON
-  readonly job: Output<string>;
+  // the payload that the script parses, as JSON
+  readonly payload: Output<string>;
   readonly kubeconfig: Output<string>;
 }
 
@@ -14,11 +14,11 @@ export function buildNixieSandboxImagesCommandArgs(
   inputs: NixieSandboxImagesCommandInputs,
 ): CommandArgs {
   return {
-    // a change to the Job's JSON is an update that runs the Job again; a trigger would replace the
+    // a change to the payload is an update that runs the Job again; a trigger would replace the
     // Command instead, which the prod deploy's guard holds
     create: command,
     update: command,
-    environment: { NIXIE_SANDBOX_IMAGES_JOB: inputs.job },
+    environment: { NIXIE_SANDBOX_IMAGES: inputs.payload },
 
     // the kubeconfig travels on stdin, so it never reaches a command line or the environment that
     // kubectl's children inherit

@@ -1,6 +1,8 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { nixieSandboxImagesPayloadSchema } from '@zgeoff/cloud-topology';
+import type { NixieSandboxImagesPayload } from '@zgeoff/cloud-topology';
 import { z } from 'zod';
 import { readSandboxImageScript } from './read-sandbox-image-script.ts';
 import { runProcess } from './run-process.ts';
@@ -25,10 +27,10 @@ const pollMs = 5000;
 export async function runSandboxImageJob(
   options: Readonly<SandboxImageJobOptions>,
 ): Promise<number> {
-  const job = parseJob(options.env['NIXIE_SANDBOX_IMAGES_JOB']);
+  const payload = parsePayload(options.env['NIXIE_SANDBOX_IMAGES']);
 
-  if (!job.ok) {
-    options.printErr(`run-sandbox-image-job: ${job.error}\n`);
+  if (!payload.ok) {
+    options.printErr(`run-sandbox-image-job: ${payload.error}\n`);
 
     return 2;
   }
@@ -52,68 +54,26 @@ export async function runSandboxImageJob(
         ...(stdin === undefined ? {} : { stdin: Buffer.from(stdin) }),
       });
 
-    return await runJob(options, job.value, kubectl);
+    return await runJob(options, payload.value, kubectl);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
 }
 
-interface ParsedJob {
-  readonly manifest: string;
-  readonly namespace: string;
-  readonly configMap: string;
-  readonly scriptKey: string;
-}
-
-const scriptItemSchema = z.looseObject({ key: z.string() });
-
-const configMapSourceSchema = z.looseObject({
-  name: z.string(),
-  items: z.tuple([scriptItemSchema]),
-});
-
-const volumeSchema = z.looseObject({
-  name: z.string(),
-  configMap: configMapSourceSchema.optional(),
-});
-
-const podSpecSchema = z.looseObject({ volumes: z.array(volumeSchema) });
-
-const jobSchema = z.looseObject({
-  metadata: z.looseObject({ namespace: z.string() }),
-  spec: z.looseObject({ template: z.looseObject({ spec: podSpecSchema }) }),
-});
-
-function parseJob(
+function parsePayload(
   text: string | undefined,
 ):
-  | { readonly ok: true; readonly value: ParsedJob }
+  | { readonly ok: true; readonly value: NixieSandboxImagesPayload }
   | { readonly ok: false; readonly error: string } {
   if (text === undefined) {
-    return { ok: false, error: 'NIXIE_SANDBOX_IMAGES_JOB must hold the Job to run' };
+    return { ok: false, error: 'NIXIE_SANDBOX_IMAGES must hold the payload that infra builds' };
   }
 
-  const result = jobSchema.safeParse(parseJSON(text));
+  const result = nixieSandboxImagesPayloadSchema.safeParse(parseJSON(text));
 
-  if (!result.success) {
-    return { ok: false, error: `NIXIE_SANDBOX_IMAGES_JOB: ${z.prettifyError(result.error)}` };
-  }
-
-  const script = result.data.spec.template.spec.volumes.find((volume) => volume.name === 'script');
-
-  if (script?.configMap === undefined) {
-    return { ok: false, error: 'NIXIE_SANDBOX_IMAGES_JOB has no ConfigMap volume named script' };
-  }
-
-  return {
-    ok: true,
-    value: {
-      manifest: text,
-      namespace: result.data.metadata.namespace,
-      configMap: script.configMap.name,
-      scriptKey: script.configMap.items[0].key,
-    },
-  };
+  return result.success
+    ? { ok: true, value: result.data }
+    : { ok: false, error: `NIXIE_SANDBOX_IMAGES: ${z.prettifyError(result.error)}` };
 }
 
 function parseJSON(text: string): unknown {
@@ -131,23 +91,23 @@ type Kubectl = (
 
 async function runJob(
   options: Readonly<SandboxImageJobOptions>,
-  job: ParsedJob,
+  payload: NixieSandboxImagesPayload,
   kubectl: Kubectl,
 ): Promise<number> {
-  const namespaceArgs = ['--namespace', job.namespace];
+  const namespaceArgs = ['--namespace', payload.namespace];
 
   const configMap = {
     apiVersion: 'v1',
     kind: 'ConfigMap',
-    metadata: { name: job.configMap, namespace: job.namespace },
-    data: { [job.scriptKey]: await options.readScript() },
+    metadata: { name: payload.configMap, namespace: payload.namespace },
+    data: { [payload.scriptKey]: await options.readScript() },
   };
 
   // a run that stopped early leaves its ConfigMap, and create refuses a name that exists
   const steps: readonly (readonly [string, readonly string[], string | undefined])[] = [
     [
       'remove the last ConfigMap',
-      ['delete', 'configmap', job.configMap, ...namespaceArgs, '--ignore-not-found'],
+      ['delete', 'configmap', payload.configMap, ...namespaceArgs, '--ignore-not-found'],
       undefined,
     ],
     ['create the ConfigMap', ['create', '--filename', '-'], JSON.stringify(configMap)],
@@ -166,20 +126,26 @@ async function runJob(
   }
 
   try {
-    return await runCreatedJob(options, job, kubectl);
+    return await runCreatedJob(options, payload, kubectl);
   } finally {
-    await kubectl(['delete', 'configmap', job.configMap, ...namespaceArgs, '--ignore-not-found']);
+    await kubectl([
+      'delete',
+      'configmap',
+      payload.configMap,
+      ...namespaceArgs,
+      '--ignore-not-found',
+    ]);
   }
 }
 
 async function runCreatedJob(
   options: Readonly<SandboxImageJobOptions>,
-  job: ParsedJob,
+  payload: NixieSandboxImagesPayload,
   kubectl: Kubectl,
 ): Promise<number> {
-  const namespaceArgs = ['--namespace', job.namespace];
+  const namespaceArgs = ['--namespace', payload.namespace];
 
-  const created = await kubectl(['create', '--filename', '-', '--output', 'name'], job.manifest);
+  const created = await kubectl(['create', '--filename', '-', '--output', 'name'], payload.job);
 
   const name = created.stdout.toString().trim();
 

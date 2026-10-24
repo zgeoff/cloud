@@ -31,29 +31,15 @@ test('it creates the script ConfigMap and the Job, waits for the Job to complete
 
   const runner = buildStubRunner(kubectl.handler);
 
-  const job = {
-    apiVersion: 'batch/v1',
-    kind: 'Job',
-    metadata: { generateName: 'nixie-sandbox-images-', namespace: 'nixie' },
-    spec: {
-      template: {
-        spec: {
-          volumes: [
-            {
-              name: 'script',
-              configMap: {
-                name: 'nixie-sandbox-images',
-                items: [{ key: 'add-sandbox-images.js', path: 'add-sandbox-images.js' }],
-              },
-            },
-          ],
-        },
-      },
-    },
-  };
-
   const exitCode = await runSandboxImageJob({
-    env: { NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify(job) },
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job","metadata":{"generateName":"nixie-sandbox-images-"}}',
+      }),
+    },
     kubeconfig: 'apiVersion: v1\nkind: Config\n',
     run: runner.run,
     readScript: () => Promise.resolve('console.log("bundled");\n'),
@@ -88,7 +74,10 @@ test('it creates the script ConfigMap and the Job, waits for the Job to complete
         data: { 'add-sandbox-images.js': 'console.log("bundled");\n' },
       }),
     ],
-    [['kubectl', 'create', '--filename', '-', '--output', 'name'], JSON.stringify(job)],
+    [
+      ['kubectl', 'create', '--filename', '-', '--output', 'name'],
+      '{"kind":"Job","metadata":{"generateName":"nixie-sandbox-images-"}}',
+    ],
     [
       [
         'kubectl',
@@ -153,20 +142,11 @@ test('it hands kubectl the kubeconfig in a file only its user reads, and removes
 
   await runSandboxImageJob({
     env: {
-      NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify({
-        metadata: { namespace: 'nixie' },
-        spec: {
-          template: {
-            spec: {
-              volumes: [
-                {
-                  name: 'script',
-                  configMap: { name: 'nixie-sandbox-images', items: [{ key: 'add.js' }] },
-                },
-              ],
-            },
-          },
-        },
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
       }),
     },
     kubeconfig:
@@ -213,20 +193,11 @@ test('it exits 1, prints the logs, and removes the ConfigMap when the Job fails'
 
   const exitCode = await runSandboxImageJob({
     env: {
-      NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify({
-        metadata: { namespace: 'nixie' },
-        spec: {
-          template: {
-            spec: {
-              volumes: [
-                {
-                  name: 'script',
-                  configMap: { name: 'nixie-sandbox-images', items: [{ key: 'add.js' }] },
-                },
-              ],
-            },
-          },
-        },
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
       }),
     },
     kubeconfig: 'apiVersion: v1\n',
@@ -266,20 +237,11 @@ test('it exits 1 once the wait outlasts the Job deadline with no outcome', async
 
   const exitCode = await runSandboxImageJob({
     env: {
-      NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify({
-        metadata: { namespace: 'nixie' },
-        spec: {
-          template: {
-            spec: {
-              volumes: [
-                {
-                  name: 'script',
-                  configMap: { name: 'nixie-sandbox-images', items: [{ key: 'add.js' }] },
-                },
-              ],
-            },
-          },
-        },
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
       }),
     },
     kubeconfig: 'apiVersion: v1\n',
@@ -319,20 +281,11 @@ test('it exits 1 with no Job when kubectl cannot create the ConfigMap', async ()
 
   const exitCode = await runSandboxImageJob({
     env: {
-      NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify({
-        metadata: { namespace: 'nixie' },
-        spec: {
-          template: {
-            spec: {
-              volumes: [
-                {
-                  name: 'script',
-                  configMap: { name: 'nixie-sandbox-images', items: [{ key: 'add.js' }] },
-                },
-              ],
-            },
-          },
-        },
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
       }),
     },
     kubeconfig: 'apiVersion: v1\n',
@@ -355,7 +308,7 @@ test('it exits 1 with no Job when kubectl cannot create the ConfigMap', async ()
   ]);
 });
 
-test('it exits 2 with no kubectl call when the Job has no script volume', async () => {
+test('it exits 2 with no kubectl call when the payload names no Job', async () => {
   const ctx = await setupTest();
 
   const clock = buildStubClock(0);
@@ -363,9 +316,10 @@ test('it exits 2 with no kubectl call when the Job has no script volume', async 
 
   const exitCode = await runSandboxImageJob({
     env: {
-      NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify({
-        metadata: { namespace: 'nixie' },
-        spec: { template: { spec: { volumes: [{ name: 'tmp', emptyDir: {} }] } } },
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
       }),
     },
     kubeconfig: 'apiVersion: v1\n',
@@ -382,7 +336,9 @@ test('it exits 2 with no kubectl call when the Job has no script volume', async 
   expect(runner.calls).toStrictEqual([]);
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
-    ['run-sandbox-image-job: NIXIE_SANDBOX_IMAGES_JOB has no ConfigMap volume named script\n'],
+    [
+      'run-sandbox-image-job: NIXIE_SANDBOX_IMAGES: ✖ Invalid input: expected string, received undefined\n  → at job\n',
+    ],
   ]);
 });
 
@@ -394,20 +350,11 @@ test('it exits 2 with no kubectl call when stdin holds no kubeconfig', async () 
 
   const exitCode = await runSandboxImageJob({
     env: {
-      NIXIE_SANDBOX_IMAGES_JOB: JSON.stringify({
-        metadata: { namespace: 'nixie' },
-        spec: {
-          template: {
-            spec: {
-              volumes: [
-                {
-                  name: 'script',
-                  configMap: { name: 'nixie-sandbox-images', items: [{ key: 'add.js' }] },
-                },
-              ],
-            },
-          },
-        },
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
       }),
     },
     kubeconfig: '',

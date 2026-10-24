@@ -12,7 +12,8 @@ export type NixieSandboxImagesJob = input.batch.v1.Job & {
   readonly metadata: input.meta.v1.ObjectMeta;
 };
 
-const scriptKey = 'add-sandbox-images.js';
+export const nixieSandboxImagesConfigMap = 'nixie-sandbox-images';
+export const nixieSandboxImagesScriptKey = 'add-sandbox-images.js';
 const scriptDirectory = '/opt/nixie-sandbox-images';
 
 // Kubernetes refuses a change to a Job's pod template, so a Job that Pulumi owned would be replaced
@@ -58,8 +59,8 @@ export function buildNixieSandboxImagesJob(
             {
               name: 'script',
               configMap: {
-                name: 'nixie-sandbox-images',
-                items: [{ key: scriptKey, path: scriptKey }],
+                name: nixieSandboxImagesConfigMap,
+                items: [{ key: nixieSandboxImagesScriptKey, path: nixieSandboxImagesScriptKey }],
               },
             },
             { name: 'tmp', emptyDir: {} },
@@ -68,7 +69,7 @@ export function buildNixieSandboxImagesJob(
             {
               name: 'add',
               image: inputs.image,
-              command: ['bun', `${scriptDirectory}/${scriptKey}`],
+              command: ['bun', `${scriptDirectory}/${nixieSandboxImagesScriptKey}`],
               env: [
                 { name: 'IMPD_URL', value: `https://${topology.imp.domain}` },
                 { name: 'NIXIE_SECRETS_FILE', value: `/etc/nixie/secrets/${nixieSecretsFileKey}` },

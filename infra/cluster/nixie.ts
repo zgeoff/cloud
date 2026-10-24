@@ -14,7 +14,7 @@ import { createNamespace } from '../shared/create-namespace.ts';
 import { egressAllows } from '../shared/egress-allows.ts';
 import { renderNixieConfig } from '../shared/render-nixie-config.ts';
 import { buildNixieSandboxImagesCommandArgs } from './build-nixie-sandbox-images-command-args.ts';
-import { buildNixieSandboxImagesJob } from './build-nixie-sandbox-images-job.ts';
+import { buildNixieSandboxImagesPayload } from './build-nixie-sandbox-images-payload.ts';
 import { buildNixieServiceArgs } from './build-nixie-service-args.ts';
 import {
   buildNixieSpec,
@@ -143,13 +143,13 @@ interface SandboxImagesShape {
 // while the old nixie-0 still serves; a failed Job fails this Command, and Pulumi then leaves the
 // StatefulSet unchanged
 function createSandboxImagesCommand(shape: SandboxImagesShape): Command {
-  const job = shape.secrets.metadata.name.apply((name) =>
-    JSON.stringify(buildNixieSandboxImagesJob({ image: shape.image, secret: name })),
+  const payload = shape.secrets.metadata.name.apply((name) =>
+    JSON.stringify(buildNixieSandboxImagesPayload({ image: shape.image, secret: name })),
   );
 
   return new Command(
     'nixie-sandbox-images',
-    buildNixieSandboxImagesCommandArgs({ job, kubeconfig: shape.kubeconfig }),
+    buildNixieSandboxImagesCommandArgs({ payload, kubeconfig: shape.kubeconfig }),
     { dependsOn: [shape.secrets, shape.egressAllow] },
   );
 }
