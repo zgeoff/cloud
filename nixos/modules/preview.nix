@@ -20,6 +20,13 @@ let
     cfg.githubAppKeyFile
     cfg.impTokenFile
   ];
+  priceRateOptions = lib.genAttrs [ "input" "cache_write" "cache_write_1h" "cached_input" "output" ] (
+    price:
+    lib.mkOption {
+      type = lib.types.either lib.types.ints.unsigned lib.types.float;
+      description = "The model's ${price} price, in dollars per million tokens.";
+    }
+  );
 
   addImage = pkgs.writeShellApplication {
     name = "preview-image";
@@ -195,13 +202,27 @@ in
 
       prices = lib.mkOption {
         type = lib.types.submodule {
-          options = lib.genAttrs [ "input" "cache_write" "cache_write_1h" "cached_input" "output" ] (
-            price:
-            lib.mkOption {
-              type = lib.types.either lib.types.ints.unsigned lib.types.float;
-              description = "The model's ${price} price, in dollars per million tokens.";
-            }
-          );
+          options = priceRateOptions // {
+            long_prompt = lib.mkOption {
+              type = lib.types.nullOr (
+                lib.types.submodule {
+                  options = priceRateOptions // {
+                    over_tokens = lib.mkOption {
+                      type = lib.types.ints.positive;
+                      example = 100000;
+                      description = "The prompt length, in tokens, past which a call costs these prices.";
+                    };
+                  };
+                }
+              );
+              default = null;
+              description = ''
+                The model's prices for a call whose prompt, cache reads and writes included, passes
+                over_tokens. Each proxy charges all of such a call's tokens at them. null charges
+                every call at the base prices.
+              '';
+            };
+          };
         };
         description = "The model's prices, which each proxy charges a reply's tokens at.";
       };
@@ -368,7 +389,10 @@ in
         PREVIEW_SPEND_DIRECTORY = "/var/lib/preview/spend";
         PREVIEW_SPEND_UPSTREAM = cfg.spendCap.upstream;
         PREVIEW_SPEND_MODEL = cfg.spendCap.model;
-        PREVIEW_SPEND_PRICES = builtins.toJSON cfg.spendCap.prices;
+        # the service's price schema takes no null for an absent long_prompt
+        PREVIEW_SPEND_PRICES = builtins.toJSON (
+          lib.filterAttrs (_: rates: rates != null) cfg.spendCap.prices
+        );
         PREVIEW_SPEND_LIMIT_DOLLARS = toString cfg.spendCap.limitDollars;
       }
       // lib.optionalAttrs (cfg.contractRepos != [ ]) {

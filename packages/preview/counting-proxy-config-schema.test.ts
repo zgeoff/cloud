@@ -21,6 +21,104 @@ test('it reads a proxy config with one route for an imp', () => {
   expect(countingProxyConfigSchema.safeParse(config).data).toStrictEqual(config);
 });
 
+test('it reads a route whose prices hold long-prompt rates', () => {
+  const config = {
+    listen: { hostname: '127.0.0.1', port: 0 },
+    store: '/var/lib/example/spend/pv-0a1b2c3d-7.count.json',
+    limits: { dollars: 2 },
+    routes: {
+      'pv-0a1b2c3d-7': {
+        upstream: 'https://models.example.test',
+        model: 'model-small',
+        prices: {
+          input: 1,
+          cache_write: 1.25,
+          cache_write_1h: 2,
+          cached_input: 0.1,
+          output: 5,
+          long_prompt: {
+            over_tokens: 200_000,
+            input: 2,
+            cache_write: 2.5,
+            cache_write_1h: 4,
+            cached_input: 0.2,
+            output: 7.5,
+          },
+        },
+      },
+    },
+  };
+
+  expect(countingProxyConfigSchema.safeParse(config).data).toStrictEqual(config);
+});
+
+test('it refuses long-prompt rates with no prompt boundary', () => {
+  const result = countingProxyConfigSchema.safeParse({
+    listen: { hostname: '127.0.0.1', port: 0 },
+    store: '/var/lib/example/spend/pv-0a1b2c3d-7.count.json',
+    limits: { dollars: 2 },
+    routes: {
+      'pv-0a1b2c3d-7': {
+        upstream: 'https://models.example.test',
+        model: 'model-small',
+        prices: {
+          input: 1,
+          cache_write: 1.25,
+          cache_write_1h: 2,
+          cached_input: 0.1,
+          output: 5,
+          long_prompt: {
+            input: 2,
+            cache_write: 2.5,
+            cache_write_1h: 4,
+            cached_input: 0.2,
+            output: 7.5,
+          },
+        },
+      },
+    },
+  });
+
+  expect(result.error?.issues).toPartiallyContain({
+    path: ['routes', 'pv-0a1b2c3d-7', 'prices', 'long_prompt', 'over_tokens'],
+  });
+});
+
+test('it refuses a long-prompt price that nixie counting proxy does not know', () => {
+  const result = countingProxyConfigSchema.safeParse({
+    listen: { hostname: '127.0.0.1', port: 0 },
+    store: '/var/lib/example/spend/pv-0a1b2c3d-7.count.json',
+    limits: { dollars: 2 },
+    routes: {
+      'pv-0a1b2c3d-7': {
+        upstream: 'https://models.example.test',
+        model: 'model-small',
+        prices: {
+          input: 1,
+          cache_write: 1.25,
+          cache_write_1h: 2,
+          cached_input: 0.1,
+          output: 5,
+          long_prompt: {
+            over_tokens: 200_000,
+            input: 2,
+            cache_write: 2.5,
+            cache_write_1h: 4,
+            cached_input: 0.2,
+            output: 7.5,
+            batch_input: 1,
+          },
+        },
+      },
+    },
+  });
+
+  expect(result.error?.issues).toPartiallyContain({
+    path: ['routes', 'pv-0a1b2c3d-7', 'prices', 'long_prompt'],
+    keys: ['batch_input'],
+  });
+});
+
 test('it reads the config that nixie counting proxy accepts, field for field', async () => {
   const text = await Bun.file(
     join(import.meta.dir, 'test-utils', 'nixie-counting-proxy-config.yaml'),
@@ -36,14 +134,28 @@ test('it reads the config that nixie counting proxy accepts, field for field', a
       'pv-0a1b2c3d-7': {
         upstream: 'https://models.example.test',
         model: 'model-small',
-        prices: { input: 1, cache_write: 1.25, cache_write_1h: 2, cached_input: 0.1, output: 5 },
+        prices: {
+          input: 1,
+          cache_write: 1.25,
+          cache_write_1h: 2,
+          cached_input: 0.1,
+          output: 5,
+          long_prompt: {
+            over_tokens: 200_000,
+            input: 2,
+            cache_write: 2.5,
+            cache_write_1h: 4,
+            cached_input: 0.2,
+            output: 7.5,
+          },
+        },
       },
     },
   });
 });
 
-// nixie's proxy config fields at commit 8a1018c, as cloud writes them: nixie also reads an
-// optional token limit and defaults the hostname, and cloud sets the dollar limit and the hostname
+// nixie's proxy config fields at commit c85f7d7 (v0.42.0), as cloud writes them: nixie also reads
+// an optional token limit and defaults the hostname, and cloud sets the dollar limit and the hostname
 test('it writes the fields of nixie proxy config with their types and no others', () => {
   expect(collectSchemaFields(z.toJSONSchema(countingProxyConfigSchema))).toStrictEqual([
     'limits.dollars: number',
@@ -54,6 +166,12 @@ test('it writes the fields of nixie proxy config with their types and no others'
     'routes.*.prices.cache_write_1h: number',
     'routes.*.prices.cached_input: number',
     'routes.*.prices.input: number',
+    'routes.*.prices.long_prompt?.cache_write: number',
+    'routes.*.prices.long_prompt?.cache_write_1h: number',
+    'routes.*.prices.long_prompt?.cached_input: number',
+    'routes.*.prices.long_prompt?.input: number',
+    'routes.*.prices.long_prompt?.output: number',
+    'routes.*.prices.long_prompt?.over_tokens: integer',
     'routes.*.prices.output: number',
     'routes.*.upstream: string',
     'store: string',

@@ -108,12 +108,66 @@ test('it reads the counting proxy settings when the environment names a model ro
   });
 });
 
+test('it reads the long-prompt prices of the counting proxy settings', async () => {
+  const files = new Map([
+    ['/run/credentials/preview.service/webhook-secret', 'stub-webhook-secret\n'],
+    ['/run/credentials/preview.service/github-app-client-id', 'Iv23liStubPreviewApp\n'],
+    ['/run/credentials/preview.service/github-app-key', stubAppKeyPEM],
+    ['/run/credentials/preview.service/imp-token', 'imp_stubpreview.stub-secret\n'],
+  ]);
+
+  const config = await loadPreviewConfig(
+    {
+      CREDENTIALS_DIRECTORY: '/run/credentials/preview.service',
+      PREVIEW_REPOS: 'acme/greenhouse',
+      PREVIEW_BASE_URL: 'http://geoffcloud:8417',
+      PREVIEW_LINK_LISTEN: '100.64.0.10:8417',
+      PREVIEW_WEBHOOK_LISTEN: '100.64.0.10:8418',
+      PREVIEW_IMPD_URL: 'http://127.0.0.1:7070',
+      PREVIEW_IMP_DOMAIN: 'imps.example.test',
+      PREVIEW_IMP_IMAGE: 'base',
+      PREVIEW_IMP_MODEL_SECRET: 'preview-model-counted',
+      PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
+      PREVIEW_SPEND_LISTEN: '172.17.0.1:18082',
+      PREVIEW_SPEND_PROXY: '/opt/counting-proxy/bin/counting-proxy',
+      PREVIEW_SPEND_DIRECTORY: '/var/lib/preview/spend',
+      PREVIEW_SPEND_UPSTREAM: 'https://models.example.test',
+      PREVIEW_SPEND_MODEL: 'model-small',
+      PREVIEW_SPEND_PRICES:
+        '{"input":1,"cache_write":1.25,"cache_write_1h":2,"cached_input":0.1,"output":5,"long_prompt":{"over_tokens":200000,"input":2,"cache_write":2.5,"cache_write_1h":4,"cached_input":0.2,"output":7.5}}',
+      PREVIEW_SPEND_LIMIT_DOLLARS: '2.5',
+    },
+    (path) => Promise.resolve(files.get(path) ?? ''),
+  );
+
+  expect(config.spend?.settings.prices).toStrictEqual({
+    input: 1,
+    cache_write: 1.25,
+    cache_write_1h: 2,
+    cached_input: 0.1,
+    output: 5,
+    long_prompt: {
+      over_tokens: 200_000,
+      input: 2,
+      cache_write: 2.5,
+      cache_write_1h: 4,
+      cached_input: 0.2,
+      output: 7.5,
+    },
+  });
+});
+
 test.each([
   ['a limit that is not a positive number', 'PREVIEW_SPEND_LIMIT_DOLLARS', '0'],
   [
     'prices that leave out the 1-hour cache write',
     'PREVIEW_SPEND_PRICES',
     '{"input":1,"cache_write":1.25,"cached_input":0.1,"output":5}',
+  ],
+  [
+    'long-prompt prices that leave out the prompt boundary',
+    'PREVIEW_SPEND_PRICES',
+    '{"input":1,"cache_write":1.25,"cache_write_1h":2,"cached_input":0.1,"output":5,"long_prompt":{"input":2,"cache_write":2.5,"cache_write_1h":4,"cached_input":0.2,"output":7.5}}',
   ],
 ])('it rejects counting proxy settings with %s', (_label, name, value) => {
   const files = new Map([

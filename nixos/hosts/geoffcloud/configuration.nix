@@ -482,15 +482,22 @@ in
       allowedSubnet = topology.docker.subnet;
       # nixie's preview/config.yaml model profile
       model = "claude-haiku-5-5";
-      # Haiku 5.5's list prices for a prompt up to 100,000 tokens, as nixie's
-      # research/turn-tokens/report.ts gives them: a 5-minute cache write is 1.25 times the input
-      # price and a 1-hour write 2 times
+      # Haiku 5.5's list prices on Anthropic's pricing page: the base prices for a prompt up to
+      # 100,000 tokens, cache reads and writes included, and the long-prompt prices for a longer one
       prices = {
         input = 0.1;
         cache_write = 0.125;
         cache_write_1h = 0.2;
         cached_input = 0.01;
         output = 0.5;
+        long_prompt = {
+          over_tokens = 100000;
+          input = 0.5;
+          cache_write = 0.625;
+          cache_write_1h = 1;
+          cached_input = 0.05;
+          output = 2.5;
+        };
       };
     };
     # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite

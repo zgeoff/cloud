@@ -188,7 +188,7 @@ function parsePrices(text: string): SpendPrices {
 
   if (!parsed.success) {
     throw new Error(
-      'PREVIEW_SPEND_PRICES is not a JSON object of input, cache_write, cache_write_1h, cached_input and output prices',
+      'PREVIEW_SPEND_PRICES is not a JSON object of input, cache_write, cache_write_1h, cached_input and output prices, with optional long_prompt prices over over_tokens',
     );
   }
 

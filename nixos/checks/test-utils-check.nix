@@ -234,13 +234,13 @@ let
       '';
     }
     {
-      title = "it start-stub-impd starts the stand-in it is given with its port read, and stops it when the case exits";
+      title = "it start-stub-server starts the stand-in it is given with its port read, and stops it when the case exits";
       script = ''
         mkdir home tmp
         source ${testLib}/wait-for.sh
 
-        bash -c 'set -euo pipefail; source "$1"; start_stub_impd "$2" /health 200 text/plain ok "$PWD/requests"; echo "$port" > port; curl -s "http://127.0.0.1:$port/health" > body' \
-          _ ${./test-utils/start-stub-impd.sh} ${./test-utils/run-stub-impd.py} > out 2> err
+        bash -c 'set -euo pipefail; source "$1"; start_stub_server "$2" /health 200 text/plain ok "$PWD/requests"; echo "$port" > port; curl -s "http://127.0.0.1:$port/health" > body' \
+          _ ${./test-utils/start-stub-server.sh} ${./test-utils/run-stub-impd.py} > out 2> err
 
         assert_equals ok "$(cat body)" "the stand-in's answer"
         assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
@@ -251,13 +251,13 @@ let
       '';
     }
     {
-      title = "it start-stub-impd lets a case stop the stand-in first, with no error when the case exits";
+      title = "it start-stub-server lets a case stop the stand-in first, with no error when the case exits";
       script = ''
         mkdir home tmp
 
         status=0
-        bash -c 'set -euo pipefail; source "$1"; start_stub_impd "$2" /health 200 text/plain ok "$PWD/requests"; kill "$stub_pid"; wait "$stub_pid" || true' \
-          _ ${./test-utils/start-stub-impd.sh} ${./test-utils/run-stub-impd.py} > out 2> err || status=$?
+        bash -c 'set -euo pipefail; source "$1"; start_stub_server "$2" /health 200 text/plain ok "$PWD/requests"; kill "$stub_pid"; wait "$stub_pid" || true' \
+          _ ${./test-utils/start-stub-server.sh} ${./test-utils/run-stub-impd.py} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the case's exit status"
         assert_files_equal /dev/null out
@@ -268,7 +268,7 @@ let
       title = "it run-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -D headers -o body "http://127.0.0.1:$port/health"
@@ -284,7 +284,7 @@ let
       title = "it run-stub-impd records a request for another path and answers it with a failure";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -D headers -o body "http://127.0.0.1:$port/ready"
@@ -299,7 +299,7 @@ let
       title = "it run-stub-impd records a request with another method and answers it with a failure";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -X POST -D headers -o body "http://127.0.0.1:$port/health"
@@ -314,7 +314,7 @@ let
       title = "it run-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         # a raw request, so the check sees every byte the stand-in sends before it closes
@@ -335,6 +335,69 @@ let
         EOF
         assert_files_equal expected actual
         assert_equals "HEAD /health" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api answers a POST of its path with its JSON body, once it prints its port";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        curl -s -D headers -o body -X POST -H 'content-type: application/json' \
+          -d '{"model":"model-small","max_tokens":3}' "http://127.0.0.1:$port/v1/messages"
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals "Content-Type: application/json" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
+        assert_equals '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$(cat body)" "the body"
+        assert_equals "POST /v1/messages" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api reads a chunked request body and answers the request";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        # a raw request, so the body goes as two chunks with no Content-Length, as a streamed one does
+        exec 4<>"/dev/tcp/127.0.0.1/$port"
+        printf 'POST /v1/messages HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\n{"a":\r\n2\r\n1}\r\n0\r\n\r\n' >&4
+        cat <&4 > response
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 response | tr -d '\r')" "the status line"
+        assert_equals '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$(tail -1 response)" "the body"
+        assert_equals "POST /v1/messages" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api records a request for another path and answers it with a failure";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        curl -s -D headers -o body -X POST -d '{}' "http://127.0.0.1:$port/v1/messages/batches"
+
+        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
+        assert_equals "unexpected request: POST /v1/messages/batches" "$(cat body)" "the body"
+        assert_equals "POST /v1/messages/batches" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api records a request with another method and answers it with a failure";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        curl -s -D headers -o body "http://127.0.0.1:$port/v1/messages"
+
+        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
+        assert_equals "unexpected request: GET /v1/messages" "$(cat body)" "the body"
+        assert_equals "GET /v1/messages" "$(cat requests)" "the requests"
       '';
     }
     {
@@ -506,7 +569,7 @@ let
       title = "it run-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-hung-impd.py}
+        start_stub_server ${./test-utils/run-stub-hung-impd.py}
 
         # one real wait serves both units: curl's own deadline is the only end it has
         real_status=0
@@ -530,7 +593,7 @@ let
       title = "it run-stub-mcp-upstream records the method, target, host and authorization of each request, and answers it as text";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+        start_stub_server ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
 
         authorization='Authorization: Bearer example-token'
         curl -s -D headers -o body -X POST -H 'Host: mcp.example.test' -H "$authorization" \
@@ -549,7 +612,7 @@ let
       script = ''
         source ${testLib}/wait-for.sh
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+        start_stub_server ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
 
         curl -s -N -D headers -o stream "http://127.0.0.1:$port/mcp" &
         curl_pid=$!
@@ -1756,7 +1819,7 @@ pkgs.runCommand "test-utils-check"
       assert_equals false "$rendered" "whether it rendered"
     )
 
-    source ${./test-utils/start-stub-impd.sh}
+    source ${./test-utils/start-stub-server.sh}
     source ${testLib}/run-cases.sh
     source ${pkgs.writeText "test-utils-cases.sh" (renderCases cases)}
     run_cases

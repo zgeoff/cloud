@@ -89,6 +89,11 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.preview = import ./checks/preview.nix { inherit nixpkgs imp; };
+      checks.x86_64-linux.geoffcloud-spend-cap = import ./checks/geoffcloud-spend-cap.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        inherit imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
       checks.x86_64-linux.public-front = import ./checks/public-front.nix {
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
