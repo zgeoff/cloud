@@ -925,7 +925,7 @@ EOF
   assert_status 1 "$status"
 }
 
-it_never_builds_or_switches_an_impd_major_bump_ahead_of_the_running_nixies_imp_client() {
+it_never_builds_or_switches_an_impd_major_that_the_running_nixie_does_not_accept() {
   local commit status=0
   create_case_tree
   setup_test "$tree"
@@ -946,7 +946,7 @@ it_never_builds_or_switches_an_impd_major_bump_ahead_of_the_running_nixies_imp_c
     STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
     bash scripts/switch-geoffcloud.sh) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/err" <<< 'the switch would run impd 4.0.0, but a nixie pod runs nixie 0.31.4, whose imp-client 3.2.1 refuses an impd of another major; deploy a nixie that speaks impd 4 first (docs/runbooks/workflows.md, Switch the host)'
+  diff - "$tree/err" <<< 'the switch would run impd 4.0.0, but a nixie pod runs nixie 0.31.4 (imp-client 3.2.1), which accepts impd 3 only; deploy a nixie that speaks impd 4 first (docs/runbooks/workflows.md, Switch the host)'
   diff - "$tree/out" << 'EOF'
 == checked by https://github.com/zgeoff/cloud/actions/runs/1
 == atc 2.26.2 on the host, 2.27.0 in the gateway

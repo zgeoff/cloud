@@ -107,12 +107,14 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    digests, which the atc-gateway images workflow opens once it publishes them, let the
    `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate too.
 4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
-   nixie pod's imp client refuses, or that finds no nixie pod, because nixie then retries its start
-   without end while every host check passes. It reads the client's version from the `bun.lock` of
-   the pod's nixie release on GitHub: `@impz/client` from nixie 0.35.1, and `@zgeoff/imp-client`
-   before it. It accepts impd 2 beside a 1.x client from nixie 0.28.0 on, as nixie itself does. It
-   checks again before the activation. For an impd major bump, deploy a nixie release whose client
-   speaks the new major first. `--build-only` skips this gate too.
+   nixie pod refuses, or that finds no nixie pod, because nixie then retries its start without end
+   while every host check passes. A nixie pod accepts the major of its imp client, whose version the
+   script reads from the `bun.lock` of the pod's nixie release on GitHub: `@impz/client` from nixie
+   0.35.1, and `@zgeoff/imp-client` before it. It accepts impd 2 beside a 1.x client from nixie
+   0.28.0 on. From nixie 0.42.0 it also accepts each major in the `EXTRA_IMPD_MAJORS` set of its imp
+   adapter, which the script reads from the release's source on GitHub. The script checks again
+   before the activation. For an impd major bump, deploy a nixie release that accepts the new major
+   first. `--build-only` skips this gate too.
 5. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
