@@ -1,4 +1,5 @@
 import { expect, mock, test } from 'bun:test';
+import { createImpClient } from '@impz/client';
 import { server } from './mocks/node.ts';
 import { runSandboxImageAdd } from './run-sandbox-image-add.ts';
 import { buildStubRunner } from './test-utils/build-stub-runner.ts';
@@ -47,14 +48,22 @@ test('it adds each manifest image that impd lacks, skips one it holds, and never
         : undefined,
   );
 
+  const connect = mock(createImpClient);
+
   const exitCode = await runSandboxImageAdd({
     env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
+    createImpClient: connect,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
 
   expect(exitCode).toBe(0);
+
+  expect(connect).toHaveBeenCalledExactlyOnceWith({
+    url: 'https://impd.test',
+    token: 'nixie-impd-token-for-tests',
+  });
 
   expect(impd.calls).toStrictEqual([
     'images.list',
@@ -110,6 +119,7 @@ test('it exits 1 and names the image when impd refuses an add', async () => {
   const exitCode = await runSandboxImageAdd({
     env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
+    createImpClient,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -169,6 +179,7 @@ test('it exits 1 with no add when impd holds a manifest name at another digest',
   const exitCode = await runSandboxImageAdd({
     env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
+    createImpClient,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -204,6 +215,7 @@ test('it exits 1 with no impd call when sops cannot read the token', async () =>
   const exitCode = await runSandboxImageAdd({
     env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
+    createImpClient,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -247,6 +259,7 @@ test("it exits 1 with no impd call when the manifest holds a ref outside nixie's
   const exitCode = await runSandboxImageAdd({
     env: { IMPD_URL: 'https://impd.test', NIXIE_SECRETS_FILE: '/etc/nixie/secrets/secrets.yaml' },
     run: runner.run,
+    createImpClient,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -268,6 +281,7 @@ test('it exits 2 when the Job leaves out its environment', async () => {
   const exitCode = await runSandboxImageAdd({
     env: { IMPD_URL: 'https://impd.test' },
     run: runner.run,
+    createImpClient,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });

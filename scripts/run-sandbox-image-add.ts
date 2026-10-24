@@ -1,4 +1,5 @@
 import { createImpClient } from '@impz/client';
+import type { ImpClient, ImpClientOptions } from '@impz/client';
 import { buildImageAddPlan } from './build-image-add-plan.ts';
 import type { HeldImage } from './build-image-add-plan.ts';
 import { parseNixieSandboxManifest } from './parse-nixie-sandbox-manifest.ts';
@@ -9,6 +10,7 @@ import type { Runner } from './run-process.ts';
 export interface SandboxImageAddOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly run: Runner;
+  readonly createImpClient: (options: Readonly<ImpClientOptions>) => Pick<ImpClient, 'images'>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -33,7 +35,7 @@ export async function runSandboxImageAdd(
     return 1;
   }
 
-  const client = createImpClient({ url: impdURL, token });
+  const client = options.createImpClient({ url: impdURL, token });
 
   const heldImages = await readHeldImages(options, () => client.images.list());
 
@@ -150,6 +152,7 @@ if (import.meta.main) {
   process.exitCode = await runSandboxImageAdd({
     env: process.env,
     run: runProcess,
+    createImpClient,
     printOut: (text) => {
       process.stdout.write(text);
     },
