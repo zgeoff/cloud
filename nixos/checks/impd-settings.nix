@@ -34,7 +34,7 @@ let
       '';
     }
     {
-      title = "it hands impd the public MCP origin https://mcp.geoff.cloud and its listener port 7071";
+      title = "it hands impd the public MCP origin https://imp.geoff.cloud and its listener port 7071";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
@@ -42,7 +42,7 @@ let
 
         assert_files_equal - actual <<'EOF'
         IMP_MCP_PUBLIC_PORT=7071
-        IMP_MCP_PUBLIC_URL=https://mcp.geoff.cloud
+        IMP_MCP_PUBLIC_URL=https://imp.geoff.cloud
         EOF
       '';
     }
