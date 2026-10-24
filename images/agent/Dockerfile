@@ -11,7 +11,7 @@
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
-FROM ghcr.io/zgeoff/imp-base:4.1.0@sha256:a5fedb309dfa65615b2712d3e3de0657b9be0f3969d22cc19e37c4135231e278
+FROM ghcr.io/zgeoff/imp-base:4.2.0@sha256:11609a56b901835d170abc5095241999f70f652e86272cfede195b9b0447d2fa
 
 ARG DEBIAN_FRONTEND=noninteractive
 
