@@ -1428,6 +1428,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                         }[];
                         next: string | null;
@@ -1558,6 +1559,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                             score?: number;
                             similarity?: number;
@@ -1660,6 +1662,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                         }[];
                         tokens: number;
@@ -1763,6 +1766,7 @@ export interface operations {
                         /** @enum {string} */
                         subject: "owner" | "self" | "shared";
                         text?: string;
+                        until: string | null;
                         version: number;
                         versions: {
                             /** @enum {string} */
@@ -2242,6 +2246,7 @@ export interface operations {
                                     /** @enum {string} */
                                     subject: "owner" | "self" | "shared";
                                     text?: string;
+                                    until: string | null;
                                     version: number;
                                     /** @enum {string} */
                                     change: "created" | "edited" | "retired" | "restored" | "undone";
@@ -2683,6 +2688,7 @@ export interface operations {
                         /** @enum {string} */
                         subject: "owner" | "self" | "shared";
                         text?: string;
+                        until: string | null;
                         version: number;
                         versions: {
                             /** @enum {string} */
@@ -3025,6 +3031,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                             lost: {
                                 evidenceMessages: number;
@@ -3556,6 +3563,7 @@ export interface operations {
                             subject: "owner" | "self" | "shared";
                             targetVersion: number | null;
                             text: string;
+                            until: string | null;
                         }[];
                     };
                 };

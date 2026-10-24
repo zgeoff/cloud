@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "nixie",
-    "version": "0.41.0"
+    "version": "0.42.0"
   },
   "openapi": "3.1.1",
   "paths": {
@@ -2449,6 +2449,18 @@
                           "text": {
                             "type": "string"
                           },
+                          "until": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "version": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -2469,6 +2481,7 @@
                           "state",
                           "status",
                           "subject",
+                          "until",
                           "version"
                         ]
                       }
@@ -2795,6 +2808,18 @@
                           "text": {
                             "type": "string"
                           },
+                          "until": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "version": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -2821,6 +2846,7 @@
                           "state",
                           "status",
                           "subject",
+                          "until",
                           "version"
                         ]
                       }
@@ -3070,6 +3096,18 @@
                           "text": {
                             "type": "string"
                           },
+                          "until": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "version": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -3090,6 +3128,7 @@
                           "state",
                           "status",
                           "subject",
+                          "until",
                           "version"
                         ]
                       }
@@ -3347,6 +3386,18 @@
                     "text": {
                       "type": "string"
                     },
+                    "until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "x-native-type": "date"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "version": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -3572,6 +3623,7 @@
                     "state",
                     "status",
                     "subject",
+                    "until",
                     "version",
                     "versions"
                   ]
@@ -4614,6 +4666,18 @@
                                         "text": {
                                           "type": "string"
                                         },
+                                        "until": {
+                                          "anyOf": [
+                                            {
+                                              "type": "string",
+                                              "format": "date-time",
+                                              "x-native-type": "date"
+                                            },
+                                            {
+                                              "type": "null"
+                                            }
+                                          ]
+                                        },
                                         "version": {
                                           "type": "integer",
                                           "minimum": -9007199254740991,
@@ -4644,6 +4708,7 @@
                                         "state",
                                         "status",
                                         "subject",
+                                        "until",
                                         "version",
                                         "change"
                                       ]
@@ -5739,6 +5804,18 @@
                     "text": {
                       "type": "string"
                     },
+                    "until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "x-native-type": "date"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "version": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -5983,6 +6060,7 @@
                     "state",
                     "status",
                     "subject",
+                    "until",
                     "version",
                     "versions",
                     "lost"
@@ -6684,6 +6762,18 @@
                           "text": {
                             "type": "string"
                           },
+                          "until": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
                           "version": {
                             "type": "integer",
                             "minimum": -9007199254740991,
@@ -6723,6 +6813,7 @@
                           "state",
                           "status",
                           "subject",
+                          "until",
                           "version",
                           "lost"
                         ]
@@ -8040,6 +8131,18 @@
                           },
                           "text": {
                             "type": "string"
+                          },
+                          "until": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "format": "date-time",
+                                "x-native-type": "date"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
                           }
                         },
                         "required": [
@@ -8060,7 +8163,8 @@
                           "sources",
                           "subject",
                           "targetVersion",
-                          "text"
+                          "text",
+                          "until"
                         ]
                       }
                     }
