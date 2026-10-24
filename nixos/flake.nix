@@ -9,7 +9,7 @@
     };
     # imp's host module (zgeoff/impz docs/guides/nixos.md); pinned by flake.lock
     imp = {
-      url = "github:zgeoff/impz/368efb8d";
+      url = "github:zgeoff/impz/db6b74c4";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -36,6 +36,7 @@
         ./modules/cloud-host-firewall.nix
         ./modules/onepassword-connect-relay.nix
         ./modules/preview.nix
+        ./modules/public-front.nix
         ./modules/tank-cloud.nix
         ./modules/imp-dataset-key.nix
         ./hosts/geoffcloud/configuration.nix
@@ -60,7 +61,8 @@
       # network-policy, which runs infra's egress NetworkPolicies on k3s, and
       # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
       # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and
-      # drift-check-vm, which runs the drift check's unit in its own sandbox. onidel-provider-vendor
+      # drift-check-vm, which runs the drift check's unit in its own sandbox, and public-front-vm,
+      # which sends requests through the TLS front to a stand-in upstream. onidel-provider-vendor
       # builds the provider's vendored Go modules, which CI's checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -92,6 +94,11 @@
         inherit imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
+      checks.x86_64-linux.public-front = import ./checks/public-front.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.public-front-vm = import ./checks/public-front-vm.nix { inherit nixpkgs; };
       checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
         inherit nixpkgs imp;
       };

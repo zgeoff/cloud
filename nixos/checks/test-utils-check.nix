@@ -401,7 +401,7 @@ let
       '';
     }
     {
-      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
+      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.3 at the hashes of this check";
       script = ''
         handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts || true)
         grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts > handler || true
@@ -411,7 +411,7 @@ let
         # an Elysia onError hook would replace the default 404; create-app.ts's onError is oRPC's
         error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/surface/create-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
-        bun=$(grep -c '^FROM oven/bun:1\.4\.2@' ${imp}/host/Dockerfile || true)
+        bun=$(grep -c '^FROM oven/bun:1\.4\.3@' ${imp}/host/Dockerfile || true)
         grep -oE '"(elysia|@sinclair/typebox|cookie|exact-mirror|fast-decode-uri-component|memoirist)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
@@ -435,7 +435,7 @@ let
         EOF
         assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
         assert_equals 1.4.29 "$elysia" "imp's Elysia version"
-        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.2 stages"
+        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.3 stages"
         cat > expected <<'EOF'
         @sinclair/typebox@0.34.52 sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==
         cookie@1.1.1 sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==
@@ -450,13 +450,13 @@ let
     }
     (
       let
-        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
+        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.3), from its release
         pinnedBun = pkgs.stdenv.mkDerivation {
           pname = "bun";
-          version = "1.4.2";
+          version = "1.4.3";
           src = pkgs.fetchurl {
-            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-linux-x64.zip";
-            hash = "sha256-NjaPrvdSeHXV/6UuU81IAhdB8qg+tiCKjdZAaNQiqRM=";
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip";
+            hash = "sha256-PnMFKNiXdfA/h/BcBnh8TfQJnQo38/JS57gpyyOBbhg=";
           };
           nativeBuildInputs = [
             pkgs.unzip
@@ -524,7 +524,7 @@ let
         '';
       in
       {
-        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.2 does";
+        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.3 does";
         script = ''
           mkdir home tmp
           mkfifo real.fifo stub-health.fifo stub-missing.fifo
@@ -587,6 +587,51 @@ let
         assert_equals "$(cut -d' ' -f1 real.out)" "$(cat stub.out)" "the stand-in's status code"
         assert_files_equal real.err stub.err
         assert_missing stub.body "the stand-in's body"
+      '';
+    }
+    {
+      title = "it run-stub-mcp-upstream records the method, target, host and authorization of each request, and answers it as text";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+
+        authorization='Authorization: Bearer example-token'
+        curl -s -D headers -o body -X POST -H 'Host: mcp.example.test' -H "$authorization" \
+          --data '{}' --path-as-is "http://127.0.0.1:$port/oauth2/../oauth2/token?client=a"
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals " text/plain" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
+        assert_equals "POST /oauth2/../oauth2/token?client=a" "$(cat body)" "the body"
+        assert_files_equal - requests <<'EOF'
+        {"method": "POST", "path": "/oauth2/../oauth2/token?client=a", "host": "mcp.example.test", "authorization": "Bearer example-token"}
+        EOF
+      '';
+    }
+    {
+      title = "it run-stub-mcp-upstream holds a GET of /mcp open after its first event until the release file exists";
+      script = ''
+        source ${testLib}/wait-for.sh
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+
+        curl -s -N -D headers -o stream "http://127.0.0.1:$port/mcp" &
+        curl_pid=$!
+        wait_for 5 "the first event" grep -qx 'data: first' stream
+        held=$(cat stream)
+        kill -0 "$curl_pid"
+        touch release
+        wait "$curl_pid"
+
+        assert_equals "data: first" "$(printf '%s' "$held" | sed '/^$/d')" "the stream before the release"
+        assert_equals " text/event-stream" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
+        assert_files_equal - stream <<'EOF'
+        data: first
+
+        data: second
+
+        EOF
+        assert_equals "{\"method\": \"GET\", \"path\": \"/mcp\", \"host\": \"127.0.0.1:$port\", \"authorization\": null}" \
+          "$(cat requests)" "the requests"
       '';
     }
     (

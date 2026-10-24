@@ -1,5 +1,6 @@
 import type { Output } from '@pulumi/pulumi';
 import { exposure } from '@zgeoff/cloud-topology';
+import type { ExposureEntry } from '@zgeoff/cloud-topology';
 
 export interface OriginAccess {
   readonly teamName: Output<string>;
@@ -60,13 +61,21 @@ export function buildTunnelIngresses(routes: readonly TunnelRoute[]): TunnelIngr
 
 function requirePublicTunnelHostname(hostname: string): void {
   const entry = exposure.entries.find(
-    (candidate) => candidate.kind === 'tunnel-hostname' && candidate.hostname === hostname,
+    (candidate) => 'hostname' in candidate && candidate.hostname === hostname,
   );
 
-  if (entry?.scope !== 'public') {
+  if (entry?.kind !== 'tunnel-hostname' || entry.scope !== 'public') {
     throw new Error(
-      `tunnel hostname ${hostname} is ${entry === undefined ? 'not in' : `${entry.scope} in`} ` +
+      `tunnel hostname ${hostname} is ${formatListing(entry)} ` +
         'packages/topology/exposure.json; a route needs a public tunnel-hostname entry',
     );
   }
+}
+
+function formatListing(entry: ExposureEntry | undefined): string {
+  if (entry === undefined) {
+    return 'not in';
+  }
+
+  return entry.kind === 'tunnel-hostname' ? `${entry.scope} in` : `a ${entry.kind} entry in`;
 }

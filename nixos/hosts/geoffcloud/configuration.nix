@@ -24,6 +24,9 @@ let
   previewLinkExposure = getHostPort "preview-link";
   previewWebhookExposure = getHostPort "preview-webhook";
   previewModelRouteExposure = getHostPort "preview-model-route";
+  impdMCPListenerExposure = getHostPort "impd-mcp-listener";
+  impdMCPRouteExposure = builtins.head (builtins.filter (entry: entry.name == "impd-mcp") exposure);
+  impdMCPListenerPort = toString impdMCPListenerExposure.port;
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -262,13 +265,12 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:2.11.0@sha256:116ecf51fbb2ba33aee2b11bb9e4fbc8d3ab7af4f4e2398888b89dd26a176836";
+    image = "ghcr.io/zgeoff/imp-host:3.0.2@sha256:e68b8580dee35d5f98b772d30d0986b1fe86160b6286dc5c4c75d258cdbc5b7e";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
     # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
-    # for both names at the tailnet IP of imp's own node. imp.geoff.cloud stays free for imp's
-    # public MCP route. The token lives in dnsApiTokenFile (root-only, re-read on change, so
+    # for both names at the tailnet IP of imp's own node. The token lives in dnsApiTokenFile (root-only, re-read on change, so
     # a rotation needs no restart) and the ACME email in environmentFile, both installed by
     # scripts/install-imp-dns-token.sh. environmentFile must not also set IMP_DNS_API_TOKEN.
     settings.IMP_DOMAIN = topology.imp.domain;
@@ -286,6 +288,24 @@ in
       k3sPodCIDR
       k3sServiceCIDR
     ];
+    # impd's public MCP route (the registry's impd-mcp entry): impd opens its public listener only
+    # with this origin set, and imp-host publishes the listener on the host's loopback alone, where
+    # the TLS front below proxies the route's paths to it
+    settings.IMP_MCP_PUBLIC_URL = "https://${impdMCPRouteExposure.hostname}";
+    settings.IMP_MCP_PUBLIC_PORT = impdMCPListenerExposure.port;
+    publicPorts = [ "127.0.0.1:${impdMCPListenerPort}:${impdMCPListenerPort}" ];
+  };
+
+  # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP
+  # client signs in and calls imp's tools through it, so each address gets a limit of its own:
+  # impd counts its limits per client and grant, never per address
+  services.public-front = {
+    enable = true;
+    routes = [ { inherit (impdMCPRouteExposure) hostname upstream paths; } ];
+    rateLimit = {
+      events = 120;
+      window = "1m";
+    };
   };
 
   # imps yield CPU to k3s and its pods rather than hold a cap (docs/architecture/host/imp.md). A
@@ -484,7 +504,7 @@ in
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:2.11.0@sha256:8722fed7485bfe9eb55743ccf9bdcbb58734a27aacfece2488e02bfb7f82764e";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:3.0.2@sha256:6945b60b5b93e6a87d49637bed8b1c529b56e758a010b044d82bb64590dab8c9";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
     githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";

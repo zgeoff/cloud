@@ -69,8 +69,12 @@ impd owns the DNS records for its hostnames. It writes DNS-only records for `imp
 publicly but answer only on the tailnet, and it gets a wildcard certificate through Cloudflare's
 DNS-01 challenge with a token scoped to that job. Pulumi never declares these records or the
 challenge record, because impd rewrites them at run time and an apply would undo its work. impd
-rereads the token file when it changes, so a rotation needs no restart. `imp.geoff.cloud` stays free
-for imp's own public endpoint.
+rereads the token file when it changes, so a rotation needs no restart.
+
+impd also opens a public MCP listener for `mcp.geoff.cloud`, imp's MCP and OAuth route for hosted
+assistants. imp-host publishes it on the host's loopback only, and the host's TLS front holds the
+route's name, certificate and DNS records
+([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
 
 ## The database
 

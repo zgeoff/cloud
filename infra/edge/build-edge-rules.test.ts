@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test';
 import { output } from '@pulumi/pulumi';
 import { buildEdgeRules } from './build-edge-rules.ts';
 
-test('it opens public SSH, Tailscale and ICMP on both families before the host is on the tailnet', () => {
+test('it opens public SSH, Tailscale, ICMP and the TLS front on both families before the host is on the tailnet', () => {
   const firewallID = output('fw-0a1b2c3d');
 
   expect(buildEdgeRules({ hostOnTailnet: false, firewallID })).toStrictEqual([
@@ -70,10 +70,32 @@ test('it opens public SSH, Tailscale and ICMP on both families before the host i
         description: 'ICMP: path MTU discovery and ping',
       },
     },
+    {
+      name: 'edge-public-front-v4',
+      args: {
+        firewallId: firewallID,
+        protocol: 'tcp',
+        port: '443',
+        subnet: '0.0.0.0',
+        subnetSize: 0,
+        description: "HTTPS to the host's TLS front for its public routes",
+      },
+    },
+    {
+      name: 'edge-public-front-v6',
+      args: {
+        firewallId: firewallID,
+        protocol: 'tcp',
+        port: '443',
+        subnet: '::',
+        subnetSize: 0,
+        description: "HTTPS to the host's TLS front for its public routes",
+      },
+    },
   ]);
 });
 
-test('it drops public SSH and keeps Tailscale and ICMP on both families once the host is on the tailnet', () => {
+test('it drops public SSH and keeps Tailscale, ICMP and the TLS front on both families once the host is on the tailnet', () => {
   const firewallID = output('fw-0a1b2c3d');
 
   expect(buildEdgeRules({ hostOnTailnet: true, firewallID })).toStrictEqual([
@@ -117,6 +139,28 @@ test('it drops public SSH and keeps Tailscale and ICMP on both families once the
         subnet: '::',
         subnetSize: 0,
         description: 'ICMP: path MTU discovery and ping',
+      },
+    },
+    {
+      name: 'edge-public-front-v4',
+      args: {
+        firewallId: firewallID,
+        protocol: 'tcp',
+        port: '443',
+        subnet: '0.0.0.0',
+        subnetSize: 0,
+        description: "HTTPS to the host's TLS front for its public routes",
+      },
+    },
+    {
+      name: 'edge-public-front-v6',
+      args: {
+        firewallId: firewallID,
+        protocol: 'tcp',
+        port: '443',
+        subnet: '::',
+        subnetSize: 0,
+        description: "HTTPS to the host's TLS front for its public routes",
       },
     },
   ]);

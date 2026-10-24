@@ -5,9 +5,10 @@ single-node k3s cluster and imp, and that joins the owner's tailnet as its priva
 cloud resource is declared in one Pulumi program, and the host itself is one NixOS flake, so this
 repo holds the whole estate and a change to it is a reviewed PR before it is a live change. The
 first workload is an agent platform: [atc](https://github.com/zgeoff/atc) manages agent sessions,
-and [imp](https://github.com/zgeoff/impz) runs each one in a Firecracker microVM. The one public
-entry point is atc's MCP endpoint, which an assistant such as ChatGPT reaches through a Cloudflare
-tunnel. Everything else stays on the host or on the tailnet.
+and [imp](https://github.com/zgeoff/impz) runs each one in a Firecracker microVM. An assistant such
+as ChatGPT reaches two public MCP endpoints: atc's, through a Cloudflare tunnel, and imp's, through
+a TLS front on the host. A few other routes are public, each for a reason the exposure registry
+records, and everything else stays on the host or on the tailnet.
 
 ## The path of a public call
 
@@ -104,7 +105,8 @@ flowchart TB
 The host's tailnet node carries every pod's tailnet traffic, so a pod reaches the tailnet with the
 host's identity. The tailnet policy therefore grants the host only the ports its workloads dial
 ([the tailnet](./network/tailnet.md)). Four firewall layers keep the public internet off everything
-but Tailscale's own port ([firewalls](./network/firewalls.md)).
+but Tailscale's own port and the HTTPS port of the host's TLS front
+([firewalls](./network/firewalls.md)).
 
 ## Data
 
@@ -136,8 +138,8 @@ plain form. Onidel never snapshots the second disk, so its data relies on each s
 ## Cross-cutting
 
 - **Public by exception.** A new service stays on the host or on the tailnet. A public route needs
-  its own reason in its PR and an auth layer named in the exposure registry, and the tunnel is the
-  only way in ([public ingress](./network/public-ingress.md)).
+  its own reason in its PR and an auth layer named in the exposure registry, and it enters through a
+  Cloudflare tunnel or the host's TLS front ([public ingress](./network/public-ingress.md)).
 - **Secrets never in the repo.** The repo is public. Every secret reaches its user through
   1Password, Pulumi's encrypted state or a root-only file on the host, and never through a command
   line, because the host's journal records each SSH command line ([secrets](./secrets.md)).

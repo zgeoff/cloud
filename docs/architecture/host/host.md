@@ -41,6 +41,9 @@ the VM's Secure Boot blocks, so Secure Boot stays off
   ([imp on the host](./imp.md)).
 - **The atc daemon** runs as a NixOS service with its own system user, sandboxed by systemd
   ([the atc gateway](../workloads/atc-gateway.md#the-cloud-daemon)).
+- **The TLS front** is Caddy on the public HTTPS port, which passes the listed paths of imp's public
+  MCP route to impd's loopback listener
+  ([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
 - **The Connect relay** is a socket-activated proxy that carries imp-host's requests to 1Password
   Connect in the cluster ([1Password Connect](../workloads/onepassword-connect.md)).
 - **impd's health probe** is a timer that asks impd's loopback health endpoint and writes the result
