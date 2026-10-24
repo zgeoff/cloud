@@ -8,6 +8,19 @@
   "rules": {
     "zgeoff/function-verb": "error",
 
+    // cloud's own lanes and their limit per case, as the project-testing skill lists them: the
+    // NixOS VMs under KVM, the alerting engines in Docker, and the images and restore fixtures in
+    // Docker; each runs Nix checks or shell suites, so the limits bind only a test file that
+    // takes one of these suffixes
+    "zgeoff/max-test-timeout": [
+      "error",
+      { "lanes": { "nixos": 1200000, "alert-rules": 90000, "images": 15000, "fixtures": 15000 } }
+    ],
+    "zgeoff/test-beside-module": [
+      "error",
+      { "lanes": { "nixos": 1200000, "alert-rules": 90000, "images": 15000, "fixtures": 15000 } }
+    ],
+
     // the import boundaries: no relative import into another workspace package, and the direction
     // between infra's groups
     "zgeoff/import-zones": [
@@ -120,14 +133,6 @@
   },
   "ignorePatterns": ["sdk/**", "provider/**", ".claude/**", "scripts/nixie-api/openapi.d.ts"],
   "overrides": [
-    {
-      // an integration suite tests one flow across several modules, so no single module sits
-      // beside it; the shared rule exempts only e2e/ and evals/
-      "files": ["integration/**/*.test.ts"],
-      "rules": {
-        "zgeoff/test-beside-module": "off"
-      }
-    },
     {
       "files": ["infra/**/*.ts", "workers/**/*.ts"],
       "rules": {

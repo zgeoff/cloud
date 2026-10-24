@@ -104,6 +104,9 @@ Each lane below needs a real system that the unit run cannot host.
 - A shell suite joins `alert-rules` or a fixture group through its `# shell-suite: <group>` line;
   each `images` script builds its image first, then runs its suites.
 - A case over its lane's time limit is a defect to fix, and the limit never rises to cover it.
+- The `lanes` option of `zgeoff/max-test-timeout` and `zgeoff/test-beside-module` in
+  [`.oxlintrc.json`](../../../.oxlintrc.json) holds the same lanes and limits. It binds only a
+  TypeScript test file that takes one of these suffixes; a change to this table changes it too.
 - Nothing enforces a limit per case yet: `run_cases` has no timer, and `nix build` ignores a
   check's `meta.timeout`. Today only the CI job's `timeout-minutes` bounds a lane: 20 for `checks`,
   which runs the shell lanes; 15 for the `fixture` job of `atc-gateway-images.yml` and the `check`
