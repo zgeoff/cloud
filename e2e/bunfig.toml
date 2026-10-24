@@ -1,0 +1,4 @@
+[test]
+# registers jest-extended matchers; the root preload never loads here, so the root unit run's MSW
+# server and faker seed stay out of the journeys
+preload = ["@zgeoff/bun-test-extended"]

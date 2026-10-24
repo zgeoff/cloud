@@ -43,6 +43,7 @@ provider and the NixOS checks each have a reference.
 | Suite                                                     | Command                             | Runs in CI                                                     |
 | --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
 | TypeScript tests in `infra/`, `scripts/` and `integration/` | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript journeys in `e2e/`                             | `bun run test:e2e`                  | `CI` → `checks`                                                |
 | The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
 | Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
 | Shell suites and `test-support/shell/` tests              | `bun run test:scripts`              | `CI` → `checks`, unless only Markdown changed                  |
@@ -88,10 +89,11 @@ steps against stand-ins. A check of config, such as which events start a workflo
 that `lint:actions` runs, as
 [`check-workflow-triggers.ts`](../../../scripts/check-workflow-triggers.ts) is, never a test.
 
-Each lane below needs a real system that the unit run cannot host.
+Each lane below needs a real system that the unit run cannot host, or tests a process from outside.
 
 | Lane | Scripts | Real system | Time limit per case |
 | -- | -- | -- | -- |
+| `e2e/` | `test:e2e` | a script started as its own process, driven from outside against stand-ins | 15 s |
 | `.nixos` | `test:nixos [check…]` | NixOS VMs under QEMU with KVM, built in the pinned Nix image | 1200 s |
 | `alert-rules` | `test:alert-rules` | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 90 s |
 | `images` | `test:agent-image`, `test:files-image` | the agent image and the files service's image, built and run in Docker | 15 s |
@@ -104,6 +106,9 @@ Each lane below needs a real system that the unit run cannot host.
 - A shell suite joins `alert-rules` or a fixture group through its `# shell-suite: <group>` line;
   each `images` script builds its image first, then runs its suites.
 - A case over its lane's time limit is a defect to fix, and the limit never rises to cover it.
+- The `lanes` option of `zgeoff/max-test-timeout` and `zgeoff/test-beside-module` in
+  [`.oxlintrc.json`](../../../.oxlintrc.json) holds the same lanes and limits. It binds only a
+  TypeScript test file that takes one of these suffixes; a change to this table changes it too.
 - Nothing enforces a limit per case yet: `run_cases` has no timer, and `nix build` ignores a
   check's `meta.timeout`. Today only the CI job's `timeout-minutes` bounds a lane: 20 for `checks`,
   which runs the shell lanes; 15 for the `fixture` job of `atc-gateway-images.yml` and the `check`
