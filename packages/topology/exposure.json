@@ -154,7 +154,7 @@
     {
       "name": "impd-mcp",
       "kind": "front-route",
-      "hostname": "mcp.geoff.cloud",
+      "hostname": "imp.geoff.cloud",
       "upstream": "127.0.0.1:7071",
       "paths": [
         "/mcp",

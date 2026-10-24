@@ -1,6 +1,7 @@
 # services.public-front on a booted VM, serving the registry's impd-mcp route
 # (packages/topology/exposure.json) with its own hostname, upstream and paths, so the check proves
-# the paths the host's front passes and the 404 it gives every other path. Two settings differ from
+# the paths the host's front passes, the 404 it gives every other path, and that a name it serves
+# no route for gets no TLS handshake. Two settings differ from
 # the host: Caddy's local CA issues the certificate, since the VM reaches no ACME server, and the
 # rate limit is low enough for a case to pass it. The upstream is impd's public listener stand-in,
 # test-utils/run-stub-mcp-upstream.py, on the route's loopback address; its log shows each request
@@ -14,6 +15,8 @@ let
   );
   upstreamPort = pkgs.lib.last (pkgs.lib.splitString ":" route.upstream);
   events = 20;
+  # a name under the zone that the front serves no route for
+  formerHostname = "mcp.geoff.cloud";
 in
 pkgs.testers.runNixOSTest {
   name = "public-front-vm";
@@ -28,7 +31,10 @@ pkgs.testers.runNixOSTest {
       };
       issuer = "internal";
     };
-    networking.hosts."127.0.0.1" = [ route.hostname ];
+    networking.hosts."127.0.0.1" = [
+      route.hostname
+      formerHostname
+    ];
     networking.hosts."::1" = [ route.hostname ];
     systemd.services.stub-mcp-upstream = {
       wantedBy = [ "multi-user.target" ];
@@ -98,6 +104,16 @@ pkgs.testers.runNixOSTest {
             {"method": "POST", "path": path, "host": hostname, "authorization": "Bearer example-token"}
             for path in paths
         ], read_requests()
+
+
+    with subtest("it completes no TLS handshake for ${formerHostname}, and the upstream never sees the request"):
+        machine.succeed(f"rm -f {requests}")
+        status, _ = machine.execute(
+            "curl -s -4 --cacert /tmp/front-ca.crt -o /dev/null 'https://${formerHostname}/mcp'"
+        )
+
+        assert status == 35, f"curl exited {status}"
+        assert read_requests() == [], read_requests()
 
 
     with subtest("it answers 404 itself for any other path, and the upstream never sees it"):

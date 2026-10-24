@@ -3,25 +3,27 @@
 The estate has two ways in from the internet: two Cloudflare tunnels that cloudflared holds open
 from inside the cluster, and a TLS front on the host's public HTTPS port. The host opens no inbound
 port for the tunnels, so a tunnel route exists only as a rule in a tunnel's configuration and a DNS
-record that points at that tunnel, and Pulumi declares both. The TLS front serves `mcp.geoff.cloud`,
-imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly. Each
-workload behind a route brings its own authentication. The atc tunnel serves `atc.geoff.cloud`, the
-atc gateway, which runs its own OAuth server. The shared tunnel serves two hostnames.
-`preview-webhook.geoff.cloud` reaches the preview service's webhook listener, which checks the
-signature of every GitHub delivery. `files.geoff.cloud` reaches the files service, which serves each
-file to anyone who holds its link and checks a role token on every write. Cloudflare Access adds an
-owner-only login in front of the gateway's sign-in pages, and nowhere else.
-[The atc gateway](../workloads/atc-gateway.md), [the preview service](../workloads/preview.md) and
-[the files service](../workloads/files.md) cover what answers behind each route.
+record that points at that tunnel, and Pulumi declares both. The TLS front serves `imp.geoff.cloud`,
+imp's own MCP and OAuth route, which a hosted assistant signs in to and calls directly at
+`https://imp.geoff.cloud/mcp`. Each workload behind a route brings its own authentication. The atc
+tunnel serves `atc.geoff.cloud`, the atc gateway, which runs its own OAuth server. The shared tunnel
+serves two hostnames. `preview-webhook.geoff.cloud` reaches the preview service's webhook listener,
+which checks the signature of every GitHub delivery. `files.geoff.cloud` reaches the files service,
+which serves each file to anyone who holds its link and checks a role token on every write.
+Cloudflare Access adds an owner-only login in front of the gateway's sign-in pages, and nowhere
+else. [The atc gateway](../workloads/atc-gateway.md), [the preview service](../workloads/preview.md)
+and [the files service](../workloads/files.md) cover what answers behind each route.
 
 ## The host's TLS front
 
 Caddy on the host serves each front route of the
 [exposure registry](./firewalls.md#the-exposure-registry) on the public addresses' port 443, and
-`mcp.geoff.cloud` is its one route. The hostname's A and AAAA records point straight at the host and
-are not proxied, for two reasons. Caddy gets the certificate itself, through Let's Encrypt's
-TLS-ALPN-01 challenge on port 443, so port 80 stays shut and the host holds no DNS credential for
-it. And Cloudflare's proxy would end an MCP event stream that stays quiet past its read timeout.
+`imp.geoff.cloud` is its one route. A name it serves no route for, such as another name under the
+zone that points at the host, gets no certificate and so no TLS handshake. The hostname's A and AAAA
+records point straight at the host and are not proxied, for two reasons. Caddy gets the certificate
+itself, through Let's Encrypt's TLS-ALPN-01 challenge on port 443, so port 80 stays shut and the
+host holds no DNS credential for it. And Cloudflare's proxy would end an MCP event stream that stays
+quiet past its read timeout.
 
 The front passes only the route's listed paths, which are impd's MCP, OAuth and discovery paths, to
 impd's public listener. A path matches only as the request sends it, so a case change, a trailing
@@ -164,6 +166,10 @@ rendered objects included. That leaves the k3s admin kubeconfig as the one holde
 controls the gateway's pod, Secrets and logs.
 
 ## Adding a route
+
+Each public service gets one host of its own, `<service>.geoff.cloud`, and a service that speaks MCP
+serves it at `/mcp` on that host, as `atc.geoff.cloud/mcp` and `imp.geoff.cloud/mcp` do. A service's
+OAuth issuer and its discovery metadata name the same host.
 
 A new public route is the exception in this estate. A service stays on the host or the tailnet
 unless its PR states why it must be public, and the route is then a tunnel rule ahead of the
