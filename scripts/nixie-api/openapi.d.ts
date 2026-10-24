@@ -1392,6 +1392,8 @@ export interface operations {
             content: {
                 "application/json": {
                     after?: string;
+                    /** @enum {string} */
+                    kind?: "fact" | "self";
                     limit?: number;
                     /** @enum {string} */
                     state: "active" | "retired" | "forgotten";
