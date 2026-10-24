@@ -1,7 +1,7 @@
 {
   "info": {
     "title": "nixie",
-    "version": "0.42.0"
+    "version": "0.43.0"
   },
   "openapi": "3.1.1",
   "paths": {
@@ -2330,6 +2330,13 @@
                   "after": {
                     "type": "string",
                     "maxLength": 20
+                  },
+                  "kind": {
+                    "enum": [
+                      "fact",
+                      "self"
+                    ],
+                    "type": "string"
                   },
                   "limit": {
                     "type": "integer",
