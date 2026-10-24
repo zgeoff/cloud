@@ -19,6 +19,9 @@ builds in a `nixos/nix` container on the `cloud-nixos-checks-store` volume, neve
   VM.
 - `geoffcloud-eval` evaluates the host's system derivation and builds nothing of the host, so a
   change that breaks the host config fails CI instead of the switch.
+- `geoffcloud-spend-cap` runs the counting proxy that geoffcloud pins, with the model and prices
+  that geoffcloud hands the preview service, against a stand-in model API, so a price or a pin
+  that counts a reply wrong fails before the switch.
 - A module check renders its cases through
   [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into `run_cases` calls,
   each in its own fresh directory, with the `assert_*` helpers.

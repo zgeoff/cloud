@@ -396,6 +396,83 @@ let
         '';
     }
     {
+      title = "it hands the service the long-prompt prices once spendCap names them";
+      script =
+        let
+          system = buildModuleSystem ../modules/preview.nix {
+            networking.nftables = {
+              enable = true;
+              flushRuleset = false;
+            };
+            services.preview = {
+              enable = true;
+              inherit package;
+              linkListen = "100.64.0.1:8417";
+              webhookListen = "100.64.0.1:8418";
+              baseURL = "http://cloudhost:8417";
+              repos = [ "acme/greenhouse" ];
+              impdURL = "http://127.0.0.1:7070";
+              impDomain = "imps.example.org";
+              impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+              impModelSecret = "preview-model-counted";
+              spendCap = {
+                enable = true;
+                package = stubCountingProxy;
+                address = "172.17.0.1";
+                port = 18082;
+                allowedSubnet = "172.17.0.0/16";
+                model = "claude-test-model";
+                prices = {
+                  input = 1;
+                  cache_write = 1.25;
+                  cache_write_1h = 2;
+                  cached_input = 0.1;
+                  output = 5;
+                  long_prompt = {
+                    over_tokens = 200000;
+                    input = 2;
+                    cache_write = 2.5;
+                    cache_write_1h = 4;
+                    cached_input = 0.2;
+                    output = 7.5;
+                  };
+                };
+              };
+              webhookSecretFile = "/run/fixture/webhook-secret";
+              githubAppClientIDFile = "/run/fixture/github-app-client-id";
+              githubAppKeyFile = "/run/fixture/github-app-key";
+              impTokenFile = "/run/fixture/imp-token";
+            };
+          };
+        in
+        ''
+          jq -S . > expected <<'EOF'
+          {
+            "input": 1,
+            "cache_write": 1.25,
+            "cache_write_1h": 2,
+            "cached_input": 0.1,
+            "output": 5,
+            "long_prompt": {
+              "over_tokens": 200000,
+              "input": 2,
+              "cache_write": 2.5,
+              "cache_write_1h": 4,
+              "cached_input": 0.2,
+              "output": 7.5
+            }
+          }
+          EOF
+
+          jq -S . > actual <<'EOF'
+          ${system.config.systemd.services.preview.environment.PREVIEW_SPEND_PRICES}
+          EOF
+
+          assert_files_equal expected actual
+          assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
+        '';
+    }
+    {
       title = "it leaves the counting proxy settings and the admission out when spendCap is off";
       script =
         let

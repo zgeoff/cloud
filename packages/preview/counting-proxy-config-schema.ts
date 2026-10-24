@@ -4,12 +4,17 @@ import { modelRoute } from './model-route.ts';
 // The config file that nixie's counting proxy reads, as nixie's proxy config schema defines it.
 // The service writes each proxy's file through this schema, and the stub proxy in the tests reads
 // it through the same one.
-export const spendPricesSchema = z.strictObject({
+const priceRatesSchema = z.strictObject({
   input: z.number().nonnegative(),
   cache_write: z.number().nonnegative(),
   cache_write_1h: z.number().nonnegative(),
   cached_input: z.number().nonnegative(),
   output: z.number().nonnegative(),
+});
+
+// a call whose prompt passes over_tokens costs the long-prompt rates for all of its tokens
+export const spendPricesSchema = priceRatesSchema.extend({
+  long_prompt: priceRatesSchema.extend({ over_tokens: z.int().positive() }).optional(),
 });
 
 const routeSchema = z.strictObject({
