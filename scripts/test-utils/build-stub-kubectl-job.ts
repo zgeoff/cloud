@@ -22,6 +22,9 @@ export interface StubKubectlJobOptions {
 
   // when set, the API server refuses the Job's create with this error
   readonly jobRefusal?: string;
+
+  // the Job reads, counted from 0, that the API server times out; a refused read uses no condition
+  readonly refusedGets?: readonly number[];
 }
 
 interface KubeconfigRead {
@@ -48,6 +51,7 @@ export function buildStubKubectlJob(options: Readonly<StubKubectlJobOptions>): S
   const kubeconfigs: KubeconfigRead[] = [];
   let gets = 0;
   let deletes = 0;
+  let reads = 0;
 
   const answer = (call: StubCall): StubAnswer | undefined => {
     const [command, verb, ...rest] = call.argv;
@@ -87,6 +91,17 @@ export function buildStubKubectlJob(options: Readonly<StubKubectlJobOptions>): S
     }
 
     if (verb === 'get' && rest.includes(`job.batch/${options.jobName}`)) {
+      const readIndex = reads;
+
+      reads += 1;
+
+      if (options.refusedGets?.includes(readIndex) === true) {
+        return {
+          exitCode: 1,
+          stderr: `Error from server (InternalError): an error on the server ("etcdserver: request timed out") has prevented the request from succeeding (get jobs.batch ${options.jobName})\n`,
+        };
+      }
+
       const conditions = options.conditions[Math.min(gets, options.conditions.length - 1)] ?? [];
 
       gets += 1;

@@ -24,6 +24,9 @@ export interface SandboxImageJobOptions {
 const waitMs = 960_000;
 const pollMs = 5000;
 
+// the API server can refuse one read in a rollout of its own; this many in a row end the wait
+const failedReadLimit = 3;
+
 export async function runSandboxImageJob(
   options: Readonly<SandboxImageJobOptions>,
 ): Promise<number> {
@@ -197,14 +200,29 @@ async function waitForJob(
   readJob: (args: readonly string[]) => ReturnType<Kubectl>,
 ): Promise<JobOutcome> {
   const deadline = options.now() + waitMs;
+  let failedReads = 0;
 
   while (options.now() < deadline) {
     const result = await readJob(['get', '--output', 'json']);
 
-    const outcome = result.exitCode === 0 ? findJobOutcome(result.stdout.toString()) : undefined;
+    if (result.exitCode === 0) {
+      failedReads = 0;
 
-    if (outcome !== undefined) {
-      return outcome;
+      const outcome = findJobOutcome(result.stdout.toString());
+
+      if (outcome !== undefined) {
+        return outcome;
+      }
+    } else {
+      const failure = `could not be read (exit ${String(result.exitCode)}): ${result.stderr.toString().trim()}`;
+
+      failedReads += 1;
+
+      options.printErr(`run-sandbox-image-job: the Job ${failure}\n`);
+
+      if (failedReads === failedReadLimit) {
+        return { isComplete: false, text: failure };
+      }
     }
 
     await options.sleep(pollMs);

@@ -126,6 +126,31 @@ test("it answers each get with the next of the Job's conditions and keeps the la
   ]);
 });
 
+test('it times out only the Job reads it was told to refuse, and answers the next with the first conditions', async () => {
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[{ type: 'Complete', status: 'True' }]],
+    logs: '',
+    refusedGets: [0],
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+  const get = ['kubectl', 'get', '--output', 'json', 'job.batch/nixie-sandbox-images-x7k2p'];
+
+  const refused = await runner.run(get);
+  const answered = await runner.run(get);
+
+  expect({ exitCode: refused.exitCode, stderr: refused.stderr.toString() }).toStrictEqual({
+    exitCode: 1,
+    stderr:
+      'Error from server (InternalError): an error on the server ("etcdserver: request timed out") has prevented the request from succeeding (get jobs.batch nixie-sandbox-images-x7k2p)\n',
+  });
+
+  expect(answered.stdout.toString()).toBe(
+    '{"kind":"Job","status":{"conditions":[{"type":"Complete","status":"True"}]}}',
+  );
+});
+
 test('it records the text and the mode of the file that KUBECONFIG names', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'stub-kubectl-job-'));
 

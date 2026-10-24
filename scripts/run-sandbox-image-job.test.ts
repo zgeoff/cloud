@@ -306,6 +306,91 @@ test('it exits 1 once the wait outlasts the Job deadline with no outcome', async
   ]);
 });
 
+test("it reports a failed read of the Job with kubectl's exit and error, and waits on for the outcome", async () => {
+  const ctx = await setupTest();
+
+  const clock = buildStubClock(0);
+
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[{ type: 'Complete', status: 'True' }]],
+    logs: 'added nixie-fetch-77aa88bb99cc\n',
+    refusedGets: [0],
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+
+  const exitCode = await runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
+    now: clock.now,
+    sleep: clock.sleep,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    [
+      'run-sandbox-image-job: the Job could not be read (exit 1): Error from server (InternalError): an error on the server ("etcdserver: request timed out") has prevented the request from succeeding (get jobs.batch nixie-sandbox-images-x7k2p)\n',
+    ],
+  ]);
+
+  expect(clock.sleeps).toStrictEqual([5000]);
+});
+
+test('it exits 1 after three failed reads of the Job in a row, with no wait to the deadline', async () => {
+  const ctx = await setupTest();
+
+  const clock = buildStubClock(0);
+
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[]],
+    logs: '',
+    refusedGets: [0, 1, 2],
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+
+  const exitCode = await runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
+    now: clock.now,
+    sleep: clock.sleep,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+  expect(clock.sleeps).toStrictEqual([5000, 5000]);
+
+  expect(ctx.printErr.mock.calls.at(-1)).toStrictEqual([
+    'run-sandbox-image-job: job.batch/nixie-sandbox-images-x7k2p could not be read (exit 1): Error from server (InternalError): an error on the server ("etcdserver: request timed out") has prevented the request from succeeding (get jobs.batch nixie-sandbox-images-x7k2p), so nixie\'s sandbox images are not all in impd and nixie does not roll\n',
+  ]);
+});
+
 test('it exits 1 with no Job when kubectl cannot create the ConfigMap', async () => {
   const ctx = await setupTest();
 
