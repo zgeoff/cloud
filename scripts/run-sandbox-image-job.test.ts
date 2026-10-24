@@ -352,6 +352,60 @@ test('it exits 1 with no Job when kubectl cannot create the ConfigMap', async ()
   ]);
 });
 
+test('it exits 1, removes the ConfigMap, and reads no Job when kubectl cannot create the Job', async () => {
+  const ctx = await setupTest();
+
+  const clock = buildStubClock(0);
+
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[]],
+    logs: '',
+    jobRefusal:
+      'Error from server (Forbidden): error when creating "STDIN": jobs.batch is forbidden: exceeded quota: nixie-jobs\n',
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+
+  const exitCode = await runSandboxImageJob({
+    env: {
+      NIXIE_SANDBOX_IMAGES: JSON.stringify({
+        namespace: 'nixie',
+        configMap: 'nixie-sandbox-images',
+        scriptKey: 'add-sandbox-images.js',
+        job: '{"kind":"Job"}',
+      }),
+    },
+    kubeconfig: 'apiVersion: v1\n',
+    run: runner.run,
+    readScript: () => Promise.resolve(''),
+    tempRoot: ctx.tempRoot,
+    now: clock.now,
+    sleep: clock.sleep,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    [
+      'run-sandbox-image-job: kubectl could not create the Job (exit 1): Error from server (Forbidden): error when creating "STDIN": jobs.batch is forbidden: exceeded quota: nixie-jobs\n',
+    ],
+  ]);
+
+  expect(kubectl.configMaps).toBeEmpty();
+
+  expect(runner.calls.map((call) => call.argv[1])).toStrictEqual([
+    'delete',
+    'create',
+    'create',
+    'delete',
+  ]);
+
+  expect(clock.sleeps).toStrictEqual([]);
+});
+
 test('it exits 2 with no kubectl call when the payload names no Job', async () => {
   const ctx = await setupTest();
 

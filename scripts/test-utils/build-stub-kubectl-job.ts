@@ -19,6 +19,9 @@ export interface StubKubectlJobOptions {
 
   // the ConfigMap deletes, counted from 0, that the API server refuses as Forbidden
   readonly refusedDeletes?: readonly number[];
+
+  // when set, the API server refuses the Job's create with this error
+  readonly jobRefusal?: string;
 }
 
 interface KubeconfigRead {
@@ -80,7 +83,7 @@ export function buildStubKubectlJob(options: Readonly<StubKubectlJobOptions>): S
     }
 
     if (verb === 'create') {
-      return createObject(call, configMaps, createdObjects, options.jobName);
+      return createObject(call, { configMaps, createdObjects, options });
     }
 
     if (verb === 'get' && rest.includes(`job.batch/${options.jobName}`)) {
@@ -101,15 +104,17 @@ export function buildStubKubectlJob(options: Readonly<StubKubectlJobOptions>): S
   return { handler: answer, configMaps, createdObjects, kubeconfigs };
 }
 
-function createObject(
-  call: StubCall,
-  configMaps: Set<string>,
-  createdObjects: unknown[],
-  jobName: string,
-): StubAnswer {
-  const object: unknown = JSON.parse(call.stdin);
+interface StubState {
+  readonly configMaps: Set<string>;
+  readonly createdObjects: unknown[];
+  readonly options: Readonly<StubKubectlJobOptions>;
+}
 
-  createdObjects.push(object);
+function createObject(call: StubCall, state: StubState): StubAnswer {
+  const object: unknown = JSON.parse(call.stdin);
+  const configMaps = state.configMaps;
+
+  state.createdObjects.push(object);
 
   const kind = findJSONField(object, 'kind');
   const name = findJSONField(findJSONField(object, 'metadata'), 'name');
@@ -127,5 +132,7 @@ function createObject(
     return { stdout: `configmap/${name} created\n` };
   }
 
-  return { stdout: `job.batch/${jobName}\n` };
+  return state.options.jobRefusal === undefined
+    ? { stdout: `job.batch/${state.options.jobName}\n` }
+    : { exitCode: 1, stderr: state.options.jobRefusal };
 }

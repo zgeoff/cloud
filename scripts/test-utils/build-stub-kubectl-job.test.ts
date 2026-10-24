@@ -79,6 +79,35 @@ test('it names a created Job by the name its generateName gives', async () => {
   ]);
 });
 
+test('it refuses the Job create with the error it was given, and still records the Job', async () => {
+  const kubectl = buildStubKubectlJob({
+    jobName: 'nixie-sandbox-images-x7k2p',
+    conditions: [[]],
+    logs: '',
+    jobRefusal:
+      'Error from server (Forbidden): error when creating "STDIN": jobs.batch is forbidden: exceeded quota: nixie-jobs\n',
+  });
+
+  const runner = buildStubRunner(kubectl.handler);
+
+  const result = await runner.run(['kubectl', 'create', '--filename', '-', '--output', 'name'], {
+    stdin: Buffer.from(JSON.stringify({ kind: 'Job' })),
+  });
+
+  expect({
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString(),
+    stderr: result.stderr.toString(),
+  }).toStrictEqual({
+    exitCode: 1,
+    stdout: '',
+    stderr:
+      'Error from server (Forbidden): error when creating "STDIN": jobs.batch is forbidden: exceeded quota: nixie-jobs\n',
+  });
+
+  expect(kubectl.createdObjects).toStrictEqual([{ kind: 'Job' }]);
+});
+
 test("it answers each get with the next of the Job's conditions and keeps the last", async () => {
   const kubectl = buildStubKubectlJob({
     jobName: 'nixie-sandbox-images-x7k2p',
