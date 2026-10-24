@@ -124,7 +124,6 @@ test.skipIf(isPulumiMissing).each([
       `transform failed: Error: ${reason}; no RBAC object may grant pods/portforward`,
     );
   },
-  120_000,
 );
 
 test.skipIf(isPulumiMissing)(
@@ -167,5 +166,4 @@ test.skipIf(isPulumiMissing)(
 
     expect(result.exitCode).toBe(0);
   },
-  120_000,
 );

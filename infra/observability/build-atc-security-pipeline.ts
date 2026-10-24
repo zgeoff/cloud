@@ -1,6 +1,15 @@
 import { atcSecurityEvents } from './atc-security-events.ts';
 
-export function buildATCSecurityPipeline(logPath: string): string {
+interface ATCSecurityPipelineTimings {
+  readonly syncPeriod?: string;
+}
+
+export function buildATCSecurityPipeline(
+  logPath: string,
+  timings: ATCSecurityPipelineTimings = {},
+): string {
+  const syncPeriod = timings.syncPeriod ?? '10s';
+
   return `
 // atc's security events, from the gateway's container log files rather than the Kubernetes log
 // API, which joins stdout and stderr; each file is read from its start, so a new pod's first
@@ -8,7 +17,8 @@ export function buildATCSecurityPipeline(logPath: string): string {
 loki.source.file "atc_security" {
   targets = [{__path__ = ${toAlloyString(logPath)}}]
   file_match {
-    enabled = true
+    enabled     = true
+    sync_period = ${toAlloyString(syncPeriod)}
   }
   forward_to = [loki.process.atc_security.receiver]
 }
