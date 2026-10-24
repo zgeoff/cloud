@@ -43,6 +43,7 @@ provider and the NixOS checks each have a reference.
 | Suite                                                     | Command                             | Runs in CI                                                     |
 | --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
 | TypeScript tests in `infra/`, `scripts/` and `integration/` | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript journeys in `e2e/`                             | `bun run test:e2e`                  | `CI` → `checks`                                                |
 | The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
 | Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
 | Shell suites and `test-support/shell/` tests              | `bun run test:scripts`              | `CI` → `checks`, unless only Markdown changed                  |
@@ -88,10 +89,11 @@ steps against stand-ins. A check of config, such as which events start a workflo
 that `lint:actions` runs, as
 [`check-workflow-triggers.ts`](../../../scripts/check-workflow-triggers.ts) is, never a test.
 
-Each lane below needs a real system that the unit run cannot host.
+Each lane below needs a real system that the unit run cannot host, or tests a process from outside.
 
 | Lane | Scripts | Real system | Time limit per case |
 | -- | -- | -- | -- |
+| `e2e/` | `test:e2e` | a script started as its own process, driven from outside against stand-ins | 15 s |
 | `.nixos` | `test:nixos [check…]` | NixOS VMs under QEMU with KVM, built in the pinned Nix image | 1200 s |
 | `alert-rules` | `test:alert-rules` | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 90 s |
 | `images` | `test:agent-image`, `test:files-image` | the agent image and the files service's image, built and run in Docker | 15 s |

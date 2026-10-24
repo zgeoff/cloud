@@ -26,6 +26,7 @@
     "test:health-check": "cd workers/health-check && bun test --randomize",
     "test:preview": "cd packages/preview && bun test --randomize",
     "test:files": "cd packages/files && bun test --randomize",
+    "test:e2e": "cd e2e && bun test --randomize",
     "test:related": "bun scripts/run-related-tests.ts",
     "test:scripts": "bash scripts/run-shell-suites.sh",
     "test:alert-rules": "bash scripts/run-shell-suites.sh alert-rules",
