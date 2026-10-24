@@ -1,11 +1,11 @@
+import { ORPCError } from '@impz/client';
+import type { Image, ImpClient } from '@impz/client';
+import { StandardRPCJsonSerializer, StandardRPCSerializer } from '@orpc/client/standard';
 import { HttpResponse, http } from 'msw';
 import type { HttpHandler } from 'msw';
+import { z } from 'zod';
 
-interface StubImpdImage {
-  readonly name: string;
-  readonly ref: string;
-  readonly digest: string;
-}
+type StubImpdImage = Pick<Image, 'name' | 'ref' | 'digest'>;
 
 export interface StubImpdImagesOptions {
   readonly url: string;
@@ -24,14 +24,20 @@ export interface StubImpdImages {
   readonly images: readonly StubImpdImage[];
 }
 
-interface AddInput {
-  readonly name: string;
-  readonly ref: string;
-}
+const serializer = new StandardRPCSerializer(new StandardRPCJsonSerializer());
 
-// impd's images.list and images.add (imp 3.0.2's caller-contract.ts, lines 229 and 234) over oRPC
-// 1.15's RPC protocol: POST <url>/rpc/<path> with a {"json", "meta"} body and answer, and an error
-// as {"json": {defined, code, status, message}} under the error's status
+// impd also adds an image from an imp; the stub takes only an OCI ref, with the name its caller
+// gives, and refuses any other body
+const addInputSchema = z.object({
+  name: z.string(),
+  ref: z.string(),
+}) satisfies z.ZodType<Parameters<ImpClient['images']['add']>[0]>;
+
+type AddInput = z.infer<typeof addInputSchema>;
+
+// @impz/client does not export imp's contract, so the routes follow imp 3.0.2's
+// caller-contract.ts (images.list at line 229, images.add at line 234) under oRPC's RPC path
+// rule, POST <url>/rpc/<path>; oRPC's own serializer encodes each body as an RPC handler does
 export function startStubImpdImages(options: Readonly<StubImpdImagesOptions>): StubImpdImages {
   const calls: string[] = [];
   const images: StubImpdImage[] = [...options.images];
@@ -44,9 +50,9 @@ export function startStubImpdImages(options: Readonly<StubImpdImagesOptions>): S
 
     if (options.refusedRefs?.includes(input.ref) === true) {
       return buildRPCError(
-        403,
-        'FORBIDDEN',
-        'token nixie may add only images whose ref starts with ghcr.io/zgeoff/nixie-',
+        new ORPCError('FORBIDDEN', {
+          message: 'token nixie may add only images whose ref starts with ghcr.io/zgeoff/nixie-',
+        }),
       );
     }
 
@@ -54,73 +60,50 @@ export function startStubImpdImages(options: Readonly<StubImpdImagesOptions>): S
 
     images.push(image);
 
-    return HttpResponse.json({ json: buildImageRecord(image), meta: [[1, 'createdAt']] });
+    return buildRPCAnswer(buildImageRecord(image));
   };
 
   const handlers = [
     http.post(`${options.url}/rpc/images/list`, (info) => {
       if (!isAuthorized(info.request)) {
-        return buildRPCError(401, 'UNAUTHORIZED', 'unauthorized');
+        return buildRPCError(new ORPCError('UNAUTHORIZED', { message: 'unauthorized' }));
       }
 
       calls.push('images.list');
 
-      return HttpResponse.json({
-        json: images.map((image) => buildImageRecord(image)),
-        meta: images.map((_, index) => [1, index, 'createdAt']),
-      });
+      return buildRPCAnswer(images.map((image) => buildImageRecord(image)));
     }),
     http.post(`${options.url}/rpc/images/add`, async (info) => {
       if (!isAuthorized(info.request)) {
-        return buildRPCError(401, 'UNAUTHORIZED', 'unauthorized');
+        return buildRPCError(new ORPCError('UNAUTHORIZED', { message: 'unauthorized' }));
       }
 
       const body: unknown = await info.request.json();
 
-      return answerAdd(parseAddInput(body));
+      return answerAdd(addInputSchema.parse(serializer.deserialize(body)));
     }),
   ];
 
   return { handlers, calls, images };
 }
 
-function buildRPCError(status: number, code: string, message: string) {
-  return HttpResponse.json(
-    { json: { defined: false, code, status, message }, meta: [] },
-    { status },
-  );
+function buildRPCError(error: ORPCError<string, unknown>) {
+  return HttpResponse.json(serializer.serialize(error.toJSON()), { status: error.status });
 }
 
-// ImageSchema in imp 3.0.2's packages/api/src/schemas/image-schema.ts; oRPC's serializer marks the
-// Date in createdAt with type 1 and its path in meta
-function buildImageRecord(image: Readonly<StubImpdImage>) {
+function buildRPCAnswer(output: unknown) {
+  return HttpResponse.json(serializer.serialize(output));
+}
+
+function buildImageRecord(image: Readonly<StubImpdImage>): Image {
   return {
     id: `image-${image.name}`,
     name: image.name,
     ref: image.ref,
     digest: image.digest,
     source: 'oci',
-    createdAt: '2026-10-01T00:00:00.000Z',
+    createdAt: new Date('2026-10-01T00:00:00.000Z'),
     sizeBytes: 1_048_576,
     pinned: false,
   };
-}
-
-function parseAddInput(body: unknown): AddInput {
-  const json = typeof body === 'object' && body !== null && 'json' in body ? body.json : undefined;
-
-  if (
-    typeof json !== 'object' ||
-    json === null ||
-    !('name' in json) ||
-    !('ref' in json) ||
-    typeof json.name !== 'string' ||
-    typeof json.ref !== 'string'
-  ) {
-    throw new Error(
-      `build-stub-impd-images: an add without a name and a ref: ${JSON.stringify(body)}`,
-    );
-  }
-
-  return { name: json.name, ref: json.ref };
 }
