@@ -90,12 +90,12 @@ that `lint:actions` runs, as
 
 Each lane below needs a real system that the unit run cannot host.
 
-| Lane | Scripts | Real system | Time limit per case | Measured per case, p95 / max | Measured per run |
-| -- | -- | -- | -- | -- | -- |
-| `.nixos` | `test:nixos [check…]` | NixOS VMs under QEMU with KVM, built in the pinned Nix image | 1200 s | 1020 s / 1109 s | 37–58 min |
-| `alert-rules` | `test:alert-rules` | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 90 s | 31 s / 62 s | 137–274 s |
-| `images` | `test:agent-image`, `test:files-image` | the agent image and the files service's image, built and run in Docker | 15 s | 1 s / 3 s | 6–126 s |
-| `fixtures` | `test:atc-gateway-fixture`, `test:nixie-backup-fixture`, `test:files-backup-fixture` | the gateway, backup and restore images with restic, on Docker volumes | 15 s | 7 s / 9 s | 42–91 s |
+| Lane | Scripts | Real system | Time limit per case |
+| -- | -- | -- | -- |
+| `.nixos` | `test:nixos [check…]` | NixOS VMs under QEMU with KVM, built in the pinned Nix image | 1200 s |
+| `alert-rules` | `test:alert-rules` | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 90 s |
+| `images` | `test:agent-image`, `test:files-image` | the agent image and the files service's image, built and run in Docker | 15 s |
+| `fixtures` | `test:atc-gateway-fixture`, `test:nixie-backup-fixture`, `test:files-backup-fixture` | the gateway, backup and restore images with restic, on Docker volumes | 15 s |
 
 - `.nixos` is no file suffix. A check is an attribute of `checks.x86_64-linux` in
   [`nixos/flake.nix`](../../../nixos/flake.nix), with its file in `nixos/checks/`, and
@@ -109,10 +109,6 @@ Each lane below needs a real system that the unit run cannot host.
   which runs the shell lanes; 15 for the `fixture` job of `atc-gateway-images.yml` and the `check`
   job of `files-image.yml`, which run `test:atc-gateway-fixture` and `test:files-image` again; and
   121 for `nixos`. A review compares a new case's time with its lane's limit.
-- The times come from the checks job logs of 8 CI runs and the `nixos` job logs of 5 runs, all on
-  2026-10-24. A shell case's time is the gap between its `ok` line and the line before it, so the
-  first case of a suite carries the suite's start-up. A NixOS case's time is the driver's
-  `test script finished in` line. Measure again the same way when a lane changes.
 
 ## No test reaches a real host
 
