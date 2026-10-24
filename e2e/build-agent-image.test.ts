@@ -1,4 +1,3 @@
-// lane: a real build-agent-image.ts process, signalled, with its exit code checked
 import { expect, onTestFinished, test } from 'bun:test';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
