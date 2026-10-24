@@ -106,8 +106,9 @@ Each lane below needs a real system that the unit run cannot host.
 - A case over its lane's time limit is a defect to fix, and the limit never rises to cover it.
 - Nothing enforces a limit per case yet: `run_cases` has no timer, and `nix build` ignores a
   check's `meta.timeout`. Today only the CI job's `timeout-minutes` bounds a lane: 20 for `checks`,
-  which runs the shell lanes, and 121 for `nixos`. A review compares a new case's time with its
-  lane's limit.
+  which runs the shell lanes; 15 for the `fixture` job of `atc-gateway-images.yml` and the `check`
+  job of `files-image.yml`, which run `test:atc-gateway-fixture` and `test:files-image` again; and
+  121 for `nixos`. A review compares a new case's time with its lane's limit.
 - The times come from the checks job logs of 8 CI runs and the `nixos` job logs of 5 runs, all on
   2026-10-24. A shell case's time is the gap between its `ok` line and the line before it, so the
   first case of a suite carries the suite's start-up. A NixOS case's time is the driver's
