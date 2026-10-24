@@ -288,8 +288,8 @@ entry.
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
    above its pin.
-2. Open a PR. CI's `checks` job runs `bun run test:agent-image` on every change to the image or its
-   check; run it locally first to find a failure sooner.
+2. Open a PR. CI's `test-agent-image` job runs `bun run test:agent-image` on every change to the
+   image or its check; run it locally first to find a failure sooner.
 3. After the PR merges, wait for the host's build line in the journal
    ([The host's build](#the-hosts-build)), and record it on the PR.
 4. Switch the `cloud` target.
