@@ -39,6 +39,16 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
+The host lets the kernel make huge pages on demand for imp guest memory, up to the imps' memory
+budget, and frees each one when its last mapping goes, so the pool holds no memory while nothing
+maps it. A guest on huge pages needs one fault on the host where a guest on base pages needs 512.
+
+No imp uses the pool yet. impd restores a boot template from a private mapping of the template's
+memory file on ZFS, which the kernel backs only with base pages. Firecracker backs a restored guest
+with huge pages only when impd serves its memory through userfaultfd. Firecracker maps huge pages
+without a reservation, so its process dies of SIGBUS when the kernel cannot make one: past the cap,
+or when too little contiguous memory is free.
+
 The imps yield CPU to the cluster rather than hold a cap. Docker starts its containers, imp-host
 among them, in `imp.slice`, whose CPU weight of 10 sits below the weight of `system.slice`, where
 k3s runs, and of the kubelet's `kubepods.slice`. The kernel splits a busy CPU between sibling

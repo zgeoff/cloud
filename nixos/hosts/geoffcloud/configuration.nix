@@ -308,6 +308,11 @@ in
     };
   };
 
+  # 2 MiB hugetlb pages for imp guest memory, made on demand up to the imps' RAM budget and freed
+  # when the last mapping goes, so the pool holds no RAM while nothing maps it
+  # (docs/architecture/host/imp.md)
+  boot.kernel.sysctl."vm.nr_overcommit_hugepages" = config.services.imp.ramBudgetMiB / 2;
+
   # imps yield CPU to k3s and its pods rather than hold a cap (docs/architecture/host/imp.md). A
   # change of daemon.json restarts docker.service, and imp-host with it.
   virtualisation.docker.daemon.settings.cgroup-parent = "imp.slice";
