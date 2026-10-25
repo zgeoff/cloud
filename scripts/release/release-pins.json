@@ -21,13 +21,13 @@
     "digest": "sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377"
   },
   "imp-host": {
-    "version": "4.2.3",
-    "digest": "sha256:e151305ac71c2d925385f1d8d2b0b27fa4f7907168a65cca065ba2709fcbf0cc",
-    "commit": "922c2f49"
+    "version": "4.2.4",
+    "digest": "sha256:9e9d3d2df51fa29b80f5f5c57465097d407177daf9bc8c4ad4424193d386e5dc",
+    "commit": "a2a697ce"
   },
   "imp-base": {
-    "version": "4.2.3",
-    "digest": "sha256:d8715f450107206fc121de8db0b3a509b9a57f038bd18bc51e57fc1e66cac947"
+    "version": "4.2.4",
+    "digest": "sha256:3ad7941a285b41d31078a4c69e01899b92f6c0c4b6534adf6aa7dd6dd05f6787"
   },
   "nixie": {
     "version": "0.47.0",
