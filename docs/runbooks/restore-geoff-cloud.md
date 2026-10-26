@@ -123,6 +123,22 @@ stopped, and switch after.
    Expect `info` to show the copy's `impVersion` from `COPY-INFO`, `ls` to match the time of the
    copy, and `https://imps.geoff.cloud/health` to return 200.
 
+5. If the restore crossed a change of the preview image, re-add `pv-base` from the restored
+   generation's reference:
+
+   ```sh
+   ref=$(systemctl show preview-image -p Environment | grep -o 'PREVIEW_IMAGE_REF=[^ ]*' | cut -d= -f2)
+   docker exec imp-host impz image add "$ref" --name pv-base
+   ```
+
+   The restored database points `pv-base` at the build folder of the image it held at the copy, and
+   the newer generation's `preview-image` unit replaced that image and removed its folder. The unit
+   sees `pv-base` at the restored reference and adds nothing, so every preview imp fails to boot
+   with ENOENT on `rootfs.ext4` until you add it again. Expect the add to print no error, and
+   `docker exec imp-host impz image ls` to list `pv-base` at `$ref`. A host switch fails on any
+   image record whose folder is gone, as [Switch the host](./workflows.md#switch-the-host)
+   describes.
+
 **Reboot window.** If the host reboots during step 3, imp-host starts on the current generation,
 against whatever the dataset holds then. Do not assume nothing changed: check the script's output
 for how far it got, and the saved directory. Before the saved files are flushed, the original
@@ -150,23 +166,25 @@ holding a WAL database and secrets, and a real generation switch. A restore to a
 saved the database, its WAL files and the secrets root-only, put the copy in place, unmounted,
 switched, and started imp-host on the copy's digest-pinned image, which `docker inspect` reported as
 the same `tag@sha256:…` string the unit names. A restore to the running generation skipped the
-switch; a database without WAL files and a dataset without secrets restored too. It refused, with
-nothing changed, without arguments, while either unit or an imp-host container ran, while `tank/imp`
-was mounted, for a dataset without `imp.sqlite`, for a copy without `imp.sqlite` or `COPY-INFO`,
-failing `integrity_check`, lacking the image or the migration, or with a different migration, and
-for a generation that was not a number, did not exist or ran another image. The stand-ins: busybox
-containers that only sleep, a proxy that only opens its socket, the local registry, and generations
-that are the VM's own specialisations. A second check on the same machine,
-`nixos/checks/impd-restore-saved-failures.nix`, reaches through real state the failures that come
-after the original is saved: a real switch failure, and a start that never produced a container
-within the wait, each stopped both units again; saved secrets or a saved database file that differed
-from the original stopped the restore before the copy went in place. A third,
-`nixos/checks/impd-restore-boundaries.nix`, reaches the errors no real state can: a unit whose state
-cannot be read, and a staged or published file that differs from the copy, through a stand-in
-`systemctl` or `cmp` that fails only that one call. Each stopped as before, with nothing started or
-switched. Every failure after the save left the original in its saved directory. A fourth,
-`nixos/checks/impd-restore-reset.nix`, checks that the machine's reset between subtests clears what
-each subtest can leave. Run them on a machine with Docker and KVM:
+switch; a database without WAL files and a dataset without secrets restored too.
+
+In the same VM the restore script refused, with nothing changed, without arguments, while either
+unit or an imp-host container ran, while `tank/imp` was mounted, for a dataset without `imp.sqlite`,
+for a copy without `imp.sqlite` or `COPY-INFO`, failing `integrity_check`, lacking the image or the
+migration, or with a different migration, and for a generation that was not a number, did not exist
+or ran another image. The stand-ins: busybox containers that only sleep, a proxy that only opens its
+socket, the local registry, and generations that are the VM's own specialisations.
+
+A second check on the same machine, `nixos/checks/impd-restore-saved-failures.nix`, reaches through
+real state the failures that come after the original is saved: a real switch failure, and a start
+that never produced a container within the wait, each stopped both units again; saved secrets or a
+saved database file that differed from the original stopped the restore before the copy went in
+place. A third, `nixos/checks/impd-restore-boundaries.nix`, reaches the errors no real state can: a
+unit whose state cannot be read, and a staged or published file that differs from the copy, through
+a stand-in `systemctl` or `cmp` that fails only that one call. Each stopped as before, with nothing
+started or switched. Every failure after the save left the original in its saved directory. A
+fourth, `nixos/checks/impd-restore-reset.nix`, checks that the machine's reset between subtests
+clears what each subtest can leave. Run them on a machine with Docker and KVM:
 
 ```sh
 bun run test:nixos impd-restore impd-restore-saved-failures impd-restore-boundaries impd-restore-reset

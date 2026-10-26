@@ -115,26 +115,36 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    adapter, which the script reads from the release's source on GitHub. The script checks again
    before the activation. For an impd major bump, deploy a nixie release that accepts the new major
    first. `--build-only` skips this gate too.
-5. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
+5. It refuses a commit whose impd stores a secret kind that the commit's atc daemon pin does not
+   accept, and names each such kind, because atc's auth binding then refuses every brokered secret
+   of that kind and every cloud spawn and adopt fails with `auth_secret_mismatch`. It reads impd's
+   kinds from the `SecretKindSchema` enum in `zgeoff/impz` at the imp-host release's tag, and atc's
+   from the `BrokerSecretKind` union in `zgeoff/atc` at the pin's tag. For an impd that adds a kind,
+   pin an atc release that accepts it first. `--build-only` skips this gate too.
+6. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-6. It copies the built store path to the host with `nix copy`, then runs the copied system's
+7. It copies the built store path to the host with `nix copy`, then runs the copied system's
    `switch-to-configuration dry-activate`, which changes nothing and lists the units the activation
    would stop and restart. It holds the switch with exit 1 and those lines when either list holds
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
-7. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
+8. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the
    host, because the store path does not name the commit it was built from.
-8. It fails unless the host's `/run/current-system` is the built path, then prints
+9. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
-9. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
-   fails with each readiness or dependency part that is not ready and nixie's reason for it, since a
-   host that switches cleanly can still leave nixie unable to start. It prints each advisory part
-   that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
-   turns fail.
-10. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+10. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
+    fails with each readiness or dependency part that is not ready and nixie's reason for it, since
+    a host that switches cleanly can still leave nixie unable to start. It prints each advisory part
+    that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
+    turns fail.
+11. It fails with each image record in impd whose build folder holds no `rootfs.ext4`, because every
+    imp boot from that image then fails with ENOENT. A database restored across a change of the
+    preview image can leave such a record, as
+    [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes.
+12. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
     `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
     marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
     a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves
