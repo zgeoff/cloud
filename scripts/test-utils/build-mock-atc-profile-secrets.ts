@@ -12,7 +12,6 @@ export function buildMockATCProfileSecrets(): Record<string, unknown>[] {
     {
       ...buildMockImpSecret({
         name: 'github-imp-agents',
-        kind: 'github',
         rules: [
           { host: 'github.com', header: 'authorization', scheme: 'basic' },
           { host: 'api.github.com', header: 'authorization', scheme: 'bearer' },
