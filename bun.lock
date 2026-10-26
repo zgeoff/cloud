@@ -14,7 +14,7 @@
         "@types/bun": "1.4.3",
         "@zgeoff/bun-test-extended": "0.2.1",
         "@zgeoff/cloud-topology": "workspace:*",
-        "@zgeoff/format-codemod": "0.3.1",
+        "@zgeoff/format-codemod": "0.3.2",
         "@zgeoff/oxlint-config": "0.7.0",
         "@zgeoff/skill-gate": "0.2.6",
         "knip": "6.42.0",
@@ -662,7 +662,7 @@
 
     "@zgeoff/cloud-topology": ["@zgeoff/cloud-topology@workspace:packages/topology"],
 
-    "@zgeoff/format-codemod": ["@zgeoff/format-codemod@0.3.1", "", { "dependencies": { "gunshi": "1.0.0-rc.1", "oxc-parser": "0.154.0" }, "bin": { "format-codemod": "dist/cli.js" } }, "sha512-upt1uvxiSrWdDyLJxnCpZ+4cTaObNvH38bMqlfOXSsTcRByHK2YM1FeRE/utdqrJ39im4TKw1cPjtSrIprY4yg=="],
+    "@zgeoff/format-codemod": ["@zgeoff/format-codemod@0.3.2", "", { "dependencies": { "gunshi": "1.0.0-rc.1", "oxc-parser": "0.154.0" }, "bin": { "format-codemod": "dist/cli.js" } }, "sha512-0dVMRQyo0ZiC22hU2PMzi8W/12c9BEIsSdkqat3qkalVc2Z5/wj2E+gXz2Uwan31Y4RUpmZ7N/arRWEuuGYsDQ=="],
 
     "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.7.0", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-ECHCzGCYnINclFxlkFxp1bJSw9RKnII/sj2YMKdJIJrQezgXp1vdcM3RuxgZqN3gJOpSKpEVrD4LD3oLSuyNgA=="],
 
