@@ -13,7 +13,6 @@ minimumReleaseAge = 604800
 # uses needs an entry here, or bun install refuses the bump.
 # @impz/client releases with impd's API, so the preview service's typed client
 # would otherwise trail the impd it talks to by a week.
-# fast-uri 3.1.9 (published 2026-10-19, patches GHSA-w74x-v6f9-j3xg + GHSA-xhq7-xmqj-769h + GHSA-wjr9-j795-jxcr + GHSA-333x-w4r6-6crp) ages past the gate ~2026-10-26 — remove then (audit-fix)
 minimumReleaseAgeExcludes = [
   "@impz/client",
   "@zgeoff/bun-test-extended",
@@ -29,7 +28,6 @@ minimumReleaseAgeExcludes = [
   "@tsrs/linux-arm64-musl",
   "@tsrs/linux-x64-gnu",
   "@tsrs/linux-x64-musl",
-  "fast-uri",
 ]
 
 [test]
