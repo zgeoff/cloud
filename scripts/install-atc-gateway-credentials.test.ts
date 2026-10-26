@@ -59,7 +59,7 @@ skip: both exist and match
 skip: both exist, atc-cloud has the expected limits, and the file authenticates as it
 
 == check
-{"name":"glm","kind":"static","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[]}
+{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}],"imps":[]}
 {"name":"atc-cloud","scope":"manage","imps":["harness-*"],"grantable":["claude-setup-token","github-imp-agents","glm","linear-imp-agents","op-connect"]}
 /var/lib/atc-daemon-secrets root 700 4096 bytes
 /var/lib/atc-daemon-secrets/gateway-token root 400 15 bytes

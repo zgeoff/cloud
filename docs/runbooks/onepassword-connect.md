@@ -19,7 +19,7 @@ ClusterIP, `10.43.82.198:8000`, whose target is Connect's API on 8080.
 | vault `cloud`, item `onepassword-connect-token`       | the read-only Connect token `imp-agents-ro` (vault `imp`)  |
 | vault `imp`                                           | the items imps read; granted to the Connect server only    |
 | the Connect Secret in k3s                             | the credentials file, set by Pulumi from `.env`            |
-| impd, static secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host |
+| impd, custom secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host |
 
 ## Add the token to impd
 

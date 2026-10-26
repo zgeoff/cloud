@@ -105,9 +105,8 @@ test('it adds glm from the line on stdin and prints it with droppedGrants, as im
 
   expect(JSON.parse(result.stdout.toString())).toStrictEqual({
     name: 'glm',
-    kind: 'static',
+    kind: 'custom',
     rules: [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }],
-    env: [],
     imps: [],
     createdAt: '2026-10-07T12:00:00.000Z',
     droppedGrants: 0,
