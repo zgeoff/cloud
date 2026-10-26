@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Test for check-impd-image-dirs.sh: it passes when each impd image record has its build folder,
-# and when impd holds no image, and fails naming each record whose folder holds no rootfs.ext4 or
-# whose digest is no sha256 digest. It stops with docker's exit code when imp-host is gone. ssh is
+# for each of impd's three digest forms, and when impd holds no image, and fails naming each record
+# whose folder holds no rootfs.ext4 or whose digest names no folder. The records take the shape of
+# impd's ImageSchema, with invented ids and digests in the forms that zgeoff/impz's guest-build.ts
+# (`imp-build-<hex>`) and template-service.ts (`imp-<uuid>`) write at v4.2.4 and v5.0.0. It stops with docker's exit code when imp-host is gone. ssh is
 # the NixOS host stand-in from test-support/shell, which answers the image listing and the folder
 # listing from the case's STUB_IMPD_IMAGES and STUB_IMPD_IMAGE_DIRS. Each case runs the script
 # under `env -i` and compares its stdout, stderr and ssh call log.
@@ -53,6 +55,79 @@ $list_call
 $dirs_call
 EOF
   assert_status 0 "$status"
+}
+
+it_passes_a_builder_image_whose_folder_holds_its_imp_build_digest() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMAGES='[{"id":"img_3","name":"pv-base","ref":"ghcr.io/zgeoff/imp-base:4.2.4@sha256:2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3","digest":"imp-build-c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2","source":"oci","createdAt":"2026-10-21T08:00:00.000Z","sizeBytes":3145728,"pinned":true}]' \
+    STUB_IMPD_IMAGE_DIRS='imp-build-c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< "== impd's images have their build folders: pv-base"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << EOF
+$list_call
+$dirs_call
+EOF
+  assert_status 0 "$status"
+}
+
+it_passes_a_template_whose_folder_holds_its_imp_uuid_digest() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMAGES='[{"id":"img_4","name":"warm-node","ref":"warm-node","digest":"imp-0199f3a2-7c41-7d8e-9b2a-4f6e1c0d3b5a","source":"imp","createdAt":"2026-10-22T08:00:00.000Z","sizeBytes":4194304,"pinned":false}]' \
+    STUB_IMPD_IMAGE_DIRS='imp-0199f3a2-7c41-7d8e-9b2a-4f6e1c0d3b5a' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< "== impd's images have their build folders: warm-node"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << EOF
+$list_call
+$dirs_call
+EOF
+  assert_status 0 "$status"
+}
+
+it_fails_naming_a_builder_image_whose_imp_build_folder_is_gone() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMAGES='[{"id":"img_3","name":"pv-base","ref":"ghcr.io/zgeoff/imp-base:4.2.4@sha256:2c624232cdd221771294dfbb310aca000a0df6ac8b66b696d90ef06fdefb64a3","digest":"imp-build-c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2","source":"oci","createdAt":"2026-10-21T08:00:00.000Z","sizeBytes":3145728,"pinned":true}]' \
+    STUB_IMPD_IMAGE_DIRS='imp-build-8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+impd's image pv-base points at /var/lib/imp/images/imp-build-c3ab8ff13720e8ad9047dd39466b3c8974e592c2fa383d4a3960714caef0c4f2, which holds no rootfs.ext4
+re-add each image from its reference with `impz image add <ref> --name <name>` (docs/runbooks/restore-geoff-cloud.md, Roll impd's database back)
+EOF
+  assert_status 1 "$status"
+}
+
+it_fails_naming_a_template_whose_imp_uuid_folder_is_gone() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMAGES='[{"id":"img_4","name":"warm-node","ref":"warm-node","digest":"imp-0199f3a2-7c41-7d8e-9b2a-4f6e1c0d3b5a","source":"imp","createdAt":"2026-10-22T08:00:00.000Z","sizeBytes":4194304,"pinned":false}]' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+impd's image warm-node points at /var/lib/imp/images/imp-0199f3a2-7c41-7d8e-9b2a-4f6e1c0d3b5a, which holds no rootfs.ext4
+re-add each image from its reference with `impz image add <ref> --name <name>` (docs/runbooks/restore-geoff-cloud.md, Roll impd's database back)
+EOF
+  assert_status 1 "$status"
 }
 
 it_passes_when_impd_holds_no_image() {
@@ -109,7 +184,7 @@ EOF
   assert_status 1 "$status"
 }
 
-it_fails_naming_a_record_whose_digest_is_no_sha256_digest() {
+it_fails_naming_a_record_whose_digest_names_no_folder() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -121,7 +196,7 @@ it_fails_naming_a_record_whose_digest_is_no_sha256_digest() {
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'EOF'
-impd's image pv-base has the digest '../../etc', which is no sha256 digest
+impd's image pv-base has the digest '../../etc', which names no image folder
 re-add each image from its reference with `impz image add <ref> --name <name>` (docs/runbooks/restore-geoff-cloud.md, Roll impd's database back)
 EOF
   assert_status 1 "$status"
