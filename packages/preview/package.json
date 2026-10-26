@@ -4,7 +4,7 @@
   "description": "The preview service: one tailnet link per pull request to that pull request's code, running in its own imp",
   "type": "module",
   "dependencies": {
-    "@impz/client": "2.10.3",
+    "@impz/client": "2.11.0",
     "@zgeoff/std": "0.3.0",
     "ts-pattern": "5.9.0",
     "xstate": "5.33.2",
