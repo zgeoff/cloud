@@ -55,7 +55,11 @@ RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNA
 # Every download retries. Plain --retry skips a dropped connection (curl exit 56)
 # and an HTTP/2 stream that did not close cleanly (exit 92), so it needs
 # --retry-all-errors. The fixed delay keeps a retried 404 to about 10 seconds.
-ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2"
+# A connection that does not open within 20 seconds, or a transfer that moves
+# less than 1 KiB a second for a minute, ends with exit 28 and retries, so a
+# stalled download cannot hold the build until its timeout. A slow transfer
+# that keeps moving runs on.
+ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60"
 
 # Claude Code's native linux-x64 binary. The sum is the linux-x64 checksum in
 # the release's manifest.json, whose signature names Anthropic's release key
@@ -178,14 +182,29 @@ COPY sbin/install-checkout-packages /usr/local/sbin/install-checkout-packages
 COPY claude-code/managed-settings.d/install-checkout-packages.json \
      /etc/claude-code/managed-settings.d/install-checkout-packages.json
 
-# Go from go.dev. The sum is the sha256 that https://go.dev/dl/?mode=json
-# lists for the linux-amd64 tarball.
+# Go from the GitHub release of actions/go-versions, because the host's path to
+# go.dev's download CDN can run at tens of KB/s. That release repacks go.dev's
+# linux-amd64 tarball without its go/ folder and adds the Actions installer
+# setup.sh, which the build removes. The sum is the release asset's sha256
+# digest, taken after its unpacked tree matches the go.dev tarball's, whose
+# sha256 https://go.dev/dl/?mode=json lists. A bump finds the release, whose tag
+# is the version and a run id, and checks it with:
+#   gh api 'repos/actions/go-versions/releases?per_page=100' --jq '.[]
+#     | select(.tag_name | startswith("'"$VERSION"'-")) | .tag_name, (.assets[]
+#     | select(.name == "go-'"$VERSION"'-linux-x64.tar.gz") | .digest)'
+#   curl -fsSLO "https://go.dev/dl/go$VERSION.linux-amd64.tar.gz"   # check its listed sha256
+#   curl -fsSLO "https://github.com/actions/go-versions/releases/download/$TAG/go-$VERSION-linux-x64.tar.gz"
+#   mkdir dev gh && tar -xzf "go$VERSION.linux-amd64.tar.gz" -C dev && tar -xzf "go-$VERSION-linux-x64.tar.gz" -C gh
+#   rm gh/setup.sh && diff -r --no-dereference dev/go gh   # prints nothing
 ARG GO_VERSION=1.27.1
-ARG GO_SHA256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
-RUN curl -fsSL ${CURL_RETRY} -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+ARG GO_RELEASE=1.27.1-33583469715
+ARG GO_SHA256=6f00fbc5b337fbf00581b7ced382fecdc4fa9493aef971277652a25f7aa14c6e
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/go.tar.gz \
+      "https://github.com/actions/go-versions/releases/download/${GO_RELEASE}/go-${GO_VERSION}-linux-x64.tar.gz" \
  && echo "${GO_SHA256}  /tmp/go.tar.gz" | sha256sum -c - \
- && tar -xzf /tmp/go.tar.gz -C /usr/local \
- && rm /tmp/go.tar.gz
+ && mkdir /usr/local/go \
+ && tar -xzf /tmp/go.tar.gz -C /usr/local/go \
+ && rm /tmp/go.tar.gz /usr/local/go/setup.sh
 
 # uv and uvx. The sum is the release's uv-x86_64-unknown-linux-gnu.tar.gz.sha256.
 ARG UV_VERSION=0.12.23
