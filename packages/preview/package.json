@@ -6,8 +6,8 @@
   "dependencies": {
     "@impz/client": "2.11.0",
     "@zgeoff/std": "0.3.0",
-    "ts-pattern": "5.9.0",
-    "xstate": "5.33.2",
+    "ts-pattern": "5.9.2",
+    "xstate": "5.33.3",
     "zod": "4.6.7"
   },
   "devDependencies": {
