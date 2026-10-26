@@ -107,8 +107,10 @@ docs/
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
   roll the gateway out first. It refuses an impd major that the running nixie does not accept, so
-  deploy a nixie that accepts it first. It fails the switch when nixie's `/health/ready` does not
-  report every part ready afterwards.
+  deploy a nixie that accepts it first. It refuses an impd that stores a secret kind the atc daemon
+  pin does not accept, so pin an atc that accepts the kind first. It fails the switch when nixie's
+  `/health/ready` does not report every part ready afterwards, or when an impd image record's build
+  folder is gone.
 - The script holds a switch whose activation would stop or restart k3s, because nixie can stay down
   for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
   approved.
