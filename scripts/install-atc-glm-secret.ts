@@ -10,8 +10,6 @@ const glmAddArgs = [
   'secret',
   'add',
   'glm',
-
-  // imp 5 takes custom as the older name of static, and stores and lists static
   '--kind',
   'custom',
   '--hosts',
@@ -48,7 +46,7 @@ const glmRules = [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' 
 
 function requireGLMRules(glm: unknown) {
   if (
-    findJSONField(glm, 'kind') !== 'static' ||
+    findJSONField(glm, 'kind') !== 'custom' ||
     !Bun.deepEquals(findJSONField(glm, 'rules'), glmRules)
   ) {
     throw new ExitError(1, 'glm exists with other rules; fix it by hand, then rerun');

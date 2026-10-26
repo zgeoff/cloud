@@ -149,9 +149,8 @@ function createSecret(state: HostState, stdin: string) {
 
   const secret = {
     name: 'glm',
-    kind: 'static',
+    kind: 'custom',
     rules: [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }],
-    env: [],
     imps: [],
     createdAt: '2026-10-07T12:00:00.000Z',
   };
