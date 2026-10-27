@@ -7,7 +7,7 @@
       "devDependencies": {
         "@commitlint/cli": "21.2.4",
         "@faker-js/faker": "10.6.0",
-        "@impz/client": "5.0.0",
+        "@impz/client": "6.0.0",
         "@orpc/client": "1.15.7",
         "@stylistic/eslint-plugin": "5.10.0",
         "@tsconfig/strictest": "2.0.8",
@@ -71,7 +71,7 @@
     "packages/preview": {
       "name": "@zgeoff/cloud-preview",
       "dependencies": {
-        "@impz/client": "5.0.0",
+        "@impz/client": "6.0.0",
         "@zgeoff/std": "0.3.0",
         "ts-pattern": "5.9.2",
         "xstate": "5.33.3",
@@ -204,7 +204,7 @@
 
     "@humanwhocodes/retry": ["@humanwhocodes/retry@0.4.3", "", {}, "sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ=="],
 
-    "@impz/client": ["@impz/client@5.0.0", "", { "dependencies": { "@orpc/client": "^1.15.5", "@orpc/contract": "^1.15.5", "p-retry": "^8.0.1", "ts-pattern": "^5.9.0", "zod": "^4.6.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-+SL4Uw7+gFIvyx6pI84IMPYgRL499Prk3gjGO6lYQNBGlZ58y4pv2jWpKhFYCti1QiGJiZ5ZrBlNSb3N7sdXZA=="],
+    "@impz/client": ["@impz/client@6.0.0", "", { "dependencies": { "@orpc/client": "^1.15.7", "@orpc/contract": "^1.15.7", "p-retry": "^8.0.1", "ts-pattern": "^5.9.2", "zod": "^4.6.7" }, "peerDependencies": { "@opentelemetry/api": ">=1.9.0" }, "optionalPeers": ["@opentelemetry/api"] }, "sha512-7I9FGqL2aaZWtnXYjJHoOm7TJrxaVAO3uM3OCkBnTmIJ8Rfg2GFLRe5gQClV2G87FRu2fTy4r5pA7MuOgsJcFA=="],
 
     "@inquirer/ansi": ["@inquirer/ansi@2.0.9", "", {}, "sha512-0Ywt3S8tqM6TWUcsRlBFQ1x+X3/o8kktX0ZiKAnByYb9GFDknnOhse1PVtfiD2BXPI8ar+BWx9PV9R0lQIcygw=="],
 
