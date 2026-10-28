@@ -62,7 +62,8 @@
       # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
       # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and
       # drift-check-vm, which runs the drift check's unit in its own sandbox, and public-front-vm,
-      # which sends requests through the TLS front to a stand-in upstream. onidel-provider-vendor
+      # which sends requests through the TLS front to a stand-in upstream, and atc-daemon-vm, which
+      # starts the atc daemon on its gateway token as the host does. onidel-provider-vendor
       # builds the provider's vendored Go modules, which CI's checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -84,6 +85,7 @@
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
+      checks.x86_64-linux.atc-daemon-vm = import ./checks/atc-daemon-vm.nix { inherit nixpkgs; };
       checks.x86_64-linux.cloud-host-firewall = import ./checks/cloud-host-firewall.nix {
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;

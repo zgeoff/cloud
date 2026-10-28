@@ -1,20 +1,20 @@
 {
   "atc-agent": {
-    "version": "7.4.0",
-    "sum": "9e55001d7f64acccccfd66a861abf8dd3771d618de17715f21bc98b86b559cf5"
+    "version": "7.5.0",
+    "sum": "f4415b7b04d526db1a21b1bce0d23b277c5deb4e4ba393eb97324209674426ac"
   },
   "atc-daemon": {
-    "version": "7.4.0",
-    "sum": "9e55001d7f64acccccfd66a861abf8dd3771d618de17715f21bc98b86b559cf5"
+    "version": "7.5.0",
+    "sum": "f4415b7b04d526db1a21b1bce0d23b277c5deb4e4ba393eb97324209674426ac"
   },
   "atc-gateway": {
-    "version": "7.4.0",
-    "sum": "219a272480686f0ce4c11bd41ff08f7ef0e32aa82dd17b7c0dea1dc710b8cd26",
-    "tag": "7.4.0"
+    "version": "7.5.0",
+    "sum": "4bf2491cecdc5bbcb2ad768295a54730f82acc0e5a4613e55f2d4ba5c2446dcf",
+    "tag": "7.5.0"
   },
   "atc-gateway-image": {
-    "version": "7.4.0",
-    "digest": "sha256:a449cbde1e6b0edd36762a271516124bdde05328c3bb7d650d0c60a7df54fee7"
+    "version": "7.5.0",
+    "digest": "sha256:792cfc452328c6ca55d77b1b062ed9ca01718ace6b6103f56ac207caf669aa69"
   },
   "atc-gateway-backup-image": {
     "tag": "2.24.0-r2",
@@ -30,15 +30,15 @@
     "digest": "sha256:1e5c7f8c5ee63e7c541d016d79bbc75e1e3555bbc285fc1e0b60fff5080d77a8"
   },
   "nixie": {
-    "version": "0.49.0",
-    "digest": "sha256:540af8dd81da77e7fdd3048127619eea6e9cff78775dea5fb58fbff7a484f5b4"
+    "version": "0.49.2",
+    "digest": "sha256:9b9a8b1df47637fd8e8b089597528b30ee015d3ab9d73f3ea9d2d6da1f023668"
   },
   "nixie-web": {
-    "version": "0.49.0",
-    "digest": "sha256:212d4704761b98d8459e02179cec443895e44d15731ff53318cce569acc4a806"
+    "version": "0.49.2",
+    "digest": "sha256:b3083168fea1c247086a555e9a6ae449a0732fbe825524202dca3cfffd7273a8"
   },
   "auto-mode": {
-    "version": "3.0.1",
-    "sum": "b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a"
+    "version": "3.1.1",
+    "sum": "79f90632c7117d5c7798f5ca2b429d68e617fde5b6cc83c910c8af816d5114ba"
   }
 }

@@ -34,6 +34,17 @@ let
     ln -sfn ${configFile} ${home}/.config/atc/config.json
   '';
 
+  # atc refuses a --token-file that another user owns or that its group or others may open, and
+  # systemd's copy of a credential belongs to root. So before the daemon starts, this script copies
+  # the gateway-token credential, as the service user, into the runtime directory: tmpfs, mode 0700,
+  # which systemd removes when the service stops.
+  stagedTokenFile = "/run/atc-daemon/gateway-token";
+  stageGatewayToken = pkgs.writeShellScript "atc-daemon-stage-gateway-token" ''
+    set -eu
+    umask 077
+    install -m 0600 "$CREDENTIALS_DIRECTORY/gateway-token" ${stagedTokenFile}
+  '';
+
   # each auth profile that an agent or one of its MCP servers selects and the config does not
   # define
   unknownProfiles = lib.concatLists (
@@ -95,8 +106,10 @@ in
         A root-only file holding the bearer tokens a gateway may present: one, or two during
         a rotation, one per line, each at least 32 bytes. It is passed in with systemd
         LoadCredential as `gateway-token`, so the service user never reads the file itself.
-        systemd copies the file when the service starts, so after a rotation run
-        `systemctl restart atc-daemon`: SIGHUP rereads only that copy, not this file.
+        When the service starts, systemd copies the file, and the service copies that credential
+        to ${stagedTokenFile}, owned by the service user with mode 0600, as atc's --token-file
+        needs. So after a rotation run `systemctl restart atc-daemon`: SIGHUP rereads only that
+        copy, not this file.
       '';
     };
 
@@ -222,22 +235,25 @@ in
       };
       restartTriggers = [ configFile ];
       serviceConfig = {
-        ExecStartPre = linkConfig;
+        ExecStartPre = [
+          linkConfig
+          stageGatewayToken
+        ];
 
-        # %d is systemd's $CREDENTIALS_DIRECTORY, which holds the gateway-token credential
         ExecStart = lib.escapeShellArgs [
           "${cfg.package}/bin/atc"
           "daemon"
           "--listen"
           cfg.listen
           "--token-file"
-          "%d/gateway-token"
+          stagedTokenFile
         ];
         User = "atc";
         Group = "atc";
         StateDirectory = "atc-daemon";
         StateDirectoryMode = "0700";
         RuntimeDirectory = "atc-daemon";
+        RuntimeDirectoryMode = "0700";
         # the release binary asks for the standard loader, which NixOS has nowhere else
         BindReadOnlyPaths = [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2:/lib64/ld-linux-x86-64.so.2" ];
         LoadCredential = [

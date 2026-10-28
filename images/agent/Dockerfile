@@ -85,8 +85,8 @@ ENV DISABLE_UPDATES=1
 # own binary in. The sum is atc-linux-x64's line in the release's SHA256SUMS:
 #   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -p atc-linux-x64
 #   sha256sum -c --ignore-missing SHA256SUMS
-ARG ATC_VERSION=7.4.0
-ARG ATC_SHA256=9e55001d7f64acccccfd66a861abf8dd3771d618de17715f21bc98b86b559cf5
+ARG ATC_VERSION=7.5.0
+ARG ATC_SHA256=f4415b7b04d526db1a21b1bce0d23b277c5deb4e4ba393eb97324209674426ac
 RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
       "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
@@ -141,11 +141,17 @@ RUN dir=/root/.local/share/gh/extensions/gh-stack \
 # in the release's SHASUMS256.txt.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
-RUN curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
+# BuildKit stamps each printed line with its time, so the echoes name the part a
+# stalled build stopped in; one RUN keeps the tarball out of the image's layers.
+RUN echo "node: downloading" \
+ && curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
       "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+ && echo "node: downloaded, checking the sum" \
  && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
+ && echo "node: extracting" \
  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
       --exclude='*.md' --exclude=LICENSE \
+ && echo "node: extracted" \
  && rm /tmp/node.tar.xz
 
 # Bun, at each version that a zgeoff repo pins in its .bun-version, so a session
@@ -238,8 +244,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=3.0.1
-ARG AUTO_MODE_SHA256=b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a
+ARG AUTO_MODE_VERSION=3.1.1
+ARG AUTO_MODE_SHA256=79f90632c7117d5c7798f5ca2b429d68e617fde5b6cc83c910c8af816d5114ba
 RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \

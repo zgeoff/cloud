@@ -17,7 +17,6 @@ const tagsSchema = z.strictObject({
   cloud: tagSchema,
   cloudDeploy: tagSchema,
   imp: tagSchema,
-  impE2E: tagSchema,
 });
 
 const nodeSchema = z.strictObject({ address: z.ipv4() });

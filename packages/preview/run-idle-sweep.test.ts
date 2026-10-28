@@ -9,7 +9,6 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { server } from './mocks/node.ts';
 import { runIdleSweep } from './run-idle-sweep.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
@@ -48,7 +47,7 @@ async function setupTest() {
     },
     spendProxies: null,
     store,
-    impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
+    impd: buildImpdClient(impd.url, impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
@@ -190,7 +189,7 @@ test('it logs a failed sweep instead of throwing', async () => {
 
   const deps = {
     ...ctx.deps,
-    impd: buildImpdClient(ctx.impd.url, 'imp_wrong.token', NativeWebSocket),
+    impd: buildImpdClient(ctx.impd.url, 'imp_wrong.token'),
   };
 
   await runIdleSweep(deps);

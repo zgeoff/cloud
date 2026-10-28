@@ -1,6 +1,5 @@
 import { expect, test } from 'bun:test';
 import { z } from 'zod';
-import { NativeWebSocket } from '../mocks/native-web-socket.ts';
 import { startStubImpd } from './start-stub-impd.ts';
 
 test('it answers a procedure in the oRPC envelope, with each date named in meta', async () => {
@@ -376,7 +375,7 @@ test('it runs a guest command opened with a ticket, with both streams, and wakes
 
   const result = z.object({ json: z.object({ ticket: z.string() }) }).parse(issuedBody);
 
-  const socket = new NativeWebSocket(
+  const socket = new WebSocket(
     `${impd.url.replace('http', 'ws')}/exec?ticket=${result.json.ticket}`,
   );
 
@@ -432,7 +431,7 @@ test('it runs a guest command opened with the bearer token', async () => {
 
   impd.answerCommand = () => ({ code: 0, stdout: 'ok\n' });
 
-  const socket = new NativeWebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
+  const socket = new WebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
     headers: { authorization: `Bearer ${impd.token}` },
   });
 
@@ -485,7 +484,7 @@ test('it refuses an exec start whose argv is not a list of strings, and records 
     grants: [],
   });
 
-  const socket = new NativeWebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
+  const socket = new WebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
     headers: { authorization: `Bearer ${impd.token}` },
   });
 
@@ -529,7 +528,7 @@ test('it holds a command open without an exit until its imp is destroyed', async
 
   impd.answerCommand = () => ({ code: null, hold: true });
 
-  const socket = new NativeWebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
+  const socket = new WebSocket(`${impd.url.replace('http', 'ws')}/exec`, {
     headers: { authorization: `Bearer ${impd.token}` },
   });
 
