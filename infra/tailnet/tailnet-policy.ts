@@ -55,7 +55,6 @@ export const tailnetPolicy = {
     // grant gives them
     { src: ['autogroup:member'], dst: ['*'], ip: allButK3sAPI },
 
-    // impd nodes reach each other's API, for moves between hosts
     { src: [tags.imp], dst: [tags.imp], ip: [impAPIPort] },
 
     // the atc gateway on a cloud host → atc's daemon on the PC; last, so adding it
