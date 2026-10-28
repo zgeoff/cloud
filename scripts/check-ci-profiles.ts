@@ -1,0 +1,102 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { findJSONField } from './find-json-field.ts';
+
+export interface CheckCIProfilesOptions {
+  readonly args: readonly string[];
+  readonly readText: (path: string) => Promise<string>;
+  readonly printOut: (text: string) => void;
+  readonly printErr: (text: string) => void;
+}
+
+const usage = 'usage: check-ci-profiles.ts [repo root]\n';
+
+// the checks job's own steps, which run in both profiles and have no twin in the parallel jobs
+const ownSteps = new Set([
+  'run: bun run ci:check-needs',
+  'run: bun run --silent ci:write-ci-pass-name "$RECORD"',
+  'uses: actions/checkout',
+  'uses: oven-sh/setup-bun',
+  'uses: actions/upload-artifact',
+]);
+
+// CI's two profiles run the same checks: the steps of the parallel jobs, which run while the
+// repository is public, and the checks job's steps, which run every check once it is private.
+export async function checkCIProfiles(options: Readonly<CheckCIProfilesOptions>): Promise<number> {
+  if (options.args.length > 1) {
+    options.printErr(usage);
+
+    return 2;
+  }
+
+  const root = options.args[0] ?? '.';
+
+  const text = await options.readText(join(root, '.github', 'workflows', 'ci.yml'));
+
+  const workflow: unknown = Bun.YAML.parse(text);
+  const jobs = findJSONField(workflow, 'jobs');
+  const parallel = collectParallelSteps(jobs);
+  const single = collectSteps(findJSONField(jobs, 'checks')).filter((step) => !ownSteps.has(step));
+
+  const violations = [
+    ...[...new Set(parallel)]
+      .filter((step) => !single.includes(step))
+      .map((step) => `ci.yml: the checks job has no private-profile step for \`${step}\`\n`),
+    ...[...new Set(single)]
+      .filter((step) => !parallel.includes(step))
+      .map((step) => `ci.yml: no parallel job runs the checks job's step \`${step}\`\n`),
+  ];
+
+  if (violations.length > 0) {
+    options.printErr(violations.join(''));
+
+    return 1;
+  }
+
+  options.printOut("check-ci-profiles: the private checks job runs every parallel job's steps\n");
+
+  return 0;
+}
+
+function collectParallelSteps(jobs: unknown): string[] {
+  if (typeof jobs !== 'object' || jobs === null) {
+    return [];
+  }
+
+  return Object.entries(jobs).flatMap((entry: readonly [string, unknown]) =>
+    entry[0] === 'checks' ? [] : collectSteps(entry[1]).filter((step) => !ownSteps.has(step)),
+  );
+}
+
+// a step's identity: its run command, or the action it uses without the pinned ref
+function collectSteps(job: unknown): string[] {
+  const steps = findJSONField(job, 'steps');
+
+  if (!Array.isArray(steps)) {
+    return [];
+  }
+
+  return steps.flatMap((step: unknown) => {
+    const run = findJSONField(step, 'run');
+    const uses = findJSONField(step, 'uses');
+
+    if (typeof run === 'string') {
+      return [`run: ${run.trim()}`];
+    }
+
+    return typeof uses === 'string' ? [`uses: ${uses.split('@')[0] ?? uses}`] : [];
+  });
+}
+
+if (import.meta.main) {
+  process.exitCode = await checkCIProfiles({
+    args: process.argv.slice(2),
+    readText: (path) => readFile(path, 'utf8'),
+    printOut: (text) => {
+      process.stdout.write(text);
+    },
+    printErr: (text) => {
+      process.stderr.write(text);
+    },
+  });
+}

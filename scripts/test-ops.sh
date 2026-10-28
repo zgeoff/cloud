@@ -108,6 +108,24 @@ JSON
   assert_status 0 "$status"
 }
 
+it_nixos_checks_dispatches_a_forced_build_with_force() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  # gh workflow run passes a workflow input with -f; gh help workflow run
+  cat > "$tree/gh-responses" << 'JSON'
+{"argv": ["gh","workflow","run","nixos-checks.yml","-R","zgeoff/cloud","--ref","main","-f","force=true"], "stdout": "https://github.com/zgeoff/cloud/actions/runs/46\n"}
+JSON
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash repo/scripts/ops.sh nixos-checks --force) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/actions/runs/46'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["gh","workflow","run","nixos-checks.yml","-R","zgeoff/cloud","--ref","main","-f","force=true"]'
+  assert_status 0 "$status"
+}
+
 it_preview_runs_the_preview_script_from_the_repo_root_with_its_flags() {
   local status=0
   create_case_tree

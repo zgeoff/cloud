@@ -1,13 +1,18 @@
 name: CI
 
-# The checks run as parallel jobs, so the slowest job sets the run's wall time, not the sum of every
-# check. The decide job runs scripts/run-decide-gates.ts, which decides, from the gates of
+# The layout follows the repository's visibility, as the ci-design skill's two profiles say. While
+# the repository is public, its minutes are free, and the checks run as parallel jobs, so the
+# slowest job sets the run's wall time, not the sum of every check. Once it is private, every job
+# bills at least a minute, so the checks job runs every check as a step, and every other job
+# skips. The decide job, or the checks job's decide step, runs scripts/run-decide-gates.ts, which decides, from the gates of
 # .github/gates.yml, whether the change touches an input of the Go checks and the SDK check, an
 # input of the vendored modules' build, an input of each lane, and any file other than Markdown,
 # which the four Nix-image linters and the shell suites need; each later job or step runs only
 # then. A failed decision leaves the gates empty, so every gated job and step runs, the secret scan
 # included. The checks job needs every other job and passes only when each one passed or its gate
-# skipped it, and the ruleset requires it, so a failed decision or a failed check fails it.
+# skipped it, and the ruleset requires it, so a failed decision or a failed check fails it. A push
+# whose tree and gate base a green pull request run already checked runs no check, and a green
+# pull request run leaves the record that says so (scripts/decide-ci-gates.sh).
 on:
   push:
     branches: [main]
@@ -27,6 +32,7 @@ concurrency:
 
 jobs:
   decide:
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # a push lists CI's green runs on main, which needs read on actions
@@ -42,6 +48,8 @@ jobs:
       files-image: ${{ steps.decide.outputs.files-image }}
       files-backup: ${{ steps.decide.outputs.files-backup }}
       nixie-backup: ${{ steps.decide.outputs.nixie-backup }}
+      alert-rules: ${{ steps.decide.outputs.alert-rules }}
+      reused: ${{ steps.decide.outputs.reused }}
     steps:
       # the full history, for the decision's merge base
       - name: Checkout
@@ -55,7 +63,7 @@ jobs:
           bun-version-file: .bun-version
 
       # a pull request compares its base with the merge commit under test; a push compares main's
-      # last green commit, which it asks the GitHub API for
+      # last green commit, which it asks the GitHub API for, with the records of pull request runs
       - name: Decide which checks the change needs
         id: decide
         env:
@@ -65,12 +73,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: >-
           bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
-          files-image files-backup nixie-backup
+          files-image files-backup nixie-backup alert-rules
 
   # the Bun checks and tests, the shell suites and the secret scan
   bun:
     needs: decide
-    if: ${{ !cancelled() }}
+    if: >-
+      ${{ !cancelled() && !github.event.repository.private && needs.decide.outputs.reused != 'true'
+      }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
@@ -189,8 +199,8 @@ jobs:
   nix-image:
     needs: decide
     if: >-
-      ${{ !cancelled() && (needs.decide.outputs.full != 'false' ||
-      needs.decide.outputs.onidel-vendor != 'false') }}
+      ${{ !cancelled() && !github.event.repository.private && (needs.decide.outputs.full != 'false'
+      || needs.decide.outputs.onidel-vendor != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -223,7 +233,8 @@ jobs:
         run: bun run lint:py
 
       # actionlint, then the check that every run step is setup or one bun run call, then the check
-      # that a push to main cancels main's earlier CI run and never a Deploy prod apply
+      # that a push to main cancels main's earlier CI run and never a Deploy prod apply, the
+      # triggers check, and the check that the private checks job runs every parallel step
       - name: Lint Actions
         if: needs.decide.outputs.full != 'false'
         run: bun run lint:actions
@@ -238,6 +249,10 @@ jobs:
   # the pinned blackbox exporter and promtool in Docker, against the probe and the rules the repo
   # builds, so a body with failing turns fires NixieTurnsFailing and a clear one does not
   test-alert-rules:
+    needs: decide
+    if: >-
+      ${{ !cancelled() && !github.event.repository.private && needs.decide.outputs.alert-rules !=
+      'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -262,7 +277,9 @@ jobs:
   # The lanes: each Docker suite runs only when its gate says the change touches its inputs.
   test-agent-image:
     needs: decide
-    if: ${{ !cancelled() && needs.decide.outputs.agent-image != 'false' }}
+    if: >-
+      ${{ !cancelled() && !github.event.repository.private && needs.decide.outputs.agent-image !=
+      'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -289,8 +306,8 @@ jobs:
   test-atc-gateway-fixture:
     needs: decide
     if: >-
-      ${{ !cancelled() && github.event_name == 'pull_request' && needs.decide.outputs.atc-gateway !=
-      'false' }}
+      ${{ !cancelled() && !github.event.repository.private && github.event_name == 'pull_request' &&
+      needs.decide.outputs.atc-gateway != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -317,8 +334,8 @@ jobs:
   test-backup-fixtures:
     needs: decide
     if: >-
-      ${{ !cancelled() && (needs.decide.outputs.files-backup != 'false' ||
-      needs.decide.outputs.nixie-backup != 'false') }}
+      ${{ !cancelled() && !github.event.repository.private && (needs.decide.outputs.files-backup !=
+      'false' || needs.decide.outputs.nixie-backup != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # the backup images are private GHCR packages, which needs read on packages
@@ -357,7 +374,9 @@ jobs:
   # sdk/onidel
   provider:
     needs: decide
-    if: ${{ !cancelled() && needs.decide.outputs.provider != 'false' }}
+    if: >-
+      ${{ !cancelled() && !github.event.repository.private && needs.decide.outputs.provider !=
+      'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -398,7 +417,9 @@ jobs:
       - name: SDK check
         run: bun run check:sdk
 
-  # the required check: it passes only when every other job passed or its gate skipped it
+  # The required check. While the repository is public, it passes only when every other job passed
+  # or its gate skipped it. Once it is private, the other jobs skip and it runs every check as a
+  # step, each gated as its job is. A green pull request run then records the trees it checked.
   checks:
     needs:
       - decide
@@ -413,12 +434,25 @@ jobs:
     # skipped required check as passed, so it runs and fails on the cancelled jobs instead
     if: ${{ always() }}
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # private: the jobs' steps in one job, the sum of their medians well under the 20 minutes each
+    # parallel job keeps, with room for every lane at once
+    timeout-minutes: ${{ github.event.repository.private && 30 || 5 }}
+    # the private profile's union of the other jobs' permissions: actions: read for the decision,
+    # pull-requests: write for gitleaks, packages: read for the image pins and the backup images
     permissions:
+      actions: read
       contents: read
+      packages: read
+      pull-requests: write
+    env:
+      LEFTHOOK: 0
     steps:
+      # the full history, for the decision's merge base and gitleaks' commit range, and the merge
+      # commit's base, whose tree names the pull request's record
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -426,6 +460,203 @@ jobs:
           bun-version-file: .bun-version
 
       - name: Check every job passed
+        if: ${{ !github.event.repository.private }}
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: bun run ci:check-needs
+
+      # The private profile: the steps of the jobs above, in their order, each gated as its job is.
+      - name: Decide which checks the change needs
+        id: decide
+        if: ${{ github.event.repository.private }}
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          bun run --silent ci:decide-ci-gates provider onidel-vendor full agent-image atc-gateway
+          files-image files-backup nixie-backup alert-rules
+
+      - name: Install
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun install --frozen-lockfile
+
+      - name: Format
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run format:check
+
+      - name: Lint
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run lint:full
+
+      - name: Doc links
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:doc-links
+
+      - name: Doc length and prose
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:doc-length
+
+      - name: Pulumi pins
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:pulumi-pins
+
+      - name: Topology
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:topology
+
+      - name: Image pins
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun run check:image-pins
+
+      - name: Release pins
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:release-pins
+
+      - name: Restore jobs
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:restore-job
+
+      - name: Typecheck
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run typecheck
+
+      - name: Setup Pulumi CLI
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run ci:install-pulumi-cli
+
+      - name: Test
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run test
+
+      - name: Test Health Check
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run test:health-check
+
+      - name: Test Preview
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run test:preview
+
+      - name: Test Files
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run test:files
+
+      - name: Test E2E
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run test:e2e
+
+      - name: Test Scripts
+        if: ${{ github.event.repository.private && steps.decide.outputs.full != 'false' }}
+        run: bun run test:scripts
+
+      - name: Test Files Image
+        if: >-
+          ${{ github.event.repository.private && github.event_name == 'pull_request' &&
+          steps.decide.outputs.files-image != 'false' }}
+        run: bun run test:files-image
+
+      - name: Dead Code
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run deadcode
+
+      - name: Lint shell
+        if: ${{ github.event.repository.private && steps.decide.outputs.full != 'false' }}
+        run: bun run lint:sh
+
+      - name: Lint Nix
+        if: ${{ github.event.repository.private && steps.decide.outputs.full != 'false' }}
+        run: bun run lint:nix
+
+      - name: Lint Python
+        if: ${{ github.event.repository.private && steps.decide.outputs.full != 'false' }}
+        run: bun run lint:py
+
+      - name: Lint Actions
+        if: ${{ github.event.repository.private && steps.decide.outputs.full != 'false' }}
+        run: bun run lint:actions
+
+      - name: Onidel vendor hash
+        if: ${{ github.event.repository.private && steps.decide.outputs.onidel-vendor != 'false' }}
+        run: bun run check:onidel-vendor
+
+      - name: Test Alert Rules
+        if: ${{ github.event.repository.private && steps.decide.outputs.alert-rules != 'false' }}
+        run: bun run test:alert-rules
+
+      - name: Test Agent Image
+        if: ${{ github.event.repository.private && steps.decide.outputs.agent-image != 'false' }}
+        run: bun run test:agent-image
+
+      - name: Test atc Gateway Fixture
+        if: >-
+          ${{ github.event.repository.private && github.event_name == 'pull_request' &&
+          steps.decide.outputs.atc-gateway != 'false' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun run test:atc-gateway-fixture
+
+      - name: Log in to GHCR
+        if: >-
+          ${{ github.event.repository.private && (steps.decide.outputs.files-backup != 'false' ||
+          steps.decide.outputs.nixie-backup != 'false') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun run login:ghcr
+
+      - name: Test Files Backup Fixture
+        if: ${{ github.event.repository.private && steps.decide.outputs.files-backup != 'false' }}
+        run: bun run test:files-backup-fixture
+
+      - name: Test nixie Backup Fixture
+        if: ${{ github.event.repository.private && steps.decide.outputs.nixie-backup != 'false' }}
+        run: bun run test:nixie-backup-fixture
+
+      - name: Setup Go
+        if: >-
+          ${{ github.event.repository.private && steps.decide.outputs.provider != 'false' &&
+          hashFiles('provider/go.mod') != '' }}
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: provider/go.mod
+          cache-dependency-path: |
+            provider/go.sum
+            provider/tools.sum
+
+      - name: Provider checks
+        if: ${{ github.event.repository.private && steps.decide.outputs.provider != 'false' }}
+        run: bun run provider:check
+
+      - name: SDK check
+        if: ${{ github.event.repository.private && steps.decide.outputs.provider != 'false' }}
+        run: bun run check:sdk
+
+      - name: Gitleaks
+        if: >-
+          ${{ !cancelled() && github.event.repository.private && steps.decide.outputs.reused !=
+          'true' }}
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: 8.30.1
+
+      # Both profiles: a green pull request run of this repository records the trees it checked,
+      # which a push of the same tree on the same base reads to skip its checks.
+      - name: Name the trees this run checked
+        id: pass
+        if: >-
+          ${{ success() && github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository }}
+        env:
+          RECORD: ${{ runner.temp }}/ci-pass
+        run: bun run --silent ci:write-ci-pass-name "$RECORD"
+
+      - name: Record the trees as checked
+        if: ${{ success() && steps.pass.outputs.name != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.pass.outputs.name }}
+          path: ${{ runner.temp }}/ci-pass
+          retention-days: 30

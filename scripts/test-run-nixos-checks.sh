@@ -3,7 +3,9 @@
 # in a container of its own, from a snapshot of the tracked and unignored files, every check the
 # flake declares or only the ones named, then builds those derivations in one more container, two
 # builds at a time, each container capped at the CPUs and memory the environment names, and it
-# passes KVM to the build only when the device is there for it. It runs no Nix and no container: git and docker
+# passes KVM to the build only when the device is there for it. With --derivations it writes the
+# sorted derivations and builds nothing, and with a cache that holds a nix-cache-info the build
+# substitutes from it. It runs no Nix and no container: git and docker
 # are stubs that log their argv as JSON lines and exit 97 on a call they do not expect, and each
 # case runs the script under `env -i` with only the variables it sets, KVM_DEVICE among them, so
 # no case depends on the machine's /dev/kvm; the case with a device it may not write runs the

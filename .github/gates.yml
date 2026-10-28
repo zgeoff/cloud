@@ -204,3 +204,21 @@ gates:
       - .bun-version
       - package.json
       - .github/workflows/ci.yml
+
+  # The probes and alert rules in their real engines (Docker): the builders under infra/ and what
+  # they import from the shared constants and the health check's contract, the suites and their
+  # helpers, the script that runs them, the dependencies, and the CI workflow.
+  alert-rules:
+    skipped:
+      Nothing the alert rules and probes build from changed, so their engine tests did not run.
+    paths:
+      - infra/**
+      - packages/topology/**
+      - workers/health-check/**
+      - e2e/test-atc-sign-in-alert-journey.sh
+      - test-support/shell/**
+      - scripts/run-shell-suites.sh
+      - bun.lock
+      - .bun-version
+      - package.json
+      - .github/workflows/ci.yml
