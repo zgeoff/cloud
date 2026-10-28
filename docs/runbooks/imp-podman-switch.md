@@ -89,7 +89,10 @@ Check each of these before you start:
 
    Expect the imp's kernel line. The exec wakes the imp first.
 
-7. Check the listeners on `podman0` from inside imp-host:
+7. Point the broker's two upstream secrets at `podman0`, as
+   [Rebind the upstream secrets](#rebind-the-upstream-secrets) describes.
+
+8. Check the listeners on `podman0` from inside imp-host:
 
    ```bash
    ssh root@geoffcloud podman exec imp-host curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://10.88.0.1:18081/heartbeat < /dev/null
@@ -100,7 +103,7 @@ Check each of these before you start:
    post-switch checks that the bump's pull request lists, a preview boot and a cloud spawn and adopt
    among them.
 
-8. Move nothing else by hand. The switch script moves `deployed/host` once its checks pass.
+9. Move nothing else by hand. The switch script moves `deployed/host` once its checks pass.
 
 ## Roll back to imp 5.0.0
 
@@ -128,7 +131,11 @@ first, as step 2 does, with `podman` in place of `docker`.
 
    Expect `ghcr.io/zgeoff/imp-host:5.0.0@sha256:dd9f3ec3…` and `version 5.0.0`.
 
-3. Revert the bump's pull request on `main` with a pull request of its own. `Deploy prod` then
+3. Point the two upstream secrets back at `docker0`, as
+   [Rebind the upstream secrets](#rebind-the-upstream-secrets) describes, with `docker` in place of
+   `podman` and `172.17.0.1` in place of `10.88.0.1`.
+
+4. Revert the bump's pull request on `main` with a pull request of its own. `Deploy prod` then
    applies the egress-deny NetworkPolicy and nixie's imp config for `docker0` again, and the next
    host switch from `main` keeps imp 5.0.0.
 
@@ -136,3 +143,60 @@ impd's database needs no restore, because imp 6.0.0 ran no migration on it. When
 restore the copy from step 1 of the switch with the 5.0.0 generation's own `restore-impd-db`, as
 [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes, once the
 rollback has run. imp 6's `restore-impd-db` refuses a generation that runs imp-host under Docker.
+
+## Rebind the upstream secrets
+
+impd's database keeps two secrets whose upstream is a listener on imp-host's bridge: `op-connect`
+sends to the Connect relay, and `preview-model-counted` to the preview model route listener. The
+bridge's address is part of each secret's binding, so a move between `docker0` and `podman0` needs a
+rebind. A rebind revokes the secret from every imp and gives it a new generation, so each token's
+grantable list and each grant need the secret named again. The steps below point both at
+`10.88.0.1`. Run them from a machine where `op` reads the `cloud` vault.
+
+1. Record which imps hold each secret, and each token's grantable list:
+
+   ```bash
+   ssh root@geoffcloud podman exec imp-host impz secret ls < /dev/null
+   ssh root@geoffcloud podman exec imp-host impz token ls < /dev/null
+   ```
+
+   Expect `op-connect` and `preview-model-counted` with their old upstream and the imps they are
+   granted to.
+
+2. Rebind `op-connect`, with the token on stdin:
+
+   ```bash
+   op read op://cloud/onepassword-connect-token/credential | ssh root@geoffcloud podman exec -i imp-host \
+     impz secret add op-connect --kind custom --hosts op-connect.imp.internal --header authorization \
+     --scheme bearer --upstream http://10.88.0.1:18081 --replace --rebind
+   ```
+
+   Expect the answer to count the grants it dropped.
+
+3. Rebind `preview-model-counted` the same way:
+
+   ```bash
+   op read op://cloud/nixie-model-credential/credential | ssh root@geoffcloud podman exec -i imp-host \
+     impz secret add preview-model-counted --kind custom --hosts api.anthropic.com --header authorization \
+     --scheme bearer --upstream http://10.88.0.1:18082 --replace --rebind
+   ```
+
+4. Set each token's grantable list from step 1 again, so it names the new generation, for
+   `atc-cloud` and `preview` at least:
+
+   ```bash
+   ssh root@geoffcloud podman exec imp-host impz token set <token_name> --grantable '<grantable_list>' < /dev/null
+   ```
+
+5. Grant `op-connect` again to each imp that step 1 listed for it, with
+   `impz grant <imp_name> op-connect`. Remove each preview imp that held `preview-model-counted`,
+   with `impz rm <imp_name>`: its next boot takes the grant itself.
+
+6. Check the bindings:
+
+   ```bash
+   ssh root@geoffcloud podman exec imp-host impz secret ls < /dev/null
+   ```
+
+   Expect `op-connect.imp.internal -> http://10.88.0.1:18081` and
+   `api.anthropic.com -> http://10.88.0.1:18082`, with the imps from step 5.
