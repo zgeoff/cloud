@@ -101,6 +101,7 @@
     "ci:decide-ci-gates": "bash scripts/decide-ci-gates.sh",
     "ci:check-needs": "bun scripts/check-ci-needs.ts",
     "ci:install-pulumi-cli": "bash scripts/install-pulumi-cli.sh",
+    "ci:load-docker-compose": "docker compose version",
     "ci:publish-atc-gateway-images": "bash scripts/publish-atc-gateway-images.sh",
     "ci:decide-atc-gateway-publish": "bun scripts/release/run-decide-gateway-publish.ts",
     "ci:write-files-image-context": "bash scripts/write-files-image-context.sh",

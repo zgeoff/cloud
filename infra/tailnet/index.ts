@@ -55,7 +55,7 @@ function createHostKey(policy: Acl): TailnetKey {
 
 function createImpKeySync(policy: Acl): Command {
   // Tailscale's 90-day maximum expiry; an apply after expiry mints a fresh one, which Pulumi writes
-  // into op://cloud/imp-tailscale-authkey. impz's scripts never read it: they join as tag:imp-e2e.
+  // into op://cloud/imp-tailscale-authkey.
   const impKey = new TailnetKey(
     'imp',
     {

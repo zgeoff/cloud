@@ -20,14 +20,13 @@ visible change to the test as well.
 A tagged node holds only what a grant gives it, while a member's device reaches every device on any
 port except the host's k3s API.
 
-| Identity           | Holder                                        | Reaches                                                                     |
-| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------- |
-| a member's device  | the owner's devices, the PC among them        | every device on any port but the host's k3s API; the host's HTTPS for nixie |
-| the PC (`home-pc`) | the owner's WSL node, where Pulumi runs       | the host's k3s API, beside a member's reach                                 |
-| `tag:cloud`        | the host's node, and through it every pod     | the PC's atc daemon; impd's node for HTTPS                                  |
-| `tag:imp`          | impd's node on the host                       | other `tag:imp` nodes' API                                                  |
-| `tag:imp-e2e`      | impz's end-to-end and dev nodes; impz owns it | other `tag:imp-e2e` nodes' API only                                         |
-| `tag:cloud-deploy` | the prod apply job's ephemeral runner node    | the host's k3s API only                                                     |
+| Identity           | Holder                                     | Reaches                                                                     |
+| ------------------ | ------------------------------------------ | --------------------------------------------------------------------------- |
+| a member's device  | the owner's devices, the PC among them     | every device on any port but the host's k3s API; the host's HTTPS for nixie |
+| the PC (`home-pc`) | the owner's WSL node, where Pulumi runs    | the host's k3s API, beside a member's reach                                 |
+| `tag:cloud`        | the host's node, and through it every pod  | the PC's atc daemon; impd's node for HTTPS                                  |
+| `tag:imp`          | impd's node on the host                    | other `tag:imp` nodes' API                                                  |
+| `tag:cloud-deploy` | the prod apply job's ephemeral runner node | the host's k3s API only                                                     |
 
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the tailnet
 sees the cluster as a whole as `tag:cloud`, and only the cluster's own egress policies narrow which
@@ -57,9 +56,9 @@ The host is the only `tag:cloud` node, so that grant lists member devices and th
 owner runs kubectl by hand on the host over Tailscale SSH, which needs no grant to the API port.
 
 impd's nodes reach each other's API only, which is what lets impd move an imp between hosts and
-nothing more. The end-to-end nodes reach each other and never a `tag:imp` node, so a test run can
-never touch a live impd. They join with keys from an OAuth client of their own, which can mint keys
-for that tag alone ([the imp e2e runbook](../../runbooks/imp-e2e-tailnet.md)).
+nothing more. imp's end-to-end suites run on tailnets that hold no production service, so the policy
+holds no tag and no grant for a test node, and a test run never reaches a live impd
+([imp's e2e nodes](../../runbooks/imp-e2e-tailnet.md)).
 
 The prod apply job's runner joins for one run as `tag:cloud-deploy`, through a federated identity
 that GitHub's token for the job proves, so no key for it is stored anywhere. The runner holds
