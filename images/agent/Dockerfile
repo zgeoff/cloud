@@ -244,8 +244,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=3.0.1
-ARG AUTO_MODE_SHA256=b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a
+ARG AUTO_MODE_VERSION=3.1.1
+ARG AUTO_MODE_SHA256=79f90632c7117d5c7798f5ca2b429d68e617fde5b6cc83c910c8af816d5114ba
 RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
