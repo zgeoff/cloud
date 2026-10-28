@@ -22,7 +22,7 @@ server.events.on('request:unhandled', (event) => {
 void NativeWebSocket;
 
 // the only real traffic is loopback, to a test's stub impd through its own passthrough()
-server.listen({ onUnhandledRequest: 'error' });
+server.listen({ onUnhandledFrame: 'error' });
 
 afterEach(() => {
   server.resetHandlers();

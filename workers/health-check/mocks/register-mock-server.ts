@@ -13,7 +13,7 @@ server.events.on('request:unhandled', (event) => {
 
 // the only real traffic is loopback: the worker test's per-test passthrough() to
 // 127.0.0.1:1, a port where nothing listens; every other request goes to a handler
-server.listen({ onUnhandledRequest: 'error' });
+server.listen({ onUnhandledFrame: 'error' });
 
 afterEach(() => {
   server.resetHandlers();
