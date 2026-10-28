@@ -110,7 +110,8 @@ jobs:
         if: steps.build.outputs.needed == 'true'
         run: bun run --silent ci:open-kvm
 
-      # capped at a private repo's standard runner (2 CPUs, 8 GB, of which the runner itself
+      # the derivations the listing step evaluated, so the flake is not evaluated twice; capped at a
+      # private repo's standard runner (2 CPUs, 8 GB, of which the runner itself
       # takes about 1 GB), so the checks keep passing once the repo goes private
       - name: NixOS checks
         if: steps.build.outputs.needed == 'true'
@@ -118,7 +119,8 @@ jobs:
           NIXOS_CHECKS_CPUS: '0-1'
           NIXOS_CHECKS_MEMORY: 7g
           NIXOS_CHECKS_CACHE: ${{ runner.temp }}/nixos-checks-cache
-        run: bun run test:nixos
+          DERIVATIONS: ${{ runner.temp }}/nixos-check-derivations
+        run: bun run test:nixos --from-derivations "$DERIVATIONS"
 
       # the record a later run with the same key finds, so it skips the build
       - name: Record the derivations as built

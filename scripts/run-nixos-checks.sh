@@ -5,9 +5,12 @@
 #   bash scripts/run-nixos-checks.sh            # every check in checks.x86_64-linux
 #   bash scripts/run-nixos-checks.sh atc-daemon # one check, by its name there
 #   bash scripts/run-nixos-checks.sh --derivations <file> [check…]
+#   bash scripts/run-nixos-checks.sh --from-derivations <file>
 #
 # --derivations evaluates the checks and writes their derivation paths to <file>, sorted, one per
-# line, and builds nothing, so it needs no KVM. NIXOS_CHECKS_CACHE names a local binary cache
+# line, and builds nothing, so it needs no KVM. --from-derivations builds the derivations such a
+# file lists, from the store volume that evaluated them, without evaluating the flake again; it
+# needs KVM, since it cannot tell which derivation boots a VM. NIXOS_CHECKS_CACHE names a local binary cache
 # (scripts/write-nixos-checks-cache.sh writes one): when it holds a nix-cache-info, the build
 # substitutes from it, unsigned, before it builds a path itself.
 #
@@ -29,17 +32,74 @@ set -euo pipefail
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
+usage="usage: run-nixos-checks.sh [--derivations <file>] [check…] | --from-derivations <file>"
 derivations_out=""
-if [ "${1:-}" = --derivations ]; then
-  if [ -z "${2:-}" ]; then
-    echo "usage: run-nixos-checks.sh [--derivations <file>] [check…]" >&2
-    exit 2
-  fi
-  derivations_out="$2"
-  shift 2
-fi
+derivations_in=""
+case "${1:-}" in
+  --derivations)
+    if [ -z "${2:-}" ]; then
+      echo "$usage" >&2
+      exit 2
+    fi
+    derivations_out="$2"
+    shift 2
+    ;;
+  --from-derivations)
+    if [ "$#" -ne 2 ] || [ ! -s "$2" ]; then
+      echo "$usage" >&2
+      exit 2
+    fi
+    derivations_in="$2"
+    shift 2
+    ;;
+esac
 
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
+kvm_device="${KVM_DEVICE:-/dev/kvm}"
+
+# NIXOS_CHECKS_CPUS (a docker --cpuset-cpus list, such as 0-1) and NIXOS_CHECKS_MEMORY (a docker
+# size, such as 7g, with swap off) cap the Nix container, so a bigger runner can prove the checks
+# fit a smaller one; CI sets them to a 2 CPU / 8 GB runner's share
+limits=()
+if [ -n "${NIXOS_CHECKS_CPUS:-}" ]; then
+  limits+=(--cpuset-cpus "$NIXOS_CHECKS_CPUS")
+fi
+if [ -n "${NIXOS_CHECKS_MEMORY:-}" ]; then
+  limits+=(--memory "$NIXOS_CHECKS_MEMORY" --memory-swap "$NIXOS_CHECKS_MEMORY")
+fi
+
+run_nix() {
+  docker run --rm --network host "${limits[@]}" "$@"
+}
+
+nix_args=(--extra-experimental-features "nix-command flakes")
+
+# build_derivations <file> [docker option…]: builds every derivation the file lists, two at a time:
+# each restore rehearsal boots a 2048 MB VM, so two of them fit in 7 GB beside Nix, where all four
+# would not. The cache's directory is mounted writable, because nix creates its missing folders on
+# open.
+build_derivations() {
+  local list="$1" cache=() outputs
+  shift
+  if [ -n "${NIXOS_CHECKS_CACHE:-}" ] && [ -f "$NIXOS_CHECKS_CACHE/nix-cache-info" ]; then
+    cache=(-v "$NIXOS_CHECKS_CACHE":/cache)
+    nix_args+=(--option extra-substituters 'file:///cache?trusted=true')
+  fi
+  mapfile -t outputs < <(sed 's/$/^*/' "$list")
+  run_nix "$@" "${cache[@]}" -v "$volume":/nix "$NIX_IMAGE" \
+    nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
+    --max-jobs 2 build --no-link -L "${outputs[@]}"
+}
+
+if [ -n "$derivations_in" ]; then
+  if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
+    echo "run-nixos-checks: $kvm_device is missing or not readable and writable; --from-derivations needs KVM" >&2
+    exit 1
+  fi
+  build_derivations "$derivations_in" --device "$kvm_device:/dev/kvm"
+  exit 0
+fi
+
 repo="$(git rev-parse --show-toplevel)"
 snapshot="$(mktemp -d)"
 derivations="$(mktemp)"
@@ -58,22 +118,6 @@ git -C "$repo" ls-files -z --cached --others --exclude-standard --deduplicate |
   done |
   tar -C "$repo" --null -T - -cf - | tar -C "$snapshot" -xf -
 
-# NIXOS_CHECKS_CPUS (a docker --cpuset-cpus list, such as 0-1) and NIXOS_CHECKS_MEMORY (a docker
-# size, such as 7g, with swap off) cap the Nix container, so a bigger runner can prove the checks
-# fit a smaller one; CI sets them to a 2 CPU / 8 GB runner's share
-limits=()
-if [ -n "${NIXOS_CHECKS_CPUS:-}" ]; then
-  limits+=(--cpuset-cpus "$NIXOS_CHECKS_CPUS")
-fi
-if [ -n "${NIXOS_CHECKS_MEMORY:-}" ]; then
-  limits+=(--memory "$NIXOS_CHECKS_MEMORY" --memory-swap "$NIXOS_CHECKS_MEMORY")
-fi
-
-run_nix() {
-  docker run --rm --network host "${limits[@]}" "$@"
-}
-
-nix_args=(--extra-experimental-features "nix-command flakes")
 if [ "$#" -gt 0 ]; then
   checks=("$@")
 else
@@ -93,7 +137,6 @@ else
 fi
 
 # the restore rehearsals' VMs need KVM; the other checks build without it
-kvm_device="${KVM_DEVICE:-/dev/kvm}"
 kvm=()
 missing_kvm=()
 installables=()
@@ -102,8 +145,8 @@ for check in "${checks[@]}"; do
     impd-restore | impd-restore-* | tank-cloud-unlock | tank-cloud-host-secrets | tank-cloud-rancher | \
       imp-dataset-key | geoffcloud-no-pool | network-policy | imp-cpu-weight | host-cgroup-cpu-vm | \
       drift-check-vm | public-front-vm | atc-daemon-vm)
-      # QEMU opens the device read-write, and falls back to emulation when it cannot
-      # an evaluation alone needs no KVM
+      # QEMU opens the device read-write, and falls back to emulation when it cannot; an
+      # evaluation alone needs no KVM
       if [ -z "$derivations_out" ] && { [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; }; then
         missing_kvm+=("$check")
         continue
@@ -118,8 +161,7 @@ done
 # built in another: a nix keeps the heap of everything it evaluated until it exits, and one that
 # evaluated every check held about 5.5 GB. As the build's nix, it left the VMs too little of the
 # 7 GB cap, and the kernel killed it (GEO-937); even alone, it reached the cap. One check's heap
-# is far smaller, and the build's nix reads only the store. Two builds at once: each restore
-# rehearsal boots a 2048 MB VM, so two of them fit in 7 GB beside Nix, where all four would not
+# is far smaller, and the build's nix reads only the store.
 if [ "${#installables[@]}" -gt 0 ]; then
   for installable in "${installables[@]}"; do
     run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
@@ -129,16 +171,7 @@ if [ "${#installables[@]}" -gt 0 ]; then
     LC_ALL=C sort "$derivations" > "$derivations_out"
     exit 0
   fi
-  # the cache's directory is mounted writable, because nix creates its missing folders on open
-  cache=()
-  if [ -n "${NIXOS_CHECKS_CACHE:-}" ] && [ -f "$NIXOS_CHECKS_CACHE/nix-cache-info" ]; then
-    cache=(-v "$NIXOS_CHECKS_CACHE":/cache)
-    nix_args+=(--option extra-substituters 'file:///cache?trusted=true')
-  fi
-  mapfile -t outputs < <(sed 's/$/^*/' "$derivations")
-  run_nix "${kvm[@]}" "${cache[@]}" -v "$volume":/nix "$NIX_IMAGE" \
-    nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
-    --max-jobs 2 build --no-link -L "${outputs[@]}"
+  build_derivations "$derivations" "${kvm[@]}"
 fi
 
 if [ "${#missing_kvm[@]}" -eq 1 ]; then
