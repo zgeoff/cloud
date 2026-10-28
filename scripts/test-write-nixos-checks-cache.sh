@@ -3,7 +3,7 @@
 # (test-support/shell/create-stub-checks-docker.sh), which answers the closure query and the
 # path-info from files each case writes and copies paths into a cache folder as narinfo files, it
 # caches and lists the closure's outputs that cache.nixos.org did not sign, leaves the derivations
-# out, writes saved=false for paths the restored cache already lists and for a cache over its cap,
+# out, puts the new cache in place of the restored one, writes saved=false for paths the restored cache already lists and for a cache over its cap,
 # and refuses a folder that already exists. Each case runs the script under `env -i` and compares
 # its whole stdout, stderr, GITHUB_OUTPUT, cache folder and docker call log.
 #
@@ -39,6 +39,10 @@ EOF
  "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-glibc":{"narHash":"sha256-6bxJTBkLnsFj4K3gXHcI8ZAxwSKfgD6cTUHlwmpTVSs=","narSize":240,"references":[],"signatures":["cache.nixos.org-1:c2lnbmF0dXJl"],"ultimate":false},
  "/nix/store/cccccccccccccccccccccccccccccccc-lantern-check":{"narHash":"sha256-ANwP7nl3mMsVNAy23Y3qgNEDqHddtM4jDRVJhyOsnyk=","narSize":360,"references":["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern-kernel","/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-glibc"],"signatures":null,"ultimate":false}}
 EOF
+  # an older cache, restored where actions/cache restores it
+  mkdir "$tree/restored"
+  printf '/nix/store/dddddddddddddddddddddddddddddddd-lantern-kernel\n' > "$tree/restored/paths"
+  printf 'StorePath: /nix/store/dddddddddddddddddddddddddddddddd-lantern-kernel\n' > "$tree/restored/dddddddddddddddddddddddddddddddd.narinfo"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_CLOSURE="$tree/closure" STUB_PATH_INFO="$tree/path-info" GITHUB_OUTPUT="$tree/output" \
@@ -48,11 +52,12 @@ EOF
   diff - "$tree/out-masked" <<< 'The cache holds 2 paths in SIZE MB.'
   diff /dev/null "$tree/err"
   diff - "$tree/output" <<< 'saved=true'
-  diff - "$tree/cache/paths" << 'EOF'
+  test ! -e "$tree/cache"
+  diff - "$tree/restored/paths" << 'EOF'
 /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern-kernel
 /nix/store/cccccccccccccccccccccccccccccccc-lantern-check
 EOF
-  ls -A "$tree/cache" > "$tree/cache-files"
+  ls -A "$tree/restored" > "$tree/cache-files"
   diff - "$tree/cache-files" << 'EOF'
 aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.narinfo
 cccccccccccccccccccccccccccccccc.narinfo

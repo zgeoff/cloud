@@ -82,7 +82,7 @@ build_derivations() {
   local list="$1" cache=() outputs
   shift
   if [ -n "${NIXOS_CHECKS_CACHE:-}" ] && [ -f "$NIXOS_CHECKS_CACHE/nix-cache-info" ]; then
-    cache=(-v "$NIXOS_CHECKS_CACHE":/cache)
+    cache=(-v "$NIXOS_CHECKS_CACHE":/cache:ro)
     nix_args+=(--option extra-substituters 'file:///cache?trusted=true')
   fi
   mapfile -t outputs < <(sed 's/$/^*/' "$list")

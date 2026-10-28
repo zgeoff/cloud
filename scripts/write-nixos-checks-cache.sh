@@ -4,7 +4,9 @@
 # closure of the derivations that <derivations> lists which the store volume holds and
 # cache.nixos.org did not sign: the paths this runner built, or took from the cache it restored.
 # The next run fetches the signed ones from cache.nixos.org itself. It lists those paths in
-# <dir>/paths, and writes `saved=true` to GITHUB_OUTPUT. It writes `saved=false` when the paths are
+# <dir>/paths, moves <dir> to <restored> in place of the cache restored there, and writes
+# `saved=true` to GITHUB_OUTPUT: actions/cache matches a saved cache only to a restore of the same
+# path, so the next run restores it at <restored>. It writes `saved=false` when the paths are
 # the ones <restored>/paths lists, so an unchanged cache is not saved again, or when <dir> outgrows
 # NIXOS_CHECKS_CACHE_MAX_MB megabytes (default 3072), the cap that keeps one cache within the
 # repository's Actions cache storage; it says why on stdout.
@@ -71,5 +73,8 @@ if [ "$size_mb" -gt "$max_mb" ]; then
   echo "The cache came to $size_mb MB, over its cap of $max_mb MB, so it was not saved."
   exit 0
 fi
+count="$(wc -l < "$dir/paths")"
+rm -rf "$restored"
+mv "$dir" "$restored"
 echo "saved=true" >> "$GITHUB_OUTPUT"
-echo "The cache holds $(wc -l < "$dir/paths") paths in $size_mb MB."
+echo "The cache holds $count paths in $size_mb MB."
