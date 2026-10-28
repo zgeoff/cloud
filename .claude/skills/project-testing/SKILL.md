@@ -21,7 +21,8 @@ provider and the NixOS checks each have a reference.
 ## Key rules
 
 - [Suites and where they run](#suites-and-where-they-run): CI calls a root package script, the
-  `nixos` job never runs on a person's PR, and every case is hermetic.
+  `nixos` job runs on a PR that changes its inputs but never gates the merge, and every case is
+  hermetic.
 - [No test reaches a real host](#no-test-reaches-a-real-host): fail-closed stand-ins for every
   remote tool, handing off to the real one only on loopback.
 - [infra (TypeScript)](#infra-typescript): units are pure builders and validators, tested with full
