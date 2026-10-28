@@ -33,6 +33,9 @@ it_skips_the_build_and_names_the_run_that_built_the_same_derivations() {
   local commit status=0
   create_case_tree
   setup_test "$tree"
+  echo '# lantern' > "$tree/repo/README.md"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern readme'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
   # the artifacts endpoint of GitHub's REST docs (actions/artifacts, list artifacts for a
@@ -68,6 +71,9 @@ it_needs_the_build_when_no_run_built_the_same_derivations() {
   local commit status=0
   create_case_tree
   setup_test "$tree"
+  echo '# lantern' > "$tree/repo/README.md"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern readme'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
   # no artifact holds the name: the --jq filter prints nothing
@@ -101,6 +107,9 @@ it_needs_the_build_without_asking_gh_when_a_dispatch_forces_it() {
   local commit status=0
   create_case_tree
   setup_test "$tree"
+  echo '# lantern' > "$tree/repo/README.md"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern readme'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
 
@@ -126,6 +135,9 @@ it_keys_the_same_derivations_alike_when_only_a_file_outside_the_build_differs() 
   create_case_tree
   setup_test "$tree"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
+  echo 'echo build' > "$tree/repo/scripts/run-nixos-checks.sh"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the build script'
   first="$(git -C "$tree/repo" rev-parse HEAD)"
   echo '# lantern' > "$tree/repo/README.md"
   git -C "$tree/repo" add -A
@@ -148,6 +160,9 @@ it_keys_the_same_derivations_apart_when_a_build_script_differs() {
   create_case_tree
   setup_test "$tree"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
+  echo 'echo build' > "$tree/repo/scripts/run-nixos-checks.sh"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the build script'
   first="$(git -C "$tree/repo" rev-parse HEAD)"
   echo 'echo two builds at once' >> "$tree/repo/scripts/run-nixos-checks.sh"
   git -C "$tree/repo" commit -qam 'change the build'
@@ -168,6 +183,9 @@ it_keys_other_derivations_apart() {
   local commit
   create_case_tree
   setup_test "$tree"
+  echo '# lantern' > "$tree/repo/README.md"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern readme'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations-a"
   printf '/nix/store/11111111111111111111111111111111-atc-daemon.drv\n' > "$tree/derivations-b"
@@ -187,6 +205,9 @@ it_fails_with_the_gh_error_and_writes_no_answer_when_gh_fails() {
   local commit status=0
   create_case_tree
   setup_test "$tree"
+  echo '# lantern' > "$tree/repo/README.md"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern readme'
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 1 for a failed
@@ -210,14 +231,13 @@ it_fails_with_the_gh_error_and_writes_no_answer_when_gh_fails() {
 }
 
 it_fails_with_its_usage_when_the_derivations_file_is_empty() {
-  local commit status=0
+  local status=0
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   : > "$tree/derivations"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA=1111111111111111111111111111111111111111 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -230,8 +250,8 @@ it_fails_with_its_usage_when_the_derivations_file_is_empty() {
 }
 
 # setup_test <tree>: the gh stand-in in <tree>/bin, the home and temp folders the script runs
-# with, the empty files the workflow's runner provides, and <tree>/repo, a repository with one
-# commit that holds a build script.
+# with, the empty files the workflow's runner provides, and <tree>/repo, a repository with no
+# commit yet.
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp" "$tree/repo/scripts"
@@ -244,10 +264,6 @@ setup_test() {
   # no auto maintenance: a commit's detached repack could still write into the repository while
   # the case's trap removes it
   git -C "$tree/repo" config maintenance.auto false
-  # boot data: a build script, so the key reads a blob that a later commit can change
-  echo 'echo build' > "$tree/repo/scripts/run-nixos-checks.sh"
-  git -C "$tree/repo" add -A
-  git -C "$tree/repo" commit -qm 'add the build script'
 }
 
 run_cases
