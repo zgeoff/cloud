@@ -62,7 +62,7 @@ export async function runBoundedProcess(
       .filter(([, tracked]) => !tracked.isSettled())
       .map(([part]) => part);
 
-    const group = await deps.readGroup(child.pid);
+    const group = await readGroupListing(deps, child.pid);
 
     deps.killGroup(child.pid);
 
@@ -104,4 +104,20 @@ function readStreamText(stream: ReadableStream<Uint8Array>) {
   );
 
   return { ...reading, read: () => text };
+}
+
+const groupListingTimeoutMs = 1000;
+
+// the listing only describes the timeout, so its failure or hang must never hold back the kill
+async function readGroupListing(deps: BoundedProcessDeps, pid: number): Promise<string> {
+  try {
+    const listing = await Promise.race([
+      deps.readGroup(pid),
+      deps.sleep(groupListingTimeoutMs).then(() => null),
+    ]);
+
+    return listing ?? `(the listing did not finish within ${String(groupListingTimeoutMs)} ms)\n`;
+  } catch (error) {
+    return `(the listing failed: ${error instanceof Error ? error.message : String(error)})\n`;
+  }
 }
