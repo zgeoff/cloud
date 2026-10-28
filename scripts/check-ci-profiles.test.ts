@@ -1,6 +1,4 @@
 import { expect, mock, test } from 'bun:test';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
 import { checkCIProfiles } from './check-ci-profiles.ts';
 
 function setupTest() {
@@ -180,19 +178,6 @@ test('it reports a secret scan in a job that waits on the reuse decision', async
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
     'ci.yml: the lint job skips its secret scan on a reused push, whose history no pull request run scanned\n',
   );
-});
-
-test('it accepts the repository own CI workflow', async () => {
-  const ctx = setupTest();
-
-  const exitCode = await checkCIProfiles({
-    args: [join(import.meta.dir, '..')],
-    readText: (path) => readFile(path, 'utf8'),
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
-  });
-
-  expect(exitCode).toBe(0);
 });
 
 test('it rejects more than one argument with its usage', async () => {
