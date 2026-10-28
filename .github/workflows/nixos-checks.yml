@@ -46,6 +46,11 @@ concurrency:
 
 jobs:
   nixos:
+    # a Renovate pull request bumps a dependency that the nightly run checks; a release bump's
+    # pull request still runs, since an atc bump once broke the daemon with no run before it merged
+    if:
+      github.event_name != 'pull_request' || github.event.pull_request.user.login !=
+      'zgeoff-renovate[bot]'
     runs-on: ubuntu-latest
     # twice the checks' 60-minute test budget plus the job's median 0.13 minutes outside them,
     # rounded up; the budget holds every measured run, the slowest at 58.4 minutes
