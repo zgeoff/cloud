@@ -86,9 +86,9 @@ docs/
 - Never write to `/dev/vdb` on the host directly. It holds the ZFS pool `tank`, which holds imp's
   data. ZFS commands on `tank`, such as `zpool trim tank`, are fine.
 - The host's firewall is NixOS's table `inet nixos-fw`, plus `inet cloud_host` for the atc daemon's
-  port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and netavark (Podman)
-  add their own tables. imp's `inet imp_egress` lives inside the imp-host container. Never
-  `flush ruleset`, and keep `networking.nftables.flushRuleset` off.
+  port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and Docker add their own
+  tables. imp's `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and
+  keep `networking.nftables.flushRuleset` off.
 - Tailscale SSH logs each session's full remote command line in `tailscaled.service`'s journal, and
   Alloy ships the host journal to Loki. So never put a secret in the command line of an SSH session
   to the host, including the `kubectl` arguments and inline scripts it runs. Send the secret on
