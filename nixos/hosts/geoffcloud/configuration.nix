@@ -517,7 +517,7 @@ in
     # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
-    # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
+    # the imp-base release that images/agent/Dockerfile builds on; the imp release pin moves both
     impRegistryImage = "ghcr.io/zgeoff/imp-base:6.0.1@sha256:17643ce183c6ce3d4346651b75e804070b7b7e3743f59354a989ece5434bf2e0";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";

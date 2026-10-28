@@ -209,7 +209,8 @@ To switch before the nightly run covers the commit:
 
 ## Upgrade imp
 
-imp is pinned in three places, and `scripts/pin-imp.sh` moves all three together:
+imp is pinned in three places, and the imp release pin moves all three together, in a bump pull
+request or [by hand](./release-check.md#pin-a-release-by-hand):
 
 | Pin                  | File                                                                                                                   |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
