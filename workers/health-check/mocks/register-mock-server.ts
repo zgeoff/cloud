@@ -29,6 +29,4 @@ afterEach(() => {
   }
 });
 
-afterAll(() => {
-  server.disable();
-});
+afterAll(() => server.disable());
