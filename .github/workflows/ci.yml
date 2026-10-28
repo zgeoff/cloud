@@ -147,7 +147,7 @@ jobs:
       # the Docker CLI's first run reads the Compose plugin's binary from the runner's cold disk,
       # which has outlasted the preview suite's bound on its compose call; this run reads it first
       - name: Load Docker Compose
-        run: docker compose version
+        run: bun run ci:load-docker-compose
 
       - name: Test Preview
         run: bun run test:preview
