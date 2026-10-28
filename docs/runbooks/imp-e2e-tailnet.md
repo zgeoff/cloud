@@ -1,49 +1,31 @@
-# imp's e2e nodes on the tailnet
+# imp's e2e nodes
 
-impz owns the tag `tag:imp-e2e`. Its `tailscale` and `moves-tailnet` e2e suites, and its dev
-instances that read 1Password, join throwaway impd nodes to the tailnet as `tag:imp-e2e`. impz's
-[e2e tailnet runbook](https://github.com/zgeoff/impz/blob/main/docs/runbooks/e2e-tailnet.md) states
-the tag's owner and grant that its tests rely on, so a change to either in this repo's policy starts
-there. The policy (`infra/tailnet/tailnet-policy.ts`) lets those nodes reach only each other on
-tcp 7070. No grant takes them to `tag:imp`, so a test run cannot reach a live impd such as
-`imp-geoffcloud`. Tracked as GEO-228.
+imp's end-to-end suites run off the production tailnet, so the production policy
+(`infra/tailnet/tailnet-policy.ts`) holds no tag and no grant for a test node. The tailscale, egress
+and moves-tailnet suites run on a Headscale control server in a container of the run's own. The
+tailnet-names suite runs on a test tailnet, a Tailscale tailnet that holds no production service.
+impz's [e2e tailnet runbook](https://github.com/zgeoff/impz/blob/main/docs/runbooks/e2e-tailnet.md)
+owns both tailnets and their policies. The 1Password vault `imp-e2e` holds the test tailnet's OAuth
+clients and no credential of the production tailnet.
 
-## What holds what
+A dev instance started with `IMP_TAILSCALE_OP=1` asks the production tailnet for a key that carries
+`tag:imp-e2e`. The production policy gives that tag no owner, so no OAuth client can mint the key,
+and the dev instance never joins the production tailnet.
 
-| Where                                           | Holds                                                            |
-| ----------------------------------------------- | ---------------------------------------------------------------- |
-| the tailnet policy (Pulumi)                     | the tag `tag:imp-e2e`, owned by admins and itself; its one grant |
-| the OAuth client `imp-e2e` (made by hand)       | scope `auth_keys` only, tag `tag:imp-e2e` only                   |
-| vault `imp-e2e`, item `imp-e2e-tailscale-oauth` | the client's `client-id` and `client-secret`                     |
+## Check the production tailnet
 
-imp's e2e harness passes the client secret to `tailscale up` as the auth key, with
-`?ephemeral=true&preauthorized=true` and `--advertise-tags=tag:imp-e2e`. Each node is ephemeral, so
-Tailscale removes it soon after it goes offline.
+1. Run the policy's tests from a clean checkout of `main`:
 
-## Why the client is made by hand
+   ```bash
+   bun test infra/tailnet/tailnet-policy.test.ts
+   ```
 
-Pulumi's own OAuth client (`op://cloud/tailscale-oauth`) has the scopes `devices:core`,
-`devices:core:read`, `devices:posture_attributes`, `policy_file`, `dns` and `auth_keys`. It has no
-`oauth_keys` scope, so it cannot create an OAuth client: the API answers `404 not found` to a
-`keyType: "client"` request (checked 2026-10-10). The pinned provider (`@pulumi/tailscale` 0.29.1)
-has an `OauthClient` resource, but it would need that wider credential. A hand-made client also
-keeps its secret out of this public repo's Pulumi state.
+   Expect every test to pass. The first test pins the whole policy, and its tag owners hold no
+   `tag:imp-e2e`.
 
-## Create or replace the client
-
-1. Apply the policy first, so `tag:imp-e2e` exists.
 2. In the Tailscale admin console's
-   [trust credentials](https://console.tailscale.com/admin/settings/trust-credentials), add a
-   credential of type OAuth: description `imp-e2e`, scope **Auth Keys** (write) only, tag
-   `tag:imp-e2e` only.
-3. Store the client ID and secret in the vault `imp-e2e`, item `imp-e2e-tailscale-oauth`, fields
-   `client-id` and `client-secret`. Never paste the secret into a terminal command line. The vault
-   `imp` is a different vault: imps read it through 1Password Connect.
-4. Revoke the old client, if any, in the same console page.
-
-The secret does not expire. Replace it when it may have leaked.
-
-## Check the isolation
-
-From a `tag:imp-e2e` node, `tailscale ping imp-geoffcloud` must fail: the policy gives the node no
-route to it. imp's e2e PR for GEO-228 records that output.
+   [access controls](https://console.tailscale.com/admin/acls/file), search the live policy file for
+   `imp-e2e`. Expect no match.
+3. In the admin console's
+   [trust credentials](https://console.tailscale.com/admin/settings/trust-credentials), look for an
+   OAuth client with the description `imp-e2e`. Expect none.

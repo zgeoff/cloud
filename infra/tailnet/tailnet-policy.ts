@@ -46,11 +46,6 @@ export const tailnetPolicy = {
     [tags.cloud]: ['autogroup:admin', tags.cloud],
     [tags.imp]: ['autogroup:admin', tags.imp],
 
-    // impz's tag: change it only with impz's docs/runbooks/e2e-tailnet.md. Owns itself, so
-    // the e2e OAuth client (tag:imp-e2e) may mint keys for it; no other tag owns it, and it
-    // owns no other tag
-    [tags.impE2E]: ['autogroup:admin', tags.impE2E],
-
     // the prod apply job's runner, an ephemeral node that joins through the deploy workflow's
     // federated identity (tag:cloud-deploy); owns itself, so that identity may mint keys for it
     [tags.cloudDeploy]: ['autogroup:admin', tags.cloudDeploy],
@@ -60,7 +55,7 @@ export const tailnetPolicy = {
     // grant gives them
     { src: ['autogroup:member'], dst: ['*'], ip: allButK3sAPI },
 
-    // impd nodes reach each other's API: moves between hosts and imp's two-node e2e
+    // impd nodes reach each other's API, for moves between hosts
     { src: [tags.imp], dst: [tags.imp], ip: [impAPIPort] },
 
     // the atc gateway on a cloud host → atc's daemon on the PC; last, so adding it
@@ -70,11 +65,6 @@ export const tailnetPolicy = {
     // the cluster's probe of imp's /health → imp's node, 443 only; last, so
     // adding it shifts no other grant
     { src: [tags.cloud], dst: [impHostname], ip: [`tcp:${impNode.httpsPort}`] },
-
-    // impz's e2e and dev nodes reach each other's API only, for the two-node moves suite;
-    // no grant takes them to tag:imp. impz's tests rely on it as written. Last, so adding it
-    // shifts no other grant
-    { src: [tags.impE2E], dst: [tags.impE2E], ip: [impAPIPort] },
 
     // members → nixie's web client and API on the host's 443. The first grant already covers it;
     // this one names the route, so it stays open if that grant narrows. Last, so adding it shifts
@@ -96,7 +86,7 @@ export const tailnetPolicy = {
     // shifts no other grant
     {
       src: ['autogroup:member'],
-      dst: ['autogroup:member', tags.imp, tags.impE2E, tags.cloudDeploy],
+      dst: ['autogroup:member', tags.imp, tags.cloudDeploy],
       ip: [`tcp:${k3sAPIPort}`],
     },
 
