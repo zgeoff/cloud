@@ -7,7 +7,6 @@ import {
   pullRequestFiles,
   uninstalledRepos,
 } from './github-state.ts';
-import { NativeWebSocket } from './native-web-socket.ts';
 import { server } from './node.ts';
 
 // A webhook answers 204 whatever GitHub said, so an unhandled request could still pass its test.
@@ -18,11 +17,9 @@ server.events.on('request:unhandled', (event) => {
   unhandledRequests.push(`${event.request.method} ${event.request.url}`);
 });
 
-// the import takes Bun's WebSocket before listen() replaces the global
-void NativeWebSocket;
-
 // the only real traffic is loopback, to a test's stub impd through its own passthrough()
-server.listen({ onUnhandledRequest: 'error' });
+server.configure({ onUnhandledFrame: 'error' });
+server.enable();
 
 afterEach(() => {
   server.resetHandlers();
@@ -41,6 +38,4 @@ afterEach(() => {
   }
 });
 
-afterAll(() => {
-  server.close();
-});
+afterAll(() => server.disable());

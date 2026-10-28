@@ -188,7 +188,7 @@ without the CLI.
   out the body stream and the readers whose types differ from Bun's. Its HTTP boundary is MSW handlers in
   [`workers/health-check/mocks/`](../../../workers/health-check/mocks/) over two in-memory stores:
   the probe targets' statuses and the alerts sent. The server runs with
-  `onUnhandledRequest: 'error'`, and the preload also fails the test on any `request:unhandled`
+  unhandled requests set to error, and the preload also fails the test on any `request:unhandled`
   event, because the worker turns a failed probe into a status instead of throwing. A dead target is
   a per-test `passthrough()` to `127.0.0.1:1`, so the connection really fails.
 - Pass an `Output` input by reference (`output('…')`) and put the same object in the expected

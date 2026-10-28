@@ -9,7 +9,6 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
 import { composeFiles } from './mocks/github-state.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { runPreviewBoot } from './run-preview-boot.ts';
 import { processDeps } from './test-utils/process-deps.ts';
 import { runBoundedProcess } from './test-utils/run-bounded-process.ts';
@@ -57,7 +56,7 @@ async function setupTest() {
     },
     spendProxies: null,
     store,
-    impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
+    impd: buildImpdClient(impd.url, impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),

@@ -11,7 +11,6 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
 import { commitStatuses } from './mocks/github-state.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { server } from './mocks/node.ts';
 import { runContractRun } from './run-contract-run.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
@@ -55,7 +54,7 @@ async function setupTest() {
     },
     spendProxies: null,
     store,
-    impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
+    impd: buildImpdClient(impd.url, impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
@@ -752,7 +751,7 @@ test('it keeps the result settling and the status unset when impd fails to remov
   );
 
   await runContractRun(
-    { ...ctx.deps, impd: buildImpdClient(ctx.impd.url, 'imp_wrong.token', NativeWebSocket) },
+    { ...ctx.deps, impd: buildImpdClient(ctx.impd.url, 'imp_wrong.token') },
     { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
   );
 
