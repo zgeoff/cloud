@@ -1,8 +1,9 @@
 # geoffcloud's CPU weights in a NixOS VM with geoffcloud's own k3s package and flags, podman
-# package and slices: a container of rootful Podman, started as imp's module starts imp-host with
-# its imps' Firecrackers, against a pod, a k3s system pod (CoreDNS) and k3s's server, which runs
-# the kubelet. The container's cgroup must sit under machine.slice, where geoffcloud sets the
-# weight. For each pair, the two cgroups where their paths part are siblings, and the container's
+# package and slices: a container of rootful Podman, started from a system service as imp's module
+# starts imp-host with its imps' Firecrackers, against a pod, a k3s system pod (CoreDNS) and k3s's
+# server, which runs the kubelet. The container's cgroup must sit under machine.slice, where
+# geoffcloud sets the weight. The container also takes the memlock limit that imp-host's run
+# arguments ask for with --ulimit, which a system service's own lower limit must not cap. For each pair, the two cgroups where their paths part are siblings, and the container's
 # must weigh less, so the kernel gives the container the smaller share whenever both want CPU. It
 # needs KVM: run `bun run test:nixos imp-cpu-weight`.
 { nixpkgs, geoffcloud }:
@@ -124,7 +125,13 @@ pkgs.testers.runNixOSTest {
 
     with subtest("it starts the container, the pod and CoreDNS"):
         machine.succeed("podman load -i ${sleepImage}")
-        machine.succeed("podman run -d --name imp-host --cgroupns=private test.local/imp-cpu-weight:local")
+        # a transient service, as imp-host.service runs podman, so the container starts under a
+        # system service's limits
+        machine.succeed(
+            "systemd-run --unit=imp-host --property=Type=exec $(command -v podman) run --rm --name imp-host"
+            " --cgroupns=private --ulimit memlock=2147483648:2147483648 test.local/imp-cpu-weight:local"
+        )
+        machine.wait_until_succeeds("podman inspect -f '{{.State.Pid}}' imp-host | grep -qvx 0", timeout=60)
         machine.wait_for_unit("k3s.service")
         # the default service account comes a moment after the namespace, and a pod waits for it
         machine.wait_until_succeeds("kubectl apply -f ${pod}", timeout=300)
@@ -144,6 +151,13 @@ pkgs.testers.runNixOSTest {
 
     with subtest("it runs the container in a cgroup under machine.slice"):
         assert imp_host.startswith("/machine.slice/"), f"imp-host runs in {imp_host}"
+
+
+    with subtest("it gives the container the memlock limit its --ulimit asks for, past the service's own"):
+        pid = machine.succeed("podman inspect -f '{{.State.Pid}}' imp-host").strip()
+        limit = machine.succeed(f"grep '^Max locked memory' /proc/{pid}/limits").split()[3:5]
+
+        assert limit == ["2147483648", "2147483648"], f"imp-host's memlock limit is {limit}"
 
     for name, other in others.items():
         with subtest(f"it weighs the container's cgroup below {name}'s where the two part"):
