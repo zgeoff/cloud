@@ -6,14 +6,13 @@ container, removes Docker and `imp-docker-proxy` from the host, and starts imp-h
 Podman's default network, whose bridge `podman0` replaces `docker0` for the Connect relay and the
 preview model route listener. imp-host's CPU weight moves with it, from Docker's `imp.slice` to
 `machine.slice`, where rootful Podman puts each container. impd's data on `tank/imp` stays as it is,
-and imp 6.0.1 adds no database migration to 5.0.0, so a rollback keeps the database. This runbook
-moves the host once, from imp 5.0.0 to imp 6.0.1, and back if the move fails.
+and imp 6.0.2 adds no database migration to 5.0.0, so a rollback keeps the database. This runbook
+moves the host once, from imp 5.0.0 to imp 6.0.2, and back if the move fails.
 
 ## Before the switch
 
-The pull request that bumps imp to 6.0.1 changes two things outside the host: the egress-deny
-NetworkPolicy refuses pods Podman's subnet instead of Docker's, and nixie's imp config lists the
-host's address on `podman0`. `Deploy prod` applies both once the pull request merges. Until the
+Outside the host, the cluster is set for Podman: the egress-deny NetworkPolicy refuses pods Podman's
+subnet instead of Docker's, and nixie's imp config lists the host's address on `podman0`. Until the
 switch, inet cloud_host on the host still drops pod traffic to Docker's subnet, so no pod reaches
 imp-host on `docker0` in between.
 
@@ -33,7 +32,7 @@ Check each of these before you start:
 1. Copy impd's database on the old host:
 
    ```bash
-   bash scripts/copy-impd-db.sh imp-5.0.0-pre-6.0.1
+   bash scripts/copy-impd-db.sh imp-5.0.0-pre-6.0.2
    ```
 
    Expect the `COPY-INFO` lines, with `integrity ok`, `impVersion 5.0.0` and an `image` line for
@@ -82,8 +81,8 @@ Check each of these before you start:
    ssh root@geoffcloud podman exec imp-host impz ls < /dev/null
    ```
 
-   Expect `version 6.0.1`, a `boot status` line, and every imp from before the switch, asleep. imp
-   6.0.1 keeps imp 5.0.0's Firecracker, so each sleeping imp restores its memory when it wakes.
+   Expect `version 6.0.2`, a `boot status` line, and every imp from before the switch, asleep. imp
+   6.0.2 keeps imp 5.0.0's Firecracker, so each sleeping imp restores its memory when it wakes.
    `https://imps.geoff.cloud/health` returns 200 from the tailnet.
 
 7. Wake one imp and run a command in it:
@@ -133,18 +132,18 @@ reaches `root@geoffcloud` over SSH. A failure in any of them is a reason to
    transcript and the smoke imp gone after the forget. A spawn that cannot read `op-connect` means
    its grant from [Rebind the upstream secrets](#rebind-the-upstream-secrets) is missing.
 
-4. Take a copy of impd's database under imp 6.0.1, and check that the restore tool is on the host:
+4. Take a copy of impd's database under imp 6.0.2, and check that the restore tool is on the host:
 
    ```bash
-   bash scripts/copy-impd-db.sh imp-6.0.1-post-switch
+   bash scripts/copy-impd-db.sh imp-6.0.2-post-switch
    ssh root@geoffcloud restore-impd-db < /dev/null
    ```
 
-   Expect `COPY-INFO` with `integrity ok`, `impVersion 6.0.1` and an `image` line for
-   `imp-host:6.0.1`, then an error that ends
+   Expect `COPY-INFO` with `integrity ok`, `impVersion 6.0.2` and an `image` line for
+   `imp-host:6.0.2`, then an error that ends
    `usage: restore-impd-db /root/imp-db-backups/<copy> <generation>`. Do not run a restore: it is
    one-way and needs the owner's approval. The restore rehearsal in `NixOS checks` restores a copy
-   into imp 6.0.1 under Podman.
+   into imp 6.0.2 under Podman.
 
 5. Check the atc daemon's impd token through the credential installer, from a machine where `op`
    reads the `cloud` vault:
@@ -217,7 +216,7 @@ and sleep the awake imps first, as steps 2 and 3 of the switch do, with `podman`
    applies the egress-deny NetworkPolicy and nixie's imp config for `docker0` again, and the next
    host switch from `main` keeps imp 5.0.0.
 
-impd's database needs no restore, because imp 6.0.1 ran no migration on it. When it does need one,
+impd's database needs no restore, because imp 6.0.2 ran no migration on it. When it does need one,
 restore the copy from step 1 of the switch with the 5.0.0 generation's own `restore-impd-db`, as
 [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes, once the
 rollback has run. imp 6's `restore-impd-db` refuses a generation that runs imp-host under Docker.
