@@ -53,9 +53,9 @@
       "protocol": "tcp",
       "port": 18081,
       "scope": "host",
-      "interface": "docker0",
+      "interface": "podman0",
       "admission": true,
-      "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from docker0's subnet only"
+      "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from podman0's subnet only"
     },
     {
       "name": "preview-link",
@@ -81,9 +81,9 @@
       "protocol": "tcp",
       "port": 18082,
       "scope": "host",
-      "interface": "docker0",
+      "interface": "podman0",
       "admission": true,
-      "reason": "imp-host's broker sends each preview's model calls to the preview service's model route listener, which inet cloud_host admits from docker0's subnet only, so each call passes its preview's counting proxy"
+      "reason": "imp-host's broker sends each preview's model calls to the preview service's model route listener, which inet cloud_host admits from podman0's subnet only, so each call passes its preview's counting proxy"
     },
     {
       "name": "grafana",

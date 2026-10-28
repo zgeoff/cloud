@@ -53,8 +53,13 @@ export const topologySchema = z.strictObject({
   tailnet: tailnetSchema,
   k3s: k3sSchema,
 
-  // docker0 on the host, where imp-host runs
-  docker: z.strictObject({ bridgeAddress: z.ipv4(), subnet: z.cidrv4() }),
+  // Podman's default network on the host, where imp-host runs: its bridge, the host's address on
+  // it and its subnet
+  podman: z.strictObject({
+    bridge: z.string().min(1),
+    bridgeAddress: z.ipv4(),
+    subnet: z.cidrv4(),
+  }),
   atc: z.strictObject({ daemonPort: portSchema, gatewayPort: portSchema }),
 
   // impd's tailnet HTTPS domain, and its API port on loopback and between impd nodes

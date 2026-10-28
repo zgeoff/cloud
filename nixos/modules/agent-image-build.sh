@@ -13,7 +13,7 @@
 # IMP_TOKEN, never in an argv. The build prints its progress to stderr and its result line, such as
 # "agent-0123abc <digest> check passed", on stdout; the script prints that line after
 # "agent-image-build: ". Inputs: REPO_URL, STATE_DIR, IMP_URL (impd's API), CREDENTIALS_DIRECTORY,
-# DOCKER, the docker that reaches imp-host, and BUN, the bun that runs the build.
+# PODMAN, the podman that reaches imp-host, and BUN, the bun that runs the build.
 
 # imp-host's image installs the CLI here (zgeoff/impz host/Dockerfile)
 impz_in_container=/usr/local/bin/impz
@@ -38,14 +38,14 @@ if [ -f "$failed" ]; then
   exit 0
 fi
 
-images=$("$DOCKER" exec imp-host impz image ls --json)
+images=$("$PODMAN" exec imp-host impz image ls --json)
 if jq -e --arg name "$image" 'any(.[]; .name == $name)' <<< "$images" > /dev/null; then
   echo "agent-image-build: impd holds $image, built from $sha; nothing to build"
   exit 0
 fi
 
 mkdir -p "$STATE_DIR/bin"
-"$DOCKER" cp "imp-host:$impz_in_container" "$STATE_DIR/bin/impz"
+"$PODMAN" cp "imp-host:$impz_in_container" "$STATE_DIR/bin/impz"
 git -C "$clone" checkout -q -f --detach origin/main
 token=$(cat "$CREDENTIALS_DIRECTORY/imp-token")
 
