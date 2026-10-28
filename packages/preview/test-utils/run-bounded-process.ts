@@ -9,7 +9,7 @@ export interface BoundedProcessOptions {
 }
 
 export interface BoundedProcessResult {
-  readonly exitCode: number | null;
+  readonly exitCode: number;
   readonly stdout: string;
   readonly stderr: string;
 }
