@@ -42,7 +42,7 @@ it_skips_the_build_and_names_the_run_that_built_the_same_derivations() {
     stdout: "4242\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -75,7 +75,7 @@ it_needs_the_build_when_no_run_built_the_same_derivations() {
     > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -194,7 +194,7 @@ it_fails_with_the_gh_error_and_writes_no_answer_when_gh_fails() {
     stderr: "HTTP 503: Service Unavailable\n", exit: 1}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -213,7 +213,7 @@ it_fails_with_its_usage_when_the_derivations_file_is_empty() {
   : > "$tree/derivations"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
