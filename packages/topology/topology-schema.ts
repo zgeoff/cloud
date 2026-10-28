@@ -53,8 +53,7 @@ export const topologySchema = z.strictObject({
   tailnet: tailnetSchema,
   k3s: k3sSchema,
 
-  // Podman's default network on the host, where imp-host runs: its bridge, the host's address on
-  // it and its subnet
+  // Podman's default network on the host, where imp-host runs
   podman: z.strictObject({
     bridge: z.string().min(1),
     bridgeAddress: z.ipv4(),
