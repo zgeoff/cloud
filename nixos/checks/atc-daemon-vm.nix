@@ -61,8 +61,10 @@ pkgs.testers.runNixOSTest {
         """the daemon listens, which atc does only after it loads its token file, and systemd
         never restarted it"""
         machine.wait_for_open_port(${toString port}, timeout=60)
-        state = machine.succeed("systemctl show -P ActiveState,NRestarts atc-daemon.service").split()
-        assert state == ["active", "0"], f"atc-daemon.service is {state}"
+        state = machine.succeed("systemctl show -P ActiveState atc-daemon.service").strip()
+        assert state == "active", f"atc-daemon.service is {state}"
+        restarts = machine.succeed("systemctl show -P NRestarts atc-daemon.service").strip()
+        assert restarts == "0", f"systemd restarted atc-daemon.service {restarts} times"
 
 
     machine.wait_for_unit("multi-user.target")

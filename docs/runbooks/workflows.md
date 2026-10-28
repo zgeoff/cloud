@@ -272,8 +272,8 @@ after a change to either.
 | imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                    |
 
 A rotation of the atc daemon's gateway or imp token needs `systemctl restart atc-daemon` on the
-host. systemd's `LoadCredential` copies the token files when the service starts, and the service
-copies the gateway token again for atc, so a reload rereads only the old copy.
+host, because the daemon reads copies of the token files made when it starts
+([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)).
 
 ## Reinstall the host
 
