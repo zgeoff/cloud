@@ -2,8 +2,9 @@
 # Test for decide-nixos-checks.sh: against a real git repository in the case tree and a gh
 # stand-in (test-support/shell/create-stub-gh.sh) that replays the green runs each case records,
 # as the lines the call's --jq filter prints ("<head sha> <run url>" per run), it writes
-# needed=true for any event but schedule without asking gh, needed=false with the summary line for
-# a nightly run on a covered commit, needed=true for a nightly run on a commit no run covers, and
+# needed=true for a forced dispatch without asking gh, needed=false with the summary line for
+# a nightly run or a dispatch on a covered commit, needed=true for a nightly run on a commit no run
+# covers, and
 # fails with gh's error and writes nothing when gh fails. Each case runs the script under `env -i`
 # with git's global and system config off, and compares its whole stdout, stderr, GITHUB_OUTPUT,
 # step summary and gh call log.
@@ -29,14 +30,14 @@ while read -r name; do unset "$name"; done < <(compgen -e GIT_)
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GIT_COMMITTER_NAME=test \
   GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_EMAIL=test@example.invalid
 
-it_needs_the_checks_for_a_dispatch_without_asking_gh() {
+it_needs_the_checks_for_a_forced_dispatch_without_asking_gh() {
   local commit status=0
   create_case_tree
   setup_test "$tree"
   commit="$(git -C "$tree/repo" rev-parse HEAD)"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 FORCE=true \
     GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
@@ -45,6 +46,32 @@ it_needs_the_checks_for_a_dispatch_without_asking_gh() {
   diff - "$tree/output" <<< 'needed=true'
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
+  assert_status 0 "$status"
+}
+
+it_skips_the_checks_for_a_dispatch_on_a_covered_commit_and_says_so() {
+  local commit status=0
+  create_case_tree
+  setup_test "$tree"
+  commit="$(git -C "$tree/repo" rev-parse HEAD)"
+  jq -cn --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/7" '{
+    argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs",
+      "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""],
+    stdout: "\($runs)\n"}' > "$tree/gh-responses"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
+    GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
+    GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'No input of the NixOS checks changed since https://github.com/zgeoff/cloud/actions/runs/7, so the checks did not run.'
+  diff /dev/null "$tree/err"
+  diff - "$tree/output" <<< 'needed=false'
+  diff - "$tree/summary" <<< 'No input of the NixOS checks changed since https://github.com/zgeoff/cloud/actions/runs/7, so the checks did not run.'
+  diff - "$tree/calls" << 'EOF'
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/nixos-checks.yml/runs","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"schedule\" or .event == \"workflow_dispatch\") | \"\\(.head_sha) \\(.html_url)\""]
+EOF
   assert_status 0 "$status"
 }
 
@@ -138,7 +165,7 @@ it_fails_without_a_github_output_file() {
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "$script: line 12: GITHUB_OUTPUT: parameter null or not set"
+  diff - "$tree/err" <<< "$script: line 14: GITHUB_OUTPUT: parameter null or not set"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
   assert_status 1 "$status"

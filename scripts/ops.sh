@@ -7,7 +7,7 @@
 #
 #   bun run ops:switch-host [-- --build-only | --allow-k3s-restart]
 #   bun run ops:deploy-prod -- <full commit>
-#   bun run ops:nixos-checks [-- <branch>]
+#   bun run ops:nixos-checks [-- [--force] <branch>]
 #   bun run ops:preview [-- <pulumi preview flag>…]
 #   bun run ops:up [-- <pulumi up flag>…]
 #   bun run ops:switch-agent-image -- <image> [<atc config file>]
@@ -71,11 +71,16 @@ case "$verb" in
     command=(gh workflow run deploy-prod.yml -R "$slug" --ref main -f "revision=$1")
     ;;
   nixos-checks)
+    force=()
+    if [ "${1:-}" = --force ]; then
+      force=(-f force=true)
+      shift
+    fi
     if [ "$#" -gt 1 ] || [ "${1-main}" = "" ]; then
-      echo "usage: ops.sh nixos-checks [<branch>]" >&2
+      echo "usage: ops.sh nixos-checks [--force] [<branch>]" >&2
       exit 2
     fi
-    command=(gh workflow run nixos-checks.yml -R "$slug" --ref "${1:-main}")
+    command=(gh workflow run nixos-checks.yml -R "$slug" --ref "${1:-main}" "${force[@]}")
     ;;
   preview)
     command=(bun run preview -- "$@")
