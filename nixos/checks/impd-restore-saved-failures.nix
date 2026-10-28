@@ -77,13 +77,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "TIME machine systemd[1]: fail-on-switch.service: Failed with result 'exit-code'.",
               "TIME machine systemd[1]: Failed to start fail-on-switch.service.",
           ], out
-          # switch-to-configuration's progress; the mounts Podman made for imp-host (its network
-          # namespace, its storage, its root file system and its /dev/shm) carry generated ids, and how many it
-          # made varies
+          # switch-to-configuration's progress; the mounts Podman makes for imp-host (its network
+          # namespace, its storage, its root file system and its /dev/shm) carry generated ids, and the
+          # switch lists them on one line only when they land before it ends
           err_lines = err.splitlines()
-          assert re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", err_lines[5]), err
+          mount_lines = [line for line in err_lines if line.startswith("the following new units were started: ")]
+          assert len(mount_lines) <= 1 and all(re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", line) for line in mount_lines), err
           # the ERR trap names the line of the switch
-          assert err_lines[:5] + err_lines[6:] == [
+          assert [line for line in err_lines if line not in mount_lines] == [
               "Checking switch inhibitors... done",
               "updating GRUB 2 menu...",
               "activating the configuration...",
