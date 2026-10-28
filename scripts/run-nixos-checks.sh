@@ -4,6 +4,12 @@
 #
 #   bash scripts/run-nixos-checks.sh            # every check in checks.x86_64-linux
 #   bash scripts/run-nixos-checks.sh atc-daemon # one check, by its name there
+#   bash scripts/run-nixos-checks.sh --derivations <file> [check…]
+#
+# --derivations evaluates the checks and writes their derivation paths to <file>, sorted, one per
+# line, and builds nothing, so it needs no KVM. NIXOS_CHECKS_CACHE names a local binary cache
+# (scripts/write-nixos-checks-cache.sh writes one): when it holds a nix-cache-info, the build
+# substitutes from it, unsigned, before it builds a path itself.
 #
 # impd-restore, every other check named impd-restore-*, tank-cloud-unlock, tank-cloud-host-secrets,
 # tank-cloud-rancher, imp-dataset-key, geoffcloud-no-pool, network-policy, imp-cpu-weight,
@@ -22,6 +28,16 @@
 set -euo pipefail
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
+
+derivations_out=""
+if [ "${1:-}" = --derivations ]; then
+  if [ -z "${2:-}" ]; then
+    echo "usage: run-nixos-checks.sh [--derivations <file>] [check…]" >&2
+    exit 2
+  fi
+  derivations_out="$2"
+  shift 2
+fi
 
 volume="${NIX_STORE_VOLUME:-cloud-nixos-checks-store}"
 repo="$(git rev-parse --show-toplevel)"
@@ -87,7 +103,8 @@ for check in "${checks[@]}"; do
       imp-dataset-key | geoffcloud-no-pool | network-policy | imp-cpu-weight | host-cgroup-cpu-vm | \
       drift-check-vm | public-front-vm | atc-daemon-vm)
       # QEMU opens the device read-write, and falls back to emulation when it cannot
-      if [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; then
+      # an evaluation alone needs no KVM
+      if [ -z "$derivations_out" ] && { [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; }; then
         missing_kvm+=("$check")
         continue
       fi
@@ -108,8 +125,18 @@ if [ "${#installables[@]}" -gt 0 ]; then
     run_nix -v "$volume":/nix -v "$snapshot":/src:ro -w /src "$NIX_IMAGE" \
       nix "${nix_args[@]}" path-info --derivation "$installable" >> "$derivations"
   done
+  if [ -n "$derivations_out" ]; then
+    LC_ALL=C sort "$derivations" > "$derivations_out"
+    exit 0
+  fi
+  # the cache's directory is mounted writable, because nix creates its missing folders on open
+  cache=()
+  if [ -n "${NIXOS_CHECKS_CACHE:-}" ] && [ -f "$NIXOS_CHECKS_CACHE/nix-cache-info" ]; then
+    cache=(-v "$NIXOS_CHECKS_CACHE":/cache)
+    nix_args+=(--option extra-substituters 'file:///cache?trusted=true')
+  fi
   mapfile -t outputs < <(sed 's/$/^*/' "$derivations")
-  run_nix "${kvm[@]}" -v "$volume":/nix "$NIX_IMAGE" \
+  run_nix "${kvm[@]}" "${cache[@]}" -v "$volume":/nix "$NIX_IMAGE" \
     nix "${nix_args[@]}" --option system-features "kvm nixos-test benchmark big-parallel uid-range" \
     --max-jobs 2 build --no-link -L "${outputs[@]}"
 fi

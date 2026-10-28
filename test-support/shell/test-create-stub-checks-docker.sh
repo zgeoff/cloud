@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test for create-stub-checks-docker.sh: the docker stand-in answers the nix eval, path-info and
-# build that run-nixos-checks.sh runs, copies what the path-info call mounts at /src, logs every
+# build that run-nixos-checks.sh runs and the closure query, path-info and copy to a cache that
+# write-nixos-checks-cache.sh runs, copies what the path-info call mounts at /src, logs every
 # call, and fails closed on any other call. No nix runs here; the stand-in's exit 1 for a failed
 # eval, path-info or build is the one its header records from one-off checks against nix 2.35.2.
 #
@@ -153,6 +154,66 @@ it_fails_closed_with_exit_97_on_any_other_call() {
 # Runtime every case needs: the stand-in in <tree>/bin, and the HOME and TMPDIR each call
 # runs with. The empty call log is boot data: the stand-in appends to it, and a case
 # compares it whole.
+it_prints_the_closure_file_for_a_closure_query() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern\n' > "$tree/closure"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_CLOSURE="$tree/closure" \
+    docker run --rm "$NIX_IMAGE" nix-store -qR --include-outputs /nix/store/00000000000000000000000000000000-lantern.drv \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff "$tree/closure" "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"$NIX_IMAGE\",\"nix-store\",\"-qR\",\"--include-outputs\",\"/nix/store/00000000000000000000000000000000-lantern.drv\"]"
+  assert_status 0 "$status"
+}
+
+it_reads_stdin_and_prints_the_path_info_file_for_a_path_info_json() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  printf '{"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern":{"signatures":[]}}\n' > "$tree/path-info"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_PATH_INFO="$tree/path-info" \
+    docker run --rm -i "$NIX_IMAGE" nix path-info --json --stdin \
+    <<< /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff "$tree/path-info" "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-i\",\"$NIX_IMAGE\",\"nix\",\"path-info\",\"--json\",\"--stdin\"]"
+  assert_status 0 "$status"
+}
+
+it_writes_the_cache_info_and_a_narinfo_for_each_path_for_a_copy_to_the_cache() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir "$tree/cache"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    docker run --rm -i -v "$tree/cache:/cache" "$NIX_IMAGE" nix copy --no-recursive --stdin \
+    --to 'file:///cache?compression=zstd' > "$tree/out" 2> "$tree/err" << 'EOF' || status=$?
+/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern
+/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-wick
+EOF
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/cache/nix-cache-info" <<< 'StoreDir: /nix/store'
+  diff - "$tree/cache/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.narinfo" <<< 'StorePath: /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern'
+  diff - "$tree/cache/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.narinfo" <<< 'StorePath: /nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-wick'
+  ls -A "$tree/cache" > "$tree/cache-files"
+  diff - "$tree/cache-files" << 'EOF'
+aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.narinfo
+bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.narinfo
+nix-cache-info
+EOF
+  diff - "$tree/calls" <<< "[\"docker\",\"run\",\"--rm\",\"-i\",\"-v\",\"$tree/cache:/cache\",\"$NIX_IMAGE\",\"nix\",\"copy\",\"--no-recursive\",\"--stdin\",\"--to\",\"file:///cache?compression=zstd\"]"
+  assert_status 0 "$status"
+}
+
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp"

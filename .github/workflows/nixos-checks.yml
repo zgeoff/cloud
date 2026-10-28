@@ -5,21 +5,40 @@ name: NixOS checks
 # scripts/switch-geoffcloud.sh refuses a commit that no green scheduled or dispatched run on main
 # covers (scripts/find-nixos-check-run.sh). So the workflow runs:
 #
-# - nightly on main, building the checks only when no green run covers the commit yet, which is
-#   when an input of the checks (the nixos gate of .github/gates.yml) changed since the last one;
-# - on workflow_dispatch, always building them, on main before a switch or on a branch.
+# - nightly on main;
+# - on workflow_dispatch, on main before a switch or on a pull request's branch.
 #
-# No pull request runs it, a bot's included, because the switch gate never reads a pull request's
-# run. The nightly run checks a change once it lands on main.
+# A run builds nothing, and passes, when a green run on main already covers the commit, which is
+# when no input of the checks (the nixos gate of .github/gates.yml) changed since that run's
+# commit, or when a run already built and passed the same derivations with the same build files
+# (scripts/decide-nixos-checks-build.sh). A dispatch with force always builds. No pull request runs
+# it, a bot's included, because the switch gate never reads a pull request's run.
+#
+# A build restores main's cache of the store paths that cache.nixos.org does not serve, and a
+# build on main saves a new one and removes the older ones (scripts/write-nixos-checks-cache.sh,
+# scripts/remove-stale-nixos-checks-caches.sh).
 on:
   schedule:
     # 03:17 UTC: GitHub's docs say scheduled runs queue at the start of each hour, so off the hour
     - cron: '17 3 * * *'
   workflow_dispatch:
+    inputs:
+      force:
+        description:
+          Build the checks even when a green run covers the commit or built its derivations
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   actions: read
+
+# Runs on one commit of main queue, so a later run finds the earlier one's result and builds
+# nothing; main never cancels, since the switch gate reads every green run. A newer dispatch on a
+# branch cancels the branch's older run, whose head is no longer the one to merge.
+concurrency:
+  group: nixos-checks-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   nixos:
@@ -27,10 +46,14 @@ jobs:
     # twice the checks' 60-minute test budget plus the job's median 0.13 minutes outside them,
     # rounded up; the budget holds every measured run, the slowest at 58.4 minutes
     timeout-minutes: 121
+    # actions: write removes main's older store caches
+    permissions:
+      contents: read
+      actions: write
     steps:
       # the full history, so a green run's commit can be compared with the commit under test; no
       # token stays in .git/config, so the checks, which run a dispatched branch's own code, never
-      # read it: only the decision step gets the token, through its own environment
+      # read it: only the decision and cache steps get the token, through their own environment
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,29 +65,92 @@ jobs:
         with:
           bun-version-file: .bun-version
 
-      # a nightly run skips a commit a green run already covers; a dispatch always builds. A gh
-      # failure fails the job rather than skipping the checks.
-      - name: Decide whether the commit needs the checks
+      # a gh failure fails the job rather than skipping the checks
+      - name: Decide whether a green run covers the commit
         id: decide
         env:
+          FORCE: ${{ inputs.force }}
           GH_TOKEN: ${{ github.token }}
           GH_TELEMETRY: '0'
           DO_NOT_TRACK: '1'
           GH_NO_UPDATE_NOTIFIER: '1'
         run: bun run --silent ci:decide-nixos-checks
 
+      - name: List the checks' derivations
+        if: steps.decide.outputs.needed == 'true'
+        env:
+          DERIVATIONS: ${{ runner.temp }}/nixos-check-derivations
+        run: bun run --silent test:nixos --derivations "$DERIVATIONS"
+
+      - name: Decide whether a run built the same derivations
+        id: build
+        if: steps.decide.outputs.needed == 'true'
+        env:
+          FORCE: ${{ inputs.force }}
+          DERIVATIONS: ${{ runner.temp }}/nixos-check-derivations
+          GH_TOKEN: ${{ github.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+        run: bun run --silent ci:decide-nixos-checks-build "$DERIVATIONS"
+
+      # the newest cache main saved; a branch reads main's caches, and never saves one
+      - name: Restore the store cache
+        if: steps.build.outputs.needed == 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nixos-checks-cache
+          key: nixos-checks-store-main-${{ github.run_id }}
+          restore-keys: nixos-checks-store-main-
+
       # the runner has /dev/kvm, but QEMU, which runs as a nixbld user in the nixos/nix
       # container, got "Permission denied" on it and fell back to emulation; this rule opens it
       # to every user, as GitHub's changelog of 2024-04-02 documents for the hosted Linux runners
       - name: Open /dev/kvm to QEMU
-        if: steps.decide.outputs.needed == 'true'
+        if: steps.build.outputs.needed == 'true'
         run: bun run --silent ci:open-kvm
 
       # capped at a private repo's standard runner (2 CPUs, 8 GB, of which the runner itself
       # takes about 1 GB), so the checks keep passing once the repo goes private
       - name: NixOS checks
-        if: steps.decide.outputs.needed == 'true'
+        if: steps.build.outputs.needed == 'true'
         env:
           NIXOS_CHECKS_CPUS: '0-1'
           NIXOS_CHECKS_MEMORY: 7g
+          NIXOS_CHECKS_CACHE: ${{ runner.temp }}/nixos-checks-cache
         run: bun run test:nixos
+
+      # the record a later run with the same key finds, so it skips the build
+      - name: Record the derivations as built
+        if: steps.build.outputs.needed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nixos-checks-${{ steps.build.outputs.key }}
+          path: ${{ runner.temp }}/nixos-check-derivations
+          retention-days: 90
+
+      - name: Write the store cache
+        id: cache
+        if: steps.build.outputs.needed == 'true' && github.ref == 'refs/heads/main'
+        env:
+          DERIVATIONS: ${{ runner.temp }}/nixos-check-derivations
+          RESTORED: ${{ runner.temp }}/nixos-checks-cache
+          CACHE: ${{ runner.temp }}/nixos-checks-cache-new
+        run: bun run --silent ci:write-nixos-checks-cache "$DERIVATIONS" "$RESTORED" "$CACHE"
+
+      - name: Save the store cache
+        if: steps.cache.outputs.saved == 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/nixos-checks-cache-new
+          key: nixos-checks-store-main-${{ github.run_id }}
+
+      - name: Remove main's older store caches
+        if: steps.cache.outputs.saved == 'true'
+        env:
+          KEPT: nixos-checks-store-main-${{ github.run_id }}
+          GH_TOKEN: ${{ github.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+        run: bun run --silent ci:remove-stale-nixos-checks-caches "$KEPT"

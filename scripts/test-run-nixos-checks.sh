@@ -514,6 +514,99 @@ EOF
   assert_status 1 "$status"
 }
 
+it_writes_every_check_s_derivation_sorted_and_builds_nothing_without_kvm() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
+    STUB_CHECKS=$'impd-restore\natc-daemon\n' KVM_DEVICE="$tree/no-kvm" \
+    bash "$script" --derivations "$tree/derivations" > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/derivations" << 'EOF'
+/nix/store/00000000000000000000000000000000-atc-daemon.drv
+/nix/store/00000000000000000000000000000000-impd-restore.drv
+EOF
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","eval","--raw","path:/src?dir=nixos#checks.x86_64-linux","--apply","checks: builtins.concatStringsSep \"\\\\n\" (builtins.attrNames checks) + \"\\\\n\""]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.impd-restore"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+EOF
+  ls -A "$tree/tmp" > "$tree/tmp-left"
+  diff /dev/null "$tree/tmp-left"
+  assert_status 0 "$status"
+}
+
+it_fails_with_its_usage_when_derivations_names_no_file() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
+    KVM_DEVICE="$tree/no-kvm" \
+    bash "$script" --derivations > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: run-nixos-checks.sh [--derivations <file>] [check…]'
+  diff /dev/null "$tree/calls"
+  assert_status 2 "$status"
+}
+
+it_substitutes_from_the_cache_the_environment_names_when_it_holds_a_nix_cache_info() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir "$tree/cache"
+  printf 'StoreDir: /nix/store\n' > "$tree/cache/nix-cache-info"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
+    KVM_DEVICE="$tree/no-kvm" NIXOS_CHECKS_CACHE="$tree/cache" \
+    bash "$script" atc-daemon > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","$tree/cache:/cache","-v","cloud-nixos-checks-store:/nix","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","extra-substituters","file:///cache?trusted=true","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","/nix/store/00000000000000000000000000000000-atc-daemon.drv^*"]
+EOF
+  assert_status 0 "$status"
+}
+
+it_builds_without_a_substituter_when_the_cache_holds_no_nix_cache_info() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  # a cache restore that missed leaves the folder empty
+  mkdir "$tree/cache"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_TOPLEVEL="$tree/repo" STUB_LS_FILES="$tree/ls-files" STUB_SOURCE_SAW="$tree/source-saw" \
+    KVM_DEVICE="$tree/no-kvm" NIXOS_CHECKS_CACHE="$tree/cache" \
+    bash "$script" atc-daemon > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|TMP|g" "$tree/calls" > "$tree/calls-masked"
+  diff - "$tree/calls-masked" << EOF
+["git","rev-parse","--show-toplevel"]
+["git","-C","$tree/repo","ls-files","-z","--cached","--others","--exclude-standard","--deduplicate"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","-v","TMP:/src:ro","-w","/src","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","path-info","--derivation","path:/src?dir=nixos#checks.x86_64-linux.atc-daemon"]
+["docker","run","--rm","--network","host","-v","cloud-nixos-checks-store:/nix","$NIX_IMAGE","nix","--extra-experimental-features","nix-command flakes","--option","system-features","kvm nixos-test benchmark big-parallel uid-range","--max-jobs","2","build","--no-link","-L","/nix/store/00000000000000000000000000000000-atc-daemon.drv^*"]
+EOF
+  assert_status 0 "$status"
+}
+
 setup_test() {
   local tree="$1"
   # the repository the stub git stands for starts empty, with nothing for ls-files to list

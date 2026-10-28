@@ -13,6 +13,14 @@
 #   /nix/store/00000000000000000000000000000000-<name>.drv, as nix prints each derivation's path;
 # - a `run … build --no-link -L …`: when STUB_BUILD_ERROR is set, prints it on stderr and exits 1,
 #   nix's exit for a failed build;
+# - a `run … nix-store -qR --include-outputs …`, which write-nixos-checks-cache.sh runs: prints the
+#   file STUB_CLOSURE, one store path per line, as nix-store prints a closure;
+# - a `run … path-info --json --stdin`: reads its stdin, then prints the file STUB_PATH_INFO, the
+#   JSON nix prints for those paths;
+# - a `run … copy --no-recursive --stdin --to file:///cache?compression=zstd`: writes to the folder
+#   mounted at /cache (its `<dir>:/cache` argument) the nix-cache-info a binary cache opens with,
+#   and for each store path on stdin a `<hash>.narinfo` that names it, in place of the real
+#   narinfo and its compressed NAR;
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
 # Nix documents no exit-code table for these commands, so the exit 1 was checked on
@@ -51,6 +59,24 @@ case "$*" in
     ;;
   "run "*" build --no-link -L "*)
     if [ -n "${STUB_BUILD_ERROR:-}" ]; then echo "$STUB_BUILD_ERROR" >&2; exit 1; fi
+    ;;
+  "run "*" nix-store -qR --include-outputs "*)
+    cat "$STUB_CLOSURE"
+    ;;
+  "run "*" path-info --json --stdin")
+    cat > /dev/null
+    cat "$STUB_PATH_INFO"
+    ;;
+  "run "*" copy --no-recursive --stdin --to file:///cache?compression=zstd")
+    cache=""
+    for arg in "$@"; do
+      case "$arg" in *":/cache") cache="${arg%:/cache}" ;; esac
+    done
+    printf 'StoreDir: /nix/store\n' > "$cache/nix-cache-info"
+    while read -r path; do
+      name="${path#/nix/store/}"
+      printf 'StorePath: %s\n' "$path" > "$cache/${name%%-*}.narinfo"
+    done
     ;;
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac
