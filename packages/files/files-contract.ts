@@ -1,8 +1,7 @@
 import { oc } from '@orpc/contract';
 import { z } from 'zod';
 
-// One upload as the API returns it. url is the public address, https://<host>/<id>/<filename>,
-// and expiresAt is null for an upload that never expires.
+// url is https://<host>/<id>/<filename>, and expiresAt is null for an upload that never expires
 const uploadSchema = z.object({
   id: z.string(),
   url: z.url(),
@@ -21,8 +20,7 @@ const uploadSchema = z.object({
 const expiresSchema = z.string().min(1).max(64);
 const idSchema = z.string().min(1).max(64);
 
-// The API the cloud CLI and the agents' curl line call, under /api, with a bearer token on every
-// call. An upload is a multipart form: the file, and the optional fields beside it.
+// served under /api, with a bearer token on every call; an upload is a multipart form
 export const filesContract = {
   upload: oc
     .route({ method: 'POST', path: '/files', successStatus: 201 })

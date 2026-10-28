@@ -107,7 +107,7 @@ test('it runs nixie as one replica that a rollout stops before it starts the nex
                 name: 'GITSYNC_REPO',
                 value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git',
               },
-              { name: 'GITSYNC_REF', value: 'main' },
+              { name: 'GITSYNC_REF', value: 'live' },
               { name: 'GITSYNC_ROOT', value: '/etc/nixie/definitions' },
               { name: 'GITSYNC_LINK', value: 'current' },
               { name: 'GITSYNC_PERIOD', value: '60s' },

@@ -178,8 +178,8 @@ checkout of `main`.
      [Set the service up](./preview.md#set-the-service-up). Each preview imp clones through it. The
      daemon's GitHub profile uses `github-imp-agents`, so the profile secrets leave `gh` out. impd
      refuses to mint the preview token while a secret it may grant is missing.
-   - nixie's images and model secret, through
-     [nixie's runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd).
+   - nixie's model secret, through [nixie's runbook](./nixie.md#add-nixies-model-secret-to-impd).
+     nixie adds its sandbox images itself when it starts.
    - The Connect token, with the command in
      [Add the token to impd](./onepassword-connect.md#add-the-token-to-impd). Leave out `--replace`:
      impd replaces only a secret that exists.

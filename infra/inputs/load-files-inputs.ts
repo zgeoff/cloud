@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { secret } from '@pulumi/pulumi';
+import { z } from 'zod';
 import { findResticBackup } from './find-restic-backup.ts';
+import { parseStackObject } from './parse-stack-object.ts';
 import { requireGeoffCloudHostname } from './require-geoff-cloud-hostname.ts';
 import { requireGHCRPullCredential } from './require-ghcr-pull-credential.ts';
 import { requirePinnedImage } from './require-pinned-image.ts';
@@ -9,27 +11,31 @@ import type {
   BackupImage,
   Environment,
   FilesBackupInputs,
-  FilesConfig,
   FilesInputs,
   StackConfig,
 } from './types.ts';
 
-// why each role token is required, for requireVariable's error
 const tokenNeed = 'the files service needs it while stack config "files" is set';
 
-// The files service's inputs, or nothing while "files" is unset (setting it approves the deploy).
-// The service reads only the SHA-256 of each role token, FILES_AGENT_TOKEN and FILES_OWNER_TOKEN.
-// FILES_RESTIC_* and FILES_R2_* add the backup, in the gateway's backup image.
+// a missing field reaches its own check below, which names what the field must hold
+const filesConfigSchema = z.object({
+  image: z.string().optional(),
+  hostname: z.string().optional(),
+});
+
+// setting stack config "files" approves the deploy; FILES_RESTIC_* and FILES_R2_* add the backup
 export function loadFilesInputs(
   stackConfig: Pick<StackConfig, 'getObject'>,
   env: Environment,
   backupImage: BackupImage | undefined,
 ): { readonly files?: FilesInputs } {
-  const config = stackConfig.getObject<FilesConfig>('files');
+  const raw = stackConfig.getObject('files');
 
-  if (config === undefined) {
+  if (raw === undefined) {
     return {};
   }
+
+  const config = parseStackObject('files', raw, filesConfigSchema);
 
   requirePinnedImage('files.image', config.image);
   requireGeoffCloudHostname('files.hostname', config.hostname);
@@ -58,7 +64,6 @@ function deriveTokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
 
-// all backup variables set, or no backup; findResticBackup throws on a partial set
 function findBackup(
   env: Environment,
   backupImage: BackupImage | undefined,

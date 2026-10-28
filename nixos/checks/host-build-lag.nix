@@ -307,6 +307,8 @@ let
             { filename = "docs/runbooks/workflows.md"; }
             { filename = "nixos/checks/preview.nix"; }
             { filename = "infra/index.ts"; }
+            { filename = "infra/Pulumi.prod.yaml"; }
+            { filename = "scripts/alert-prod-apply.sh"; }
           ];
         }}
         mkdir -p store/aaaa-nixos-system-geoffcloud
@@ -341,6 +343,30 @@ let
               filename = "docs/old-module.md";
               previous_filename = "nixos/modules/old-module.nix";
             }
+          ];
+        }}
+        mkdir -p store/aaaa-nixos-system-geoffcloud
+        ln -s "$PWD/store/aaaa-nixos-system-geoffcloud" current-system
+        echo "${running} $PWD/store/aaaa-nixos-system-geoffcloud" > state/switches
+        echo 2.3.0 > impd/version
+
+        run_check
+
+        assert_equals 0 "$status" "the check's exit status"
+        assert_files_equal /dev/null stderr
+        assert_equals "$PWD/store/aaaa-nixos-system-geoffcloud" "$(cut -d' ' -f1 state/system-lag)" "the system the lag state names"
+        assert_missing state/imp-lag "imp's lag state"
+      '';
+    }
+    {
+      title = "it counts a change to a file the drift check runs from as a system change";
+      script = ''
+        ${setupTest}
+        ${writeGitHub {
+          status = "ahead";
+          files = [
+            { filename = "docs/runbooks/drift-check.md"; }
+            { filename = "scripts/check-scheduled-drift.sh"; }
           ];
         }}
         mkdir -p store/aaaa-nixos-system-geoffcloud

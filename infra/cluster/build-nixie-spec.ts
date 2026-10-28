@@ -1,7 +1,8 @@
 import type { input } from '@pulumi/kubernetes/types';
 import type { Output } from '@pulumi/pulumi';
+import { podLabels } from '../shared/pod-labels.ts';
 
-export const nixieLabels = { app: 'nixie' };
+export const nixieLabels = podLabels.nixie;
 
 // from https://api.github.com/meta (ssh_keys). The host blocks outbound port 22, so git-sync
 // reaches GitHub's SSH on 443, which serves the same key
@@ -153,7 +154,9 @@ function buildGitSyncContainer(): input.core.v1.Container {
     image: gitSyncImage,
     env: [
       { name: 'GITSYNC_REPO', value: 'ssh://git@ssh.github.com:443/zgeoff/nixie-definitions.git' },
-      { name: 'GITSYNC_REF', value: 'main' },
+
+      // production follows `live`, which moves only on a promote, so a merge to `main` changes nothing
+      { name: 'GITSYNC_REF', value: 'live' },
       { name: 'GITSYNC_ROOT', value: definitionsRoot },
 
       // nixie reads the `current` link, which git-sync swaps in one rename

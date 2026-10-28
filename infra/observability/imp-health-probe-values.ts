@@ -1,4 +1,5 @@
 import { topology } from '@zgeoff/cloud-topology';
+import { podLabels } from '../shared/pod-labels.ts';
 import { buildProbeValues } from './build-probe-values.ts';
 import { impHealthProbeTarget } from './imp-health-probe-target.ts';
 
@@ -20,5 +21,6 @@ export const impHealthProbeValues = buildProbeValues({
     },
   },
   module: 'imp_health',
+  podLabels: podLabels.impHealthProbe,
   targets: [{ name: impHealthProbeTarget, url: impHealthURL }],
 });

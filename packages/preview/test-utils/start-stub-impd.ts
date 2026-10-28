@@ -1,8 +1,8 @@
-/* oxlint-disable typescript/no-unsafe-type-assertion */
 import { onTestFinished } from 'bun:test';
 import type { ServerWebSocket } from 'bun';
 import { http, passthrough } from 'msw';
 import { match } from 'ts-pattern';
+import { z } from 'zod';
 import { server as mockServer } from '../mocks/node.ts';
 import type { StubApp } from './build-stub-proxy-response.ts';
 import { buildStubProxyResponse } from './build-stub-proxy-response.ts';
@@ -64,7 +64,17 @@ export interface StubImpd {
 
   // live exec tickets, each to the imp it was issued for; a ticket redeems once
   readonly tickets: Map<string, string>;
+
+  // the path filter of each filtered grant, as `<imp> <secret>`; a grant again with a filter
+  // replaces it, as impd's does
+  readonly grantPaths: Map<string, readonly string[]>;
+
+  // the host each secret gives a credential for; impd refuses a grant whose host another of the
+  // imp's grants already covers, and a secret with no host here clashes with none
+  readonly secretHosts: Map<string, string>;
 }
+
+const procedureBodySchema = z.object({ json: z.record(z.string(), z.unknown()).optional() });
 
 export function startStubImpd(): StubImpd {
   const token = 'imp_stubpreview.stub-secret';
@@ -81,6 +91,8 @@ export function startStubImpd(): StubImpd {
     held: new Map(),
     answerCommand: () => ({ code: 0 }),
     tickets: new Map(),
+    grantPaths: new Map(),
+    secretHosts: new Map(),
   };
 
   const answerRequest = async (request: Request, bunServer: Bun.Server<ExecSocketData>) => {
@@ -99,11 +111,14 @@ export function startStubImpd(): StubImpd {
     // a procedure without input, such as system.info, comes with no body
     const text = await request.text();
 
-    const body = (text === '' ? {} : JSON.parse(text)) as {
-      readonly json?: Record<string, unknown>;
-    };
+    const raw: unknown = text === '' ? {} : JSON.parse(text);
+    const body = procedureBodySchema.safeParse(raw);
 
-    return buildProcedureResponse(stub, procedure, body.json ?? {});
+    if (!body.success) {
+      return buildRPCError(400, 'BAD_REQUEST', 'Input validation failed');
+    }
+
+    return buildProcedureResponse(stub, procedure, body.data.json ?? {});
   };
 
   const server = Bun.serve<ExecSocketData>({
@@ -162,6 +177,7 @@ function buildRPCError(status: number, code: string, message: string): Response 
 
 // the version system.info reports: the impd the host pins
 const stubImpdVersion = '2.3.0';
+const grantFilterSchema = z.object({ paths: z.array(z.string()).optional() });
 
 function buildProcedureResponse(
   stub: StubImpd,
@@ -236,7 +252,42 @@ function buildProcedureResponse(
     })
     .with('grants/list', () => buildRPCResult(imp.grants))
     .with('grants/add', () => {
-      imp.grants.push(String(input['secret']));
+      const secret = String(input['secret']);
+      const filter = grantFilterSchema.safeParse(input['filter']);
+      const host = stub.secretHosts.get(secret);
+
+      const clash = imp.grants.find(
+        (held) => held !== secret && host !== undefined && stub.secretHosts.get(held) === host,
+      );
+
+      // impd's message for a clash, from its broker service at the pinned release
+      if (clash !== undefined) {
+        return buildRPCError(
+          409,
+          'CONFLICT',
+          `secret ${clash} already gives ${imp.name} a credential for ${host}`,
+        );
+      }
+
+      if (!imp.grants.includes(secret)) {
+        imp.grants.push(secret);
+      }
+
+      if (filter.success && filter.data.paths !== undefined) {
+        stub.grantPaths.set(`${imp.name} ${secret}`, filter.data.paths);
+      }
+
+      return buildRPCResult({});
+    })
+    .with('grants/delete', () => {
+      const secret = String(input['secret']);
+
+      if (!imp.grants.includes(secret)) {
+        return buildRPCError(404, 'NOT_FOUND', `${imp.name} holds no grant of ${secret}`);
+      }
+
+      imp.grants.splice(imp.grants.indexOf(secret), 1);
+      stub.grantPaths.delete(`${imp.name} ${secret}`);
 
       return buildRPCResult({});
     })
@@ -297,17 +348,32 @@ function toImpRecord(imp: StubImp) {
   };
 }
 
+const execMessageSchema = z.object({
+  type: z.string(),
+  name: z.string().optional(),
+  argv: z.array(z.string()).optional(),
+  require: z.array(z.string()).optional(),
+});
+
 function runStubCommand(
   stub: StubImpd,
   socket: ServerWebSocket<ExecSocketData>,
   raw: string | Buffer,
 ): void {
-  const message = JSON.parse(String(raw)) as {
-    readonly type: string;
-    readonly name?: string;
-    readonly argv?: string[];
-    readonly require?: string[];
-  };
+  const parsed: unknown = JSON.parse(String(raw));
+  const result = execMessageSchema.safeParse(parsed);
+
+  if (!result.success) {
+    socket.send(
+      JSON.stringify({ type: 'error', code: 'BAD_REQUEST', message: 'not an exec message' }),
+    );
+
+    socket.close();
+
+    return;
+  }
+
+  const message = result.data;
 
   if (message.type !== 'start') {
     return;

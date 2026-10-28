@@ -4,13 +4,16 @@
   "description": "The preview service: one tailnet link per pull request to that pull request's code, running in its own imp",
   "type": "module",
   "dependencies": {
-    "@impz/client": "2.3.0"
+    "@impz/client": "6.0.0",
+    "@zgeoff/std": "0.3.0",
+    "ts-pattern": "5.9.2",
+    "xstate": "5.33.3",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",
     "@types/bun": "1.4.3",
-    "@zgeoff/bun-test-extended": "0.2.0",
-    "msw": "2.15.0",
-    "ts-pattern": "5.9.0"
+    "@zgeoff/bun-test-extended": "0.2.1",
+    "msw": "2.15.0"
   }
 }

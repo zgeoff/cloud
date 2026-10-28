@@ -15,11 +15,13 @@ export type NixieProcedure = ToProcedure<keyof paths>;
 
 type Operation<Procedure extends NixieProcedure> = paths[`/${Procedure}`]['post'];
 
-type NixieInput<Procedure extends NixieProcedure> = Operation<Procedure>['requestBody'] extends {
-  content: { 'application/json': infer Input };
-}
-  ? Input
-  : undefined;
+// it distributes over a union of procedures, so a request for any one of several procedures takes
+// any one of their inputs
+export type NixieInput<Procedure extends NixieProcedure> = Procedure extends NixieProcedure
+  ? Operation<Procedure>['requestBody'] extends { content: { 'application/json': infer Input } }
+    ? Input
+    : undefined
+  : never;
 
 // a stream's answer has no JSON output
 export type NixieOutput<Procedure extends NixieProcedure> =
@@ -37,18 +39,26 @@ export interface NixieRequest<Procedure extends NixieProcedure> {
 
 export type NixieAnswer =
   | { readonly ok: true; readonly output: unknown }
-  | { readonly ok: false; readonly code: string | null };
+  | {
+      readonly ok: false;
+      readonly code: string | null;
+
+      // false when the body is no error that nixie's contract defines, for which oRPC makes the
+      // code up from the HTTP status, as for a proxy's own 401
+      readonly isDefined: boolean;
+    };
 
 interface NixieContext {
   readonly url: string;
   readonly token: string | null;
 }
 
-// the procedure's path joins the base URL, so every call goes under /rpc
+// the procedure's path joins the base URL, so every call goes under rpc/ below the base URL's own
+// path, which a proxy such as the k3s API's service proxy puts in front of nixie's
 const codec = new StandardRPCLinkCodec<NixieContext>(
   new StandardRPCSerializer(new StandardRPCJsonSerializer()),
   {
-    url: (options) => new URL('/rpc', options.context.url),
+    url: (options) => new URL('rpc', toDirectoryURL(options.context.url)),
     headers: (options) => buildNixieHeaders(options.context.token),
   },
 );
@@ -83,8 +93,16 @@ export async function decodeNixieAnswer(status: number, text: string): Promise<N
   } catch (error) {
     const code: unknown = error instanceof ORPCError ? error.code : null;
 
-    return { ok: false, code: typeof code === 'string' ? code : null };
+    return {
+      ok: false,
+      code: typeof code === 'string' ? code : null,
+      isDefined: error instanceof ORPCError && error.defined,
+    };
   }
+}
+
+function toDirectoryURL(url: string): string {
+  return url.endsWith('/') ? url : `${url}/`;
 }
 
 function toHeaders(

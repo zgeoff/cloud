@@ -1,0 +1,18 @@
+async function readFeatures(
+  client: ImpClient,
+  signal: AbortSignal | undefined,
+): ReturnType<ImpPort['readFeatures']> {
+  const options = signal === undefined ? {} : { signal };
+
+  const check = await client.checkServer(options);
+
+  if (!check.compatible) {
+    throw new Error(`impd ${check.serverVersion} does not speak imp client ${check.clientVersion}`);
+  }
+
+  return {
+    publicEgress: check.info.features?.publicEgress === true,
+    isEgressEnforced: check.info.egress?.isEnforced === true,
+    hasBackupOptOut: check.info.features?.backupOptOut === true,
+  };
+}

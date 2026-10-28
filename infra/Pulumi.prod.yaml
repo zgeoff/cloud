@@ -3,7 +3,7 @@ config:
   geoff-cloud:cluster: managed
   geoff-cloud:hostOnTailnet: 'true'
   geoff-cloud:atcGateway:
-    image: ghcr.io/zgeoff/atc-gateway:5.0.0@sha256:fc81d39229008779894e00cc4b6f9a272d1dc92e77843003a9790f191c0ee10c
+    image: ghcr.io/zgeoff/atc-gateway:7.4.0@sha256:a449cbde1e6b0edd36762a271516124bdde05328c3bb7d650d0c60a7df54fee7
     backupImage: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2@sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377
     publicURL: https://atc.geoff.cloud
     daemons:
@@ -19,11 +19,11 @@ config:
       - 127.0.0.1
   geoff-cloud:discordAlerts: 'true'
   geoff-cloud:nixie:
-    image: ghcr.io/zgeoff/nixie:0.37.0@sha256:b73169ba10654cd1315672b3ff86604f453789e577ad7e0cc639b6fd269eae8c
-    webImage: ghcr.io/zgeoff/nixie-web:0.37.0@sha256:9be02e8a3d9d0a123f3046e8f6fd31cad6f8ed5f481daef9bab76be5fa793a4a
+    image: ghcr.io/zgeoff/nixie:0.49.0@sha256:540af8dd81da77e7fdd3048127619eea6e9cff78775dea5fb58fbff7a484f5b4
+    webImage: ghcr.io/zgeoff/nixie-web:0.49.0@sha256:212d4704761b98d8459e02179cec443895e44d15731ff53318cce569acc4a806
     hostname: nixie.geoff.cloud
   geoff-cloud:files:
-    image: ghcr.io/zgeoff/cloud-files:3d7a541cabcd25faa474c68a5b5a3ed4b453c8a2@sha256:af9411239556141dbdb4a157614bb0cdc4924783701642f2d471a1a089a86296
+    image: ghcr.io/zgeoff/cloud-files:33830cac231f4295a03516fe081d1a0cbd790452@sha256:0c3ecdf88e7a02ce1b80d17e3017757b79f49b9abc1986af7c3674e7574334f9
     hostname: files.geoff.cloud
   geoff-cloud:atcGatewayOwnerEmail:
     secure: v1:qtn2w/XR0+liFzQ/:W1+yrhJlqaefFrlRSnptVnSirINfeT8elzOilqkmF0VmHbE=

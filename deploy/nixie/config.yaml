@@ -41,8 +41,11 @@ models:
 definitions:
   source:
     kind: path
-    # git-sync's link to its newest checkout of zgeoff/nixie-definitions
+    # git-sync's link to its newest checkout of zgeoff/nixie-definitions' `live` branch
     path: /etc/nixie/definitions/current
+  # nixie opens a pull request here for each skill it writes, with the token in the sops file
+  export:
+    repository: zgeoff/nixie-definitions
 # the owner's name, which the conversation reads in place of "the owner", and the owner's pronouns
 # for the review sentences; both stay out of this public file, in the sops file's settings
 owner:

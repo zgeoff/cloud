@@ -3,8 +3,9 @@ import type { Output } from '@pulumi/pulumi';
 import { topology } from '@zgeoff/cloud-topology';
 import type { ATCGatewayConfig } from '../inputs/index.ts';
 import { cloudflaredImage } from '../shared/cloudflared-image.ts';
+import { podLabels } from '../shared/pod-labels.ts';
 
-export const atcGatewayLabels = { app: 'atc-gateway' };
+export const atcGatewayLabels = podLabels.atcGateway;
 const nonrootID = 65_532;
 
 interface GatewaySpecInputs {
@@ -61,7 +62,7 @@ export function buildATCPodSecurity(): input.core.v1.PodSecurityContext {
 export const atcGatewayRegistryFile = 'registry.json';
 const registryDir = '/etc/atc-gateway';
 
-// $HOME/.local/state/atc, until atc's packaging names the gateway's state path
+// atc's default, $HOME/.local/state/atc: atc's packaging names no state path for the gateway
 const defaultStateDir = '/home/nonroot/.local/state/atc';
 
 export const atcGatewayPort = topology.atc.gatewayPort;

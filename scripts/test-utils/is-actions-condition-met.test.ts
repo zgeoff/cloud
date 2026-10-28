@@ -86,6 +86,26 @@ test.each([
   },
 );
 
+test.each([
+  ['cancelled()', true],
+  ['success()', false],
+  ['failure()', false],
+  ['always()', true],
+  ["steps.guard.outputs.verdict == 'apply'", false],
+  ["cancelled() && steps.guard.outputs.verdict == 'apply'", true],
+])('it evaluates %s in a cancelled run as %p', (condition, met) => {
+  expect(
+    isActionsConditionMet(condition, {
+      github: { event_name: 'push' },
+      needs: {},
+      steps: {
+        guard: { outcome: 'success', conclusion: 'success', outputs: { verdict: 'apply' } },
+      },
+      cancelled: true,
+    }),
+  ).toBe(met);
+});
+
 test('it rejects a steps path when no steps context is given', () => {
   expect(() =>
     isActionsConditionMet("steps.outcome.outputs.outcome == 'apply'", {

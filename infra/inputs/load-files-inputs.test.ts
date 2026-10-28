@@ -149,6 +149,19 @@ test('it refuses an image without a digest', () => {
   ).toThrowWithMessage(Error, 'stack config "files.image" must name an image by tag and digest');
 });
 
+test('it refuses an image that is not a string', () => {
+  expect(() =>
+    loadFilesInputs(
+      buildStubConfig({ files: JSON.stringify({ image: 42, hostname: 'files.geoff.cloud' }) }),
+      { FILES_AGENT_TOKEN: 'agent-token-for-tests', FILES_OWNER_TOKEN: 'owner-token-for-tests' },
+      undefined,
+    ),
+  ).toThrowWithMessage(
+    Error,
+    'stack config "files.image" Invalid input: expected string, received number',
+  );
+});
+
 test('it refuses a host name outside geoff.cloud', () => {
   expect(() =>
     loadFilesInputs(

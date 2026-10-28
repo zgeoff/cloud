@@ -33,6 +33,12 @@ A blackbox probe in the cluster opens a TCP connection to each daemon on the gat
 it, so the alert for a daemon fires when the gateway could not reach it either
 ([observability](./observability.md)).
 
+An egress NetworkPolicy lets the gateway's pod and the probe's pod reach the two daemons' addresses
+on the daemon port, and refuses every other pod in their namespaces, the gateway's backup job among
+them ([which pod uses each grant](../network/tailnet.md#which-pod-uses-each-grant)). The policy
+takes those addresses from the shared constants, not from the registry, so a daemon added to the
+stack config stays unreachable until its address joins the policy.
+
 ## The gateway pod
 
 The gateway is atc's released binary in a distroless image that this repo builds. CI builds the
@@ -114,3 +120,8 @@ or added profile changes both daemons' configs. The daemon's impd token lists ea
 as grantable, so the token, not the config, bounds what a session can reach. impd ties each entry of
 that list to the secret it named, so a secret made again under the same name needs a new grantable
 list on each daemon's token. A Codex session has no brokered sign-in.
+
+A Claude session runs its prompt only in a folder that Claude Code trusts, and the imp's Claude
+config trusts only the root of a workspace that the spawn cloned with trust opted in. The daemon
+resolves a git workspace's ref with git on the host before the imp clones it. The
+[smoke spawn](../../runbooks/atc-gateway-smoke.md) uses those settings.

@@ -1,6 +1,3 @@
-// The parts of a GitHub Actions workflow that decide when its jobs run: each job's needs, `if`,
-// concurrency group and outputs, and the workflow's group. It throws on concurrency or an output
-// it does not model, so a test never passes on a rule the scheduler stand-in ignores.
 export interface ActionsConcurrency {
   // lowercased, since GitHub compares group names case-insensitively
   readonly group: string;
@@ -9,11 +6,11 @@ export interface ActionsConcurrency {
   readonly queue: 'single' | 'max';
 }
 
-// a job output that publishes one step's output, `${{ steps.<step>.outputs.<output> }}`
-interface ActionsJobOutput {
-  readonly step: string;
-  readonly output: string;
-}
+// a step's output, `${{ steps.<step>.outputs.<output> }}`, or the outcome of a step, which
+// continue-on-error leaves apart from its job's result
+type ActionsJobOutput =
+  | { readonly kind: 'output'; readonly step: string; readonly output: string }
+  | { readonly kind: 'outcome'; readonly step: string };
 
 export interface ActionsJob {
   readonly name: string;
@@ -116,7 +113,7 @@ function isStringArray(value: unknown): value is readonly string[] {
 }
 
 const stepOutput =
-  /^\$\{\{\s*steps\.(?<step>[A-Za-z_][\w-]*)\.outputs\.(?<output>[A-Za-z_][\w-]*)\s*\}\}$/u;
+  /^\$\{\{\s*steps\.(?<step>[A-Za-z_][\w-]*)\.(?:outputs\.(?<output>[A-Za-z_][\w-]*)|(?<outcome>outcome))\s*\}\}$/u;
 
 function parseOutputs(job: string, value: unknown): Record<string, ActionsJobOutput> {
   if (value === undefined) {
@@ -130,12 +127,17 @@ function parseOutputs(job: string, value: unknown): Record<string, ActionsJobOut
   return Object.fromEntries(
     Object.entries(value).map((entry: readonly [string, unknown]) => {
       const groups = typeof entry[1] === 'string' ? stepOutput.exec(entry[1])?.groups : undefined;
+      const step = groups?.['step'];
+      const output = groups?.['output'];
 
-      if (groups?.['step'] === undefined || groups['output'] === undefined) {
+      if (step === undefined) {
         throw new Error(`job ${job}: unsupported output ${entry[0]}: ${JSON.stringify(entry[1])}`);
       }
 
-      return [entry[0], { step: groups['step'], output: groups['output'] }];
+      const source: ActionsJobOutput =
+        output === undefined ? { kind: 'outcome', step } : { kind: 'output', step, output };
+
+      return [entry[0], source];
     }),
   );
 }

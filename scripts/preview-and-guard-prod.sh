@@ -2,8 +2,8 @@
 # The prod apply job's preview and guard: it builds the SDK and previews the prod stack with a
 # refresh into $RUNNER_TEMP/plan.json, both in PROGRAM, the checkout of the revision to apply, then
 # runs the guard (check-prod-plan.ts) of its own checkout on that plan and DRIFT, the outcome of
-# the drift check from the deployed revision. The preview runs through
-# retry-transient-pulumi.sh, which runs it again after an ACME server's 5xx or a failed plugin
+# the drift check from the deployed revision. The preview runs through retry-transient-pulumi.sh,
+# which runs it again after an ACME server's 5xx, a Cloudflare API 5xx to a read or a failed plugin
 # download. The guard's text goes to stdout and to $GITHUB_STEP_SUMMARY, and its verdict to
 # $GITHUB_OUTPUT: verdict=apply when it passes the plan (exit 0), verdict=hold when it holds it
 # (exit 3).

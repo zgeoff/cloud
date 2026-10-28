@@ -23,6 +23,7 @@ let
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
   stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubAgentImageBun = import ./test-utils/build-stub-agent-image-bun.nix { inherit pkgs; };
   stubOpRead = import ./test-utils/build-stub-op-read.nix { inherit pkgs; } {
     "op://vault/item/field" = "a value with spaces";
     "op://vault/item/other" = "other";
@@ -233,13 +234,13 @@ let
       '';
     }
     {
-      title = "it start-stub-impd starts the stand-in it is given with its port read, and stops it when the case exits";
+      title = "it start-stub-server starts the stand-in it is given with its port read, and stops it when the case exits";
       script = ''
         mkdir home tmp
         source ${testLib}/wait-for.sh
 
-        bash -c 'set -euo pipefail; source "$1"; start_stub_impd "$2" /health 200 text/plain ok "$PWD/requests"; echo "$port" > port; curl -s "http://127.0.0.1:$port/health" > body' \
-          _ ${./test-utils/start-stub-impd.sh} ${./test-utils/run-stub-impd.py} > out 2> err
+        bash -c 'set -euo pipefail; source "$1"; start_stub_server "$2" /health 200 text/plain ok "$PWD/requests"; echo "$port" > port; curl -s "http://127.0.0.1:$port/health" > body' \
+          _ ${./test-utils/start-stub-server.sh} ${./test-utils/run-stub-impd.py} > out 2> err
 
         assert_equals ok "$(cat body)" "the stand-in's answer"
         assert_equals "GET /health" "$(cat requests)" "the stand-in's requests"
@@ -250,13 +251,13 @@ let
       '';
     }
     {
-      title = "it start-stub-impd lets a case stop the stand-in first, with no error when the case exits";
+      title = "it start-stub-server lets a case stop the stand-in first, with no error when the case exits";
       script = ''
         mkdir home tmp
 
         status=0
-        bash -c 'set -euo pipefail; source "$1"; start_stub_impd "$2" /health 200 text/plain ok "$PWD/requests"; kill "$stub_pid"; wait "$stub_pid" || true' \
-          _ ${./test-utils/start-stub-impd.sh} ${./test-utils/run-stub-impd.py} > out 2> err || status=$?
+        bash -c 'set -euo pipefail; source "$1"; start_stub_server "$2" /health 200 text/plain ok "$PWD/requests"; kill "$stub_pid"; wait "$stub_pid" || true' \
+          _ ${./test-utils/start-stub-server.sh} ${./test-utils/run-stub-impd.py} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the case's exit status"
         assert_files_equal /dev/null out
@@ -267,7 +268,7 @@ let
       title = "it run-stub-impd answers a GET of its path with the given status, content type and body, once it prints its port";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -D headers -o body "http://127.0.0.1:$port/health"
@@ -283,7 +284,7 @@ let
       title = "it run-stub-impd records a request for another path and answers it with a failure";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -D headers -o body "http://127.0.0.1:$port/ready"
@@ -298,7 +299,7 @@ let
       title = "it run-stub-impd records a request with another method and answers it with a failure";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         curl -s -X POST -D headers -o body "http://127.0.0.1:$port/health"
@@ -313,7 +314,7 @@ let
       title = "it run-stub-impd records a HEAD request and answers it with the headers of a failure and no body";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         # a raw request, so the check sees every byte the stand-in sends before it closes
@@ -337,21 +338,84 @@ let
       '';
     }
     {
-      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.2 at the hashes of this check";
+      title = "it run-stub-model-api answers a POST of its path with its JSON body, once it prints its port";
       script = ''
-        handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts || true)
-        grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/build-app.ts > handler || true
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        curl -s -D headers -o body -X POST -H 'content-type: application/json' \
+          -d '{"model":"model-small","max_tokens":3}' "http://127.0.0.1:$port/v1/messages"
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals "Content-Type: application/json" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
+        assert_equals '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$(cat body)" "the body"
+        assert_equals "POST /v1/messages" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api reads a chunked request body and answers the request";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        # a raw request, so the body goes as two chunks with no Content-Length, as a streamed one does
+        exec 4<>"/dev/tcp/127.0.0.1/$port"
+        printf 'POST /v1/messages HTTP/1.1\r\nHost: 127.0.0.1\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n5\r\n{"a":\r\n2\r\n1}\r\n0\r\n\r\n' >&4
+        cat <&4 > response
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 response | tr -d '\r')" "the status line"
+        assert_equals '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$(tail -1 response)" "the body"
+        assert_equals "POST /v1/messages" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api records a request for another path and answers it with a failure";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        curl -s -D headers -o body -X POST -d '{}' "http://127.0.0.1:$port/v1/messages/batches"
+
+        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
+        assert_equals "unexpected request: POST /v1/messages/batches" "$(cat body)" "the body"
+        assert_equals "POST /v1/messages/batches" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-model-api records a request with another method and answers it with a failure";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-model-api.py} \
+          /v1/messages '{"type":"message","usage":{"input_tokens":12,"output_tokens":3}}' "$PWD/requests"
+
+        curl -s -D headers -o body "http://127.0.0.1:$port/v1/messages"
+
+        assert_equals "HTTP/1.1 500 Internal Server Error" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals "Content-Type: text/plain" "$(grep -i '^content-type:' headers | tr -d '\r')" "the content type"
+        assert_equals "unexpected request: GET /v1/messages" "$(cat body)" "the body"
+        assert_equals "GET /v1/messages" "$(cat requests)" "the requests"
+      '';
+    }
+    {
+      title = "it run-stub-impd holds to the pinned imp: its /health handler and its empty warnings, the default 404 of Elysia, Elysia 1.4.29 and Bun 1.4.3 at the hashes of this check";
+      script = ''
+        handlers=$(grep -cxF "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts || true)
+        grep -xF -A4 "    .get('/health', () => ({" ${imp}/packages/daemon/src/surface/create-app.ts > handler || true
         # with no reboot reason and no storage warnings, the warnings are the empty list the
         # stand-in's bodies hold
-        grep -xF -A7 'function buildHealthWarnings(' ${imp}/packages/daemon/src/build-app.ts > warnings || true
-        # an Elysia onError hook would replace the default 404; build-app.ts's onError is oRPC's
-        error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/build-app.ts || true)
+        grep -xF -A7 'function buildHealthWarnings(' ${imp}/packages/daemon/src/surface/create-app.ts > warnings || true
+        # an Elysia onError hook would replace the default 404; create-app.ts's onError is oRPC's
+        error_hooks=$(grep -cF '.onError(' ${imp}/packages/daemon/src/surface/create-app.ts || true)
         elysia=$(jq -r '.workspaces.catalog.elysia' ${imp}/package.json)
-        bun=$(grep -c '^FROM oven/bun:1\.4\.2@' ${imp}/host/Dockerfile || true)
+        bun=$(grep -c '^FROM oven/bun:1\.4\.3@' ${imp}/host/Dockerfile || true)
         grep -oE '"(elysia|@sinclair/typebox|cookie|exact-mirror|fast-decode-uri-component|memoirist)": \["[^"]+".*"sha512-[^"]+"\]' \
           ${imp}/bun.lock | sed -E 's/^"([^"]+)": \["([^"]+)".*"(sha512-[^"]+)"\]$/\2 \3/' | sort > locked
 
-        assert_equals 1 "$handlers" "build-app.ts's /health handlers"
+        assert_equals 1 "$handlers" "create-app.ts's /health handlers"
         assert_files_equal - handler <<'EOF'
             .get('/health', () => ({
               status: 'ok',
@@ -369,9 +433,9 @@ let
           return [...reboot, ...storageWarnings];
         }
         EOF
-        assert_equals 0 "$error_hooks" "build-app.ts's Elysia onError hooks"
+        assert_equals 0 "$error_hooks" "create-app.ts's Elysia onError hooks"
         assert_equals 1.4.29 "$elysia" "imp's Elysia version"
-        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.2 stages"
+        assert_equals 1 "$bun" "host/Dockerfile's oven/bun:1.4.3 stages"
         cat > expected <<'EOF'
         @sinclair/typebox@0.34.52 sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==
         cookie@1.1.1 sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==
@@ -386,13 +450,13 @@ let
     }
     (
       let
-        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.2), from its release
+        # the Bun the pinned imp runs (host/Dockerfile's oven/bun:1.4.3), from its release
         pinnedBun = pkgs.stdenv.mkDerivation {
           pname = "bun";
-          version = "1.4.2";
+          version = "1.4.3";
           src = pkgs.fetchurl {
-            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.2/bun-linux-x64.zip";
-            hash = "sha256-NjaPrvdSeHXV/6UuU81IAhdB8qg+tiCKjdZAaNQiqRM=";
+            url = "https://github.com/oven-sh/bun/releases/download/bun-v1.4.3/bun-linux-x64.zip";
+            hash = "sha256-PnMFKNiXdfA/h/BcBnh8TfQJnQo38/JS57gpyyOBbhg=";
           };
           nativeBuildInputs = [
             pkgs.unzip
@@ -449,8 +513,8 @@ let
           cat > $out/app.ts <<'EOF'
           import { Elysia } from 'elysia';
 
-          // packages/daemon/src/build-app.ts's /health handler, with impd ready, no reboot reason and
-          // no storage warnings
+          // packages/daemon/src/surface/create-app.ts's /health handler, with impd ready, no reboot
+          // reason and no storage warnings
           const app = new Elysia()
             .get('/health', () => ({ status: 'ok', ready: true, warnings: [] }))
             .listen({ hostname: '127.0.0.1', port: 0 });
@@ -460,7 +524,7 @@ let
         '';
       in
       {
-        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.2 does";
+        title = "it run-stub-impd answers /health and an unknown route as the Elysia 1.4.29 of imp on Bun 1.4.3 does";
         script = ''
           mkdir home tmp
           mkfifo real.fifo stub-health.fifo stub-missing.fifo
@@ -505,7 +569,7 @@ let
       title = "it run-stub-hung-impd takes a connection and never answers it, and buildStubCurl answers the call of the probe as curl then does";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-hung-impd.py}
+        start_stub_server ${./test-utils/run-stub-hung-impd.py}
 
         # one real wait serves both units: curl's own deadline is the only end it has
         real_status=0
@@ -523,6 +587,51 @@ let
         assert_equals "$(cut -d' ' -f1 real.out)" "$(cat stub.out)" "the stand-in's status code"
         assert_files_equal real.err stub.err
         assert_missing stub.body "the stand-in's body"
+      '';
+    }
+    {
+      title = "it run-stub-mcp-upstream records the method, target, host and authorization of each request, and answers it as text";
+      script = ''
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+
+        authorization='Authorization: Bearer example-token'
+        curl -s -D headers -o body -X POST -H 'Host: mcp.example.test' -H "$authorization" \
+          --data '{}' --path-as-is "http://127.0.0.1:$port/oauth2/../oauth2/token?client=a"
+
+        assert_equals "HTTP/1.1 200 OK" "$(head -1 headers | tr -d '\r')" "the status line"
+        assert_equals " text/plain" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
+        assert_equals "POST /oauth2/../oauth2/token?client=a" "$(cat body)" "the body"
+        assert_files_equal - requests <<'EOF'
+        {"method": "POST", "path": "/oauth2/../oauth2/token?client=a", "host": "mcp.example.test", "authorization": "Bearer example-token"}
+        EOF
+      '';
+    }
+    {
+      title = "it run-stub-mcp-upstream holds a GET of /mcp open after its first event until the release file exists";
+      script = ''
+        source ${testLib}/wait-for.sh
+        mkdir home tmp
+        start_stub_server ${./test-utils/run-stub-mcp-upstream.py} 0 "$PWD/requests" "$PWD/release"
+
+        curl -s -N -D headers -o stream "http://127.0.0.1:$port/mcp" &
+        curl_pid=$!
+        wait_for 5 "the first event" grep -qx 'data: first' stream
+        held=$(cat stream)
+        kill -0 "$curl_pid"
+        touch release
+        wait "$curl_pid"
+
+        assert_equals "data: first" "$(printf '%s' "$held" | sed '/^$/d')" "the stream before the release"
+        assert_equals " text/event-stream" "$(grep -i '^content-type:' headers | cut -d: -f2- | tr -d '\r')" "the content type"
+        assert_files_equal - stream <<'EOF'
+        data: first
+
+        data: second
+
+        EOF
+        assert_equals "{\"method\": \"GET\", \"path\": \"/mcp\", \"host\": \"127.0.0.1:$port\", \"authorization\": null}" \
+          "$(cat requests)" "the requests"
       '';
     }
     (
@@ -1271,6 +1380,55 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostDocker keeps the pin of the image whose name an add points at a new ref";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":true}]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","pinned":true}' "$(jq -c '{name, ref, pinned}' out)" "the printed image"
+        assert_files_equal /dev/null err
+        assert_equals '[["pv-base","ghcr.io/example/base:1.0.0",true]]' \
+          "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker pins the image of the name it is given, prints nothing, and leaves the other images alone";
+      script = ''
+        mkdir home tmp impd
+        echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false},{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false}]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image pin pv-base > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_equals '[["base",false],["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails a pin of a name that holds no image, as impz fails a call";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} exec imp-host impz image pin pv-base > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "impz: NOT_FOUND: image pv-base not found" "$(cat err)" "the error"
+        assert_equals '[]' "$(cat impd/images.json)" "impd's images"
+      '';
+    }
+    {
       title = "it buildStubImpHostDocker fails the calls its unreachable count names as docker fails a missing container, then answers";
       script = ''
         mkdir home tmp impd
@@ -1356,6 +1514,114 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostDocker copies a file out of its container directory with its mode, and records the call";
+      script = ''
+        mkdir home tmp impd impd/container impd/container/usr impd/container/usr/local impd/container/usr/local/bin
+        printf '#!/bin/sh\necho stand-in\n' > impd/container/usr/local/bin/impz
+        chmod 0755 impd/container/usr/local/bin/impz
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_files_equal impd/container/usr/local/bin/impz impz
+        assert_equals 755 "$(stat -c %a impz)" "the copy's mode"
+        assert_equals "[\"cp\",\"imp-host:/usr/local/bin/impz\",\"$PWD/impz\"]" "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubImpHostDocker fails a copy of a path its container directory lacks, as docker fails it";
+      script = ''
+        mkdir home tmp impd
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostDocker} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "Error response from daemon: Could not find the file /usr/local/bin/impz in container imp-host" "$(cat err)" "the error"
+        assert_missing impz "the copy"
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun prints its stdout file for a build, and records the argv, directory, impd settings and impz of the build";
+      script = ''
+        mkdir home tmp build bin work
+        printf '#!/bin/sh\n' > bin/impz
+        chmod 0755 bin/impz
+        echo 'agent-0123abc imp-build-aa check passed' > build/stdout
+
+        root=$PWD
+        status=0
+        (cd work && env -i PATH="$root/bin:$PATH" HOME="$root/home" TMPDIR="$root/tmp" BUILD_STATE="$root/build" \
+          IMP_URL=http://127.0.0.1:7070 IMP_TOKEN=imp_fixture_token \
+          ${stubAgentImageBun} scripts/build-agent-image.ts 0123abcdef0123abcdef0123abcdef0123abcdef > "$root/out" 2> "$root/err") || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals 'agent-0123abc imp-build-aa check passed' "$(cat out)" "the printed result"
+        assert_files_equal /dev/null err
+        jq -S . > expected <<EOF
+        {
+          "argv": ["scripts/build-agent-image.ts", "0123abcdef0123abcdef0123abcdef0123abcdef"],
+          "cwd": "$PWD/work",
+          "impURL": "http://127.0.0.1:7070",
+          "impToken": "imp_fixture_token",
+          "impz": "$PWD/bin/impz"
+        }
+        EOF
+        jq -S . build/calls > actual
+        assert_files_equal expected actual
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun exits with its status file, and records a null impz when PATH holds none";
+      script = ''
+        mkdir home tmp build
+        echo 1 > build/status
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
+          ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal /dev/null err
+        assert_equals '{"impURL":null,"impToken":null,"impz":null}' "$(jq -c '{impURL, impToken, impz}' build/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun fails another call as unexpected, and records none";
+      script = ''
+        mkdir home tmp build
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" BUILD_STATE="$PWD/build" \
+          ${stubAgentImageBun} scripts/build-agent-image.ts --keep 0123abc > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "unexpected: scripts/build-agent-image.ts --keep 0123abc" "$(cat err)" "the error"
+        assert_missing build/calls "the call log"
+      '';
+    }
+    {
+      title = "it buildStubAgentImageBun refuses to run without the build state directory";
+      script = ''
+        mkdir home tmp
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubAgentImageBun} scripts/build-agent-image.ts 0123abc > out 2> err || status=$?
+
+        assert_equals 2 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals "bun-answering-build-agent-image: set BUILD_STATE to the directory that holds the build's answer" "$(cat err)" "the error"
+      '';
+    }
+    {
       title = "it buildStubImpHostDocker refuses to run without the impd state directory";
       script = ''
         mkdir home tmp
@@ -1369,11 +1635,12 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker holds to preview-image: it reaches impd only through the docker it is given, with the two calls the stand-in answers";
+      title = "it buildStubImpHostDocker holds to preview-image: it reaches impd only through the docker it is given, with the three calls the stand-in answers";
       script = ''
         docker_cmd=$(grep -cxF 'docker="''${DOCKER:-docker}"' ${../modules/preview-image.sh} || true)
         list=$(grep -cxF 'until images=$("$docker" exec imp-host impz image ls --json 2> "$err"); do' ${../modules/preview-image.sh} || true)
-        add=$(grep -cxF '"$docker" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        add=$(grep -cxF '  "$docker" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        pin=$(grep -cxF '  "$docker" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
         calls=$(grep -cF '"$docker"' ${../modules/preview-image.sh} || true)
         # a docker call by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ ;&|($])docker ' ${../modules/preview-image.sh} || true)
@@ -1381,7 +1648,8 @@ let
         assert_equals 1 "$docker_cmd" "the script's docker"
         assert_equals 1 "$list" "the script's image list"
         assert_equals 1 "$add" "the script's image add"
-        assert_equals 2 "$calls" "the script's calls through DOCKER"
+        assert_equals 1 "$pin" "the script's image pin"
+        assert_equals 3 "$calls" "the script's calls through DOCKER"
         assert_equals 0 "$direct" "the script's calls of docker by name"
       '';
     }
@@ -1551,7 +1819,7 @@ pkgs.runCommand "test-utils-check"
       assert_equals false "$rendered" "whether it rendered"
     )
 
-    source ${./test-utils/start-stub-impd.sh}
+    source ${./test-utils/start-stub-server.sh}
     source ${testLib}/run-cases.sh
     source ${pkgs.writeText "test-utils-cases.sh" (renderCases cases)}
     run_cases

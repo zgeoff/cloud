@@ -35,15 +35,48 @@ gates:
       - scripts/run-decide-gates.ts
       - scripts/is-gate-needed.ts
       - scripts/load-gate-manifest.ts
+      - scripts/find-gate-base.sh
+      - scripts/decide-ci-gates.sh
+
+  # The onidel provider's vendored Go modules, which the NixOS check onidel-provider-vendor builds
+  # in the pinned Nix image, so a stale vendorHash in nixos/packages/onidel-provider.nix fails the
+  # pull request that makes it stale. go mod vendor copies only the packages that the provider's
+  # non-test Go files import, from the modules that go.mod and go.sum pin, with the Go of
+  # nixos/flake.lock's nixpkgs. The other inputs are the check, the flake that declares it, the
+  # scripts that run it, the CI workflow, and the gate filter with this file.
+  onidel-vendor:
+    skipped:
+      No input of the onidel provider's vendored Go modules changed, so their build did not run.
+    paths:
+      - provider/go.mod
+      - provider/go.sum
+      - provider/**/*.go
+      - nixos/packages/onidel-provider.nix
+      - nixos/checks/onidel-provider-vendor.nix
+      - nixos/flake.nix
+      - nixos/flake.lock
+      - scripts/run-nixos-checks.sh
+      - scripts/nix-image.sh
+      - .github/workflows/ci.yml
+      - .github/gates.yml
+      - scripts/run-decide-gates.ts
+      - scripts/is-gate-needed.ts
+      - scripts/load-gate-manifest.ts
+      - scripts/find-gate-base.sh
+      - scripts/decide-ci-gates.sh
+    ignore:
+      - provider/**/*_test.go
 
   # The NixOS checks, which boot VMs and take minutes. A green run on main covers each later
   # commit until one of these paths changes (scripts/find-nixos-check-run.sh). The inputs are the
   # flake, which holds the impd database tools the restore rehearsals run; the shared constants it
   # reads; the preview service's source, which the host's package copies, and bun.lock, from which
-  # that package fetches the service's dependencies; the shell test helpers that
-  # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them; the
-  # scripts that run the checks, pin their image and open KVM to them; the scripts that
-  # tank-cloud-host-secrets runs in its VM; .bun-version; the workflow; and the scripts that decide
+  # that package fetches the service's dependencies; the drift check's Onidel provider, project and
+  # stack files and scripts, which the host's drift check copies; the shell test helpers that
+  # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them, with
+  # the Discord webhook and kubectl stand-ins that the drift-check-vm check runs; the scripts that
+  # run the checks, pin their image and open KVM to them; the scripts that tank-cloud-host-secrets
+  # runs in its VM; .bun-version; the workflow; and the scripts that decide
   # when the checks run, with this file. The root package.json is no input, although its
   # test:nixos script runs the checks: a change to it alone runs at the next change to an input,
   # or on a dispatch.
@@ -53,6 +86,15 @@ gates:
       - packages/topology/**
       - packages/preview/**
       - bun.lock
+      - provider/**
+      - infra/Pulumi.yaml
+      - infra/Pulumi.prod.yaml
+      - scripts/run-host-drift-check.sh
+      - scripts/check-scheduled-drift.sh
+      - scripts/retry-transient-pulumi.sh
+      - scripts/alert-scheduled-drift.sh
+      - scripts/hold-prod-lock.sh
+      - scripts/hold-host-prod-lock.sh
       - test-support/shell/run-cases.sh
       - test-support/shell/test-run-cases.sh
       - test-support/shell/assert-equals.sh
@@ -66,6 +108,8 @@ gates:
       - test-support/shell/assert-missing.sh
       - test-support/shell/test-assert-missing.sh
       - test-support/shell/wait-for.sh
+      - test-support/shell/start-stub-discord-webhook.sh
+      - test-support/shell/create-stub-kubectl.sh
       - scripts/run-nixos-checks.sh
       - scripts/nix-image.sh
       - scripts/open-kvm.sh
@@ -89,3 +133,71 @@ gates:
       - provider/**
       - sdk/**
       - packages/topology/**
+
+  # The lanes: the Docker suites that CI's checks job runs as steps, each only when a change
+  # touches its image, its scripts or its workflow. A push to main runs the atc gateway's fixture
+  # and the files image's test in their publish workflows, so CI runs those two on a pull request
+  # only.
+  agent-image:
+    skipped: Nothing the agent image builds from changed, so its build and check did not run.
+    paths:
+      - images/agent/**
+      - scripts/*agent-image*
+      - test-support/shell/*-stub-apt-*
+      - .github/workflows/ci.yml
+
+  atc-gateway:
+    skipped: Nothing the atc gateway's images build from changed, so their fixture test did not run.
+    paths:
+      - images/atc-gateway/**
+      - scripts/fetch-atc-release.sh
+      - scripts/publish-atc-gateway-images.sh
+      - scripts/run-shell-suites.sh
+      - e2e/test-atc-gateway-restore.sh
+      - infra/cluster/build-atc-gateway-spec.ts
+      - infra/cluster/create-atc-gateway-backup-job.ts
+      - infra/cluster/build-atc-gateway-backup-pod-spec.ts
+      - test-support/shell/**
+      - .github/workflows/ci.yml
+
+  files-image:
+    skipped: Nothing the files image builds from changed, so its image test did not run.
+    paths:
+      - packages/files/**
+      - images/files/**
+      - images/atc-gateway/versions.env
+      - scripts/write-files-image-context.sh
+      - scripts/publish-files-image.sh
+      - scripts/run-shell-suites.sh
+      - test-support/shell/**
+      - bun.lock
+      - .bun-version
+      - .github/workflows/ci.yml
+
+  files-backup:
+    skipped: Nothing the files backup reads changed, so its fixture test did not run.
+    paths:
+      - deploy/files/backup/**
+      - scripts/run-shell-suites.sh
+      - test-support/shell/run-cases.sh
+      - test-support/shell/run-backup.sh
+      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/normalize-restic-output.sh
+      - infra/Pulumi.prod.yaml
+      - .bun-version
+      - package.json
+      - .github/workflows/ci.yml
+
+  nixie-backup:
+    skipped: Nothing the nixie backup reads changed, so its fixture test did not run.
+    paths:
+      - deploy/nixie/backup/**
+      - scripts/run-shell-suites.sh
+      - test-support/shell/run-cases.sh
+      - test-support/shell/run-backup.sh
+      - test-support/shell/run-backup-shell.sh
+      - test-support/shell/normalize-restic-output.sh
+      - infra/Pulumi.prod.yaml
+      - .bun-version
+      - package.json
+      - .github/workflows/ci.yml

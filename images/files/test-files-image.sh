@@ -45,7 +45,7 @@ it_serves_an_uploaded_PNG_inline_with_nosniff_and_the_sandbox_policy() {
   grep -i -v '^date:' "$tree/headers" | tr -d '\r' | LC_ALL=C sort -f > "$tree/headers.sorted"
   diff - "$tree/headers.sorted" << 'EOF'
 
-Cache-Control: public, max-age=300
+Cache-Control: no-store
 Content-Disposition: inline; filename="shot.png"; filename*=UTF-8''shot.png
 content-length: 12
 Content-Security-Policy: default-src 'none'; sandbox

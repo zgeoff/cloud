@@ -9,6 +9,11 @@ test.each([
   [`\${{ steps.guard.outputs.verdict }}`, 'hold'],
   [`\${{ steps.missing.outputs.verdict }}`, ''],
   [`\${{ inputs.absent }}`, ''],
+  [`\${{ secrets.TOKEN }}`, 'token-value'],
+  [`\${{ secrets.ABSENT }}`, ''],
+  [`\${{ needs.build.outputs.image-tag }}`, 'v7'],
+  [`\${{ needs.build.result }}`, 'success'],
+  [`\${{ needs.absent.outputs.image-tag }}`, ''],
   [`deploy \${{ github.event_name }} at \${{ github.sha }}`, 'deploy workflow_run at def456'],
   ['bun run up', 'bun run up'],
   [0, '0'],
@@ -23,6 +28,8 @@ test.each([
       },
       inputs: { revision: 'abc123' },
       steps: { guard: { outputs: { verdict: 'hold' } } },
+      secrets: { TOKEN: 'token-value' },
+      needs: { build: { result: 'success', outputs: { 'image-tag': 'v7' } } },
     }),
   ).toBe(rendered);
 });

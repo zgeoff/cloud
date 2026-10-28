@@ -10,12 +10,16 @@ on it.
 
 ## What the image holds
 
-The Dockerfile pins every input. The base image is pinned by digest, the Ubuntu packages come from
-Ubuntu's snapshot archive at a fixed moment so their exact versions stay installable, and every
-other download carries a checksum taken from its publisher's signed or attested release. The tools
-are the coding agents, atc, auto-mode with its mod, GitHub's CLI, the language toolchains,
-1Password's CLI and gitleaks. Claude Code is installed with its own updates turned off, so a session
-runs the version the image pins.
+The Dockerfile pins every input. The base image is pinned by digest, and every download other than
+an Ubuntu package carries a checksum taken from its publisher's signed or attested release. apt
+resolves the Ubuntu packages and their dependencies against Ubuntu's snapshot archive at a fixed
+moment, so a build installs the same versions after Ubuntu replaces one in its live archive. apt
+fetches each package file from the live archive when it still holds that version, and from the
+snapshot archive otherwise. The build step fetches again after a wait when either archive answers
+with an error, because apt does not retry an HTTP error by itself. The tools are the coding agents,
+atc, auto-mode with its mod, GitHub's CLI, the language toolchains, 1Password's CLI and gitleaks.
+Claude Code is installed with its own updates turned off, so a session runs the version the image
+pins.
 
 The build runs no tool, because a tool can write state the first time it runs: a version check alone
 can create a tool's config directory. That keeps the image free of anything a session could inherit
@@ -33,6 +37,14 @@ The image is built by impd, not by CI: the build script sends a `git archive` of
 to the imp host, and impd builds it into an image named after that commit. The script then checks
 the new image in a fresh imp and removes a failed image unless told to keep it, so the host holds
 only images that passed.
+
+A timer on the host runs that script for the newest commit on `main` that changes the image, once
+impd holds no image of that commit's name, so a merged pin reaches an image without a person. The
+timer fetches the public repository with no credential. Its impd token can manage every imp, grant
+and image on the host, so it stays in a root-only file on the host and never reaches the public
+repository's CI. A failed build records its commit, and the timer skips that commit until an
+operator clears the record, so a broken commit is not built again at every run
+([the agent image runbook](../../runbooks/agent-image.md#the-hosts-build)).
 
 The check runs the same way in CI against a Docker build of the image, and on the host against a
 live imp. It compares each tool's version with its pin, checks that no login state exists and that

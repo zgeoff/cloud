@@ -10,12 +10,19 @@
 # before the build and names the command that starts one. It also stops, before the build and
 # again before the activation, when the commit's atc daemon pin and a running atc gateway pod's
 # image differ in atc major version, since atc breaks its daemon protocol only in a major release,
-# and when the running nixie's imp client refuses the commit's impd major (check-nixie-impd-major.sh).
+# and when the running nixie refuses the commit's impd major (check-nixie-impd-major.sh). Before
+# the build it also stops when the commit's impd stores a secret kind that its atc daemon pin does
+# not accept (check-atc-secret-kinds.sh), so the switch never starts that impd.
 # After the copy it holds a switch whose activation would stop or restart k3s, which can keep
 # nixie down for minutes, unless --allow-k3s-restart names a planned k3s window
 # (check-k3s-restart.sh).
 # After the activation it waits for nixie's /health/ready to report every part ready
 # (check-nixie-ready.sh), and fails with each part that is not, since nixie needs impd to start.
+# Then it fails with each impd image record whose build folder is gone (check-impd-image-dirs.sh),
+# since every imp boot from such an image fails.
+# Once every check passes, it moves origin's deployed/host tag to the switched commit, so a change
+# that reaches the host only through a switch counts as shipped once the host runs it. A failed
+# switch leaves the tag where it was.
 # The switch runs only after the build
 # exits 0: a failed build stops the script before
 # anything reaches the host. The build reads a `git archive` snapshot of the checked commit,
@@ -93,8 +100,8 @@ require_gateway_major() {
   bash "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$snapshot/nixos/packages/atc.nix" $images
 }
 
-# nixie talks to impd with an imp client that refuses another impd major, so a switch takes only an
-# impd that each running nixie pod speaks (scripts/check-nixie-impd-major.sh). It reads the pods,
+# nixie refuses an impd of a major it does not accept, so a switch takes only an impd whose major
+# each running nixie pod accepts (scripts/check-nixie-impd-major.sh). It reads the pods,
 # runs at the same two points, and fails on an ssh, kubectl or gh failure, as the gateway check does.
 require_nixie_impd_major() {
   local images
@@ -145,6 +152,9 @@ if [[ "$mode" == switch ]]; then
   echo "== checked by $checked_by"
   require_gateway_major
   require_nixie_impd_major
+  # both pins come from the snapshot, which the copy cannot change, so this check runs once
+  bash "$(dirname "${BASH_SOURCE[0]}")/check-atc-secret-kinds.sh" \
+    "$snapshot/nixos/hosts/geoffcloud/configuration.nix" "$snapshot/nixos/packages/atc.nix"
 fi
 echo "== build ${commit:0:7}"
 
@@ -192,3 +202,16 @@ fi
 echo "== $host runs $current"
 ssh -o BatchMode=yes "$host" systemctl --failed --no-legend --plain
 bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$host"
+bash "$(dirname "${BASH_SOURCE[0]}")/check-impd-image-dirs.sh" "$host"
+
+# The tag records the commit the host runs, and the last activation decides that, so the push forces
+# the tag even when an earlier switch left it on a later commit. A failed push fails the switch with
+# git's exit code and the command that moves the tag by hand, because the host runs the commit.
+push_status=0
+git -C "$repo" push -q --force origin "$commit:refs/tags/deployed/host" || push_status=$?
+if [[ "$push_status" != 0 ]]; then
+  echo "$host runs ${commit:0:7}, but deployed/host did not move; move it with" \
+    "\`git push --force origin $commit:refs/tags/deployed/host\`" >&2
+  exit "$push_status"
+fi
+echo "== deployed/host moved to $commit"

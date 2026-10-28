@@ -11,7 +11,7 @@ The rules a task needs are not repeated here. Load the skill for the work before
 | Skill                | Load before                                                                        |
 | -------------------- | ---------------------------------------------------------------------------------- |
 | `code-style`         | writing, reviewing, or renaming any TypeScript — the shared function-verb taxonomy |
-| `project-code-style` | the same, beside `code-style` — cloud's own verbs                                  |
+| `project-code-style` | the same, beside `code-style` — where a rule only cloud needs goes                 |
 | `testing`            | designing, writing, or reviewing tests                                             |
 | `project-testing`    | the same, beside `testing` — where each suite runs and cloud's stand-ins           |
 | `docs-writing`       | writing or editing any committed prose: `docs/`, READMEs, this file, skills        |
@@ -37,7 +37,8 @@ nixos/             the host flake
 deploy/            the manifests and config of the workloads the cluster runs, such as nixie
 scripts/           repo tooling, run through the root package.json scripts
 test-support/      the shell suites' assertions and stand-ins
-e2e/               whole-workflow suites
+integration/       flows across several scripts, in process, against stand-ins
+e2e/               journeys that drive real containers from outside
 docs/
   architecture/    what is built
   runbooks/        operator and contributor procedures
@@ -61,6 +62,10 @@ docs/
 
 - lefthook runs the light checks before a commit and a push. Leave the heavier checks to CI, because
   the host may have little memory.
+- An agent session runs an operator action, such as a host switch, a workflow dispatch or an apply,
+  through its `bun run ops:<verb>` script, never the script or workflow behind it.
+  [`docs/runbooks/ops.md`](docs/runbooks/ops.md) lists each verb, what it wraps and its
+  preconditions.
 - `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check,
   and is CI-only: never run it locally.
 - Run `bun install` in the main checkout before you run `bun run deadcode` in a worktree. knip's
@@ -101,9 +106,11 @@ docs/
 - Never use `nixos-rebuild build`, because the repo mounts read-only. Never switch by hand after a
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
-  roll the gateway out first. It refuses an impd that the running nixie's imp client cannot speak,
-  so deploy that nixie first. It fails the switch when nixie's `/health/ready` does not report every
-  part ready afterwards.
+  roll the gateway out first. It refuses an impd major that the running nixie does not accept, so
+  deploy a nixie that accepts it first. It refuses an impd that stores a secret kind the atc daemon
+  pin does not accept, so pin an atc that accepts the kind first. It fails the switch when nixie's
+  `/health/ready` does not report every part ready afterwards, or when an impd image record's build
+  folder is gone.
 - The script holds a switch whose activation would stop or restart k3s, because nixie can stay down
   for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
   approved.

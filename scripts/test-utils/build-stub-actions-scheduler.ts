@@ -1,3 +1,4 @@
+import { match } from 'ts-pattern';
 import { buildStubConcurrencyGroup } from './build-stub-concurrency-group.ts';
 import type { StubConcurrencyGroup } from './build-stub-concurrency-group.ts';
 import { isActionsConditionMet } from './is-actions-condition-met.ts';
@@ -22,18 +23,18 @@ interface StubRun {
   readonly jobs: Readonly<Record<string, StubJobStatus>>;
 }
 
-// the outputs each step of the job set, by the step's id; the job's outputs are the ones its
-// workflow declares, read from these, and an output no step set reads as empty, as on GitHub
+// the outputs each step of the job set, and each step's outcome, by the step's id; the job's
+// outputs are the ones its workflow declares, read from these, and one that no step set reads as
+// empty, as on GitHub
 interface StubJobResult {
   readonly status: 'success' | 'failure';
   readonly steps?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  readonly outcomes?: Readonly<Record<string, string>>;
 }
 
 export interface StubActionsScheduler {
-  // starts a run of the workflow for the event, and returns its id
   readonly startRun: (github: StubGitHubContext) => number;
 
-  // ends a job the scheduler started
   readonly finishJob: (runID: number, job: string, result: StubJobResult) => void;
 
   readonly getRun: (runID: number) => StubRun;
@@ -173,8 +174,6 @@ function updateToCancelled(state: SchedulerState, holder: Holder): void {
   });
 }
 
-// starts each waiting job whose needs have ended, and ends each run whose jobs all have, until
-// nothing changes
 function updateRuns(state: SchedulerState): void {
   let changed = true;
 
@@ -279,7 +278,10 @@ function updateFinishedJob(state: SchedulerState, holder: Required<Holder>, resu
   job.outputs = Object.fromEntries(
     Object.entries(definition?.outputs ?? {}).map(([name, source]) => [
       name,
-      result.steps?.[source.step]?.[source.output] ?? '',
+      match(source)
+        .with({ kind: 'output' }, (output) => result.steps?.[output.step]?.[output.output])
+        .with({ kind: 'outcome' }, (outcome) => result.outcomes?.[outcome.step])
+        .exhaustive() ?? '',
     ]),
   );
 

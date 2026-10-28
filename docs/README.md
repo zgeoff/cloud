@@ -47,11 +47,13 @@ call, the path of a change, the topology and the data.
 - [Development](./runbooks/development.md): set up a machine and run a first preview.
 - [Workflows](./runbooks/workflows.md): change infrastructure, switch the host, upgrade imp, rotate
   a credential.
+- [Operator verbs](./runbooks/ops.md): the `bun run ops:<verb>` scripts, what each wraps, and its
+  preconditions.
 - [Observe](./runbooks/observe.md): Grafana, logs, metrics, the external health check, and Discord
   alerts.
 - [The prod apply job](./runbooks/prod-apply.md): set up the job, read a run, answer a held one.
-- [The scheduled drift check](./runbooks/drift-check.md): the `cloud-ci` vault, the schedule, and
-  how to answer drift.
+- [The scheduled drift check](./runbooks/drift-check.md): the host's daily check, its credentials, a
+  run by hand, and how to answer drift.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
@@ -64,6 +66,8 @@ call, the path of a change, the topology and the data.
   their measured times, and the untested root-disk snapshot restore.
 - [atc gateway backup and restore](./runbooks/atc-gateway-backup-restore.md): back up and restore
   the gateway's state.
+- [atc gateway smoke spawn](./runbooks/atc-gateway-smoke.md): spawn a Claude session through the
+  gateway onto an imp and check its first turn.
 - [The GHCR pull token](./runbooks/ghcr-pull-token.md): rotate the token k3s pulls the private
   images with, and check a pull.
 - [Agent image](./runbooks/agent-image.md): build, check, switch or roll back the agent image.

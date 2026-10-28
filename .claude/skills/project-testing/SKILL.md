@@ -40,17 +40,24 @@ provider and the NixOS checks each have a reference.
 
 ## Suites and where they run
 
-| Suite                                              | Command                             | Runs in CI                                |
-| -------------------------------------------------- | ----------------------------------- | ----------------------------------------- |
-| TypeScript unit tests in `infra/` and `scripts/`   | `bun run test`                      | `CI` → `ci`                               |
-| The health-check Worker's tests                    | `bun run test:health-check`         | `CI` → `ci`                               |
-| Go tests in `provider/`                            | `bun run provider:check`            | `CI` → `ci`, if `provider/` changed       |
-| Shell suites and `test-support/shell/` tests       | `bun run test:scripts`              | `CI` → `ci`, unless only Markdown changed |
-| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules` | `CI` → `ci` |
-| Gateway image, backup and restore journey (Docker) | `bun run test:atc-gateway-fixture`  | `atc-gateway images` → `fixture`          |
-| nixie's backup script in its pinned image (Docker) | `bun run test:nixie-backup-fixture` | `nixie backup` → `fixture`                |
-| The agent image's gitleaks allowlist (Docker)      | `bun run test:agent-image`          | `agent image` → `check`                   |
-| NixOS checks and the restore rehearsals (KVM)      | `bun run test:nixos [check…]`       | `NixOS checks` → `nixos`                  |
+| Suite                                                     | Command                             | Runs in CI                                                     |
+| --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
+| TypeScript tests in `infra/`, `scripts/` and `integration/` | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript journeys in `e2e/`                             | `bun run test:e2e`                  | `CI` → `checks`                                                |
+| The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
+| Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
+| Shell suites and `test-support/shell/` tests              | `bun run test:scripts`              | `CI` → `checks`, unless only Markdown changed                  |
+| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules`          | `CI` → `checks`                                                |
+| Gateway image, backup and restore journey (Docker)        | `bun run test:atc-gateway-fixture`  | `CI` → `checks` on a PR, `atc-gateway images` → `fixture` on main |
+| The files service's image (Docker)                        | `bun run test:files-image`          | `CI` → `checks` on a PR, `files image` → `check` on main       |
+| The files backup script in its pinned image (Docker)      | `bun run test:files-backup-fixture` | `CI` → `checks`                                                |
+| nixie's backup script in its pinned image (Docker)        | `bun run test:nixie-backup-fixture` | `CI` → `checks`                                                |
+| The agent image's gitleaks allowlist (Docker)             | `bun run test:agent-image`          | `CI` → `checks`                                                |
+| NixOS checks and the restore rehearsals (KVM)             | `bun run test:nixos [check…]`       | `NixOS checks` → `nixos`                                       |
+
+- CI's one `checks` job runs every suite above but the NixOS checks. Each Docker suite is a step
+  that runs only when its gate in [`gates.yml`](../../../.github/gates.yml) says the change touches
+  its inputs; a new input of a Docker suite extends its gate.
 
 - CI calls a root [`package.json`](../../../package.json) script, never a suite file directly.
 - A new shell suite needs no list entry:
@@ -62,7 +69,7 @@ provider and the NixOS checks each have a reference.
   [`with-fixture-images.sh`](../../../test-support/shell/with-fixture-images.sh), and
   `fixture-images`, which tests that wrapper, from outside it.
 - The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main,
-  and on an app's pull request that changes `nixos/`. A person's pull request never runs it, so run
+  and never on a pull request, so run
   `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can break a
   check. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
   green run on main covers. The `nixos` gate of [`gates.yml`](../../../.github/gates.yml) lists
@@ -72,6 +79,41 @@ provider and the NixOS checks each have a reference.
   Cloudflare, the Pulumi state or the internet. The image and flake builds that run before the cases
   fetch only pinned inputs. `bun run drift` is a read-only check of a refactor, never part of a
   test.
+
+## Lanes in this repo
+
+The unit run, `bun run test`, holds `infra/`, `scripts/` and `integration/`, under the shared 5 s
+rule. `integration/` holds one flow across several scripts in process, such as
+[`deploy-prod.test.ts`](../../../integration/deploy-prod.test.ts), which runs the workflow's own
+steps against stand-ins. A check of config, such as which events start a workflow, is a script
+that `lint:actions` runs, as
+[`check-workflow-triggers.ts`](../../../scripts/check-workflow-triggers.ts) is, never a test.
+
+Each lane below needs a real system that the unit run cannot host, or tests a process from outside.
+
+| Lane | Scripts | Real system | Time limit per case |
+| -- | -- | -- | -- |
+| `e2e/` | `test:e2e` | a script started as its own process, driven from outside against stand-ins | 15 s |
+| `.nixos` | `test:nixos [check…]` | NixOS VMs under QEMU with KVM, built in the pinned Nix image | 1200 s |
+| `alert-rules` | `test:alert-rules` | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 90 s |
+| `images` | `test:agent-image`, `test:files-image` | the agent image and the files service's image, built and run in Docker | 15 s |
+| `fixtures` | `test:atc-gateway-fixture`, `test:nixie-backup-fixture`, `test:files-backup-fixture` | the gateway, backup and restore images with restic, on Docker volumes | 15 s |
+
+- `.nixos` is no file suffix. A check is an attribute of `checks.x86_64-linux` in
+  [`nixos/flake.nix`](../../../nixos/flake.nix), with its file in `nixos/checks/`, and
+  [`run-nixos-checks.sh`](../../../scripts/run-nixos-checks.sh) builds every check, or the ones it
+  is named. A case is one check's whole VM test script.
+- A shell suite joins `alert-rules` or a fixture group through its `# shell-suite: <group>` line;
+  each `images` script builds its image first, then runs its suites.
+- A case over its lane's time limit is a defect to fix, and the limit never rises to cover it.
+- The `lanes` option of `zgeoff/max-test-timeout` and `zgeoff/test-beside-module` in
+  [`.oxlintrc.json`](../../../.oxlintrc.json) holds the same lanes and limits. It binds only a
+  TypeScript test file that takes one of these suffixes; a change to this table changes it too.
+- Nothing enforces a limit per case yet: `run_cases` has no timer, and `nix build` ignores a
+  check's `meta.timeout`. Today only the CI job's `timeout-minutes` bounds a lane: 20 for `checks`,
+  which runs the shell lanes; 15 for the `fixture` job of `atc-gateway-images.yml` and the `check`
+  job of `files-image.yml`, which run `test:atc-gateway-fixture` and `test:files-image` again; and
+  121 for `nixos`. A review compares a new case's time with its lane's limit.
 
 ## No test reaches a real host
 
@@ -141,9 +183,9 @@ without the CLI.
   replacing the global console. [`index.test.ts`](../../../workers/health-check/index.test.ts)
   checks the module Workers loads: its default export's `scheduled`, wired to `console`.
   [`buildStubR2Bucket`](../../../workers/health-check/test-utils/build-stub-r2-bucket.ts) is an
-  in-memory R2 bucket. It implements `Pick<R2Bucket, 'get' | 'put'>` from
-  `@cloudflare/workers-types` with R2's full object shapes, and rejects options and non-string
-  values instead of modelling them. Its HTTP boundary is MSW handlers in
+  in-memory R2 bucket. It models only the two calls the Worker makes, a `get` of a key and a `put`
+  of a string, and answers each with R2's object shapes from `@cloudflare/workers-types`, leaving
+  out the body stream and the readers whose types differ from Bun's. Its HTTP boundary is MSW handlers in
   [`workers/health-check/mocks/`](../../../workers/health-check/mocks/) over two in-memory stores:
   the probe targets' statuses and the alerts sent. The server runs with
   `onUnhandledRequest: 'error'`, and the preload also fails the test on any `request:unhandled`
@@ -189,7 +231,7 @@ reaches a real tool.
 
 `scripts/test-<script>.sh` tests `scripts/<script>.sh`. A test of a deploy artifact sits beside it,
 as [`test-atc-gateway-image.sh`](../../../images/atc-gateway/test-atc-gateway-image.sh) does, and a
-journey sits in `e2e/`, one file per journey. Each shared rule takes its shell form:
+journey that drives real containers sits in `e2e/`, one file per journey. Each shared rule takes its shell form:
 
 | Shared rule                  | Shell form                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -250,6 +292,12 @@ journey sits in `e2e/`, one file per journey. Each shared rule takes its shell f
   the host's environment file and the host stand-ins' own settings.
 - A guard's tests pass it a search path the case owns, so its expected text never depends on the
   host.
+- A `test:scripts` suite that needs a local tool that CI's image has and a developer's host may
+  lack, as [`test-create-stub-apt-suite.sh`](../../../test-support/shell/test-create-stub-apt-suite.sh)
+  needs `dpkg-deb`, checks for the tool before `run_cases`. Without it, the suite prints a `skip`
+  line and exits 0, so the pre-push hook passes. With `CI` set, as GitHub Actions sets it, the
+  suite exits 1 instead, so CI never skips the cases. A Docker suite has no skip: it fails before
+  any case and names the tool.
 - A producer whose output a case compares writes to a file under errexit first, so a failing
   producer fails the case instead of producing an empty match.
 - Every other helper in `test-support/shell/` exports one public function, named for its file, and

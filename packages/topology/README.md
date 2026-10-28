@@ -31,7 +31,8 @@ CI and before a push.
 
 Version pins are not topology: each keeps its own pin file, which its bump tooling rewrites. Other
 data that the host, infra and the scripts all read belongs in this package as its own file beside
-`constants.json`.
+`constants.json`. So does a schema for data that infra hands to a script, such as the payload of the
+Job that adds nixie's sandbox images, so that the producer and the parser share one type.
 
 ## The exposure registry
 

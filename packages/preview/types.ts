@@ -1,11 +1,13 @@
 import type { GitHubClient } from './build-github-client.ts';
 import type { ImpdClient } from './build-impd-client.ts';
 import type { PreviewStore } from './create-preview-store.ts';
+import type { SpendProxies } from './create-spend-proxies.ts';
 
 export interface PreviewSettings {
   readonly baseURL: string;
 
-  // owner/name of each repository whose pull requests get previews, or owner/* for an owner's
+  // owner/name of each repository whose pull requests get previews, or owner/* for every
+  // repository of an owner
   readonly repos: ReadonlySet<string>;
 
   readonly slots: number;
@@ -41,10 +43,49 @@ export interface ContractSettings {
   readonly modelSecret: string;
 
   readonly timeoutMs: number;
+
+  // how long a running preview goes unused before a waiting run puts it to sleep to take its slot
+  readonly idleMs: number;
+}
+
+export interface SpendSettings {
+  // the counting proxy's binary, which the service starts once for each preview
+  readonly proxyPath: string;
+
+  // each preview's proxy config and counter store
+  readonly directory: string;
+
+  // the model API's origin, which each proxy sends a preview's model calls to
+  readonly upstream: string;
+
+  // the one model each preview may call, priced per million tokens with the proxy's price keys
+  readonly model: string;
+  readonly prices: SpendPrices;
+
+  // the dollars a preview may spend over its pull request's life
+  readonly limitDollars: number;
+
+  // how long a proxy goes unused before the service stops it; its count stays on disk
+  readonly idleMs: number;
+}
+
+interface SpendRates {
+  readonly input: number;
+  readonly cache_write: number;
+  readonly cache_write_1h: number;
+  readonly cached_input: number;
+  readonly output: number;
+}
+
+export interface SpendPrices extends SpendRates {
+  readonly long_prompt?: (SpendRates & { readonly over_tokens: number }) | undefined;
 }
 
 export interface PreviewDeps {
   readonly settings: PreviewSettings;
+
+  // the counting proxies on each preview's model route; null runs the previews without a spend cap
+  readonly spendProxies: SpendProxies | null;
   readonly store: PreviewStore;
   readonly impd: ImpdClient;
   readonly github: GitHubClient;

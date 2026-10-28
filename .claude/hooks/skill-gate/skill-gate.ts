@@ -1,223 +1,158 @@
-import { statSync } from 'node:fs';
+// The skill gate's entry point, which repo-sync delivers from zgeoff/tools. The gate lives in
+// @zgeoff/skill-gate, which the repo installs at its root.
 import path from 'node:path';
-import { buildBashSkillGateOutput } from './build-bash-skill-gate-output.ts';
-import { buildSkillGateOutput } from './build-skill-gate-output.ts';
-import { collectLoadedSkills } from './collect-loaded-skills.ts';
-import { collectWrittenPaths } from './collect-written-paths.ts';
-import { parseSkillGateRules } from './parse-skill-gate-rules.ts';
-import { planBashSkillGate } from './plan-bash-skill-gate.ts';
-import { planSkillGate } from './plan-skill-gate.ts';
-import type { WrittenPath } from './types.ts';
 
-// A PreToolUse hook for Edit, Write, MultiEdit and Bash that repo-sync delivers from zgeoff/tools.
-// The repo's own .claude/skill-gate.json holds the rules; a repo without that file has no gate. A
-// subagent's loads come from its own transcript, never the main session's.
-const payload: unknown = await Bun.stdin.json().catch(() => null);
+// Claude Code runs the call when a PreToolUse hook exits with any status but 2, so a static import
+// that fails would let a gated edit through. This file therefore imports only Node builtins.
+const runGate = await import('@zgeoff/skill-gate').then(
+  (gate) => gate.runSkillGate,
+  (error: unknown) => () => reportLoadFailure(formatError(error)),
+);
 
-const input = parseHookInput(payload);
+await runGate();
 
-if (input === null) {
-  process.exit(0);
+// Bun rejects a failed import with a ResolveMessage, which is not an Error.
+function formatError(error: unknown): string {
+  if (isRecord(error) && typeof error['message'] === 'string') {
+    return error['message'];
+  }
+
+  return String(error);
 }
 
-const projectDir = process.env['CLAUDE_PROJECT_DIR'] ?? input.cwd;
-const rulesFile = Bun.file(path.join(projectDir, '.claude', 'skill-gate.json'));
+async function reportLoadFailure(loadError: string): Promise<never> {
+  const payload: unknown = await Bun.stdin.json().catch(() => null);
 
-const hasRules = await rulesFile.exists();
+  const edit = parseEdit(payload, process.env['CLAUDE_PROJECT_DIR']);
 
-if (hasRules && input.command !== null) {
-  await checkBashCommand(input, input.command);
+  const isGated = await probeGatedEdit(edit);
+
+  if (edit !== null && isGated) {
+    console.error(
+      `The skill gate cannot load, so it blocks this edit to ${edit.filePath}: ${loadError}. Run \`bun install\` at the repo root, then retry the edit.`,
+    );
+
+    process.exit(2);
+  }
+
+  console.error(`The skill gate cannot load: ${loadError}`);
+  process.exit(1);
 }
 
-if (input.filePath === null) {
-  process.exit(0);
+interface Edit {
+  readonly projectDir: string;
+  readonly filePath: string;
 }
 
-const filePath = path.resolve(input.cwd, input.filePath);
-const relativePath = toProjectPath(filePath);
-
-if (!hasRules || isOutsideProject(relativePath)) {
-  process.exit(0);
-}
-
-const rulesText = await rulesFile.text();
-
-const parsed = parseSkillGateRules(rulesText);
-
-if (!parsed.ok) {
-  printOutput(
-    buildSkillGateOutput(filePath, { missing: [], unknown: [] }, { rulesError: parsed.error }),
-  );
-
-  process.exit(0);
-}
-
-const availableSkills = await collectAvailableSkills(path.join(projectDir, '.claude', 'skills'));
-const transcript = await readTranscript(resolveSessionTranscriptPath(input));
-
-const loaded = collectLoadedSkills(transcript);
-
-const plan = planSkillGate({
-  rules: parsed.rules,
-  relativePath,
-  loadedSkills: loaded.skills,
-  availableSkills,
-});
-
-printOutput(buildSkillGateOutput(filePath, plan, { compacted: loaded.compacted }));
-
-// An Edit, Write or MultiEdit call carries `file_path`, and a Bash call carries `command`.
-interface HookInput {
-  readonly cwd: string;
-  readonly filePath: string | null;
-  readonly command: string | null;
-  readonly transcriptPath: string;
-  readonly agentID: unknown;
-}
-
-function parseHookInput(value: unknown): HookInput | null {
-  if (!isRecord(value) || !isRecord(value['tool_input'])) {
+// Only an Edit, Write or MultiEdit call carries `file_path`; the gate never blocks a Bash call.
+function parseEdit(payload: unknown, projectDir: string | undefined): Edit | null {
+  if (!isRecord(payload) || !isRecord(payload['tool_input'])) {
     return null;
   }
 
-  const cwd = value['cwd'];
-  const transcriptPath = value['transcript_path'];
-  const editPath = value['tool_input']['file_path'];
-  const command = value['tool_input']['command'];
+  const cwd = payload['cwd'];
+  const filePath = payload['tool_input']['file_path'];
 
-  if (typeof cwd !== 'string' || typeof transcriptPath !== 'string') {
-    return null;
-  }
-
-  if (typeof editPath !== 'string' && typeof command !== 'string') {
+  if (typeof cwd !== 'string' || typeof filePath !== 'string') {
     return null;
   }
 
   return {
-    cwd,
-    filePath: typeof editPath === 'string' ? editPath : null,
-    command: typeof command === 'string' ? command : null,
-    transcriptPath,
-    agentID: value['agent_id'],
+    projectDir: projectDir ?? cwd,
+    filePath: path.resolve(cwd, filePath),
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isOutsideProject(fromProject: string): boolean {
-  return fromProject === '..' || fromProject.startsWith('../') || path.isAbsolute(fromProject);
-}
-
-// Warns on a command that writes a gated path in the project and exits; any other command goes
-// ahead in silence. A broken rules file lets every command through, since the next edit reports it.
-async function checkBashCommand(hookInput: HookInput, command: string): Promise<void> {
-  const written = collectWrittenPaths(command).map((entry) =>
-    readWrittenPath(hookInput.cwd, entry),
-  );
-
-  const candidates = [...new Set(written)].filter(
-    (entry) => !isOutsideProject(toProjectPath(entry)),
-  );
-
-  if (candidates.length === 0) {
-    process.exit(0);
+async function probeGatedEdit(edit: Edit | null): Promise<boolean> {
+  if (edit === null) {
+    return false;
   }
 
-  const text = await rulesFile.text();
+  const relativePath = path.relative(edit.projectDir, edit.filePath).split(path.sep).join('/');
 
-  const parsedRules = parseSkillGateRules(text);
-
-  if (!parsedRules.ok) {
-    process.exit(0);
+  if (relativePath === '..' || relativePath.startsWith('../') || path.isAbsolute(relativePath)) {
+    return false;
   }
 
-  const skills = await collectAvailableSkills(path.join(projectDir, '.claude', 'skills'));
-  const sessionTranscript = await readTranscript(resolveSessionTranscriptPath(hookInput));
+  const rulesFile = Bun.file(path.join(edit.projectDir, '.claude', 'skill-gate.json'));
 
-  const sessionLoads = collectLoadedSkills(sessionTranscript);
+  const hasRules = await rulesFile.exists();
 
-  const bashPlan = planBashSkillGate({
-    rules: parsedRules.rules,
-    paths: candidates.map((entry) => ({ path: entry, relativePath: toProjectPath(entry) })),
-    loadedSkills: sessionLoads.skills,
-    availableSkills: skills,
+  if (!hasRules) {
+    return false;
+  }
+
+  const rulesText = await rulesFile.text().catch((error: unknown) => {
+    console.error(`The skill gate cannot read .claude/skill-gate.json: ${formatError(error)}`);
+
+    return null;
   });
 
-  printOutput(
-    buildBashSkillGateOutput(bashPlan.gatedPaths, bashPlan.missing, {
-      compacted: sessionLoads.compacted,
-    }),
-  );
-
-  process.exit(0);
+  return rulesText === null || isGatedPath(rulesText, relativePath);
 }
 
-// A `cp` or `mv` onto an existing directory writes the source's file name inside it.
-function readWrittenPath(cwd: string, written: WrittenPath): string {
-  const absolute = path.resolve(cwd, written.path);
+function isGatedPath(rulesText: string, relativePath: string): boolean {
+  const rules = parseRules(rulesText);
 
-  if (written.fileName === undefined) {
-    return absolute;
+  if (rules === null) {
+    return true;
   }
 
-  const isDirectory = statSync(absolute, { throwIfNoEntry: false })?.isDirectory() === true;
-
-  return isDirectory ? path.join(absolute, written.fileName) : absolute;
-}
-
-function toProjectPath(absolute: string): string {
-  return path.relative(projectDir, absolute).split(path.sep).join('/');
-}
-
-async function collectAvailableSkills(skillsDir: string): Promise<readonly string[]> {
-  const skills: string[] = [];
-
-  const scan = new Bun.Glob('*/SKILL.md').scan({ cwd: skillsDir, followSymlinks: true });
-
-  try {
-    for await (const match of scan) {
-      skills.push(path.dirname(match));
-    }
-  } catch {
-    // A repo without .claude/skills has no skills, so each rule reports its skills as unknown.
+  if (rules.ignore.some((segment) => relativePath.includes(segment))) {
+    return false;
   }
 
-  return skills;
+  return rules.matches.some((match) => new Bun.Glob(match).match(relativePath));
 }
 
-// A subagent's call carries the main session's transcript_path plus its own agent_id, and Claude
-// Code keeps its transcript at <session>/subagents/agent-<agent_id>.jsonl. An agent_id that is not
-// a plain name resolves to no transcript, so the edit is denied.
-function resolveSessionTranscriptPath(edit: HookInput): string | null {
-  if (edit.agentID === undefined) {
-    return edit.transcriptPath;
-  }
+interface Rules {
+  readonly ignore: readonly string[];
+  readonly matches: readonly string[];
+}
 
-  if (typeof edit.agentID !== 'string' || !/^[\w-]+$/u.test(edit.agentID)) {
+function parseRules(text: string): Rules | null {
+  const value = parseJSON(text);
+
+  if (!isRecord(value)) {
     return null;
   }
 
-  const sessionDir = edit.transcriptPath.replace(/\.jsonl$/u, '');
+  const ignore = value['ignore'] ?? [];
+  const gates = value['gates'];
 
-  return path.join(sessionDir, 'subagents', `agent-${edit.agentID}.jsonl`);
-}
-
-async function readTranscript(transcriptPath: string | null): Promise<string> {
-  if (transcriptPath === null) {
-    return '';
+  if (!isStringArray(ignore) || !Array.isArray(gates)) {
+    return null;
   }
 
-  const transcriptFile = Bun.file(transcriptPath);
+  const matches = gates.map((entry: unknown) =>
+    isRecord(entry) &&
+    typeof entry['match'] === 'string' &&
+    entry['match'] !== '' &&
+    isStringArray(entry['skills']) &&
+    entry['skills'].length > 0
+      ? entry['match']
+      : null,
+  );
 
-  const exists = await transcriptFile.exists();
+  if (matches.includes(null)) {
+    return null;
+  }
 
-  return exists ? transcriptFile.text() : '';
+  return { ignore, matches: matches.filter((match) => match !== null) };
 }
 
-function printOutput(output: object | null): void {
-  if (output !== null) {
-    console.log(JSON.stringify(output));
+function parseJSON(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
   }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string' && item !== '');
+}
+
+function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

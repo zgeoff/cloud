@@ -10,7 +10,8 @@ test("it counts the gateway's stderr security events from the start of its log f
 loki.source.file "atc_security" {
   targets = [{__path__ = "/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log"}]
   file_match {
-    enabled = true
+    enabled     = true
+    sync_period = "10s"
   }
   forward_to = [loki.process.atc_security.receiver]
 }
@@ -109,4 +110,12 @@ loki.process "atc_security" {
   }
 }
 `);
+});
+
+test('it looks for new log files at the given sync period', () => {
+  expect(
+    buildATCSecurityPipeline('/var/log/pods/atc_atc-gateway-*/atc-gateway/*.log', {
+      syncPeriod: '1s',
+    }),
+  ).toInclude('  file_match {\n    enabled     = true\n    sync_period = "1s"\n  }\n');
 });

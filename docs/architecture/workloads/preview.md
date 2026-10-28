@@ -32,12 +32,12 @@ flowchart LR
 ## Two listeners
 
 The service listens twice on the host's tailnet address, so the public route reaches only the part
-that checks signatures. The webhook listener takes GitHub's `pull_request` deliveries through a
-tunnel hostname, the one public endpoint, and the host admits its port only from pod addresses,
-because cloudflared dials it from its pod. The listener checks each delivery's HMAC signature
-against the webhook's secret before it parses the body, so an unsigned or wrongly signed call gets a
-401 and reaches no other code. The link listener serves the links on the tailnet only, and the
-tailnet policy lets only member devices reach it.
+that checks signatures. The webhook listener takes the preview GitHub App's `pull_request`
+deliveries through a tunnel hostname, the one public endpoint, and the host admits its port only
+from pod addresses, because cloudflared dials it from its pod. The listener checks each delivery's
+HMAC signature against the App's webhook secret before it parses the body, so an unsigned or wrongly
+signed call gets a 401 and reaches no other code. The link listener serves the links on the tailnet
+only, and the tailnet policy lets only member devices reach it.
 
 A signed delivery changes a preview only for a repository the service lists, by name or by its
 owner, and only when the pull request's head branch lives in that repository. A pull request from a
@@ -45,6 +45,17 @@ fork never gets a preview, because its code would run in an imp that holds the b
 credential. That credential is impd's `gh` secret, a fine-grained token that reads the contents of
 the listed repositories and nothing else, so a preview's code can clone its own repository but can
 neither push to it nor reach a repository the service does not list.
+
+## GitHub access
+
+The service reaches GitHub as the preview GitHub App, and an install of the App on a repository is
+that repository's opt-in: GitHub sends the App's deliveries only for the repositories it is
+installed on, and the comments post as the App's bot. The service holds the App's private key and no
+GitHub token. For each call, such as one comment update, it signs a short-lived JWT with the key,
+looks up the App's installation on the repository, and mints an installation token scoped to that
+one repository, which it drops when the call ends. A leaked installation token reaches one
+repository, and it expires at the end of the lifetime that GitHub fixes for it. The App is private
+to the owner's account, so no other account can install it and send the service deliveries.
 
 ## A pull request's preview
 
@@ -76,7 +87,7 @@ sweep of interrupted boots all follow the same rule.
 - **opened, reopened or synchronize.** The service reads `preview/compose.yaml` at the head commit.
   A commit without the file has not opted in, and the service does nothing. Otherwise it records the
   head commit and posts the pull request's comment, or edits it in place: a marker in the comment
-  body and the token's own login tell the service's comment from every other. A synchronize never
+  body and the App's bot login tell the service's comment from every other. A synchronize never
   brings an ended preview back; only an open or a reopen does.
 - **The link opens.** A ready preview whose built commit is the head wakes if it sleeps, and the
   link redirects to the imp's own HTTPS name, which impd's wake proxy serves on the tailnet. A wake
@@ -108,15 +119,18 @@ Every preview imp boots from one impd image, which the service names apart from 
 so that an operator who points the default elsewhere leaves previews alone. A oneshot unit on the
 host adds that image from imp's base image, pinned by digest, whenever a switch changes the pin or
 imp-host restarts, and the service starts after it. A switch therefore never leaves the service
-booting from an image impd lacks. The release check moves that pin with the agent image's, so the
-previews and the agents run one release of imp's base image.
+booting from an image impd lacks. The unit pins the image's name in impd too, so impd's image
+eviction keeps the image while no preview imp runs. The release check moves that pin with the agent
+image's, so the previews and the agents run one release of imp's base image.
 
 1. The service reads the head commit's Compose file again, since the head may have moved, and takes
    the app's port and health path from its `x-preview` block, a top-level key that Compose ignores.
 2. A new imp gets that port as impd's HTTP port and no backup. An imp from an earlier build keeps
    its disk and takes the new commit's port. Either way, the boot adds the grants of the broker's
    GitHub secret and model secret when the imp lacks them, so an imp whose grant failed gets it on
-   the next boot.
+   the next boot. Before it adds them, the boot removes every other grant. An imp holds one
+   credential per host, so impd refuses the current model secret while one granted under an earlier
+   setting remains.
 3. A guest command installs Docker Compose's pinned release binary, checked against its sha256, when
    the image lacks the Compose plugin, as imp's base image does. It then fetches the head commit
    into a checkout in the imp, takes down the stack of the previous build with its volumes, and runs
@@ -125,7 +139,10 @@ previews and the agents run one release of imp's base image.
    no key sits in the guest. When the commit has `preview/compose.broker.yaml`, the guest command
    adds it to `docker compose up` and passes it the broker's proxy and CA bundle, which impd sets on
    the command. The stack's model calls then go out through the broker, which adds the model
-   secret's credential.
+   secret's credential. With the spend cap on, the guest command writes the model route into
+   `preview/.env` after the commit's own lines. Compose reads that file on every command, so a
+   compose command run by hand in the imp keeps the route, where it would otherwise recreate a
+   service without it.
 4. The service probes the health path through the imp's own HTTPS name until it answers or the boot
    times out. The probe takes the route of impd's proxy, which reaches the app on the imp's own
    address and never on the guest's loopback, so an app that listens on the loopback alone fails its
@@ -134,14 +151,40 @@ previews and the agents run one release of imp's base image.
 A rebuild discards the old volumes, so every build seeds its data afresh, and the seed never needs
 to know whether it ran before.
 
+## The spend cap
+
+With the spend cap on, each preview's model calls pass through a counting proxy of its own, so a
+runaway preview stops at a small limit instead of using up the shared model credential. The cap sits
+outside the preview's imp, because the code under test runs its tools with no security boundary and
+could change anything inside the imp. The counting proxy is nixie's own program, a release binary
+that the host pins, and nixie's architecture docs own how it prices and counts a reply.
+
+The broker sends every preview's model calls to one listener of the service on the docker bridge,
+because an impd secret has one upstream for all the imps it is granted to. The first segment of each
+call's path names the imp, and the model grant's path filter admits only the imp's own segment, so
+one preview can neither spend from another's count nor skip its own. The repository's preview stack
+puts that segment on its model address when the boot passes it the route. The listener starts the
+imp's proxy on loopback on the first call, waits for the port the proxy names, and forwards the call
+unchanged. A proxy that fails to start gets the call a 503, so a preview without its counter makes
+no model call.
+
+Each proxy counts in a file of its own in the service's state, and the count lasts for the pull
+request's life. A proxy with no reply under way that went unused for the sleep time stops and keeps
+its count, and the next call starts it again from that count. Calls that arrive together share one
+start, and a start waits until the imp's previous proxy has exited, so two proxies never write one
+count. Closing the pull request stops the proxy and removes its count with the imp, after the proxy
+has exited. The proxy refuses a model other than the one the host config names, at the prices it
+names.
+
 ## Slots and sleep
 
 The service runs at most a set number of previews at once, one by default, because each preview's
 imp holds memory from impd's budget while it runs. Before a preview boots or wakes, the service
 lists the running preview imps and puts the least recently active to sleep until the opening one
 fits. A sleeping imp keeps its memory on disk, so its next open resumes it where it stopped. A sweep
-on a timer puts every preview to sleep that nobody used for the idle timeout, and impd counts each
-request through its wake proxy as use.
+on a timer puts every preview to sleep that nobody used for the idle timeout. impd records an imp's
+last use, and counts as use a request through its wake proxy, a guest session, an open TCP
+connection to or from the guest, or CPU load above its idle threshold.
 
 The slot rule runs under one lock, so two opens at once never both find a free slot. A boot holds
 the lock until it settles, because its build's guest commands would wake an imp that another open
@@ -168,9 +211,11 @@ file too large to show, and such a manifest counts as a change, because a needle
 than a missed one. The previews file holds one record per repository and head commit, so a commit
 runs the suite once however many deliveries name it, and each push to a new head runs it again.
 
-1. Under the slot lock, the service counts the running imps. A run never puts a preview to sleep,
-   because the owner may be using it, so with every slot taken the run waits. Its `sdk-contract`
-   status turns pending with that reason, and the sweep's timer tries the run again on each pass.
+1. Under the slot lock, the service counts the running imps. With every slot taken, the run puts the
+   least recently used previews to sleep to free one, but only previews that nobody used for the
+   contract idle time, which is shorter than the idle timeout. A preview in use keeps its slot, so
+   when too few previews are idle, or impd refuses a sleep, the run waits. Its `sdk-contract` status
+   turns pending with that reason, and the sweep's timer tries the run again on each pass.
 2. With a slot free, the service starts a new imp from the preview image, grants it the model secret
    and the GitHub secret, and sets the status to pending.
 3. A guest command installs Bun's pinned build, checked against its sha256, since imp's base image
@@ -180,7 +225,9 @@ runs the suite once however many deliveries name it, and each push to a new head
    with the suite's pass and fail counts. A failure to start the imp sets an error status instead.
    The record keeps the result until impd removes the imp and GitHub takes the status, and the
    sweep's timer retries either step that fails. A leftover imp therefore never holds a slot for
-   good, and a status never stays pending after its run ends.
+   good. One exception: a refusal of the status that a retry would meet again, such as a missing
+   permission, ends the run at once, and the record keeps the refusal beside the result. A rate
+   limit, a timeout or a server error leaves the run for the next retry.
 
 The guest's `timeout` bounds the whole run, and a deadline on the host backs it for a guest that
 never reports an exit. Either way the status reports failure at the time limit, and the imp goes. A

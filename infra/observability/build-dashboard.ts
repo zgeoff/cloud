@@ -1,6 +1,6 @@
 import { buildGridPositions } from './build-grid-positions.ts';
 
-// one panel and its one query; width and height in grid units, 24 to a row
+// width and height in Grafana grid units, 24 to a row
 export interface DashboardPanel {
   readonly title: string;
   readonly type: 'timeseries' | 'stat' | 'logs';

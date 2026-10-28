@@ -1,9 +1,11 @@
 # The preview service (docs/architecture/workloads/preview.md): a tailnet link per pull request
 # to that pull request's code, running in its own imp. It listens twice: the link listener on
 # the tailnet, and the webhook listener that cloudflared's pod dials for GitHub's deliveries.
-# The unit starts only once its three secret files exist, so a switch before they are staged
+# The unit starts only once its four secret files exist, so a switch before they are staged
 # skips it instead of failing. The preview-image unit adds the image each preview imp boots to
 # impd, from a reference pinned by digest, so a switch never leaves the service without it.
+# With spendCap on, a third listener on docker0 takes each preview's model calls from imp-host's
+# broker and hands them to that preview's own counting proxy.
 {
   config,
   lib,
@@ -14,9 +16,17 @@ let
   cfg = config.services.preview;
   secretFiles = [
     cfg.webhookSecretFile
-    cfg.githubTokenFile
+    cfg.githubAppClientIDFile
+    cfg.githubAppKeyFile
     cfg.impTokenFile
   ];
+  priceRateOptions = lib.genAttrs [ "input" "cache_write" "cache_write_1h" "cached_input" "output" ] (
+    price:
+    lib.mkOption {
+      type = lib.types.either lib.types.ints.unsigned lib.types.float;
+      description = "The model's ${price} price, in dollars per million tokens.";
+    }
+  );
 
   addImage = pkgs.writeShellApplication {
     name = "preview-image";
@@ -29,6 +39,8 @@ let
   };
 in
 {
+  imports = [ ./cloud-host-firewall.nix ];
+
   options.services.preview = {
     enable = lib.mkEnableOption "the preview service, one imp per pull request";
 
@@ -64,7 +76,8 @@ in
       example = [ "acme/greenhouse" ];
       description = ''
         The repositories whose pull requests get previews, as owner/name, or owner/* for every
-        repository of an owner. A repository opts in with a preview/compose.yaml and a webhook.
+        repository of an owner. A listed repository opts in with a preview/compose.yaml and the
+        GitHub App's installation.
       '';
     };
 
@@ -145,6 +158,85 @@ in
       '';
     };
 
+    spendCap = {
+      enable = lib.mkEnableOption ''
+        a counting proxy on each preview's model route, which refuses the preview's model calls
+        once they cost the limit. impModelSecret must then be a custom secret for the model API's
+        host whose upstream is http://<address>:<port>
+      '';
+
+      package = lib.mkOption {
+        type = lib.types.package;
+        description = "The package whose bin/counting-proxy is nixie's counting proxy.";
+      };
+
+      address = lib.mkOption {
+        type = lib.types.str;
+        example = "172.17.0.1";
+        description = "docker0's host address, where the model route listener listens.";
+      };
+
+      port = lib.mkOption {
+        type = lib.types.port;
+        example = 18082;
+        description = "The port of the model route listener.";
+      };
+
+      allowedSubnet = lib.mkOption {
+        type = lib.types.str;
+        example = "172.17.0.0/16";
+        description = "docker0's subnet, the only source cloud_host admits to the listener.";
+      };
+
+      upstream = lib.mkOption {
+        type = lib.types.str;
+        default = "https://api.anthropic.com";
+        description = "The model API's origin, which each proxy sends a preview's model calls to.";
+      };
+
+      model = lib.mkOption {
+        type = lib.types.str;
+        example = "claude-haiku-5-5";
+        description = "The one model a preview may call; each proxy refuses a call for another.";
+      };
+
+      prices = lib.mkOption {
+        type = lib.types.submodule {
+          options = priceRateOptions // {
+            long_prompt = lib.mkOption {
+              type = lib.types.nullOr (
+                lib.types.submodule {
+                  options = priceRateOptions // {
+                    over_tokens = lib.mkOption {
+                      type = lib.types.ints.positive;
+                      example = 100000;
+                      description = "The prompt length, in tokens, past which a call costs these prices.";
+                    };
+                  };
+                }
+              );
+              default = null;
+              description = ''
+                The model's prices for a call whose prompt, cache reads and writes included, passes
+                over_tokens. Each proxy charges all of such a call's tokens at them. null charges
+                every call at the base prices.
+              '';
+            };
+          };
+        };
+        description = "The model's prices, which each proxy charges a reply's tokens at.";
+      };
+
+      limitDollars = lib.mkOption {
+        type = lib.types.either lib.types.ints.positive lib.types.float;
+        default = 2;
+        description = ''
+          The dollars, at the model's prices, that a preview's model calls may cost over its pull
+          request's life. A closed pull request's count goes with its imp.
+        '';
+      };
+    };
+
     contractRepos = lib.mkOption {
       type = lib.types.listOf (lib.types.strMatching "[A-Za-z0-9_.-]+/([A-Za-z0-9_.-]+|\\*)");
       default = [ ];
@@ -172,14 +264,28 @@ in
       description = "How long one contract run may take before it fails.";
     };
 
-    webhookSecretFile = lib.mkOption {
-      type = lib.types.str;
-      description = "A root-only file holding the GitHub webhook's secret.";
+    contractIdleMinutes = lib.mkOption {
+      type = lib.types.ints.positive;
+      default = 5;
+      description = ''
+        How long a running preview goes unused before a contract run that finds every slot taken
+        puts it to sleep to take its slot.
+      '';
     };
 
-    githubTokenFile = lib.mkOption {
+    webhookSecretFile = lib.mkOption {
       type = lib.types.str;
-      description = "A root-only file holding the GitHub token that reads preview/ and comments.";
+      description = "A root-only file holding the webhook secret of the GitHub App.";
+    };
+
+    githubAppClientIDFile = lib.mkOption {
+      type = lib.types.str;
+      description = "A root-only file holding the client ID of the GitHub App that reads preview/ and comments.";
+    };
+
+    githubAppKeyFile = lib.mkOption {
+      type = lib.types.str;
+      description = "A root-only file holding that GitHub App's private key, as GitHub's PEM.";
     };
 
     impTokenFile = lib.mkOption {
@@ -194,6 +300,26 @@ in
         assertion = cfg.contractRepos == [ ] || cfg.contractModelSecret != null;
         message = "services.preview.contractModelSecret must name the model secret when contractRepos lists a repository.";
       }
+      {
+        assertion = !cfg.spendCap.enable || cfg.impModelSecret != null;
+        message = "services.preview.spendCap needs impModelSecret, whose upstream reaches the model route listener.";
+      }
+      {
+        assertion = !cfg.spendCap.enable || !(config.services.imp.ipv6.enable or false);
+        message = "the model route listener assumes imp-host on docker0; services.imp.ipv6.enable moves it to br-imphost";
+      }
+    ];
+
+    networking.cloudHost.admissions = lib.mkIf cfg.spendCap.enable [
+      {
+        inherit (cfg.spendCap) port;
+        interface = "docker0";
+        sourceCIDR = cfg.spendCap.allowedSubnet;
+        destinationAddress = cfg.spendCap.address;
+      }
+    ];
+    networking.firewall.interfaces.docker0.allowedTCPPorts = lib.mkIf cfg.spendCap.enable [
+      cfg.spendCap.port
     ];
 
     # A oneshot that each switch restarts when the reference changes, so impd holds the pinned
@@ -257,10 +383,23 @@ in
       // lib.optionalAttrs (cfg.impModelSecret != null) {
         PREVIEW_IMP_MODEL_SECRET = cfg.impModelSecret;
       }
+      // lib.optionalAttrs cfg.spendCap.enable {
+        PREVIEW_SPEND_LISTEN = "${cfg.spendCap.address}:${toString cfg.spendCap.port}";
+        PREVIEW_SPEND_PROXY = "${cfg.spendCap.package}/bin/counting-proxy";
+        PREVIEW_SPEND_DIRECTORY = "/var/lib/preview/spend";
+        PREVIEW_SPEND_UPSTREAM = cfg.spendCap.upstream;
+        PREVIEW_SPEND_MODEL = cfg.spendCap.model;
+        # the service's price schema takes no null for an absent long_prompt
+        PREVIEW_SPEND_PRICES = builtins.toJSON (
+          lib.filterAttrs (_: rates: rates != null) cfg.spendCap.prices
+        );
+        PREVIEW_SPEND_LIMIT_DOLLARS = toString cfg.spendCap.limitDollars;
+      }
       // lib.optionalAttrs (cfg.contractRepos != [ ]) {
         PREVIEW_CONTRACT_REPOS = lib.concatStringsSep "," cfg.contractRepos;
         PREVIEW_CONTRACT_MODEL_SECRET = toString cfg.contractModelSecret;
         PREVIEW_CONTRACT_TIMEOUT_MINUTES = toString cfg.contractTimeoutMinutes;
+        PREVIEW_CONTRACT_IDLE_MINUTES = toString cfg.contractIdleMinutes;
       };
       serviceConfig = {
         ExecStart = "${cfg.package}/bin/preview-service";
@@ -269,7 +408,8 @@ in
         StateDirectoryMode = "0700";
         LoadCredential = [
           "webhook-secret:${cfg.webhookSecretFile}"
-          "github-token:${cfg.githubTokenFile}"
+          "github-app-client-id:${cfg.githubAppClientIDFile}"
+          "github-app-key:${cfg.githubAppKeyFile}"
           "imp-token:${cfg.impTokenFile}"
         ];
         Restart = "on-failure";

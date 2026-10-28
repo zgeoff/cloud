@@ -7,15 +7,15 @@
     "./contract": "./files-contract.ts"
   },
   "dependencies": {
-    "@orpc/contract": "1.15.6",
-    "@orpc/openapi": "1.15.6",
-    "@orpc/server": "1.15.6",
+    "@orpc/contract": "1.15.7",
+    "@orpc/openapi": "1.15.7",
+    "@orpc/server": "1.15.7",
     "elysia": "1.4.30",
-    "zod": "4.6.6"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",
     "@types/bun": "1.4.3",
-    "@zgeoff/bun-test-extended": "0.2.0"
+    "@zgeoff/bun-test-extended": "0.2.1"
   }
 }

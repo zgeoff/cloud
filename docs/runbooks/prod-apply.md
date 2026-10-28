@@ -92,9 +92,48 @@ changed nothing, and so did a run whose decision printed
 `deployed/prod at <commit> already holds every Pulumi input of <revision>, so nothing applied.`
 after it waited behind a newer commit's apply.
 
+A run that has work holds the prod lock from its first drift check to its last step, so it never
+applies while the scheduled drift check reads the state
+([State and drift](../architecture/infrastructure-as-code.md#state-and-drift)). While the check
+holds the lock, the step `Take the prod lock` logs
+`hold-prod-lock: drift-check <invocation_id> holds the prod lock until <time>; asking again in 30s`
+and waits. A run whose check never released the lock fails that step with
+`hold-prod-lock: drift-check <invocation_id> still holds the prod lock after 3300s` and posts
+`The prod apply failed`. [The drift check runbook](./drift-check.md) shows how to see the holder;
+dispatch the run again once the check ends.
+
+A run that applied and whose `check` job failed posts
+`The prod apply passed, but nixie's API check after it failed`. The apply job's step
+`Check nixie's API` logs a `check-nixie-api:` line for each call that nixie answered with anything
+other than `401 UNAUTHORIZED`, or a `run-nixie-api-check:` line when nixie's rollout did not finish
+or `kubectl proxy` did not start. A 404 with no error that nixie's contract defines means the
+release dropped or renamed a procedure that the check calls, so vendor the release's contract as
+[nixie's runbook](./nixie.md) describes. A 401 with no such error comes from the k3s API server, not
+nixie, so check the deploy kubeconfig. Never send nixie a call by hand to reproduce the failure.
+
+A run that applies a new nixie image runs the Job that adds the release's sandbox images to impd
+before it rolls nixie
+([sandbox images before a roll](../architecture/workloads/nixie.md#sandbox-images-before-a-roll)).
+The step `Apply` shows `run-sandbox-image-job: started job.batch/<job_name>`, the Job's `added` and
+`held` lines, and `run-sandbox-image-job: job.batch/<job_name> added nixie's sandbox images` before
+the update of `kubernetes:apps/v1:StatefulSet nixie`. When the Job fails, the step logs
+`run-sandbox-image-job: job.batch/<job_name> failed (<reason>), so nixie's sandbox images are not all in impd and nixie does not roll`,
+the apply fails with nixie still on its old release, and the run posts `The prod apply failed`. Fix
+the cause that the Job's log names, as [nixie's runbook](./nixie.md#failures) describes, then
+dispatch the run again.
+
 A run whose apply job ended cancelled before its first step found the queue full: GitHub keeps at
 most 100 waiting runs and cancels any more. It still posts `The prod apply failed` to Discord. Check
 that a newer run applied, because its apply covers every change of the cancelled one.
+
+A run that someone cancelled, or that hit the job's time limit, during its refresh or apply clears
+the lock that step left on the prod stack's state. The step `Cancel this run's Pulumi update` runs
+`pulumi cancel` only while the run still holds the prod lock, then the run releases the prod lock.
+When the step logs
+`cancel-deploy-prod-update: the job does not hold the prod lock, so it leaves the Pulumi lock to its holder`,
+or a runner died and ran no step at all, the next run fails on `the stack is currently locked`.
+Clear that lock with `bun run ops:cancel-prod-lock`, whose preconditions
+[the operator verbs](./ops.md#bun-run-opscancel-prod-lock) list.
 
 ## Answer a held run
 

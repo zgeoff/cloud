@@ -30,6 +30,12 @@ export function renderBumpBody(input: BumpBodyInput): string {
     ...renderMergeLines(input),
     '',
     `After the merge: ${input.record.rollout}`,
+    ...(input.labels.includes('sandbox-images-changed')
+      ? [
+          '',
+          "The release changes nixie's sandbox images. nixie adds them to impd itself; pin them once it reports ready (`docs/runbooks/nixie.md`).",
+        ]
+      : []),
     '',
   ].join('\n');
 }
@@ -44,7 +50,7 @@ function isOlder(pinned: string, version: string) {
 function renderMergeLines(input: BumpBodyInput) {
   if (input.labels.includes('auto-merge')) {
     return [
-      'It merges on its own once every check on its head passes, including the NixOS checks when it changes `nixos/`.',
+      'It merges on its own once every check on its head passes. A change to `nixos/` gets its NixOS checks on `main`, which the host switch waits for.',
     ];
   }
 
@@ -65,12 +71,6 @@ const reasonRenderers = new Map<string, (version: string) => string[]>([
   [
     'migrations',
     () => ['- a release in the bump adds database migrations, which a revert does not undo.'],
-  ],
-  [
-    'sandbox-images-changed',
-    () => [
-      "- the release changes nixie's sandbox images, which a person adds to impd before the merge, because the `Deploy prod` workflow applies the merged pin (`docs/runbooks/nixie.md`).",
-    ],
   ],
 ]);
 

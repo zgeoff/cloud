@@ -13,7 +13,6 @@ test.each([
   expect(buildFileHeaders({ contentType, filename: 'clip' })).toStrictEqual({
     'Content-Type': contentType,
     'Content-Disposition': `inline; filename="clip"; filename*=UTF-8''clip`,
-    'Cache-Control': 'public, max-age=300',
   });
 });
 
@@ -23,7 +22,6 @@ test.each([['image/svg+xml'], ['text/html'], ['application/pdf'], ['application/
     expect(buildFileHeaders({ contentType, filename: 'page' })).toStrictEqual({
       'Content-Type': 'application/octet-stream',
       'Content-Disposition': `attachment; filename="page"; filename*=UTF-8''page`,
-      'Cache-Control': 'public, max-age=300',
     });
   },
 );

@@ -107,31 +107,51 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    digests, which the atc-gateway images workflow opens once it publishes them, let the
    `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate too.
 4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
-   nixie pod's imp client refuses, or that finds no nixie pod, because nixie then retries its start
-   without end while every host check passes. It reads the client's version from the `bun.lock` of
-   the pod's nixie release on GitHub: `@impz/client` from nixie 0.35.1, and `@zgeoff/imp-client`
-   before it. It accepts impd 2 beside a 1.x client from nixie 0.28.0 on, as nixie itself does. It
-   checks again before the activation. For an impd major bump, deploy a nixie release whose client
-   speaks the new major first. `--build-only` skips this gate too.
-5. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
+   nixie pod refuses, or that finds no nixie pod, because nixie then retries its start without end
+   while every host check passes. A nixie pod accepts the major of its imp client, whose version the
+   script reads from the `bun.lock` of the pod's nixie release on GitHub: `@impz/client` from nixie
+   0.35.1, and `@zgeoff/imp-client` before it. It accepts impd 2 beside a 1.x client from nixie
+   0.28.0 on. From nixie 0.42.0 it also accepts each major in the `EXTRA_IMPD_MAJORS` set of its imp
+   adapter, which the script reads from the release's source on GitHub. The script checks again
+   before the activation. For an impd major bump, deploy a nixie release that accepts the new major
+   first. `--build-only` skips this gate too.
+5. It refuses a commit whose impd stores a secret kind that the commit's atc daemon pin does not
+   accept, and names each such kind, because atc's auth binding then refuses every brokered secret
+   of that kind and every cloud spawn and adopt fails with `auth_secret_mismatch`. It reads impd's
+   kinds from the `SecretKindSchema` enum in `zgeoff/impz` at the imp-host release's tag, and atc's
+   from the `BrokerSecretKind` union in `zgeoff/atc` at the pin's tag. For an impd that adds a kind,
+   pin an atc release that accepts it first. `--build-only` skips this gate too.
+6. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-6. It copies the built store path to the host with `nix copy`, then runs the copied system's
+7. It copies the built store path to the host with `nix copy`, then runs the copied system's
    `switch-to-configuration dry-activate`, which changes nothing and lists the units the activation
    would stop and restart. It holds the switch with exit 1 and those lines when either list holds
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
-7. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
+8. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the
    host, because the store path does not name the commit it was built from.
-8. It fails unless the host's `/run/current-system` is the built path, then prints
+9. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
-9. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
-   fails with each readiness or dependency part that is not ready and nixie's reason for it, since a
-   host that switches cleanly can still leave nixie unable to start. It prints each advisory part
-   that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
-   turns fail.
+10. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
+    fails with each readiness or dependency part that is not ready and nixie's reason for it, since
+    a host that switches cleanly can still leave nixie unable to start. It prints each advisory part
+    that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
+    turns fail.
+11. It fails with each image record in impd whose build folder holds no `rootfs.ext4`, because every
+    imp boot from that image then fails with ENOENT. A database restored across a change of the
+    preview image can leave such a record, as
+    [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes.
+12. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+    `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
+    marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
+    a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves
+    the tag where it was. The push forces the tag, because the last activation decides what the host
+    runs, even when it activates an older commit. When `origin` refuses the push, the script exits
+    with git's code and prints the `git push --force origin <commit>:refs/tags/deployed/host` that
+    moves the tag by hand.
 
 A timer on the host checks every hour whether it runs an older system or imp than the latest green
 NixOS checks run on `main`, and after a day of that the `HostBehindLatestBuild` alert fires, as
@@ -160,11 +180,10 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 ### Check the host before a switch
 
 The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
-without them. The `NixOS checks` workflow builds them on `main` every night, and skips the build
-when an earlier green run covers the commit. A green scheduled or dispatched run on `main` covers
-every later commit that changes no input of the checks, which the `nixos` gate of
-[`gates.yml`](../../.github/gates.yml) lists. An app's pull request that changes `nixos/`, such as a
-release bump, runs the checks before it merges; a person's pull request skips them.
+without them, a release bump included. The `NixOS checks` workflow builds them on `main` every
+night, and skips the build when an earlier green run covers the commit. A green scheduled or
+dispatched run on `main` covers every later commit that changes no input of the checks, which the
+`nixos` gate of [`gates.yml`](../../.github/gates.yml) lists. No pull request runs the checks.
 
 To switch before the nightly run covers the commit:
 
@@ -200,7 +219,7 @@ imp is pinned in three places, and `scripts/pin-imp.sh` moves all three together
 
 The [release check](./release-check.md) opens the bump pull request for each new imp release on the
 `release-check/imp` branch, with all three pins moved. The `release bump merge` workflow merges it
-once its checks pass, the NixOS checks included, unless its labels hold it for a person, as
+once its checks pass, unless its labels hold it for a person, as
 [When a bump merges on its own](./release-check.md#when-a-bump-merges-on-its-own) describes. The
 merge changes nothing on the host. The steps after it stay with a person, and the pull request's
 body lists them:
@@ -237,13 +256,15 @@ health check, and turning Discord alerts on or off.
 
 Store the new value in its 1Password item first, then deliver it. An item `.env` references has a
 copy in the vault `cloud-deploy` for the apply job: update both. The passphrase and the alert
-webhook have a third copy in the vault `cloud-ci`, for the
-[scheduled drift check](./drift-check.md#rotate-the-checks-credentials).
+webhook have a third copy in the host's credentials file for the
+[scheduled drift check](./drift-check.md#rotate-the-checks-credentials): install that file again
+after a change to either.
 
 | Credential                                                     | Deliver it with                                                                                       |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | a provider credential: Onidel, Cloudflare, Tailscale, R2 state | nothing: the next run reads the new value through `op run`. Revoke the old one at its source          |
 | `ALERT_WEBHOOK_URL`                                            | `bun run up`, which updates the Worker's secret, and Alertmanager's Secret when `discordAlerts` is on |
+| `ALERT_MENTION_USER_ID`                                        | `bun run up`, which updates Alertmanager's Secret and restarts it when `discordAlerts` is on          |
 | `PULUMI_CONFIG_PASSPHRASE`                                     | do not replace the item: the stack's secrets are encrypted with it. Changing it needs a migration     |
 | imp's Cloudflare DNS token                                     | `bash scripts/install-imp-dns-token.sh`; impd rereads the file, no restart                            |
 | the k3s kubeconfig                                             | `bash scripts/connect-k3s.sh`, then a preview. Read it before any apply                               |

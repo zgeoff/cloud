@@ -1,5 +1,5 @@
-# Compares the exposure registry's host-port entries (packages/topology/exposure.json) with an
-# evaluated NixOS config, both ways, and returns one message per mismatch: [ ] when they agree.
+# Compares the exposure registry's host-port and front-route entries
+# (packages/topology/exposure.json) with an evaluated NixOS config, both ways, and returns one message per mismatch: [ ] when they agree.
 # checks/exposure.nix runs it on geoffcloud's config and tests it.
 #
 # - A port in networking.firewall's allowedTCPPorts or allowedUDPPorts is open on every
@@ -20,7 +20,12 @@
 #   ports needs a tailnet-scope or public tcp entry while it runs.
 # - An interface that carries a default route or a static address is public, so a port opened
 #   there needs a public entry, and a host-scope entry never names it.
-# - Each of imp's publicPorts publishes a host port past nixos-fw, so it needs a public entry.
+# - Each of imp's publicPorts publishes a host port past nixos-fw, so it needs a public entry. One
+#   exception: a spec bound to 127.0.0.1 publishes on the loopback only, so it needs a host-scope
+#   entry for lo instead, and such an entry needs its publish.
+# - Each route of the TLS front (modules/public-front.nix) needs a public front-route entry with
+#   its hostname, its upstream and exactly its paths, and a host-scope entry for lo with its
+#   upstream's port. Each public front-route entry needs its route.
 # - A port range or extraInputRules cannot be matched with an entry, so either is a mismatch.
 { lib }:
 { config, entries }:
@@ -96,10 +101,11 @@ let
     toOpenPorts firewall
   );
 
+  # a public entry first, since a tailnet entry can share its port
   publicPortMismatches = lib.concatMap (
     open:
     let
-      entry = lib.findFirst (isPort open.protocol open.port) null hostPorts;
+      entry = lib.findFirst (isPort open.protocol open.port) null (publicEntries ++ hostPorts);
       port = formatPort open.protocol open.port;
     in
     if entry == null then
@@ -206,7 +212,7 @@ let
     let
       isEntryPath =
         candidate: candidate.interface == entry.interface && isPort entry.protocol entry.port candidate;
-      opened = lib.any isEntryPath openInterfacePorts;
+      opened = lib.any isEntryPath (openInterfacePorts ++ loopbackPublishes);
       dropped = lib.any isEntryPath interfacePorts;
       admitted = lib.any (admission: isEntryPath (admission // { protocol = "tcp"; })) admissions;
       accepted = admitted && isAcceptedByNixosFw entry.interface entry.port;
@@ -241,19 +247,72 @@ let
       inherit spec;
       protocol = if lib.length halves > 1 then lib.elemAt halves 1 else "tcp";
       port = if builtins.match "[0-9]+" hostPort == null then null else lib.toIntBase10 hostPort;
+      isLoopback = lib.length fields == 3 && lib.head fields == "127.0.0.1";
     };
+  impPublishes = map parsePublishSpec impPublicPorts;
+  # the loopback publishes as interface paths, the shape a host-scope entry for lo matches
+  loopbackPublishes = map (published: {
+    interface = "lo";
+    inherit (published) protocol port;
+  }) (lib.filter (published: published.isLoopback && published.port != null) impPublishes);
 
   impMismatches = lib.concatMap (
     published:
+    let
+      port = formatPort published.protocol published.port;
+    in
     if published.port == null then
       [ "imp's publicPorts publishes ${published.spec}, whose host port the exposure check cannot read" ]
+    else if published.isLoopback then
+      lib.optional (
+        findHostEntry "lo" published.protocol published.port == null
+      ) "imp's publicPorts publishes ${published.spec} (${port}) with no host-scope registry entry for lo"
     else if lib.any (isPort published.protocol published.port) publicEntries then
       [ ]
     else
-      [
-        "imp's publicPorts publishes ${published.spec} (${formatPort published.protocol published.port}) with no public registry entry"
-      ]
-  ) (map parsePublishSpec impPublicPorts);
+      [ "imp's publicPorts publishes ${published.spec} (${port}) with no public registry entry" ]
+  ) impPublishes;
+
+  frontRoutes = lib.optionals (config.services.public-front.enable or false
+  ) config.services.public-front.routes;
+  frontRouteEntries = lib.filter (
+    entry: entry.kind == "front-route" && entry.scope == "public"
+  ) entries;
+  formatPaths = paths: lib.concatStringsSep " " (lib.sort lib.lessThan paths);
+
+  frontRouteMismatches = lib.concatMap (
+    route:
+    let
+      entry = lib.findFirst (candidate: candidate.hostname == route.hostname) null frontRouteEntries;
+      prefix = "the TLS front serves ${route.hostname}";
+      upstreamPort = lib.last (lib.splitString ":" route.upstream);
+      upstreamEntry =
+        if builtins.match "[0-9]+" upstreamPort == null then
+          null
+        else
+          findHostEntry "lo" "tcp" (lib.toIntBase10 upstreamPort);
+    in
+    lib.optional (
+      upstreamEntry == null
+    ) "${prefix} from ${route.upstream}, with no host-scope registry entry for lo"
+    ++ (
+      if entry == null then
+        [ "${prefix} with no public front-route registry entry" ]
+      else
+        lib.optional (
+          entry.upstream != route.upstream
+        ) "${prefix} to ${route.upstream}, but the registry's ${entry.name} entry names ${entry.upstream}"
+        ++
+          lib.optional (formatPaths entry.paths != formatPaths route.paths)
+            "${prefix} for the paths ${formatPaths route.paths}, but the registry's ${entry.name} entry lists ${formatPaths entry.paths}"
+    )
+  ) frontRoutes;
+
+  staleFrontRouteEntries = lib.concatMap (
+    entry:
+    lib.optional (!lib.any (route: route.hostname == entry.hostname) frontRoutes)
+      "the registry's ${entry.name} entry is a public front route, but the TLS front does not serve ${entry.hostname}"
+  ) frontRouteEntries;
 
   sshMismatches = lib.concatMap (
     port:
@@ -282,4 +341,6 @@ publicPortMismatches
 ++ staleHostEntries
 ++ sshMismatches
 ++ impMismatches
+++ frontRouteMismatches
+++ staleFrontRouteEntries
 ++ extraRuleMismatches

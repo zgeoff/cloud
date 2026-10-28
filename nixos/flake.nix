@@ -9,7 +9,7 @@
     };
     # imp's host module (zgeoff/impz docs/guides/nixos.md); pinned by flake.lock
     imp = {
-      url = "github:zgeoff/impz/2f23a4b1";
+      url = "github:zgeoff/impz/50868a53";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -29,10 +29,14 @@
         imp.nixosModules.imp
         ./modules/impd-local-health.nix
         ./modules/host-build-lag.nix
+        ./modules/agent-image-build.nix
+        ./modules/host-cgroup-cpu.nix
+        ./modules/drift-check.nix
         ./modules/atc-daemon.nix
         ./modules/cloud-host-firewall.nix
         ./modules/onepassword-connect-relay.nix
         ./modules/preview.nix
+        ./modules/public-front.nix
         ./modules/tank-cloud.nix
         ./modules/imp-dataset-key.nix
         ./hosts/geoffcloud/configuration.nix
@@ -53,7 +57,13 @@
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
       # impd-restore-reset tests that rehearsal's own reset. tank-cloud-unlock, tank-cloud-host-secrets
       # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
-      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk
+      # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk, and
+      # network-policy, which runs infra's egress NetworkPolicies on k3s, and
+      # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
+      # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and
+      # drift-check-vm, which runs the drift check's unit in its own sandbox, and public-front-vm,
+      # which sends requests through the TLS front to a stand-in upstream. onidel-provider-vendor
+      # builds the provider's vendored Go modules, which CI's checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -66,6 +76,10 @@
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
+      checks.x86_64-linux.impd-settings = import ./checks/impd-settings.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
       checks.x86_64-linux.atc-daemon = import ./checks/atc-daemon.nix {
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -75,6 +89,16 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.preview = import ./checks/preview.nix { inherit nixpkgs imp; };
+      checks.x86_64-linux.geoffcloud-spend-cap = import ./checks/geoffcloud-spend-cap.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+        inherit imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.public-front = import ./checks/public-front.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.public-front-vm = import ./checks/public-front-vm.nix { inherit nixpkgs; };
       checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
         inherit nixpkgs imp;
       };
@@ -89,6 +113,20 @@
       checks.x86_64-linux.host-build-lag = import ./checks/host-build-lag.nix {
         inherit nixpkgs imp;
       };
+      checks.x86_64-linux.agent-image-build = import ./checks/agent-image-build.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.host-cgroup-cpu = import ./checks/host-cgroup-cpu.nix {
+        inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.host-cgroup-cpu-vm = import ./checks/host-cgroup-cpu-vm.nix {
+        inherit nixpkgs;
+      };
+      checks.x86_64-linux.onidel-provider-vendor = import ./checks/onidel-provider-vendor.nix {
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      };
+      checks.x86_64-linux.drift-check = import ./checks/drift-check.nix { inherit nixpkgs imp; };
+      checks.x86_64-linux.drift-check-vm = import ./checks/drift-check-vm.nix { inherit nixpkgs; };
       checks.x86_64-linux.impd-restore = import ./checks/impd-restore.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.impd-restore-boundaries = import ./checks/impd-restore-boundaries.nix {
         inherit nixpkgs imp;
@@ -111,6 +149,14 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.tank-cloud-rancher = import ./checks/tank-cloud-rancher.nix {
+        inherit nixpkgs;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.network-policy = import ./checks/network-policy.nix {
+        inherit nixpkgs;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.imp-cpu-weight = import ./checks/imp-cpu-weight.nix {
         inherit nixpkgs;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };

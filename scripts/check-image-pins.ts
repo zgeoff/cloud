@@ -175,8 +175,8 @@ async function readRegistryDigests(
   return Object.fromEntries(answers);
 }
 
-// The images this repo's release flows publish. A published release tag is never replaced, so a
-// tag that names another digest is a hand edit that moved the tag or the digest alone.
+// A published release tag is never replaced, so a tag that names another digest is a hand edit
+// that moved the tag or the digest alone.
 const releasePrefix = 'ghcr.io/zgeoff/';
 
 // An upstream tag, such as Distroless's nonroot, moves when its publisher rebuilds the image, so

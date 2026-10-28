@@ -6,9 +6,7 @@ import type { Runner } from '../run-process.ts';
 import { runProcess } from '../run-process.ts';
 import { removeDescendant } from './remove-descendant.ts';
 
-// Starts a command through run whose grandchild holds the captured pipes, as an `impz exec` or a
-// `curl` in an older commit's check does, and returns the grandchild's pid once it runs. The
-// grandchild runs prelude first, such as `trap "" TERM; `.
+// the grandchild holds the captured pipes, as an `impz exec` or a `curl` in a check does
 export async function runGrandchildCommand(run: Runner, prelude: string): Promise<number> {
   const directory = await mkdtemp(join(tmpdir(), 'grandchild-command-'));
 

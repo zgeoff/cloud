@@ -14,6 +14,7 @@ This page sets up a machine to work on geoff.cloud, and ends with a preview of t
 | Docker                    | current                                  | NixOS builds and switches (`nixos/nix` image), fixture test                        |
 | gitleaks                  | on `PATH`                                | the pre-commit hook                                                                |
 | `jq`, `gh`, `ssh`, `curl` | current                                  | the scripts in `scripts/`                                                          |
+| `dpkg-deb`                | optional                                 | the apt stand-in's suite, which skips without it outside CI; `test:agent-image`    |
 
 You need no local Nix: every Nix command here runs in the `nixos/nix` image.
 
@@ -26,9 +27,10 @@ bun install
 ```
 
 `bun install` also installs the lefthook git hooks. pre-commit fixes and checks staged files and
-runs gitleaks. pre-push runs the format check, lint, the Pulumi pin check, typecheck, the tests, the
-dead-code check, the provider's checks and the SDK check; CI adds the type-aware lint, the script
-tests, the docs checks and the NixOS checks.
+runs gitleaks. pre-push runs the format check, the Pulumi pin and topology checks and typecheck on
+every push, and the linters and tests of each kind of file the branch changes, such as every shell
+suite for a branch that changes a shell file; `lefthook.yml` lists the jobs. CI adds the type-aware
+lint, the dead-code check, the docs checks and the NixOS checks.
 
 The Pulumi CLI runs at the version `infra/package.json` pins for `@pulumi/pulumi`, the one Pulumi
 pin in the repo. CI installs that version for the SDK check, and `check:sdk` warns when the local

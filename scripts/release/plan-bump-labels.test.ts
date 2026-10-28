@@ -37,6 +37,14 @@ test('it prints each flag and holds its patch update for review', () => {
   ).toStrictEqual(['update:patch', 'migrations', 'sandbox-images-changed', 'needs-review']);
 });
 
+test('it prints the changed sandbox images flag and lets its patch update merge on its own', () => {
+  expect(planBumpLabels('2.3.1', ['2.3.0'], ['sandbox-images-changed'])).toStrictEqual([
+    'update:patch',
+    'sandbox-images-changed',
+    'auto-merge',
+  ]);
+});
+
 test('it labels the largest step across the pins', () => {
   expect(planBumpLabels('5.0.0', ['4.11.0', '4.9.2', '5.0.0'], [])).toStrictEqual([
     'update:major',

@@ -1,5 +1,6 @@
 import { applySlotEvictions } from './apply-slot-evictions.ts';
 import type { PhaseChange, Preview } from './create-preview-store.ts';
+import { modelRoute } from './model-route.ts';
 import type { PreviewContract } from './parse-preview-contract.ts';
 import { parsePreviewContract } from './parse-preview-contract.ts';
 import type { PreviewDeps } from './types.ts';
@@ -61,10 +62,28 @@ async function startImpInSlot(
     await (imp.state === 'running' ? Promise.resolve() : deps.impd.wakeImp(preview.imp));
   }
 
+  // impd refuses a second grant for a host the imp already holds a credential for, so a model
+  // secret granted under an earlier setting goes before the current one is granted
+  await deps.impd.removeGrantsExcept(preview.imp, collectGrantSecrets(deps));
+
   // every boot installs the grants, so an imp whose grant failed or never came gets it now
-  for (const secret of collectGrantSecrets(deps)) {
-    await deps.impd.installGrant(preview.imp, secret);
+  if (deps.settings.impGitHubSecret !== null) {
+    await deps.impd.installGrant(preview.imp, deps.settings.impGitHubSecret);
   }
+
+  if (deps.settings.impModelSecret === null) {
+    return;
+  }
+
+  // with a counting proxy, the model secret's upstream is the service's route listener, and the
+  // filter keeps each imp on its own route, so one preview can neither skip nor spend another's cap
+  await (deps.spendProxies === null
+    ? deps.impd.installGrant(preview.imp, deps.settings.impModelSecret)
+    : deps.impd.installPathGrant(
+        preview.imp,
+        deps.settings.impModelSecret,
+        modelRoute.buildGrantPaths(preview.imp),
+      ));
 }
 
 function collectGrantSecrets(deps: PreviewDeps): string[] {
@@ -94,10 +113,11 @@ const composeURL =
 
 const composeSHA256 = '40343e21ca777173e69cff5dbafeb37c6f81f3b0d57d9e597f036e95eb63e76a';
 
-// The guest script takes the repository and the commit as arguments, never inside its text. A
-// rebuild takes the old stack down with its volumes first, so every build seeds fresh data. A
-// compose.broker.yaml joins with the proxy and CA bundle that impd sets on an exec with a grant.
+// Compose reads the project's .env on every command, so the route goes in it: a one-off run by hand,
+// such as `docker compose run enrol`, would otherwise recreate the service it depends on without
+// the route. A compose.broker.yaml joins with the proxy and CA bundle impd sets on the exec.
 const bootScript = `set -eu
+export PREVIEW_MODEL_ROUTE="$3"
 if ! docker compose version >/dev/null 2>&1; then
   plugins=/usr/local/lib/docker/cli-plugins
   mkdir -p "$plugins"
@@ -106,8 +126,8 @@ if ! docker compose version >/dev/null 2>&1; then
   chmod 0755 "$plugins/docker-compose.part"
   mv "$plugins/docker-compose.part" "$plugins/docker-compose"
 fi
-mkdir -p /srv/preview
-cd /srv/preview
+mkdir -p "$4"
+cd "$4"
 if [ ! -d .git ]; then
   git init -q
   git remote add origin "https://github.com/$1.git"
@@ -118,6 +138,13 @@ fi
 git fetch -q --depth 1 origin "$2"
 git checkout -q --force FETCH_HEAD
 cd preview
+{
+  git show FETCH_HEAD:preview/.env 2>/dev/null || true
+  if [ -n "$PREVIEW_MODEL_ROUTE" ]; then
+    printf '\\nPREVIEW_MODEL_ROUTE=%s\\n' "$PREVIEW_MODEL_ROUTE"
+  fi
+} > .env.part
+mv .env.part .env
 if [ -f compose.broker.yaml ]; then
   export BROKER_CA_FILE="\${SSL_CERT_FILE:?the broker's CA bundle did not reach the boot}"
   docker compose -f compose.yaml -f compose.broker.yaml up --detach --build --wait
@@ -147,6 +174,8 @@ async function runBuild(
       'preview-boot',
       preview.repo,
       preview.headSHA,
+      deps.spendProxies === null ? '' : preview.imp,
+      '/srv/preview',
     ],
     { requireBroker: collectGrantSecrets(deps).length > 0 },
   );

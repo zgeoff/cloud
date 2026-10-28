@@ -76,9 +76,24 @@ config in the state holds the full-account API key, because Onidel offers no oth
 Kubernetes provider's holds the admin kubeconfig. The check therefore leaves out every Onidel and
 Kubernetes resource, and reads the rest with credentials that can only read: a read-only token for
 the state bucket, and read-only Cloudflare and Tailscale credentials. It still needs the passphrase,
-because Pulumi opens no state without it, so the vault that holds the check's credentials also opens
-every secret in the state. [The drift check runbook](../runbooks/drift-check.md) lists each
-credential and its scope.
+because Pulumi opens no state without it, so whatever holds the check's credentials also opens every
+secret in the state. The check therefore runs on the host, from a root-only credentials file there,
+and never on a GitHub runner. Its scoped read tokens live only in that file and in their items in
+the vault `cloud`, so no workflow reads them. The passphrase and the alert webhook are shared: the
+apply job reads its own copies of both from `cloud-deploy`, because every apply needs the
+passphrase. [The drift check runbook](../runbooks/drift-check.md) lists each credential and its
+scope.
+
+The scheduled check and the apply job share one lock, the prod lock, so neither uses the state while
+the other does. An apply changes resources before it writes them into the state, so a check that
+refreshed during an apply would report the apply's own changes as drift. Pulumi's own state lock
+cannot serve, for two reasons: a refresh that only previews never takes it, and the check's token
+for the state bucket can only read. The prod lock is therefore a Kubernetes Lease in k3s, which both
+sides reach: the host as root, and the apply job over the tailnet with the admin kubeconfig it
+already holds. A side that finds the Lease held waits for the holder to release it. Each side holds
+the Lease for a set time, and the other side takes it over once that time runs out, so a runner that
+dies holding it blocks the scheduled check only until then. The apply job holds the lock from its
+first drift check to its last step, and the scheduled check holds it around its refresh.
 
 Some resources are declared to avoid drift on their own. The host's auth keys are single-use, so
 after the host joins they read as used, and the program never mints them again until a reinstall
@@ -105,6 +120,7 @@ flowchart LR
   G -->|pass| U["apply"]
   U --> D2["drift check<br>at the commit"]
   D2 --> T["move deployed/prod"]
+  T --> N["nixie API check"]
 ```
 
 The tag `deployed/prod` marks the last revision the job applied, and it moves only after an apply
@@ -139,15 +155,27 @@ because the tag sits behind it and the preview covers the whole stack, so the la
 too. A failed apply or a failed second drift check leaves the tag where it was, so the next run's
 first drift check fails and holds until a person repairs the stack.
 
+After the tag moves, the job checks that the applied commit's nixie client still speaks the API of
+the nixie it deployed. It waits for nixie's rollout, then sends nixie a few calls through the k3s
+API's service proxy, because the job's tailnet grant reaches only k3s's API. Each call carries no
+session, and each names a procedure that the client's table of nixie's procedures marks as a read,
+so the check changes nothing in nixie even if nixie stopped asking for a session. The check passes
+when nixie refuses every call with the contract's unauthorized error, which shows that the route,
+the client header, the RPC encoding and each procedure still hold. A failed check fails the
+workflow's check job, not the apply job, because the apply is done by then, and Discord gets the
+failure.
+
 The apply plans again from a fresh refresh, so the guard covers the preview and not the apply
 itself. A change made outside Pulumi in the minutes between the two reaches the apply unguarded.
 
-The drift checks and the preview run again when they fail on an error that a later try can pass: a
-server error from Let's Encrypt while the ACME provider refreshes nixie's certificate, or a failed
-plugin download. A preview changes nothing, so a second try is safe. The apply never runs twice,
-because a failed apply can leave the stack half changed. Pulumi's update plans would close that gap,
-but they are experimental, and a plan they reject stops the apply partway, which leaves the stack
-half changed.
+The drift checks, the preview and the refresh before the apply run again when they fail on an error
+that a later try can pass: a server error from Let's Encrypt while the ACME provider refreshes
+nixie's certificate, a server error from the Cloudflare API to a read, or a failed plugin download.
+A preview changes nothing, and a refresh writes only what it reads into the state, so a second try
+is safe. The refresh runs as a step of its own for that reason, and the apply that follows it skips
+its own refresh. The apply never runs twice, because a failed apply can leave the stack half
+changed. Pulumi's update plans would close that gap, but they are experimental, and a plan they
+reject stops the apply partway, which leaves the stack half changed.
 
 One run of the job runs at a time, and GitHub never cancels one in progress, because a cancelled
 apply leaves the stack half changed. The job's concurrency group holds the whole job, from its
@@ -165,6 +193,11 @@ The decision counts every commit since the tag that touches a Pulumi input, as t
 of the repo's path-gate manifest lists them, not the difference between the two trees. A commit that
 reverts an input change while that change applies therefore still gets its own apply, and a decision
 of nothing to apply stays right after the tag moves forward.
+
+A push to `main` cancels the CI run of the push before it, as on a pull request, and a cancelled CI
+run starts no apply. The next push's run holds the cancelled commit's changes, because its decision
+counts every commit since the tag. CI's group never holds the apply job, so a new push never cancels
+an apply in progress.
 
 The job prints only each held step's op and resource name, never a resource's state, and its Pulumi
 runs suppress the stack outputs, because the repo and its logs are public.

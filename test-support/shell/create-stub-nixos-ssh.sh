@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the seven remote commands the switch runs:
+# answers the nine remote commands the switch runs:
 #
 # - the kubectl query for the atc gateway pods' images: prints STUB_GATEWAY_IMAGES (images
 #   separated by spaces, as jsonpath joins an `[*]` list) with no newline, as kubectl's jsonpath
@@ -31,7 +31,21 @@
 # - `readlink /run/current-system`: prints STUB_CURRENT, or with STUB_SSH_DROP_AT_READLINK
 #   drops the connection as OpenSSH reports a closed session (exit 255);
 # - `systemctl --failed --no-legend --plain`: prints STUB_FAILED_UNITS, or with
-#   STUB_FAILED_EXIT fails with systemctl's message and that code.
+#   STUB_FAILED_EXIT fails with systemctl's message and that code;
+# - `docker exec imp-host impz image ls --json`: prints STUB_IMPD_IMAGES, the JSON array of impd's
+#   image records, and `[]` when that is unset;
+# - the `docker exec imp-host sh -c` loop that lists the folders under /var/lib/imp/images holding
+#   a rootfs.ext4: prints each name in STUB_IMPD_IMAGE_DIRS (names separated by spaces) on its own
+#   line, and nothing when that is unset;
+# - with STUB_IMP_HOST_GONE, both docker commands fail as docker does for a container that does
+#   not exist: "Error response from daemon: No such container: imp-host" on stderr and exit 1,
+#   which ssh passes back.
+#
+# docker's line was checked on 2026-10-26 against a real docker 29.8.2: `docker exec <a container
+# that does not exist> true` printed "Error response from daemon: No such container: <name>" and
+# exited 1. Not run against geoffcloud's docker. The image records' shape is impd's ImageSchema
+# (zgeoff/impz packages/api/src/schemas/image-schema.ts at v4.2.4 and v5.0.0), which a case
+# supplies whole.
 #
 # With STUB_SSH_PASS=1, a call after it is logged goes through print-ssh-pass-through.sh's
 # guard: to the real ssh for a loopback destination, else exit 97. A call without
@@ -152,6 +166,20 @@ case "${*:4}" in
       exit "$STUB_FAILED_EXIT"
     fi
     if [ -n "${STUB_FAILED_UNITS:-}" ]; then printf '%s\n' "$STUB_FAILED_UNITS"; fi
+    ;;
+  "docker exec imp-host impz image ls --json")
+    if [ -n "${STUB_IMP_HOST_GONE:-}" ]; then
+      echo "Error response from daemon: No such container: imp-host" >&2
+      exit 1
+    fi
+    printf '%s\n' "${STUB_IMPD_IMAGES:-[]}"
+    ;;
+  "docker exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'")
+    if [ -n "${STUB_IMP_HOST_GONE:-}" ]; then
+      echo "Error response from daemon: No such container: imp-host" >&2
+      exit 1
+    fi
+    if [ -n "${STUB_IMPD_IMAGE_DIRS:-}" ]; then printf '%s\n' $STUB_IMPD_IMAGE_DIRS; fi
     ;;
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac

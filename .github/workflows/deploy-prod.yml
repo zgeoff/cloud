@@ -3,9 +3,11 @@ name: Deploy prod
 # Applies main to the prod stack with no person involved, unless the guard holds it. It starts
 # when the CI run of a push to main passes. One job decides, guards and applies inside the
 # deploy-prod concurrency group, so it reads the deployed/prod tag that the last apply left, and
-# it does nothing unless a Pulumi input changed since that tag. It checks drift from the tag,
-# previews the commit, and applies only when the guard passes the plan; then it checks drift again
-# and moves the tag. A held plan ends the run as held, not failed: the job succeeds, Discord gets
+# it does nothing unless a Pulumi input changed since that tag. It takes the prod lock, which the
+# scheduled drift check on the host also takes (scripts/hold-prod-lock.sh), checks drift from the
+# tag, previews the commit, and applies only when the guard passes the plan; then it checks drift
+# again, moves the tag and releases the lock. A run cancelled during its refresh or apply first
+# clears the lock that step left on the prod stack's Pulumi state. A held plan ends the run as held, not failed: the job succeeds, Discord gets
 # the hold, and the group passes to the next push's run. A manual dispatch of this workflow on
 # main applies whatever the guard found. docs/runbooks/prod-apply.md covers a held run and the
 # tag's first setting. The run's name holds the commit it decides on: the CI run's commit, or a
@@ -35,7 +37,8 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 45 minutes for the work, and up to 55 for the drift check to release the prod lock
+    timeout-minutes: 100
     environment: prod
     # One run at a time, and never cancel one in progress: a cancelled apply leaves the stack half
     # changed. queue: max keeps every waiting run, up to GitHub's 100, so no run takes the place of
@@ -49,6 +52,7 @@ jobs:
       queue: max
     outputs:
       outcome: ${{ steps.outcome.outputs.outcome }}
+      nixie-check: ${{ steps.nixie_check.outcome }}
     # contents: write moves the deployed/prod tag; id-token: write joins the tailnet through the
     # federated identity; actions: read lists CI's runs for a dispatch
     permissions:
@@ -117,7 +121,7 @@ jobs:
         if: steps.decide.outputs.apply == 'true'
         uses: pulumi/actions@8e5e406f4007fca908480587cb9893c07090f58d # v7.0.0
         with:
-          pulumi-version: 3.268.0
+          pulumi-version: 3.270.0
 
       - name: Setup 1Password CLI
         if: steps.decide.outputs.apply == 'true'
@@ -151,11 +155,24 @@ jobs:
           DEPLOYED: ${{ steps.decide.outputs.deployed }}
         run: bun run ci:check-out-deployed-revision
 
+      # the prod lock, from the first Pulumi step to the last, so the scheduled drift check never
+      # reads the state while this job uses it. It waits up to 3300 s for a check to release it, and
+      # holds it for the job's 100 minutes at most, so a lock that a lost runner left runs out. The
+      # kubeconfig is the deploy vault's admin one, which kubectl on the runner reads.
+      - name: Take the prod lock
+        if: steps.decide.outputs.apply == 'true'
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+        run: bun run ci:hold-deploy-prod-lock take
+
       # a failure here holds the apply rather than failing the run, so the plan still shows. Each
       # Pulumi step reads GITHUB_TOKEN, which Pulumi sends when it downloads a plugin from GitHub,
       # because GitHub limits the runners' shared address to 60 calls an hour without it. The drift
-      # checks and the preview run again after an ACME server's 5xx or a failed plugin download
-      # (retry-transient-pulumi.sh); the apply never does.
+      # checks, the preview and the refresh before the apply run again after an ACME server's 5xx, a
+      # Cloudflare API 5xx to a read or a failed plugin download (retry-transient-pulumi.sh); the
+      # apply never does.
       - name: Check drift from the deployed revision
         id: drift
         if: steps.decide.outputs.apply == 'true'
@@ -189,13 +206,25 @@ jobs:
           REVISION: ${{ steps.decide.outputs.revision }}
         run: bun run --silent ci:decide-prod-outcome
 
+      # the refresh writes only what it reads into the state and changes no resource, so it runs
+      # apart from the apply, where a second try is safe
+      - name: Refresh before the apply
+        id: refresh
+        if: steps.outcome.outputs.outcome == 'apply'
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PROGRAM: program
+        run: bun run --silent ci:refresh-prod
+
       - name: Apply
+        id: apply
         if: steps.outcome.outputs.outcome == 'apply'
         working-directory: program
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           GITHUB_TOKEN: ${{ github.token }}
-        run: bun run up -- --yes --refresh --skip-preview --suppress-outputs
+        run: bun run up -- --yes --skip-preview --suppress-outputs
 
       - name: Check drift after the apply
         if: steps.outcome.outputs.outcome == 'apply'
@@ -212,17 +241,84 @@ jobs:
           REVISION: ${{ steps.decide.outputs.revision }}
         run: bun run ci:move-deployed-prod "$REVISION"
 
-  # posts a held run, a failed one and a cancelled one to Discord
-  alert:
+      # the applied commit's nixie adapter against the nixie this run deployed, through k3s's
+      # service proxy, with calls that read only and carry no session (run-nixie-api-check.ts). It
+      # runs inside the prod lock, so no later apply restarts nixie under it, and a failure fails
+      # the check job below, not this job, because the apply is done by now
+      - name: Check nixie's API
+        id: nixie_check
+        if: steps.outcome.outputs.outcome == 'apply'
+        continue-on-error: true
+        working-directory: program
+        env:
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+        run: bun run ci:check-nixie-api
+
+      # a cancel or a timeout that stops the refresh or the apply leaves their lock on the prod
+      # stack's state, and the next run then fails on "the stack is currently locked"; the runner
+      # reports a job that its timeout ended as cancelled. The previews and drift checks take no
+      # such lock, and a refresh or an apply that fails releases its own. pulumi cancel ends
+      # whatever update holds the lock, so it runs only for a step of this run that the cancel
+      # stopped, and never after a failure: a refresh that fails on the lock found another update
+      # holding it, such as an apply that a person started by hand. The script also checks that
+      # the run still holds the prod lock. A runner that dies
+      # runs no step at all, and `bun run ops:cancel-prod-lock` clears what it leaves.
+      - name: Cancel this run's Pulumi update
+        if: >-
+          cancelled() && (steps.refresh.outcome == 'cancelled' || steps.apply.outcome ==
+          'cancelled')
+        timeout-minutes: 5
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          RUN_ID: ${{ github.run_id }}
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+          PROGRAM: program
+        run: bun run --silent ci:cancel-deploy-prod-update
+
+      # whatever the run's outcome, a held, failed or cancelled run included; it releases only this
+      # run's hold, and does nothing when the job never took the lock
+      - name: Release the prod lock
+        if: always() && steps.decide.outputs.apply == 'true'
+        env:
+          RUN_ID: ${{ github.run_id }}
+          KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig
+        run: bun run ci:hold-deploy-prod-lock release
+
+  # the deploy's check stage, after an apply job that applied and passed: it fails when nixie's API
+  # check failed, so the run shows the check failing and the apply passing
+  check:
     needs: [apply]
+    if: needs.apply.outputs.outcome == 'apply'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: .bun-version
+
+      - name: Check nixie's API
+        env:
+          NIXIE_CHECK: ${{ needs.apply.outputs.nixie-check }}
+        run: bun run ci:require-nixie-check
+
+  # posts a held run, a failed one, a cancelled one and a failed check to Discord
+  alert:
+    needs: [apply, check]
     if: >-
       always() && (needs.apply.result == 'failure' || needs.apply.result == 'cancelled' ||
-      needs.apply.outputs.outcome == 'held')
+      needs.apply.outputs.outcome == 'held' || needs.check.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     environment: prod
     env:
       OUTCOME: ${{ needs.apply.outputs.outcome }}
+      CHECK_RESULT: ${{ needs.check.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
       - name: Checkout

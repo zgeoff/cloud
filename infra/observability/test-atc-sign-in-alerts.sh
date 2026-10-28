@@ -4,7 +4,9 @@
 # written in the kubelet's CRI format and stamped relative to now, and each Alloy case compares the
 # security counters it exports. promtool tests the rules build-atc-sign-in-rules.ts builds against
 # series shaped like those counters. The pinned Alertmanager runs the route and receivers
-# build-alertmanager-values.ts builds and posts to the Discord webhook stand-in.
+# build-alertmanager-values.ts builds and posts to the Discord webhook stand-in. Alloy looks for new
+# log files every 1 s and Alertmanager holds a new group for 1 s, in place of production's 10 s and
+# 30 s, which the builders' own tests pin.
 # e2e/test-atc-sign-in-alert-journey.sh runs the stages together.
 #
 #   bash scripts/run-shell-suites.sh alert-rules
@@ -37,10 +39,12 @@ setup_test() {
     import { buildATCSecurityPipeline } from './infra/observability/build-atc-security-pipeline.ts';
     import { buildATCSignInRules } from './infra/observability/build-atc-sign-in-rules.ts';
     import { buildAlertmanagerValues } from './infra/observability/build-alertmanager-values.ts';
+    import { renderMentionTemplate } from './infra/observability/render-mention-template.ts';
     const tree = process.env.TREE ?? '';
-    await Bun.write(tree + '/config/config.alloy', buildATCSecurityPipeline('/logs/atc_atc-gateway-*/atc-gateway/*.log'));
+    await Bun.write(tree + '/config/config.alloy', buildATCSecurityPipeline('/logs/atc_atc-gateway-*/atc-gateway/*.log', { syncPeriod: '1s' }));
     await Bun.write(tree + '/config/rules.json', JSON.stringify({ groups: [buildATCSignInRules()] }));
-    const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url' });
+    const alertmanager = buildAlertmanagerValues({ secretName: 'alertmanager-discord', file: '/config/webhook-url', mentionTemplateFile: '/config/mention.tmpl' }, { groupWait: '1s' });
+    await Bun.write(tree + '/config/mention.tmpl', renderMentionTemplate('100000000000000001'));
     await Bun.write(tree + '/config/alertmanager.json', JSON.stringify(alertmanager.config));
   ")
 }

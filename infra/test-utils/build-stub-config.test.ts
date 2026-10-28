@@ -17,7 +17,7 @@ test('it returns the JSON text of an object from get, as Config does', () => {
 test('it parses the JSON text from getObject', () => {
   const config = buildStubConfig({ atcGateway: '{"image":"atc","daemons":{"geoffcloud":{}}}' });
 
-  expect(config.getObject<object>('atcGateway')).toStrictEqual({
+  expect(config.getObject('atcGateway')).toStrictEqual({
     image: 'atc',
     daemons: { geoffcloud: {} },
   });
@@ -48,13 +48,13 @@ test('it reads an unset key as undefined from get', () => {
 });
 
 test('it reads an unset key as undefined from getObject', () => {
-  expect(buildStubConfig({}).getObject<object>('atcGateway')).toBeUndefined();
+  expect(buildStubConfig({}).getObject('atcGateway')).toBeUndefined();
 });
 
 test("it throws Config's error, naming the full key, from getObject on a value that is not JSON", () => {
   const config = buildStubConfig({ atcGateway: 'not json' });
 
-  expect(() => config.getObject<object>('atcGateway')).toThrowWithMessage(
+  expect(() => config.getObject('atcGateway')).toThrowWithMessage(
     RunError,
     "Configuration 'geoff-cloud:atcGateway' value 'not json' is not a valid JSON object",
   );

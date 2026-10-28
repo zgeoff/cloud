@@ -53,6 +53,33 @@ so it fails when clients cannot reach impd even though impd itself is healthy. T
 also carries a stale alert, which fires when the timer, the textfile or node-exporter stops, so a
 dead probe never reads as a healthy impd.
 
+## Host CPU by cgroup
+
+The host's CPU time reaches Prometheus by cgroup, so a spike of system CPU shows which unit,
+container or kernel work took it. node-exporter reports the host's CPU by mode, such as user and
+system, but no unit. The kubelet's cAdvisor reads only the pods' cgroups, and node-exporter's
+systemd collector reports no CPU time. A service on the host reads the kernel's CPU accounting of
+the root cgroup, each slice and each unit in a slice, and writes it by mode where node-exporter's
+textfile collector reads it. The service loops rather than running from a timer, so the journal that
+Alloy ships to Loki gets no lines for each write.
+
+The same service writes the host's kernel time: the CPU time that was neither idle, iowait nor
+stolen, less the usage of the top-level cgroups. That remainder is the work that runs in the root
+cgroup itself: kernel threads, such as ZFS's threads that serve a zvol, and interrupts. The service
+never takes it from the root cgroup's own time less its slices', because the two differ in kind. The
+kernel samples the root's user and system time at each timer tick, while a child cgroup's usage is
+the scheduler's exact runtime, so that difference can read below zero. Idle, iowait and steal are
+measured rather than sampled, so the kernel time stays exact.
+
+The service holds the kernel count at its last value from the same boot when a new reading is lower,
+so a small dip in the measured idle time never reads as a counter reset. A top-level cgroup can go,
+such as `user.slice` after its last session, so the service keeps subtracting the last time it read
+for each one that went or that systemd made again under the same name.
+
+A container that Docker runs shows as a scope in `imp.slice`, and the pods show in the top-level
+cgroup that the kubelet makes for them. Grafana's `host-cpu` dashboard charts the kernel time beside
+the time of each top-level cgroup.
+
 ## Alert rules
 
 This repo's rules live in one PrometheusRule, built in code, and each rule that rests on one probe's
@@ -88,6 +115,15 @@ Discord alerts off, every alert goes to a receiver that sends nothing, and alert
 Prometheus and Alertmanager. Alertmanager keeps silences and notification state in memory-backed
 storage, so a restart forgets them. Grafana does no alerting. The sign-in alerts take a route of
 their own to the same webhook ([sign-in alerts](#sign-in-alerts)).
+
+A critical alert reaches Discord twice: once as every alert does, and once in a message that
+mentions the owner's Discord user, so the owner's phone gets a push. The mention goes with a firing
+alert only, and the resolved message comes without it. The user's ID reaches Alertmanager as a
+template file in the webhook's Secret, so the ID never appears in the repo or in Alertmanager's
+config. Alertmanager reads a template only when it loads its config, so a change to the Secret
+restarts Alertmanager through a checksum of the Secret on its pod. Each message's title holds the
+status, the alert name and the namespace, each cut to a length that keeps the title within Discord's
+title limit. The sign-in alerts keep Alertmanager's default title, which lists their labels.
 
 ## Sign-in alerts
 

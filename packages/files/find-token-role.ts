@@ -6,9 +6,7 @@ export type TokenHashes = Readonly<Record<Role, string>>;
 
 const roles: readonly Role[] = ['owner', 'agent'];
 
-// The role whose token the Authorization header carries as a bearer token, or undefined for no
-// header, another scheme, or a token whose hash matches neither role. Each comparison takes the
-// same time whatever the hash holds.
+// each comparison takes the same time whatever the hash holds, so its timing leaks nothing
 export function findTokenRole(authorization: string | null, hashes: TokenHashes): Role | undefined {
   const token = /^Bearer (?<token>\S+)$/u.exec(authorization ?? '')?.groups?.['token'];
 

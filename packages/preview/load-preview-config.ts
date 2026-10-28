@@ -1,5 +1,9 @@
+import type { KeyObject } from 'node:crypto';
+import { createPrivateKey } from 'node:crypto';
 import { join } from 'node:path';
-import type { ContractSettings, PreviewSettings } from './types.ts';
+import type { GitHubApp } from './build-github-client.ts';
+import { spendPricesSchema } from './counting-proxy-config-schema.ts';
+import type { ContractSettings, PreviewSettings, SpendPrices, SpendSettings } from './types.ts';
 
 interface Listener {
   readonly hostname: string;
@@ -13,9 +17,13 @@ export interface PreviewConfig {
   readonly impdURL: string;
   readonly databasePath: string;
   readonly webhookSecret: string;
-  readonly githubToken: string;
+  readonly githubApp: GitHubApp;
   readonly impdToken: string;
   readonly sweepIntervalMs: number;
+
+  // the route listener on the docker bridge, which the model secret's upstream names, and the
+  // proxies behind it; null runs the previews without a spend cap
+  readonly spend: { readonly listener: Listener; readonly settings: SpendSettings } | null;
 }
 
 export async function loadPreviewConfig(
@@ -34,6 +42,12 @@ export async function loadPreviewConfig(
     }
 
     return value;
+  };
+
+  const readAppKey = async (): Promise<KeyObject> => {
+    const pem = await readCredential('github-app-key');
+
+    return parseAppKey(pem);
   };
 
   return {
@@ -57,9 +71,13 @@ export async function loadPreviewConfig(
     impdURL: requireValue(env, 'PREVIEW_IMPD_URL').replace(/\/+$/u, ''),
     databasePath: requireValue(env, 'PREVIEW_DATABASE'),
     webhookSecret: await readCredential('webhook-secret'),
-    githubToken: await readCredential('github-token'),
+    githubApp: {
+      clientID: await readCredential('github-app-client-id'),
+      privateKey: await readAppKey(),
+    },
     impdToken: await readCredential('imp-token'),
     sweepIntervalMs: 60_000,
+    spend: parseSpendConfig(env),
   };
 }
 
@@ -71,6 +89,15 @@ function requireValue(env: Readonly<Record<string, string | undefined>>, name: s
   }
 
   return value;
+}
+
+function parseAppKey(pem: string): KeyObject {
+  try {
+    return createPrivateKey(pem);
+  } catch {
+    // OpenSSL's message, such as `PEM routines:OPENSSL_internal:NO_START_LINE`, names no credential
+    throw new Error('the credential github-app-key is not a PEM private key');
+  }
 }
 
 function parseRepos(list: string, name: string): ReadonlySet<string> {
@@ -118,6 +145,7 @@ function parseContractSettings(
     // a run without the model secret would only fail
     modelSecret: requireValue(env, 'PREVIEW_CONTRACT_MODEL_SECRET'),
     timeoutMs: requireInteger(env, 'PREVIEW_CONTRACT_TIMEOUT_MINUTES', '10') * 60_000,
+    idleMs: requireInteger(env, 'PREVIEW_CONTRACT_IDLE_MINUTES', '5') * 60_000,
   };
 }
 
@@ -130,4 +158,61 @@ function parseListener(address: string): Listener {
   }
 
   return { hostname, port: Number(match?.groups?.['port']) };
+}
+
+function parseSpendConfig(
+  env: Readonly<Record<string, string | undefined>>,
+): PreviewConfig['spend'] {
+  const listen = env['PREVIEW_SPEND_LISTEN'] ?? '';
+
+  if (listen === '') {
+    return null;
+  }
+
+  return {
+    listener: parseListener(listen),
+    settings: {
+      proxyPath: requireValue(env, 'PREVIEW_SPEND_PROXY'),
+      directory: requireValue(env, 'PREVIEW_SPEND_DIRECTORY'),
+      upstream: requireValue(env, 'PREVIEW_SPEND_UPSTREAM').replace(/\/+$/u, ''),
+      model: requireValue(env, 'PREVIEW_SPEND_MODEL'),
+      prices: parsePrices(requireValue(env, 'PREVIEW_SPEND_PRICES')),
+      limitDollars: requirePositiveNumber(env, 'PREVIEW_SPEND_LIMIT_DOLLARS'),
+      idleMs: requireInteger(env, 'PREVIEW_IDLE_MINUTES', '30') * 60_000,
+    },
+  };
+}
+
+function parsePrices(text: string): SpendPrices {
+  const parsed = spendPricesSchema.safeParse(parseJSONOrNull(text));
+
+  if (!parsed.success) {
+    throw new Error(
+      'PREVIEW_SPEND_PRICES is not a JSON object of input, cache_write, cache_write_1h, cached_input and output prices, with optional long_prompt prices over over_tokens',
+    );
+  }
+
+  return parsed.data;
+}
+
+function parseJSONOrNull(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function requirePositiveNumber(
+  env: Readonly<Record<string, string | undefined>>,
+  name: string,
+): number {
+  const text = requireValue(env, name);
+  const value = Number(text);
+
+  if (!/^\d+(?:\.\d+)?$/u.test(text) || value <= 0) {
+    throw new Error(`${name} is ${text}, not a positive number`);
+  }
+
+  return value;
 }

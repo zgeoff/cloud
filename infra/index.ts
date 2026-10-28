@@ -1,5 +1,4 @@
-// the program's entry point: it reads the inputs once and wires each group through its entry module
-import { Config } from '@pulumi/pulumi';
+import { Config, secret } from '@pulumi/pulumi';
 import { createCluster, createClusterProvider } from './cluster/index.ts';
 import { createEdge } from './edge/index.ts';
 import { createATCTunnel, createIngress } from './ingress/index.ts';
@@ -7,8 +6,7 @@ import { buildATCDaemonEndpoints, loadInputs } from './inputs/index.ts';
 import { createObservability } from './observability/index.ts';
 import { createTailnet } from './tailnet/index.ts';
 
-// The one place the program reads its stack config and env (.env's op:// refs, through `op
-// run`); every value is checked before any resource registers.
+// the env holds .env's op:// refs, resolved through `op run`
 const inputs = loadInputs(new Config(), process.env);
 const accountID = inputs.accountID;
 const edge = createEdge({ accountID, hostOnTailnet: inputs.hostOnTailnet });
@@ -26,8 +24,7 @@ export const hostAuthKey = tailnet.hostAuthKey;
 export const impKeySyncID = tailnet.impKeySyncID;
 export const impHostAuthKey = tailnet.impHostAuthKey;
 
-// k3s workloads (#6), with their inputs checked at the top of the program. Pulumi reaches the
-// k3s API over the tailnet with the kubeconfig from op://cloud/k3s-kubeconfig.
+// Pulumi reaches the k3s API over the tailnet with the kubeconfig from op://cloud/k3s-kubeconfig
 const k3s =
   inputs.cluster === undefined
     ? undefined
@@ -54,6 +51,7 @@ const workloads =
         ...(k3s.inputs.nixie === undefined ? {} : { nixie: k3s.inputs.nixie }),
         ...(k3s.inputs.files === undefined ? {} : { files: k3s.inputs.files }),
         zoneID: edge.zoneID,
+        kubeconfig: secret(k3s.inputs.kubeconfig),
       });
 
 const ingress = createIngress({
@@ -85,7 +83,7 @@ const observability = await createObservability({
       ? undefined
       : {
           provider: k3s.provider,
-          alertWebhookURL: k3s.inputs.alertWebhookURL,
+          alertWebhook: k3s.inputs.alertWebhook,
           atcDaemons: buildATCDaemonEndpoints(k3s.inputs.atcGateway?.config),
           nixieReadinessURL: workloads?.nixieReadinessURL,
         },

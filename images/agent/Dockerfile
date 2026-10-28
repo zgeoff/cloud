@@ -11,17 +11,20 @@
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
-FROM ghcr.io/zgeoff/imp-base:2.8.0@sha256:8a09d7d5093e2b6b3086a2fec5d0c68795ded996da987d9264f9928d50c4058f
+FROM ghcr.io/zgeoff/imp-base:5.0.0@sha256:1e5c7f8c5ee63e7c541d016d79bbc75e1e3555bbc285fc1e0b60fff5080d77a8
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Ubuntu packages come from snapshot.ubuntu.com at a fixed moment, so the
-# exact versions below stay installable after the archive moves on. A bump
-# moves the snapshot and the versions together; read the candidates with
-#   apt-get update --snapshot <stamp> && apt-cache policy <package>
+# Ubuntu packages are pinned to exact versions, and UBUNTU_SNAPSHOT names a
+# snapshot.ubuntu.com moment that holds every one of them. sbin/install-ubuntu-packages
+# resolves the pins and their dependencies against that snapshot only, and fetches
+# each file from the live archive or the snapshot, so a pin keeps installing after
+# Ubuntu replaces that version in the live archive. A bump moves the snapshot and
+# the versions together; read the candidates with
+#   apt-get update --snapshot <stamp> && apt-cache --snapshot <stamp> policy <package>
 # docker-compose-plugin comes from Docker's repository, which keeps old builds.
-ARG UBUNTU_SNAPSHOT=20261006T000000Z
-ARG GIT_VERSION=1:2.43.0-1ubuntu7.3
+ARG UBUNTU_SNAPSHOT=20261021T120000Z
+ARG GIT_VERSION=1:2.43.0-1ubuntu7.4
 ARG BASH_VERSION=5.2.21-2ubuntu4
 ARG JQ_VERSION=1.7.1-3ubuntu0.24.04.2
 ARG BUILD_ESSENTIAL_VERSION=12.10ubuntu1
@@ -30,26 +33,33 @@ ARG PYTHON3_VERSION=3.12.3-0ubuntu2.1
 ARG PYTHON3_PIP_VERSION=24.0+dfsg-1ubuntu1.3
 ARG PYTHON_IS_PYTHON3_VERSION=3.11.4-1
 ARG UNZIP_VERSION=6.0-28ubuntu4.1
-ARG XZ_UTILS_VERSION=5.6.1+really5.4.5-1ubuntu0.3
+ARG XZ_UTILS_VERSION=5.6.1+really5.4.5-1ubuntu0.4
 ARG DOCKER_COMPOSE_VERSION=5.6.0-1~ubuntu.24.04~noble
 
 # build-essential: native npm modules and Python wheels without a binary build
 # need a compiler. docker-compose-plugin: dev stacks use compose.
-RUN apt-get update --snapshot "$UBUNTU_SNAPSHOT" \
- && apt-get install -y --no-install-recommends \
+COPY sbin/install-ubuntu-packages /tmp/install-ubuntu-packages
+RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNAPSHOT/" \
       "git=$GIT_VERSION" "bash=$BASH_VERSION" "jq=$JQ_VERSION" \
       "build-essential=$BUILD_ESSENTIAL_VERSION" "pkg-config=$PKG_CONFIG_VERSION" \
       "python3=$PYTHON3_VERSION" "python3-venv=$PYTHON3_VERSION" \
       "python3-pip=$PYTHON3_PIP_VERSION" "python-is-python3=$PYTHON_IS_PYTHON3_VERSION" \
       "unzip=$UNZIP_VERSION" "xz-utils=$XZ_UTILS_VERSION" \
       "docker-compose-plugin=$DOCKER_COMPOSE_VERSION" \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin /var/log/apt /var/log/dpkg.log \
-      /var/log/alternatives.log /var/cache/debconf/*-old /var/lib/dpkg/*-old
+ && rm /tmp/install-ubuntu-packages
 
 # Each download below is checked against a sha256 taken from its publisher's
 # signed or attested release. The comment above each pin says where the sum
 # comes from; a bump repeats that check.
+
+# Every download retries. Plain --retry skips a dropped connection (curl exit 56)
+# and an HTTP/2 stream that did not close cleanly (exit 92), so it needs
+# --retry-all-errors. The fixed delay keeps a retried 404 to about 10 seconds.
+# A connection that does not open within 20 seconds, or a transfer that moves
+# less than 1 KiB a second for a minute, ends with exit 28 and retries, so a
+# stalled download cannot hold the build until its timeout. A slow transfer
+# that keeps moving runs on.
+ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60"
 
 # Claude Code's native linux-x64 binary. The sum is the linux-x64 checksum in
 # the release's manifest.json, whose signature names Anthropic's release key
@@ -61,7 +71,7 @@ RUN apt-get update --snapshot "$UBUNTU_SNAPSHOT" \
 #   jq -r '.platforms["linux-x64"].checksum' manifest.json
 ARG CLAUDE_CODE_VERSION=2.1.294
 ARG CLAUDE_CODE_SHA256=27122ca7b624f537546fbef35b80c66370d974ff258f3d9b10ac50bb8771f262
-RUN curl -fsSL -o /usr/local/bin/claude \
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/claude \
       "https://downloads.claude.ai/claude-code-releases/${CLAUDE_CODE_VERSION}/linux-x64/claude" \
  && echo "${CLAUDE_CODE_SHA256}  /usr/local/bin/claude" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/claude
@@ -75,9 +85,9 @@ ENV DISABLE_UPDATES=1
 # own binary in. The sum is atc-linux-x64's line in the release's SHA256SUMS:
 #   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -p atc-linux-x64
 #   sha256sum -c --ignore-missing SHA256SUMS
-ARG ATC_VERSION=5.0.0
-ARG ATC_SHA256=51078e77bf3dc8f76f8ba1597b6c9c6cc7bc9d82a0ab73587892747cef6e7e91
-RUN curl -fsSL -o /usr/local/bin/atc \
+ARG ATC_VERSION=7.4.0
+ARG ATC_SHA256=9e55001d7f64acccccfd66a861abf8dd3771d618de17715f21bc98b86b559cf5
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
       "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/atc
@@ -88,7 +98,7 @@ RUN curl -fsSL -o /usr/local/bin/atc \
 #     --jq '.assets[] | select(.name=="codex-package-x86_64-unknown-linux-musl.tar.gz") | .digest'
 ARG CODEX_VERSION=0.160.1
 ARG CODEX_SHA256=340801565906a7028f6baaa9ab6853addaef221f0016a1417a7c1ffdd96c21f0
-RUN curl -fsSL -o /tmp/codex.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/codex.tar.gz \
       "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-package-x86_64-unknown-linux-musl.tar.gz" \
  && echo "${CODEX_SHA256}  /tmp/codex.tar.gz" | sha256sum -c - \
  && mkdir -p /opt/codex \
@@ -103,7 +113,7 @@ RUN curl -fsSL -o /tmp/codex.tar.gz \
 #   sha256sum "gh_${VERSION}_linux_amd64.tar.gz"
 ARG GH_VERSION=2.102.0
 ARG GH_SHA256=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386
-RUN curl -fsSL -o /tmp/gh.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/gh.tar.gz \
       "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
  && echo "${GH_SHA256}  /tmp/gh.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/gh.tar.gz -C /tmp \
@@ -119,7 +129,7 @@ ARG GH_STACK_VERSION=0.2.0
 ARG GH_STACK_SHA256=577065033b49d4505730ea0ad43ab1b0374b0d9b1308e9765647a6aa8eba3cb7
 RUN dir=/root/.local/share/gh/extensions/gh-stack \
  && mkdir -p "$dir" \
- && curl -fsSL -o "$dir/gh-stack" \
+ && curl -fsSL ${CURL_RETRY} -o "$dir/gh-stack" \
       "https://github.com/github/gh-stack/releases/download/v${GH_STACK_VERSION}/linux-amd64" \
  && echo "${GH_STACK_SHA256}  $dir/gh-stack" | sha256sum -c - \
  && chmod 0755 "$dir/gh-stack" \
@@ -131,37 +141,75 @@ RUN dir=/root/.local/share/gh/extensions/gh-stack \
 # in the release's SHASUMS256.txt.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
-RUN curl -fsSL -o /tmp/node.tar.xz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
       "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
  && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
       --exclude='*.md' --exclude=LICENSE \
  && rm /tmp/node.tar.xz
 
-# Bun. The sum is bun-linux-x64.zip's line in the release's SHASUMS256.txt.
-ARG BUN_VERSION=1.4.2
-ARG BUN_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
-RUN curl -fsSL -o /tmp/bun.zip \
-      "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip" \
- && echo "${BUN_SHA256}  /tmp/bun.zip" | sha256sum -c - \
- && unzip -q /tmp/bun.zip -d /tmp \
- && install -m 0755 /tmp/bun-linux-x64/bun /usr/local/bin/bun \
- && ln -s bun /usr/local/bin/bunx \
- && rm -rf /tmp/bun.zip /tmp/bun-linux-x64
+# Bun, at each version that a zgeoff repo pins in its .bun-version, so a session
+# runs the Bun its checkout pins: each in /opt/bun/<version>, with
+# /opt/bun/default linked to BUN_VERSION, the newest. /usr/local/bin/bun and
+# bunx are bin/bun, which runs the version that the nearest .bun-version pins,
+# and the default without one. A repo that moves to a version no pin below
+# names adds a pin here. Each sum is bun-linux-x64.zip's line in the release's
+# SHASUMS256.txt.
+ARG BUN_VERSION=1.4.3
+ARG BUN_SHA256=3e730528d89775f03f87f05c06787c4df4099d0a37f3f252e7b829cb23816e18
+ARG BUN_OLDER_VERSION=1.4.2
+ARG BUN_OLDER_SHA256=36368faef7527875d5ffa52e53cd48021741f2a83eb6208a8dd64068d422a913
+RUN for pin in "$BUN_VERSION $BUN_SHA256" "$BUN_OLDER_VERSION $BUN_OLDER_SHA256"; do \
+      version=${pin% *} sum=${pin#* } \
+   && curl -fsSL ${CURL_RETRY} -o /tmp/bun.zip \
+        "https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-x64.zip" \
+   && echo "${sum}  /tmp/bun.zip" | sha256sum -c - \
+   && unzip -q /tmp/bun.zip -d /tmp \
+   && install -D -m 0755 /tmp/bun-linux-x64/bun "/opt/bun/${version}/bun" \
+   && ln -s bun "/opt/bun/${version}/bunx" \
+   && rm -rf /tmp/bun.zip /tmp/bun-linux-x64 \
+   || exit 1; \
+    done \
+ && ln -s "$BUN_VERSION" /opt/bun/default
+COPY bin/bun /usr/local/bin/bun
+RUN ln -s bun /usr/local/bin/bunx
 
-# Go from go.dev. The sum is the sha256 that https://go.dev/dl/?mode=json
-# lists for the linux-amd64 tarball.
+# A Claude Code SessionStart hook that installs the packages a checkout locks, when it has no
+# node_modules, so a repo's hooks import the versions its bun.lock pins and never the newest one
+# that Bun's auto-install takes. It is a managed settings drop-in, so it adds to the session's own
+# hooks and needs no change to the config that atc writes per session.
+COPY sbin/install-checkout-packages /usr/local/sbin/install-checkout-packages
+COPY claude-code/managed-settings.d/install-checkout-packages.json \
+     /etc/claude-code/managed-settings.d/install-checkout-packages.json
+
+# Go from the GitHub release of actions/go-versions, because the host's path to
+# go.dev's download CDN can run at tens of KB/s. That release repacks go.dev's
+# linux-amd64 tarball without its go/ folder and adds the Actions installer
+# setup.sh, which the build removes. The sum is the release asset's sha256
+# digest, taken after its unpacked tree matches the go.dev tarball's, whose
+# sha256 https://go.dev/dl/?mode=json lists. A bump finds the release, whose tag
+# is the version and a run id, and checks it with:
+#   gh api 'repos/actions/go-versions/releases?per_page=100' --jq '.[]
+#     | select(.tag_name | startswith("'"$VERSION"'-")) | .tag_name, (.assets[]
+#     | select(.name == "go-'"$VERSION"'-linux-x64.tar.gz") | .digest)'
+#   curl -fsSLO "https://go.dev/dl/go$VERSION.linux-amd64.tar.gz"   # check its listed sha256
+#   curl -fsSLO "https://github.com/actions/go-versions/releases/download/$TAG/go-$VERSION-linux-x64.tar.gz"
+#   mkdir dev gh && tar -xzf "go$VERSION.linux-amd64.tar.gz" -C dev && tar -xzf "go-$VERSION-linux-x64.tar.gz" -C gh
+#   rm gh/setup.sh && diff -r --no-dereference dev/go gh   # prints nothing
 ARG GO_VERSION=1.27.1
-ARG GO_SHA256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
-RUN curl -fsSL -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+ARG GO_RELEASE=1.27.1-33583469715
+ARG GO_SHA256=6f00fbc5b337fbf00581b7ced382fecdc4fa9493aef971277652a25f7aa14c6e
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/go.tar.gz \
+      "https://github.com/actions/go-versions/releases/download/${GO_RELEASE}/go-${GO_VERSION}-linux-x64.tar.gz" \
  && echo "${GO_SHA256}  /tmp/go.tar.gz" | sha256sum -c - \
- && tar -xzf /tmp/go.tar.gz -C /usr/local \
- && rm /tmp/go.tar.gz
+ && mkdir /usr/local/go \
+ && tar -xzf /tmp/go.tar.gz -C /usr/local/go \
+ && rm /tmp/go.tar.gz /usr/local/go/setup.sh
 
 # uv and uvx. The sum is the release's uv-x86_64-unknown-linux-gnu.tar.gz.sha256.
 ARG UV_VERSION=0.12.23
 ARG UV_SHA256=9167d72b3319674b6303c4cbe071854bba13ebdf3d76b1a7cbdc175471fb66d6
-RUN curl -fsSL -o /tmp/uv.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/uv.tar.gz \
       "https://github.com/astral-sh/uv/releases/download/${UV_VERSION}/uv-x86_64-unknown-linux-gnu.tar.gz" \
  && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/uv.tar.gz -C /tmp \
@@ -178,7 +226,7 @@ RUN curl -fsSL -o /tmp/uv.tar.gz \
 #   gpg --verify op.sig op && sha256sum op_linux_amd64_v$VERSION.zip
 ARG OP_VERSION=2.40.0
 ARG OP_SHA256=74277219e8da60958c00f9aee9d2023225e98fdda8bfd2156a5d9e85e0edaab3
-RUN curl -fsSL -o /tmp/op.zip \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
       "https://cache.agilebits.com/dist/1P/op2/pkg/v${OP_VERSION}/op_linux_amd64_v${OP_VERSION}.zip" \
  && echo "${OP_SHA256}  /tmp/op.zip" | sha256sum -c - \
  && unzip -q /tmp/op.zip op -d /tmp/op \
@@ -190,9 +238,9 @@ RUN curl -fsSL -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=2.0.2
-ARG AUTO_MODE_SHA256=cb7981f08f19fefdd7f780a1191ddbba9388718e77313ba78ff8ff4d45f03eed
-RUN curl -fsSL -o /tmp/auto-mode.tgz \
+ARG AUTO_MODE_VERSION=3.0.1
+ARG AUTO_MODE_SHA256=b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \
  && mkdir -p /opt/auto-mode \
@@ -206,7 +254,7 @@ RUN curl -fsSL -o /tmp/auto-mode.tgz \
 #   gh release download v$VERSION -R gitleaks/gitleaks -p "gitleaks_${VERSION}_checksums.txt"
 ARG GITLEAKS_VERSION=8.30.1
 ARG GITLEAKS_SHA256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
-RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/gitleaks.tar.gz \
       "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
  && echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tar.gz" | sha256sum -c - \
  && tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks \
@@ -222,7 +270,7 @@ RUN curl -fsSL -o /tmp/gitleaks.tar.gz \
 #     --jq '.assets[] | select(.name=="shfmt_v'"$VERSION"'_linux_amd64") | .digest'
 ARG SHELLCHECK_VERSION=0.11.0
 ARG SHELLCHECK_SHA256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
-RUN curl -fsSL -o /tmp/shellcheck.tar.xz \
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/shellcheck.tar.xz \
       "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" \
  && echo "${SHELLCHECK_SHA256}  /tmp/shellcheck.tar.xz" | sha256sum -c - \
  && tar -xJf /tmp/shellcheck.tar.xz -C /tmp "shellcheck-v${SHELLCHECK_VERSION}/shellcheck" \
@@ -231,7 +279,7 @@ RUN curl -fsSL -o /tmp/shellcheck.tar.xz \
 
 ARG SHFMT_VERSION=3.13.1
 ARG SHFMT_SHA256=fb096c5d1ac6beabbdbaa2874d025badb03ee07929f0c9ff67563ce8c75398b1
-RUN curl -fsSL -o /usr/local/bin/shfmt \
+RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/shfmt \
       "https://github.com/mvdan/sh/releases/download/v${SHFMT_VERSION}/shfmt_v${SHFMT_VERSION}_linux_amd64" \
  && echo "${SHFMT_SHA256}  /usr/local/bin/shfmt" | sha256sum -c - \
  && chmod 0755 /usr/local/bin/shfmt

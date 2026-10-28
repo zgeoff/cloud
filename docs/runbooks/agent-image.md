@@ -17,25 +17,63 @@ none, because the service keeps room free for the session's checkout and the bro
 service prints its choice and the free space it read, which `impz logs <name> swap` shows.
 `images/agent/sbin/setup-swap` holds the bounds and the reason for each.
 
-The image holds no other configuration, no login state and no secret: atc sets up grants,
-placeholder variables, the config bundle and the seed for each session at launch. Its build runs no
-tool, because a tool can write state when it runs (`codex --version` creates `~/.codex`).
+Beside them, the image holds one Claude Code hook, which [Locked packages](#locked-packages) covers.
+It holds no other configuration, no login state and no secret: atc sets up grants, placeholder
+variables, the config bundle and the seed for each session at launch. Its build runs no tool,
+because a tool can write state when it runs (`codex --version` creates `~/.codex`).
 
-| Path                                  | Holds                                                   |
-| ------------------------------------- | ------------------------------------------------------- |
-| `images/agent/Dockerfile`             | the pins, each with the command that checks its sum     |
-| `scripts/agent-image-check-guest.sh`  | the version sweep, login-state check and secret scan    |
-| `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files |
-| `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`      |
-| `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use  |
-| `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`     |
-| `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap` |
+| Path                                  | Holds                                                     |
+| ------------------------------------- | --------------------------------------------------------- |
+| `images/agent/Dockerfile`             | the pins, each with the command that checks its sum       |
+| `scripts/agent-image-check-guest.sh`  | the version sweep, login-state check and secret scan      |
+| `scripts/agent-image-gitleaks.toml`   | gitleaks' default rules, less named upstream test files   |
+| `/opt/auto-mode/mods/auto-mode`       | the auto-mode mod in the guest, for `--plugin-dir`        |
+| `/usr/local/bin/atc`                  | atc in the guest, which the `cloud` target's hooks use    |
+| `/usr/local/bin/bun`                  | the shim that runs the Bun a checkout pins                |
+| `/etc/imp/services.d/overcommit.json` | the boot service that sets `vm.overcommit_memory=1`       |
+| `/etc/imp/services.d/swap.json`       | the boot service that runs `/usr/local/sbin/setup-swap`   |
+| `/etc/claude-code/managed-settings.d` | the SessionStart hook that installs a checkout's packages |
 
 Each image is named `agent-<short sha>`, after the zgeoff/cloud commit on `main` it builds from. So
 each build gets a new imp image name, and the image that ran before stays on the host for a
 rollback.
 
+## Bun versions
+
+A session runs the Bun version that its checkout pins, so a repo's hooks and tests run on the Bun
+its CI runs. The image holds each Bun version that a zgeoff repo pins in its `.bun-version`, one
+folder per version under `/opt/bun`. `bun` and `bunx` are a shim that reads the nearest
+`.bun-version` from the current folder up to `/` and runs that version. Without a `.bun-version`,
+the shim runs the newest version the image holds.
+
+A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
+so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
+that version to the Dockerfile's Bun pins, then build and switch the image.
+
+## Locked packages
+
+A session's hooks import the package versions that its checkout's `bun.lock` pins, as they do in an
+installed checkout on a person's machine. Without `node_modules`, Bun's auto-install would load the
+newest published version of an imported package, or whichever version its cache already holds,
+because it reads neither `package.json` nor `bun.lock`. A repo's `.claude` hook, such as the skill
+gate, would then run another version than the repo pins, and a broken version stays in the cache.
+
+So the image adds a Claude Code SessionStart hook as a managed settings drop-in, which Claude Code
+runs beside the hooks of the session's own settings. At each session start in a checkout with a
+`bun.lock` and no `node_modules`, `/usr/local/sbin/install-checkout-packages` runs
+`bun install --frozen-lockfile` there, before the session's first tool call. A checkout that holds
+`node_modules` keeps it. After a failed install, the hook adds one line to the session's context, so
+the session runs the install itself.
+
+Claude Code reads the managed settings file only while no server-managed settings apply to the
+session. If an organization policy reaches the imp's sessions, that policy needs the same hook.
+
 ## Build
+
+The host builds each image itself, as [The host's build](#the-hosts-build) describes: once a commit
+that changes `images/agent` lands on `main`, the `agent-image-build` timer runs the build script for
+that commit. Run the script yourself only to build another commit, or to build again after a failed
+build.
 
 Build and check in one command, from any zgeoff/cloud clone, on a machine whose `impz` CLI calls the
 geoffcloud host. The token needs `manage` scope with no imp patterns.
@@ -45,16 +83,56 @@ bun scripts/build-agent-image.ts            # origin/main's head, after a fetch
 bun scripts/build-agent-image.ts <commit>   # or an older commit on main
 ```
 
+Name the commit that changed `images/agent`, as the timer does, so a build by hand and the timer
+make the same image name.
+
 The script builds from a `git archive` of the commit, so the clone's working tree never reaches the
 image. It names the image `agent-<short sha>`, then boots the imp `agent-check-<short sha>` from it,
 runs that commit's `scripts/check-agent-image.ts` there, and removes the imp. Its last line is
-`agent-<short sha> <digest> check passed`; record that line on the PR. A failed check removes the
-image, unless `--keep` keeps it for a look, and every failure exits 1. It refuses a commit that is
-not on `main`, and an image or check imp name that already exists.
+`agent-<short sha> <digest> check passed`; record that line on the PR. A passed check pins the image
+in impd, because a daemon's target boots it by name, and impd's image eviction would otherwise
+remove it while no imp uses it. A failed check removes the image, unless `--keep` keeps it for a
+look, and every failure exits 1. It refuses a commit that is not on `main`, and an image or check
+imp name that already exists.
 
 `impz image build` prints no progress off a terminal, so the build runs quietly for several minutes.
 `AGENT_IMAGE_BUILD_TIMEOUT` (45m by default) stops a build that hangs. impd can still finish that
 build afterwards, so read `impz image ls` before a retry.
+
+## The host's build
+
+The `agent-image-build` timer on geoffcloud fetches `main` of the public zgeoff/cloud repository
+without a credential, into a clone under `/var/lib/agent-image-build`. It takes the newest commit on
+`main` that changes `images/agent`, and runs the build script for that commit when impd holds no
+image of its name. It copies `impz` out of the imp-host container for each build, so the CLI matches
+the impd it calls. The build's token is a `manage` token with no imp patterns, so it controls every
+imp, grant and image on the host. It lives in a root-only file on the host's encrypted secrets
+dataset, and never in a GitHub secret.
+
+Until the token file exists, systemd skips the unit. To stage the token, run this once from a
+machine that reaches the host:
+
+```bash
+ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/agent-image-build && docker exec imp-host impz token new agent-image-build --scope manage | (umask 377 && cat > /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token) && test -s /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token && echo ok' < /dev/null
+```
+
+Expect `ok`. impz prints the token on its stdout, which goes straight into the file with mode 0400,
+so the token never appears in a command line or the journal. To replace the token, remove the old
+one with `docker exec imp-host impz token rm agent-image-build` and run the command again.
+
+Each run writes its decision to the unit's journal, which Alloy ships to Loki, on a line that starts
+with `agent-image-build:`. A build adds the build script's progress, and its last line repeats the
+script's result line:
+
+```bash
+ssh root@geoffcloud journalctl -u agent-image-build --since -1d | grep 'agent-image-build:'
+```
+
+Expect `agent-image-build: agent-<short sha> <digest> check passed` after a pin merges. A failed
+build fails the unit and records its time in `/var/lib/agent-image-build/failed/<sha>`, and later
+runs skip that commit, so a broken commit is built once. Read the build's output in the journal, fix
+the cause, then remove that file: the next run builds the commit again. A failure before the build,
+such as an imp-host that does not answer, records nothing, and the next run tries again.
 
 ## Check
 
@@ -126,14 +204,15 @@ next wake. Restart the daemon when few imps are live, so few wakes pay for it.
 Run these steps on the machine that runs the daemon, after the pin pull request merges. `$VERSION`
 is the release, such as `4.5.0`.
 
-1. Build and check the image from `main`'s head:
+1. Wait for the host to build and check the image of the pin's commit, as
+   [The host's build](#the-hosts-build) describes:
 
    ```bash
-   bun scripts/build-agent-image.ts
+   ssh root@geoffcloud journalctl -u agent-image-build --since -2h | grep 'check passed'
    ```
 
-   Expect its last line to read `agent-<short sha> <digest> check passed`. Record that line on the
-   pin pull request.
+   Expect `agent-image-build: agent-<short sha> <digest> check passed`, where `<short sha>` is the
+   pin's commit on `main`. Record that line on the pin pull request.
 
 2. Check that the image's commit pins the release:
 
@@ -209,12 +288,15 @@ entry.
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
    above its pin.
-2. Open a PR. CI's `agent image` job runs `bun run test:agent-image` on every change to the image or
-   its check; run it locally first to find a failure sooner.
-3. After the PR merges, run `bun scripts/build-agent-image.ts`, and record its last line on the PR.
+2. Open a PR. CI's `test-agent-image` job runs `bun run test:agent-image` on every change to the
+   image or its check; run it locally first to find a failure sooner.
+3. After the PR merges, wait for the host's build line in the journal
+   ([The host's build](#the-hosts-build)), and record it on the PR.
 4. Switch the `cloud` target.
 5. Keep the image the target ran before, for a rollback. Remove an older one with
-   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses.
+   `impz image rm agent-<short sha>`; imp refuses to remove an image that an imp uses. The build
+   pinned it, so impd's image eviction never removes it: to leave an image that no target boots to
+   the eviction instead, unpin it with `impz image unpin agent-<short sha>`.
 
 ## Roll back
 

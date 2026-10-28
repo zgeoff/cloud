@@ -28,7 +28,7 @@ case "$#:$*" in
     exit "${STUB_INSTALL_EXIT:-0}"
     ;;
   "2:run sdk:build")
-    echo '$ tsc -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json' >&2
+    echo '$ tsrs -p sdk/onidel/tsconfig.json && cp sdk/onidel/package.json sdk/onidel/bin/package.json' >&2
     status="${STUB_SDK_BUILD_EXIT:-0}"
     if [ "$status" != 0 ]; then echo "error: script \"sdk:build\" exited with code $status" >&2; fi
     exit "$status"

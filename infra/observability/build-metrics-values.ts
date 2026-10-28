@@ -85,8 +85,8 @@ export function buildMetricsValues(grafana: GrafanaInputs): Record<string, unkno
       resources: grafanaResources,
       additionalDataSources: [{ name: 'Loki', type: 'loki', url: lokiURL, access: 'proxy' }],
 
-      // no Alertmanager datasource: Grafana does no alerting here; deleteDatasources removes the
-      // copy Grafana provisioned while Alertmanager was off
+      // no Alertmanager datasource: Grafana does no alerting here; Grafana keeps a datasource it
+      // once provisioned, so deleteDatasources removes that copy
       sidecar: { datasources: { alertmanager: { enabled: false } } },
       deleteDatasources: [{ name: 'Alertmanager', orgId: 1 }],
     },

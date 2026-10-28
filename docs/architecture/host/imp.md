@@ -39,6 +39,29 @@ impd holds the host's memory budget for imps and refuses a boot that would excee
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
+The imps yield CPU to the cluster rather than hold a cap. Docker starts its containers, imp-host
+among them, in `imp.slice`, whose CPU weight of 10 sits below the weight of `system.slice`, where
+k3s runs, and of the kubelet's `kubepods.slice`. The kernel splits a busy CPU between sibling
+cgroups by weight, so under load the pods and k3s get the larger share, while on a quiet host the
+imps use every core. impd's own weights for each imp's cgroup, inside the container, only order the
+imps among themselves.
+
+## Images on the pool
+
+impd keeps its images on `tank/imp`, which shares the pool with the encrypted datasets and the k3s
+zvol, and it removes images under storage pressure. The host's configuration sets impd's two marks:
+once an image add, a build or a template leaves the dataset's usage at the high mark or above, impd
+removes unused images, least recently used first, until the usage falls under the low mark
+([imp's image eviction](https://github.com/zgeoff/impz/blob/main/docs/guides/images.md#evict-images-under-storage-pressure)).
+The high mark sits low enough that a builder imp's disk still fits above impd's disk reserve.
+
+impd never removes a pinned image, so each image that a config outside impd boots by name carries a
+pin. The preview service's image unit pins the preview image, and the agent image build pins each
+image that passes its check. nixie adds its sandbox images with its own token, which cannot pin, so
+delivery pins each release's new sandbox images as root, as
+[nixie's runbook](../../runbooks/nixie.md#pin-nixies-sandbox-images) describes. nixie adds an
+evicted image again before it creates a sandbox on it, so an image that misses its pin costs a pull.
+
 ## DNS and certificates
 
 impd owns the DNS records for its hostnames. It writes DNS-only records for `imps.geoff.cloud` and
@@ -46,8 +69,13 @@ impd owns the DNS records for its hostnames. It writes DNS-only records for `imp
 publicly but answer only on the tailnet, and it gets a wildcard certificate through Cloudflare's
 DNS-01 challenge with a token scoped to that job. Pulumi never declares these records or the
 challenge record, because impd rewrites them at run time and an apply would undo its work. impd
-rereads the token file when it changes, so a rotation needs no restart. `imp.geoff.cloud` stays free
-for imp's own public endpoint.
+rereads the token file when it changes, so a rotation needs no restart.
+
+impd also opens a public MCP listener for `imp.geoff.cloud`, imp's MCP and OAuth route for hosted
+assistants, which names that host as its OAuth issuer and serves MCP at `/mcp`. The public name is
+`imp`, and the tailnet names sit under `imps`. imp-host publishes it on the host's loopback only,
+and the host's TLS front holds the route's name, certificate and DNS records
+([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
 
 ## The database
 

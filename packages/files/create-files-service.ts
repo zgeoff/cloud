@@ -19,19 +19,19 @@ export interface FilesServiceInputs {
   // the public origin, such as https://files.geoff.cloud, with no trailing slash
   readonly publicURL: string;
   readonly now: () => Date;
-
-  // the bytes still free on the volume
   readonly readFreeBytes: () => number;
 
   // writes an upload's bytes to a path on the volume, as Bun.write does
   readonly writeBytes: (path: string, file: Blob) => Promise<unknown>;
 }
 
-// on every response, the API's and the 404s included: no browser guesses a type, and no response
-// runs script or loads anything
-const securityHeaders = {
+// On every response, the API's and the 404s included: no browser guesses a type, and no response
+// runs script or loads anything. Cloudflare's zone raises any shorter max-age to its 4-hour browser
+// TTL and caches a 404, but it never stores a no-store response, so a removal shows at once.
+const everyResponseHeaders = {
   'X-Content-Type-Options': 'nosniff',
   'Content-Security-Policy': "default-src 'none'; sandbox",
+  'Cache-Control': 'no-store',
 };
 
 // the largest request body Bun reads: the largest file, and room for the form around it
@@ -41,9 +41,6 @@ interface RequestContext {
   readonly request: Request;
 }
 
-// The service: GET /<id>/<filename> serves a file that has not expired, GET /healthz answers ok,
-// and /api/files is the API (files-contract.ts). Every other path is 404. At start it removes what
-// a stopped run left: a half-written file in incoming/, and a file in files/ without a row.
 export function createFilesService(inputs: FilesServiceInputs) {
   const filesDir = join(inputs.dataDir, 'files');
   const incomingDir = join(inputs.dataDir, 'incoming');
@@ -80,7 +77,7 @@ export function createFilesService(inputs: FilesServiceInputs) {
   // reads the body itself
   return new Elysia({ serve: { maxRequestBodySize: maxRequestBodyBytes } })
     .onRequest((context) => {
-      Object.assign(context.set.headers, securityHeaders);
+      Object.assign(context.set.headers, everyResponseHeaders);
     })
     .get('/healthz', () => 'ok')
     .all('/api/files', sendToAPI, { parse: 'none' })
@@ -107,7 +104,6 @@ interface FileParams {
   readonly filename: string;
 }
 
-// a live upload's file, or 404 for an unknown id, another filename, or an expired upload
 async function readFileResponse(inputs: FileReadInputs, params: FileParams): Promise<Response> {
   const upload = fileIDPattern.test(params.id) ? inputs.store.findUpload(params.id) : null;
   const file = Bun.file(join(inputs.filesDir, params.id));

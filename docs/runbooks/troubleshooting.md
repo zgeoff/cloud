@@ -34,6 +34,13 @@ The run did not go through `op run`, or the reference resolved to an empty value
 `discordAlerts` is true, but the webhook did not resolve. Check the `alert-webhook` item and the
 `ALERT_WEBHOOK_URL` line in `.env`, or turn the flag off.
 
+### `discordAlerts is on, but ALERT_MENTION_USER_ID is empty` or `is not a Discord user ID`
+
+`discordAlerts` is true, but the Discord user that a critical alert mentions did not resolve to a
+user ID. Check the `mention-user-id` field of the `alert-webhook` item in `cloud`, and in
+`cloud-deploy` for the apply job: it holds the user's numeric ID, from **Copy User ID** in Discord's
+developer mode.
+
 ### `x509: certificate signed by unknown authority`
 
 The kubeconfig in `k3s-kubeconfig` does not match the cluster, such as after k3s was rebuilt. The

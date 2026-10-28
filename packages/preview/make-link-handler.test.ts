@@ -8,6 +8,7 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeLinkHandler } from './make-link-handler.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
+import { stubApp } from './mocks/github-app.ts';
 import { composeFiles } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
@@ -49,9 +50,10 @@ async function setupTest() {
       buildTimeoutMs: 1_800_000,
       contract: null,
     },
+    spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
-    github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
+    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots,
     pendingRuns: new Set(),
@@ -186,9 +188,10 @@ test('it keeps both previews running when two slots fit them', async () => {
       buildTimeoutMs: 1_800_000,
       contract: null,
     },
+    spendProxies: null,
     store: ctx.store,
     impd: buildImpdClient(ctx.impd.url, ctx.impd.token, NativeWebSocket),
-    github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
+    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: ctx.pendingBoots,
     pendingRuns: new Set(),

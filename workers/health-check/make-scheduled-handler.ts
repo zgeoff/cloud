@@ -1,11 +1,14 @@
 // Host monitoring cannot report the host down, so this Worker probes tunnel hostnames from the
 // edge: 530/1033 reads tunnel down, 502/504 gateway down, else up.
-import type { R2Bucket } from '@cloudflare/workers-types';
+import type { R2ObjectBody } from '@cloudflare/workers-types';
 import { bindingNames } from './binding-names.ts';
 import { targetsSchema } from './targets-schema.ts';
 import type { Target } from './targets-schema.ts';
 
-type StateBucket = Pick<R2Bucket, 'get' | 'put'>;
+interface StateBucket {
+  readonly get: (key: string) => Promise<Pick<R2ObjectBody, 'text'> | null>;
+  readonly put: (key: string, value: string) => Promise<unknown>;
+}
 
 interface Env {
   readonly [bindingNames.state]: StateBucket;

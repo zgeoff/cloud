@@ -7,7 +7,6 @@ export interface StoredComment {
   body: string;
 }
 
-export const tokenLogin = 'preview-bot';
 export const composeFiles = new Map<string, string>();
 export const issueComments: StoredComment[] = [];
 
@@ -29,3 +28,17 @@ export interface StoredCommitStatus {
 
 // every status posted, in order, as GitHub keeps each one rather than replacing the last
 export const commitStatuses: StoredCommitStatus[] = [];
+
+export interface StoredInstallationToken {
+  readonly token: string;
+
+  // the repositories the token reaches, as owner/name
+  readonly repos: readonly string[];
+  readonly expiresAt: Date;
+}
+
+// every installation token minted, in order
+export const installationTokens: StoredInstallationToken[] = [];
+
+// the stand-in App is installed on every repository but these
+export const uninstalledRepos = new Set<string>();

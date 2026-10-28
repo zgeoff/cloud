@@ -5,8 +5,6 @@ import { loadFilesConfig } from './load-files-config.ts';
 import { readFreeBytes } from './read-free-bytes.ts';
 import { startExpirySweep } from './start-expiry-sweep.ts';
 
-// The entry point the container runs: configuration from the environment, the metadata file on
-// the volume, the listener, and the expiry sweep at start and then hourly, until SIGTERM.
 const config = loadFilesConfig(process.env);
 const store = createUploadStore(join(config.dataDir, 'files.db'));
 

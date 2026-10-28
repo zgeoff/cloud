@@ -9,11 +9,9 @@ interface TunnelRoutesInputs {
   readonly zoneID: Output<string>;
   readonly tunnelID: Output<string>;
 
-  // the atc gateway, on its public URL's host, with the Access application in front of its
-  // sign-in pages. It owns OAuth too.
   readonly gateway?: GatewayIngress | undefined;
 
-  // the files service, on the shared tunnel, set with the service
+  // set only with the files service
   readonly files?: TunnelRoute | undefined;
 }
 
@@ -27,8 +25,6 @@ interface TunnelRoutesOutputs {
   readonly previewWebhookURL: Output<string>;
 }
 
-// Each tunnel's ingress rules and the proxied CNAME for each hostname, as buildTunnelRouteSpecs
-// assigns them. Each tunnel's catch-all 404 stays last.
 export function createTunnelRoutes(inputs: TunnelRoutesInputs): TunnelRoutesOutputs {
   const specs = buildTunnelRouteSpecs(inputs.tunnelID, inputs.gateway, inputs.files);
 

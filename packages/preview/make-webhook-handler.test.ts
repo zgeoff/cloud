@@ -1,4 +1,4 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { createHmac } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,9 +10,11 @@ import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { makeWebhookHandler } from './make-webhook-handler.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
+import { stubApp } from './mocks/github-app.ts';
 import {
   commitStatuses,
   composeFiles,
+  installationTokens,
   issueComments,
   pullRequestFiles,
 } from './mocks/github-state.ts';
@@ -55,11 +57,13 @@ async function setupTest() {
         repos: new Set(['acme/greenhouse']),
         modelSecret: 'model-haiku',
         timeoutMs: 600_000,
+        idleMs: 300_000,
       },
     },
+    spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
-    github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
+    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
 
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
@@ -111,7 +115,7 @@ test('it posts one comment with the tailnet link when a pull request opens', asy
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
-      author: 'preview-bot',
+      author: 'acme-previews[bot]',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('**Preview:** http://geoffcloud:8417/acme/greenhouse/17'),
@@ -174,7 +178,7 @@ test('it edits the same comment when a push moves the head of the pull request',
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
-      author: 'preview-bot',
+      author: 'acme-previews[bot]',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('Opening the link boots `bbbbbbb`'),
@@ -414,7 +418,7 @@ test('it posts the ended comment again when GitHub redelivers a close', async ()
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
-      author: 'preview-bot',
+      author: 'acme-previews[bot]',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('**Preview ended.**'),
@@ -578,7 +582,7 @@ test('it posts the link for a repository its owner wildcard lists', async () => 
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
-      author: 'preview-bot',
+      author: 'acme-previews[bot]',
       repo: 'nursery/seedlings',
       number: 3,
       body: expect.toInclude('**Preview:** http://geoffcloud:8417/nursery/seedlings/3'),
@@ -696,12 +700,60 @@ test('it removes the imp and says the preview ended when the pull request closes
   expect(issueComments).toStrictEqual([
     {
       id: expect.toBeNumber(),
-      author: 'preview-bot',
+      author: 'acme-previews[bot]',
       repo: 'acme/greenhouse',
       number: 17,
       body: expect.toInclude('**Preview ended.**'),
     },
   ]);
+});
+
+test('it removes the counting proxy and its count with the imp when the pull request closes', async () => {
+  const ctx = await setupTest();
+
+  const removeProxy = mock(async () => {});
+
+  const handler = makeWebhookHandler({
+    ...ctx.deps,
+    spendProxies: {
+      holdProxy: () => Promise.reject(new Error('a close starts no counting proxy')),
+      removeProxy,
+      removeIdle: () => Promise.resolve(),
+      removeAll: () => Promise.resolve(),
+    },
+  });
+
+  ctx.store.upsertHead({
+    repo: 'acme/greenhouse',
+    number: 17,
+    imp: 'pv-0bcd7c17-17',
+    headSHA: '4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c',
+  });
+
+  const body = JSON.stringify({
+    action: 'closed',
+    number: 17,
+    repository: { full_name: 'acme/greenhouse' },
+    pull_request: {
+      head: {
+        sha: '4d2a7c1e9b0f3a5d6c8e7f1a2b3c4d5e6f7a8b9c',
+        repo: { full_name: 'acme/greenhouse' },
+      },
+    },
+  });
+
+  await handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'pull_request',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  expect(removeProxy).toHaveBeenCalledExactlyOnceWith('pv-0bcd7c17-17');
 });
 
 test('it removes the imp of a closed pull request it holds no record of, and posts nothing', async () => {
@@ -763,6 +815,31 @@ test('it answers a ping with no change', async () => {
 
   expect(response.status).toBe(204);
   expect(issueComments).toStrictEqual([]);
+});
+
+test("it answers the App's installation delivery with no change and mints no token", async () => {
+  const ctx = await setupTest();
+
+  // GitHub sends every App this event when an account installs it, whatever events it subscribes to
+  const body = JSON.stringify({
+    action: 'created',
+    installation: { id: 7001, account: { login: 'acme' } },
+    repositories: [{ full_name: 'acme/greenhouse' }],
+  });
+
+  const response = await ctx.handler(
+    new Request('http://preview.test/webhook', {
+      method: 'POST',
+      headers: {
+        'x-github-event': 'installation',
+        'x-hub-signature-256': `sha256=${createHmac('sha256', 'stub-webhook-secret').update(body).digest('hex')}`,
+      },
+      body,
+    }),
+  );
+
+  expect(response.status).toBe(204);
+  expect(installationTokens).toStrictEqual([]);
 });
 
 test('it runs the SDK contract suite once for a pull request that changes the SDK pin', async () => {

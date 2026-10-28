@@ -8,15 +8,11 @@ import { ghcrPullSecretName } from './build-ghcr-pull-secret-args.ts';
 import { buildNixieBackupPodSpec } from './build-nixie-backup-pod-spec.ts';
 import { buildRestoreJob } from './build-restore-job.ts';
 
-// Writes each restore Job's YAML from its backup pod builder and atcGateway.backupImage, the one
-// pin of the backup image. With --check it writes nothing: 0 when every file matches, 1 on a
-// difference, an unreadable file or a stack config the gateway schema refuses.
 export interface WriteRestoreJobsOptions {
   readonly args: readonly string[];
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 
-  // the oxfmt that lays each file out; the repo's own by default
   readonly formatter?: string;
 }
 
@@ -44,7 +40,6 @@ interface RestoreJobsArgs {
   readonly root: string;
 }
 
-// [--check] [repo root], or undefined for any other arguments
 function parseArgs(args: readonly string[]): RestoreJobsArgs | undefined {
   const check = args[0] === '--check';
   const rest = check ? args.slice(1) : args;
@@ -54,7 +49,6 @@ function parseArgs(args: readonly string[]): RestoreJobsArgs | undefined {
     : { check, root: rest[0] ?? '.' };
 }
 
-// each restore Job, written or checked, and its report
 async function applyRestoreJobs(
   parsed: RestoreJobsArgs,
   options: Readonly<WriteRestoreJobsOptions>,
@@ -85,7 +79,6 @@ async function applyRestoreJobs(
 
 const stackSchema = z.object({ config: z.object({ 'geoff-cloud:atcGateway': z.unknown() }) });
 
-// the stack config's backup image, checked by the gateway config schema, or what stops the read
 async function loadBackupImage(root: string): Promise<string | { readonly error: string }> {
   const text = await readFile(join(root, stackFile), 'utf8').catch(() => null);
 
@@ -116,16 +109,13 @@ function parseYAML(text: string): unknown {
   }
 }
 
-// a generated file: its path from the repo root, its header comment and its Job
 interface RestoreJobFile {
   readonly path: string;
   readonly header: string;
   readonly job: unknown;
 }
 
-// Each restore Job, named as the backup CronJob's claim, Secrets and ConfigMap are named in infra
-// (atc-gateway.ts, create-atc-gateway-backup-job.ts, create-nixie-backup-job.ts,
-// create-files-backup-job.ts and build-ghcr-pull-secret-args.ts)
+// each name must match the one its backup CronJob's claim, Secret or ConfigMap gets in the cluster
 function buildRestoreJobFiles(backupImage: string): readonly RestoreJobFile[] {
   return [
     {
@@ -207,13 +197,11 @@ interface RestoreJobChange {
   readonly formatter: string;
 }
 
-// a file's status, and the line that reports it, if any
 interface RestoreJobOutcome {
   readonly status: number;
   readonly line?: string;
 }
 
-// writes the file that differs from its Job, or fails the check without writing it
 async function applyRestoreJob(change: RestoreJobChange): Promise<RestoreJobOutcome> {
   const written = await tryRunRestoreJobFormatter(change.job, change.formatter);
 
@@ -239,7 +227,6 @@ async function applyRestoreJob(change: RestoreJobChange): Promise<RestoreJobOutc
   return { status: 0, line: `write-restore-jobs: wrote ${change.job.path}\n` };
 }
 
-// the rendered file, or why oxfmt gave none, such as a checkout without its dependencies
 async function tryRunRestoreJobFormatter(
   job: RestoreJobFile,
   formatter: string,
@@ -253,8 +240,7 @@ async function tryRunRestoreJobFormatter(
   }
 }
 
-// The header and the Job as YAML, laid out by the repo's own oxfmt, so format:check leaves the
-// written file as it is
+// the repo's own oxfmt lays the file out, so format:check leaves the written file as it is
 async function runRestoreJobFormatter(job: RestoreJobFile, formatterPath: string): Promise<string> {
   const formatter = Bun.spawn([formatterPath, `--stdin-filepath=${job.path}`], {
     cwd: repoDir,
@@ -279,7 +265,6 @@ async function runRestoreJobFormatter(job: RestoreJobFile, formatterPath: string
   return text;
 }
 
-// each file's line, in the files' order: a written file's on stdout, a differing file's on stderr
 function printOutcomes(
   outcomes: readonly RestoreJobOutcome[],
   options: Readonly<WriteRestoreJobsOptions>,

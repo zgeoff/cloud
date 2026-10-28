@@ -4,9 +4,6 @@ import { isGateNeeded } from './is-gate-needed.ts';
 import { loadGateManifest } from './load-gate-manifest.ts';
 import { runProcess } from './run-process.ts';
 
-// The manifest's own suite: it reads the real .github/gates.yml, so a change to a gate's paths
-// shows here as a changed answer.
-
 test.each([
   ['full', ['README.md', 'docs/runbooks/prod-apply.md'], false],
   ['full', ['README.md', 'scripts/lint.sh'], true],
@@ -16,6 +13,16 @@ test.each([
   ['provider', ['scripts/check-sdk.sh'], true],
   ['provider', ['.github/gates.yml'], true],
   ['provider', ['infra/index.ts', 'package.json'], false],
+  ['onidel-vendor', ['provider/go.sum'], true],
+  ['onidel-vendor', ['provider/internal/client/client.go'], true],
+  ['onidel-vendor', ['nixos/packages/onidel-provider.nix'], true],
+  ['onidel-vendor', ['nixos/flake.lock'], true],
+  [
+    'onidel-vendor',
+    ['provider/internal/client/client_test.go', 'provider/spec/onidel.yaml'],
+    false,
+  ],
+  ['onidel-vendor', ['nixos/modules/preview.nix', 'sdk/onidel/index.ts'], false],
   ['nixos', ['nixos/flake.nix'], true],
   ['nixos', ['packages/preview/src/serve.ts'], true],
   ['nixos', ['bun.lock'], true],
@@ -30,6 +37,22 @@ test.each([
   ['prod-apply', ['provider/main.go'], true],
   ['prod-apply', ['sdk/onidel/index.ts'], true],
   ['prod-apply', ['packages/topology/src/ports.ts'], true],
+  ['agent-image', ['images/agent/Dockerfile'], true],
+  ['agent-image', ['scripts/check-agent-image.ts'], true],
+  ['agent-image', ['.github/workflows/ci.yml'], true],
+  ['agent-image', ['images/files/Dockerfile', 'infra/index.ts'], false],
+  ['atc-gateway', ['images/atc-gateway/versions.env'], true],
+  ['atc-gateway', ['test-support/shell/wait-for.sh'], true],
+  ['atc-gateway', ['images/agent/Dockerfile'], false],
+  ['files-image', ['packages/files/create-files-service.ts'], true],
+  ['files-image', ['bun.lock'], true],
+  ['files-image', ['images/agent/Dockerfile', 'infra/index.ts'], false],
+  ['files-backup', ['deploy/files/backup/backup.sh'], true],
+  ['files-backup', ['infra/Pulumi.prod.yaml'], true],
+  ['files-backup', ['deploy/nixie/backup/backup.sh'], false],
+  ['nixie-backup', ['deploy/nixie/backup/backup.sh'], true],
+  ['nixie-backup', ['package.json'], true],
+  ['nixie-backup', ['deploy/files/backup/backup.sh', 'infra/index.ts'], false],
 ])('it decides the %s gate for a change to %p as %p', async (name, paths, expected) => {
   const manifest = await loadGateManifest(join(import.meta.dir, '..', '.github', 'gates.yml'));
 
@@ -45,7 +68,18 @@ test.each([
 test('it holds the gates that CI, the NixOS checks and the prod apply read', async () => {
   const manifest = await loadGateManifest(join(import.meta.dir, '..', '.github', 'gates.yml'));
 
-  expect([...manifest.keys()]).toStrictEqual(['full', 'provider', 'nixos', 'prod-apply']);
+  expect([...manifest.keys()]).toStrictEqual([
+    'full',
+    'provider',
+    'onidel-vendor',
+    'nixos',
+    'prod-apply',
+    'agent-image',
+    'atc-gateway',
+    'files-image',
+    'files-backup',
+    'nixie-backup',
+  ]);
 });
 
 // a glob that matches no file, such as a path with a typo, would skip its check silently

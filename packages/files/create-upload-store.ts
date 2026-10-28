@@ -1,4 +1,5 @@
 import { Database } from 'bun:sqlite';
+import { z } from 'zod';
 import type { Role, Upload } from './types.ts';
 
 interface UploadFilter {
@@ -8,7 +9,7 @@ interface UploadFilter {
 }
 
 export interface UploadStore {
-  // records a new upload; its id is unique
+  // the upload's id must be new
   readonly writeUpload: (upload: Upload) => void;
   readonly findUpload: (id: string) => Upload | null;
 
@@ -37,22 +38,23 @@ const schema = `CREATE TABLE IF NOT EXISTS uploads (
   expires_at INTEGER
 ) STRICT`;
 
-interface UploadRow {
-  readonly id: string;
-  readonly filename: string;
-  readonly content_type: string;
-  readonly size: number;
-  readonly sha256: string;
-  readonly created_at: number;
-  readonly uploader: Role;
-  readonly label: string | null;
-  readonly link: string | null;
-  readonly expires_at: number | null;
-}
+const uploadRowSchema = z.object({
+  id: z.string(),
+  filename: z.string(),
+  content_type: z.string(),
+  size: z.number(),
+  sha256: z.string(),
+  created_at: z.number(),
+  uploader: z.enum(['agent', 'owner']),
+  label: z.string().nullable(),
+  link: z.string().nullable(),
+  expires_at: z.number().nullable(),
+});
 
-// The metadata file on the volume beside the files: one row per upload, with times in
-// milliseconds since the epoch. WAL mode lets the backup's sqlite3 copy it while the service
-// writes.
+const expiredRowsSchema = z.array(z.object({ id: z.string() }));
+
+// Times are stored in milliseconds since the epoch. WAL mode lets the backup's sqlite3 copy the
+// file while the service writes.
 export function createUploadStore(path: string): UploadStore {
   const db = new Database(path, { create: true, strict: true });
 
@@ -65,9 +67,9 @@ export function createUploadStore(path: string): UploadStore {
     VALUES ($id, $filename, $contentType, $size, $sha256, $createdAt, $uploader, $label, $link,
       $expiresAt)`);
 
-  const select = db.query<UploadRow, [string]>('SELECT * FROM uploads WHERE id = ?1');
+  const select = db.query('SELECT * FROM uploads WHERE id = ?1');
 
-  const selectExpired = db.query<{ id: string }, [number]>(
+  const selectExpired = db.query(
     'SELECT id FROM uploads WHERE expires_at < ?1 ORDER BY expires_at, id',
   );
 
@@ -90,7 +92,7 @@ export function createUploadStore(path: string): UploadStore {
       });
     },
     findUpload: (id) => {
-      const row = select.get(id);
+      const row = uploadRowSchema.nullable().parse(select.get(id));
 
       return row === null ? null : toUpload(row);
     },
@@ -101,12 +103,15 @@ export function createUploadStore(path: string): UploadStore {
     removeUpload: (id) => {
       remove.run(id);
     },
-    readExpiredIDs: (now) => selectExpired.all(now.getTime()).map((row) => row.id),
+    readExpiredIDs: (now) =>
+      expiredRowsSchema.parse(selectExpired.all(now.getTime())).map((row) => row.id),
     close: () => {
       db.close();
     },
   };
 }
+
+type UploadRow = z.infer<typeof uploadRowSchema>;
 
 function toUpload(row: UploadRow): Upload {
   return {
@@ -128,7 +133,7 @@ function readUploads(db: Database, filter: UploadFilter): readonly Upload[] {
   const includeExpired = filter.includeExpired ? 1 : 0;
 
   const rows = db
-    .query<UploadRow, [Role | null, number, number]>(
+    .query(
       `SELECT * FROM uploads
       WHERE (?1 IS NULL OR uploader = ?1)
         AND (?2 = 1 OR expires_at IS NULL OR expires_at > ?3)
@@ -136,5 +141,8 @@ function readUploads(db: Database, filter: UploadFilter): readonly Upload[] {
     )
     .all(filter.uploader ?? null, includeExpired, filter.now.getTime());
 
-  return rows.map((row) => toUpload(row));
+  return z
+    .array(uploadRowSchema)
+    .parse(rows)
+    .map((row) => toUpload(row));
 }

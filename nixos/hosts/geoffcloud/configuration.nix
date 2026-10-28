@@ -23,6 +23,10 @@ let
   atcDaemonHomePCExposure = getHostPort "atc-daemon-home-pc";
   previewLinkExposure = getHostPort "preview-link";
   previewWebhookExposure = getHostPort "preview-webhook";
+  previewModelRouteExposure = getHostPort "preview-model-route";
+  impdMCPListenerExposure = getHostPort "impd-mcp-listener";
+  impdMCPRouteExposure = builtins.head (builtins.filter (entry: entry.name == "impd-mcp") exposure);
+  impdMCPListenerPort = toString impdMCPListenerExposure.port;
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -46,6 +50,24 @@ in
   };
   # how long the host has run an older system or imp than the latest green main build
   services.host-build-lag.enable = true;
+  # builds and checks the agent image of each commit on main that changes images/agent
+  # (docs/runbooks/agent-image.md). Its impd token sits on host-secrets, staged by the runbook;
+  # until it exists, the unit is skipped.
+  services.agent-image-build = {
+    enable = true;
+    impdURL = impdLoopbackURL;
+    impTokenFile = "/var/lib/tank-cloud/host-secrets/agent-image-build/imp-token";
+  };
+  # each slice's and unit's CPU time, the root cgroup's, and the kernel's, as node-exporter
+  # textfile metrics
+  services.host-cgroup-cpu.enable = true;
+  # the daily drift check of prod (docs/runbooks/drift-check.md). Its credentials file sits on
+  # host-secrets, installed by scripts/install-drift-check-credentials.sh; until it exists, the
+  # unit is skipped.
+  services.drift-check = {
+    enable = true;
+    credentialsFile = "/var/lib/tank-cloud/host-secrets/drift-check/credentials";
+  };
   networking.hostName = "geoffcloud";
   # ZFS host ID: the one imp's pool was created under on Ubuntu (/etc/hostid),
   # so NixOS imports tank without -f
@@ -243,24 +265,53 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:2.8.0@sha256:25fa4208771be0514b36b970a9ef8164ed6ceab91e22575f67239f4febd2e268";
+    image = "ghcr.io/zgeoff/imp-host:5.0.0@sha256:dd9f3ec3ca5b710376ab0a74ae9e41a0fa5358b3a595a1081ccad7e63f8613d5";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
     # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
-    # for both names at the tailnet IP of imp's own node. imp.geoff.cloud stays free for imp's
-    # public MCP route. The token lives in dnsApiTokenFile (root-only, re-read on change, so
+    # for both names at the tailnet IP of imp's own node. The token lives in dnsApiTokenFile (root-only, re-read on change, so
     # a rotation needs no restart) and the ACME email in environmentFile, both installed by
     # scripts/install-imp-dns-token.sh. environmentFile must not also set IMP_DNS_API_TOKEN.
     settings.IMP_DOMAIN = topology.imp.domain;
     dnsApiTokenFile = "/var/lib/imp-host/secrets/dns-api-token";
     settings.IMP_DNS_PROVIDER = "cloudflare";
+    # image eviction, in percent of tank/imp (docs/architecture/host/imp.md). tank/imp sees the
+    # 200 GB pool less ZFS's slop and the rancher zvol's reservation, about 160 GiB, and impd's disk
+    # reserve is 5 % of that, about 8 GiB. At 80 % a 20 GiB builder disk still fits above the
+    # reserve (85 % would refuse it), and eviction starts before impd's low-disk warning at twice
+    # the reserve. The 15-point gap frees about 24 GiB, so one eviction serves many adds.
+    settings.IMP_IMAGE_EVICT_HIGH_PERCENT = 80;
+    settings.IMP_IMAGE_EVICT_LOW_PERCENT = 65;
     # imps are agent sandboxes: they must not reach the k3s pod and service ranges
     forwardDeny = [
       k3sPodCIDR
       k3sServiceCIDR
     ];
+    # impd's public MCP route (the registry's impd-mcp entry): impd opens its public listener only
+    # with this origin set, and imp-host publishes the listener on the host's loopback alone, where
+    # the TLS front below proxies the route's paths to it
+    settings.IMP_MCP_PUBLIC_URL = "https://${impdMCPRouteExposure.hostname}";
+    settings.IMP_MCP_PUBLIC_PORT = impdMCPListenerExposure.port;
+    publicPorts = [ "127.0.0.1:${impdMCPListenerPort}:${impdMCPListenerPort}" ];
   };
+
+  # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP
+  # client signs in and calls imp's tools through it, so each address gets a limit of its own:
+  # impd counts its limits per client and grant, never per address
+  services.public-front = {
+    enable = true;
+    routes = [ { inherit (impdMCPRouteExposure) hostname upstream paths; } ];
+    rateLimit = {
+      events = 120;
+      window = "1m";
+    };
+  };
+
+  # imps yield CPU to k3s and its pods rather than hold a cap (docs/architecture/host/imp.md). A
+  # change of daemon.json restarts docker.service, and imp-host with it.
+  virtualisation.docker.daemon.settings.cgroup-parent = "imp.slice";
+  systemd.slices.imp.sliceConfig.CPUWeight = 10;
 
   # tank/cloud, the encrypted datasets on tank (modules/tank-cloud.nix, docs/runbooks/tank-cloud.md):
   # unlocked at boot from /var/lib/zfs-keys/tank.key. Each service here refuses to start while
@@ -304,6 +355,7 @@ in
       imp-host-dns-token = [ "imp-host-secrets" ];
       atc-daemon = [ "atc-daemon-secrets" ];
       preview = [ "host-secrets" ];
+      drift-check = [ "host-secrets" ];
     };
   };
 
@@ -406,25 +458,56 @@ in
 
   # The preview service (docs/architecture/workloads/preview.md, docs/runbooks/preview.md). Its
   # secrets sit on host-secrets, staged by the runbook; until they exist, the unit is skipped.
-  # A repository opts in with preview/compose.yaml and a webhook to the public route.
+  # A repository opts in with preview/compose.yaml and the preview GitHub App's installation,
+  # which only the owner's account can install, so every repository of the owner is listed.
   services.preview = {
     enable = true;
     linkListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewLinkExposure.port}";
     webhookListen = "${topology.tailnet.nodes.geoffcloud.address}:${toString previewWebhookExposure.port}";
     baseURL = "http://geoffcloud:${toString previewLinkExposure.port}";
-    repos = [ "zgeoff/nixie" ];
+    repos = [ "zgeoff/*" ];
     impdURL = impdLoopbackURL;
     impDomain = topology.imp.domain;
     impGitHubSecret = "gh";
-    # nixie's preview stack sends its model calls through the broker with this grant
-    impModelSecret = "preview-model";
+    # nixie's preview stack sends its model calls through the broker with this grant, whose
+    # upstream is the spend cap's model route listener (docs/runbooks/preview.md)
+    impModelSecret = "preview-model-counted";
+    # each preview's model calls pass a counting proxy of their own, which refuses them past the
+    # module's default limit
+    spendCap = {
+      enable = true;
+      package = pkgs.callPackage ../../packages/counting-proxy.nix { };
+      address = topology.docker.bridgeAddress;
+      inherit (previewModelRouteExposure) port;
+      allowedSubnet = topology.docker.subnet;
+      # nixie's preview/config.yaml model profile
+      model = "claude-haiku-5-5";
+      # Haiku 5.5's list prices on Anthropic's pricing page: the base prices for a prompt up to
+      # 100,000 tokens, cache reads and writes included, and the long-prompt prices for a longer one
+      prices = {
+        input = 0.1;
+        cache_write = 0.125;
+        cache_write_1h = 0.2;
+        cached_input = 0.01;
+        output = 0.5;
+        long_prompt = {
+          over_tokens = 100000;
+          input = 0.5;
+          cache_write = 0.625;
+          cache_write_1h = 1;
+          cached_input = 0.05;
+          output = 2.5;
+        };
+      };
+    };
     # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
     # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:2.8.0@sha256:8a09d7d5093e2b6b3086a2fec5d0c68795ded996da987d9264f9928d50c4058f";
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:5.0.0@sha256:1e5c7f8c5ee63e7c541d016d79bbc75e1e3555bbc285fc1e0b60fff5080d77a8";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
-    githubTokenFile = "/var/lib/tank-cloud/host-secrets/preview/github-token";
+    githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
+    githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";
     impTokenFile = "/var/lib/tank-cloud/host-secrets/preview/imp-token";
   };
 

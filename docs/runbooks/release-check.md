@@ -88,28 +88,27 @@ it `needs-review` when any of these holds:
 - The update is minor and the new release is 0.x, because a 0.x minor release is the breaking one.
 - A nixie release in the bump adds migrations (label `migrations`). nixie's migrations run forward
   only, so a revert does not undo them.
-- The bump changes nixie's sandbox images (label `sandbox-images-changed`), which a person adds to
-  impd before the merge, because the `Deploy prod` workflow applies the merged pin, as
-  [the nixie runbook](./nixie.md#add-nixies-images-and-model-secret-to-impd) describes.
 
-The merge workflow runs each time a check workflow finishes on a `release-check/` branch, and each
-time such a pull request gets the `auto-merge` label. The label event matters when a bump run fails
-after its push: the pull request loses the label, its checks can all finish before the next run puts
-the label back, and no later check finishes to start a merge. The workflow merges a pull request
-labelled `auto-merge` only when the release check app opened it and wrote every commit on it, it
-changes no file outside its dependency's pins, and every GitHub Actions check on its head has
-passed. A commit anyone else pushes to the branch therefore holds the pull request for a person.
-Each check that its changed files start must also have passed, because a workflow can register its
-check after another one finishes: the NixOS checks for `nixos/`, which run on an app's pull request,
-the agent image check, the atc-gateway fixture and the nixie backup fixture. The merge uses the
-app's token, so the push to `main` starts its workflows.
+A nixie bump that changes nixie's sandbox images gets the label `sandbox-images-changed`, which
+never holds the merge: nixie adds its own images to impd at start. The label tells delivery to pin
+the new images once the release reports ready, as
+[Pin nixie's sandbox images](./nixie.md#pin-nixies-sandbox-images) describes.
+
+The merge workflow runs each time CI finishes on a `release-check/` branch, and each time such a
+pull request gets the `auto-merge` label. The label event matters when a bump run fails after its
+push: the pull request loses the label, its checks can all finish before the next run puts the label
+back, and no later check finishes to start a merge. The workflow merges a pull request labelled
+`auto-merge` only when the release check app opened it and wrote every commit on it, it changes no
+file outside its dependency's pins, and every GitHub Actions check on its head has passed. A commit
+anyone else pushes to the branch therefore holds the pull request for a person. CI's `checks` job
+must also have passed, because it holds every check, the agent image check and the fixtures
+included, and it can register its check run after the label event. The merge uses the app's token,
+so the push to `main` starts its workflows.
 
 ## Review a bump
 
 1. Read the release notes the pull request links, and every release between the pin and the bump.
-2. For a nixie bump with `sandbox-images-changed`, add the new sandbox images to impd before you
-   merge it, because the `Deploy prod` workflow applies the merged pin.
-3. Merge it once its checks pass. For a nixie bump, read the `Deploy prod` run it starts, and answer
+2. Merge it once its checks pass. For a nixie bump, read the `Deploy prod` run it starts, and answer
    it if its guard holds the plan, as [the prod apply job](./prod-apply.md) describes.
 
 A later release replaces the branch, the title, the body and the labels of the open pull request,

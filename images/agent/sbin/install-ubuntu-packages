@@ -1,0 +1,77 @@
+#!/bin/sh
+# Build step: install the agent image's pinned Ubuntu packages as a snapshot.ubuntu.com moment
+# holds them. The Dockerfile runs it once, with its pins:
+#
+#   install-ubuntu-packages https://snapshot.ubuntu.com/ubuntu/<stamp>/ <package>=<version>...
+#
+# It adds the snapshot as an apt source beside the live archive and pins the live archive to -1, so
+# apt resolves every pin and every unpinned dependency against the snapshot only, and a build of the
+# same pins gets the same packages. A version that the live archive still serves has two sources,
+# and apt fetches its file from the other one when the first fails. A pin that a security or point
+# update replaced is in the snapshot only, so it still installs. Without the -1 pin, `apt-get
+# install` without --snapshot resolves against the live lists, where a replaced pin is missing.
+#
+# apt does not retry a fetch that snapshot.ubuntu.com answers with an HTTP error such as the 503 of
+# an outage, so the step runs a failed apt-get update or download again, up to 4 times, 10, 20, 40
+# and 80 seconds apart. It turns apt's own retries off: in a 502 outage of snapshot.ubuntu.com,
+# their delayed queue printed `W: Tried to start delayed item ... but failed` 250,000 times.
+# apt-get update fails on any list it cannot fetch, instead of the warning that leaves the list out
+# and turns into a misleading `Version ... was not found`. The install itself runs once, from the
+# downloaded files. The image keeps imp-base's sources: the step removes the snapshot source and
+# the pin when it is done.
+set -eu
+
+if [ "$#" -lt 2 ]; then
+  echo "usage: install-ubuntu-packages <snapshot URI> <package>=<version>..." >&2
+  exit 2
+fi
+snapshot_uri=$1
+shift
+
+# after ubuntu.sources in apt's order, so apt tries the live archive's copy of a file first
+sources=/etc/apt/sources.list.d/zz-ubuntu-snapshot.sources
+preferences=/etc/apt/preferences.d/ubuntu-snapshot
+
+# snapshot.ubuntu.com serves the archive's and the security pocket's suites under one path
+cat > "$sources" << EOF
+Types: deb
+URIs: $snapshot_uri
+Suites: noble noble-updates noble-backports noble-security
+Components: main universe restricted multiverse
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+EOF
+
+# -1 never installs a version from these hosts, but a version that the snapshot also holds keeps
+# their files as a second source
+cat > "$preferences" << 'EOF'
+Package: *
+Pin: origin "archive.ubuntu.com"
+Pin-Priority: -1
+
+Package: *
+Pin: origin "security.ubuntu.com"
+Pin-Priority: -1
+EOF
+
+# with_retries <command>...: runs the command, and again after each failure until the waits run out
+with_retries() {
+  delay=10
+  while :; do
+    status=0
+    "$@" || status=$?
+    if [ "$status" -eq 0 ] || [ "$delay" -gt 80 ]; then
+      return "$status"
+    fi
+    echo "install-ubuntu-packages: $1 $2 exited $status, again in ${delay}s" >&2
+    sleep "$delay"
+    delay=$((delay * 2))
+  done
+}
+
+with_retries apt-get update -o Acquire::Retries=0 --error-on=any
+with_retries apt-get install -o Acquire::Retries=0 -y --no-install-recommends --download-only "$@"
+apt-get install -y --no-install-recommends --no-download "$@"
+
+apt-get clean
+rm -rf "$sources" "$preferences" /var/lib/apt/lists/* /var/cache/apt/*.bin /var/log/apt \
+  /var/log/dpkg.log /var/log/alternatives.log /var/cache/debconf/*-old /var/lib/dpkg/*-old

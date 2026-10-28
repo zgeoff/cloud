@@ -20,6 +20,14 @@ minimumReleaseAgeExcludes = [
   "@zgeoff/oxlint-config",
   "@zgeoff/skill-gate",
   "@zgeoff/std",
+  # tsrs 0.18.0 and its native packages skip the gate so typecheck can move to
+  # it now; these entries come out on 2026-10-26, once tsrs 0.18.0 is 7 days old
+  "tsrs",
+  "@tsrs/darwin-arm64",
+  "@tsrs/linux-arm64-gnu",
+  "@tsrs/linux-arm64-musl",
+  "@tsrs/linux-x64-gnu",
+  "@tsrs/linux-x64-musl",
 ]
 
 [test]
@@ -27,10 +35,11 @@ minimumReleaseAgeExcludes = [
 # for the run, and runs the scripts' MSW server. The health-check worker is its own package with
 # its own preload, so `bun run test:health-check` runs it from its directory, and the preview
 # service and the files service likewise run their own, with `bun run test:preview` and
-# `bun run test:files`.
+# `bun run test:files`. The TypeScript journeys in e2e/ are a lane, not part of the unit run, so
+# `bun run test:e2e` runs them from their directory with their own preload.
 preload = [
   "@zgeoff/bun-test-extended",
   "./infra/test-utils/seed-faker.ts",
   "./scripts/mocks/register-mock-server.ts",
 ]
-pathIgnorePatterns = ["workers/**", "packages/preview/**", "packages/files/**"]
+pathIgnorePatterns = ["workers/**", "packages/preview/**", "packages/files/**", "e2e/**"]

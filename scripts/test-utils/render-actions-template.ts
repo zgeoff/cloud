@@ -1,19 +1,26 @@
 import { findJSONField } from '../find-json-field.ts';
 
-// The contexts a step's env and run may read, as GitHub fills them for the run under test.
 export interface ActionsTemplateContext {
   readonly github: object;
   readonly inputs: Readonly<Record<string, string>>;
 
   // the earlier steps' outputs, by step id
   readonly steps: Readonly<Record<string, { readonly outputs: Readonly<Record<string, string>> }>>;
+
+  // a run without it refuses every secrets expression, so a step never runs a secret by accident
+  readonly secrets?: Readonly<Record<string, string>>;
+
+  // the result and outputs of each job the step's job needs, by job id
+  readonly needs?: Readonly<
+    Record<string, { readonly result: string; readonly outputs: Readonly<Record<string, string>> }>
+  >;
 }
 
 const expression = /\$\{\{\s*(?<path>[^}]*?)\s*\}\}/gu;
 
-// Renders a workflow value as the runner hands it to a step: a number or a boolean as its text, and
-// each `${{ <path> }}` in a string as the path's value, empty when the path is missing, as on
-// GitHub. Any other expression throws, so a test never runs a value the stand-in cannot render.
+// GitHub's runner hands a step a number or a boolean as its text, and each `${{ <path> }}` in a
+// string as the path's value, empty when the path is missing. Any other expression throws, so a
+// test never runs a value the stand-in cannot render.
 export function renderActionsTemplate(
   value: unknown,
   context: Readonly<ActionsTemplateContext>,
@@ -29,10 +36,10 @@ export function renderActionsTemplate(
   return value.replaceAll(expression, (_match: string, path: string) => resolvePath(path, context));
 }
 
-const contextPath = /^(?:github|inputs|steps)(?:\.[A-Za-z_][\w-]*)+$/u;
+const contextPath = /^(?:github|inputs|steps|secrets|needs)(?:\.[A-Za-z_][\w-]*)+$/u;
 
 function resolvePath(path: string, context: Readonly<ActionsTemplateContext>): string {
-  if (!contextPath.test(path)) {
+  if (!contextPath.test(path) || (path.startsWith('secrets.') && context.secrets === undefined)) {
     throw new Error(`unsupported expression: ${path}`);
   }
 

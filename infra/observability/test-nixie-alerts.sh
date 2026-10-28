@@ -49,9 +49,6 @@ setup_test() {
     await Bun.write(tree + '/config/blackbox.json', JSON.stringify(buildNixieProbeValues(url).config));
     await Bun.write(tree + '/config/rules.json', JSON.stringify({ groups: buildAlertRules({ nixieReadinessURL: url }) }));
   ")
-  # pulled here, so a cold image cache never writes its progress into a case's compared output
-  docker pull -q "$blackbox_image" > /dev/null
-  docker pull -q "$prometheus_image" > /dev/null
   python3 -m http.server --bind 127.0.0.1 --directory "$tree/www" "$web_port" > "$tree/www.log" 2>&1 &
   server_pid=$!
   container="nixie-alerts-exporter-$run_id-$BASHPID"
@@ -179,5 +176,10 @@ it_keeps_NixieDegraded_quiet_on_a_ready_body_whose_conversation_turns_fail() {
 EOF
   assert_equals 0 "$status" "promtool's exit"
 }
+
+# pulled once before the cases, so a cold image cache never writes its progress into a case's
+# compared output, and no case pays for the pull
+docker pull -q "$blackbox_image" > /dev/null
+docker pull -q "$prometheus_image" > /dev/null
 
 run_cases

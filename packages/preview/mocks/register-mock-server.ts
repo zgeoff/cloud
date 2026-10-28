@@ -1,5 +1,12 @@
 import { afterAll, afterEach } from 'bun:test';
-import { commitStatuses, composeFiles, issueComments, pullRequestFiles } from './github-state.ts';
+import {
+  commitStatuses,
+  composeFiles,
+  installationTokens,
+  issueComments,
+  pullRequestFiles,
+  uninstalledRepos,
+} from './github-state.ts';
 import { NativeWebSocket } from './native-web-socket.ts';
 import { server } from './node.ts';
 
@@ -11,7 +18,7 @@ server.events.on('request:unhandled', (event) => {
   unhandledRequests.push(`${event.request.method} ${event.request.url}`);
 });
 
-// importing NativeWebSocket takes Bun's WebSocket before listen() replaces the global
+// the import takes Bun's WebSocket before listen() replaces the global
 void NativeWebSocket;
 
 // the only real traffic is loopback, to a test's stub impd through its own passthrough()
@@ -21,9 +28,11 @@ afterEach(() => {
   server.resetHandlers();
   composeFiles.clear();
   pullRequestFiles.clear();
+  uninstalledRepos.clear();
 
   issueComments.length = 0;
   commitStatuses.length = 0;
+  installationTokens.length = 0;
 
   const unhandled = unhandledRequests.splice(0);
 

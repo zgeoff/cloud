@@ -1,13 +1,15 @@
-import { expect, onTestFinished, test } from 'bun:test';
+import { expect, mock, onTestFinished, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { HttpResponse, http } from 'msw';
+import { z } from 'zod';
 import { buildGitHubClient } from './build-github-client.ts';
 import { buildImpdClient } from './build-impd-client.ts';
 import { createPreviewStore } from './create-preview-store.ts';
 import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
+import { stubApp } from './mocks/github-app.ts';
 import { commitStatuses } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { server } from './mocks/node.ts';
@@ -48,11 +50,13 @@ async function setupTest() {
         repos: new Set(['acme/greenhouse']),
         modelSecret: 'model-haiku',
         timeoutMs: 600_000,
+        idleMs: 300_000,
       },
     },
+    spendProxies: null,
     store,
     impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
-    github: buildGitHubClient(githubAPIURL, 'ghp_stub-preview-token'),
+    github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
     pendingRuns: new Set(),
@@ -228,7 +232,7 @@ test('it posts failure and removes the imp when the run passes its time limit', 
   ).toBe('failed');
 });
 
-test('it posts pending with the reason and starts no imp when every preview slot is taken', async () => {
+test('it posts pending with the reason, starts no imp, and leaves the preview awake when a preview used within the idle time holds every slot', async () => {
   const ctx = await setupTest();
 
   ctx.impd.imps.set('pv-0a1b2c3d-17', {
@@ -249,10 +253,10 @@ test('it posts pending with the reason and starts no imp when every preview slot
     imp: 'pv-sdk-0123456789abcdef',
   });
 
-  await runContractRun(ctx.deps, {
-    repo: 'acme/greenhouse',
-    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  });
+  await runContractRun(
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z') },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
 
   expect(commitStatuses).toStrictEqual([
     {
@@ -302,12 +306,125 @@ test('it posts nothing new when a retry still finds every slot taken', async () 
     { phase: 'waiting', detail: 'Waiting for a free preview slot' },
   );
 
-  await runContractRun(ctx.deps, {
-    repo: 'acme/greenhouse',
-    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  });
+  await runContractRun(
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z') },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
 
   expect(commitStatuses).toStrictEqual([]);
+});
+
+test('it puts a preview unused for the idle time to sleep and runs a waiting run in its slot', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:55:00.000Z',
+    httpPort: 8080,
+    image: 'pv-base',
+    memoryMib: 4096,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 18,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'waiting', detail: 'Waiting for a free preview slot' },
+  );
+
+  ctx.impd.answerCommand = () => ({ code: 0, stdout: ' 18 pass\n 0 fail\n' });
+
+  const log = mock<(line: string) => void>();
+
+  await runContractRun(
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z'), log },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
+
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('sleeping');
+
+  expect(commitStatuses.map((status) => status.description)).toStrictEqual([
+    'Running the SDK contract suite',
+    '18 pass, 0 fail',
+  ]);
+
+  expect(log.mock.calls[0]).toStrictEqual([
+    'pv-0a1b2c3d-17: asleep to free a slot for the SDK contract run of acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+  ]);
+});
+
+test('it keeps the run waiting and starts no imp when impd refuses to sleep the idle preview', async () => {
+  const ctx = await setupTest();
+
+  ctx.impd.imps.set('pv-0a1b2c3d-17', {
+    name: 'pv-0a1b2c3d-17',
+    state: 'running',
+    lastActiveAt: '2026-10-15T08:00:00.000Z',
+    httpPort: 8080,
+    image: 'pv-base',
+    memoryMib: 4096,
+    backup: false,
+    grants: ['gh'],
+  });
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 18,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  server.use(
+    http.post(`${ctx.impd.url}/rpc/imps/sleep`, () =>
+      HttpResponse.json(
+        {
+          json: {
+            defined: true,
+            code: 'CONFLICT',
+            status: 409,
+            message: 'pv-0a1b2c3d-17 holds a lease',
+          },
+        },
+        { status: 409 },
+      ),
+    ),
+  );
+
+  const log = mock<(line: string) => void>();
+
+  await runContractRun(
+    { ...ctx.deps, now: () => new Date('2026-10-15T09:00:00Z'), log },
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+  );
+
+  expect([...ctx.impd.imps.keys()]).toStrictEqual(['pv-0a1b2c3d-17']);
+  expect(ctx.impd.imps.get('pv-0a1b2c3d-17')?.state).toBe('running');
+
+  expect(commitStatuses.map((status) => status.description)).toStrictEqual([
+    'Waiting for a free preview slot',
+  ]);
+
+  expect(log.mock.calls).toStrictEqual([
+    [
+      'pv-0a1b2c3d-17: could not sleep it to free a slot for a contract run: ImpdError: impd CONFLICT: pv-0a1b2c3d-17 holds a lease',
+    ],
+  ]);
+
+  expect(
+    ctx.store.findContractRun({
+      repo: 'acme/greenhouse',
+      headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    })?.phase,
+  ).toBe('waiting');
 });
 
 test('it runs a waiting run once a slot is free', async () => {
@@ -509,7 +626,7 @@ test('it ends a queued run with an error and removes its imp once the contract s
   ).toBe('failed');
 });
 
-test('it keeps the result settling when GitHub refuses the final status', async () => {
+test('it keeps the result settling when GitHub answers the final status with a server error', async () => {
   const ctx = await setupTest();
 
   ctx.store.claimContractRun({
@@ -524,8 +641,9 @@ test('it keeps the result settling when GitHub refuses the final status', async 
   // GitHub's answer to a status while it is down, for every status but the pending ones
   server.use(
     http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, async (info) => {
-      // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- GitHub's status request shape
-      const payload = (await info.request.clone().json()) as { readonly state: string };
+      const body = await info.request.clone().json();
+
+      const payload = z.object({ state: z.string() }).parse(body);
 
       return payload.state === 'pending'
         ? undefined
@@ -546,6 +664,64 @@ test('it keeps the result settling when GitHub refuses the final status', async 
   ).toMatchObject({ phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' });
 
   expect(commitStatuses.map((status) => status.state)).toStrictEqual(['pending']);
+});
+
+test('it ends a settling run with the refusal and posts no status again when GitHub refuses the final status for good', async () => {
+  const ctx = await setupTest();
+
+  ctx.store.claimContractRun({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+  });
+
+  ctx.store.updateContractPhase(
+    { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' },
+    ['queued'],
+    { phase: 'settling', detail: '18 pass, 0 fail', outcome: 'success' },
+  );
+
+  const recordStatusPost = mock((sha: string) => sha);
+  const recordLog = mock((line: string) => line);
+
+  // GitHub's answer to an App without Commit statuses write (docs.github.com/en/rest:
+  // authentication/permissions-required-for-github-apps)
+  server.use(
+    http.post(`${githubAPIURL}/repos/acme/greenhouse/statuses/:sha`, (info) => {
+      recordStatusPost(String(info.params['sha']));
+
+      return HttpResponse.json(
+        { message: 'Resource not accessible by integration', status: '403' },
+        { status: 403, headers: { 'x-accepted-github-permissions': 'statuses=write' } },
+      );
+    }),
+  );
+
+  const deps = { ...ctx.deps, log: recordLog };
+  const key = { repo: 'acme/greenhouse', headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' };
+
+  await runContractRun(deps, key);
+  await runContractRun(deps, key);
+
+  expect(ctx.store.findContractRun(key)).toStrictEqual({
+    repo: 'acme/greenhouse',
+    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+    number: 17,
+    imp: 'pv-sdk-0123456789abcdef',
+    phase: 'passed',
+    detail:
+      '18 pass, 0 fail; the status was not posted: GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 403: Resource not accessible by integration (the App needs statuses=write)',
+    outcome: 'success',
+  });
+
+  expect(recordStatusPost.mock.calls).toStrictEqual([['aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa']]);
+
+  expect(recordLog.mock.calls).toStrictEqual([
+    [
+      'acme/greenhouse@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: the SDK contract run ended: 18 pass, 0 fail; the status was not posted: GitHub POST /repos/acme/greenhouse/statuses/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: HTTP 403: Resource not accessible by integration (the App needs statuses=write)',
+    ],
+  ]);
 });
 
 test('it keeps the result settling and the status unset when impd fails to remove the imp', async () => {

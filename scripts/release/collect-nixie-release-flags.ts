@@ -7,7 +7,7 @@ export interface NixieReleaseNotes {
 export function collectNixieReleaseFlags(notes: NixieReleaseNotes): readonly string[] {
   const migrations = [notes.target, ...notes.between].some((each) => hasMigrations(each));
 
-  // impd does not add sandbox images itself, so a person adds changed ones before the rollout
+  // nixie's token cannot pin, so delivery pins a release's new sandbox images after the rollout
   const changed =
     collectSandboxImages(notes.pinned).join('\n') !== collectSandboxImages(notes.target).join('\n');
 

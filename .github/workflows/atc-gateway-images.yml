@@ -1,27 +1,15 @@
 name: atc-gateway images
 
-# Runs the fixture test on every change to the images. Only main publishes to GHCR: a push to
-# main that changes images/atc-gateway/versions.env, or a manual run on main with push: true
-# (scripts/release/decide-gateway-publish.ts). A pull request never publishes: the decide job
-# skips on one, and the publish job also refuses any ref but main. After the push, the publish job
-# opens the pull request that pins the new digests in infra/Pulumi.prod.yaml, as the release check
-# app, so CI runs on it; the release bump merge workflow merges it by its rules, and the Deploy
-# prod workflow applies it (docs/runbooks/release-check.md).
+# Runs the fixture test on every push to main that changes the images; CI's checks job runs it on
+# a pull request. Only main publishes to GHCR: a push to main that changes
+# images/atc-gateway/versions.env, or a manual run on main with push: true
+# (scripts/release/decide-gateway-publish.ts). The publish job refuses any ref but main. After the
+# push, the publish job opens the pull request that pins the new digests in infra/Pulumi.prod.yaml,
+# as the release check app, so CI runs on it; the release bump merge workflow merges it by its
+# rules, and the Deploy prod workflow applies it (docs/runbooks/release-check.md).
 on:
   push:
     branches: [main]
-    paths:
-      - images/atc-gateway/**
-      - scripts/fetch-atc-release.sh
-      - scripts/publish-atc-gateway-images.sh
-      - scripts/run-shell-suites.sh
-      - e2e/test-atc-gateway-restore.sh
-      - infra/cluster/build-atc-gateway-spec.ts
-      - infra/cluster/create-atc-gateway-backup-job.ts
-      - infra/cluster/build-atc-gateway-backup-pod-spec.ts
-      - test-support/shell/**
-      - .github/workflows/atc-gateway-images.yml
-  pull_request:
     paths:
       - images/atc-gateway/**
       - scripts/fetch-atc-release.sh
@@ -62,7 +50,6 @@ jobs:
         run: bun run test:atc-gateway-fixture
 
   decide:
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
@@ -88,9 +75,7 @@ jobs:
 
   publish:
     needs: [fixture, decide]
-    if: >-
-      github.event_name != 'pull_request' && github.ref == 'refs/heads/main' &&
-      needs.decide.outputs.publish == 'true'
+    if: github.ref == 'refs/heads/main' && needs.decide.outputs.publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # one publish at a time; a newer push waits, and replaces any older one still waiting, since

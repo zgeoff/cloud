@@ -1,11 +1,19 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>zgeoff/tools"],
+  "rebaseWhen": "conflicted",
   "packageRules": [
     {
       "description": "typescript-5 gives openapi-typescript 7 the TypeScript 5 compiler API that TypeScript 7 no longer ships (scripts/nixie-api/generate-nixie-api-types.ts), so it stays on 5",
       "matchDepNames": ["typescript-5"],
       "allowedVersions": "<6"
+    },
+    {
+      "description": "A provider/go.mod bump changes the vendored Go modules, whose vendorHash in nixos/packages/onidel-provider.nix Renovate cannot recompute, so CI's onidel vendor hash check fails it until a reviewer commits the new hash. automerge false says so, and groupName null keeps it out of the weekly patch group, whose other bumps would otherwise wait on its failed check",
+      "matchManagers": ["gomod"],
+      "matchFileNames": ["provider/go.mod"],
+      "automerge": false,
+      "groupName": null
     }
   ]
 }

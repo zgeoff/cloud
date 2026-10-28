@@ -13,6 +13,10 @@
 # that names both takes @impz/client's version, because the rename replaced the old package:
 # nixie's sandbox-imp adapter imports only @impz/client from v0.35.1, so an @zgeoff/imp-client entry
 # beside it is a leftover that nixie does not talk to impd through.
+# From nixie 0.42.0, nixie's imp adapter also accepts each impd major in its EXTRA_IMPD_MAJORS set,
+# a constant in adapters/sandbox-imp/src/build-imp-port.ts that nixie reports nowhere, so when the
+# client's major differs from impd's, the check reads that file at the release's tag too. A file
+# without the set adds no major.
 # It prints one line and exits 0 when every nixie pod accepts the impd major. It exits 1 when one
 # does not, when no nixie pod runs, when the pin or an image holds no release version, or when the
 # lock names no one client version; a gh failure stops it with gh's exit code.
@@ -38,15 +42,31 @@ if [[ ! "$impd" =~ ^$version$ ]]; then
 fi
 impd_major="${BASH_REMATCH[1]}"
 
-# accepts_impd_major <nixie version> <client version>: exits 0 when that nixie speaks impd_major.
-# nixie takes impd's major from its client, except that nixie 0.28.0 and later accept impd 2 with
-# a 1.x client: impd 2 renamed imp's CLI and kept impd 1.6's wire API (RENAMED_IMPD in nixie's
-# adapters/sandbox-imp/src/build-imp-port.ts, absent at v0.27.2).
-accepts_impd_major() {
-  local client_major="${2%%.*}"
-  if [ "$client_major" = "$impd_major" ]; then return 0; fi
-  [ "$client_major" = 1 ] && [ "$impd_major" = 2 ] &&
-    printf '0.28.0\n%s\n' "$1" | sort -V -C
+# is_release_at_least <version> <release>: exits 0 when <version> is <release> or later
+is_release_at_least() {
+  printf '%s\n%s\n' "$2" "$1" | sort -V -C
+}
+
+# read_impd_majors <nixie version> <client version>: sets majors to the impd majors that nixie
+# accepts, lowest first. It sets a global rather than printing, because bash drops errexit inside a
+# command substitution, so a gh failure there would pass.
+# nixie 0.28.0 and later accept impd 2 with a 1.x client: impd 2 renamed imp's CLI and kept impd
+# 1.6's wire API (RENAMED_IMPD in nixie's build-imp-port.ts, absent at v0.27.2).
+read_impd_majors() {
+  local client_major="${2%%.*}" source set_line
+  local -a extras=()
+  majors=("$client_major")
+  if [ "$client_major" = 1 ] && is_release_at_least "$1" 0.28.0; then majors+=(2); fi
+  if [ "$client_major" != "$impd_major" ] && is_release_at_least "$1" 0.42.0; then
+    source="$(gh api -H 'Accept: application/vnd.github.raw' \
+      "repos/zgeoff/nixie/contents/adapters/sandbox-imp/src/build-imp-port.ts?ref=v$1")"
+    # the set's one line, `const EXTRA_IMPD_MAJORS: ReadonlySet<number> = new Set([2, 4]);`
+    set_line="$(sed -nE 's/^const EXTRA_IMPD_MAJORS: ReadonlySet<number> = new Set\(\[([0-9, ]*)\]\);$/\1/p' \
+      <<< "$source")"
+    read -ra extras <<< "${set_line//,/ }"
+    majors+=("${extras[@]}")
+  fi
+  mapfile -t majors < <(printf '%s\n' "${majors[@]}" | sort -nu)
 }
 
 # a nixie rollout recreates its one pod, so between the old pod's end and the new pod's start no
@@ -76,10 +96,12 @@ for image in "${images[@]}"; do
     echo "nixie $nixie's bun.lock names no one @impz/client or @zgeoff/imp-client version" >&2
     exit 1
   fi
-  if ! accepts_impd_major "$nixie" "$clients"; then
-    echo "the switch would run impd $impd, but a nixie pod runs nixie $nixie, whose imp-client" \
-      "$clients refuses an impd of another major; deploy a nixie that speaks impd $impd_major" \
-      "first (docs/runbooks/workflows.md, Switch the host)" >&2
+  read_impd_majors "$nixie" "$clients"
+  if [[ " ${majors[*]} " != *" $impd_major "* ]]; then
+    accepted="${majors[*]}"
+    echo "the switch would run impd $impd, but a nixie pod runs nixie $nixie (imp-client" \
+      "$clients), which accepts impd ${accepted// /, } only; deploy a nixie that speaks impd" \
+      "$impd_major first (docs/runbooks/workflows.md, Switch the host)" >&2
     exit 1
   fi
   found+=("nixie $nixie (imp-client $clients)")
