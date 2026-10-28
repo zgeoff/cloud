@@ -64,9 +64,9 @@ in
         CURRENT_SYSTEM = "/run/current-system";
         GITHUB_API_URL = "https://api.github.com";
         GITHUB_RAW_URL = "https://raw.githubusercontent.com";
-        DOCKER = lib.getExe config.virtualisation.docker.package;
+        PODMAN = lib.getExe config.virtualisation.podman.package;
       };
-      # root, since docker's socket is root's
+      # root, since imp-host is a container of root's Podman
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe check;

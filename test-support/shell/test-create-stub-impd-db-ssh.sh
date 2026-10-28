@@ -68,7 +68,7 @@ OUT
   assert_status 1 "$status"
 }
 
-it_answers_a_stopped_imp_host_with_dockers_error_and_exit_1() {
+it_answers_a_stopped_imp_host_with_podmans_error_and_exit_125() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -78,9 +78,9 @@ it_answers_a_stopped_imp_host_with_dockers_error_and_exit_1() {
     < /dev/null > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error response from daemon: No such container: imp-host'
+  diff - "$tree/err" <<< 'Error: no container with name or ID "imp-host" found: no such container'
   diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","copy-impd-db-host pre-x"]'
-  assert_status 1 "$status"
+  assert_status 125 "$status"
 }
 
 it_fails_closed_with_exit_97_on_a_call_without_batch_mode() {

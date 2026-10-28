@@ -36,7 +36,7 @@ sops_nixie() {
     --user "$(id -u):$(id -g)" -e HOME=/tmp -e SOPS_AGE_KEY -v "$PWD/deploy/nixie:/w" -w /w --entrypoint /usr/local/bin/sops \
     "$NIXIE_IMAGE" "$@"
 }
-host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
+host_imp() { ssh root@geoffcloud podman exec -i imp-host impz "$@"; }
 ```
 
 `host_imp` sends its standard input over SSH, so a secret piped into it never reaches the host's
@@ -337,7 +337,7 @@ repository with a helper that runs restic in imp-host with impd's own settings:
 
 ```bash
 host_restic() {
-  ssh root@geoffcloud "docker exec imp-host sh -c 'export RESTIC_REPOSITORY=\$IMP_BACKUP_REPOSITORY RESTIC_PASSWORD_FILE=\$IMP_BACKUP_PASSWORD_FILE; restic $*'" < /dev/null
+  ssh root@geoffcloud "podman exec imp-host sh -c 'export RESTIC_REPOSITORY=\$IMP_BACKUP_REPOSITORY RESTIC_PASSWORD_FILE=\$IMP_BACKUP_PASSWORD_FILE; restic $*'" < /dev/null
 }
 host_restic snapshots --no-lock --json \
   | jq -r '.[] | select(any(.tags[]; startswith("imp=nixie-"))) | .short_id'

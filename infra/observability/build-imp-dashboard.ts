@@ -42,13 +42,6 @@ const impPanels: readonly DashboardPanel[] = [
     width: 6,
     height: 5,
   },
-  {
-    title: 'imp-docker-proxy log lines',
-    type: 'stat',
-    expr: 'sum(count_over_time({job="journal", unit="imp-docker-proxy.service"} [$__range]))',
-    width: 6,
-    height: 5,
-  },
   { title: 'impd logs', type: 'logs', expr: impdStream, width: 24, height: 12 },
 ];
 

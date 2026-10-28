@@ -347,12 +347,12 @@ it_prints_the_named_impd_image_records() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_IMPD_IMAGES='[{"name":"pv-base","digest":"sha256:0a"}]' \
-    ssh -o BatchMode=yes root@geoffcloud "docker exec imp-host impz image ls --json" \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz image ls --json" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '[{"name":"pv-base","digest":"sha256:0a"}]'
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec imp-host impz image ls --json"]'
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz image ls --json"]'
   assert_status 0 "$status"
 }
 
@@ -362,7 +362,7 @@ it_prints_an_empty_image_list_when_no_record_is_named() {
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    ssh -o BatchMode=yes root@geoffcloud "docker exec imp-host impz image ls --json" \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz image ls --json" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '[]'
@@ -377,7 +377,7 @@ it_prints_one_named_image_folder_per_line() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_IMPD_IMAGE_DIRS='0a 1b' ssh -o BatchMode=yes root@geoffcloud \
-    "docker exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'" \
+    "podman exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -386,31 +386,31 @@ it_prints_one_named_image_folder_per_line() {
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << 'CALLS'
-["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"$d/rootfs.ext4\" ]; then echo \"$d\"; fi; done'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"$d/rootfs.ext4\" ]; then echo \"$d\"; fi; done'"]
 CALLS
   assert_status 0 "$status"
 }
 
-it_fails_both_docker_commands_as_docker_does_without_imp_host() {
+it_fails_both_podman_commands_as_podman_does_without_imp_host() {
   local status=0 dirs_status=0
   create_case_tree
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    STUB_IMP_HOST_GONE=1 ssh -o BatchMode=yes root@geoffcloud "docker exec imp-host impz image ls --json" \
+    STUB_IMP_HOST_GONE=1 ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz image ls --json" \
     > "$tree/out" 2> "$tree/err" || status=$?
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_IMP_HOST_GONE=1 STUB_IMPD_IMAGE_DIRS=0a ssh -o BatchMode=yes root@geoffcloud \
-    "docker exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'" \
+    "podman exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'" \
     >> "$tree/out" 2>> "$tree/err" || dirs_status=$?
 
   diff /dev/null "$tree/out"
   diff - "$tree/err" << 'EOF'
-Error response from daemon: No such container: imp-host
-Error response from daemon: No such container: imp-host
+Error: no container with name or ID "imp-host" found: no such container
+Error: no container with name or ID "imp-host" found: no such container
 EOF
-  assert_status 1 "$status"
-  assert_status 1 "$dirs_status"
+  assert_status 125 "$status"
+  assert_status 125 "$dirs_status"
 }
 
 it_fails_closed_with_exit_97_on_an_unknown_remote_command() {

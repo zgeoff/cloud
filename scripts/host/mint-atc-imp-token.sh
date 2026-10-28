@@ -3,7 +3,7 @@
 # with the argv that runs imp's CLI in imp-host after the directory (scripts/imp-cli.ts names the
 # CLI, so this script never does):
 #
-#   ssh root@geoffcloud bash -s -- <dir> docker exec imp-host <imp's CLI>
+#   ssh root@geoffcloud bash -s -- <dir> podman exec imp-host <imp's CLI>
 #
 # It mints impd's token atc-cloud (scope manage, imps harness-*, may grant glm and the secrets of
 # the daemon's auth profiles in nixos/hosts/geoffcloud/configuration.nix) straight into
@@ -23,7 +23,7 @@ mint_atc_imp_token() {
   # global, so the EXIT trap still reads it after a failure inside this function
   temp="$(mktemp "$dir/.imp-token.XXXXXX")"
   trap 'rm -f "$temp"' EXIT
-  # docker exec without -i leaves stdin alone, which holds the rest of this script
+  # podman exec without -i leaves stdin alone, which holds the rest of this script
   "$@" token new atc-cloud --scope manage --imps 'harness-*' \
     --grantable glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect > "$temp"
   test "$(wc -l < "$temp")" -eq 1

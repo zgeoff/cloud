@@ -70,7 +70,7 @@ in
           };
           destinationAddress = lib.mkOption {
             type = lib.types.str;
-            example = "172.17.0.1";
+            example = "10.88.0.1";
             description = "The host address the admitted packets go to.";
           };
         };
@@ -118,7 +118,7 @@ in
           };
           destinationCIDR = lib.mkOption {
             type = lib.types.str;
-            example = "172.17.0.0/16";
+            example = "10.88.0.0/16";
             description = "The IPv4 range the dropped packets go to.";
           };
         };
@@ -140,7 +140,7 @@ in
       }
       {
         assertion = !config.networking.nftables.flushRuleset;
-        message = "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and Docker";
+        message = "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark";
       }
     ];
 

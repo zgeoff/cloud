@@ -28,7 +28,7 @@ test('it accepts one entry of each kind as given', () => {
         protocol: 'tcp',
         port: 18_081,
         scope: 'host',
-        interface: 'docker0',
+        interface: 'podman0',
         admission: true,
         reason: 'the relay',
       },

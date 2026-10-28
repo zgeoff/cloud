@@ -76,7 +76,7 @@ test('it keeps a preview proxy through an idle sweep while the proxy reply is un
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body: '{"model":"model-small"}',
     }),
@@ -125,7 +125,7 @@ test('it lets an idle sweep stop a preview proxy once the proxy reply is read', 
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body: '{"model":"model-small"}',
     }),
@@ -175,7 +175,7 @@ test('it sends a preview model call to that preview proxy and answers with what 
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages?beta=true', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages?beta=true', {
       method: 'POST',
       body: '{"model":"model-small"}',
     }),
@@ -218,7 +218,7 @@ test('it answers a route that names no preview with a 404 and starts no proxy', 
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-9/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-9/v1/messages', {
       method: 'POST',
       body: '{}',
     }),
@@ -265,7 +265,7 @@ test('it answers the route of an ended preview with a 404', async () => {
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body: '{}',
     }),
@@ -305,7 +305,7 @@ test('it refuses a preview model call with a 503 when its proxy cannot start', a
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body: '{}',
     }),
@@ -362,7 +362,7 @@ test('it answers a 404 and starts no proxy when the preview closes while the cal
   });
 
   const pending = handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body,
       duplex: 'half',
@@ -407,7 +407,7 @@ test('it answers a 502 and releases its hold when the started proxy refuses the 
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body: '{"model":"model-small"}',
     }),
@@ -461,7 +461,7 @@ test('it passes the proxy budget refusal through with its status and its body', 
   });
 
   const response = await handler(
-    new Request('http://172.17.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
+    new Request('http://10.88.0.1:18082/pv-0a1b2c3d-7/v1/messages', {
       method: 'POST',
       body: '{"model":"model-small"}',
     }),

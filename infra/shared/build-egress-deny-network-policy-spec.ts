@@ -16,7 +16,7 @@ export function buildEgressDenyNetworkPolicySpec(): input.networking.v1.NetworkP
           {
             ipBlock: {
               cidr: '0.0.0.0/0',
-              except: [topology.tailnet.cidr, topology.docker.subnet],
+              except: [topology.tailnet.cidr, topology.podman.subnet],
             },
           },
         ],

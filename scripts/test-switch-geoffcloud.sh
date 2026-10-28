@@ -63,7 +63,7 @@ kinds_calls='["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff
 ["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff/atc/contents/packages/plugin-api/src/credential-broker.ts?ref=%40zgeoff/atc%402.26.2"]'
 kinds_line='== impd 3.4.0 stores the secret kinds github, anthropic, npm, custom, oauth, which atc 2.26.2 accepts'
 # the image listing check-impd-image-dirs.sh runs after nixie reports ready
-images_call='["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec imp-host impz image ls --json"]'
+images_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz image ls --json"]'
 # the dry-activate of the built system on root@geoffcloud, which every switch that copies runs
 dry_activate_call='["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE     -E NIXOS_INSTALL_BOOTLOADER -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud-dry-activate '"'"'/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration'"'"'     dry-activate"]'
 
@@ -1111,7 +1111,7 @@ EOF
   tail -n 2 "$tree/calls" > "$tree/calls-last"
   diff - "$tree/calls-last" << EOF
 $images_call
-["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'"]
 EOF
   git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
   diff - "$tree/deployed-host" <<< "$earlier"

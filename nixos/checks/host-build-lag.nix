@@ -1,7 +1,7 @@
 # Checks services.host-build-lag: the units the module generates, and the check script run in the
 # build sandbox against Python's http.server, which serves a case's own GitHub answers from a
-# directory on an ephemeral loopback port, with the stand-in docker of
-# test-utils/build-stub-imp-host-docker.nix for imp-host. Each case runs on its own, in a fresh
+# directory on an ephemeral loopback port, with the stand-in podman of
+# test-utils/build-stub-imp-host-podman.nix for imp-host. Each case runs on its own, in a fresh
 # directory, with its own answers, state, textfile directory and current system, and the script
 # under env -i with a HOME and TMPDIR of its own, under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos host-build-lag
@@ -13,7 +13,7 @@ let
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
-  stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubImpHostPodman = import ./test-utils/build-stub-imp-host-podman.nix { inherit pkgs; };
 
   check = "${
     (buildModuleSystem ../modules/host-build-lag.nix { services.host-build-lag.enable = true; })
@@ -41,7 +41,7 @@ let
       env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" REPO=example/cloud TEXTFILE_DIR=out \
         STATE_DIR="$PWD/state" CURRENT_SYSTEM="$PWD/current-system" \
         GITHUB_API_URL="http://127.0.0.1:$port" GITHUB_RAW_URL="http://127.0.0.1:$port/raw" \
-        DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" ${check} > stdout 2> stderr || status=$?
+        PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" ${check} > stdout 2> stderr || status=$?
       after=$(date +%s)
       sed -n 's/.*"GET \([^ ]*\) HTTP\/1\.[01]" .*/\1/p' server.log > requests
     }
@@ -133,7 +133,9 @@ let
                 CURRENT_SYSTEM = "/run/current-system";
                 GITHUB_API_URL = "https://api.github.com";
                 GITHUB_RAW_URL = "https://raw.githubusercontent.com";
-                DOCKER = "${pkgs.docker}/bin/docker";
+                # the podman module wraps pkgs.podman with the system's runtimes, so the unit runs
+                # the system's own podman
+                PODMAN = "${config.virtualisation.podman.package}/bin/podman";
               };
               serviceConfig = {
                 Type = "oneshot";
@@ -263,7 +265,7 @@ let
         ${metrics "0" "0"}
         EOF
         assert_equals switches "$(ls -A state)" "the state directory"
-        assert_equals '["exec","imp-host","impz","info"]' "$(cat impd/calls)" "the docker calls"
+        assert_equals '["exec","imp-host","impz","info"]' "$(cat impd/calls)" "the podman calls"
       '';
     }
     {
@@ -491,7 +493,7 @@ let
 
         assert_equals 0 "$status" "the check's exit status"
         assert_files_equal /dev/null stdout
-        assert_equals "Error response from daemon: No such container: imp-host" "$(cat stderr)" "the check's stderr"
+        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat stderr)" "the check's stderr"
         assert_equals none "$(cut -d' ' -f1 state/imp-lag)" "the imp the lag state names"
         assert_missing state/system-lag "the system's lag state"
       '';

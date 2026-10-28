@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildHostImpArgv } from '../imp-cli.ts';
 import { runProcess } from '../run-process.ts';
-import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
+import { createStubImpPodman } from '../test-utils/create-stub-imp-podman.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'mint-atc-imp-token-'));
@@ -27,7 +27,7 @@ async function setupTest() {
 test('it mints atc-cloud straight into a root-only imp-token in one rename', async () => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(ctx.bin, {
+  await createStubImpPodman(ctx.bin, {
     stdout: 'imp_fixture_minted_token\n',
     stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
@@ -54,7 +54,7 @@ test('it mints atc-cloud straight into a root-only imp-token in one rename', asy
 test('it runs impz token new once with atc-cloud’s limits, and passes imp’s notice through', async () => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(ctx.bin, {
+  await createStubImpPodman(ctx.bin, {
     stdout: 'imp_fixture_minted_token\n',
     stderr: 'impz: token atc-cloud made; impd shows its secret only this once\n',
     exitCode: 0,
@@ -65,7 +65,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
     env: ctx.env,
   });
 
-  const calls = await readFile(join(ctx.bin, 'docker-calls'), 'utf8');
+  const calls = await readFile(join(ctx.bin, 'podman-calls'), 'utf8');
 
   expect(result.stdout.toString()).toBe('');
 
@@ -74,7 +74,7 @@ test('it runs impz token new once with atc-cloud’s limits, and passes imp’s 
   );
 
   expect(calls).toBe(
-    '["docker","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect"]\n',
+    '["podman","exec","imp-host","impz","token","new","atc-cloud","--scope","manage","--imps","harness-*","--grantable","glm,claude-setup-token,github-imp-agents,linear-imp-agents,op-connect"]\n',
   );
 });
 
@@ -84,7 +84,7 @@ test.each([
 ])('it saves no token when %s', async (_label: string, stdout: string, exitCode: number) => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(ctx.bin, { stdout, stderr: '', exitCode });
+  await createStubImpPodman(ctx.bin, { stdout, stderr: '', exitCode });
 
   const result = await runProcess(['bash', '-s', '--', ctx.secrets, ...buildHostImpArgv([])], {
     stdin: ctx.script,

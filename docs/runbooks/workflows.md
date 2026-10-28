@@ -209,7 +209,8 @@ To switch before the nightly run covers the commit:
 
 ## Upgrade imp
 
-imp is pinned in three places, and `scripts/pin-imp.sh` moves all three together:
+imp is pinned in three places, and the imp release pin moves all three together, in a bump pull
+request or [by hand](./release-check.md#pin-a-release-by-hand):
 
 | Pin                  | File                                                                                                                   |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -236,13 +237,16 @@ body lists them:
    [The restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy back.
 
 3. [Switch the host](#switch-the-host). The switch restarts impd.
-4. Check: `ssh root@geoffcloud docker exec imp-host impz info` shows the new version,
+4. Check: `ssh root@geoffcloud podman exec imp-host impz info` shows the new version,
    `https://imps.geoff.cloud/health` answers 200 from the tailnet, and the `imp` dashboard in
    Grafana shows impd's logs.
 5. Rebuild the agent image on the new imp-base, as [the agent image runbook](./agent-image.md)
    describes.
 
 A merged bump that waits a day for the switch fires the `HostBehindLatestBuild` alert.
+
+The move from imp 5.0.0 on Docker to imp 6.0.0 on Podman takes more steps, which
+[the Podman switch runbook](./imp-podman-switch.md) lists.
 
 impd's database lives in `tank/imp`, which has a legacy mountpoint inside imp-host. The host's
 `/var/lib/imp` is empty.

@@ -14,13 +14,13 @@ export function buildHostImpArgv(
   args: readonly string[],
   options: { readonly stdin?: boolean; readonly env?: readonly string[] } = {},
 ): readonly string[] {
-  // docker passes stdin on only with -i, and a host script's text can sit on that stdin
+  // podman passes stdin on only with -i, and a host script's text can sit on that stdin
   const input = options.stdin === true ? ['-i'] : [];
 
-  // each env name passes docker's own value through, so a secret never enters the argv
+  // each env name passes podman's own value through, so a secret never enters the argv
   const env = (options.env ?? []).flatMap((name) => ['-e', name]);
 
-  return ['docker', 'exec', ...input, ...env, 'imp-host', impCLI, ...args];
+  return ['podman', 'exec', ...input, ...env, 'imp-host', impCLI, ...args];
 }
 
 export function formatImpCommand(args: readonly string[]): string {

@@ -53,13 +53,13 @@ let
               flushRuleset = false;
             };
             networking.firewall.allowedUDPPorts = [ 41641 ];
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 18081 ];
             networking.cloudHost.admissions = [
               {
                 port = 18081;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "podman0";
+                sourceCIDR = "10.88.0.0/16";
+                destinationAddress = "10.88.0.1";
               }
             ];
           };
@@ -86,7 +86,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
               {
@@ -449,7 +449,7 @@ let
               flushRuleset = false;
             };
             networking.firewall.trustedInterfaces = [ "cni0" ];
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 18081 ];
             networking.cloudHost.admissions = [
               {
                 port = 8415;
@@ -464,7 +464,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "tcp 18081 is open on docker0 with no host-scope registry entry for docker0"
+                "tcp 18081 is open on podman0 with no host-scope registry entry for podman0"
                 "inet cloud_host admits tcp 8415 on cni0 with no host-scope registry entry that marks the admission"
               ]
             )
@@ -493,14 +493,14 @@ let
       script =
         let
           system = buildModuleSystem firewallModules {
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 18081 ];
           };
         in
         ''
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's relay entry marks an admission, but inet cloud_host admits no tcp 18081 on docker0"
+                "the registry's relay entry marks an admission, but inet cloud_host admits no tcp 18081 on podman0"
                 "the registry's atc-daemon entry is host scope on cni0, but nothing opens or admits tcp 8415 there"
                 "the registry's atc-daemon entry marks an admission, but inet cloud_host admits no tcp 8415 on cni0"
               ]
@@ -519,7 +519,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
               {
@@ -581,9 +581,9 @@ let
             networking.cloudHost.admissions = [
               {
                 port = 18081;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "podman0";
+                sourceCIDR = "10.88.0.0/16";
+                destinationAddress = "10.88.0.1";
               }
             ];
           };
@@ -592,7 +592,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's relay entry is host scope on docker0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: docker0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
+                "the registry's relay entry is host scope on podman0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: podman0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
               ]
             )
           } ${
@@ -609,7 +609,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
             ]
@@ -626,7 +626,7 @@ let
               flushRuleset = false;
             };
             networking.firewall.trustedInterfaces = [ "cni0" ];
-            networking.firewall.interfaces.docker0.allowedTCPPortRanges = [
+            networking.firewall.interfaces.podman0.allowedTCPPortRanges = [
               {
                 from = 18000;
                 to = 18099;
@@ -641,9 +641,9 @@ let
               }
               {
                 port = 18081;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "podman0";
+                sourceCIDR = "10.88.0.0/16";
+                destinationAddress = "10.88.0.1";
               }
             ];
           };
@@ -652,7 +652,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "tcp 18000-18099 is open on docker0 as a range, which no registry entry can match"
+                "tcp 18000-18099 is open on podman0 as a range, which no registry entry can match"
               ]
             )
           } ${
@@ -678,7 +678,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
             ]
@@ -695,7 +695,7 @@ let
               flushRuleset = false;
             };
             networking.firewall.trustedInterfaces = [ "cni0" ];
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 8415 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 8415 ];
             networking.cloudHost.admissions = [
               {
                 port = 8415;
@@ -710,7 +710,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's docker-daemon entry is host scope on docker0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
+                "the registry's podman-daemon entry is host scope on podman0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
               ]
             )
           } ${
@@ -731,12 +731,12 @@ let
                 admission = true;
               }
               {
-                name = "docker-daemon";
+                name = "podman-daemon";
                 kind = "host-port";
                 protocol = "tcp";
                 port = 8415;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
               }
             ]
           } "mismatches"
@@ -1156,7 +1156,7 @@ let
                 to = 61000;
               }
             ];
-            networking.firewall.interfaces.docker0.allowedTCPPortRanges = [
+            networking.firewall.interfaces.podman0.allowedTCPPortRanges = [
               {
                 from = 8000;
                 to = 8010;
@@ -1170,7 +1170,7 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "udp 60000-61000 is open on every interface as a range, which no registry entry can match"
-                "tcp 8000-8010 is open on docker0 as a range, which no registry entry can match"
+                "tcp 8000-8010 is open on podman0 as a range, which no registry entry can match"
                 "networking.firewall.extraInputRules is set, and the exposure check cannot read it: open the port through allowedTCPPorts or allowedUDPPorts instead"
               ]
             )

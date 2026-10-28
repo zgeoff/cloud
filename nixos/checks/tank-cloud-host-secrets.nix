@@ -57,7 +57,7 @@ pkgs.testers.runNixOSTest {
       networking.hostId = "5ca71846";
       # the VM reaches nothing, and dhcpcd crashing at times would fail a unit at boot
       networking.useDHCP = false;
-      # imp-host's docker run passes --device /dev/kvm
+      # imp-host's podman run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"
         "kvm-intel"
@@ -264,12 +264,12 @@ pkgs.testers.runNixOSTest {
 
 
     with subtest("it takes an impd database copy onto tank/cloud"):
-        machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
+        machine.succeed("podman exec imp-host mkdir -p /var/lib/imp/db")
         machine.succeed(
             "sqlite3 /tmp/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);'"
             " \"INSERT INTO kysely_migration VALUES ('0001_init','t');\""
         )
-        machine.succeed("docker cp /tmp/imp.sqlite imp-host:/var/lib/imp/db/imp.sqlite")
+        machine.succeed("podman cp /tmp/imp.sqlite imp-host:/var/lib/imp/db/imp.sqlite")
         copied = machine.succeed("copy-impd-db-host fixture")
         copy_dir = copied.splitlines()[-1].split("copy: ")[1].split(" ")[0]
         source = machine.succeed(f"findmnt -n -o SOURCE -T {copy_dir}/imp.sqlite").strip()

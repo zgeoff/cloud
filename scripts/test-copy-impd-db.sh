@@ -3,7 +3,7 @@
 # on root@geoffcloud or the host IMPD_DB_HOST names, with nothing on ssh's stdin, and passes the
 # host's report and exit code through. It touches no host: ssh is a stand-in from
 # test-support/shell that logs its argv as a JSON line and its stdin, and answers as the host
-# does without running the host's tool, which needs root, Docker and the imp-host container;
+# does without running the host's tool, which needs root, Podman and the imp-host container;
 # nixos/checks/impd-restore.nix runs that tool in the restore VM. One case hands ssh to the
 # real ssh, refused by a dead loopback port. Each case runs the script under `env -i` with
 # only the variables it sets and compares its whole stdout, stderr, call log and the stdin it
@@ -100,7 +100,7 @@ OUT
   assert_status 1 "$status"
 }
 
-it_exits_1_with_dockers_error_when_imp_host_is_not_running() {
+it_exits_125_with_podmans_error_when_imp_host_is_not_running() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -111,10 +111,10 @@ it_exits_1_with_dockers_error_when_imp_host_is_not_running() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error response from daemon: No such container: imp-host'
+  diff - "$tree/err" <<< 'Error: no container with name or ID "imp-host" found: no such container'
   diff "$tree/calls-expected" "$tree/calls"
   diff /dev/null "$tree/stdin"
-  assert_status 1 "$status"
+  assert_status 125 "$status"
 }
 
 it_fails_with_ssh_exit_255_when_the_host_refuses_the_connection() {
