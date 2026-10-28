@@ -99,11 +99,74 @@ Check each of these before you start:
    ssh root@geoffcloud 'systemctl is-active preview-image.service preview.service' < /dev/null
    ```
 
-   Expect `200` from 1Password Connect through the relay, then `active` twice. Then run the
-   post-switch checks that the bump's pull request lists, a preview boot and a cloud spawn and adopt
-   among them.
+   Expect `200` from 1Password Connect through the relay, then `active` twice. Then run each check
+   in [Check after the switch](#check-after-the-switch).
 
 9. Move nothing else by hand. The switch script moves `deployed/host` once its checks pass.
+
+## Check after the switch
+
+Each check runs a part of cloud that reaches imp-host through Podman, and none of them changes an
+imp that existed before the switch. Run them in order from a repo checkout on a tailnet device that
+reaches `root@geoffcloud` over SSH. A failure in any of them is a reason to
+[roll back](#roll-back-to-imp-500).
+
+1. Check that nixie reports every part ready:
+
+   ```bash
+   bash scripts/check-nixie-ready.sh root@geoffcloud
+   ```
+
+   Expect a line that starts `== nixie ready:` and exit 0.
+
+2. Boot a preview, as [Check a preview live](./preview.md#check-a-preview-live) describes in its
+   first two steps. Expect the app with its invented data. A preview that boots but answers no model
+   call means the rebind of `preview-model-counted` did not take.
+
+3. Spawn a session on the `geoffcloud` target and adopt it, as
+   [Run the smoke](./atc-gateway-smoke.md#run-the-smoke) describes. Expect `smoke-ok` in the
+   transcript and the smoke imp gone after the forget. A spawn that cannot read `op-connect` means
+   its grant from [Rebind the upstream secrets](#rebind-the-upstream-secrets) is missing.
+
+4. Take a copy of impd's database under imp 6.0.1, and check that the restore tool is on the host:
+
+   ```bash
+   bash scripts/copy-impd-db.sh imp-6.0.1-post-switch
+   ssh root@geoffcloud restore-impd-db < /dev/null
+   ```
+
+   Expect `COPY-INFO` with `integrity ok`, `impVersion 6.0.1` and an `image` line for
+   `imp-host:6.0.1`, then an error that ends
+   `usage: restore-impd-db /root/imp-db-backups/<copy> <generation>`. Do not run a restore: it is
+   one-way and needs the owner's approval. The restore rehearsal in `NixOS checks` restores a copy
+   into imp 6.0.1 under Podman.
+
+5. Check the atc daemon's impd token through the credential installer, from a machine where `op`
+   reads the `cloud` vault:
+
+   ```bash
+   bun scripts/install-atc-gateway-credentials.ts
+   ```
+
+   Expect the line
+   `skip: both exist, atc-cloud has the expected limits, and the file authenticates as it` under
+   `== 3/3`. That path runs `check-atc-imp-token.sh` through `podman exec`. The installer runs
+   `mint-atc-imp-token.sh` only when both the `atc-cloud` token and its host file are gone, as
+   [Lost disk](./lost-disk.md) describes, so do not remove them to test the mint.
+
+6. Check the Connect relay from a granted imp, as
+   [Check from a granted imp](./onepassword-connect.md#check-from-a-granted-imp) describes. Expect
+   the field's value. Step 8 of the switch has checked the relay itself from imp-host.
+
+7. Run the agent image build and read its result:
+
+   ```bash
+   ssh root@geoffcloud 'systemctl start agent-image-build.service; journalctl -u agent-image-build --since -30min | grep agent-image-build:' < /dev/null
+   ```
+
+   Expect `agent-image-build: agent-<short sha> <digest> check passed`, or
+   `agent-image-build: impd holds <image>, built from <sha>; nothing to build` when impd holds the
+   newest build. The unit asks impd through `podman exec` on both paths.
 
 ## Roll back to imp 5.0.0
 
