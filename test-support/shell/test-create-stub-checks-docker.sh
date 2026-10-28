@@ -214,6 +214,49 @@ EOF
   assert_status 0 "$status"
 }
 
+it_refuses_a_copy_to_the_cache_of_a_path_whose_reference_the_cache_lacks() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir "$tree/cache"
+  cat > "$tree/path-info" << 'EOF'
+{"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern":{"references":["/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-wick","/nix/store/cccccccccccccccccccccccccccccccc-flint"]}}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_PATH_INFO="$tree/path-info" \
+    docker run --rm -i -v "$tree/cache:/cache" "$NIX_IMAGE" nix copy --no-recursive --stdin \
+    --to 'file:///cache?compression=zstd' > "$tree/out" 2> "$tree/err" << 'EOF' || status=$?
+/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern
+/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-wick
+EOF
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< "error: cannot add '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern' to the binary cache because the reference '/nix/store/cccccccccccccccccccccccccccccccc-flint' is not valid"
+  ls -A "$tree/cache" > "$tree/cache-files"
+  diff /dev/null "$tree/cache-files"
+  assert_status 1 "$status"
+}
+
+it_copies_a_path_whose_reference_has_a_narinfo_in_the_cache() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir "$tree/cache"
+  printf 'StorePath: /nix/store/cccccccccccccccccccccccccccccccc-flint\n' > "$tree/cache/cccccccccccccccccccccccccccccccc.narinfo"
+  cat > "$tree/path-info" << 'EOF'
+{"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern":{"references":["/nix/store/cccccccccccccccccccccccccccccccc-flint"]}}
+EOF
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" STUB_PATH_INFO="$tree/path-info" \
+    docker run --rm -i -v "$tree/cache:/cache" "$NIX_IMAGE" nix copy --no-recursive --stdin \
+    --to 'file:///cache?compression=zstd' > "$tree/out" 2> "$tree/err" <<< '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern' || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/cache/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.narinfo" <<< 'StorePath: /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern'
+  assert_status 0 "$status"
+}
+
 setup_test() {
   local tree="$1"
   mkdir -p "$tree/bin" "$tree/home" "$tree/tmp"

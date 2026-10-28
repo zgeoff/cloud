@@ -20,7 +20,9 @@
 # - a `run … copy --no-recursive --stdin --to file:///cache?compression=zstd`: writes to the folder
 #   mounted at /cache (its `<dir>:/cache` argument) the nix-cache-info a binary cache opens with,
 #   and for each store path on stdin a `<hash>.narinfo` that names it, in place of the real
-#   narinfo and its compressed NAR;
+#   narinfo and its compressed NAR. As nix 2.35.2 does, it first refuses, with nix's error and
+#   exit 1, a path with a reference, in the references STUB_PATH_INFO lists for it, that is
+#   neither on stdin nor has a `<hash>.narinfo` in the folder;
 # - any other call ends with exit 97 and "unexpected: <argv>" on stderr.
 #
 # Nix documents no exit-code table for these commands, so the exit 1 was checked on
@@ -29,7 +31,9 @@
 # scripts/nix-image.sh), in a container without network. A failed `nix eval --raw`, a `nix
 # build` whose builder exits 1 and a `nix copy --to ssh://` to a refused port each
 # exited 1. On 2026-10-15 the same image's `nix path-info --derivation` exited 1 for a check
-# that fails to evaluate. A later image could change the exit, and nix's manual gives 100-and-up codes for
+# that fails to evaluate. On 2026-10-28 its `nix copy --no-recursive` to a file cache exited 1 for
+# a path whose reference the cache lacked, and copied the path once a narinfo for the reference
+# was in the cache. A later image could change the exit, and nix's manual gives 100-and-up codes for
 # some build failures under `nix-store --realise`, which this check did not reach.
 create_stub_checks_docker() {
   local bin="$1"
@@ -72,8 +76,22 @@ case "$*" in
     for arg in "$@"; do
       case "$arg" in *":/cache") cache="${arg%:/cache}" ;; esac
     done
+    mapfile -t paths
+    for path in "${paths[@]}"; do
+      references=()
+      if [ -n "${STUB_PATH_INFO:-}" ]; then
+        mapfile -t references < <(jq -r --arg path "$path" '.[$path].references // [] | .[]' "$STUB_PATH_INFO")
+      fi
+      for reference in "${references[@]}"; do
+        name="${reference#/nix/store/}"
+        if ! printf '%s\n' "${paths[@]}" | grep -qxF "$reference" && [ ! -f "$cache/${name%%-*}.narinfo" ]; then
+          echo "error: cannot add '$path' to the binary cache because the reference '$reference' is not valid" >&2
+          exit 1
+        fi
+      done
+    done
     printf 'StoreDir: /nix/store\n' > "$cache/nix-cache-info"
-    while read -r path; do
+    for path in "${paths[@]}"; do
       name="${path#/nix/store/}"
       printf 'StorePath: %s\n' "$path" > "$cache/${name%%-*}.narinfo"
     done

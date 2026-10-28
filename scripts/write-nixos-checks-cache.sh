@@ -28,7 +28,8 @@ nix_args=(--extra-experimental-features nix-command)
 
 outputs="$(mktemp)"
 info="$(mktemp)"
-trap 'rm -f "$outputs" "$info"' EXIT
+stand_ins="$(mktemp)"
+trap 'rm -f "$outputs" "$info" "$stand_ins"' EXIT
 
 mapfile -t drvs < "$derivations"
 docker run --rm -v "$volume":/nix "$NIX_IMAGE" nix-store -qR --include-outputs "${drvs[@]}" |
@@ -47,8 +48,22 @@ if [ -f "$restored/paths" ] && cmp -s "$restored/paths" "$dir/paths"; then
   echo "The cache holds the paths this build needed, so it was not saved again."
   exit 0
 fi
+# A binary cache refuses a path whose references it lacks, so each signed reference gets a narinfo
+# for the copy and loses it after: the next run's nix substitutes those from cache.nixos.org.
+jq -r --rawfile copied "$dir/paths" '
+  (if type == "array" then map({key: .path, value: .}) else to_entries end | from_entries) as $all
+  | ($copied | split("\n") | map(select(. != "") | {key: ., value: true}) | from_entries) as $set
+  | [$set | keys[] | $all[.].references // [] | .[] | select($set[.] | not)] | unique[]
+  | select($all[.]) | . as $path | $all[$path]
+  | ($path | ltrimstr("/nix/store/") | .[0:32]) + "\t"
+    + ("StorePath: \($path)\nURL: nar/none\nCompression: none\nNarHash: \(.narHash)\nNarSize: \(.narSize)\nReferences: \(.references // [] | map(ltrimstr("/nix/store/")) | join(" "))\n" | @base64)' \
+  "$info" > "$stand_ins"
+while IFS=$'\t' read -r hash text; do
+  base64 -d <<< "$text" > "$dir/$hash.narinfo"
+done < "$stand_ins"
 docker run --rm -i -v "$volume":/nix -v "$(realpath "$dir")":/cache "$NIX_IMAGE" \
   nix "${nix_args[@]}" copy --no-recursive --stdin --to 'file:///cache?compression=zstd' < "$dir/paths"
+cut -f1 "$stand_ins" | while read -r hash; do rm "$dir/$hash.narinfo"; done
 
 size_mb="$(du -sm "$dir" | cut -f1)"
 if [ "$size_mb" -gt "$max_mb" ]; then
