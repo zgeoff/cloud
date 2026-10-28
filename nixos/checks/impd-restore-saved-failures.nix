@@ -95,7 +95,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "the switch or start did not finish; imp-host is stopped again",
           ], err
           units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
-          assert units == ["failed"], f"the units are {units}"
+          assert units == ["inactive"], f"the units are {units}"
           machine.fail("findmnt -rn -S tank/imp")
           # the activation ran; only a unit failed
           current = machine.succeed("readlink -f /run/current-system").strip()

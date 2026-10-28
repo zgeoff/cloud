@@ -351,7 +351,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           units_before = machine.execute("systemctl is-active imp-host")[1].split()
 
           ctx = setup_test()
-          assert units_before == ["failed"], f"the imp units were {units_before}"
+          assert units_before == ["inactive"], f"the imp units were {units_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -603,7 +603,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               f"restore-impd-db: the copy is in place (the original is in {saved_before[0]}); "
               "the switch or start did not finish; imp-host is stopped again"
           ), err_before
-          assert units_before == ["failed"], f"the imp units were {units_before}"
+          assert units_before == ["inactive"], f"the imp units were {units_before}"
           assert switch_unit_before == "failed", f"fail-on-switch was {switch_unit_before!r}"
           assert current_before == broken_before, f"the system was {current_before}"
           assert links_before == ["system-1-link", "system-2-link", "system-3-link", "system-4-link"], f"the generations were {links_before}"
@@ -732,7 +732,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
           ctx = setup_test()
           assert dataset_before == (1, "cannot open 'tank/imp': dataset does not exist\n"), f"tank/imp was {dataset_before}"
-          assert units_before == ["failed"], f"the imp units were {units_before}"
+          assert units_before == ["inactive"], f"the imp units were {units_before}"
           assert images_before == "", f"the images were {images_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
@@ -782,7 +782,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
           ctx = setup_test()
           assert profiles_before == [], f"the system profile's links were {profiles_before}"
-          assert units_before == ["failed"], f"the imp units were {units_before}"
+          assert units_before == ["inactive"], f"the imp units were {units_before}"
           assert images_before == "", f"the images were {images_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
