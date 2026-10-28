@@ -15,5 +15,15 @@
       "automerge": false,
       "groupName": null
     }
+  ],
+  "customManagers": [
+    {
+      "description": "The provider declares the generated SDK's @types/node in provider/internal/onidel/provider.go, and scripts/check-sdk.sh fails a bump of sdk/onidel/package.json that the provider does not match, so this manager bumps both in one PR",
+      "customType": "regex",
+      "managerFilePatterns": ["/^provider/internal/onidel/provider\\.go$/"],
+      "matchStrings": ["\"(?<depName>@types/node)\":\\s*\"(?<currentValue>[^\"]+)\""],
+      "datasourceTemplate": "npm",
+      "versioningTemplate": "npm"
+    }
   ]
 }
