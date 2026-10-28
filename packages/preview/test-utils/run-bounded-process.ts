@@ -13,6 +13,7 @@ interface BoundedSpawnOptions {
 export interface BoundedProcessDeps {
   readonly spawn: (argv: readonly string[], options: BoundedSpawnOptions) => BoundedChild;
   readonly killGroup: (pid: number) => void;
+  readonly readGroup: (pid: number) => Promise<string>;
   readonly sleep: (durationMs: number) => Promise<void>;
   readonly now: () => number;
 }
@@ -56,17 +57,19 @@ export async function runBoundedProcess(
   if (outcome === null) {
     const elapsedMs = Math.round(deps.now() - startedAt);
 
-    // collected before the kill, which settles every part
+    // read before the kill, which ends the group and settles every part
     const pending = Object.entries({ exit, stdout, stderr })
       .filter(([, tracked]) => !tracked.isSettled())
       .map(([part]) => part);
+
+    const group = await deps.readGroup(child.pid);
 
     deps.killGroup(child.pid);
 
     await finished;
 
     throw new Error(
-      `${options.name} did not finish within ${String(options.timeoutMs)} ms (stopped after ${String(elapsedMs)} ms, waiting on ${pending.join(', ')}); stdout: ${stdout.read()}; stderr: ${stderr.read()}`,
+      `${options.name} did not finish within ${String(options.timeoutMs)} ms (stopped after ${String(elapsedMs)} ms, waiting on ${pending.join(', ')}); stdout: ${stdout.read()}; stderr: ${stderr.read()}; process group:\n${group}`,
     );
   }
 

@@ -18,6 +18,7 @@ async function setupTest() {
 
   const deps: BoundedProcessDeps = {
     ...processDeps,
+    readGroup: () => Promise.resolve('4242 4242 1 S do_wait sh -c stalled\n'),
     sleep: () => deadline.promise,
     now: () => clock.now,
   };
@@ -70,7 +71,7 @@ test('it names the step, its elapsed time, the parts it waits on and its output 
 
   expect(running).rejects.toThrowWithMessage(
     Error,
-    'the stalled step did not finish within 2000 ms (stopped after 2000 ms, waiting on exit, stdout, stderr); stdout: partial\n; stderr: stuck\n',
+    'the stalled step did not finish within 2000 ms (stopped after 2000 ms, waiting on exit, stdout, stderr); stdout: partial\n; stderr: stuck\n; process group:\n4242 4242 1 S do_wait sh -c stalled\n',
   );
 });
 
@@ -98,7 +99,7 @@ test('it stops at its bound, waiting on the pipes alone, when a grandchild keeps
 
   expect(running).rejects.toThrowWithMessage(
     Error,
-    'the step with a straggler did not finish within 2000 ms (stopped after 0 ms, waiting on stdout, stderr); stdout: ; stderr: ',
+    'the step with a straggler did not finish within 2000 ms (stopped after 0 ms, waiting on stdout, stderr); stdout: ; stderr: ; process group:\n4242 4242 1 S do_wait sh -c stalled\n',
   );
 });
 

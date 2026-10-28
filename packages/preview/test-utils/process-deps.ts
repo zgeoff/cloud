@@ -15,6 +15,15 @@ export const processDeps: BoundedProcessDeps = {
   killGroup: (pid) => {
     process.kill(-pid, 'SIGKILL');
   },
+  readGroup: async (pid) => {
+    const listing = await Bun.$`ps -e -o pid=,pgid=,ppid=,stat=,wchan:32=,args=`.quiet().text();
+
+    return listing
+      .split('\n')
+      .filter((line) => line.trim().split(/\s+/u)[1] === String(pid))
+      .map((line) => `${line.trim()}\n`)
+      .join('');
+  },
   sleep: (durationMs) => Bun.sleep(durationMs),
   now: () => performance.now(),
 };
