@@ -51,14 +51,19 @@ test('it runs the process in the given directory with the given environment', as
   expect(result).toStrictEqual({ exitCode: 0, stdout: '/\nhi\n', stderr: '' });
 });
 
-test('it names the step, its elapsed time and its stderr when the process outlives its bound', async () => {
+test('it names the step, its elapsed time, the parts it waits on and its output when the process outlives its bound', async () => {
   const ctx = await setupTest();
 
   const ready = join(ctx.directory, 'ready');
 
-  const running = runBoundedProcess(ctx.deps, {
+  const deps: BoundedProcessDeps = {
+    ...ctx.deps,
+    readGroup: () => Promise.resolve('4242 4242 1 S do_wait sh -c stalled\n'),
+  };
+
+  const running = runBoundedProcess(deps, {
     name: 'the stalled step',
-    argv: ['sh', '-c', `echo stuck >&2; touch ${ready}; exec sleep 5`],
+    argv: ['sh', '-c', `echo partial; echo stuck >&2; touch ${ready}; exec sleep 5`],
     timeoutMs: 2000,
   });
 
@@ -70,29 +75,117 @@ test('it names the step, its elapsed time and its stderr when the process outliv
 
   expect(running).rejects.toThrowWithMessage(
     Error,
-    'the stalled step did not finish within 2000 ms (stopped after 2000 ms); stderr: stuck\n',
+    'the stalled step did not finish within 2000 ms (stopped after 2000 ms, waiting on exit, stdout, stderr); stdout: partial\n; stderr: stuck\n; process group:\n4242 4242 1 S do_wait sh -c stalled\n',
   );
 });
 
-test('it stops at its bound when a grandchild keeps the pipes open after the process ends', async () => {
+test('it stops at its bound, waiting on the pipes alone, when a grandchild keeps them open after the process ends', async () => {
   const ctx = await setupTest();
 
-  const ready = join(ctx.directory, 'ready');
+  const pidFile = join(ctx.directory, 'child.pid');
 
-  const running = runBoundedProcess(ctx.deps, {
+  const deps: BoundedProcessDeps = {
+    ...ctx.deps,
+    readGroup: () => Promise.resolve('4243 4242 1 S hrtimer_nanosleep sleep 5\n'),
+  };
+
+  const running = runBoundedProcess(deps, {
     name: 'the step with a straggler',
-    argv: ['sh', '-c', `sleep 5 & touch ${ready}; exit 0`],
+    argv: ['sh', '-c', `sleep 5 & echo $$ > ${pidFile}.tmp; mv ${pidFile}.tmp ${pidFile}; exit 0`],
     timeoutMs: 2000,
   });
 
-  await waitForCondition(() => existsSync(ready));
+  await waitForCondition(() => existsSync(pidFile));
+
+  const pidText = await Bun.file(pidFile).text();
+
+  const childPID = Number(pidText.trim());
+
+  // Bun reaps the child, and settles its exit, before its process entry goes
+  await waitForCondition(() => !existsSync(`/proc/${String(childPID)}`), { timeoutMs: 1000 });
 
   ctx.deadline.resolve();
 
   expect(running).rejects.toThrowWithMessage(
     Error,
-    'the step with a straggler did not finish within 2000 ms (stopped after 0 ms); stderr: ',
+    'the step with a straggler did not finish within 2000 ms (stopped after 0 ms, waiting on stdout, stderr); stdout: ; stderr: ; process group:\n4243 4242 1 S hrtimer_nanosleep sleep 5\n',
   );
+});
+
+test('it kills the process and names the failure when the process listing fails', async () => {
+  const ctx = await setupTest();
+
+  const pidFile = join(ctx.directory, 'child.pid');
+
+  const deps: BoundedProcessDeps = {
+    ...ctx.deps,
+    readGroup: () => Promise.reject(new Error('ps exited with code 1')),
+  };
+
+  const running = runBoundedProcess(deps, {
+    name: 'the stalled step',
+    argv: ['sh', '-c', `echo $$ > ${pidFile}.tmp; mv ${pidFile}.tmp ${pidFile}; exec sleep 5`],
+    timeoutMs: 2000,
+  });
+
+  await waitForCondition(() => existsSync(pidFile));
+
+  const pidText = await Bun.file(pidFile).text();
+
+  const childPID = Number(pidText.trim());
+
+  ctx.deadline.resolve();
+
+  const failure = await running.then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+
+  expect(String(failure)).toEndWith(
+    'process group:\n(the listing failed: ps exited with code 1)\n',
+  );
+
+  expect(existsSync(`/proc/${String(childPID)}`)).toBeFalse();
+});
+
+test('it kills the process and names the hang when the process listing never finishes', async () => {
+  const ctx = await setupTest();
+
+  const pidFile = join(ctx.directory, 'child.pid');
+
+  const deps: BoundedProcessDeps = {
+    ...ctx.deps,
+    readGroup: () => Promise.withResolvers<string>().promise,
+  };
+
+  const running = runBoundedProcess(deps, {
+    name: 'the stalled step',
+    argv: ['sh', '-c', `echo $$ > ${pidFile}.tmp; mv ${pidFile}.tmp ${pidFile}; exec sleep 5`],
+    timeoutMs: 2000,
+  });
+
+  await waitForCondition(() => existsSync(pidFile));
+
+  const pidText = await Bun.file(pidFile).text();
+
+  const childPID = Number(pidText.trim());
+
+  ctx.deadline.resolve();
+
+  const failure = await running.then(
+    () => null,
+    (error: unknown) => error,
+  );
+
+  expect(failure).toBeInstanceOf(Error);
+
+  expect(String(failure)).toEndWith(
+    'process group:\n(the listing did not finish within 1000 ms)\n',
+  );
+
+  expect(existsSync(`/proc/${String(childPID)}`)).toBeFalse();
 });
 
 test('it waits for the killed process to exit before it rejects', async () => {

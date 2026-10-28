@@ -12,8 +12,9 @@
   },
   "devDependencies": {
     "@faker-js/faker": "10.6.0",
+    "@mswjs/interceptors": "0.45.9",
     "@types/bun": "1.4.3",
     "@zgeoff/bun-test-extended": "0.2.1",
-    "msw": "2.15.0"
+    "msw": "3.0.3"
   }
 }

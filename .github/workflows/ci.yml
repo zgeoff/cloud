@@ -144,6 +144,11 @@ jobs:
       - name: Test Health Check
         run: bun run test:health-check
 
+      # the Docker CLI's first run reads the Compose plugin's binary from the runner's cold disk,
+      # which has outlasted the preview suite's bound on its compose call; this run reads it first
+      - name: Load Docker Compose
+        run: bun run ci:load-docker-compose
+
       - name: Test Preview
         run: bun run test:preview
 

@@ -17,7 +17,6 @@ test('it accepts a complete topology as given', () => {
         cloud: 'tag:cloud',
         cloudDeploy: 'tag:cloud-deploy',
         imp: 'tag:imp',
-        impE2E: 'tag:imp-e2e',
       },
       nodes: {
         geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -58,7 +57,6 @@ test('it rejects a key that the schema does not name', () => {
         cloud: 'tag:cloud',
         cloudDeploy: 'tag:cloud-deploy',
         imp: 'tag:imp',
-        impE2E: 'tag:imp-e2e',
       },
       nodes: {
         geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -99,7 +97,6 @@ test('it rejects a port outside 1 to 65535', () => {
         cloud: 'tag:cloud',
         cloudDeploy: 'tag:cloud-deploy',
         imp: 'tag:imp',
-        impE2E: 'tag:imp-e2e',
       },
       nodes: {
         geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -140,7 +137,6 @@ test('it rejects a tag without the tag: prefix', () => {
         cloud: 'cloud',
         cloudDeploy: 'tag:cloud-deploy',
         imp: 'tag:imp',
-        impE2E: 'tag:imp-e2e',
       },
       nodes: {
         geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -181,7 +177,6 @@ test('it rejects a CIDR without its prefix length', () => {
         cloud: 'tag:cloud',
         cloudDeploy: 'tag:cloud-deploy',
         imp: 'tag:imp',
-        impE2E: 'tag:imp-e2e',
       },
       nodes: {
         geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },

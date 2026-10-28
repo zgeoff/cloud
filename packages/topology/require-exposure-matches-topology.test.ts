@@ -58,7 +58,6 @@ test('it accepts registry ports that equal their constants', () => {
             cloud: 'tag:cloud',
             cloudDeploy: 'tag:cloud-deploy',
             imp: 'tag:imp',
-            impE2E: 'tag:imp-e2e',
           },
           nodes: {
             geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -132,7 +131,6 @@ test('it names every registry port that differs from its constant, and a missing
             cloud: 'tag:cloud',
             cloudDeploy: 'tag:cloud-deploy',
             imp: 'tag:imp',
-            impE2E: 'tag:imp-e2e',
           },
           nodes: {
             geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },

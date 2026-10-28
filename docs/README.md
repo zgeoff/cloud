@@ -84,6 +84,7 @@ call, the path of a change, the topology and the data.
   auto-mode releases, when they merge on their own, and the app they run as.
 - [Previews](./runbooks/preview.md): set up the preview service, opt a repository in, check a
   preview live.
-- [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): the tailnet client for imp's end-to-end suites.
+- [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): where imp's end-to-end suites run, and how to
+  check that the production tailnet holds none of their nodes.
 
 Planned work and open choices live in Linear, not in this tree.
