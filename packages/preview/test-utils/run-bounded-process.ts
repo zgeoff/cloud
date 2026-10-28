@@ -1,4 +1,21 @@
-import { once } from 'node:events';
+export interface BoundedChild {
+  readonly pid: number;
+  readonly exited: Promise<number>;
+  readonly stdout: ReadableStream<Uint8Array>;
+  readonly stderr: ReadableStream<Uint8Array>;
+}
+
+export interface BoundedSpawnOptions {
+  readonly cwd?: string;
+  readonly env?: Record<string, string>;
+}
+
+export interface BoundedProcessDeps {
+  readonly spawn: (argv: readonly string[], options: BoundedSpawnOptions) => BoundedChild;
+  readonly killGroup: (pid: number) => void;
+  readonly sleep: (durationMs: number) => Promise<void>;
+  readonly now: () => number;
+}
 
 export interface BoundedProcessOptions {
   readonly name: string;
@@ -15,35 +32,32 @@ export interface BoundedProcessResult {
 }
 
 export async function runBoundedProcess(
+  deps: BoundedProcessDeps,
   options: BoundedProcessOptions,
 ): Promise<BoundedProcessResult> {
-  const signal = AbortSignal.timeout(options.timeoutMs);
-  const startedAt = performance.now();
+  const startedAt = deps.now();
 
-  const child = Bun.spawn([...options.argv], {
+  const child = deps.spawn(options.argv, {
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
     ...(options.env === undefined ? {} : { env: options.env }),
-    stdin: 'ignore',
-    stdout: 'pipe',
-    stderr: 'pipe',
-    detached: true,
   });
 
   const stdout = readStreamText(child.stdout);
   const stderr = readStreamText(child.stderr);
   const finished = Promise.all([child.exited, stdout.done, stderr.done]);
 
-  // a grandchild that outlives the child keeps the pipes open, so the bound covers the pipes too,
-  // and the kill reaches the child's whole process group
+  // a grandchild that outlives the child keeps the pipes open, so the bound covers the pipes too
   const outcome = await Promise.race([
     finished.then(([exitCode]) => ({ exitCode })),
-    once(signal, 'abort').then(() => null),
+    deps.sleep(options.timeoutMs).then(() => null),
   ]);
 
   if (outcome === null) {
-    process.kill(-child.pid, 'SIGKILL');
+    const elapsedMs = Math.round(deps.now() - startedAt);
 
-    const elapsedMs = Math.round(performance.now() - startedAt);
+    deps.killGroup(child.pid);
+
+    await finished;
 
     throw new Error(
       `${options.name} did not finish within ${String(options.timeoutMs)} ms (stopped after ${String(elapsedMs)} ms); stderr: ${stderr.read()}`,

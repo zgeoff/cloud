@@ -11,6 +11,7 @@ import { stubApp } from './mocks/github-app.ts';
 import { composeFiles } from './mocks/github-state.ts';
 import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { runPreviewBoot } from './run-preview-boot.ts';
+import { processDeps } from './test-utils/process-deps.ts';
 import { runBoundedProcess } from './test-utils/run-bounded-process.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
@@ -455,7 +456,7 @@ test("it writes the route into the stack's .env after the commit's own lines, so
     },
   );
 
-  const guest = await runBoundedProcess({
+  const guest = await runBoundedProcess(processDeps, {
     name: "the boot's guest script",
     argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
     env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
@@ -533,14 +534,14 @@ test.skipIf(Bun.which('docker') === null)(
       },
     );
 
-    await runBoundedProcess({
+    await runBoundedProcess(processDeps, {
       name: "the boot's guest script",
       argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
       env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
       timeoutMs: 2000,
     });
 
-    const composeConfig = await runBoundedProcess({
+    const composeConfig = await runBoundedProcess(processDeps, {
       name: 'docker compose config',
       argv: ['docker', 'compose', 'config', '--format', 'json'],
       cwd: join(checkout, 'preview'),
@@ -607,7 +608,7 @@ test("it leaves no route in the stack's .env once the previews run without count
     },
   );
 
-  const guest = await runBoundedProcess({
+  const guest = await runBoundedProcess(processDeps, {
     name: "the boot's guest script",
     argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
     env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
