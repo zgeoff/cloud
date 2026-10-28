@@ -111,6 +111,7 @@
     "@commitlint/cli": "21.2.4",
     "@faker-js/faker": "10.6.0",
     "@impz/client": "6.0.0",
+    "@mswjs/interceptors": "0.45.9",
     "@orpc/client": "1.15.7",
     "@stylistic/eslint-plugin": "5.10.0",
     "@tsconfig/strictest": "2.0.8",

@@ -1,11 +1,10 @@
 import { expect, test } from 'bun:test';
 import { buildImpdClient } from './build-impd-client.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 
 function setupTest() {
   const impd = startStubImpd();
-  const client = buildImpdClient(impd.url, impd.token, NativeWebSocket);
+  const client = buildImpdClient(impd.url, impd.token);
 
   return { impd, client };
 }

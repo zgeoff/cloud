@@ -11,7 +11,8 @@ server.events.on('request:unhandled', (event) => {
 
 // the only real traffic is loopback, through a test's own passthrough(); every other request
 // goes to a handler
-server.listen({ onUnhandledFrame: 'error' });
+server.configure({ onUnhandledFrame: 'error' });
+server.enable();
 
 afterEach(() => {
   server.resetHandlers();
@@ -24,5 +25,5 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  server.close();
+  server.disable();
 });
