@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { parseArgs } from 'node:util';
 import { findJSONField } from './find-json-field.ts';
 
 export interface CheckCIProfilesOptions {
@@ -23,13 +24,13 @@ const ownSteps = new Set([
 // CI's two profiles run the same checks: the steps of the parallel jobs, which run while the
 // repository is public, and the checks job's steps, which run every check once it is private.
 export async function checkCIProfiles(options: Readonly<CheckCIProfilesOptions>): Promise<number> {
-  if (options.args.length > 1) {
+  const root = parseRoot(options.args);
+
+  if (root === undefined) {
     options.printErr(usage);
 
     return 2;
   }
-
-  const root = options.args[0] ?? '.';
 
   const text = await options.readText(join(root, '.github', 'workflows', 'ci.yml'));
 
@@ -60,6 +61,26 @@ export async function checkCIProfiles(options: Readonly<CheckCIProfilesOptions>)
   options.printOut("check-ci-profiles: the private checks job runs every parallel job's steps\n");
 
   return 0;
+}
+
+function parseRoot(args: readonly string[]): string | undefined {
+  const positionals = tryParsePositionals(args);
+
+  if (positionals === null || positionals.length > 1) {
+    return undefined;
+  }
+
+  return positionals[0] ?? '.';
+}
+
+// util.parseArgs throws on an option it does not know, such as a misspelt flag
+function tryParsePositionals(args: readonly string[]): string[] | null {
+  try {
+    return parseArgs({ args: [...args], options: {}, allowPositionals: true, strict: true })
+      .positionals;
+  } catch {
+    return null;
+  }
 }
 
 function collectParallelSteps(jobs: unknown): string[] {

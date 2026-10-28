@@ -190,6 +190,23 @@ test('it rejects a repo with no CI workflow with the read error', async () => {
   ).rejects.toMatchObject({ code: 'ENOENT' });
 });
 
+test('it rejects an option it does not know with its usage', async () => {
+  const ctx = await setupTest();
+
+  const readText = mock<(path: string) => Promise<string>>();
+
+  const exitCode = await checkCIProfiles({
+    args: ['--unknown'],
+    readText,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(2);
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith('usage: check-ci-profiles.ts [repo root]\n');
+  expect(readText).not.toHaveBeenCalled();
+});
+
 test('it rejects more than one argument with its usage', async () => {
   const ctx = await setupTest();
 
