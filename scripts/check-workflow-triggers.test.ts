@@ -8,6 +8,8 @@ function setupTest() {
   const printErr = mock<(text: string) => void>();
 
   const nixosChecks = `on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
@@ -61,11 +63,11 @@ test('it accepts the repository own workflows', async () => {
   expect(ctx.printErr).not.toHaveBeenCalled();
 });
 
-test('it reports NixOS checks that a pull request starts and the schedule and a dispatch do not', async () => {
+test('it reports NixOS checks that neither a pull request, the schedule nor a dispatch starts', async () => {
   const ctx = setupTest();
 
   const files = new Map([
-    ['/repo/.github/workflows/nixos-checks.yml', "on:\n  pull_request:\n    paths: ['nixos/**']\n"],
+    ['/repo/.github/workflows/nixos-checks.yml', 'on:\n  push:\n    branches: [main]\n'],
     ['/repo/.github/workflows/release-bump-merge.yml', ctx.releaseBumpMerge],
   ]);
 
@@ -79,7 +81,7 @@ test('it reports NixOS checks that a pull request starts and the schedule and a 
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'nixos-checks.yml: a pull request that changes nixos/ starts a run\n' +
+    'nixos-checks.yml: a pull request that changes nixos/ starts no run\n' +
       'nixos-checks.yml: the nightly schedule starts no run\n' +
       'nixos-checks.yml: a dispatch starts no run\n',
   );

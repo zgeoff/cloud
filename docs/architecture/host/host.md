@@ -90,10 +90,13 @@ impd, so the script's failure paths run before it ever runs on the real host. Th
 
 The checks gate the host switch rather than the merge, because no merge changes the host: only the
 switch script does, and an operator runs it by hand. CI builds the checks on `main` every night and
-on a dispatch, never on a pull request, so an automatic bump merges without them. The switch script
-refuses a commit unless a green scheduled or dispatched run on `main` covers it: the run checked
-that commit, or an ancestor with no input of the checks changed since. A run skips the build when an
-earlier green run covers the commit, or when an earlier run built and passed the same derivations,
-because Nix builds a derivation to the same result wherever it runs. So a quiet night costs no VM
-boot, and a merge whose checks a pull request's run already built costs none either.
-[The switch runbook](../../runbooks/workflows.md#check-the-host-before-a-switch) gives the commands.
+on a dispatch, and on each pull request that changes an input of the checks, so a break shows before
+the merge; the merge never waits for that run. The switch script refuses a commit unless a green
+scheduled or dispatched run on `main` covers it: the run checked that commit, or an ancestor with no
+input of the checks changed since.
+
+A run skips the build when an earlier green run covers the commit, or when an earlier run built and
+passed the same derivations, because Nix builds a derivation to the same result wherever it runs. So
+a quiet night costs no VM boot, and a merge whose checks a pull request's run already built costs
+none either. [The switch runbook](../../runbooks/workflows.md#check-the-host-before-a-switch) gives
+the commands.

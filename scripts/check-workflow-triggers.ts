@@ -21,8 +21,8 @@ interface TriggerExpectation {
 const usage = 'usage: check-workflow-triggers.ts [repo root]\n';
 
 const expectations: readonly TriggerExpectation[] = [
-  // the switch gate reads only the scheduled and dispatched runs on main, so a pull request's run
-  // would bill for a result nothing reads
+  // a pull request that changes the checks' inputs learns of a break before it merges, a release
+  // bump's included; the switch gate still reads only main's runs
   {
     workflow: 'nixos-checks.yml',
     event: {
@@ -30,8 +30,8 @@ const expectations: readonly TriggerExpectation[] = [
       baseBranch: 'main',
       files: ['nixos/flake.nix', 'nixos/flake.lock', 'packages/topology/index.ts'],
     },
-    triggered: false,
-    violation: 'a pull request that changes nixos/ starts a run',
+    triggered: true,
+    violation: 'a pull request that changes nixos/ starts no run',
   },
   {
     workflow: 'nixos-checks.yml',

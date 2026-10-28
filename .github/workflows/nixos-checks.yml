@@ -6,18 +6,21 @@ name: NixOS checks
 # covers (scripts/find-nixos-check-run.sh). So the workflow runs:
 #
 # - nightly on main;
-# - on workflow_dispatch, on main before a switch or on a pull request's branch.
+# - on workflow_dispatch, on main before a switch or on a branch;
+# - on each push to a pull request that changes an input of the checks (the nixos gate of
+#   .github/gates.yml), so a break shows before the merge; the switch gate never reads that run.
 #
 # A run builds nothing, and passes, when a green run on main already covers the commit, which is
 # when no input of the checks (the nixos gate of .github/gates.yml) changed since that run's
 # commit, or when a run already built and passed the same derivations with the same build files
-# (scripts/decide-nixos-checks-build.sh). A dispatch with force always builds. No pull request runs
-# it, a bot's included, because the switch gate never reads a pull request's run.
+# (scripts/decide-nixos-checks-build.sh). A dispatch with force always builds.
 #
 # A build restores main's cache of the store paths that cache.nixos.org does not serve, and a
 # build on main saves a new one and removes the older ones (scripts/write-nixos-checks-cache.sh,
 # scripts/remove-stale-nixos-checks-caches.sh).
 on:
+  pull_request:
+    branches: [main]
   schedule:
     # 03:17 UTC: GitHub's docs say scheduled runs queue at the start of each hour, so off the hour
     - cron: '17 3 * * *'
@@ -34,8 +37,9 @@ permissions:
   actions: read
 
 # Runs on one commit of main queue, so a later run finds the earlier one's result and builds
-# nothing; main never cancels, since the switch gate reads every green run. A newer dispatch on a
-# branch cancels the branch's older run, whose head is no longer the one to merge.
+# nothing; main never cancels, since the switch gate reads every green run. A newer push or
+# dispatch on a branch or pull request cancels its older run, whose head is no longer the one to
+# merge.
 concurrency:
   group: nixos-checks-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -65,9 +69,20 @@ jobs:
         with:
           bun-version-file: .bun-version
 
+      # a pull request compares its base with the merge commit under test
+      - name: Decide whether the pull request changes the checks' inputs
+        id: gates
+        if: github.event_name == 'pull_request'
+        env:
+          EVENT: ${{ github.event_name }}
+          HEAD: ${{ github.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: bun run --silent ci:decide-ci-gates nixos
+
       # a gh failure fails the job rather than skipping the checks
       - name: Decide whether a green run covers the commit
         id: decide
+        if: github.event_name != 'pull_request' || steps.gates.outputs.nixos != 'false'
         env:
           FORCE: ${{ inputs.force }}
           GH_TOKEN: ${{ github.token }}
@@ -110,14 +125,10 @@ jobs:
         if: steps.build.outputs.needed == 'true'
         run: bun run --silent ci:open-kvm
 
-      # the derivations the listing step evaluated, so the flake is not evaluated twice; capped at a
-      # private repo's standard runner (2 CPUs, 8 GB, of which the runner itself
-      # takes about 1 GB), so the checks keep passing once the repo goes private
+      # the derivations the listing step evaluated, so the flake is not evaluated twice
       - name: NixOS checks
         if: steps.build.outputs.needed == 'true'
         env:
-          NIXOS_CHECKS_CPUS: '0-1'
-          NIXOS_CHECKS_MEMORY: 7g
           NIXOS_CHECKS_CACHE: ${{ runner.temp }}/nixos-checks-cache
           DERIVATIONS: ${{ runner.temp }}/nixos-check-derivations
         run: bun run test:nixos --from-derivations "$DERIVATIONS"
