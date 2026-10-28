@@ -108,10 +108,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               f"restored /root/imp-db-backups/pre-0.29-20261004T000000 (migration 0002_tokens) on generation 1; the replaced database is in {saved}",
           ], out
           # switch-to-configuration's progress; the mounts Podman made for imp-host (its network
-          # namespace, its root file system and its /dev/shm) carry generated ids, and how many it
+          # namespace, its storage, its root file system and its /dev/shm) carry generated ids, and how many it
           # made varies
           err_lines = err.splitlines()
-          assert re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", err_lines[5]), err
+          assert re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", err_lines[5]), err
           assert err_lines[:5] + err_lines[6:] == [
               "Checking switch inhibitors... done",
               "updating GRUB 2 menu...",
@@ -197,10 +197,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               f"restored /root/imp-db-backups/pre-0.29-20261004T000000 (migration 0002_tokens) on generation 1; the replaced database is in {saved}",
           ], out
           # switch-to-configuration's progress; the mounts Podman made for imp-host (its network
-          # namespace, its root file system and its /dev/shm) carry generated ids, and how many it
+          # namespace, its storage, its root file system and its /dev/shm) carry generated ids, and how many it
           # made varies
           err_lines = err.splitlines()
-          assert re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", err_lines[5]), err
+          assert re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", err_lines[5]), err
           assert err_lines[:5] + err_lines[6:] == [
               "Checking switch inhibitors... done",
               "updating GRUB 2 menu...",
