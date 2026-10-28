@@ -138,11 +138,11 @@ RUN dir=/root/.local/share/gh/extensions/gh-stack \
  && GH_TELEMETRY=0 DO_NOT_TRACK=1 GH_NO_UPDATE_NOTIFIER=1 gh stack --help >/dev/null
 
 # Node 24 from nodejs.org, with npm and corepack. The sum is the tarball's line
-# in the release's SHASUMS256.txt. BuildKit stamps each line the step prints
-# with its time, so the echo lines show which part a build that stalls here
-# stopped in; one RUN keeps the tarball out of the image's layers.
+# in the release's SHASUMS256.txt.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
+# BuildKit stamps each printed line with its time, so the echoes name the part a
+# stalled build stopped in; one RUN keeps the tarball out of the image's layers.
 RUN echo "node: downloading" \
  && curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
       "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
