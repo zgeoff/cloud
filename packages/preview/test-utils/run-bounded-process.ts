@@ -42,9 +42,10 @@ export async function runBoundedProcess(
     ...(options.env === undefined ? {} : { env: options.env }),
   });
 
+  const exit = trackSettled(child.exited);
   const stdout = readStreamText(child.stdout);
   const stderr = readStreamText(child.stderr);
-  const finished = Promise.all([child.exited, stdout.done, stderr.done]);
+  const finished = Promise.all([exit.done, stdout.done, stderr.done]);
 
   // a grandchild that outlives the child keeps the pipes open, so the bound covers the pipes too
   const outcome = await Promise.race([
@@ -55,16 +56,35 @@ export async function runBoundedProcess(
   if (outcome === null) {
     const elapsedMs = Math.round(deps.now() - startedAt);
 
+    // collected before the kill, which settles every part
+    const pending = Object.entries({ exit, stdout, stderr })
+      .filter(([, tracked]) => !tracked.isSettled())
+      .map(([part]) => part);
+
     deps.killGroup(child.pid);
 
     await finished;
 
     throw new Error(
-      `${options.name} did not finish within ${String(options.timeoutMs)} ms (stopped after ${String(elapsedMs)} ms); stderr: ${stderr.read()}`,
+      `${options.name} did not finish within ${String(options.timeoutMs)} ms (stopped after ${String(elapsedMs)} ms, waiting on ${pending.join(', ')}); stdout: ${stdout.read()}; stderr: ${stderr.read()}`,
     );
   }
 
   return { exitCode: outcome.exitCode, stdout: stdout.read(), stderr: stderr.read() };
+}
+
+function trackSettled<T>(promise: Promise<T>) {
+  let settled = false;
+
+  const done = (async () => {
+    try {
+      return await promise;
+    } finally {
+      settled = true;
+    }
+  })();
+
+  return { done, isSettled: () => settled };
 }
 
 function readStreamText(stream: ReadableStream<Uint8Array>) {
@@ -72,11 +92,13 @@ function readStreamText(stream: ReadableStream<Uint8Array>) {
 
   let text = '';
 
-  const done = (async () => {
-    for await (const chunk of stream) {
-      text += decoder.decode(chunk, { stream: true });
-    }
-  })();
+  const reading = trackSettled(
+    (async () => {
+      for await (const chunk of stream) {
+        text += decoder.decode(chunk, { stream: true });
+      }
+    })(),
+  );
 
-  return { done, read: () => text };
+  return { ...reading, read: () => text };
 }
