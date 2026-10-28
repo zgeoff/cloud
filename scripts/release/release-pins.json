@@ -38,7 +38,7 @@
     "digest": "sha256:7021f962cfcdce15312a44da3a9bb34c48c7e4dc62c7d15e8d398faee157b19a"
   },
   "auto-mode": {
-    "version": "3.1.1",
-    "sum": "79f90632c7117d5c7798f5ca2b429d68e617fde5b6cc83c910c8af816d5114ba"
+    "version": "3.1.2",
+    "sum": "972b75aeece3252346b2caffbd2b761ac28d4c928dec73edae58bfc6da296972"
   }
 }
