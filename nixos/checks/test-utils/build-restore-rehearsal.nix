@@ -9,7 +9,7 @@
 #
 # Given a name and a function from the two images ({ image28, image29 }, each
 # { layout, ref, digestRef }) to the subtests' script, it returns the NixOS test. One VM boots
-# once. Its script runs the two boot subtests first, then defines setup_test(), which returns the
+# once. Its script runs the three boot subtests first, then defines setup_test(), which returns the
 # VM to the same boot state before each subtest: the 0.29.0 system running, its image pulled
 # fresh, an empty tank/imp mounted nowhere, generations 1 to 3, and nothing an earlier subtest
 # left. The given subtests
@@ -144,6 +144,14 @@ pkgs.testers.runNixOSTest {
         failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
 
         assert failed == "", f"units failed at boot: {failed}"
+
+
+    with subtest("it runs imp-host with the memlock limit of imp's own run arguments"):
+        machine.wait_until_succeeds("podman inspect -f '{{.State.Pid}}' imp-host | grep -qvx 0", timeout=120)
+        pid = machine.succeed("podman inspect -f '{{.State.Pid}}' imp-host").strip()
+        limit = machine.succeed(f"grep '^Max locked memory' /proc/{pid}/limits").split()[3:5]
+
+        assert limit == ["2147483648", "2147483648"], f"imp-host's memlock limit is {limit}"
 
 
     def setup_test():

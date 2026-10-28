@@ -6,7 +6,7 @@
 #
 # impd keeps each image in /var/lib/imp/images/<folder>/rootfs.ext4 inside imp-host, where the
 # folder is the record's digest without a leading `sha256:` (buildImagePaths and toDigestHex in
-# zgeoff/impz packages/daemon/src/vm/storage/data-layout.ts, the same at v4.2.4, v5.0.0 and v6.0.0). Each
+# zgeoff/impz packages/daemon/src/vm/storage/data-layout.ts, the same at v4.2.4, v5.0.0 and v6.0.1). Each
 # kind of record has its own digest form, at both releases: `sha256:<hex>` for an OCI image,
 # `imp-build-<hex>` for an image a builder imp adds or builds
 # (packages/daemon/src/imps/images/build/guest-build.ts), and `imp-<uuid>` for a template made
