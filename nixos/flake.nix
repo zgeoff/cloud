@@ -65,7 +65,9 @@
       # booted VM's cgroups through node-exporter, and drift-check-vm, which runs the drift check's
       # unit in its own sandbox, and public-front-vm, which sends requests through the TLS front to
       # a stand-in upstream, and atc-daemon-vm, which starts the atc daemon on its gateway token as
-      # the host does. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
+      # the host does, and onepassword-connect-relay-vm, which switches the Connect relay to another
+      # bridge, and preview-image-vm, which boots the preview-image unit against a stand-in impd
+      # that refuses its first start. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
       # checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -109,6 +111,14 @@
       checks.x86_64-linux.public-front-vm = import ./checks/public-front-vm.nix { inherit nixpkgs; };
       checks.x86_64-linux.onepassword-connect-relay = import ./checks/onepassword-connect-relay.nix {
         inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.onepassword-connect-relay-vm =
+        import ./checks/onepassword-connect-relay-vm.nix
+          {
+            inherit nixpkgs;
+          };
+      checks.x86_64-linux.preview-image-vm = import ./checks/preview-image-vm.nix {
+        inherit nixpkgs;
       };
       checks.x86_64-linux.impd-db-tools = import ./checks/impd-db-tools.nix { inherit nixpkgs imp; };
       checks.x86_64-linux.test-utils = import ./checks/test-utils-check.nix {

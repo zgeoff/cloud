@@ -39,7 +39,13 @@ Check each of these before you start:
    Expect the `COPY-INFO` lines, with `integrity ok`, `impVersion 5.0.0` and an `image` line for
    `imp-host:5.0.0`.
 
-2. Sleep every awake imp, one at a time, while imp-host still runs under Docker:
+2. Stop every atc session on the `geoffcloud` daemon: call `atc_session_stop` with each running
+   session's ID.
+
+   atc wakes the imp of a session that wants to run, so an imp whose session still runs does not
+   stay asleep. Expect each session stopped.
+
+3. Sleep every awake imp, one at a time, while imp-host still runs under Docker:
 
    ```bash
    ssh root@geoffcloud 'docker exec imp-host impz ls --json' < /dev/null \
@@ -50,7 +56,7 @@ Check each of these before you start:
    Expect one `<name> asleep` line for each awake imp. If a sleep fails, stop here: the host still
    runs imp 5.0.0, and nothing has changed.
 
-3. Switch the host from a clean checkout of `main` at the merge commit:
+4. Switch the host from a clean checkout of `main` at the merge commit:
 
    ```bash
    bun run ops:switch-host
@@ -60,7 +66,7 @@ Check each of these before you start:
    image folder check passes. The script holds a switch whose activation would restart k3s; pass
    `--allow-k3s-restart` only in a k3s window that the owner approved.
 
-4. Check that imp-host runs under Podman and Docker is gone:
+5. Check that imp-host runs under Podman and Docker is gone:
 
    ```bash
    ssh root@geoffcloud 'podman inspect imp-host --format "{{.Config.Image}}"; systemctl is-active docker.service imp-docker-proxy.service' < /dev/null
@@ -69,7 +75,7 @@ Check each of these before you start:
    Expect `ghcr.io/zgeoff/imp-host@sha256:<digest>`, with the digest that `services.imp.image` pins,
    then `inactive` twice.
 
-5. Check impd and its imps:
+6. Check impd and its imps:
 
    ```bash
    ssh root@geoffcloud podman exec imp-host impz info < /dev/null
@@ -80,7 +86,7 @@ Check each of these before you start:
    6.0.1 keeps imp 5.0.0's Firecracker, so each sleeping imp restores its memory when it wakes.
    `https://imps.geoff.cloud/health` returns 200 from the tailnet.
 
-6. Wake one imp and run a command in it:
+7. Wake one imp and run a command in it:
 
    ```bash
    ssh root@geoffcloud podman exec imp-host impz exec <imp_name> -- uname -a < /dev/null
@@ -88,10 +94,10 @@ Check each of these before you start:
 
    Expect the imp's kernel line. The exec wakes the imp first.
 
-7. Point the broker's two upstream secrets at `podman0`, as
+8. Point the broker's two upstream secrets at `podman0`, as
    [Rebind the upstream secrets](#rebind-the-upstream-secrets) describes.
 
-8. Check the listeners on `podman0` from inside imp-host:
+9. Check the listeners on `podman0` from inside imp-host:
 
    ```bash
    ssh root@geoffcloud podman exec imp-host curl -sS -m 5 -o /dev/null -w '%{http_code}\n' http://10.88.0.1:18081/heartbeat < /dev/null
@@ -101,7 +107,7 @@ Check each of these before you start:
    Expect `200` from 1Password Connect through the relay, then `active` twice. Then run each check
    in [Check after the switch](#check-after-the-switch).
 
-9. Move nothing else by hand. The switch script moves `deployed/host` once its checks pass.
+10. Move nothing else by hand. The switch script moves `deployed/host` once its checks pass.
 
 ## Check after the switch
 
@@ -155,7 +161,7 @@ reaches `root@geoffcloud` over SSH. A failure in any of them is a reason to
 
 6. Check the Connect relay from a granted imp, as
    [Check from a granted imp](./onepassword-connect.md#check-from-a-granted-imp) describes. Expect
-   the field's value. Step 8 of the switch has checked the relay itself from imp-host.
+   the field's value. Step 9 of the switch has checked the relay itself from imp-host.
 
 7. Run the agent image build and read its result:
 
@@ -174,18 +180,28 @@ can wait. The previous generation brings back Docker, `imp-docker-proxy` and imp
 and Docker still holds the 5.0.0 image, so the rollback pulls nothing.
 
 **CAUTION:** The rollback stops imp-host, and the stop sleeps every awake imp within its stop
-timeout. An imp that does not sleep in time loses its memory, not its disk. Sleep the awake imps
-first, as step 2 does, with `podman` in place of `docker`.
+timeout. An imp that does not sleep in time loses its memory, not its disk. Stop the atc sessions
+and sleep the awake imps first, as steps 2 and 3 of the switch do, with `podman` in place of
+`docker`.
 
-1. Activate the previous generation:
+1. List the system generations, and find the one before the switch's, which runs imp 5.0.0:
 
    ```bash
-   ssh root@geoffcloud nixos-rebuild switch --rollback
+   ssh root@geoffcloud nix-env -p /nix/var/nix/profiles/system --list-generations < /dev/null
    ```
 
-   Expect exit 0.
+   Expect the switch's generation last, marked `(current)`.
 
-2. Check that imp-host runs under Docker on the 5.0.0 image:
+2. Activate that generation:
+
+   ```bash
+   ssh root@geoffcloud 'nix-env -p /nix/var/nix/profiles/system --switch-generation <generation> && systemd-run --collect --wait --pipe --quiet --service-type=exec --unit=rollback-geoffcloud /nix/var/nix/profiles/system-<generation>-link/bin/switch-to-configuration switch' < /dev/null
+   ```
+
+   Expect exit 0. The activation runs in its own unit, so a dropped SSH session does not stop it.
+   `nixos-rebuild switch --rollback` fails on the host, which has no `nixos-config` to evaluate.
+
+3. Check that imp-host runs under Docker on the 5.0.0 image:
 
    ```bash
    ssh root@geoffcloud 'docker inspect imp-host --format "{{.Config.Image}}"; docker exec imp-host impz info' < /dev/null
@@ -193,11 +209,11 @@ first, as step 2 does, with `podman` in place of `docker`.
 
    Expect `ghcr.io/zgeoff/imp-host:5.0.0@sha256:dd9f3ec3…` and `version 5.0.0`.
 
-3. Point the two upstream secrets back at `docker0`, as
+4. Point the two upstream secrets back at `docker0`, as
    [Rebind the upstream secrets](#rebind-the-upstream-secrets) describes, with `docker` in place of
    `podman` and `172.17.0.1` in place of `10.88.0.1`.
 
-4. Revert the bump's pull request on `main` with a pull request of its own. `Deploy prod` then
+5. Revert the bump's pull request on `main` with a pull request of its own. `Deploy prod` then
    applies the egress-deny NetworkPolicy and nixie's imp config for `docker0` again, and the next
    host switch from `main` keeps imp 5.0.0.
 

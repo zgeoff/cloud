@@ -181,8 +181,9 @@ docker run --rm --network host -v geoffcloud-nix-store:/nix \
 
 require_k3s_kept
 
-# as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a boot after a failed activation still picks the
-# new system, then switch-to-configuration in its own unit, so it survives a dropped SSH. Between
+# as nixos-rebuild 26.11 (nix.py: set_profile, switch_to_configuration): the profile first, so a
+# boot after a failed activation still picks the new system, then switch-to-configuration in its
+# own unit, so it survives a dropped SSH. Between
 # them it records which commit the system was built from, which the host's build lag check
 # (nixos/modules/host-build-lag.sh) reads, because the store path does not hold the commit.
 require_gateway_major

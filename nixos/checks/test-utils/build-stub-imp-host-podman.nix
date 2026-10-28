@@ -10,6 +10,8 @@
 #   - images.json, impd's images as `impz image ls --json` prints them: an array of objects;
 #   - unreachable, optional: a count of calls still to fail, each as podman fails an exec while
 #     the imp-host container does not exist, which the stand-in counts down;
+#   - unauthorized, optional: a count of calls still to fail once unreachable has none left, each
+#     as impz fails a call that impd refuses with 401, which the stand-in counts down;
 #   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
 #   - version, optional: the imp version that `impz info` prints;
 #   - container, optional: a directory that stands for the imp-host container's filesystem.
@@ -30,7 +32,9 @@
 # packages/daemon/src/images/create-image-writer.ts): `impz image ls --json` and `impz image add
 # --json` print JSON.stringify(value, null, 2) of an image list and of one image, with the fields
 # id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
-# `impz: <message>`, and exits 1; an add under a name that exists points the name at the new image
+# `impz: <message>`, and exits 1, with the message 'unauthorized: set IMP_TOKEN to the token from
+# <IMP_DATA_DIR>/token, or run impz login <url>' for a 401 from impd; an add under a name that
+# exists points the name at the new image
 # and keeps the name's pin (packages/daemon/src/platform/db/images.ts). podman prints
 # 'Error: no container with name or ID "<name>" found: no such container' and exits 125 for an
 # exec in a container that does not exist, and 'Error: "<path>" could not be found on container
@@ -57,6 +61,14 @@ pkgs.lib.getExe (
           echo $((left - 1)) > "$IMPD_STATE/unreachable"
           echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
           exit 125
+        fi
+      fi
+      if [ "$#" -ge 3 ] && [ "$1 $2 $3" = "exec imp-host impz" ] && [ -s "$IMPD_STATE/unauthorized" ]; then
+        left=$(cat "$IMPD_STATE/unauthorized")
+        if [ "$left" -gt 0 ]; then
+          echo $((left - 1)) > "$IMPD_STATE/unauthorized"
+          echo 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>' >&2
+          exit 1
         fi
       fi
       if [ "$*" = "exec imp-host impz image ls --json" ]; then

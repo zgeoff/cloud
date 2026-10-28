@@ -31,7 +31,8 @@ the drop holds even after kube-proxy rewrites a destination, so the container ca
 Service, nor a pod, nor a NodePort. The host is not under that rule, so the host dials the Service
 for it. systemd holds the relay's socket and starts the proxy on the first connection, so the socket
 can bind the host's address on Podman's bridge before Podman's network backend creates the bridge
-for imp-host.
+for imp-host. A NixOS switch never restarts a changed socket unit, so a switch that moves the
+relay's address restarts the socket through a unit of its own, and the proxy stops with the socket.
 
 The relay dials the Service by its cluster address, so the Service pins that address, and Pulumi
 ignores any later change to it. Recreating the Service at a new address would silently break the
