@@ -72,9 +72,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+          # the run's own commit, never the branch tip at checkout: the switch gate counts this run
+          # for github.sha, which main can move past while the run queues
           ref:
             ${{ inputs.pull-request != '' && format('refs/pull/{0}/merge', inputs.pull-request) ||
-            github.ref }}
+            github.sha }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
