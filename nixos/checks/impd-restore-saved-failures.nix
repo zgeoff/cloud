@@ -79,10 +79,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           ], out
           # switch-to-configuration's progress; the mounts Podman makes for imp-host (its network
           # namespace, its storage, its root file system and its /dev/shm) carry generated ids, and the
-          # switch lists them on one line only when they land before it ends
+          # switch lists them, and imp-host.service when it starts imp-host itself, on one line
           err_lines = err.splitlines()
           mount_lines = [line for line in err_lines if line.startswith("the following new units were started: ")]
-          assert len(mount_lines) <= 1 and all(re.fullmatch(r"the following new units were started: ((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount(, |$))+", line) for line in mount_lines), err
+          assert len(mount_lines) <= 1 and all(re.fullmatch(r"the following new units were started: (((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount|imp-host\.service)(, |$))+", line) for line in mount_lines), err
           # the ERR trap names the line of the switch
           assert [line for line in err_lines if line not in mount_lines] == [
               "Checking switch inhibitors... done",
