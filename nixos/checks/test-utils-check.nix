@@ -718,7 +718,7 @@ let
       }
     )
     {
-      title = "it buildStubImpHostImage holds to the pinned imp: the module pulls the image by its reference, and runs imp-host with podman run from the image's own command";
+      title = "it buildStubImpHostImage holds to the pinned imp: the module pulls the image by its reference, and runs imp-host with podman run from the own command of the image";
       script = ''
         pulls=$(grep -cxF '          ''${podman} image exists "$ref" || ''${podman} pull -q "$ref"' \
           ${imp}/deploy/nixos/config.nix || true)
