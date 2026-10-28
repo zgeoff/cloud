@@ -45,6 +45,10 @@ export async function checkCIProfiles(options: Readonly<CheckCIProfilesOptions>)
     ...[...new Set(single)]
       .filter((step) => !parallel.includes(step))
       .map((step) => `ci.yml: no parallel job runs the checks job's step \`${step}\`\n`),
+    ...collectReusedSecretScans(jobs).map(
+      (job) =>
+        `ci.yml: the ${job} job skips its secret scan on a reused push, whose history no pull request run scanned\n`,
+    ),
   ];
 
   if (violations.length > 0) {
@@ -86,6 +90,39 @@ function collectSteps(job: unknown): string[] {
 
     return typeof uses === 'string' ? [`uses: ${uses.split('@')[0] ?? uses}`] : [];
   });
+}
+
+// a reuse matches trees, and a secret committed then removed leaves the same tree, so the scan of
+// a push's history never waits on the reuse decision
+function collectReusedSecretScans(jobs: unknown): string[] {
+  if (typeof jobs !== 'object' || jobs === null) {
+    return [];
+  }
+
+  return Object.entries(jobs).flatMap((entry: readonly [string, unknown]) => {
+    const steps = findJSONField(entry[1], 'steps');
+    const jobCondition = toCondition(findJSONField(entry[1], 'if'));
+
+    if (!Array.isArray(steps)) {
+      return [];
+    }
+
+    const reused = steps.some((step: unknown) => {
+      const uses = findJSONField(step, 'uses');
+
+      return (
+        typeof uses === 'string' &&
+        uses.startsWith('gitleaks/gitleaks-action@') &&
+        `${jobCondition} ${toCondition(findJSONField(step, 'if'))}`.includes('reused')
+      );
+    });
+
+    return reused ? [entry[0]] : [];
+  });
+}
+
+function toCondition(value: unknown): string {
+  return typeof value === 'string' ? value : '';
 }
 
 if (import.meta.main) {

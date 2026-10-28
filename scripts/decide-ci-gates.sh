@@ -3,7 +3,8 @@
 # push to main cancels main's earlier run, so a push compares with the last commit that a green
 # main run checked (find-gate-base.sh), never with the commit before it.
 #
-# A push skips every check when a green pull request run of this repository already checked the
+# A push skips every check but the secret scan, which reads the push's history rather than its
+# tree, when a green pull request run of this repository already checked the
 # push's tree on a base with the same tree as that commit: the run's checks job uploads an artifact
 # named ci-pass-<tree>-<base tree> (write-ci-pass-name.sh), and the same gates on the same two trees
 # decide the same checks. Then it writes each gate as false and reused=true, and names the run on

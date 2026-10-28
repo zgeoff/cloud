@@ -117,6 +117,71 @@ test('it reports a checks job step that no parallel job runs', async () => {
   );
 });
 
+test('it reports a secret scan step that waits on the reuse decision', async () => {
+  const ctx = setupTest();
+
+  const files = new Map([
+    [
+      '/repo/.github/workflows/ci.yml',
+      `jobs:
+  lint:
+    steps:
+      - uses: gitleaks/gitleaks-action@cccc
+  checks:
+    steps:
+      - if: \${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        uses: gitleaks/gitleaks-action@cccc
+`,
+    ],
+  ]);
+
+  const exitCode = await checkCIProfiles({
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'ci.yml: the checks job skips its secret scan on a reused push, whose history no pull request run scanned\n',
+  );
+});
+
+test('it reports a secret scan in a job that waits on the reuse decision', async () => {
+  const ctx = setupTest();
+
+  const files = new Map([
+    [
+      '/repo/.github/workflows/ci.yml',
+      `jobs:
+  lint:
+    if: \${{ needs.decide.outputs.reused != 'true' }}
+    steps:
+      - uses: gitleaks/gitleaks-action@cccc
+  checks:
+    steps:
+      - if: \${{ github.event.repository.private }}
+        uses: gitleaks/gitleaks-action@cccc
+`,
+    ],
+  ]);
+
+  const exitCode = await checkCIProfiles({
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'ci.yml: the lint job skips its secret scan on a reused push, whose history no pull request run scanned\n',
+  );
+});
+
 test('it accepts the repository own CI workflow', async () => {
   const ctx = setupTest();
 

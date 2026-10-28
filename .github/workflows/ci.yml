@@ -78,9 +78,8 @@ jobs:
   # the Bun checks and tests, the shell suites and the secret scan
   bun:
     needs: decide
-    if: >-
-      ${{ !cancelled() && !github.event.repository.private && needs.decide.outputs.reused != 'true'
-      }}
+    # a push that reuses a pull request run still scans its history for secrets
+    if: ${{ !cancelled() && !github.event.repository.private }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     # the gitleaks action comments findings on the PR, which needs write on pull-requests; the
@@ -99,73 +98,92 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Bun
+        if: needs.decide.outputs.reused != 'true'
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
 
       - name: Install
+        if: needs.decide.outputs.reused != 'true'
         run: bun install --frozen-lockfile
 
       - name: Format
+        if: needs.decide.outputs.reused != 'true'
         run: bun run format:check
 
       - name: Lint
+        if: needs.decide.outputs.reused != 'true'
         run: bun run lint:full
 
       - name: Doc links
+        if: needs.decide.outputs.reused != 'true'
         run: bun run check:doc-links
 
       - name: Doc length and prose
+        if: needs.decide.outputs.reused != 'true'
         run: bun run check:doc-length
 
       - name: Pulumi pins
+        if: needs.decide.outputs.reused != 'true'
         run: bun run check:pulumi-pins
 
       # the copies of shared constants that stay outside packages/topology agree with it
       - name: Topology
+        if: needs.decide.outputs.reused != 'true'
         run: bun run check:topology
 
       # each release tag still names its pinned digest, and each upstream digest is still served
       - name: Image pins
+        if: needs.decide.outputs.reused != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run check:image-pins
 
       # each release registry pin in the checkout holds what the pin table holds
       - name: Release pins
+        if: needs.decide.outputs.reused != 'true'
         run: bun run check:release-pins
 
       # each restore Job's YAML is its backup pod builder's output
       - name: Restore jobs
+        if: needs.decide.outputs.reused != 'true'
         run: bun run check:restore-job
 
       - name: Typecheck
+        if: needs.decide.outputs.reused != 'true'
         run: bun run typecheck
 
       # the Pulumi CLI at infra's @pulumi/pulumi pin, with the Kubernetes plugin at infra's pin,
       # for the port-forward guard's preview test; the tarball is checked against the release's
       # checksum file
       - name: Setup Pulumi CLI
+        if: needs.decide.outputs.reused != 'true'
         run: bun run ci:install-pulumi-cli
 
       - name: Test
+        if: needs.decide.outputs.reused != 'true'
         run: bun run test
 
       - name: Test Health Check
+        if: needs.decide.outputs.reused != 'true'
         run: bun run test:health-check
 
       # the Docker CLI's first run reads the Compose plugin's binary from the runner's cold disk,
       # which has outlasted the preview suite's bound on its compose call; this run reads it first
       - name: Load Docker Compose
+        if: needs.decide.outputs.reused != 'true'
         run: bun run ci:load-docker-compose
 
       - name: Test Preview
+        if: needs.decide.outputs.reused != 'true'
         run: bun run test:preview
 
       - name: Test Files
+        if: needs.decide.outputs.reused != 'true'
         run: bun run test:files
 
       - name: Test E2E
+        if: needs.decide.outputs.reused != 'true'
         run: bun run test:e2e
 
       # bash, git, jq, openssl, curl, python3, coreutils, dpkg-deb and gh, all on ubuntu-latest's
@@ -173,16 +191,19 @@ jobs:
       # the ubuntu-24.04 image 20260927.320.1 readme lists GitHub CLI 2.101.0, which the GitHub
       # API stand-in's real-gh case (test-support/shell/test-start-stub-github-api.sh) runs
       - name: Test Scripts
-        if: needs.decide.outputs.full != 'false'
+        if: needs.decide.outputs.reused != 'true' && (needs.decide.outputs.full != 'false')
         run: bun run test:scripts
 
       # A push to main runs the files image's test in its publish workflow, before it publishes, so
       # this job runs it on a pull request only.
       - name: Test Files Image
-        if: github.event_name == 'pull_request' && needs.decide.outputs.files-image != 'false'
+        if:
+          needs.decide.outputs.reused != 'true' && (github.event_name == 'pull_request' &&
+          needs.decide.outputs.files-image != 'false')
         run: bun run test:files-image
 
       - name: Dead Code
+        if: needs.decide.outputs.reused != 'true'
         run: bun run deadcode
 
       # last, because the action leaves results.sarif in the checkout, which the format check
@@ -640,9 +661,7 @@ jobs:
         run: bun run check:sdk
 
       - name: Gitleaks
-        if: >-
-          ${{ !cancelled() && github.event.repository.private && steps.decide.outputs.reused !=
-          'true' }}
+        if: ${{ !cancelled() && github.event.repository.private }}
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
