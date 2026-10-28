@@ -182,7 +182,8 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 The NixOS checks gate the switch, not the merge. The `NixOS checks` workflow runs on `main` every
 night and on each dispatch, on `main` or on a branch. It also runs on each push to a pull request
 that changes an input of the checks, a release bump included, so a break shows before the merge; the
-merge does not wait for it, and the switch never counts it.
+merge does not wait for it, and the switch never counts it. A Renovate pull request starts no run;
+the nightly run checks its bump.
 
 A run builds nothing, and passes, in two cases. A green scheduled or dispatched run on `main` covers
 every later commit that changes no input of the checks, which the `nixos` gate of

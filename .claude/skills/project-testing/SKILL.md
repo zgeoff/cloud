@@ -71,7 +71,7 @@ provider and the NixOS checks each have a reference.
   `fixture-images`, which tests that wrapper, from outside it.
 - The `nixos` job gates the host switch, not the merge: it runs nightly, on a dispatch, and on
   each push to a pull request that changes an input of the checks, whose result shows on the pull
-  request but gates nothing. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
+  request but gates nothing. A Renovate pull request starts no run. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
   green run on main covers. The `nixos` gate of [`gates.yml`](../../../.github/gates.yml) lists
   the inputs of the checks, and a run stops covering later commits once one of them changes. A new
   input of the checks extends that list.
