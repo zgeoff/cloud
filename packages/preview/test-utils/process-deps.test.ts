@@ -45,7 +45,7 @@ test('it lists the processes of the group that the spawned process leads, the le
   expect(lines).toContainEqual(
     expect.toSatisfy(
       (line: string) =>
-        line.startsWith(`${String(child.pid)} ${String(child.pid)} `) && line.endsWith('; wait'),
+        line.split(/\s+/u)[0] === String(child.pid) && line.endsWith(`touch ${ready}; wait`),
     ),
   );
 });
