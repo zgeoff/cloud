@@ -32,11 +32,12 @@ it_caches_and_lists_the_outputs_that_cache_nixos_org_did_not_sign() {
 EOF
   # the shape nix 2.35.2's `nix path-info --json` prints: an object keyed by store path; the
   # kernel built here has no signature, glibc came signed from cache.nixos.org, and the check's
-  # result came unsigned from an earlier run's cache
+  # result came unsigned from an earlier run's cache; the kernel references glibc, which the cache
+  # needs a narinfo for during the copy
   cat > "$tree/path-info" << 'EOF'
-{"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern-kernel":{"signatures":[],"ultimate":true},
- "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-glibc":{"signatures":["cache.nixos.org-1:c2lnbmF0dXJl"],"ultimate":false},
- "/nix/store/cccccccccccccccccccccccccccccccc-lantern-check":{"signatures":null,"ultimate":false}}
+{"/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern-kernel":{"narHash":"sha256-IlLUt4yU6Mes5OMxe3i9/mS8jjlwpk620vfCpEPAw/w=","narSize":120,"references":["/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-glibc"],"signatures":[],"ultimate":true},
+ "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-glibc":{"narHash":"sha256-6bxJTBkLnsFj4K3gXHcI8ZAxwSKfgD6cTUHlwmpTVSs=","narSize":240,"references":[],"signatures":["cache.nixos.org-1:c2lnbmF0dXJl"],"ultimate":false},
+ "/nix/store/cccccccccccccccccccccccccccccccc-lantern-check":{"narHash":"sha256-ANwP7nl3mMsVNAy23Y3qgNEDqHddtM4jDRVJhyOsnyk=","narSize":360,"references":["/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-lantern-kernel","/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-glibc"],"signatures":null,"ultimate":false}}
 EOF
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
