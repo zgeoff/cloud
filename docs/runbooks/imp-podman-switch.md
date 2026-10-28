@@ -19,10 +19,9 @@ imp-host on `docker0` in between.
 
 Check each of these before you start:
 
-- A nixie release that accepts impd 6 runs in the cluster. The switch script refuses the switch
-  while a nixie pod runs whose imp adapter accepts impd 5 at most
-  ([Switch the host](./workflows.md#switch-the-host)). Deploy the first nixie release with impd 6 in
-  its imp adapter first, as [the nixie runbook](./nixie.md) describes.
+- The nixie that runs in the cluster accepts impd 6. The switch script reads the impd majors that
+  the running nixie release's imp adapter accepts, and refuses the switch when 6 is not among them
+  ([Switch the host](./workflows.md#switch-the-host)). nixie 0.49.2 accepts impd 6.
 - A green `NixOS checks` run on `main` covers the merge commit. Dispatch one with
   `bun run ops:nixos-checks` when the nightly run has not.
 - No `Deploy prod` run is in progress, and the last one on the merge commit passed.
