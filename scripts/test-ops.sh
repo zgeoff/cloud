@@ -90,22 +90,41 @@ JSON
   assert_status 0 "$status"
 }
 
-it_nixos_checks_dispatches_on_the_branch_it_is_given() {
+it_nixos_checks_dispatches_a_pull_request_s_run_on_its_head_branch() {
   local status=0
   create_case_tree
   setup_test "$tree"
-  # gh workflow run prints the new run's URL on stdout; gh help workflow run
+  # gh pr view --json headRefName prints the branch with --jq; gh workflow run prints the new
+  # run's URL on stdout; gh help pr view, gh help workflow run
   cat > "$tree/gh-responses" << 'JSON'
-{"argv": ["gh","workflow","run","nixos-checks.yml","-R","zgeoff/cloud","--ref","rename-backup-unit"], "stdout": "https://github.com/zgeoff/cloud/actions/runs/45\n"}
+{"argv": ["gh","pr","view","412","-R","zgeoff/cloud","--json","headRefName","--jq",".headRefName"], "stdout": "rename-backup-unit\n"}
+{"argv": ["gh","workflow","run","nixos-checks.yml","-R","zgeoff/cloud","--ref","rename-backup-unit","-f","pull-request=412"], "stdout": "https://github.com/zgeoff/cloud/actions/runs/45\n"}
 JSON
+
+  (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    bash repo/scripts/ops.sh nixos-checks --pr 412) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/actions/runs/45'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'EOF'
+["gh","pr","view","412","-R","zgeoff/cloud","--json","headRefName","--jq",".headRefName"]
+["gh","workflow","run","nixos-checks.yml","-R","zgeoff/cloud","--ref","rename-backup-unit","-f","pull-request=412"]
+EOF
+  assert_status 0 "$status"
+}
+
+it_nixos_checks_refuses_a_branch_without_its_pull_request_with_its_usage() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
 
   (cd "$tree" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     bash repo/scripts/ops.sh nixos-checks rename-backup-unit) > "$tree/out" 2> "$tree/err" || status=$?
 
-  diff - "$tree/out" <<< 'https://github.com/zgeoff/cloud/actions/runs/45'
-  diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["gh","workflow","run","nixos-checks.yml","-R","zgeoff/cloud","--ref","rename-backup-unit"]'
-  assert_status 0 "$status"
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" <<< 'usage: ops.sh nixos-checks [--force] [--pr <pull request number>]'
+  diff /dev/null "$tree/calls"
+  assert_status 2 "$status"
 }
 
 it_nixos_checks_dispatches_a_forced_build_with_force() {

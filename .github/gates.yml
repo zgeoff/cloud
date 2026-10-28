@@ -117,6 +117,7 @@ gates:
       - scripts/host/write-atc-gateway-token.sh
       - .bun-version
       - .github/workflows/nixos-checks.yml
+      - scripts/check-nixos-checks-dispatch.sh
       - scripts/decide-nixos-checks.sh
       - scripts/decide-nixos-checks-build.sh
       - scripts/write-nixos-checks-cache.sh

@@ -7,7 +7,7 @@
 #
 #   bun run ops:switch-host [-- --build-only | --allow-k3s-restart]
 #   bun run ops:deploy-prod -- <full commit>
-#   bun run ops:nixos-checks [-- [--force] <branch>]
+#   bun run ops:nixos-checks [-- [--force] [--pr <pull request number>]]
 #   bun run ops:preview [-- <pulumi preview flag>…]
 #   bun run ops:up [-- <pulumi up flag>…]
 #   bun run ops:switch-agent-image -- <image> [<atc config file>]
@@ -71,16 +71,22 @@ case "$verb" in
     command=(gh workflow run deploy-prod.yml -R "$slug" --ref main -f "revision=$1")
     ;;
   nixos-checks)
-    force=()
+    # a pull request's run checks its merge commit, dispatched on its head branch so the switch
+    # gate, which reads only main's runs, never counts it
+    inputs=()
+    ref=main
     if [ "${1:-}" = --force ]; then
-      force=(-f force=true)
+      inputs+=(-f force=true)
       shift
     fi
-    if [ "$#" -gt 1 ] || [ "${1-main}" = "" ]; then
-      echo "usage: ops.sh nixos-checks [--force] [<branch>]" >&2
+    if [ "${1:-}" = --pr ] && [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] && [ "$#" -eq 2 ]; then
+      ref="$(gh pr view "$2" -R "$slug" --json headRefName --jq .headRefName)"
+      inputs+=(-f "pull-request=$2")
+    elif [ "$#" -gt 0 ]; then
+      echo "usage: ops.sh nixos-checks [--force] [--pr <pull request number>]" >&2
       exit 2
     fi
-    command=(gh workflow run nixos-checks.yml -R "$slug" --ref "${1:-main}" "${force[@]}")
+    command=(gh workflow run nixos-checks.yml -R "$slug" --ref "$ref" "${inputs[@]}")
     ;;
   preview)
     command=(bun run preview -- "$@")

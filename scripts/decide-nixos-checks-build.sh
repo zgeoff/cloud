@@ -2,7 +2,7 @@
 # Decides whether the NixOS checks workflow builds the checks whose derivation paths <derivations>
 # lists (run-nixos-checks.sh --derivations writes it). It writes `key=<key>` and `needed=true` or
 # `needed=false` to GITHUB_OUTPUT. The key hashes the derivation paths with the git blob of each
-# file that decides how the workflow builds them, at GITHUB_SHA: a run that builds the checks and
+# file that decides how the workflow builds them, at the checkout's HEAD: a run that builds the checks and
 # passes uploads an artifact named nixos-checks-<key>. Nix builds a derivation path to the same
 # result wherever it runs, so a later run whose key names an unexpired artifact of this repository
 # skips the build, and says which run built it on stdout and in GITHUB_STEP_SUMMARY. A run on a
@@ -13,7 +13,7 @@
 #   [FORCE=true] bash scripts/decide-nixos-checks-build.sh <derivations>
 set -euo pipefail
 
-: "${GITHUB_SHA:?}" "${GITHUB_OUTPUT:?}" "${GITHUB_STEP_SUMMARY:?}" "${GITHUB_SERVER_URL:?}" "${GITHUB_REPOSITORY:?}"
+: "${GITHUB_OUTPUT:?}" "${GITHUB_STEP_SUMMARY:?}" "${GITHUB_SERVER_URL:?}" "${GITHUB_REPOSITORY:?}"
 if [ "$#" -ne 1 ] || [ ! -s "$1" ]; then
   echo "usage: decide-nixos-checks-build.sh <derivations>, a file of one derivation path per line" >&2
   exit 2
@@ -30,7 +30,7 @@ build_files=(
 )
 key="$({
   cat "$1"
-  git ls-tree "$GITHUB_SHA" -- "${build_files[@]}"
+  git ls-tree HEAD -- "${build_files[@]}"
 } | sha256sum | cut -d' ' -f1)"
 
 if [ "${FORCE:-}" = true ]; then

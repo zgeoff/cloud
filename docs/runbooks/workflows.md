@@ -179,9 +179,11 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 
 ### Check the host before a switch
 
-The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
-without them, a release bump included. The `NixOS checks` workflow runs on `main` every night and on
-each dispatch, on `main` or on a branch. No pull request runs the checks.
+The NixOS checks gate the switch, not the merge. The `NixOS checks` workflow runs on `main` every
+night and on each dispatch on `main`. A pull request that changes an input of the checks gets one
+dispatched run on its merge commit before it merges, as
+[One run per pull request](./ops.md#one-run-per-pull-request) describes, and the switch never counts
+that run.
 
 A run builds nothing, and passes, in two cases. A green scheduled or dispatched run on `main` covers
 every later commit that changes no input of the checks, which the `nixos` gate of
@@ -199,7 +201,7 @@ To switch before the nightly run covers the commit:
 1. Start a run on `main`:
 
    ```sh
-   gh workflow run nixos-checks.yml --ref main
+   bun run ops:nixos-checks
    ```
 
 2. Find the run's id, the first column of the newest `workflow_dispatch` row, and wait for it:

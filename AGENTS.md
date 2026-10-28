@@ -115,9 +115,10 @@ docs/
   for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
   approved.
 - The NixOS checks gate the switch, not the merge: the script refuses a commit that no green
-  `NixOS checks` run on `main` covers. Dispatch one with
-  `gh workflow run nixos-checks.yml --ref main` when the nightly run has not covered the commit, and
-  never switch around the gate.
+  `NixOS checks` run on `main` covers. Dispatch one with `bun run ops:nixos-checks` when the nightly
+  run has not covered the commit, and never switch around the gate. A pull request that changes an
+  input of the checks gets one run on its merge commit before it merges, dispatched with
+  `bun run ops:nixos-checks -- --pr <number>` once its CI passes.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`. It takes a `VACUUM INTO` copy inside imp-host while impd
   runs, and records its integrity check, schema migration and imp version in `COPY-INFO`. Never tar

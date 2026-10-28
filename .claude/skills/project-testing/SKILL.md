@@ -69,10 +69,9 @@ provider and the NixOS checks each have a reference.
   `atc-gateway-fixture` inside
   [`with-fixture-images.sh`](../../../test-support/shell/with-fixture-images.sh), and
   `fixture-images`, which tests that wrapper, from outside it.
-- The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main,
-  and never on a pull request, so run
-  `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can break a
-  check. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
+- The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main.
+  A pull request that changes an input of the checks gets one dispatched run on its merge commit,
+  with `bun run ops:nixos-checks -- --pr <number>` once its CI passes. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
   green run on main covers. The `nixos` gate of [`gates.yml`](../../../.github/gates.yml) lists
   the inputs of the checks, and a run stops covering later commits once one of them changes. A new
   input of the checks extends that list.

@@ -6,13 +6,16 @@ name: NixOS checks
 # covers (scripts/find-nixos-check-run.sh). So the workflow runs:
 #
 # - nightly on main;
-# - on workflow_dispatch, on main before a switch or on a pull request's branch.
+# - on workflow_dispatch on main, at the commit to switch to;
+# - on workflow_dispatch on a pull request's head branch with its number, once its CI passed on
+#   the head it merges: the run checks the pull request's merge commit, and the switch gate,
+#   which reads only main's runs, never counts it (scripts/check-nixos-checks-dispatch.sh).
 #
 # A run builds nothing, and passes, when a green run on main already covers the commit, which is
 # when no input of the checks (the nixos gate of .github/gates.yml) changed since that run's
 # commit, or when a run already built and passed the same derivations with the same build files
-# (scripts/decide-nixos-checks-build.sh). A dispatch with force always builds. No pull request runs
-# it, a bot's included, because the switch gate never reads a pull request's run.
+# (scripts/decide-nixos-checks-build.sh). A dispatch with force always builds. No pull_request
+# event starts it.
 #
 # A build restores main's cache of the store paths that cache.nixos.org does not serve, and a
 # build on main saves a new one and removes the older ones (scripts/write-nixos-checks-cache.sh,
@@ -28,6 +31,12 @@ on:
           Build the checks even when a green run covers the commit or built its derivations
         type: boolean
         default: false
+      pull-request:
+        description:
+          On a pull request's head branch, its number; the run checks the pull request's merge
+          commit
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -46,24 +55,41 @@ jobs:
     # twice the checks' 60-minute test budget plus the job's median 0.13 minutes outside them,
     # rounded up; the budget holds every measured run, the slowest at 58.4 minutes
     timeout-minutes: 121
-    # actions: write removes main's older store caches
+    # actions: write removes main's older store caches; checks and pull-requests read let the
+    # dispatch check read a pull request and its CI checks
     permissions:
       contents: read
       actions: write
+      checks: read
+      pull-requests: read
     steps:
       # the full history, so a green run's commit can be compared with the commit under test; no
       # token stays in .git/config, so the checks, which run a dispatched branch's own code, never
-      # read it: only the decision and cache steps get the token, through their own environment
+      # read it: only the decision and cache steps get the token, through their own environment.
+      # A pull request's run checks out its merge commit.
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
+          ref:
+            ${{ inputs.pull-request != '' && format('refs/pull/{0}/merge', inputs.pull-request) ||
+            github.ref }}
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
         with:
           bun-version-file: .bun-version
+
+      # once per pull request, on the head it merges (docs/runbooks/ops.md)
+      - name: Check the dispatch
+        env:
+          PULL_REQUEST: ${{ inputs.pull-request }}
+          GH_TOKEN: ${{ github.token }}
+          GH_TELEMETRY: '0'
+          DO_NOT_TRACK: '1'
+          GH_NO_UPDATE_NOTIFIER: '1'
+        run: bun run --silent ci:check-nixos-checks-dispatch
 
       # a gh failure fails the job rather than skipping the checks
       - name: Decide whether a green run covers the commit

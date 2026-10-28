@@ -92,6 +92,7 @@
     "ci:check-nixie-api": "bun scripts/run-nixie-api-check.ts",
     "ci:require-nixie-check": "bash scripts/require-nixie-check.sh",
     "ci:alert-prod-apply": "bash scripts/alert-prod-apply.sh",
+    "ci:check-nixos-checks-dispatch": "bash scripts/check-nixos-checks-dispatch.sh",
     "ci:decide-nixos-checks": "bash scripts/decide-nixos-checks.sh",
     "ci:decide-nixos-checks-build": "bash scripts/decide-nixos-checks-build.sh",
     "ci:write-nixos-checks-cache": "bash scripts/write-nixos-checks-cache.sh",

@@ -38,7 +38,7 @@ it_needs_the_checks_for_a_forced_dispatch_without_asking_gh() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 FORCE=true \
-    GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
+    GITHUB_EVENT_NAME=workflow_dispatch GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -62,7 +62,7 @@ it_skips_the_checks_for_a_dispatch_on_a_covered_commit_and_says_so() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GITHUB_EVENT_NAME=workflow_dispatch GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
+    GITHUB_EVENT_NAME=workflow_dispatch GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'No input of the NixOS checks changed since https://github.com/zgeoff/cloud/actions/runs/7, so the checks did not run.'
@@ -88,7 +88,7 @@ it_skips_the_checks_for_a_nightly_run_on_a_covered_commit_and_says_so() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
+    GITHUB_EVENT_NAME=schedule GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< 'No input of the NixOS checks changed since https://github.com/zgeoff/cloud/actions/runs/7, so the checks did not run.'
@@ -115,7 +115,7 @@ it_needs_the_checks_for_a_nightly_run_on_a_commit_no_run_covers() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
+    GITHUB_EVENT_NAME=schedule GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -143,7 +143,7 @@ it_fails_with_the_gh_error_and_writes_nothing_when_gh_fails() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_OUTPUT="$tree/output" \
+    GITHUB_EVENT_NAME=schedule GITHUB_OUTPUT="$tree/output" \
     GITHUB_STEP_SUMMARY="$tree/summary" bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
@@ -161,11 +161,11 @@ it_fails_without_a_github_output_file() {
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
-    GITHUB_EVENT_NAME=schedule GITHUB_SHA="$commit" GITHUB_STEP_SUMMARY="$tree/summary" \
+    GITHUB_EVENT_NAME=schedule GITHUB_STEP_SUMMARY="$tree/summary" \
     bash "$script") > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< "$script: line 14: GITHUB_OUTPUT: parameter null or not set"
+  diff - "$tree/err" <<< "$script: line 15: GITHUB_OUTPUT: parameter null or not set"
   diff /dev/null "$tree/summary"
   diff /dev/null "$tree/calls"
   assert_status 1 "$status"

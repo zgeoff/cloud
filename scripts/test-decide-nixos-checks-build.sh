@@ -30,10 +30,9 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=test GI
   GIT_AUTHOR_EMAIL=test@example.invalid GIT_COMMITTER_EMAIL=test@example.invalid
 
 it_skips_the_build_and_names_the_run_that_built_the_same_derivations() {
-  local commit status=0
+  local status=0
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
   # the artifacts endpoint of GitHub's REST docs (actions/artifacts, list artifacts for a
   # repository, read 2026-10-28), filtered to the id of the run that uploaded the first match
@@ -43,7 +42,7 @@ it_skips_the_build_and_names_the_run_that_built_the_same_derivations() {
     stdout: "4242\n"}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -65,10 +64,9 @@ EOF
 }
 
 it_needs_the_build_when_no_run_built_the_same_derivations() {
-  local commit status=0
+  local status=0
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
   # no artifact holds the name: the --jq filter prints nothing
   jq -cn '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/artifacts", "-f", null,
@@ -77,7 +75,7 @@ it_needs_the_build_when_no_run_built_the_same_derivations() {
     > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -98,14 +96,13 @@ EOF
 }
 
 it_needs_the_build_without_asking_gh_when_a_dispatch_forces_it() {
-  local commit status=0
+  local status=0
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" FORCE=true \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 FORCE=true \
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -122,7 +119,7 @@ EOF
 }
 
 it_keys_the_same_derivations_alike_when_only_a_file_outside_the_build_differs() {
-  local first second
+  local first second commit
   create_case_tree
   setup_test "$tree"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
@@ -133,8 +130,9 @@ it_keys_the_same_derivations_alike_when_only_a_file_outside_the_build_differs() 
   second="$(git -C "$tree/repo" rev-parse HEAD)"
 
   for commit in "$first" "$second"; do
+    git -C "$tree/repo" checkout -q "$commit"
     (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" FORCE=true \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 FORCE=true \
       GITHUB_OUTPUT="$tree/output-$commit" GITHUB_STEP_SUMMARY="$tree/summary" \
       GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
       bash "$script" "$tree/derivations")
@@ -144,7 +142,7 @@ it_keys_the_same_derivations_alike_when_only_a_file_outside_the_build_differs() 
 }
 
 it_keys_the_same_derivations_apart_when_a_build_script_differs() {
-  local first second
+  local first second commit
   create_case_tree
   setup_test "$tree"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
@@ -154,8 +152,9 @@ it_keys_the_same_derivations_apart_when_a_build_script_differs() {
   second="$(git -C "$tree/repo" rev-parse HEAD)"
 
   for commit in "$first" "$second"; do
+    git -C "$tree/repo" checkout -q "$commit"
     (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" FORCE=true \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 FORCE=true \
       GITHUB_OUTPUT="$tree/output-$commit" GITHUB_STEP_SUMMARY="$tree/summary" \
       GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
       bash "$script" "$tree/derivations")
@@ -165,16 +164,15 @@ it_keys_the_same_derivations_apart_when_a_build_script_differs() {
 }
 
 it_keys_other_derivations_apart() {
-  local commit
+  local list
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations-a"
   printf '/nix/store/11111111111111111111111111111111-atc-daemon.drv\n' > "$tree/derivations-b"
 
   for list in a b; do
     (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" FORCE=true \
+      GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 FORCE=true \
       GITHUB_OUTPUT="$tree/output-$list" GITHUB_STEP_SUMMARY="$tree/summary" \
       GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
       bash "$script" "$tree/derivations-$list")
@@ -184,10 +182,9 @@ it_keys_other_derivations_apart() {
 }
 
 it_fails_with_the_gh_error_and_writes_no_answer_when_gh_fails() {
-  local commit status=0
+  local status=0
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   printf '/nix/store/00000000000000000000000000000000-atc-daemon.drv\n' > "$tree/derivations"
   # gh's manual (`gh help exit-codes`, gh 2.102.0, read 2026-10-12) gives exit 1 for a failed
   # command, such as an API error
@@ -197,7 +194,7 @@ it_fails_with_the_gh_error_and_writes_no_answer_when_gh_fails() {
     stderr: "HTTP 503: Service Unavailable\n", exit: 1}' > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?
@@ -210,14 +207,13 @@ it_fails_with_the_gh_error_and_writes_no_answer_when_gh_fails() {
 }
 
 it_fails_with_its_usage_when_the_derivations_file_is_empty() {
-  local commit status=0
+  local status=0
   create_case_tree
   setup_test "$tree"
-  commit="$(git -C "$tree/repo" rev-parse HEAD)"
   : > "$tree/derivations"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
-    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_SHA="$commit" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1\
     GITHUB_OUTPUT="$tree/output" GITHUB_STEP_SUMMARY="$tree/summary" \
     GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
     bash "$script" "$tree/derivations") > "$tree/out" 2> "$tree/err" || status=$?

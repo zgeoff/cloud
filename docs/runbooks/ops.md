@@ -70,16 +70,29 @@ Dispatches the `NixOS checks` workflow, on `main` by default.
 
 ```bash
 bun run ops:nixos-checks                    # on main, before a host switch
-bun run ops:nixos-checks -- <branch>        # on a pushed branch
+bun run ops:nixos-checks -- --pr <number>   # on a pull request's merge commit, once per pull request
 bun run ops:nixos-checks -- --force         # on main, building even a covered commit
 ```
 
 - Wraps `gh workflow run nixos-checks.yml -R zgeoff/cloud --ref <branch>`, with `-f force=true` for
-  `--force`.
+  `--force`. `--pr` dispatches on the pull request's head branch with `-f pull-request=<number>`.
+- A host switch reads only a green run on `main`. A pull request's run checks the change before it
+  merges and gates nothing.
 - A run skips the build when an earlier run covers the commit or built the same derivations, as
   [Check the host before a switch](./workflows.md#check-the-host-before-a-switch) describes.
-- A host switch reads only a green run on `main`. A run on a branch checks the change and gates
-  nothing.
+
+### One run per pull request
+
+A pull request that changes an input of the checks gets one run, on its merge commit, after its last
+push. A release bump counts: a bump of the atc daemon pin can break a check that only the host runs.
+
+1. Wait for CI's `checks` to pass on the head you mean to merge.
+2. Run `bun run ops:nixos-checks -- --pr <number>`.
+3. Push again only to fix what the run found, then dispatch again.
+
+The workflow enforces what it can see. It refuses a run on a branch without `--pr`, a pull request
+that is not open at the run's commit, and a head whose `checks` have not passed. A dispatch with
+`--pr` on `main` fails too. A newer run on the same branch cancels the older one.
 
 ## `bun run ops:preview`
 
