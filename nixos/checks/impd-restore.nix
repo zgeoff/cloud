@@ -980,7 +980,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert out.splitlines() == ["== check the copy", "== check the host"], out
           # podman's own error comes first; the TOML parser's detail after "toml: " is not ours
           err_lines = err.splitlines()
-          assert err_lines[0].startswith("Failed to obtain podman configuration: decode configuration /tmp/broken-containers.conf: toml: "), err
+          assert err_lines[0].startswith('Failed to obtain podman configuration: reading system config "/tmp/broken-containers.conf": decode configuration /tmp/broken-containers.conf: toml: '), err
           assert err_lines[1:] == [
               "restore-impd-db: cannot list podman containers",
               "restore-impd-db: nothing was changed",
