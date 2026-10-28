@@ -1,11 +1,11 @@
-export interface BoundedChild {
+interface BoundedChild {
   readonly pid: number;
   readonly exited: Promise<number>;
   readonly stdout: ReadableStream<Uint8Array>;
   readonly stderr: ReadableStream<Uint8Array>;
 }
 
-export interface BoundedSpawnOptions {
+interface BoundedSpawnOptions {
   readonly cwd?: string;
   readonly env?: Record<string, string>;
 }
