@@ -44,7 +44,7 @@ test('it writes one row per entry between the markers, and keeps the rest of the
         protocol: 'tcp',
         port: 18_081,
         scope: 'host',
-        interface: 'docker0',
+        interface: 'podman0',
         admission: true,
         reason: 'the relay',
       },
@@ -106,7 +106,7 @@ The prose.
 | Name        | Kind               | Exposes                                                     | Scope    | Reason            | Auth            | Ticket  |
 | ----------- | ------------------ | ----------------------------------------------------------- | -------- | ----------------- | --------------- | ------- |
 | \`tailscale\` | host-port          | udp 41641                                                   | public   | direct \\| relayed |                 |         |
-| \`relay\`     | host-port          | tcp 18081 on \`docker0\`                                      | host     | the relay         |                 |         |
+| \`relay\`     | host-port          | tcp 18081 on \`podman0\`                                      | host     | the relay         |                 |         |
 | \`icmp\`      | host-port          | icmp                                                        | public   | ping              |                 |         |
 | \`imp\`       | tunnel-hostname    | \`imp.example.org\`                                           | reserved | held              |                 |         |
 | \`notes\`     | front-route        | \`notes.example.org\` to \`127.0.0.1:8080\`: \`/notes\`, \`/login\` | public   | the notes API     | a token         |         |

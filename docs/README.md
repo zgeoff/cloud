@@ -57,6 +57,8 @@ call, the path of a change, the topology and the data.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
+- [Switch imp to Podman](./runbooks/imp-podman-switch.md): move geoffcloud from imp 5 on Docker to
+  imp 6 on Podman, and roll back.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.
 - [Recover a lost disk](./runbooks/lost-disk.md): recover from the loss of `vda`, `vdb` or both.

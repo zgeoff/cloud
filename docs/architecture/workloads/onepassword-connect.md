@@ -20,7 +20,7 @@ flowchart LR
 1. A guest with a grant for Connect sends an HTTPS request to `op-connect.imp.internal`, a name that
    exists only inside imp's broker.
 2. The broker swaps the placeholder bearer for the real Connect token, which impd keeps as one of
-   its secrets, and forwards the request to the relay's address on Docker's bridge.
+   its secrets, and forwards the request to the relay's address on Podman's bridge.
 3. The relay, a socket-activated proxy on the host, opens a connection to Connect's Service at its
    cluster address.
 4. The Service sends the request to the Connect server, which answers from its synced copy of the
@@ -30,13 +30,14 @@ The relay exists because imp's forward table drops imp-host's traffic to the clu
 the drop holds even after kube-proxy rewrites a destination, so the container can reach neither the
 Service, nor a pod, nor a NodePort. The host is not under that rule, so the host dials the Service
 for it. systemd holds the relay's socket and starts the proxy on the first connection, so the socket
-can bind Docker's bridge address before Docker has created the bridge.
+can bind the host's address on Podman's bridge before Podman's network backend creates the bridge
+for imp-host.
 
 The relay dials the Service by its cluster address, so the Service pins that address, and Pulumi
 ignores any later change to it. Recreating the Service at a new address would silently break the
 relay until the host's configuration changed to match. The relay also assumes imp-host sits on
-Docker's default bridge, so the host's configuration refuses to build with imp's IPv6 mode on, which
-moves imp-host to a bridge of its own.
+Podman's default network, so the host's configuration refuses to build with imp's IPv6 mode on,
+which moves imp-host to a bridge of its own.
 
 ## What limits a read
 
@@ -44,9 +45,9 @@ moves imp-host to a bridge of its own.
   refuses a write and any other vault.
 - **The grant is per imp.** Only an imp that impd granted the Connect secret gets the broker's
   injection, so an ungranted imp reaches the name and gets no token.
-- **The relay's port is local.** The host's narrowing table admits the relay's port from Docker's
-  subnet only, on Docker's bridge. Every container on that bridge can reach it, imp's Docker proxy
-  and image builds included, and each still needs the bearer.
+- **The relay's port is local.** The host's narrowing table admits the relay's port from Podman's
+  subnet only, on Podman's bridge. Every container on that bridge can reach it, and each still needs
+  the bearer.
 - **Pods are refused.** A NetworkPolicy selects the Connect pod and admits no ingress, so k3s's
   policy controller, kube-router, refuses every pod that calls the Service. The relay still passes,
   because kube-router accepts a packet whose source is one of the node's own addresses before it

@@ -37,7 +37,7 @@ the VM's Secure Boot blocks, so Secure Boot stays off
   only ingress. Its NodePorts bind to the tailnet's address range only, since kube-proxy routes a
   NodePort through forwarding, which the input firewall never sees. Pods resolve names through
   public resolvers, because the host resolves through MagicDNS, which a pod cannot reach.
-- **imp-host** runs impd and its microVMs in a container on the host's Docker
+- **imp-host** runs impd and its microVMs in a container under the host's rootful Podman
   ([imp on the host](./imp.md)).
 - **The atc daemon** runs as a NixOS service with its own system user, sandboxed by systemd
   ([the atc gateway](../workloads/atc-gateway.md#the-cloud-daemon)).

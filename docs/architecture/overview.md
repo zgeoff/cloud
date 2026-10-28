@@ -94,8 +94,8 @@ flowchart TB
 - **k3s** runs every workload that a Helm chart or a manifest describes: cloudflared, the gateway,
   1Password Connect, nixie and the monitoring stack. It is chosen for that tooling, since a single
   node needs no scheduler.
-- **imp** runs as imp ships it, in one container on the host's Docker, outside k3s, because impd
-  schedules its own microVMs and needs KVM and a ZFS pool on the host
+- **imp** runs as imp ships it, in one container under the host's rootful Podman, outside k3s,
+  because impd schedules its own microVMs and needs KVM and a ZFS pool on the host
   ([imp on the host](./host/imp.md)).
 - **The cloud daemon** is a NixOS service on the host, beside imp-host, so it reaches impd on the
   host's loopback.

@@ -1,14 +1,14 @@
-# A stand-in docker for the preview-image script (nixos/modules/preview-image.sh), the host build
+# A stand-in podman for the preview-image script (nixos/modules/preview-image.sh), the host build
 # lag check (nixos/modules/host-build-lag.sh) and the agent image build
 # (nixos/modules/agent-image-build.sh): it answers their impd calls through
-# `docker exec imp-host impz` from a state directory, $IMPD_STATE, and records each call's argv as
+# `podman exec imp-host impz` from a state directory, $IMPD_STATE, and records each call's argv as
 # one JSON line in $IMPD_STATE/calls.
 #
-#   DOCKER=<this> IMPD_STATE=/tmp/impd preview-image
+#   PODMAN=<this> IMPD_STATE=/tmp/impd preview-image
 #
 # The state directory holds:
 #   - images.json, impd's images as `impz image ls --json` prints them: an array of objects;
-#   - unreachable, optional: a count of calls still to fail, each as docker fails an exec while
+#   - unreachable, optional: a count of calls still to fail, each as podman fails an exec while
 #     the imp-host container does not exist, which the stand-in counts down;
 #   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
 #   - version, optional: the imp version that `impz info` prints;
@@ -21,32 +21,33 @@
 # found" when images.json holds none. `exec imp-host impz info`, with a version file, prints
 # the first line of `impz info`, the version, its label padded to 12 characters, and no other line.
 # `cp imp-host:<path> <dest>` copies container/<path> to <dest> with its mode and prints nothing,
-# or fails with "Error response from daemon: Could not find the file <path> in container imp-host"
-# when container/<path> is not a file.
+# or fails with 'Error: "<path>" could not be found on container imp-host: no such file or
+# directory' when container/<path> is not a file.
 # Any other call fails with "unexpected: <argv>" and status 97. Without $IMPD_STATE it exits 2.
 #
-# What it assumes of docker and impd, from zgeoff/impz at the flake's imp input
+# What it assumes of podman and impd, from zgeoff/impz at the flake's imp input
 # (packages/cli/src/commands/image.ts, packages/cli/src/run-action.ts and
 # packages/daemon/src/images/create-image-writer.ts): `impz image ls --json` and `impz image add
 # --json` print JSON.stringify(value, null, 2) of an image list and of one image, with the fields
 # id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
 # `impz: <message>`, and exits 1; an add under a name that exists points the name at the new image
-# and keeps the name's pin (packages/daemon/src/platform/db/images.ts). docker prints "Error response from daemon: No such container: <name>" and exits 1 for an
-# exec in a container that does not exist, and "Error response from daemon: Could not find the file
-# <path> in container <name>" and exits 1 for a cp of a path the container lacks (moby's
-# daemon/errors.go). The id, digest, time and size the stand-in writes are its own, not impd's.
+# and keeps the name's pin (packages/daemon/src/platform/db/images.ts). podman prints
+# 'Error: no container with name or ID "<name>" found: no such container' and exits 125 for an
+# exec in a container that does not exist, and 'Error: "<path>" could not be found on container
+# <name>: no such file or directory' and exits 125 for a cp of a path the container lacks (checked
+# against podman 5). The id, digest, time and size the stand-in writes are its own, not impd's.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
 pkgs.lib.getExe (
   pkgs.writeShellApplication {
-    name = "docker-answering-impz";
+    name = "podman-answering-impz";
     runtimeInputs = [
       pkgs.coreutils
       pkgs.jq
     ];
     text = ''
       if [ -z "''${IMPD_STATE:-}" ]; then
-        echo "docker-answering-impz: set IMPD_STATE to the directory that holds impd's images" >&2
+        echo "podman-answering-impz: set IMPD_STATE to the directory that holds impd's images" >&2
         exit 2
       fi
       jq -cn '$ARGS.positional' --args -- "$@" >> "$IMPD_STATE/calls"
@@ -54,8 +55,8 @@ pkgs.lib.getExe (
         left=$(cat "$IMPD_STATE/unreachable")
         if [ "$left" -gt 0 ]; then
           echo $((left - 1)) > "$IMPD_STATE/unreachable"
-          echo "Error response from daemon: No such container: imp-host" >&2
-          exit 1
+          echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
+          exit 125
         fi
       fi
       if [ "$*" = "exec imp-host impz image ls --json" ]; then
@@ -93,8 +94,8 @@ pkgs.lib.getExe (
       if [ "$#" -eq 3 ] && [ "$1" = cp ] && [ "''${2#imp-host:/}" != "$2" ]; then
         path="''${2#imp-host:}"
         if [ ! -f "$IMPD_STATE/container$path" ]; then
-          echo "Error response from daemon: Could not find the file $path in container imp-host" >&2
-          exit 1
+          echo "Error: \"$path\" could not be found on container imp-host: no such file or directory" >&2
+          exit 125
         fi
         cp --preserve=mode "$IMPD_STATE/container$path" "$3"
         exit 0

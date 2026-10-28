@@ -64,7 +64,7 @@ test('it skips a token with the expected limits whose saved file authenticates a
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     [
-      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' '7070' 'podman' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'",
       ctx.checkScript,
     ],
   ]);
@@ -106,7 +106,7 @@ test('it checks the saved file against the impd port and directory the environme
       '-o',
       'ConnectTimeout=15',
       'root@canary',
-      "'bash' '-s' '--' '/srv/atc secrets' '7171' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'",
+      "'bash' '-s' '--' '/srv/atc secrets' '7171' 'podman' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'",
     ],
   ]);
 });
@@ -319,7 +319,7 @@ test('it mints atc-cloud on the host with the mint script on stdin when neither 
 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     [
-      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'podman' 'exec' 'imp-host' 'impz'",
       ctx.mintScript,
     ],
   ]);

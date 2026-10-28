@@ -24,17 +24,17 @@ impd backs up every imp to R2 about every 6 hours. `impz backup ls` lists the ba
 1. List the backups:
 
    ```sh
-   docker exec imp-host impz backup ls
+   podman exec imp-host impz backup ls
    ```
 
 2. Restore one imp, the newest backup at or before a time, or every imp:
 
    ```sh
-   docker exec imp-host impz backup restore <name>
-   docker exec imp-host impz backup restore <name> --at 2026-10-03T07:40:00Z
-   docker exec imp-host impz backup restore <name> --as <name>-restored
-   docker exec imp-host impz backup restore --all          # empty host
-   docker exec imp-host impz backup restore --all --merge  # host with imps
+   podman exec imp-host impz backup restore <name>
+   podman exec imp-host impz backup restore <name> --at 2026-10-03T07:40:00Z
+   podman exec imp-host impz backup restore <name> --as <name>-restored
+   podman exec imp-host impz backup restore --all          # empty host
+   podman exec imp-host impz backup restore --all --merge  # host with imps
    ```
 
    A restored imp is stopped. Start it with `impz start <name>`.
@@ -80,7 +80,7 @@ stopped, and switch after.
 2. Stop impd:
 
    ```sh
-   systemctl stop imp-host imp-docker-proxy
+   systemctl stop imp-host
    ```
 
 3. Run the restore on the host with the copy and that generation:
@@ -94,16 +94,17 @@ stopped, and switch after.
    that.
 
    It fails closed. Before it changes anything it checks the copy (integrity, `COPY-INFO`, its
-   migration), reads both units' state and requires `inactive` or `failed`, checks that no
-   `imp-host` or `imp-docker-proxy` container runs, that the generation exists and runs the copy's
-   image, and that the dataset is not mounted. Then it mounts `tank/imp` and saves the stopped
-   database, its WAL files and impd's secret values, root-only, to
+   migration), reads imp-host's state and requires `inactive` or `failed`, checks that no `imp-host`
+   container runs under Podman, that the generation exists, runs imp-host under Podman and runs the
+   copy's image, and that the dataset is not mounted. It compares images by name and digest, because
+   Podman reports an image pulled by tag and digest by its digest alone. Then it mounts `tank/imp`
+   and saves the stopped database, its WAL files and impd's secret values, root-only, to
    `/root/imp-db-backups/pre-restore-<UTC time>/`, flushes that filesystem and compares every saved
    file with its original. Only then does it stage the copy beside the database, check it, and
    publish it with one rename. After a clean unmount it activates the generation (when it is not the
    current one), starts imp-host, waits up to 60 s for its container, and checks that it runs the
    copy's image. On an error it says how far it got; if the switch or the start had begun, it stops
-   both units again.
+   imp-host again.
 
    **CAUTION:** A database-only restore is an incomplete recovery. At start, impd deletes every
    secret value that no database row names, so a copy older than a secret loses that secret's value,
@@ -116,8 +117,8 @@ stopped, and switch after.
    rename has only `imp`, so each command runs whichever CLI the container has:
 
    ```sh
-   docker exec imp-host sh -c 'if command -v impz > /dev/null; then impz info; else imp info; fi'
-   docker exec imp-host sh -c 'if command -v impz > /dev/null; then impz ls; else imp ls; fi'
+   podman exec imp-host sh -c 'if command -v impz > /dev/null; then impz info; else imp info; fi'
+   podman exec imp-host sh -c 'if command -v impz > /dev/null; then impz ls; else imp ls; fi'
    ```
 
    Expect `info` to show the copy's `impVersion` from `COPY-INFO`, `ls` to match the time of the
@@ -128,14 +129,14 @@ stopped, and switch after.
 
    ```sh
    ref=$(systemctl show preview-image -p Environment | grep -o 'PREVIEW_IMAGE_REF=[^ ]*' | cut -d= -f2)
-   docker exec imp-host impz image add "$ref" --name pv-base
+   podman exec imp-host impz image add "$ref" --name pv-base
    ```
 
    The restored database points `pv-base` at the build folder of the image it held at the copy, and
    the newer generation's `preview-image` unit replaced that image and removed its folder. The unit
    sees `pv-base` at the restored reference and adds nothing, so every preview imp fails to boot
    with ENOENT on `rootfs.ext4` until you add it again. Expect the add to print no error, and
-   `docker exec imp-host impz image ls` to list `pv-base` at `$ref`. A host switch fails on any
+   `podman exec imp-host impz image ls` to list `pv-base` at `$ref`. A host switch fails on any
    image record whose folder is gone, as [Switch the host](./workflows.md#switch-the-host)
    describes.
 
@@ -184,7 +185,8 @@ unit whose state cannot be read, and a staged or published file that differs fro
 a stand-in `systemctl` or `cmp` that fails only that one call. Each stopped as before, with nothing
 started or switched. Every failure after the save left the original in its saved directory. A
 fourth, `nixos/checks/impd-restore-reset.nix`, checks that the machine's reset between subtests
-clears what each subtest can leave. Run them on a machine with Docker and KVM:
+clears what each subtest can leave. Run them on a machine with Docker and KVM; the VM inside runs
+imp-host under Podman, as geoffcloud does:
 
 ```sh
 bun run test:nixos impd-restore impd-restore-saved-failures impd-restore-boundaries impd-restore-reset

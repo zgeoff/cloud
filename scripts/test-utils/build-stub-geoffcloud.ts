@@ -74,7 +74,7 @@ function buildAnswer(state: StubState, command: string): RemoteResult {
     return { exitCode: 0, stdout: stdoutOf(state.scenario), stderr: '' };
   }
 
-  const imp = /^docker exec imp-host impz (?<verb>new|exec|rm) (?<name>\S+)/u.exec(command)?.groups;
+  const imp = /^podman exec imp-host impz (?<verb>new|exec|rm) (?<name>\S+)/u.exec(command)?.groups;
 
   if (imp === undefined) {
     return buildProbeAnswer(state.scenario.hostReaches, hostProbe.exec(command)?.groups, command);
@@ -105,10 +105,10 @@ interface ImpCall {
 }
 
 const sandboxProbe =
-  /^docker exec imp-host impz exec \S+ -- bash -c 'timeout 5 bash -c '\\''exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)'\\'' 2>\/dev\/null; echo probe-exit:\$\?'$/u;
+  /^podman exec imp-host impz exec \S+ -- bash -c 'timeout 5 bash -c '\\''exec 3<>\/dev\/tcp\/(?<host>[^/]+)\/(?<port>\d+)'\\'' 2>\/dev\/null; echo probe-exit:\$\?'$/u;
 
 const pageFetch =
-  /^docker exec imp-host impz exec \S+ -- bash -c '\/usr\/local\/bin\/bun -e '\\''const page = await fetch\("https:\/\/example\.com\/"\); .*'\\'''$/u;
+  /^podman exec imp-host impz exec \S+ -- bash -c '\/usr\/local\/bin\/bun -e '\\''const page = await fetch\("https:\/\/example\.com\/"\); .*'\\'''$/u;
 
 function buildImpAnswer(state: StubState, call: ImpCall): RemoteResult {
   if (call.verb === 'new') {

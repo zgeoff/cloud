@@ -4,7 +4,7 @@
 # test in infra/shared compares with them. Stand-ins answer on every path a pod could take to
 # geoffcloud's grants: the atc daemon, the preview links and the preview webhook on the host's
 # tailnet address, local delivery as on the host; home-pc's daemon and impd on tailnet peers in a
-# network namespace behind tailscale0; and impd's plain API on Docker's subnet in another, both
+# network namespace behind tailscale0; and impd's plain API on Podman's subnet in another, both
 # forwarded as on the host. The VM leaves out inet cloud_host, so kube-router alone refuses a
 # path. Each test pod runs the same image and differs only by its labels. It needs KVM: run
 # `bun run test:nixos network-policy`.
@@ -76,9 +76,9 @@ let
       port = 443;
     }
     {
-      name = "impd-docker-api";
-      netns = "docker";
-      address = "172.17.0.2";
+      name = "impd-podman-api";
+      netns = "podman";
+      address = "10.88.0.2";
       port = topology.imp.apiPort;
     }
   ];
@@ -264,8 +264,8 @@ pkgs.testers.runNixOSTest {
       environment.systemPackages = [ pkgs.kubectl ];
       environment.sessionVariables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
 
-      # the host's tailnet address on tailscale0, with the tailnet's peers behind it, and Docker's
-      # bridge address on docker0, with imp-host's container behind it
+      # the host's tailnet address on tailscale0, with the tailnet's peers behind it, and Podman's
+      # bridge address on podman0, with imp-host's container behind it
       systemd.services = {
         stand-in-network = {
           wantedBy = [ "multi-user.target" ];
@@ -288,14 +288,14 @@ pkgs.testers.runNixOSTest {
             ip -n tailnet route add ${nodes.geoffcloud.address}/32 dev eth0
             ip -n tailnet route add default via ${nodes.geoffcloud.address} dev eth0 onlink
 
-            ip netns add docker
-            ip link add docker0 type veth peer name eth0 netns docker
-            ip addr add ${topology.docker.bridgeAddress}/16 dev docker0
-            ip link set docker0 up
-            ip -n docker link set lo up
-            ip -n docker addr add 172.17.0.2/16 dev eth0
-            ip -n docker link set eth0 up
-            ip -n docker route add default via ${topology.docker.bridgeAddress}
+            ip netns add podman
+            ip link add ${topology.podman.bridge} type veth peer name eth0 netns podman
+            ip addr add ${topology.podman.bridgeAddress}/16 dev ${topology.podman.bridge}
+            ip link set ${topology.podman.bridge} up
+            ip -n podman link set lo up
+            ip -n podman addr add 10.88.0.2/16 dev eth0
+            ip -n podman link set eth0 up
+            ip -n podman route add default via ${topology.podman.bridgeAddress}
           '';
         };
       }

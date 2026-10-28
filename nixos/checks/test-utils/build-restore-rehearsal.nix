@@ -1,17 +1,18 @@
 # The restore rehearsal's VM, for the checks of restore-impd-db, so each runs its
 # subtests on the identical machine and reset: imp's own NixOS module (the flake's pinned imp
-# input) runs imp-host and imp-docker-proxy, on a real ZFS pool with the module's legacy dataset
+# input) runs imp-host under rootful Podman, on a real ZFS pool with the module's legacy dataset
 # tank/imp, real generations in the system profile and a real switch-to-configuration. The images
-# are pinned by tag and digest, as geoffcloud pins them, and pulled from a registry inside the VM
-# that answers for ghcr.io: an imp-host image of busybox that only sleeps, with a proxy that only
-# opens its socket (build-stub-imp-host-image.nix). Beside them, generations that are this VM's
-# own specialisations.
+# are pinned by tag and digest, as geoffcloud pins them, and the module pulls them from a registry
+# inside the VM that answers for ghcr.io: an imp-host image of busybox that only sleeps
+# (build-stub-imp-host-image.nix). Beside them, generations that are this VM's own
+# specialisations, one of them an imp-host that runs under Docker, as imp before 6.0.0 ran it.
 #
-# Given a name and a function from the two images ({ image28, image29 }, each { layout, ref }) to
-# the subtests' script, it returns the NixOS test. One VM boots once. Its script runs the two
-# boot subtests first, then defines setup_test(), which returns the VM to the same boot state
-# before each subtest: the 0.29.0 system running, its image pulled fresh, an empty tank/imp
-# mounted nowhere, generations 1 to 3, and nothing an earlier subtest left. The given subtests
+# Given a name and a function from the two images ({ image28, image29 }, each
+# { layout, ref, digestRef }) to the subtests' script, it returns the NixOS test. One VM boots
+# once. Its script runs the two boot subtests first, then defines setup_test(), which returns the
+# VM to the same boot state before each subtest: the 0.29.0 system running, its image pulled
+# fresh, an empty tank/imp mounted nowhere, generations 1 to 3, and nothing an earlier subtest
+# left. The given subtests
 # follow, each calling setup_test() first. It needs KVM, and the checks it builds read
 # test-support/shell beside nixos/, so they build only from the repo root. The test utilities pass their own check
 # (test-utils-check.nix) before the VM runs, and every check that uses this runs it on every
@@ -39,7 +40,7 @@ pkgs.testers.runNixOSTest {
       # the rehearsal reaches only loopback, and dhcpcd crashing at times would start
       # systemd-coredump's slice in the middle of a switch
       networking.useDHCP = false;
-      # imp-host's docker run passes --device /dev/kvm
+      # imp-host's podman run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"
         "kvm-intel"
@@ -54,17 +55,17 @@ pkgs.testers.runNixOSTest {
         impdDbTools
       ];
 
-      # the registry that answers for ghcr.io: plain HTTP on port 80, which Docker falls back to
-      # for a registry it lists as insecure
+      # the registry that answers for ghcr.io: plain HTTP on port 80, which Podman falls back to
+      # for a registry that registries.conf lists as insecure
       networking.hosts."127.0.0.1" = [ "ghcr.io" ];
-      virtualisation.docker.daemon.settings."insecure-registries" = [ "ghcr.io" ];
+      virtualisation.containers.registries.insecure = [ "ghcr.io" ];
       services.dockerRegistry = {
         enable = true;
         listenAddress = "127.0.0.1";
         port = 80;
       };
       systemd.services.docker-registry.serviceConfig.AmbientCapabilities = [ "CAP_NET_BIND_SERVICE" ];
-      # both images in it before the module first pulls one
+      # both images in it before the module's imp-host-image first pulls one
       systemd.services.rehearsal-registry-images = {
         requiredBy = [ "imp-host-image.service" ];
         before = [ "imp-host-image.service" ];
@@ -111,6 +112,10 @@ pkgs.testers.runNixOSTest {
         ramBudgetMiB = 512;
       };
       specialisation.old.configuration.services.imp.image = lib.mkForce image28.ref;
+      # a generation of imp before 6.0.0, whose imp-host runs the copy's image under Docker; only
+      # read, never switched to
+      specialisation.docker.configuration.systemd.services.imp-host.serviceConfig.ExecStart =
+        lib.mkForce "/run/current-system/sw/bin/docker run --rm --name imp-host ${image29.ref}";
       # a switch that fails: a new unit fails to start during activation
       specialisation.broken.configuration = {
         services.imp.image = lib.mkForce image28.ref;
@@ -149,24 +154,25 @@ pkgs.testers.runNixOSTest {
         path would be; which generation a restore goes to stays in each subtest's body."""
         base_path = machine.succeed("readlink -f /run/booted-system").strip()
         # what a subtest can leave: a holder keeping a mount busy, tank/imp or a copy mounted,
-        # the seccomp profile covered, docker stopped
+        # the seccomp profile covered, a broken Podman config
         # tail returns once the holder has exited, so its mount is no longer busy
         machine.succeed("if [ -f /tmp/holder.pid ]; then holder=$(cat /tmp/holder.pid); kill \"$holder\" || true; tail --pid=\"$holder\" -s 0.1 -f /dev/null; rm /tmp/holder.pid; fi")
         # findmnt and grep exit 1 when they find nothing
         machine.succeed("{ findmnt -rn -S tank/imp -o TARGET || true; } | xargs -r -n1 umount")
         machine.succeed("{ findmnt -rn -o TARGET | grep '^/root/imp-db-backups/' || true; } | sort -r | xargs -r -n1 umount")
         machine.succeed(f"for seccomp in $(grep -o 'seccomp=/nix/store/[^ ]*' {base_path}/etc/systemd/system/imp-host.service | cut -d= -f2 | tr -d \"'\"); do if mountpoint -q \"$seccomp\"; then umount \"$seccomp\"; fi; done")
-        machine.succeed("rm -f /tmp/broken-seccomp.json")
+        machine.succeed("rm -f /tmp/broken-seccomp.json /tmp/broken-containers.conf")
         machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*' -exec rmdir {} +")
-        machine.succeed("systemctl start docker.socket docker.service")
         machine.succeed("systemctl reset-failed")
         machine.succeed(f"nix-env -p /nix/var/nix/profiles/system --set {base_path}")
         machine.succeed(f"{base_path}/bin/switch-to-configuration test")
-        machine.succeed("systemctl stop imp-host imp-docker-proxy")
+        machine.succeed("systemctl stop imp-host")
         machine.succeed("systemctl reset-failed")
-        machine.succeed("docker ps -aq | xargs -r docker rm -f")
-        machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
-        images = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
+        machine.succeed("podman ps -aq | xargs -r podman rm -f")
+        # every image is an imp-host one: Podman names one pulled by tag and digest by its digest
+        # alone, and only imp-host's images are ever pulled here
+        machine.succeed("podman images -aq | sort -u | xargs -r podman rmi -f")
+        images = machine.succeed("podman images -aq")
         assert images == "", f"images are left: {images}"
         machine.succeed("rm -rf /root/imp-db-backups /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err")
 
@@ -185,10 +191,10 @@ pkgs.testers.runNixOSTest {
         assert links == ["system-1-link", "system-2-link", "system-3-link"], f"the generations are {links}"
 
         machine.succeed("systemctl start imp-host")
+        # Podman names the image by its digest alone, without the tag the unit pins
         machine.wait_until_succeeds(
-            "test \"$(docker inspect imp-host --format '{{.Config.Image}}')\" = ${image29.ref}"
+            "test \"$(podman inspect imp-host --format '{{.Config.Image}}')\" = ${image29.digestRef}"
         )
-        machine.wait_for_unit("imp-docker-proxy.service")
         return {
             "base_path": base_path,
             "old_path": machine.succeed("readlink -f /nix/var/nix/profiles/system-1-link").strip(),

@@ -22,7 +22,7 @@ let
   stubCmp = import ./test-utils/build-stub-cmp.nix { inherit pkgs; };
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
-  stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubImpHostPodman = import ./test-utils/build-stub-imp-host-podman.nix { inherit pkgs; };
   stubAgentImageBun = import ./test-utils/build-stub-agent-image-bun.nix { inherit pkgs; };
   stubOpRead = import ./test-utils/build-stub-op-read.nix { inherit pkgs; } {
     "op://vault/item/field" = "a value with spaces";
@@ -639,11 +639,12 @@ let
         stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
       in
       {
-        title = "it buildStubImpHostImage pins the image by its tag and the manifest digest of the layout";
+        title = "it buildStubImpHostImage pins the image by its tag and the manifest digest of the layout, and names it by that digest alone";
         script = ''
           digest=$(jq -r '.manifests[0].digest' ${stubImage.layout}/index.json)
 
           assert_equals "ghcr.io/zgeoff/imp-host:0.28.0@$digest" ${lib.escapeShellArg stubImage.ref} "the reference"
+          assert_equals "ghcr.io/zgeoff/imp-host@$digest" ${lib.escapeShellArg stubImage.digestRef} "the reference by digest"
           assert_equals 1 "$(jq '.manifests | length' ${stubImage.layout}/index.json)" "the layout's manifests"
           assert_equals 0.28.0 "$(jq -r '.manifests[0].annotations."org.opencontainers.image.ref.name"' ${stubImage.layout}/index.json)" \
             "the layout's tag"
@@ -678,7 +679,7 @@ let
         stubImage = import ./test-utils/build-stub-imp-host-image.nix { inherit pkgs; } "0.28.0";
       in
       {
-        title = "it buildStubImpHostImage sleeps as imp-host, its imp-docker-proxy only opens the socket, and its impz info prints the version";
+        title = "it buildStubImpHostImage sleeps as imp-host, and its impz info prints the version";
         script = ''
           blobs=${stubImage.layout}/blobs/sha256
           manifest=$blobs/$(jq -r '.manifests[0].digest | ltrimstr("sha256:")' ${stubImage.layout}/index.json)
@@ -688,9 +689,6 @@ let
 
           cmd=$(jq -c '.config.Cmd' "$config")
           tar -tvf "$layer" > listing
-          proxy=$(sed -n 's|^l.* \./usr/local/bin/imp-docker-proxy -> /||p' listing)
-          tar -xOf "$layer" "$proxy" > proxy-script
-          proxy_mode=$(grep -E " $proxy\$" listing | cut -c1-10)
           sleep_target=$(sed -n 's|^l.* \./bin/sleep -> ||p' listing)
           # busybox's own bin/sleep is a link to the busybox binary beside it
           busybox_path=''${sleep_target%/sleep}/busybox
@@ -698,9 +696,6 @@ let
 
           assert_equals 1 "$(printf '%s\n' "$layers" | wc -l)" "the image's layers"
           assert_equals '["sleep","infinity"]' "$cmd" "the image's command"
-          printf '%s\n' '#!/bin/sh' 'exec ${pkgs.socat}/bin/socat UNIX-LISTEN:/run/imp-docker/docker.sock,fork EXEC:/bin/true' > expected
-          assert_files_equal expected proxy-script
-          assert_equals -r-xr-xr-x "$proxy_mode" "the proxy's mode"
           assert_equals "${pkgs.busybox}/bin/sleep" "$sleep_target" "the image's sleep"
           assert_equals 1 "$busybox" "the image's busybox binaries"
 
@@ -723,15 +718,17 @@ let
       }
     )
     {
-      title = "it buildStubImpHostImage holds to the pinned imp: the path and socket of the proxy, and the own command of imp-host";
+      title = "it buildStubImpHostImage holds to the pinned imp: the module pulls the image by its reference, and runs imp-host with podman run from the image's own command";
       script = ''
-        command=$(jq -c '.proxy.command' ${imp}/deploy/imp-host.args.json)
-        waits=$(grep -cF '[ -S /run/imp-docker/docker.sock ] && exit 0' ${imp}/deploy/nixos/config.nix || true)
+        pulls=$(grep -cxF '          ''${podman} image exists "$ref" || ''${podman} pull -q "$ref"' \
+          ${imp}/deploy/nixos/config.nix || true)
+        starts=$(grep -cxF '        ExecStart = "''${podman} run ''${lib.escapeShellArgs runArgs}";' \
+          ${imp}/deploy/nixos/config.nix || true)
         runs=$(grep -cxF '  runArgs = privileges ++ probedArgs ++ sharedArgs ++ secretArgs ++ dnsArgs ++ [ cfg.image ];' \
           ${imp}/deploy/nixos/config.nix || true)
 
-        assert_equals '["/usr/local/bin/imp-docker-proxy"]' "$command" "the proxy's command"
-        assert_equals 1 "$waits" "the module's waits for the proxy's socket"
+        assert_equals 1 "$pulls" "the module's pulls of a missing image without an archive"
+        assert_equals 1 "$starts" "the module's imp-host starts with podman run"
         assert_equals 1 "$runs" "the module's imp-host runs that end at the image, with no command"
       '';
     }
@@ -897,8 +894,8 @@ let
         mkdir home tmp
 
         status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-docker-proxy \
-          ${stubSystemctl} show -p ActiveState --value imp-docker-proxy > out 2> err || status=$?
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
+          ${stubSystemctl} show -p ActiveState --value imp-host > out 2> err || status=$?
 
         assert_equals 1 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -912,10 +909,10 @@ let
 
         real_status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
-          ${pkgs.systemd}/bin/systemctl show -p ActiveState --value imp-host > real.out 2> real.err || real_status=$?
+          ${pkgs.systemd}/bin/systemctl show -p ActiveState --value imp-host-image > real.out 2> real.err || real_status=$?
         stub_status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-docker-proxy \
-          ${stubSystemctl} show -p ActiveState --value imp-host > stub.out 2> stub.err || stub_status=$?
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
+          ${stubSystemctl} show -p ActiveState --value imp-host-image > stub.out 2> stub.err || stub_status=$?
 
         assert_equals "$real_status" "$stub_status" "the exit status"
         assert_files_equal real.out stub.out
@@ -929,10 +926,10 @@ let
 
         real_status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
-          ${pkgs.systemd}/bin/systemctl show -p SubState --value imp-docker-proxy > real.out 2> real.err || real_status=$?
+          ${pkgs.systemd}/bin/systemctl show -p SubState --value imp-host > real.out 2> real.err || real_status=$?
         stub_status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-docker-proxy \
-          ${stubSystemctl} show -p SubState --value imp-docker-proxy > stub.out 2> stub.err || stub_status=$?
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
+          ${stubSystemctl} show -p SubState --value imp-host > stub.out 2> stub.err || stub_status=$?
 
         assert_equals "$real_status" "$stub_status" "the exit status"
         assert_files_equal real.out stub.out
@@ -945,7 +942,7 @@ let
         mkdir home tmp
 
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${pkgs.systemd}/bin/systemctl --version > real.out 2> real.err
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-docker-proxy \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} --version > stub.out 2> stub.err
 
         assert_files_equal real.out stub.out
@@ -962,7 +959,7 @@ let
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" \
           ${pkgs.systemd}/bin/systemctl --no-such-option 'two words' > real.out 2> real.err || real_status=$?
         stub_status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-docker-proxy \
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" FAIL_SHOW_UNIT=imp-host \
           ${stubSystemctl} --no-such-option 'two words' > stub.out 2> stub.err || stub_status=$?
 
         assert_equals "$real_status" "$stub_status" "the exit status"
@@ -993,7 +990,7 @@ let
         systemctl=$(grep -cxF 'systemctl="''${SYSTEMCTL:-systemctl}"' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
         reads=$(grep -cxF '  unit_state="$("$systemctl" show -p ActiveState --value "$unit")" || fail "cannot read $unit'"'"'s state"' \
           ${../packages/impd-db-tools/restore-impd-db.sh} || true)
-        units=$(grep -cxF 'units=(imp-host imp-docker-proxy)' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
+        units=$(grep -cxF 'units=(imp-host)' ${../packages/impd-db-tools/restore-impd-db.sh} || true)
 
         assert_equals 1 "$message" "systemd's files that hold the message"
         assert_equals 1 "$systemctl" "the script's systemctl"
@@ -1335,14 +1332,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker prints the impd images for an image list, and records the call";
+      title = "it buildStubImpHostPodman prints the impd images for an image list, and records the call";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image ls --json > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image ls --json > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
         assert_files_equal - out <<'EOF'
@@ -1363,14 +1360,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker points a name at the added ref in place of the image of that name, and prints the image";
+      title = "it buildStubImpHostPodman points a name at the added ref in place of the image of that name, and prints the image";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12},{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
         assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","source":"oci"}' "$(jq -c '{name, ref, source}' out)" "the printed image"
@@ -1380,14 +1377,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker keeps the pin of the image whose name an add points at a new ref";
+      title = "it buildStubImpHostPodman keeps the pin of the image whose name an add points at a new ref";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":true}]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
         assert_equals '{"name":"pv-base","ref":"ghcr.io/example/base:1.0.0","pinned":true}' "$(jq -c '{name, ref, pinned}' out)" "the printed image"
@@ -1397,14 +1394,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker pins the image of the name it is given, prints nothing, and leaves the other images alone";
+      title = "it buildStubImpHostPodman pins the image of the name it is given, prints nothing, and leaves the other images alone";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false},{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/base:0.9.0","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false}]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image pin pv-base > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image pin pv-base > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -1413,14 +1410,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker fails a pin of a name that holds no image, as impz fails a call";
+      title = "it buildStubImpHostPodman fails a pin of a name that holds no image, as impz fails a call";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image pin pv-base > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image pin pv-base > out 2> err || status=$?
 
         assert_equals 1 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -1429,7 +1426,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker fails the calls its unreachable count names as docker fails a missing container, then answers";
+      title = "it buildStubImpHostPodman fails the calls its unreachable count names as podman fails a missing container, then answers";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -1437,21 +1434,21 @@ let
 
         first_status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image ls --json > first.out 2> first.err || first_status=$?
+          ${stubImpHostPodman} exec imp-host impz image ls --json > first.out 2> first.err || first_status=$?
         second_status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image ls --json > second.out 2> second.err || second_status=$?
+          ${stubImpHostPodman} exec imp-host impz image ls --json > second.out 2> second.err || second_status=$?
 
-        assert_equals 1 "$first_status" "the first call's exit status"
+        assert_equals 125 "$first_status" "the first call's exit status"
         assert_files_equal /dev/null first.out
-        assert_equals "Error response from daemon: No such container: imp-host" "$(cat first.err)" "the first call's error"
+        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first call's error"
         assert_equals 0 "$second_status" "the second call's exit status"
         assert_equals '[]' "$(cat second.out)" "the second call's output"
         assert_files_equal /dev/null second.err
       '';
     }
     {
-      title = "it buildStubImpHostDocker fails the next add with its add-error as impz fails a call, and adds nothing";
+      title = "it buildStubImpHostPodman fails the next add with its add-error as impz fails a call, and adds nothing";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -1459,7 +1456,7 @@ let
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
 
         assert_equals 1 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -1468,14 +1465,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker records another call and fails it as unexpected";
+      title = "it buildStubImpHostPodman records another call and fails it as unexpected";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz image rm 'two words' > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz image rm 'two words' > out 2> err || status=$?
 
         assert_equals 97 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -1484,14 +1481,14 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker prints the version line of impz info from its version file, and records the call";
+      title = "it buildStubImpHostPodman prints the version line of impz info from its version file, and records the call";
       script = ''
         mkdir home tmp impd
         echo 4.5.6 > impd/version
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz info > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz info > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
         assert_equals 'version     4.5.6' "$(cat out)" "the printed info"
@@ -1500,13 +1497,13 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker fails impz info as unexpected without a version file";
+      title = "it buildStubImpHostPodman fails impz info as unexpected without a version file";
       script = ''
         mkdir home tmp impd
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} exec imp-host impz info > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host impz info > out 2> err || status=$?
 
         assert_equals 97 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -1514,7 +1511,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker copies a file out of its container directory with its mode, and records the call";
+      title = "it buildStubImpHostPodman copies a file out of its container directory with its mode, and records the call";
       script = ''
         mkdir home tmp impd impd/container impd/container/usr impd/container/usr/local impd/container/usr/local/bin
         printf '#!/bin/sh\necho stand-in\n' > impd/container/usr/local/bin/impz
@@ -1522,7 +1519,7 @@ let
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+          ${stubImpHostPodman} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
         assert_files_equal /dev/null out
@@ -1533,17 +1530,17 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker fails a copy of a path its container directory lacks, as docker fails it";
+      title = "it buildStubImpHostPodman fails a copy of a path its container directory lacks, as podman fails it";
       script = ''
         mkdir home tmp impd
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostDocker} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+          ${stubImpHostPodman} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
 
-        assert_equals 1 "$status" "the exit status"
+        assert_equals 125 "$status" "the exit status"
         assert_files_equal /dev/null out
-        assert_equals "Error response from daemon: Could not find the file /usr/local/bin/impz in container imp-host" "$(cat err)" "the error"
+        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat err)" "the error"
         assert_missing impz "the copy"
       '';
     }
@@ -1622,35 +1619,35 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostDocker refuses to run without the impd state directory";
+      title = "it buildStubImpHostPodman refuses to run without the impd state directory";
       script = ''
         mkdir home tmp
 
         status=0
-        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubImpHostDocker} exec imp-host impz image ls --json > out 2> err || status=$?
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" ${stubImpHostPodman} exec imp-host impz image ls --json > out 2> err || status=$?
 
         assert_equals 2 "$status" "the exit status"
         assert_files_equal /dev/null out
-        assert_equals "docker-answering-impz: set IMPD_STATE to the directory that holds impd's images" "$(cat err)" "the error"
+        assert_equals "podman-answering-impz: set IMPD_STATE to the directory that holds impd's images" "$(cat err)" "the error"
       '';
     }
     {
-      title = "it buildStubImpHostDocker holds to preview-image: it reaches impd only through the docker it is given, with the three calls the stand-in answers";
+      title = "it buildStubImpHostPodman holds to preview-image: it reaches impd only through the podman it is given, with the three calls the stand-in answers";
       script = ''
-        docker_cmd=$(grep -cxF 'docker="''${DOCKER:-docker}"' ${../modules/preview-image.sh} || true)
-        list=$(grep -cxF 'until images=$("$docker" exec imp-host impz image ls --json 2> "$err"); do' ${../modules/preview-image.sh} || true)
-        add=$(grep -cxF '  "$docker" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
-        pin=$(grep -cxF '  "$docker" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
-        calls=$(grep -cF '"$docker"' ${../modules/preview-image.sh} || true)
-        # a docker call by name, outside a comment, would pass the stand-in by
-        direct=$(grep -cE '^[^#]*(^|[ ;&|($])docker ' ${../modules/preview-image.sh} || true)
+        podman_cmd=$(grep -cxF 'podman="''${PODMAN:-podman}"' ${../modules/preview-image.sh} || true)
+        list=$(grep -cxF 'until images=$("$podman" exec imp-host impz image ls --json 2> "$err"); do' ${../modules/preview-image.sh} || true)
+        add=$(grep -cxF '  "$podman" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        pin=$(grep -cxF '  "$podman" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
+        calls=$(grep -cF '"$podman"' ${../modules/preview-image.sh} || true)
+        # a podman call by name, outside a comment, would pass the stand-in by
+        direct=$(grep -cE '^[^#]*(^|[ ;&|($])podman ' ${../modules/preview-image.sh} || true)
 
-        assert_equals 1 "$docker_cmd" "the script's docker"
+        assert_equals 1 "$podman_cmd" "the script's podman"
         assert_equals 1 "$list" "the script's image list"
         assert_equals 1 "$add" "the script's image add"
         assert_equals 1 "$pin" "the script's image pin"
-        assert_equals 3 "$calls" "the script's calls through DOCKER"
-        assert_equals 0 "$direct" "the script's calls of docker by name"
+        assert_equals 3 "$calls" "the script's calls through PODMAN"
+        assert_equals 0 "$direct" "the script's calls of podman by name"
       '';
     }
     {

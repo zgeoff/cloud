@@ -1,15 +1,16 @@
-# geoffcloud's CPU weights in a NixOS VM with geoffcloud's own k3s package and flags and Docker
-# settings: a container on Docker, as imp-host runs with its imps' Firecrackers, against a pod, a
-# k3s system pod (CoreDNS) and k3s's server, which runs the kubelet. For each pair, the two cgroups
-# where their paths part are siblings, and the container's must weigh less, so the kernel gives the
-# container the smaller share whenever both want CPU. It needs KVM: run
-# `bun run test:nixos imp-cpu-weight`.
+# geoffcloud's CPU weights in a NixOS VM with geoffcloud's own k3s package and flags, podman
+# package and slices: a container of rootful Podman, started as imp's module starts imp-host with
+# its imps' Firecrackers, against a pod, a k3s system pod (CoreDNS) and k3s's server, which runs
+# the kubelet. The container's cgroup must sit under machine.slice, where geoffcloud sets the
+# weight. For each pair, the two cgroups where their paths part are siblings, and the container's
+# must weigh less, so the kernel gives the container the smaller share whenever both want CPU. It
+# needs KVM: run `bun run test:nixos imp-cpu-weight`.
 { nixpkgs, geoffcloud }:
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux;
   lib = pkgs.lib;
   hostK3s = geoffcloud.config.services.k3s;
-  hostDocker = geoffcloud.config.virtualisation.docker;
+  hostPodman = geoffcloud.config.virtualisation.podman;
 
   # the pod and the container run the same image, which only sleeps
   sleepImage = pkgs.dockerTools.buildLayeredImage {
@@ -72,10 +73,9 @@ pkgs.testers.runNixOSTest {
       environment.systemPackages = [ pkgs.kubectl ];
       environment.sessionVariables.KUBECONFIG = "/etc/rancher/k3s/k3s.yaml";
 
-      virtualisation.docker = {
+      virtualisation.podman = {
         enable = true;
-        inherit (hostDocker) package;
-        daemon.settings = hostDocker.daemon.settings;
+        inherit (hostPodman) package;
       };
       systemd.slices = lib.mapAttrs (_: slice: {
         inherit (slice) sliceConfig;
@@ -123,9 +123,8 @@ pkgs.testers.runNixOSTest {
 
 
     with subtest("it starts the container, the pod and CoreDNS"):
-        machine.wait_for_unit("docker.service")
-        machine.succeed("docker load -i ${sleepImage}")
-        machine.succeed("docker run -d --name imp-host --cgroupns=private test.local/imp-cpu-weight:local")
+        machine.succeed("podman load -i ${sleepImage}")
+        machine.succeed("podman run -d --name imp-host --cgroupns=private test.local/imp-cpu-weight:local")
         machine.wait_for_unit("k3s.service")
         # the default service account comes a moment after the namespace, and a pod waits for it
         machine.wait_until_succeeds("kubectl apply -f ${pod}", timeout=300)
@@ -133,7 +132,7 @@ pkgs.testers.runNixOSTest {
         machine.wait_until_succeeds("kubectl wait --for=condition=Ready -n kube-system pod -l k8s-app=kube-dns --timeout=10s", timeout=600)
 
 
-    imp_host = read_cgroup(machine.succeed("docker inspect -f '{{.State.Pid}}' imp-host").strip())
+    imp_host = read_cgroup(machine.succeed("podman inspect -f '{{.State.Pid}}' imp-host").strip())
     others = {
         "the pod": read_cgroup(read_pod_pid("sleeper")),
         "CoreDNS": read_cgroup(read_pod_pid("coredns")),
@@ -141,6 +140,10 @@ pkgs.testers.runNixOSTest {
     }
     print(f"imp-host: {imp_host}")
     print(json.dumps(others, indent=2))
+
+
+    with subtest("it runs the container in a cgroup under machine.slice"):
+        assert imp_host.startswith("/machine.slice/"), f"imp-host runs in {imp_host}"
 
     for name, other in others.items():
         with subtest(f"it weighs the container's cgroup below {name}'s where the two part"):

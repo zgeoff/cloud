@@ -46,7 +46,7 @@ test("it disables the chart's TargetDown, drops the kubelet's copy of the contro
     },
     'prometheus-node-exporter': {
       extraArgs: [
-        '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)',
+        '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/containers/storage/.+|var/lib/kubelet/.+)($|/)',
         '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$',
         '--collector.textfile.directory=/host/root/var/lib/node-exporter/textfile',
       ],

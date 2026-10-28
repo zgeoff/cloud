@@ -52,7 +52,7 @@ async function requireTools(context: Readonly<ATCCredentialsContext>) {
 }
 
 async function requireGrantableTokens(context: Readonly<ATCCredentialsContext>) {
-  // a failing `info` stops here with docker's own message, so the check reads only a real answer
+  // a failing `info` stops here with podman's own message, so the check reads only a real answer
   const info = await loadHostImpJSON(context, ['info']);
 
   const features = findJSONField(info, 'features');

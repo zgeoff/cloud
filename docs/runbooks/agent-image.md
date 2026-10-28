@@ -113,12 +113,12 @@ Until the token file exists, systemd skips the unit. To stage the token, run thi
 machine that reaches the host:
 
 ```bash
-ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/agent-image-build && docker exec imp-host impz token new agent-image-build --scope manage | (umask 377 && cat > /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token) && test -s /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token && echo ok' < /dev/null
+ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/agent-image-build && podman exec imp-host impz token new agent-image-build --scope manage | (umask 377 && cat > /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token) && test -s /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token && echo ok' < /dev/null
 ```
 
 Expect `ok`. impz prints the token on its stdout, which goes straight into the file with mode 0400,
 so the token never appears in a command line or the journal. To replace the token, remove the old
-one with `docker exec imp-host impz token rm agent-image-build` and run the command again.
+one with `podman exec imp-host impz token rm agent-image-build` and run the command again.
 
 Each run writes its decision to the unit's journal, which Alloy ships to Loki, on a line that starts
 with `agent-image-build:`. A build adds the build script's progress, and its last line repeats the

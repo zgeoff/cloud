@@ -159,7 +159,7 @@ outside the preview's imp, because the code under test runs its tools with no se
 could change anything inside the imp. The counting proxy is nixie's own program, a release binary
 that the host pins, and nixie's architecture docs own how it prices and counts a reply.
 
-The broker sends every preview's model calls to one listener of the service on the docker bridge,
+The broker sends every preview's model calls to one listener of the service on Podman's bridge,
 because an impd secret has one upstream for all the imps it is granted to. The first segment of each
 call's path names the imp, and the model grant's path filter admits only the imp's own segment, so
 one preview can neither spend from another's count nor skip its own. The repository's preview stack

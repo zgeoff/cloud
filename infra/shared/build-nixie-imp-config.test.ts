@@ -8,7 +8,7 @@ test('it builds the imp section that nixie ran with from packages/topology', () 
     host_addresses: [
       '104.250.100.18/24',
       '2401:a4a0:4:17f::1/64',
-      '172.17.0.1/16',
+      '10.88.0.1/16',
       '100.69.47.33/32',
       'fd7a:115c:a1e0::ca36:2f22/128',
       '10.42.0.0/32',
@@ -41,7 +41,7 @@ test('it moves each address with the constant it comes from', () => {
       serviceCIDR: '10.53.0.0/16',
       nodePodCIDR: '10.52.3.0/24',
     },
-    docker: { bridgeAddress: '172.18.0.1', subnet: '172.18.0.0/16' },
+    podman: { bridge: 'podman1', bridgeAddress: '172.18.0.1', subnet: '172.18.0.0/16' },
     imp: { ...topology.imp, domain: 'imps.example.test' },
   };
 

@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_impd_db_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the host that
 # copy-impd-db.sh copies impd's database on. It never runs the host's copy-impd-db-host
-# (nixos/packages/impd-db-tools): the copy needs root, Docker and the imp-host container, which
+# (nixos/packages/impd-db-tools): the copy needs root, Podman and the imp-host container, which
 # no case has (nixos/checks/impd-restore.nix runs it in the restore VM). It logs each call's
 # argv as a JSON line to STUB_TREE/calls, writes what it reads on stdin to STUB_TREE/stdin, and
 # answers one `copy-impd-db-host <label>` command, whose label is letters, digits, '.', '_' and
@@ -12,10 +12,11 @@
 #   bytes, mode 600)" line, exit 0;
 # - with STUB_COPY_FAIL=integrity, the same report with integrity set to the findings of a
 #   damaged index, joined with "; " as the script joins them, exit 1 from its last `test`;
-# - with STUB_COPY_FAIL=imp-host-stopped, docker's "No such container: imp-host" error on
-#   stderr when the script makes its work directory, exit 1: imp's module runs imp-host with
-#   --rm, so a stopped imp-host leaves no container. nixos/checks/impd-restore.nix gets this
-#   answer from the real docker for the real script.
+# - with STUB_COPY_FAIL=imp-host-stopped, podman's 'no container with name or ID "imp-host"'
+#   error on stderr when the script makes its work directory, and podman's exit 125, which the
+#   script's errexit passes back: imp's module runs imp-host with --rm, so a stopped imp-host
+#   leaves no container. podman's line and code were checked against podman 5.
+#   nixos/checks/impd-restore.nix gets this answer from the real podman for the real script.
 #
 # The findings are the real sqlite3's report on the damaged database of
 # nixos/checks/test-utils/build-stub-integrity-sqlite3.nix: an empty page in place of the index
@@ -46,8 +47,8 @@ fi
 cat > "$STUB_TREE/stdin"
 dir="/root/imp-db-backups/${BASH_REMATCH[1]}-20261008T120000"
 if [ "${STUB_COPY_FAIL:-}" = imp-host-stopped ]; then
-  echo "Error response from daemon: No such container: imp-host" >&2
-  exit 1
+  echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
+  exit 125
 fi
 integrity=ok
 if [ "${STUB_COPY_FAIL:-}" = integrity ]; then integrity="wrong # of entries in index sqlite_autoindex_imps_1; row 1 missing from index sqlite_autoindex_imps_1; row 2 missing from index sqlite_autoindex_imps_1; row 3 missing from index sqlite_autoindex_imps_1"; fi

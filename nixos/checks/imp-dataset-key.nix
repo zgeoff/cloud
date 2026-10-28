@@ -27,7 +27,7 @@ pkgs.testers.runNixOSTest {
       networking.hostId = "5ca71846";
       # the VM reaches nothing, and dhcpcd crashing at times would fail a unit at boot
       networking.useDHCP = false;
-      # imp-host's docker run passes --device /dev/kvm
+      # imp-host's podman run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"
         "kvm-intel"

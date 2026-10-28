@@ -32,20 +32,20 @@
 #   drops the connection as OpenSSH reports a closed session (exit 255);
 # - `systemctl --failed --no-legend --plain`: prints STUB_FAILED_UNITS, or with
 #   STUB_FAILED_EXIT fails with systemctl's message and that code;
-# - `docker exec imp-host impz image ls --json`: prints STUB_IMPD_IMAGES, the JSON array of impd's
+# - `podman exec imp-host impz image ls --json`: prints STUB_IMPD_IMAGES, the JSON array of impd's
 #   image records, and `[]` when that is unset;
-# - the `docker exec imp-host sh -c` loop that lists the folders under /var/lib/imp/images holding
+# - the `podman exec imp-host sh -c` loop that lists the folders under /var/lib/imp/images holding
 #   a rootfs.ext4: prints each name in STUB_IMPD_IMAGE_DIRS (names separated by spaces) on its own
 #   line, and nothing when that is unset;
-# - with STUB_IMP_HOST_GONE, both docker commands fail as docker does for a container that does
-#   not exist: "Error response from daemon: No such container: imp-host" on stderr and exit 1,
-#   which ssh passes back.
+# - with STUB_IMP_HOST_GONE, both podman commands fail as podman does for a container that does
+#   not exist: 'Error: no container with name or ID "imp-host" found: no such container' on
+#   stderr and exit 125, which ssh passes back.
 #
-# docker's line was checked on 2026-10-26 against a real docker 29.8.2: `docker exec <a container
-# that does not exist> true` printed "Error response from daemon: No such container: <name>" and
-# exited 1. Not run against geoffcloud's docker. The image records' shape is impd's ImageSchema
-# (zgeoff/impz packages/api/src/schemas/image-schema.ts at v4.2.4 and v5.0.0), which a case
-# supplies whole.
+# podman's line was checked against a real podman 5: `podman exec <a container that does not
+# exist> true` printed 'Error: no container with name or ID "<name>" found: no such container'
+# and exited 125. Not run against geoffcloud's podman. The image records' shape is impd's
+# ImageSchema (zgeoff/impz packages/api/src/schemas/image-schema.ts at v4.2.4 and v5.0.0), which a
+# case supplies whole.
 #
 # With STUB_SSH_PASS=1, a call after it is logged goes through print-ssh-pass-through.sh's
 # guard: to the real ssh for a loopback destination, else exit 97. A call without
@@ -167,17 +167,17 @@ case "${*:4}" in
     fi
     if [ -n "${STUB_FAILED_UNITS:-}" ]; then printf '%s\n' "$STUB_FAILED_UNITS"; fi
     ;;
-  "docker exec imp-host impz image ls --json")
+  "podman exec imp-host impz image ls --json")
     if [ -n "${STUB_IMP_HOST_GONE:-}" ]; then
-      echo "Error response from daemon: No such container: imp-host" >&2
-      exit 1
+      echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
+      exit 125
     fi
     printf '%s\n' "${STUB_IMPD_IMAGES:-[]}"
     ;;
-  "docker exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'")
+  "podman exec imp-host sh -c 'cd /var/lib/imp/images && for d in *; do if [ -f \"\$d/rootfs.ext4\" ]; then echo \"\$d\"; fi; done'")
     if [ -n "${STUB_IMP_HOST_GONE:-}" ]; then
-      echo "Error response from daemon: No such container: imp-host" >&2
-      exit 1
+      echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
+      exit 125
     fi
     if [ -n "${STUB_IMPD_IMAGE_DIRS:-}" ]; then printf '%s\n' $STUB_IMPD_IMAGE_DIRS; fi
     ;;

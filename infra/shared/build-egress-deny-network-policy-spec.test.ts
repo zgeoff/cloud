@@ -7,7 +7,7 @@ test("it selects every pod and allows egress to every address but the tailnet ra
     policyTypes: ['Egress'],
     egress: [
       {
-        to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '172.17.0.0/16'] } }],
+        to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '10.88.0.0/16'] } }],
       },
     ],
   });

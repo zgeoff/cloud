@@ -3,7 +3,7 @@
 # for each of impd's three digest forms, and when impd holds no image, and fails naming each record
 # whose folder holds no rootfs.ext4 or whose digest names no folder. The records take the shape of
 # impd's ImageSchema, with invented ids and digests in the forms that zgeoff/impz's guest-build.ts
-# (`imp-build-<hex>`) and template-service.ts (`imp-<uuid>`) write at v4.2.4 and v5.0.0. It stops with docker's exit code when imp-host is gone. ssh is
+# (`imp-build-<hex>`) and template-service.ts (`imp-<uuid>`) write at v4.2.4 and v5.0.0. It stops with podman's exit code when imp-host is gone. ssh is
 # the NixOS host stand-in from test-support/shell, which answers the image listing and the folder
 # listing from the case's STUB_IMPD_IMAGES and STUB_IMPD_IMAGE_DIRS. Each case runs the script
 # under `env -i` and compares its stdout, stderr and ssh call log.
@@ -22,9 +22,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/check-impd-image-dirs.sh"
 # the two remote commands the check runs, as the call log records them
-list_call='["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec imp-host impz image ls --json"]'
+list_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz image ls --json"]'
 # shellcheck disable=SC2016 # $d is the remote shell's loop variable, as the call log records it
-dirs_call='["ssh","-o","BatchMode=yes","root@geoffcloud","docker exec imp-host sh -c '"'"'cd /var/lib/imp/images && for d in *; do if [ -f \"$d/rootfs.ext4\" ]; then echo \"$d\"; fi; done'"'"'"]'
+dirs_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c '"'"'cd /var/lib/imp/images && for d in *; do if [ -f \"$d/rootfs.ext4\" ]; then echo \"$d\"; fi; done'"'"'"]'
 
 # setup_test <tree>: the home and temp folders the cases run with, the ssh stand-in, fail-closed
 # stand-ins for the other remote tools, and a guard that ends the case unless each resolves to a
@@ -202,7 +202,7 @@ EOF
   assert_status 1 "$status"
 }
 
-it_stops_with_docker_exit_code_when_imp_host_is_gone() {
+it_stops_with_podman_exit_code_when_imp_host_is_gone() {
   local status=0
   create_case_tree
   setup_test "$tree"
@@ -211,9 +211,9 @@ it_stops_with_docker_exit_code_when_imp_host_is_gone() {
     STUB_IMP_HOST_GONE=1 bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
 
   diff /dev/null "$tree/out"
-  diff - "$tree/err" <<< 'Error response from daemon: No such container: imp-host'
+  diff - "$tree/err" <<< 'Error: no container with name or ID "imp-host" found: no such container'
   diff - "$tree/calls" <<< "$list_call"
-  assert_status 1 "$status"
+  assert_status 125 "$status"
 }
 
 it_prints_its_usage_without_a_host() {
