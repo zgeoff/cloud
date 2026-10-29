@@ -1473,6 +1473,60 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostPodman prints the container ID of each inspect from container-ids, keeping the last";
+      script = ''
+        mkdir home tmp impd
+        printf 'c0ffee01\nc0ffee02\n' > impd/container-ids
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > first.out 2> first.err
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > second.out 2> second.err
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > third.out 2> third.err
+
+        assert_equals c0ffee01 "$(cat first.out)" "the first inspect's output"
+        assert_equals c0ffee02 "$(cat second.out)" "the second inspect's output"
+        assert_equals c0ffee02 "$(cat third.out)" "the third inspect's output"
+        assert_files_equal /dev/null first.err
+        assert_files_equal /dev/null second.err
+        assert_files_equal /dev/null third.err
+      '';
+    }
+    {
+      title = "it buildStubImpHostPodman fails an inspect as podman fails a missing container when container-ids is missing";
+      script = ''
+        mkdir home tmp impd
+
+        status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > out 2> err || status=$?
+
+        assert_equals 125 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_equals 'Error: no such container "imp-host"' "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubImpHostPodman fails the inspect that an empty line of container-ids names as podman fails a missing container";
+      script = ''
+        mkdir home tmp impd
+        printf 'c0ffee01\n\n' > impd/container-ids
+
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > first.out 2> first.err
+        second_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} container inspect --format '{{.Id}}' imp-host > second.out 2> second.err || second_status=$?
+
+        assert_equals c0ffee01 "$(cat first.out)" "the first inspect's output"
+        assert_files_equal /dev/null first.err
+        assert_equals 125 "$second_status" "the second inspect's exit status"
+        assert_files_equal /dev/null second.out
+        assert_equals 'Error: no such container "imp-host"' "$(cat second.err)" "the second inspect's error"
+      '';
+    }
+    {
       title = "it buildStubImpHostPodman fails the next add with its add-error as impz fails a call, and adds nothing";
       script = ''
         mkdir home tmp impd

@@ -105,7 +105,8 @@ The `agent-image-build` timer on geoffcloud fetches `main` of the public zgeoff/
 without a credential, into a clone under `/var/lib/agent-image-build`. It takes the newest commit on
 `main` that changes `images/agent`, and runs the build script for that commit when impd holds no
 image of its name. While impd does not answer, as when a host switch recreates imp-host, a run waits
-up to 10 minutes and then leaves the build to the next run, so the unit does not fail the switch. It
+up to 10 minutes and then leaves the build to the next run, so the unit does not fail the switch. A
+build that fails while imp-host's container changes leaves the commit for the next run as well. It
 copies `impz` out of the imp-host container for each build, so the CLI matches the impd it calls.
 The build's token is a `manage` token with no imp patterns, so it controls every imp, grant and
 image on the host. It lives in a root-only file on the host's encrypted secrets dataset, and never
