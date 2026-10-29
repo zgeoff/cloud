@@ -11,9 +11,10 @@ test("it takes the given record's entries and keeps the others in registry order
     planPinTable([getReleaseRecord('nixie')], {
       'scripts/release/release-pins.json': `{\n  "auto-mode": {\n    "version": "0.19.3",\n    "sum": "${'d'.repeat(64)}"\n  },\n  "nixie": {\n    "version": "0.6.2",\n    "digest": "sha256:${'c'.repeat(64)}"\n  }\n}\n`,
       'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+      'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     }),
   ).toBe(
-    `{\n  "nixie": {\n    "version": "0.7.0",\n    "digest": "sha256:${'a'.repeat(64)}"\n  },\n  "nixie-web": {\n    "version": "0.7.0",\n    "digest": "sha256:${'b'.repeat(64)}"\n  },\n  "auto-mode": {\n    "version": "0.19.3",\n    "sum": "${'d'.repeat(64)}"\n  }\n}\n`,
+    `{\n  "nixie": {\n    "version": "0.7.0",\n    "digest": "sha256:${'a'.repeat(64)}"\n  },\n  "nixie-web": {\n    "version": "0.7.0",\n    "digest": "sha256:${'b'.repeat(64)}"\n  },\n  "nixie-contract": {\n    "version": "0.7.0"\n  },\n  "auto-mode": {\n    "version": "0.19.3",\n    "sum": "${'d'.repeat(64)}"\n  }\n}\n`,
   );
 });
 

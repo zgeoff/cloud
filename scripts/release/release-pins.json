@@ -37,6 +37,9 @@
     "version": "0.55.0",
     "digest": "sha256:0a48710fb95de92558469dcf13ed24fc597d91b76c963045cad5d054c7bb27b8"
   },
+  "nixie-contract": {
+    "version": "0.55.0"
+  },
   "auto-mode": {
     "version": "3.1.5",
     "sum": "c3ed8b12722ccbec4d66567eb6c69dd12f367925cc1dbf9688abd310efc9f67e"

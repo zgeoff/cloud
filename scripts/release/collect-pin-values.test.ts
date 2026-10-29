@@ -6,10 +6,12 @@ test('it collects each pin line part by pin id and group', () => {
   expect(
     collectPinValues(getReleaseRecord('nixie'), {
       'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.1@sha256:${'b'.repeat(64)}\n`,
+      'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
     }),
   ).toStrictEqual({
     nixie: { version: '0.7.0', digest: `sha256:${'a'.repeat(64)}` },
     'nixie-web': { version: '0.7.1', digest: `sha256:${'b'.repeat(64)}` },
+    'nixie-contract': { version: '0.7.0' },
   });
 });
 

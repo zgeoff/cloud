@@ -78,6 +78,7 @@ export async function runPublishedImagesBump(
         values: bump.values,
         root: context.cwd,
         run: context.run,
+        readText: (path) => readFile(path, 'utf8'),
         env: context.env,
         printOut: context.printOut,
       }),
