@@ -466,8 +466,6 @@ in
     principals = {
       # ChatGPT's connector, added 2026-10-04
       "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
-      # a temporary Claude Code client for the gateway smoke spawn, added 2026-10-29
-      "8nl7dBdGflNT70cpkwCboXzHBXqPV3VV".targets = [ "geoffcloud" ];
     };
   };
 
