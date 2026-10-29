@@ -557,7 +557,7 @@ let
         '';
     }
     {
-      title = "it adds the pinned image to impd once imp-host runs, at each switch that changes the pin and each imp-host restart, before the service starts";
+      title = "it adds the pinned image to impd once imp-host runs, at each switch that changes the pin and each imp-host restart, before the service starts, and starts again after a failed start";
       script =
         let
           system = buildImageSystem {
@@ -576,6 +576,8 @@ let
             after = [ "imp-host.service" ];
             requires = [ "imp-host.service" ];
             restartIfChanged = true;
+            startLimitIntervalSec = 3600;
+            startLimitBurst = 10;
             environment = {
               PREVIEW_IMAGE_NAME = "pv-base";
               PREVIEW_IMAGE_REF = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
@@ -583,6 +585,8 @@ let
             serviceConfig = {
               Type = "oneshot";
               RemainAfterExit = true;
+              Restart = "on-failure";
+              RestartSec = 10;
               ExecStart = imageScript;
               TimeoutStartSec = "20min";
               NoNewPrivileges = true;
@@ -600,6 +604,8 @@ let
               after
               requires
               restartIfChanged
+              startLimitIntervalSec
+              startLimitBurst
               serviceConfig
               ;
             environment = removeAttrs service.environment [ "PATH" ];
@@ -757,7 +763,7 @@ let
           ${imageScript} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null err
+        assert_equals 'preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container' "$(cat err)" "the error"
         assert_files_equal - sleep.log <<'EOF'
         ["2"]
         ["2"]
@@ -769,6 +775,28 @@ let
         ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         ["exec","imp-host","impz","image","pin","pv-base"]
         EOF
+      '';
+    }
+    {
+      title = "it prints each failed try whose error differs from the one before, while impd starts and then refuses the call";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 2 > impd/unreachable
+        echo 2 > impd/unauthorized
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal - err <<'EOF'
+        preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container
+        preview-image: try 3: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
+        EOF
+        assert_equals 4 "$(wc -l < sleep.log)" "the pauses"
       '';
     }
     {
@@ -786,7 +814,10 @@ let
 
         assert_equals 1 "$status" "the exit status"
         assert_files_equal /dev/null out
-        assert_equals "preview-image: impd listed no images after 3 tries: Error: no container with name or ID \"imp-host\" found: no such container" "$(cat err)" "the error"
+        assert_files_equal - err <<'EOF'
+        preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container
+        preview-image: impd listed no images after 3 tries: Error: no container with name or ID "imp-host" found: no such container
+        EOF
         assert_files_equal - sleep.log <<'EOF'
         ["2"]
         ["2"]

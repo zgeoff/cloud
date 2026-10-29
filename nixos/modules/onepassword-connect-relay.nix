@@ -17,6 +17,7 @@
 { config, lib, ... }:
 let
   cfg = config.services.onepassword-connect-relay;
+  listenStreams = [ "${cfg.address}:${toString cfg.port}" ];
 in
 {
   # the admission below is an option of this module
@@ -79,10 +80,25 @@ in
 
     systemd.sockets.onepassword-connect-relay = {
       wantedBy = [ "sockets.target" ];
-      listenStreams = [ "${cfg.address}:${toString cfg.port}" ];
+      inherit listenStreams;
       socketConfig.FreeBind = true;
     };
+    # switch-to-configuration never restarts a changed socket unit (nixpkgs#74899), so a switch
+    # that moves the listen address restarts this unit instead, and it restarts the socket
+    systemd.services.onepassword-connect-relay-listen = {
+      description = "the Connect relay's socket on its listen address";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "onepassword-connect-relay.socket" ];
+      restartTriggers = listenStreams;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${config.systemd.package}/bin/systemctl restart onepassword-connect-relay.socket";
+      };
+    };
     systemd.services.onepassword-connect-relay = {
+      # the proxy holds the listening socket it was started with, so it stops with the socket
+      partOf = [ "onepassword-connect-relay.socket" ];
       serviceConfig = {
         ExecStart = "${config.systemd.package}/lib/systemd/systemd-socket-proxyd ${cfg.target}";
         DynamicUser = true;

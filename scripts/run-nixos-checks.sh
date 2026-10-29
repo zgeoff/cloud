@@ -10,22 +10,21 @@
 # --derivations evaluates the checks and writes their derivation paths to <file>, sorted, one per
 # line, and builds nothing, so it needs no KVM. --from-derivations builds the derivations such a
 # file lists, from the store volume that evaluated them, without evaluating the flake again; it
-# needs KVM, since it cannot tell which derivation boots a VM. NIXOS_CHECKS_CACHE names a local binary cache
-# (scripts/write-nixos-checks-cache.sh writes one): when it holds a nix-cache-info, the build
-# substitutes from it, unsigned, before it builds a path itself.
+# needs KVM, since it cannot tell which derivation boots a VM. NIXOS_CHECKS_CACHE names a local
+# binary cache (scripts/write-nixos-checks-cache.sh writes one): when it holds a nix-cache-info,
+# the build substitutes from it, unsigned, before it builds a path itself.
 #
 # impd-restore, every other check named impd-restore-*, tank-cloud-unlock, tank-cloud-host-secrets,
 # tank-cloud-rancher, imp-dataset-key, geoffcloud-no-pool, network-policy, imp-cpu-weight,
-# host-cgroup-cpu-vm, drift-check-vm, public-front-vm and atc-daemon-vm boot a NixOS VM, so they
-# need KVM: unless /dev/kvm (or KVM_DEVICE, which the script's own test sets) is readable and
-# writable, the script builds every other check it was asked for and then fails, naming those
-# checks. Each such
-# check itself fails if QEMU still falls back to emulation. A container for each check evaluates it to
-# its derivation, and one more builds those derivations from the store. The checks read
-# test-support/shell beside nixos/, so the evaluation's flake source is the repo root
-# (path:.?dir=nixos), not nixos/ alone. The source is a snapshot of the working tree's
-# tracked and unignored files, so a local edit is tested before it is committed and nothing
-# ignored, such as node_modules or .worktrees, is copied. The Docker
+# host-cgroup-cpu-vm, drift-check-vm, public-front-vm, atc-daemon-vm, onepassword-connect-relay-vm
+# and preview-image-vm boot a NixOS VM, so they need KVM: unless /dev/kvm (or KVM_DEVICE, which
+# the script's own test sets) is readable and writable, the script builds every other check it was
+# asked for and then fails, naming those checks. Each such check itself fails if QEMU still falls
+# back to emulation. A container for each check evaluates it to its derivation, and one more
+# builds those derivations from the store. The checks read test-support/shell beside nixos/, so
+# the evaluation's flake source is the repo root (path:.?dir=nixos), not nixos/ alone. The source
+# is a snapshot of the working tree's tracked and unignored files, so a local edit is tested before
+# it is committed and nothing ignored, such as node_modules or .worktrees, is copied. The Docker
 # volume NIX_STORE_VOLUME (default cloud-nixos-checks-store) keeps the Nix store between runs; it
 # is not the switch's geoffcloud-nix-store, so a test build never shares the deploy cache.
 set -euo pipefail
@@ -144,7 +143,8 @@ for check in "${checks[@]}"; do
   case "$check" in
     impd-restore | impd-restore-* | tank-cloud-unlock | tank-cloud-host-secrets | tank-cloud-rancher | \
       imp-dataset-key | geoffcloud-no-pool | network-policy | imp-cpu-weight | host-cgroup-cpu-vm | \
-      drift-check-vm | public-front-vm | atc-daemon-vm)
+      drift-check-vm | public-front-vm | atc-daemon-vm | onepassword-connect-relay-vm | \
+      preview-image-vm)
       # QEMU opens the device read-write, and falls back to emulation when it cannot; an
       # evaluation alone needs no KVM
       if [ -z "$derivations_out" ] && { [ ! -r "$kvm_device" ] || [ ! -w "$kvm_device" ]; }; then

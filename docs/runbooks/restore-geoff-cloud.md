@@ -215,8 +215,12 @@ rehearsed. If imp's image changes, restore the matching database with section 2,
 you; do not switch first.
 
 ```sh
-ssh root@geoffcloud nixos-rebuild switch --rollback
+ssh root@geoffcloud nix-env -p /nix/var/nix/profiles/system --list-generations < /dev/null
+ssh root@geoffcloud 'nix-env -p /nix/var/nix/profiles/system --switch-generation <generation> && systemd-run --collect --wait --pipe --quiet --service-type=exec --unit=rollback-geoffcloud /nix/var/nix/profiles/system-<generation>-link/bin/switch-to-configuration switch' < /dev/null
 ```
+
+`<generation>` is the number before the `(current)` one. `nixos-rebuild switch --rollback` fails on
+the host, which has no `nixos-config` to evaluate.
 
 Exception: imp 0.29.1 adds no migration to 0.29.0, so a rollback from 0.29.1 to the 0.29.0
 generation needs no database restore. **CAUTION:** 0.29.0 holds the image.json flaw that 0.29.1

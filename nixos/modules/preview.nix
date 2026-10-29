@@ -344,9 +344,14 @@ in
         PREVIEW_IMAGE_NAME = cfg.impImage;
         PREVIEW_IMAGE_REF = cfg.impRegistryImage;
       };
+      # each start waits about 2 min for impd, so 10 starts outlast imp-host's 15 min start timeout
+      startLimitIntervalSec = 3600;
+      startLimitBurst = 10;
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
+        Restart = "on-failure";
+        RestartSec = 10;
         ExecStart = lib.getExe addImage;
         # impd's first add pulls its builder image before the add pulls this one
         TimeoutStartSec = "20min";

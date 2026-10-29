@@ -1448,6 +1448,31 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostPodman fails the calls its unauthorized count names as impz fails a 401, once unreachable has none left, then answers";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unreachable
+        echo 1 > impd/unauthorized
+
+        for call in first second third; do
+          status=0
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+            ${stubImpHostPodman} exec imp-host impz image ls --json > "$call.out" 2> "$call.err" || status=$?
+          echo "$status" > "$call.status"
+        done
+
+        assert_equals 125 "$(cat first.status)" "the first call's exit status"
+        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first call's error"
+        assert_equals 1 "$(cat second.status)" "the second call's exit status"
+        assert_files_equal /dev/null second.out
+        assert_equals 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>' "$(cat second.err)" "the second call's error"
+        assert_equals 0 "$(cat third.status)" "the third call's exit status"
+        assert_equals '[]' "$(cat third.out)" "the third call's output"
+        assert_files_equal /dev/null third.err
+      '';
+    }
+    {
       title = "it buildStubImpHostPodman fails the next add with its add-error as impz fails a call, and adds nothing";
       script = ''
         mkdir home tmp impd

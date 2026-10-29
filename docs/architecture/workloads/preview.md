@@ -118,10 +118,11 @@ A boot runs after the link answers, so a slow build never holds a request open.
 Every preview imp boots from one impd image, which the service names apart from impd's default image
 so that an operator who points the default elsewhere leaves previews alone. A oneshot unit on the
 host adds that image from imp's base image, pinned by digest, whenever a switch changes the pin or
-imp-host restarts, and the service starts after it. A switch therefore never leaves the service
-booting from an image impd lacks. The unit pins the image's name in impd too, so impd's image
-eviction keeps the image while no preview imp runs. The release check moves that pin with the agent
-image's, so the previews and the agents run one release of imp's base image.
+imp-host restarts, and the service starts after it. A start that impd does not answer in time starts
+again, up to the unit's start limit. A switch therefore never leaves the service booting from an
+image impd lacks. The unit pins the image's name in impd too, so impd's image eviction keeps the
+image while no preview imp runs. The release check moves that pin with the agent image's, so the
+previews and the agents run one release of imp's base image.
 
 1. The service reads the head commit's Compose file again, since the head may have moved, and takes
    the app's port and health path from its `x-preview` block, a top-level key that Compose ignores.

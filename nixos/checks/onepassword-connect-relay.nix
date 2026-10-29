@@ -1,5 +1,5 @@
 # Evaluates services.onepassword-connect-relay apart from any host's config, beside imp's own
-# module (the flake's pinned imp input), and checks the socket and service it adds, the port it
+# module (the flake's pinned imp input), and checks the socket and the services it adds, the port it
 # admits in inet cloud_host and opens on imp-host's bridge, and its assertion. Each case evaluates
 # its own config through test-utils/build-module-system.nix and runs on its own, in a fresh
 # directory, under test-support/shell/run-cases.sh, which reports each case and fails the check
@@ -24,7 +24,7 @@ let
 
   cases = [
     {
-      title = "it proxies the socket on the relay address to the target, hardened";
+      title = "it proxies the socket on the relay address to the target, hardened, and restarts the socket and the proxy at a switch that moves the address";
       script =
         let
           system = buildModuleSystem relayModule {
@@ -43,6 +43,7 @@ let
           };
           socket = system.config.systemd.sockets.onepassword-connect-relay;
           service = system.config.systemd.services.onepassword-connect-relay;
+          listen = system.config.systemd.services.onepassword-connect-relay-listen;
         in
         ''
           jq -S . > expected <<'EOF'
@@ -51,6 +52,18 @@ let
               wantedBy = [ "sockets.target" ];
               listenStreams = [ "10.88.0.1:18081" ];
               socketConfig.FreeBind = true;
+            };
+            partOf = [ "onepassword-connect-relay.socket" ];
+            listen = {
+              description = "the Connect relay's socket on its listen address";
+              wantedBy = [ "multi-user.target" ];
+              after = [ "onepassword-connect-relay.socket" ];
+              restartTriggers = [ "10.88.0.1:18081" ];
+              serviceConfig = {
+                Type = "oneshot";
+                RemainAfterExit = true;
+                ExecStart = "${system.config.systemd.package}/bin/systemctl restart onepassword-connect-relay.socket";
+              };
             };
             serviceConfig = {
               ExecStart = "${system.config.systemd.package}/lib/systemd/systemd-socket-proxyd 10.43.82.198:8000";
@@ -73,7 +86,16 @@ let
             socket = {
               inherit (socket) wantedBy listenStreams socketConfig;
             };
-            inherit (service) serviceConfig;
+            inherit (service) partOf serviceConfig;
+            listen = {
+              inherit (listen)
+                description
+                wantedBy
+                after
+                restartTriggers
+                serviceConfig
+                ;
+            };
           }}
           EOF
 
