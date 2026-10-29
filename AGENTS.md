@@ -66,8 +66,10 @@ docs/
   through its `bun run ops:<verb>` script, never the script or workflow behind it.
   [`docs/runbooks/ops.md`](docs/runbooks/ops.md) lists each verb, what it wraps and its
   preconditions.
-- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check,
-  and is CI-only: never run it locally.
+- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check.
+  oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
+  place, because stock tsgolint runs out of memory under 2 GiB. `lint:full` is CI-only: never run it
+  locally.
 - Run `bun install` in the main checkout before you run `bun run deadcode` in a worktree. knip's
   config loader looks for a `tsconfig.json` from the directory above the worktree, so it reads the
   main checkout's, and without that checkout's `node_modules` knip exits 1 with
