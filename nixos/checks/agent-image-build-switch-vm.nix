@@ -3,8 +3,10 @@
 # and the stand-in podman of test-utils/build-stub-imp-host-podman.nix answers for the container:
 # imp-host's start marks the container missing before it starts the build and lets it answer once
 # the unit runs. The specialisation's imp-host differs from the boot config's, so the switch
-# restarts it, and its start starts the build mid-recreate, in place of the timer. The build's
-# origin is a local repository whose newest commit on images/agent impd already holds.
+# restarts it, and its start starts the build mid-recreate, in place of the timer. In the recreate
+# specialisation, impd holds the image of the origin's newest commit on images/agent; in the remove
+# specialisation, impd holds none, and the container is gone once impd has listed its images. The
+# build's origin is a local repository.
 # It needs KVM: run `bun run test:nixos agent-image-build-switch-vm`.
 { nixpkgs }:
 let
@@ -41,6 +43,14 @@ pkgs.testers.runNixOSTest {
         "${pkgs.coreutils}/bin/sleep 15"
       ];
       ExecStart = lib.mkForce "${pkgs.bash}/bin/bash -c 'echo 0 > ${impdState}/unreachable; exec ${pkgs.coreutils}/bin/sleep infinity'";
+    };
+    specialisation.remove.configuration.systemd.services.imp-host.serviceConfig = {
+      ExecStartPre = [
+        "${pkgs.bash}/bin/bash -c 'echo [] > ${impdState}/images.json; rm -f ${impdState}/container-ids'"
+        "${pkgs.systemd}/bin/systemctl start --no-block agent-image-build.service"
+        "${pkgs.coreutils}/bin/sleep 15"
+      ];
+      ExecStart = lib.mkForce "${pkgs.bash}/bin/bash -c 'echo c0ffee02 > ${impdState}/container-ids; exec ${pkgs.coreutils}/bin/sleep infinity'";
     };
     systemd.tmpfiles.rules = [ "d ${impdState} 0755 root root -" ];
     environment.systemPackages = [
@@ -85,5 +95,20 @@ pkgs.testers.runNixOSTest {
             'agent-image-build: waiting for impd, try 1: Error: no container with name or ID "imp-host" found: no such container',
             f"agent-image-build: impd holds {image}, built from {pin}; nothing to build",
         ], lines
+
+
+    with subtest("it finishes the switch with no failed unit when imp-host loses its container after impd listed its images"):
+        status, out = machine.execute("/run/booted-system/specialisation/remove/bin/switch-to-configuration test 2>&1")
+        machine.wait_until_succeeds("test \"$(systemctl show -p ActiveState --value agent-image-build.service)\" = inactive", timeout=120)
+        build = machine.succeed("systemctl show -p Result -p ExecMainStatus agent-image-build.service").split()
+        invocation = machine.succeed("systemctl show -p InvocationID --value agent-image-build.service").strip()
+        lines = machine.succeed(f"journalctl -b _SYSTEMD_INVOCATION_ID={invocation} -o cat | grep '^agent-image-build: '").splitlines()
+
+        assert status == 0, f"switch-to-configuration exited {status}: {out}"
+        assert sorted(build) == ["ExecMainStatus=0", "Result=success"], build
+        assert lines == [
+            f"agent-image-build: imp-host went from the container that listed impd's images to none before the build of {image} from {pin}; the next run builds {image} again",
+        ], lines
+        machine.fail("test -e /var/lib/agent-image-build/failed")
   '';
 }

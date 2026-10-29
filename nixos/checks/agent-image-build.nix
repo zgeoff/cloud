@@ -328,7 +328,7 @@ let
         assert_equals 0 "$status" "the script's exit status"
         assert_files_equal - stdout <<EOF
         agent-image-build: building $image from $pin
-        agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to c0ffee02; the next run builds it again
+        agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to c0ffee02; the next run builds $image again
         EOF
         assert_files_equal /dev/null stderr
         assert_missing state/failed "the failed builds"
@@ -355,9 +355,75 @@ let
         assert_equals 0 "$status" "the script's exit status"
         assert_files_equal - stdout <<EOF
         agent-image-build: building $image from $pin
-        agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to none; the next run builds it again
+        agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to none; the next run builds $image again
         EOF
         assert_files_equal /dev/null stderr
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it passes the run without a copy or a build when imp-host has no container once impd listed its images";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_equals "agent-image-build: imp-host went from the container that listed impd's images to none before the build of $image from $pin; the next run builds $image again" \
+          "$(cat stdout)" "the script's stdout"
+        assert_files_equal /dev/null stderr
+        assert_missing state/bin "the copied CLI"
+        assert_missing build/calls "the build calls"
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it passes the run without a build when the copy of the CLI fails while imp-host loses its container";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf 'c0ffee01\n\n' > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_equals "agent-image-build: the copy of imp's CLI failed while imp-host went from container c0ffee01 to none; the next run builds $image again" \
+          "$(cat stdout)" "the script's stdout"
+        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat stderr)" "the script's stderr"
+        assert_missing build/calls "the build calls"
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it fails the run without a record or a build when the copy of the CLI fails while imp-host keeps its container";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        echo '[]' > impd/images.json
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 1 "$status" "the script's exit status"
+        assert_files_equal /dev/null stdout
+        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat stderr)" "the script's stderr"
+        assert_missing build/calls "the build calls"
         assert_missing state/failed "the failed builds"
       '';
     }
