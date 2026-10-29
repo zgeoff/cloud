@@ -76,7 +76,7 @@ pkgs.testers.runNixOSTest {
         unit = machine.succeed("systemctl show -p ActiveState -p Result -p NRestarts preview-image.service").split()
         calls = [json.loads(line) for line in machine.succeed("cat /var/lib/stub-impd/calls").splitlines()]
         images = json.loads(machine.succeed("cat /var/lib/stub-impd/images.json"))
-        log = machine.succeed("journalctl -b -u preview-image.service -o cat | grep '^preview-image: '").splitlines()
+        journal = machine.succeed("journalctl -b -u preview-image.service -o cat | grep '^preview-image: '").splitlines()
         inode = machine.succeed("stat -c %i /var/lib/stub-impd/container/var/lib/imp/token").strip()
         modified = machine.succeed("date -u -d @$(stat -c %Y /var/lib/stub-impd/container/var/lib/imp/token) +%Y-%m-%dT%H:%M:%SZ").strip()
         health = ["exec", "imp-host", "curl", "-sS", "--max-time", "5", "http://127.0.0.1:7070/health"]
@@ -90,13 +90,13 @@ pkgs.testers.runNixOSTest {
             ["exec", "imp-host", "impz", "image", "pin", "pv-base"],
         ], calls
         assert [(image["name"], image["ref"], image["pinned"]) for image in images] == [("pv-base", "${ref}", True)], images
-        assert log == [
+        assert journal == [
             'preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container',
             'preview-image: try 2: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}',
             f"preview-image: try 5: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode {inode}, modified {modified}",
             "preview-image: adding ${ref} to impd as pv-base",
             "preview-image: pinning pv-base",
             "preview-image: impd holds pv-base at ${ref}, pinned",
-        ], log
+        ], journal
   '';
 }
