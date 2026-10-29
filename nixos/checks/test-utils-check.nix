@@ -1757,10 +1757,13 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostPodman holds to preview-image: it reaches impd only through the podman it is given, with the three calls the stand-in answers";
+      title = "it buildStubImpHostPodman holds to preview-image: it reaches impd only through the podman it is given, with the five calls the stand-in answers";
       script = ''
         podman_cmd=$(grep -cxF 'podman="''${PODMAN:-podman}"' ${../modules/preview-image.sh} || true)
-        list=$(grep -cxF 'until images=$("$podman" exec imp-host impz image ls --json 2> "$err"); do' ${../modules/preview-image.sh} || true)
+        health_url=$(grep -cxF 'health_url=http://127.0.0.1:7070/health' ${../modules/preview-image.sh} || true)
+        health=$(grep -cxF '  health=$("$podman" exec imp-host curl -sS --max-time 5 "$health_url" 2> "$err") || return 1' ${../modules/preview-image.sh} || true)
+        list=$(grep -cxF '  if [ -n "$ready" ] && images=$("$podman" exec imp-host impz image ls --json 2> "$err"); then' ${../modules/preview-image.sh} || true)
+        facts=$(grep -cxF '    error="$error; $("$podman" exec -i imp-host sh -s -- /root/.config/impz/token /proc < "$token_facts" 2>&1)"' ${../modules/preview-image.sh} || true)
         add=$(grep -cxF '  "$podman" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
         pin=$(grep -cxF '  "$podman" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
         calls=$(grep -cF '"$podman"' ${../modules/preview-image.sh} || true)
@@ -1768,10 +1771,13 @@ let
         direct=$(grep -cE '^[^#]*(^|[ ;&|($])podman ' ${../modules/preview-image.sh} || true)
 
         assert_equals 1 "$podman_cmd" "the script's podman"
+        assert_equals 1 "$health_url" "the script's /health URL"
+        assert_equals 1 "$health" "the script's /health call"
         assert_equals 1 "$list" "the script's image list"
+        assert_equals 1 "$facts" "the script's token-file facts"
         assert_equals 1 "$add" "the script's image add"
         assert_equals 1 "$pin" "the script's image pin"
-        assert_equals 3 "$calls" "the script's calls through PODMAN"
+        assert_equals 5 "$calls" "the script's calls through PODMAN"
         assert_equals 0 "$direct" "the script's calls of podman by name"
       '';
     }
