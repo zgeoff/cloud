@@ -15,15 +15,17 @@
 # packages/daemon/src/imps/imps/pick-wake-huge-pages.ts), and its one RAM budget never counts the
 # pool's unused pages, so a guest on 4 KiB pages takes ordinary memory beside the reserved pool.
 # `impz stop` frees the imp's memory and its snapshot, and keeps its disk; the guest's processes
-# and sessions end. impd records the page size as `"hugePages": "2M"` in a sleeping imp's
-# snapshot/meta.json and in a running imp's vm.json under /var/lib/imp/imps/<id>/ in imp-host
+# and sessions end. impd records the page size as `"hugePages": "2M"` in the imp's vm.json at each
+# cold boot and in each snapshot/meta.json it writes, under /var/lib/imp/imps/<id>/ in imp-host
 # (buildImpPaths in packages/daemon/src/vm/storage/data-layout.ts, both written with
-# JSON.stringify(…, null, 2)); any other file, or none, means 4 KiB pages. An imp in another state
-# has no guest. The script lists the imps with `impz ls --json` and reads the files with one
-# `podman exec`, both over ssh.
+# JSON.stringify(…, null, 2)). A running or sleeping imp counts as on 2 MiB pages when either file
+# says so, because a wake between the listing and the read removes the snapshot's file; with
+# neither, it is on 4 KiB pages. An imp in another state has no guest. The script lists the imps
+# with `impz ls --json` and reads the files with one `podman exec`, both over ssh.
 # --check exits 1 when it finds an imp on 4 KiB pages, and an ssh failure stops every mode with
 # ssh's exit code. impd's names hold only lowercase letters, digits and hyphens (NameSchema in
-# packages/api/src/schemas/name-schema.ts), and the script checks each before it puts one in a remote command.
+# packages/api/src/schemas/name-schema.ts), and the script checks each before it puts one in a
+# remote command.
 set -euo pipefail
 
 mode=stop
@@ -51,11 +53,12 @@ declare -A states=()
 while read -r id name state; do
   [ -n "${id:-}" ] || continue
   case "$state" in
-    sleeping) column=2 ;;
-    running) column=3 ;;
+    sleeping | running) ;;
     *) continue ;;
   esac
-  if [ "$(awk -v id="$id" -v column="$column" '$1 == id { print $column }' <<< "$sizes")" = 2M ]; then
+  # either file, since a wake between the two reads removes the snapshot's
+  if awk -v id="$id" '$1 == id && ($2 == "2M" || $3 == "2M") { found = 1 } END { exit !found }' \
+    <<< "$sizes"; then
     continue
   fi
   if [[ ! "$name" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then

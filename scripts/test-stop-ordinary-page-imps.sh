@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Test for stop-ordinary-page-imps.sh: it stops each running or sleeping imp whose guest is on 4 KiB
 # pages, in its names' sorted order after the names IMP_STOP_ORDER puts first, and only through
-# `impz stop`, so each disk stays. It leaves an imp on 2 MiB pages and an imp with no guest alone.
+# `impz stop`, so each disk stays. It leaves an imp on 2 MiB pages and an imp with no guest alone,
+# and counts an imp as on 2 MiB pages when either its snapshot's file or its VM's file says so.
 # --plan prints the order and stops nothing, and --check fails naming each imp on 4 KiB pages, or
 # passes when none is left. It stops with ssh's exit code when the host refuses the connection. The
 # imps take the id, name and state fields of impd's ImpSchema (zgeoff/impz
@@ -47,7 +48,7 @@ it_stops_each_imp_on_4_kib_pages_in_sorted_order_and_leaves_the_rest() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping"},{"id":"imp_2","name":"anvil","state":"running"},{"id":"imp_3","name":"lantern","state":"sleeping"},{"id":"imp_4","name":"quill","state":"running"},{"id":"imp_5","name":"barrow","state":"stopped"}]' \
-    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K\nimp_3 2M 2M\nimp_4 4K 2M\nimp_5 4K 4K' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K\nimp_3 2M 2M\nimp_4 2M 2M\nimp_5 4K 4K' \
     bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
@@ -62,6 +63,25 @@ $list_call
 $pages_call
 ["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop anvil"]
 ["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop teapot"]
+EOF
+  assert_status 0 "$status"
+}
+
+it_leaves_a_sleeping_imp_whose_snapshot_file_a_wake_removed_when_its_vm_file_says_2_mib() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping"},{"id":"imp_2","name":"anvil","state":"running"}]' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 2M\nimp_2 2M 4K' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< "== no imp on root@geoffcloud is on 4 KiB pages"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << EOF
+$list_call
+$pages_call
 EOF
   assert_status 0 "$status"
 }
