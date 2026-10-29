@@ -132,7 +132,7 @@ jobs:
       # an ephemeral node, tagged tag:cloud-deploy, that reaches only k3s's API on geoffcloud
       - name: Join the tailnet
         if: steps.decide.outputs.apply == 'true'
-        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        uses: tailscale/github-action@99a8333667fff04fdd6cffb46dfd409f8329a7bf # v4.3.0
         with:
           oauth-client-id: ${{ vars.TS_DEPLOY_CLIENT_ID }}
           audience: ${{ vars.TS_DEPLOY_AUDIENCE }}
