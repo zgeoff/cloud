@@ -369,6 +369,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/memory/markSensitive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.markSensitive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/memory/listProposals": {
         parameters: {
             query?: never;
@@ -1553,6 +1569,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -1684,6 +1701,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -1787,6 +1805,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -1891,6 +1910,7 @@ export interface operations {
                         createdAt: string;
                         forgottenAt: string | null;
                         isPinned: boolean;
+                        isSensitive: boolean;
                         itemID: string;
                         /** @enum {string} */
                         kind: "fact" | "self";
@@ -2371,6 +2391,7 @@ export interface operations {
                                     createdAt: string;
                                     forgottenAt: string | null;
                                     isPinned: boolean;
+                                    isSensitive: boolean;
                                     itemID: string;
                                     /** @enum {string} */
                                     kind: "fact" | "self";
@@ -2813,6 +2834,7 @@ export interface operations {
                         createdAt: string;
                         forgottenAt: string | null;
                         isPinned: boolean;
+                        isSensitive: boolean;
                         itemID: string;
                         /** @enum {string} */
                         kind: "fact" | "self";
@@ -3156,6 +3178,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -3641,6 +3664,162 @@ export interface operations {
             };
         };
     };
+    "memory.markSensitive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    clientActionID: string;
+                    isSensitive: boolean;
+                    itemID: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        isSensitive: boolean;
+                        itemID: string;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_ITEM_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No memory item has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The memory item has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "WRONG_STATE";
+                        /** @constant */
+                        status: 409;
+                        /** @default The memory item is not in a state that change takes */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
     "memory.listProposals": {
         parameters: {
             query?: never;
@@ -3677,6 +3856,7 @@ export interface operations {
                                 thread: string;
                             } | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -3689,7 +3869,7 @@ export interface operations {
                             proposalID: string;
                             quote: string | null;
                             /** @enum {string} */
-                            reason: "no_quote" | "quote_not_typed" | "quote_in_quoted_block" | "invisible_character" | "token_missing" | "checker_not_asserted" | "checker_unsure" | "checker_unreachable" | "forgotten_evidence" | "ambiguous_target" | "pinned" | "other" | "self_note" | "from_photo";
+                            reason: "no_quote" | "quote_not_typed" | "quote_in_quoted_block" | "invisible_character" | "token_missing" | "checker_not_asserted" | "checker_unsure" | "checker_unreachable" | "forgotten_evidence" | "ambiguous_target" | "pinned" | "other" | "self_note" | "from_photo" | "sensitive";
                             /** @enum {string} */
                             source: "owner" | "owner_data" | "untrusted";
                             sources: {
