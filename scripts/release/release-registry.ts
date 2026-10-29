@@ -48,13 +48,16 @@ export interface PinLine {
   readonly parts: Readonly<Record<string, PinPart>>;
 }
 
-export interface PinLock {
-  // runs after the pin's lines are written, and must lock the input at the pinned commit
-  readonly kind: 'nix-flake-lock';
-  readonly flake: string;
-  readonly input: string;
-  readonly lockFile: string;
-}
+// runs after the pin's lines are written: a flake lock must lock the input at the pinned commit,
+// and a bun lock must lock the package at the pinned version
+export type PinLock =
+  | {
+      readonly kind: 'nix-flake-lock';
+      readonly flake: string;
+      readonly input: string;
+      readonly lockFile: string;
+    }
+  | { readonly kind: 'bun-lock'; readonly packageName: string; readonly lockFile: string };
 
 export interface Pin {
   readonly id: string;
@@ -63,12 +66,6 @@ export interface Pin {
   readonly title: string;
   readonly lines: readonly PinLine[];
   readonly lock?: PinLock;
-}
-
-interface GeneratedFiles {
-  // runs with bun and takes the release's tag as its one argument
-  readonly script: string;
-  readonly files: readonly string[];
 }
 
 export interface ReleaseRecord {
@@ -81,9 +78,6 @@ export interface ReleaseRecord {
 
   // in the order the bump line lists their versions
   readonly pins: readonly Pin[];
-
-  // files that a script in the checkout writes from the release, which a bump runs after its pins
-  readonly generated?: GeneratedFiles;
 
   // the bump pull request's "After the merge:" text, as Markdown
   readonly rollout: string;
@@ -295,13 +289,19 @@ export const releaseRegistry: readonly ReleaseRecord[] = [
           },
         ],
       },
+      {
+        id: 'nixie-contract',
+        title: 'the nixie contract package (`package.json`)',
+        lines: [
+          {
+            file: 'package.json',
+            pattern: String.raw`^ {4}"@heynixie\/contract": "(?<version>\d+\.\d+\.\d+)",?$`,
+            parts: { version },
+          },
+        ],
+        lock: { kind: 'bun-lock', packageName: '@heynixie/contract', lockFile: 'bun.lock' },
+      },
     ],
-
-    // the contract the scripts' nixie calls type-check against
-    generated: {
-      script: 'scripts/nixie-api/write-nixie-api-contract.ts',
-      files: ['scripts/nixie-api/openapi.d.ts', 'scripts/nixie-api/openapi.json'],
-    },
     rollout:
       'The `Deploy prod` workflow applies the stack config once CI passes on main, unless its guard holds the plan (`docs/runbooks/prod-apply.md`). Check the deploy (`docs/runbooks/nixie.md`).',
   },

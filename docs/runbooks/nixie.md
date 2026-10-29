@@ -153,10 +153,11 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    ```
 
    For an upgrade, set `image` and `webImage` in the stack config `nixie` to the new release's tag
-   and digest, from its release notes, in one PR. In the same PR, vendor the release's API contract
-   with `bun run nixie:openapi <release_tag>`, so the type check fails on a procedure that the
-   deploy checks call and the release dropped or renamed. A procedure that the release added and
-   that cloud does not call needs no change.
+   and digest, from its release notes, in one PR. In the same PR, set `@heynixie/contract` in
+   `package.json` to the same version and run `bun install`, so the type check fails on a procedure
+   that the deploy checks call and the release dropped or renamed. A procedure that the release
+   added and that cloud does not call needs no change. The release check's nixie bump makes both
+   changes ([Release check](./release-check.md)).
 
 2. Preview, then apply:
 

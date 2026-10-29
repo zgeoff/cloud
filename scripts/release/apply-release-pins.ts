@@ -1,5 +1,6 @@
 import { chmod, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
 import type { Runner } from '../run-process.ts';
 import { collectPinFiles } from './collect-pin-files.ts';
@@ -103,27 +104,16 @@ async function writeLockedPins(
 
   const locked = await runLocks(options, plan.written);
 
-  // the files generated from a release move only with a pin, as a lock does
-  const generated =
-    locked instanceof Error || plan.written.length === 0 ? locked : await runGenerator(options);
-
   const lockFiles = plan.written.flatMap((pin) =>
     pin.lock === undefined ? [] : [pin.lock.lockFile],
   );
 
-  // a generated file that the checkout lacked has no contents to put back
-  const generatedFiles = (options.record.generated?.files ?? []).filter((path) => path in files);
-
-  // put every file back, so no pin moves without its lock and the files generated from its release
-  if (generated instanceof Error) {
-    await writePinFiles(options.root, files, [
-      ...Object.keys(plan.files),
-      ...lockFiles,
-      ...generatedFiles,
-    ]);
+  // put every file back, so no pin moves without its lock
+  if (locked instanceof Error) {
+    await writePinFiles(options.root, files, [...Object.keys(plan.files), ...lockFiles]);
   }
 
-  return generated;
+  return locked;
 }
 
 async function writePinFiles(
@@ -161,9 +151,18 @@ async function runLocks(
   return undefined;
 }
 
+function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock) {
+  return match(lock)
+    .with({ kind: 'nix-flake-lock' }, (flakeLock) => runFlakeLock(options, flakeLock))
+    .with({ kind: 'bun-lock' }, (bunLock) => runBunLock(options, bunLock))
+    .exhaustive();
+}
+
+type FlakeLock = Extract<PinLock, { readonly kind: 'nix-flake-lock' }>;
+
 const nixImageFile = new URL('../nix-image.sh', import.meta.url);
 
-async function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock) {
+async function runFlakeLock(options: Readonly<ApplyReleasePinsOptions>, lock: FlakeLock) {
   const pins = await readFile(nixImageFile, 'utf8');
 
   const image = /^NIX_IMAGE='(?<image>[^']+)'$/mu.exec(pins)?.groups?.['image'];
@@ -206,7 +205,7 @@ async function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock
   return locked instanceof Error ? locked : checkLockedCommit(options, lock);
 }
 
-async function checkLockedCommit(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock) {
+async function checkLockedCommit(options: Readonly<ApplyReleasePinsOptions>, lock: FlakeLock) {
   const text = await readFile(join(options.root, lock.lockFile), 'utf8');
 
   const nodes = findJSONField(JSON.parse(text), 'nodes');
@@ -220,21 +219,36 @@ async function checkLockedCommit(options: Readonly<ApplyReleasePinsOptions>, loc
       );
 }
 
-async function runGenerator(
-  options: Readonly<ApplyReleasePinsOptions>,
-): Promise<Error | undefined> {
-  const generator = options.record.generated;
+type BunLock = Extract<PinLock, { readonly kind: 'bun-lock' }>;
 
-  if (generator === undefined) {
-    return undefined;
-  }
-
-  const tag = `${options.record.tagPrefix}${options.version}`;
-
-  const ran = await runChecked(options.run, ['bun', join(options.root, generator.script), tag], {
+// the release-age gate in bunfig.toml excludes the package, so its release locks on the day it
+// publishes; the package's own dependencies stay behind the gate
+async function runBunLock(options: Readonly<ApplyReleasePinsOptions>, lock: BunLock) {
+  const locked = await runChecked(options.run, ['bun', 'install', '--lockfile-only'], {
     cwd: options.root,
     env: options.env,
   });
 
-  return ran instanceof Error ? ran : undefined;
+  return locked instanceof Error ? locked : checkLockedVersion(options, lock);
+}
+
+async function checkLockedVersion(options: Readonly<ApplyReleasePinsOptions>, lock: BunLock) {
+  const text = await readFile(join(options.root, lock.lockFile), 'utf8');
+
+  // bun.lock is JSON with trailing commas, which JSON.parse refuses; each package's entry starts
+  // with the name and version it resolved to
+  const packages = findJSONField(Bun.JSONC.parse(text), 'packages');
+  const entry = findJSONField(packages, lock.packageName);
+  const resolved: unknown = Array.isArray(entry) ? entry.at(0) : undefined;
+
+  const version =
+    typeof resolved === 'string' && resolved.startsWith(`${lock.packageName}@`)
+      ? resolved.slice(lock.packageName.length + 1)
+      : undefined;
+
+  return version === options.version
+    ? undefined
+    : new Error(
+        `${lock.lockFile} locks ${lock.packageName} at ${version ?? 'no version'}, want ${options.version}`,
+      );
 }

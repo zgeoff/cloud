@@ -20,7 +20,7 @@ daemon.
 | ------------------ | ---------------------------------- | --------------------------------------------------------------------------- |
 | atc                | `release-check/atc`                | the agent image, the host's atc daemon, the atc-gateway images' release     |
 | imp                | `release-check/imp`                | imp's NixOS module and its lock with the imp-host image, the imp-base image |
-| nixie              | `release-check/nixie`              | the nixie and nixie-web images in the stack config                          |
+| nixie              | `release-check/nixie`              | the nixie and nixie-web images in the stack config, the contract package    |
 | auto-mode          | `release-check/auto-mode`          | the auto-mode tarball in the agent image                                    |
 | atc-gateway-images | `release-check/atc-gateway-images` | the atc-gateway and backup images in the stack config                       |
 
@@ -32,6 +32,13 @@ commit and the images' digests from GitHub and GHCR, and the auto-mode pin takes
 npm tarball, which it checks against npm's integrity hash and the release's version. Before it
 writes anything, it checks every pin line of the dependency, so a pin at the release with another
 sum fails the bump and changes no file. The bump never moves a pin back to an older release.
+
+The nixie bump moves nixie's contract package, `@heynixie/contract`, to the same release as the
+images, then runs `bun install --lockfile-only` and checks that `bun.lock` resolves the package at
+that release. The scripts' nixie calls type-check against the package, so CI on the bump pull
+request fails only when the release drops or changes a procedure that a script calls. The
+release-age gate in `bunfig.toml` excludes the package, so the lock resolves it on the day nixie
+publishes it, and Renovate leaves it to this bump, so the package never moves without the images.
 
 The pin table (`scripts/release/release-pins.json`) holds every registry pin's parts, and each bump
 writes its entries beside the pins. CI's release pin check (`bun run check:release-pins`) fails a
