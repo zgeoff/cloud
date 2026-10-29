@@ -488,3 +488,171 @@ test('it waits for a required check that was skipped', () => {
     decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
   ).toStrictEqual({ action: 'hold', number: 7, reason: 'waiting for checks (CI)' });
 });
+
+test('it holds a bump that changes nixos/ while the NixOS checks run after CI passed', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 12,
+    authorLogin: 'app/cloud-release-check',
+    labels: ['update:minor', 'auto-merge'],
+    files: [
+      'images/atc-gateway/versions.env',
+      'images/agent/Dockerfile',
+      'nixos/packages/atc.nix',
+      'scripts/release/release-pins.json',
+    ],
+    commits: [
+      {
+        oid: '5555555555555555555555555555555555555555',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'NixOS checks', name: 'nixos', status: 'IN_PROGRESS', conclusion: null },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/atc', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({ action: 'hold', number: 12, reason: 'waiting for nixos' });
+});
+
+test('it holds a bump that changes nixos/ while CI runs after the NixOS checks passed', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 12,
+    authorLogin: 'app/cloud-release-check',
+    labels: ['update:minor', 'auto-merge'],
+    files: [
+      'images/atc-gateway/versions.env',
+      'images/agent/Dockerfile',
+      'nixos/packages/atc.nix',
+      'scripts/release/release-pins.json',
+    ],
+    commits: [
+      {
+        oid: '5555555555555555555555555555555555555555',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'checks', status: 'IN_PROGRESS', conclusion: null },
+      { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/atc', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({ action: 'hold', number: 12, reason: 'waiting for checks' });
+});
+
+test('it merges a bump that changes nixos/ once both CI and the NixOS checks passed', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 12,
+    authorLogin: 'app/cloud-release-check',
+    head: '5555555555555555555555555555555555555555',
+    labels: ['update:minor', 'auto-merge'],
+    files: [
+      'images/atc-gateway/versions.env',
+      'images/agent/Dockerfile',
+      'nixos/packages/atc.nix',
+      'scripts/release/release-pins.json',
+    ],
+    commits: [
+      {
+        oid: '5555555555555555555555555555555555555555',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/atc', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({
+    action: 'merge',
+    number: 12,
+    head: '5555555555555555555555555555555555555555',
+  });
+});
+
+test('it merges a green bump while its own merge job runs', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 13,
+    authorLogin: 'app/cloud-release-check',
+    head: '6666666666666666666666666666666666666666',
+    labels: ['update:patch', 'auto-merge'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
+    commits: [
+      {
+        oid: '6666666666666666666666666666666666666666',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({
+    action: 'merge',
+    number: 13,
+    head: '6666666666666666666666666666666666666666',
+  });
+});
+
+test('it merges a green bump whose earlier merge job failed', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 13,
+    authorLogin: 'app/cloud-release-check',
+    head: '6666666666666666666666666666666666666666',
+    labels: ['update:patch', 'auto-merge'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
+    commits: [
+      {
+        oid: '6666666666666666666666666666666666666666',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'release bump merge', name: 'merge', status: 'COMPLETED', conclusion: 'FAILURE' },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({
+    action: 'merge',
+    number: 13,
+    head: '6666666666666666666666666666666666666666',
+  });
+});
+
+test('it holds a bump while a merge job of another workflow runs', () => {
+  const pr = buildMockBumpPullRequest({
+    number: 13,
+    authorLogin: 'app/cloud-release-check',
+    labels: ['update:patch', 'auto-merge'],
+    files: ['infra/Pulumi.prod.yaml', 'scripts/release/release-pins.json'],
+    commits: [
+      {
+        oid: '6666666666666666666666666666666666666666',
+        authorLogins: ['cloud-release-check[bot]'],
+      },
+    ],
+    checkRuns: [
+      { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'example deploy', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
+    ],
+  });
+
+  expect(
+    decide({ branch: 'release-check/nixie', appLogin: 'app/cloud-release-check', pr }),
+  ).toStrictEqual({ action: 'hold', number: 13, reason: 'waiting for merge' });
+});

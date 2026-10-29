@@ -73,6 +73,56 @@ test('it merges a green bump and copies the decision to the summary', async () =
   expect(summary).toBe(`merged #31 at ${view.headRefOid}\n`);
 });
 
+test('it merges a relabelled bump while its own merge job runs on the head', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    ctx.eventPath,
+    '{"action":"labeled","label":{"name":"auto-merge"},"pull_request":{"head":{"ref":"release-check/atc","repo":{"full_name":"zgeoff/cloud"}}}}',
+  );
+
+  const view = buildMockGHPRView({
+    author: { login: 'app/cloud-release-check' },
+    labels: [{ name: 'update:minor' }, { name: 'auto-merge' }],
+    files: [{ path: 'nixos/packages/atc.nix' }, { path: 'scripts/release/release-pins.json' }],
+    commits: [{ oid: '7777777', authors: [{ login: 'cloud-release-check[bot]' }] }],
+    statusCheckRollup: [
+      buildMockGHCheckRun({ workflowName: 'CI', name: 'checks' }),
+      buildMockGHCheckRun({ workflowName: 'NixOS checks', name: 'nixos' }),
+      buildMockGHCheckRun({
+        workflowName: 'release bump merge',
+        name: 'merge',
+        status: 'IN_PROGRESS',
+        conclusion: null,
+      }),
+    ],
+  });
+
+  const stub = buildStubRunner(
+    buildStubReleaseGH({
+      openPRs: [{ number: 33, isCrossRepository: false }],
+      prViews: { 33: view },
+    }),
+  );
+
+  const status = await runReleaseBumpMerge({
+    env: {
+      ...ctx.env,
+      GITHUB_EVENT_NAME: 'pull_request_target',
+      GITHUB_REPOSITORY: 'zgeoff/cloud',
+      APP_LOGIN: 'app/cloud-release-check',
+      MERGE_TOKEN: 'merge-token',
+    },
+    run: stub.run,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(status).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([[`merged #33 at ${view.headRefOid}\n`]]);
+  expect(ctx.printErr).not.toHaveBeenCalled();
+});
+
 test('it reads its own pull request with GH_TOKEN and merges it at its head with the merge token', async () => {
   const ctx = await setupTest();
 
