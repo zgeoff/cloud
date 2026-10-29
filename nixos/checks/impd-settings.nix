@@ -27,7 +27,7 @@ let
 
   cases = [
     {
-      title = "it turns impd's huge pages on at 2M and passes imp-host the userfaultfd device";
+      title = "it turns on huge pages of 2M for impd and passes imp-host the userfaultfd device";
       script = ''
         assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
         settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
