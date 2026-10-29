@@ -71,9 +71,13 @@ Dispatches the `NixOS checks` workflow, on `main` by default.
 ```bash
 bun run ops:nixos-checks                    # on main, before a host switch
 bun run ops:nixos-checks -- <branch>        # on a pushed branch
+bun run ops:nixos-checks -- --force         # on main, building even a covered commit
 ```
 
-- Wraps `gh workflow run nixos-checks.yml -R zgeoff/cloud --ref <branch>`.
+- Wraps `gh workflow run nixos-checks.yml -R zgeoff/cloud --ref <branch>`, with `-f force=true` for
+  `--force`.
+- A run skips the build when an earlier run covers the commit or built the same derivations, as
+  [Check the host before a switch](./workflows.md#check-the-host-before-a-switch) describes.
 - A host switch reads only a green run on `main`. A run on a branch checks the change and gates
   nothing.
 

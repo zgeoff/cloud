@@ -4,7 +4,7 @@ import { buildForwardedHeaders } from './build-forwarded-headers.ts';
 test('it drops the hop-by-hop and body length headers from a call and keeps the rest', () => {
   const headers = buildForwardedHeaders(
     new Headers({
-      host: '172.17.0.1:18082',
+      host: '10.88.0.1:18082',
       connection: 'keep-alive',
       'keep-alive': 'timeout=5',
       'transfer-encoding': 'chunked',

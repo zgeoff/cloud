@@ -122,7 +122,7 @@ test('it adds glm with the z.ai key on imp’s stdin, never its argv', async () 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     ['atc-key zai', ''],
     [
-      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'podman' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
       'zai_fixture_key\n',
     ],
   ]);

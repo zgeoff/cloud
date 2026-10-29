@@ -74,7 +74,7 @@ and mints the host's and impd's auth keys with it.
 
 Kubernetes NetworkPolicies, which Pulumi creates beside the workloads, decide which pod on the host
 uses each `tag:cloud` grant and each port on the host's tailnet address. Every namespace holds a
-deny that refuses its pods the tailnet range and Docker's subnet, and leaves every other address
+deny that refuses its pods the tailnet range and Podman's subnet, and leaves every other address
 open, because a pod reaches the Kubernetes API on the host's public address. An allow beside each
 workload selects its pods by label and gives them back one address and port per destination.
 
@@ -85,9 +85,9 @@ workload selects its pods by label and gives them back one address and port per 
 | impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pod, nixie's sandbox image Job |
 | the preview webhook, on the host's tailnet address   | local delivery on the host | cloudflared                                                  |
 | the preview links, on the host's tailnet address     | local delivery on the host | none                                                         |
-| impd's plain API on Docker's subnet                  | the host's Docker bridge   | none                                                         |
+| impd's plain API on Podman's subnet                  | the host's Podman bridge   | none                                                         |
 
-The host's own forward rule drops every pod's traffic to Docker's subnet beside the deny
+The host's own forward rule drops every pod's traffic to Podman's subnet beside the deny
 ([firewalls](./firewalls.md)). A pod on the host's network, such as the node exporter, sends from
 the host's own addresses, so no NetworkPolicy applies to it.
 

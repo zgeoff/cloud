@@ -43,13 +43,6 @@ test("it charts impd's journal lines from Loki: volume, errors, boot and backup 
         height: 5,
       },
       {
-        title: 'imp-docker-proxy log lines',
-        type: 'stat',
-        expr: 'sum(count_over_time({job="journal", unit="imp-docker-proxy.service"} [$__range]))',
-        width: 6,
-        height: 5,
-      },
-      {
         title: 'impd logs',
         type: 'logs',
         expr: '{job="journal", unit="imp-host.service"}',

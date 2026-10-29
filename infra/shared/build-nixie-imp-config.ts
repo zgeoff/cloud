@@ -18,7 +18,7 @@ export function buildNixieImpConfig(topology: Readonly<Topology>): NixieImpConfi
     host_addresses: [
       `${topology.vm.publicIPv4}/${topology.vm.publicIPv4PrefixLength}`,
       `${topology.vm.publicIPv6}/${topology.vm.publicIPv6PrefixLength}`,
-      `${topology.docker.bridgeAddress}/${splitCIDR(topology.docker.subnet).prefixLength}`,
+      `${topology.podman.bridgeAddress}/${splitCIDR(topology.podman.subnet).prefixLength}`,
       `${topology.tailnet.nodes.geoffcloud.address}/32`,
       `${topology.tailnet.nodes.geoffcloud.addressIPv6}/128`,
 

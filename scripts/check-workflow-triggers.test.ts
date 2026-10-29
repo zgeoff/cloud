@@ -8,9 +8,14 @@ function setupTest() {
   const printErr = mock<(text: string) => void>();
 
   const nixosChecks = `on:
+  pull_request:
+    branches: [main]
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
+jobs:
+  nixos:
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'zgeoff-renovate[bot]'
 `;
 
   const releaseBumpMerge = `on:
@@ -61,11 +66,11 @@ test('it accepts the repository own workflows', async () => {
   expect(ctx.printErr).not.toHaveBeenCalled();
 });
 
-test('it reports NixOS checks that a pull request starts and the schedule and a dispatch do not', async () => {
+test('it reports NixOS checks that neither a pull request, the schedule nor a dispatch starts', async () => {
   const ctx = setupTest();
 
   const files = new Map([
-    ['/repo/.github/workflows/nixos-checks.yml', "on:\n  pull_request:\n    paths: ['nixos/**']\n"],
+    ['/repo/.github/workflows/nixos-checks.yml', 'on:\n  push:\n    branches: [main]\n'],
     ['/repo/.github/workflows/release-bump-merge.yml', ctx.releaseBumpMerge],
   ]);
 
@@ -79,12 +84,47 @@ test('it reports NixOS checks that a pull request starts and the schedule and a 
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'nixos-checks.yml: a pull request that changes nixos/ starts a run\n' +
+    'nixos-checks.yml: a pull request that changes nixos/ starts no run\n' +
       'nixos-checks.yml: the nightly schedule starts no run\n' +
-      'nixos-checks.yml: a dispatch starts no run\n',
+      'nixos-checks.yml: a dispatch starts no run\n' +
+      'nixos-checks.yml: a Renovate pull request starts the nixos job\n',
   );
 
   expect(ctx.printOut).not.toHaveBeenCalled();
+});
+
+test('it reports NixOS checks whose job a Renovate pull request starts', async () => {
+  const ctx = setupTest();
+
+  const files = new Map([
+    [
+      '/repo/.github/workflows/nixos-checks.yml',
+      `on:
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+jobs:
+  nixos:
+    if: github.event_name != 'pull_request' || github.event.pull_request.user.login != 'zgeoff-release-check[bot]'
+`,
+    ],
+    ['/repo/.github/workflows/release-bump-merge.yml', ctx.releaseBumpMerge],
+  ]);
+
+  const exitCode = await checkWorkflowTriggers({
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'nixos-checks.yml: a Renovate pull request starts the nixos job\n',
+  );
 });
 
 test('it reports a release bump merge that a CI run on another branch starts', async () => {

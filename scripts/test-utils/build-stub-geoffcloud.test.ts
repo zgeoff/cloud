@@ -62,11 +62,11 @@ test('it answers a sandbox’s probe from the sandbox’s reach once impz new ha
   });
 
   const created = await host.runRemote(
-    'docker exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
+    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3 --policy public',
   );
 
   const probe = await host.runRemote(
-    `docker exec imp-host impz exec fetch-check-1a2b3c4d -- bash -c ${toShellArg(buildTCPProbe({ host: '1.1.1.1', port: 443 }))}`,
+    `podman exec imp-host impz exec fetch-check-1a2b3c4d -- bash -c ${toShellArg(buildTCPProbe({ host: '1.1.1.1', port: 443 }))}`,
   );
 
   expect(created.exitCode).toBe(0);
@@ -88,7 +88,7 @@ test('it refuses impz exec and impz rm on a sandbox that does not exist, as imp 
     createExitCode: 0,
   });
 
-  const removed = await host.runRemote('docker exec imp-host impz rm fetch-check-1a2b3c4d');
+  const removed = await host.runRemote('podman exec imp-host impz rm fetch-check-1a2b3c4d');
 
   expect(removed).toStrictEqual({
     exitCode: 1,
@@ -112,7 +112,7 @@ test('it refuses a sandbox that is not public on a nixie fetch image', async () 
   });
 
   const created = await host.runRemote(
-    'docker exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3',
+    'podman exec imp-host impz new fetch-check-1a2b3c4d --image nixie-fetch-9c4e2a71b0d3',
   );
 
   expect(created.exitCode).toBe(97);

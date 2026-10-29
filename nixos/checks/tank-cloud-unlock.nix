@@ -61,12 +61,16 @@ pkgs.testers.runNixOSTest {
           path = [
             config.boot.zfs.package
             pkgs.util-linux
+            pkgs.kmod
           ];
           serviceConfig = {
             Type = "oneshot";
             RemainAfterExit = true;
           };
+          # zpool create enables only the features that the module lists in sysfs, which it fills
+          # in after /dev/zfs appears, so the module loads in full first
           script = ''
+            modprobe zfs
             if [ -z "$(blkid -o value -s PTTYPE /dev/vdb || true)" ]; then
               zpool create -O mountpoint=none tank /dev/vdb
             fi

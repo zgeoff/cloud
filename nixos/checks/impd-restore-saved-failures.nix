@@ -24,11 +24,11 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
       import re
 
 
-      with subtest("it stops imp-host and imp-docker-proxy again when the switch fails"):
+      with subtest("it stops imp-host again when the switch fails"):
           ctx = setup_test()
           db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.digestRef}")
+          machine.succeed("systemctl stop imp-host")
           # the failing unit's script, a store path of the broken generation
           fail_script = machine.succeed(f"grep -o '^ExecStart=.*' {ctx['broken_path']}/etc/systemd/system/fail-on-switch.service | cut -d= -f2-").strip()
 
@@ -77,24 +77,29 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "TIME machine systemd[1]: fail-on-switch.service: Failed with result 'exit-code'.",
               "TIME machine systemd[1]: Failed to start fail-on-switch.service.",
           ], out
-          # switch-to-configuration's progress; the mounts docker made for imp-host carry generated
-          # ids, and how many it made varies
+          # switch-to-configuration's progress; the mounts Podman makes for imp-host (its network
+          # namespace, its storage, its root file system and its /dev/shm) carry generated ids, and the
+          # switch lists them, imp-host.service when it starts imp-host itself, and the device units
+          # of Podman's bridge and veth when udev reports them after the switch's first look, on one
+          # line
           err_lines = err.splitlines()
-          assert re.fullmatch(r"the following new units were started: ((run-docker-netns-[0-9a-f]+|tmp-containerd\\x2dmount[0-9]+|var-lib-docker-rootfs-overlayfs-[0-9a-f]+)\.mount(, |$))+", err_lines[5]), err
+          mount_lines = [line for line in err_lines if line.startswith("the following new units were started: ")]
+          assert len(mount_lines) <= 1 and all(re.fullmatch(r"the following new units were started: (((run-netns-netns(\\x2d[0-9a-f]+)+|var-lib-containers-storage-overlay|var-lib-containers-storage-overlay-[0-9a-f]{64}-merged|var-lib-containers-storage-overlay\\x2dcontainers-[0-9a-f]{64}-userdata-shm)\.mount|(sys-devices-virtual-net|sys-subsystem-net-devices)-(podman0|veth[0-9]+)\.device|imp-host\.service)(, |$))+", line) for line in mount_lines), err
           # the ERR trap names the line of the switch
-          assert err_lines[:5] + err_lines[6:] == [
+          assert [line for line in err_lines if line not in mount_lines] == [
               "Checking switch inhibitors... done",
               "updating GRUB 2 menu...",
               "activating the configuration...",
               "restarting sysinit-reactivation.target",
               "reloading the following units: dbus-broker.service",
               "warning: the following units failed: fail-on-switch.service",
-              "restore-impd-db: failed at line 185",
+              "restore-impd-db: failed at line 196",
               f"restore-impd-db: the copy is in place (the original is in {saved}); "
-              "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
+              "the switch or start did not finish; imp-host is stopped again",
           ], err
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-          assert units == ["failed", "failed"], f"the units are {units}"
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
+          # a stop leaves imp-host under Podman inactive in some runs and failed in others
+          assert units in (["inactive"], ["failed"]), f"the units are {units}"
           machine.fail("findmnt -rn -S tank/imp")
           # the activation ran; only a unit failed
           current = machine.succeed("readlink -f /run/current-system").strip()
@@ -129,12 +134,12 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert secret_saved == 0, "the saved secret differs from the one in place"
 
 
-      with subtest("it stops both units again when no imp-host container appears within the wait"):
+      with subtest("it stops imp-host again when no imp-host container appears within the wait"):
           ctx = setup_test()
           db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          # docker run reads its seccomp profile before it creates the container: an invalid profile
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.digestRef}")
+          machine.succeed("systemctl stop imp-host")
+          # podman run reads its seccomp profile before it creates the container: an invalid profile
           # makes every start fail with no container at all
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
@@ -163,14 +168,15 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert err.splitlines() == [
               "restore-impd-db: no imp-host container appeared within 3 s of the start",
               f"restore-impd-db: the copy is in place (the original is in {saved}); "
-              "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again",
+              "the switch or start did not finish; imp-host is stopped again",
           ], err
           # one pause of a second after each of the three tries; the stand-in returns at once
           pauses = machine.succeed("cat /tmp/sleep.log").splitlines()
           assert pauses == ['["1"]', '["1"]', '["1"]'], f"the pauses are {pauses}"
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
-          assert units == ["inactive", "failed"], f"the units are {units}"
-          containers = machine.succeed("docker ps -a --format '{{.Names}}'").split()
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
+          # a stop leaves imp-host under Podman inactive in some runs and failed in others
+          assert units in (["inactive"], ["failed"]), f"the units are {units}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
           assert containers == [], f"the containers are {containers}"
           machine.fail("findmnt -rn -S tank/imp")
           assert_generations_unchanged(ctx["base_path"])
@@ -213,9 +219,9 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("ln -s ../imp.sqlite /mnt/imp/secrets/note")
           db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite imp.sqlite-shm imp.sqlite-wal")
           machine.succeed("umount /mnt/imp")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.digestRef}")
+          machine.succeed("systemctl stop imp-host")
+          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
 
           status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
@@ -229,7 +235,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "restore-impd-db: the saved secrets differ from the originals",
               "restore-impd-db: nothing was changed",
           ], err
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
@@ -272,9 +278,9 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.succeed("ln -s /proc/self/status /mnt/imp/db/imp.sqlite-shm")
           db_sums = machine.succeed("cd /mnt/imp/db && sha256sum imp.sqlite")
           machine.succeed("umount /mnt/imp")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.digestRef}")
+          machine.succeed("systemctl stop imp-host")
+          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
 
           status, out = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
@@ -288,7 +294,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "restore-impd-db: the saved imp.sqlite-shm differs from the original",
               "restore-impd-db: nothing was changed",
           ], err
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")

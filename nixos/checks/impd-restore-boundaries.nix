@@ -23,22 +23,22 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
       with subtest("it refuses to restore when it cannot read a unit's state, and changes nothing"):
           ctx = setup_test()
           db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.digestRef}")
+          machine.succeed("systemctl stop imp-host")
+          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
 
-          status, out = machine.execute("SYSTEMCTL=${stubSystemctl} FAIL_SHOW_UNIT=imp-docker-proxy restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
+          status, out = machine.execute("SYSTEMCTL=${stubSystemctl} FAIL_SHOW_UNIT=imp-host restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 1 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
 
           assert status == 1, f"exit {status}: {out}{err}"
           assert out.splitlines() == ["== check the copy", "== check the host"], out
-          # imp-host's state read passes through the stand-in; imp-docker-proxy's fails
+          # the stand-in fails imp-host's state read
           assert err.splitlines() == [
               "Failed to get properties: Connection timed out",
-              "restore-impd-db: cannot read imp-docker-proxy's state",
+              "restore-impd-db: cannot read imp-host's state",
               "restore-impd-db: nothing was changed",
           ], err
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
           backups = machine.succeed("ls -A /root/imp-db-backups").split()
           assert backups == ["pre-0.29-20261004T000000"], f"the backups are {backups}"
@@ -57,9 +57,9 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
       with subtest("it stops, and leaves the database in place, when the staged file differs from the copy"):
           ctx = setup_test()
           db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.digestRef}")
+          machine.succeed("systemctl stop imp-host")
+          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
 
           status, out = machine.execute("CMP=${stubCmp} FAIL_CMP_FIRST=/root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite.restore' restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
@@ -83,7 +83,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
           assert_generations_unchanged(ctx["base_path"])
           listing = machine.succeed(f"cd {saved} && find . -printf '%M %u:%g %p\\n' | sort -k3").splitlines()
@@ -113,9 +113,9 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
       with subtest("it stops, leaving the copy in place and tank/imp unmounted, when the published database differs from the copy"):
           ctx = setup_test()
           db_sums = write_dataset(["0001_init", "0002_tokens", "0003_leases"], "original", "dummy-secret-value")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.digestRef}")
+          machine.succeed("systemctl stop imp-host")
+          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
 
           status, out = machine.execute("CMP=${stubCmp} FAIL_CMP_FIRST=/root/imp-db-backups/pre-0.29-20261004T000000/imp.sqlite FAIL_CMP_SECOND='/run/impd-restore.*/db/imp.sqlite' restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 2>/tmp/restore.err")
           err = machine.succeed("cat /tmp/restore.err")
@@ -142,7 +142,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           machine.fail("findmnt -rn -S tank/imp")
           leftovers = machine.succeed("find /run -maxdepth 1 -name 'impd-restore.*'")
           assert leftovers == "", f"the script left {leftovers}"
-          units = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          units = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
           assert units == units_before, f"the units went from {units_before} to {units}"
           assert_generations_unchanged(ctx["base_path"])
           listing = machine.succeed(f"cd {saved} && find . -printf '%M %u:%g %p\\n' | sort -k3").splitlines()

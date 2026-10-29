@@ -150,7 +150,7 @@ checkout of `main`.
    [Keep the tailnet addresses](./leak-response.md#keep-the-tailnet-addresses) describes. impd
    writes its DNS records at the node's address, so restart it with
    `ssh root@geoffcloud systemctl restart imp-host` after the edit. Then restore every imp with
-   `ssh root@geoffcloud docker exec imp-host impz backup restore --all`, as
+   `ssh root@geoffcloud podman exec imp-host impz backup restore --all`, as
    [restore imps from restic](./restore-geoff-cloud.md#1-restore-imps-from-restic) describes.
 8. Log imp's CLI on this machine in to the new impd. impd's record of the CLI's saved token was in
    its database, so each `impz` call from this machine fails with `unauthorized` until then. Wait
@@ -158,7 +158,7 @@ checkout of `main`.
    patterns in imp-host, and pass it to `impz login` on stdin:
 
    ```bash
-   ssh root@geoffcloud docker exec imp-host impz token new operator --scope manage < /dev/null \
+   ssh root@geoffcloud podman exec imp-host impz token new operator --scope manage < /dev/null \
      | impz login https://imps.geoff.cloud
    ```
 
@@ -230,13 +230,13 @@ finds the two bearer copies equal and skips them. Start the daemon with
     `impPrefix` is unset), and write it straight into the file in `tokenFile`:
 
     ```bash
-    ssh root@geoffcloud docker exec imp-host impz token new home-pc-cloud --scope manage --imps '<imp_prefix>*' --grantable '<grantable>' < /dev/null \
+    ssh root@geoffcloud podman exec imp-host impz token new home-pc-cloud --scope manage --imps '<imp_prefix>*' --grantable '<grantable>' < /dev/null \
       | (umask 077 && cat > <token_file>)
     ```
 
     impd refuses the mint with `NOT_FOUND` for a secret that step 9 did not add, so add that secret
     first. When a failed attempt leaves `home-pc-cloud` in `impz token ls` in imp-host, remove it
-    with `ssh root@geoffcloud docker exec imp-host impz token rm home-pc-cloud` before a rerun. Keep
+    with `ssh root@geoffcloud podman exec imp-host impz token rm home-pc-cloud` before a rerun. Keep
     the target's token source as it is, because a change between a file and a variable changes the
     target's identity and refuses its sessions with `target_changed`. The daemon reads the file
     before each call to impd, so the new token needs no restart

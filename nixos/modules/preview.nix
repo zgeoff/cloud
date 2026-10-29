@@ -4,7 +4,7 @@
 # The unit starts only once its four secret files exist, so a switch before they are staged
 # skips it instead of failing. The preview-image unit adds the image each preview imp boots to
 # impd, from a reference pinned by digest, so a switch never leaves the service without it.
-# With spendCap on, a third listener on docker0 takes each preview's model calls from imp-host's
+# With spendCap on, a third listener on imp-host's bridge takes each preview's model calls from imp-host's
 # broker and hands them to that preview's own counting proxy.
 {
   config,
@@ -33,7 +33,7 @@ let
     runtimeInputs = [
       pkgs.coreutils
       pkgs.jq
-      config.virtualisation.docker.package
+      config.virtualisation.podman.package
     ];
     text = builtins.readFile ./preview-image.sh;
   };
@@ -170,10 +170,16 @@ in
         description = "The package whose bin/counting-proxy is nixie's counting proxy.";
       };
 
+      interface = lib.mkOption {
+        type = lib.types.str;
+        example = "podman0";
+        description = "imp-host's bridge, the interface the model route listener takes calls on.";
+      };
+
       address = lib.mkOption {
         type = lib.types.str;
-        example = "172.17.0.1";
-        description = "docker0's host address, where the model route listener listens.";
+        example = "10.88.0.1";
+        description = "The host's address on the bridge, where the model route listener listens.";
       };
 
       port = lib.mkOption {
@@ -184,8 +190,8 @@ in
 
       allowedSubnet = lib.mkOption {
         type = lib.types.str;
-        example = "172.17.0.0/16";
-        description = "docker0's subnet, the only source cloud_host admits to the listener.";
+        example = "10.88.0.0/16";
+        description = "The bridge's subnet, the only source cloud_host admits to the listener.";
       };
 
       upstream = lib.mkOption {
@@ -306,21 +312,22 @@ in
       }
       {
         assertion = !cfg.spendCap.enable || !(config.services.imp.ipv6.enable or false);
-        message = "the model route listener assumes imp-host on docker0; services.imp.ipv6.enable moves it to br-imphost";
+        message = "the model route listener assumes imp-host on ${cfg.spendCap.interface}; services.imp.ipv6.enable moves it to br-imphost";
       }
     ];
 
     networking.cloudHost.admissions = lib.mkIf cfg.spendCap.enable [
       {
-        inherit (cfg.spendCap) port;
-        interface = "docker0";
+        inherit (cfg.spendCap) port interface;
         sourceCIDR = cfg.spendCap.allowedSubnet;
         destinationAddress = cfg.spendCap.address;
       }
     ];
-    networking.firewall.interfaces.docker0.allowedTCPPorts = lib.mkIf cfg.spendCap.enable [
-      cfg.spendCap.port
-    ];
+    # optionalAttrs, not mkIf: the module system reads the names of an attrset inside an mkIf even
+    # when its condition is false, and with spendCap off the interface option has no value
+    networking.firewall.interfaces = lib.optionalAttrs cfg.spendCap.enable {
+      ${cfg.spendCap.interface}.allowedTCPPorts = [ cfg.spendCap.port ];
+    };
 
     # A oneshot that each switch restarts when the reference changes, so impd holds the pinned
     # image before the service boots a preview from it. A stop of imp-host stops it (requires),

@@ -3,10 +3,10 @@
 # with the argv that runs imp's CLI in imp-host, IMP_TOKEN and IMP_URL passed through, after the
 # directory and impd's port (scripts/imp-cli.ts names the CLI, so this script never does):
 #
-#   ssh root@geoffcloud bash -s -- <dir> <impd port> docker exec -e IMP_TOKEN -e IMP_URL imp-host <imp's CLI>
+#   ssh root@geoffcloud bash -s -- <dir> <impd port> podman exec -e IMP_TOKEN -e IMP_URL imp-host <imp's CLI>
 #
 # It asks impd who <dir>/imp-token is, through the CLI's `token whoami --json` on loopback. The
-# token goes from the file into docker's environment, which `docker exec -e IMP_TOKEN` copies into
+# token goes from the file into podman's environment, which `podman exec -e IMP_TOKEN` copies into
 # the CLI's, so it never enters an argv or returns to the caller: only the CLI's answer returns.
 # With IMP_URL set, the CLI uses IMP_TOKEN and no saved host or token file of its own.
 #
@@ -37,7 +37,7 @@ check_imp_token() {
   # global, so the EXIT trap still reads it after this function returns
   errors="$(mktemp)"
   trap 'rm -f "$errors"' EXIT
-  # docker exec without -i leaves stdin alone, which holds the rest of this script
+  # podman exec without -i leaves stdin alone, which holds the rest of this script
   IMP_TOKEN="$value" IMP_URL="http://127.0.0.1:$port" "$@" token whoami --json 2> "$errors" ||
     status=$?
   # the CLI's one line for impd's 401 (packages/cli/src/run-action.ts in imp's repo at v2.4.1)

@@ -82,7 +82,7 @@ test('it reads the counting proxy settings when the environment names a model ro
       PREVIEW_IMP_MODEL_SECRET: 'preview-model-counted',
       PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
       PREVIEW_IDLE_MINUTES: '20',
-      PREVIEW_SPEND_LISTEN: '172.17.0.1:18082',
+      PREVIEW_SPEND_LISTEN: '10.88.0.1:18082',
       PREVIEW_SPEND_PROXY: '/opt/counting-proxy/bin/counting-proxy',
       PREVIEW_SPEND_DIRECTORY: '/var/lib/preview/spend',
       PREVIEW_SPEND_UPSTREAM: 'https://models.example.test/',
@@ -95,7 +95,7 @@ test('it reads the counting proxy settings when the environment names a model ro
   );
 
   expect(config.spend).toStrictEqual({
-    listener: { hostname: '172.17.0.1', port: 18_082 },
+    listener: { hostname: '10.88.0.1', port: 18_082 },
     settings: {
       proxyPath: '/opt/counting-proxy/bin/counting-proxy',
       directory: '/var/lib/preview/spend',
@@ -128,7 +128,7 @@ test('it reads the long-prompt prices of the counting proxy settings', async () 
       PREVIEW_IMP_IMAGE: 'base',
       PREVIEW_IMP_MODEL_SECRET: 'preview-model-counted',
       PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
-      PREVIEW_SPEND_LISTEN: '172.17.0.1:18082',
+      PREVIEW_SPEND_LISTEN: '10.88.0.1:18082',
       PREVIEW_SPEND_PROXY: '/opt/counting-proxy/bin/counting-proxy',
       PREVIEW_SPEND_DIRECTORY: '/var/lib/preview/spend',
       PREVIEW_SPEND_UPSTREAM: 'https://models.example.test',
@@ -189,7 +189,7 @@ test.each([
         PREVIEW_IMP_DOMAIN: 'imps.example.test',
         PREVIEW_IMP_IMAGE: 'base',
         PREVIEW_DATABASE: '/var/lib/preview/previews.sqlite',
-        PREVIEW_SPEND_LISTEN: '172.17.0.1:18082',
+        PREVIEW_SPEND_LISTEN: '10.88.0.1:18082',
         PREVIEW_SPEND_PROXY: '/opt/counting-proxy/bin/counting-proxy',
         PREVIEW_SPEND_DIRECTORY: '/var/lib/preview/spend',
         PREVIEW_SPEND_UPSTREAM: 'https://models.example.test',

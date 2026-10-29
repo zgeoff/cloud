@@ -68,7 +68,7 @@ with the atc MCP tools.
 3. List the harness imps:
 
    ```bash
-   ssh root@geoffcloud docker exec imp-host impz ls < /dev/null | grep harness-
+   ssh root@geoffcloud podman exec imp-host impz ls < /dev/null | grep harness-
    ```
 
    Expect one new imp on the image that the `geoffcloud` target names in

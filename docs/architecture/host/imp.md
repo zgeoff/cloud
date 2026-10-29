@@ -1,12 +1,12 @@
 # imp on the host
 
 impd, imp's daemon, runs every imp on the host as a Firecracker microVM, and it runs as imp ships
-it: one `imp-host` container on the host's Docker, set up by imp's NixOS module. impd schedules its
-own microVMs, needs KVM and a ZFS pool, and runs its own tailnet node, so it sits outside k3s. Its
-state is one SQLite database and a set of secret files on its own ZFS dataset, and this repo's part
-is to pin it, wire it to the host and keep a copy of that database before every upgrade.
-[The host](./host.md) covers the disks and the switch, and [secrets](../secrets.md) covers how
-impd's secret files arrive.
+it: one `imp-host` container under the host's rootful Podman, set up by imp's NixOS module. impd
+schedules its own microVMs, needs KVM and a ZFS pool, and runs its own tailnet node, so it sits
+outside k3s. Its state is one SQLite database and a set of secret files on its own ZFS dataset, and
+this repo's part is to pin it, wire it to the host and keep a copy of that database before every
+upgrade. [The host](./host.md) covers the disks and the switch, and [secrets](../secrets.md) covers
+how impd's secret files arrive.
 
 ## Two pins
 
@@ -23,28 +23,30 @@ impd serves its API on the host's loopback and on its own tailnet node, `imp-geo
 to impd. The tailnet node serves impd's API and each imp over HTTPS at `imps.geoff.cloud` and
 `<name>.imps.geoff.cloud` ([the tailnet](../network/tailnet.md)).
 
-imp-host filters inbound traffic only from its imps' interfaces. From Docker's bridge, every
-listener in the container answers, impd's plain-HTTP API, its SSH server and imp's credential broker
-among them, so impd's token is the only gate inside the container. The host's own table therefore
-drops pod traffic to Docker's subnet ([firewalls](../network/firewalls.md#the-narrowing-table)), and
-on Docker's bridge only the host and the containers reach imp-host.
+imp-host runs on Podman's default network, whose bridge and subnet the host's configuration pins
+from the shared topology. imp-host filters inbound traffic only from its imps' interfaces. From
+Podman's bridge, every listener in the container answers, impd's plain-HTTP API, its SSH server and
+imp's credential broker among them, so impd's token is the only gate inside the container. The
+host's own table therefore drops pod traffic to Podman's subnet
+([firewalls](../network/firewalls.md#the-narrowing-table)), and on Podman's bridge only the host and
+the containers reach imp-host.
 
-impd reaches the host's Docker only through imp's Docker API proxy, a separate unit with no network
-that forwards the calls impd needs, so the container never mounts the Docker socket. The module also
-loads the `inet imp-forward` table, which drops traffic from imp-host's bridge to the cluster's pod
-and service ranges, because an imp is an agent sandbox and must not reach a workload
+The container gets no socket of a container engine, and the host runs no Docker: impd fetches its
+builder image from the registry itself. Host tools reach impd through `podman exec imp-host`. The
+module also loads the `inet imp-forward` table, which drops traffic from imp-host's bridge to the
+cluster's pod and service ranges, because an imp is an agent sandbox and must not reach a workload
 ([firewalls](../network/firewalls.md)).
 
 impd holds the host's memory budget for imps and refuses a boot that would exceed it, while an idle
 imp sleeps to disk and frees its memory. The ZFS cache has a cap of its own, so the pool and the
 imps never compete for the rest of the host's memory.
 
-The imps yield CPU to the cluster rather than hold a cap. Docker starts its containers, imp-host
-among them, in `imp.slice`, whose CPU weight of 10 sits below the weight of `system.slice`, where
-k3s runs, and of the kubelet's `kubepods.slice`. The kernel splits a busy CPU between sibling
-cgroups by weight, so under load the pods and k3s get the larger share, while on a quiet host the
-imps use every core. impd's own weights for each imp's cgroup, inside the container, only order the
-imps among themselves.
+The imps yield CPU to the cluster rather than hold a cap. Rootful Podman starts its containers,
+imp-host the only one, in `machine.slice`, whose CPU weight of 10 sits below the weight of
+`system.slice`, where k3s runs, and of the kubelet's `kubepods.slice`. The kernel splits a busy CPU
+between sibling cgroups by weight, so under load the pods and k3s get the larger share, while on a
+quiet host the imps use every core. impd's own weights for each imp's cgroup, inside the container,
+only order the imps among themselves.
 
 ## Images on the pool
 

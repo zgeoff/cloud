@@ -3,10 +3,10 @@
 # that a rehearsal subtest can leave, runs the reset again, and checks the whole boot state the
 # reset promises: the booted 0.29.0 system current; generations 1 (0.28.0), 2 (0.28.0, a switch
 # that fails) and 3 (the booted one) in the system profile, and returned as the reset's three
-# paths; no unit failed; docker and both imp units up; imp-host and its proxy the only
-# containers, imp-host on its image, and that image the only one; an empty tank/imp with no
-# snapshot or child, mounted nowhere; nothing mounted under the backups or over imp-host's
-# seccomp profile; and no holder, backup, restore error, pause log or restore directory left.
+# paths; no unit failed; imp-host up, the only container, on its image, and that image the only
+# one; an empty tank/imp with no snapshot or child, mounted nowhere; nothing mounted under the
+# backups or over imp-host's seccomp profile; and no holder, backup, restore error, pause log,
+# broken Podman config or restore directory left.
 #
 # Beside the hand-made states, the last subtests reach the reset from what a real run leaves: a
 # restore-impd-db run that fails in its switch, and one killed with SIGKILL while it checks its
@@ -48,14 +48,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -63,7 +63,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -91,14 +91,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -106,7 +106,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -135,14 +135,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -150,7 +150,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -162,18 +162,19 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert contents == "", f"tank/imp holds {contents}"
 
 
-      with subtest("it removes the backups, the saved restore error, the pause log, the copy's seed and its saved error"):
+      with subtest("it removes the backups, the saved restore error, the pause log, the copy's seed, its saved error and a broken Podman config"):
           ctx = setup_test()
           machine.succeed("install -d -m 0700 /root/imp-db-backups/pre-restore-20261004T000000/secrets")
           machine.succeed("printf 'dummy-secret-value\\n' > /root/imp-db-backups/pre-restore-20261004T000000/secrets/glm")
           machine.succeed("printf 'restore-impd-db: nothing was changed\\n' > /tmp/restore.err")
           machine.succeed("printf '[\"1\"]\\n' > /tmp/sleep.log")
           machine.succeed("install -d -m 0700 /tmp/impd-db-seed && sqlite3 /tmp/impd-db-seed/imp.sqlite 'CREATE TABLE marker (v TEXT);'")
-          machine.succeed("printf 'Error response from daemon\\n' > /tmp/copy.err")
-          left_before = machine.succeed("find /root/imp-db-backups /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err | sort").split()
+          machine.succeed("printf 'Error: no such container\\n' > /tmp/copy.err")
+          machine.succeed("printf '[engine\\n' > /tmp/broken-containers.conf")
+          left_before = machine.succeed("find /root/imp-db-backups /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /tmp/broken-containers.conf | sort").split()
 
           ctx = setup_test()
-          assert left_before == ["/root/imp-db-backups", "/root/imp-db-backups/pre-restore-20261004T000000", "/root/imp-db-backups/pre-restore-20261004T000000/secrets", "/root/imp-db-backups/pre-restore-20261004T000000/secrets/glm", "/tmp/copy.err", "/tmp/impd-db-seed", "/tmp/impd-db-seed/imp.sqlite", "/tmp/restore.err", "/tmp/sleep.log"], f"the files were {left_before}"
+          assert left_before == ["/root/imp-db-backups", "/root/imp-db-backups/pre-restore-20261004T000000", "/root/imp-db-backups/pre-restore-20261004T000000/secrets", "/root/imp-db-backups/pre-restore-20261004T000000/secrets/glm", "/tmp/broken-containers.conf", "/tmp/copy.err", "/tmp/impd-db-seed", "/tmp/impd-db-seed/imp.sqlite", "/tmp/restore.err", "/tmp/sleep.log"], f"the files were {left_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -182,14 +183,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -197,7 +198,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -226,14 +227,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -241,7 +242,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -275,14 +276,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -290,49 +291,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
-          assert left == "", f"the reset left {left}"
-          datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
-          assert datasets == ["tank/imp"], f"the datasets are {datasets}"
-          mountpoint = machine.succeed("zfs get -H -o value mountpoint tank/imp").strip()
-          assert mountpoint == "legacy", f"tank/imp has mountpoint {mountpoint!r}"
-          machine.succeed("mkdir -p /mnt/imp && mount -t zfs tank/imp /mnt/imp")
-          contents = machine.succeed("ls -A /mnt/imp")
-          machine.succeed("umount /mnt/imp")
-          assert contents == "", f"tank/imp holds {contents}"
-
-
-      with subtest("it starts docker again when it is stopped"):
-          ctx = setup_test()
-          machine.succeed("systemctl stop docker.socket docker.service")
-          docker_before = machine.execute("systemctl is-active docker.socket docker.service")[1].split()
-
-          ctx = setup_test()
-          assert docker_before == ["inactive", "inactive"], f"docker was {docker_before}"
-          booted = machine.succeed("readlink -f /run/booted-system").strip()
-          specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
-          assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
-          assert_generations_unchanged(booted)
-          generations = machine.succeed("cd /nix/var/nix/profiles && readlink -f system-1-link system-2-link system-3-link").split()
-          assert generations == specialisations + [booted], f"the generations' systems are {generations}"
-          failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
-          assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
-          machine.fail("findmnt -rn -S tank/imp")
-          targets = machine.succeed("findmnt -rn -o TARGET").split()
-          backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
-          assert backup_mounts == [], f"mounted under the backups: {backup_mounts}"
-          seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
-          assert len(seccomp) == 1, f"the unit names {seccomp}"
-          machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -359,14 +318,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -374,7 +333,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -386,13 +345,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert contents == "", f"tank/imp holds {contents}"
 
 
-      with subtest("it starts imp-host and its proxy again when they are stopped"):
+      with subtest("it starts imp-host again when it is stopped"):
           ctx = setup_test()
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          units_before = machine.execute("systemctl is-active imp-host imp-docker-proxy")[1].split()
+          machine.succeed("systemctl stop imp-host")
+          units_before = machine.execute("systemctl is-active imp-host")[1].split()
 
           ctx = setup_test()
-          assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+          # a stop leaves imp-host under Podman inactive in some runs and failed in others
+          assert units_before in (["inactive"], ["failed"]), f"the imp units were {units_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -401,14 +361,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -416,7 +376,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -430,12 +390,12 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
 
       with subtest("it removes a container on another image, and that image"):
           ctx = setup_test()
-          machine.succeed("docker pull ${image28.ref}")
-          machine.succeed("docker run -d --name leftover ${image28.ref}")
-          leftover_before = machine.succeed("docker inspect leftover --format '{{.Config.Image}}'").strip()
+          machine.succeed("podman pull ${image28.ref}")
+          machine.succeed("podman run -d --name leftover ${image28.ref}")
+          leftover_before = machine.succeed("podman inspect leftover --format '{{.Config.Image}}'").strip()
 
           ctx = setup_test()
-          assert leftover_before == "${image28.ref}", f"the leftover container ran {leftover_before}"
+          assert leftover_before == "${image28.digestRef}", f"the leftover container ran {leftover_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
           assert ctx == {"base_path": booted, "old_path": specialisations[0], "broken_path": specialisations[1]}, f"setup_test() returned {ctx}"
@@ -444,14 +404,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -459,7 +419,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -490,14 +450,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -505,7 +465,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -536,14 +496,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -551,7 +511,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -584,14 +544,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -599,7 +559,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -621,14 +581,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "sqlite3 /mnt/imp/db/imp.sqlite 'PRAGMA journal_mode=WAL;' '.dbconfig no_ckpt_on_close on' 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
           )
           machine.succeed("umount /mnt/imp")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image28.digestRef}")
+          machine.succeed("systemctl stop imp-host")
           broken_before = ctx["broken_path"]
 
           status_before, out_before = machine.execute("restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 2 2>/tmp/restore.err")
           err_before = machine.succeed("cat /tmp/restore.err").splitlines()
           saved_before = machine.succeed("ls -d /root/imp-db-backups/pre-restore-*").split()
-          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host imp-docker-proxy").split()
+          units_before = machine.succeed("systemctl show -p ActiveState --value imp-host").split()
           switch_unit_before = machine.execute("systemctl is-failed fail-on-switch")[1].strip()
           current_before = machine.succeed("readlink -f /run/current-system").strip()
           links_before = machine.succeed("ls -1 /nix/var/nix/profiles | grep -E '^system-[0-9]+-link$'").split()
@@ -642,9 +602,10 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert len(saved_before) == 1, f"the saved directories were {saved_before}"
           assert err_before[-1] == (
               f"restore-impd-db: the copy is in place (the original is in {saved_before[0]}); "
-              "the switch or start did not finish; imp-host and imp-docker-proxy are stopped again"
+              "the switch or start did not finish; imp-host is stopped again"
           ), err_before
-          assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+          # a stop leaves imp-host under Podman inactive in some runs and failed in others
+          assert units_before in (["inactive"], ["failed"]), f"the imp units were {units_before}"
           assert switch_unit_before == "failed", f"fail-on-switch was {switch_unit_before!r}"
           assert current_before == broken_before, f"the system was {current_before}"
           assert links_before == ["system-1-link", "system-2-link", "system-3-link", "system-4-link"], f"the generations were {links_before}"
@@ -658,14 +619,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -673,7 +634,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -695,8 +656,8 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
               "sqlite3 /mnt/imp/db/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);' \"INSERT INTO kysely_migration VALUES ('0001_init','t'),('0002_tokens','t'),('0003_leases','t');\" 'CREATE TABLE marker (v TEXT);' \"INSERT INTO marker VALUES ('original');\""
           )
           machine.succeed("umount /mnt/imp")
-          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.ref}")
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
+          write_copy("/root/imp-db-backups/pre-0.29-20261004T000000", ["0001_init", "0002_tokens"], "copy", "${image29.digestRef}")
+          machine.succeed("systemctl stop imp-host")
 
           # the stand-in writes /tmp/holder.pid once the script is inside the check of its staged copy
           pid = machine.succeed("SQLITE3=${stubBlockingSqlite3} HOLDER_PID_FILE=/tmp/holder.pid restore-impd-db /root/imp-db-backups/pre-0.29-20261004T000000 3 > /tmp/restore.err 2>&1 < /dev/null & echo $!").strip()
@@ -733,14 +694,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -748,7 +709,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -763,17 +724,18 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
       with subtest("it makes tank/imp again after a reset that stopped once it had destroyed the dataset"):
           ctx = setup_test()
           # the reset's own steps up to its destroy of tank/imp
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          machine.succeed("docker ps -aq | xargs -r docker rm -f")
-          machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
+          machine.succeed("systemctl stop imp-host")
+          machine.succeed("podman ps -aq | xargs -r podman rm -f")
+          machine.succeed("podman images -aq | sort -u | xargs -r podman rmi -f")
           machine.succeed("zfs destroy -r tank/imp")
           dataset_before = machine.execute("zfs list -H -o name tank/imp 2>&1")
-          units_before = machine.execute("systemctl is-active imp-host imp-docker-proxy")[1].split()
-          images_before = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
+          units_before = machine.execute("systemctl is-active imp-host")[1].split()
+          images_before = machine.succeed("podman images -aq")
 
           ctx = setup_test()
           assert dataset_before == (1, "cannot open 'tank/imp': dataset does not exist\n"), f"tank/imp was {dataset_before}"
-          assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+          # a stop leaves imp-host under Podman inactive in some runs and failed in others
+          assert units_before in (["inactive"], ["failed"]), f"the imp units were {units_before}"
           assert images_before == "", f"the images were {images_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
@@ -783,14 +745,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -798,7 +760,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"
@@ -813,17 +775,18 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
       with subtest("it rebuilds the system profile after a reset that stopped once it had removed every generation"):
           ctx = setup_test()
           # the reset's own steps up to its removal of the system profile's links
-          machine.succeed("systemctl stop imp-host imp-docker-proxy")
-          machine.succeed("docker ps -aq | xargs -r docker rm -f")
-          machine.succeed("docker images -q ghcr.io/zgeoff/imp-host | sort -u | xargs -r docker rmi -f")
+          machine.succeed("systemctl stop imp-host")
+          machine.succeed("podman ps -aq | xargs -r podman rm -f")
+          machine.succeed("podman images -aq | sort -u | xargs -r podman rmi -f")
           machine.succeed("rm -f /nix/var/nix/profiles/system /nix/var/nix/profiles/system-*-link")
           profiles_before = [name for name in machine.succeed("ls -1 /nix/var/nix/profiles").split() if name.startswith("system")]
-          units_before = machine.execute("systemctl is-active imp-host imp-docker-proxy")[1].split()
-          images_before = machine.succeed("docker images -q ghcr.io/zgeoff/imp-host")
+          units_before = machine.execute("systemctl is-active imp-host")[1].split()
+          images_before = machine.succeed("podman images -aq")
 
           ctx = setup_test()
           assert profiles_before == [], f"the system profile's links were {profiles_before}"
-          assert units_before == ["failed", "failed"], f"the imp units were {units_before}"
+          # a stop leaves imp-host under Podman inactive in some runs and failed in others
+          assert units_before in (["inactive"], ["failed"]), f"the imp units were {units_before}"
           assert images_before == "", f"the images were {images_before}"
           booted = machine.succeed("readlink -f /run/booted-system").strip()
           specialisations = machine.succeed(f"readlink -f {booted}/specialisation/old {booted}/specialisation/broken").split()
@@ -833,14 +796,14 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           assert generations == specialisations + [booted], f"the generations' systems are {generations}"
           failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
           assert failed == "", f"units are failed: {failed}"
-          active = machine.succeed("systemctl is-active docker.socket docker.service imp-host imp-docker-proxy").split()
-          assert active == ["active", "active", "active", "active"], f"the units are {active}"
-          containers = sorted(machine.succeed("docker ps -a --format '{{.Names}}'").split())
-          assert containers == ["imp-docker-proxy", "imp-host"], f"the containers are {containers}"
-          image = machine.succeed("docker inspect imp-host --format '{{.Config.Image}}'").strip()
-          assert image == "${image29.ref}", f"imp-host runs {image}"
-          images = machine.succeed("docker images --digests --format '{{.Repository}}@{{.Digest}}'").split()
-          assert images == ["ghcr.io/zgeoff/imp-host@" + "${image29.ref}".split("@")[1]], f"the images are {images}"
+          active = machine.succeed("systemctl is-active imp-host").split()
+          assert active == ["active"], f"the units are {active}"
+          containers = machine.succeed("podman ps -a --format '{{.Names}}'").split()
+          assert containers == ["imp-host"], f"the containers are {containers}"
+          image = machine.succeed("podman inspect imp-host --format '{{.Config.Image}}'").strip()
+          assert image == "${image29.digestRef}", f"imp-host runs {image}"
+          images = machine.succeed("podman images --format '{{.Repository}}@{{.Digest}}'").split()
+          assert images == ["${image29.digestRef}"], f"the images are {images}"
           machine.fail("findmnt -rn -S tank/imp")
           targets = machine.succeed("findmnt -rn -o TARGET").split()
           backup_mounts = [target for target in targets if target.startswith("/root/imp-db-backups")]
@@ -848,7 +811,7 @@ import ./test-utils/build-restore-rehearsal.nix { inherit nixpkgs imp; } {
           seccomp = re.findall(r"seccomp=(/nix/store/[^ ']+)", machine.succeed("cat /etc/systemd/system/imp-host.service"))
           assert len(seccomp) == 1, f"the unit names {seccomp}"
           machine.fail(f"mountpoint -q {seccomp[0]}")
-          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
+          left = machine.execute("ls -d /tmp/holder.pid /tmp/broken-seccomp.json /tmp/broken-containers.conf /tmp/restore.err /tmp/sleep.log /tmp/impd-db-seed /tmp/copy.err /root/imp-db-backups /run/impd-restore.* 2>/dev/null")[1]
           assert left == "", f"the reset left {left}"
           datasets = machine.succeed("zfs list -H -r -t all -o name tank/imp").split()
           assert datasets == ["tank/imp"], f"the datasets are {datasets}"

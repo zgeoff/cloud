@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildHostImpArgv } from '../imp-cli.ts';
 import { runProcess } from '../run-process.ts';
-import { createStubImpDocker } from '../test-utils/create-stub-imp-docker.ts';
+import { createStubImpPodman } from '../test-utils/create-stub-imp-podman.ts';
 
 async function setupTest() {
   const directory = await mkdtemp(join(tmpdir(), 'check-atc-imp-token-'));
@@ -25,10 +25,10 @@ async function setupTest() {
   return { bin, secrets, script, env, cli };
 }
 
-test('it asks impd who the saved token is through the CLI, with the token in docker’s environment alone', async () => {
+test('it asks impd who the saved token is through the CLI, with the token in podman’s environment alone', async () => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(
+  await createStubImpPodman(
     ctx.bin,
     { stdout: '{"kind":"token","name":"atc-cloud"}\n', stderr: '', exitCode: 0 },
     ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
@@ -41,8 +41,8 @@ test('it asks impd who the saved token is through the CLI, with the token in doc
     env: ctx.env,
   });
 
-  const calls = await readFile(join(ctx.bin, 'docker-calls'), 'utf8');
-  const env = await readFile(join(ctx.bin, 'docker-env'), 'utf8');
+  const calls = await readFile(join(ctx.bin, 'podman-calls'), 'utf8');
+  const env = await readFile(join(ctx.bin, 'podman-env'), 'utf8');
 
   expect(result).toStrictEqual({
     exitCode: 0,
@@ -52,7 +52,7 @@ test('it asks impd who the saved token is through the CLI, with the token in doc
   });
 
   expect(calls).toBe(
-    '["docker","exec","-e","IMP_TOKEN","-e","IMP_URL","imp-host","impz","token","whoami","--json"]\n',
+    '["podman","exec","-e","IMP_TOKEN","-e","IMP_URL","imp-host","impz","token","whoami","--json"]\n',
   );
 
   expect(env).toBe('{"IMP_TOKEN":"imp_fixture_good","IMP_URL":"http://127.0.0.1:7070"}\n');
@@ -61,7 +61,7 @@ test('it asks impd who the saved token is through the CLI, with the token in doc
 test('it hands on a saved token without a trailing newline as it is', async () => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(
+  await createStubImpPodman(
     ctx.bin,
     { stdout: '{"kind":"token","name":"atc-cloud"}\n', stderr: '', exitCode: 0 },
     ['exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz', 'token', 'whoami', '--json'],
@@ -74,7 +74,7 @@ test('it hands on a saved token without a trailing newline as it is', async () =
     env: ctx.env,
   });
 
-  const env = await readFile(join(ctx.bin, 'docker-env'), 'utf8');
+  const env = await readFile(join(ctx.bin, 'podman-env'), 'utf8');
 
   expect(env).toBe('{"IMP_TOKEN":"imp_fixture_good","IMP_URL":"http://127.0.0.1:7070"}\n');
 });
@@ -84,7 +84,7 @@ test('it hands on a saved token without a trailing newline as it is', async () =
 test('it exits 122 with nothing printed for a token impd refuses', async () => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(
+  await createStubImpPodman(
     ctx.bin,
     {
       stdout: '',
@@ -113,7 +113,7 @@ test('it exits 122 with nothing printed for a token impd refuses', async () => {
 test('it exits with the CLI’s code and passes its line through for any other failure', async () => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(
+  await createStubImpPodman(
     ctx.bin,
     {
       stdout: '',
@@ -150,7 +150,7 @@ test.each([
   async (_label: string, content: string) => {
     const ctx = await setupTest();
 
-    await createStubImpDocker(ctx.bin, { stdout: '', stderr: '', exitCode: 0 });
+    await createStubImpPodman(ctx.bin, { stdout: '', stderr: '', exitCode: 0 });
     await writeFile(join(ctx.secrets, 'imp-token'), content);
 
     const result = await runProcess(['bash', '-s', '--', ctx.secrets, '7070', ...ctx.cli], {
@@ -158,7 +158,7 @@ test.each([
       env: ctx.env,
     });
 
-    const called = await Bun.file(join(ctx.bin, 'docker-calls')).exists();
+    const called = await Bun.file(join(ctx.bin, 'podman-calls')).exists();
 
     expect(result.exitCode).toBe(121);
     expect(result.stdout.toString()).toBe('');
@@ -172,7 +172,7 @@ test.each([
 ])('it exits 120 without asking impd for %s', async (_label: string, directory: boolean) => {
   const ctx = await setupTest();
 
-  await createStubImpDocker(ctx.bin, { stdout: '', stderr: '', exitCode: 0 });
+  await createStubImpPodman(ctx.bin, { stdout: '', stderr: '', exitCode: 0 });
 
   if (directory) {
     await mkdir(join(ctx.secrets, 'imp-token'));
@@ -183,7 +183,7 @@ test.each([
     env: ctx.env,
   });
 
-  const called = await Bun.file(join(ctx.bin, 'docker-calls')).exists();
+  const called = await Bun.file(join(ctx.bin, 'podman-calls')).exists();
 
   expect(result.exitCode).toBe(120);
   expect(called).toBe(false);

@@ -1,6 +1,6 @@
 # Evaluates services.preview apart from any host's config and checks the units it defines, runs
-# the preview-image unit's script against a stand-in docker that answers for impd
-# (test-utils/build-stub-imp-host-docker.nix) and a stand-in sleep (test-utils/build-stub-sleep.nix),
+# the preview-image unit's script against a stand-in podman that answers for impd
+# (test-utils/build-stub-imp-host-podman.nix) and a stand-in sleep (test-utils/build-stub-sleep.nix),
 # and builds the package to check that it carries the service's modules and none of its tests,
 # and that its typed impd client loads from the dependencies it carries.
 # Each case runs on its own, in a fresh directory, under test-support/shell/run-cases.sh.
@@ -15,7 +15,7 @@ let
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
   package = pkgs.callPackage ../packages/preview.nix { };
-  stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubImpHostPodman = import ./test-utils/build-stub-imp-host-podman.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
   # the spendCap cases only read the proxy's path, so the binary never runs
   stubCountingProxy = pkgs.writeShellScriptBin "counting-proxy" "exit 1";
@@ -312,7 +312,7 @@ let
         '';
     }
     {
-      title = "it sets the counting proxy settings and admits the docker0 subnet to the model route listener once spendCap is on";
+      title = "it sets the counting proxy settings and admits the podman0 subnet to the model route listener once spendCap is on";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
@@ -334,9 +334,10 @@ let
               spendCap = {
                 enable = true;
                 package = stubCountingProxy;
-                address = "172.17.0.1";
+                interface = "podman0";
+                address = "10.88.0.1";
                 port = 18082;
-                allowedSubnet = "172.17.0.0/16";
+                allowedSubnet = "10.88.0.0/16";
                 model = "claude-test-model";
                 prices = {
                   input = 1;
@@ -358,7 +359,7 @@ let
         ''
           jq -S . > expected <<'EOF'
           ${builtins.toJSON {
-            PREVIEW_SPEND_LISTEN = "172.17.0.1:18082";
+            PREVIEW_SPEND_LISTEN = "10.88.0.1:18082";
             PREVIEW_SPEND_PROXY = "${stubCountingProxy}/bin/counting-proxy";
             PREVIEW_SPEND_DIRECTORY = "/var/lib/preview/spend";
             PREVIEW_SPEND_UPSTREAM = "https://api.anthropic.com";
@@ -384,14 +385,14 @@ let
               builtins.toJSON [
                 {
                   port = 18082;
-                  interface = "docker0";
-                  sourceCIDR = "172.17.0.0/16";
-                  destinationAddress = "172.17.0.1";
+                  interface = "podman0";
+                  sourceCIDR = "10.88.0.0/16";
+                  destinationAddress = "10.88.0.1";
                 }
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
-          assert_equals '[18082]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.docker0.allowedTCPPorts)} "the ports nixos-fw opens on docker0"
+          assert_equals '[18082]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces.podman0.allowedTCPPorts)} "the ports nixos-fw opens on podman0"
           assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
@@ -418,9 +419,10 @@ let
               spendCap = {
                 enable = true;
                 package = stubCountingProxy;
-                address = "172.17.0.1";
+                interface = "podman0";
+                address = "10.88.0.1";
                 port = 18082;
-                allowedSubnet = "172.17.0.0/16";
+                allowedSubnet = "10.88.0.0/16";
                 model = "claude-test-model";
                 prices = {
                   input = 1;
@@ -473,7 +475,7 @@ let
         '';
     }
     {
-      title = "it leaves the counting proxy settings and the admission out when spendCap is off";
+      title = "it leaves the counting proxy settings, the admission and the open port out when spendCap is off";
       script =
         let
           system = buildModuleSystem ../modules/preview.nix {
@@ -499,6 +501,7 @@ let
         ''
           assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (builtins.filter (lib.hasPrefix "PREVIEW_SPEND_") names))} "the counting proxy's variables"
           assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON system.config.networking.cloudHost.admissions)} "the cloud_host admissions"
+          assert_equals '{}' ${lib.escapeShellArg (builtins.toJSON system.config.networking.firewall.interfaces)} "the interfaces nixos-fw opens ports on"
         '';
     }
     {
@@ -523,9 +526,10 @@ let
               spendCap = {
                 enable = true;
                 package = stubCountingProxy;
-                address = "172.17.0.1";
+                interface = "podman0";
+                address = "10.88.0.1";
                 port = 18082;
-                allowedSubnet = "172.17.0.0/16";
+                allowedSubnet = "10.88.0.0/16";
                 model = "claude-test-model";
                 prices = {
                   input = 1;
@@ -645,7 +649,7 @@ let
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/imp-base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
@@ -674,7 +678,7 @@ let
         echo '[{"id":"img-2","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.2@sha256:${lib.strings.replicate 64 "b"}","digest":"imp-build-bb","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":true}]' > impd/images.json
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
@@ -701,7 +705,7 @@ let
         cp impd/images.json before.json
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
@@ -720,7 +724,7 @@ let
         echo '[{"id":"img-3","name":"pv-base","ref":"ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","digest":"imp-build-cc","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12,"pinned":false}]' > impd/images.json
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
@@ -747,7 +751,7 @@ let
         echo 2 > impd/unreachable
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
@@ -768,21 +772,21 @@ let
       '';
     }
     {
-      title = "it fails with the last docker error when impd does not answer in its tries";
+      title = "it fails with the last podman error when impd does not answer in its tries";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
         echo 5 > impd/unreachable
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" PREVIEW_IMAGE_WAIT_TRIES=3 \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
         assert_equals 1 "$status" "the exit status"
         assert_files_equal /dev/null out
-        assert_equals "preview-image: impd listed no images after 3 tries: Error response from daemon: No such container: imp-host" "$(cat err)" "the error"
+        assert_equals "preview-image: impd listed no images after 3 tries: Error: no container with name or ID \"imp-host\" found: no such container" "$(cat err)" "the error"
         assert_files_equal - sleep.log <<'EOF'
         ["2"]
         ["2"]
@@ -798,7 +802,7 @@ let
         echo 'image ghcr.io/example/imp-base:1.2.3: pull failed' > impd/add-error
 
         status=0
-        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?

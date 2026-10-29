@@ -1,12 +1,12 @@
 # shellcheck shell=bash
 # Put a copy of impd's database back on geoffcloud (#9), packaged as restore-impd-db on the
-# host's PATH (default.nix beside it). Runs ON THE HOST, as root, after imp-host and
-# imp-docker-proxy are stopped (docs/runbooks/restore-geoff-cloud.md, section 2):
+# host's PATH (default.nix beside it). Runs ON THE HOST, as root, after imp-host is stopped
+# (docs/runbooks/restore-geoff-cloud.md, section 2):
 #
 #   restore-impd-db /root/imp-db-backups/<copy> <generation>
 #
-# <generation> is the NixOS generation whose imp-host image matches the copy's COPY-INFO. The
-# order pairs them safely: restore the database while impd is stopped, then activate that
+# <generation> is the NixOS generation whose imp-host image matches the copy's COPY-INFO, and
+# whose imp-host runs under Podman, as imp 6.0.0 and later run it. The order pairs them safely: restore the database while impd is stopped, then activate that
 # generation, then start imp-host and check it runs the copy's image. A runtime mask cannot
 # hold impd down through a switch on NixOS (the units in /etc outrank /run), so nothing here
 # relies on one. It fails closed: every check runs before anything changes, and on any error
@@ -28,7 +28,7 @@ systemctl="${SYSTEMCTL:-systemctl}"
 cmp="${CMP:-cmp}"
 start_wait="${IMPD_START_WAIT_SECONDS:-60}"
 start_sleep="${IMPD_START_SLEEP:-sleep}"
-units=(imp-host imp-docker-proxy)
+units=(imp-host)
 
 # what has happened so far, for the error message
 state="nothing was changed"
@@ -46,9 +46,9 @@ fail() {
 stop_after_failure() {
   if [ "$starting" = true ]; then
     if "$systemctl" stop "${units[@]}"; then
-      state="$state; imp-host and imp-docker-proxy are stopped again"
+      state="$state; imp-host is stopped again"
     else
-      state="$state; stopping imp-host and imp-docker-proxy FAILED, check them by hand"
+      state="$state; stopping imp-host FAILED, check it by hand"
     fi
   fi
 }
@@ -57,6 +57,13 @@ trap 'fail "failed at line $LINENO"' ERR
 
 step() {
   printf '== %s\n' "$*"
+}
+
+# image_by_digest <ref>: prints <ref> without the tag before its digest. Podman names an image
+# pulled by tag and digest as <name>@sha256:<digest>, while the unit and an older COPY-INFO name it
+# <name>:<tag>@sha256:<digest>; the digest alone names the image.
+image_by_digest() {
+  sed -E 's|^(.*/[^/:@]+):[^/@]+@|\1@|' <<< "$1"
 }
 
 step "check the copy"
@@ -81,7 +88,7 @@ for unit in "${units[@]}"; do
     *) fail "$unit is $unit_state, not stopped; run: systemctl stop ${units[*]}" ;;
   esac
 done
-containers="$(docker ps --format '{{.Names}}')" || fail "cannot list docker containers"
+containers="$(podman ps --format '{{.Names}}')" || fail "cannot list podman containers"
 for unit in "${units[@]}"; do
   if grep -qx "$unit" <<< "$containers"; then
     fail "the $unit container still runs; stop it before a restore"
@@ -90,8 +97,12 @@ done
 [[ "$generation" =~ ^[0-9]+$ ]] || fail "the generation must be a number, such as 14"
 target="$profiles/system-$generation-link"
 [ -x "$target/bin/switch-to-configuration" ] || fail "generation $generation does not exist"
-target_image="$(grep -o 'ghcr.io/zgeoff/imp-host:[^ ;]*' "$target/etc/systemd/system/imp-host.service" | head -1)"
-[ "$target_image" = "$copy_image" ] ||
+target_unit="$target/etc/systemd/system/imp-host.service"
+# imp before 6.0.0 ran imp-host under Docker, which this script neither lists nor inspects
+grep -q '/bin/podman run ' "$target_unit" ||
+  fail "generation $generation runs imp-host without Podman; restore only to a generation of imp 6.0.0 or later"
+target_image="$(grep -o 'ghcr.io/zgeoff/imp-host:[^ ;]*' "$target_unit" | head -1)"
+[ "$(image_by_digest "$target_image")" = "$(image_by_digest "$copy_image")" ] ||
   fail "generation $generation runs $target_image, but the copy is from $copy_image"
 if findmnt -rn -S "$dataset" > /dev/null; then
   fail "$dataset is already mounted"
@@ -180,15 +191,15 @@ fi
 
 step "start"
 "$systemctl" start imp-host
-# imp-host is Type=exec: the start returns once docker run has begun, before the container
+# imp-host is Type=exec: the start returns once podman run has begun, before the container
 # exists, so wait for it
 running_image=""
 for _ in $(seq "$start_wait"); do
-  running_image="$(docker inspect imp-host --format '{{.Config.Image}}' 2> /dev/null)" && break
+  running_image="$(podman inspect imp-host --format '{{.Config.Image}}' 2> /dev/null)" && break
   running_image=""
   "$start_sleep" 1
 done
 [ -n "$running_image" ] || fail "no imp-host container appeared within $start_wait s of the start"
-[ "$running_image" = "$copy_image" ] ||
+[ "$(image_by_digest "$running_image")" = "$(image_by_digest "$copy_image")" ] ||
   fail "imp-host runs $running_image, not the copy's $copy_image"
 echo "restored $copy (migration $copy_migration) on generation $generation; the replaced database is in $saved"

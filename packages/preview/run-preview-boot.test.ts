@@ -537,15 +537,17 @@ test.skipIf(Bun.which('docker') === null)(
       name: "the boot's guest script",
       argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
       env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
-      timeoutMs: 2000,
+      timeoutMs: 500,
     });
 
+    // `docker compose config` has taken from 0.2 s to over 3.5 s on CI runners, while the guest
+    // script's local git work takes under 0.1 s; the two bounds keep the case under its 5 s limit
     const composeConfig = await runBoundedProcess(processDeps, {
       name: 'docker compose config',
       argv: ['docker', 'compose', 'config', '--format', 'json'],
       cwd: join(checkout, 'preview'),
       env: { PATH: process.env['PATH'] ?? '', HOME: ctx.directory },
-      timeoutMs: 2000,
+      timeoutMs: 4400,
     });
 
     const config: unknown = JSON.parse(composeConfig.stdout);

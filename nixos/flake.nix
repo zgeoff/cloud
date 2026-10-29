@@ -9,7 +9,7 @@
     };
     # imp's host module (zgeoff/impz docs/guides/nixos.md); pinned by flake.lock
     imp = {
-      url = "github:zgeoff/impz/50868a53";
+      url = "github:zgeoff/impz/41e535a6";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };
@@ -51,7 +51,8 @@
 
       # bun run test:nixos builds them all. geoffcloud-eval evaluates the host config, and exposure
       # compares its firewall with the exposure registry (packages/topology/exposure.json), and
-      # imp-pin compares the imp input's release with its imp-host image tag. Every other
+      # imp-pin compares the imp input's release with its imp-host image tag, and podman-network
+      # compares its Podman default network with the topology. Every other
       # check reads ../test-support/shell (checks/test-utils/build-shell-lib-source.nix), so they
       # build only with the repo root as the flake's source (path:.?dir=nixos); the impd-restore
       # checks boot one VM each, from checks/test-utils/build-restore-rehearsal.nix, and need KVM.
@@ -59,12 +60,13 @@
       # and tank-cloud-rancher boot a VM of their own, and need KVM too, and so does
       # geoffcloud-no-pool, which boots geoffcloud's own modules with no pool disk, and
       # network-policy, which runs infra's egress NetworkPolicies on k3s, and
-      # imp-cpu-weight, which weighs a Docker container's cgroup against k3s's pods' and server's, and
-      # host-cgroup-cpu-vm, which reads a booted VM's cgroups through node-exporter, and
-      # drift-check-vm, which runs the drift check's unit in its own sandbox, and public-front-vm,
-      # which sends requests through the TLS front to a stand-in upstream, and atc-daemon-vm, which
-      # starts the atc daemon on its gateway token as the host does. onidel-provider-vendor
-      # builds the provider's vendored Go modules, which CI's checks job also runs on a Go change
+      # imp-cpu-weight, which weighs a rootful Podman container's cgroup against k3s's pods' and
+      # server's and reads the container's memlock limit, and host-cgroup-cpu-vm, which reads a
+      # booted VM's cgroups through node-exporter, and drift-check-vm, which runs the drift check's
+      # unit in its own sandbox, and public-front-vm, which sends requests through the TLS front to
+      # a stand-in upstream, and atc-daemon-vm, which starts the atc daemon on its gateway token as
+      # the host does. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
+      # checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
         geoffcloud = self.nixosConfigurations.geoffcloud;
@@ -74,6 +76,10 @@
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };
       checks.x86_64-linux.imp-pin = import ./checks/imp-pin.nix {
+        inherit nixpkgs imp;
+        geoffcloud = self.nixosConfigurations.geoffcloud;
+      };
+      checks.x86_64-linux.podman-network = import ./checks/podman-network.nix {
         inherit nixpkgs imp;
         geoffcloud = self.nixosConfigurations.geoffcloud;
       };

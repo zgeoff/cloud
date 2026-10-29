@@ -45,9 +45,9 @@ test('it reads what exists, in this order, and checks the secrets mount and crea
     'op vault get cloud --format json',
     'sh -c command -v atc-key > /dev/null',
     "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'true'",
-    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' 'imp-host' 'impz' 'info' '--json'",
-    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
-    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'podman' 'exec' 'imp-host' 'impz' 'info' '--json'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'podman' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
+    "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'podman' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'",
     'op item list --vault cloud --format json',
     `ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'bash' '-c' 'mountpoint -q "$1" || { echo "$1 is not a mount point; nothing written" >&2; exit 1; }; install -d -m 0700 -o root -g root "$1"' 'bash' '/var/lib/atc-daemon-secrets'`,
     "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'ls' '/var/lib/atc-daemon-secrets'",
@@ -154,7 +154,7 @@ test.each([
   expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([
     'ConnectTimeout=15',
     'root@geoffcloud',
-    "'docker' 'exec' 'imp-host' 'impz' 'info' '--json'",
+    "'podman' 'exec' 'imp-host' 'impz' 'info' '--json'",
   ]);
 });
 
@@ -191,16 +191,16 @@ test('it stops before any change when impd lacks a secret that atc-cloud may gra
   expect(tools.calls.at(-1)?.argv.slice(4)).toStrictEqual([
     'ConnectTimeout=15',
     'root@geoffcloud',
-    "'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
+    "'podman' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'",
   ]);
 });
 
 test.each([
-  ['impz info', 'info', "'docker' 'exec' 'imp-host' 'impz' 'info' '--json'"],
-  ['impz secret ls', 'secret-ls', "'docker' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'"],
-  ['impz token ls', 'token-ls', "'docker' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'"],
+  ['impz info', 'info', "'podman' 'exec' 'imp-host' 'impz' 'info' '--json'"],
+  ['impz secret ls', 'secret-ls', "'podman' 'exec' 'imp-host' 'impz' 'secret' 'ls' '--json'"],
+  ['impz token ls', 'token-ls', "'podman' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'"],
 ] as const)(
-  'it stops with docker’s message when %s fails',
+  'it stops with podman’s message when %s fails',
   async (_label: string, stoppedAt: 'info' | 'secret-ls' | 'token-ls', line: string) => {
     const tools = buildStubCredentialTools({
       op: { vaults: { cloud: {} } },
@@ -210,11 +210,11 @@ test.each([
 
     const ctx = await setupTest({ run: tools.run });
 
-    expect(checkATCCredentialsPreflight(ctx.context)).rejects.toMatchObject({ exitCode: 1 });
+    expect(checkATCCredentialsPreflight(ctx.context)).rejects.toMatchObject({ exitCode: 125 });
     expect(tools.calls.at(-1)?.argv[6]).toBe(line);
 
     expect(ctx.err.join('')).toBe(
-      'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n',
+      'Error: no container with name or ID "imp-host" found: no such container\n',
     );
   },
 );
