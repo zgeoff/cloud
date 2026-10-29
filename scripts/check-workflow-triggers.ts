@@ -95,7 +95,10 @@ export async function checkWorkflowTriggers(
   }
 
   const workflowDir = join(root, '.github', 'workflows');
-  const workflows = [...new Set(expectations.map((expectation) => expectation.workflow))];
+
+  const workflows = [
+    ...new Set([...expectations.map((expectation) => expectation.workflow), 'audit-fix.yml']),
+  ];
 
   const entries = await Promise.all(
     workflows.map(async (workflow) => {
@@ -119,6 +122,12 @@ export async function checkWorkflowTriggers(
     violations.push('nixos-checks.yml: a Renovate pull request starts the nixos job');
   }
 
+  if (!isAuditFixPushOnly(texts.get('audit-fix.yml') ?? '')) {
+    violations.push(
+      'audit-fix.yml: a failed run that is not a push to this repository starts the audit-fix job',
+    );
+  }
+
   if (violations.length > 0) {
     options.printErr(violations.map((violation) => `${violation}\n`).join(''));
 
@@ -126,7 +135,7 @@ export async function checkWorkflowTriggers(
   }
 
   options.printOut(
-    'check-workflow-triggers: the NixOS checks and the release bump merge start only on their own events\n',
+    'check-workflow-triggers: the NixOS checks, the release bump merge and the audit fix start only on their own events\n',
   );
 
   return 0;
@@ -161,6 +170,26 @@ function isRenovateSkipped(workflowText: string): boolean {
   const condition = findJSONField(findJSONField(findJSONField(document, 'jobs'), 'nixos'), 'if');
 
   return typeof condition === 'string' && condition.replaceAll(/\s+/gu, ' ').includes(renovateSkip);
+}
+
+// the trigger's branches filter matches a fork's branch named main too, so only the job's
+// condition can tell a push to this repository from a pull request
+const auditFixPushOnly =
+  "github.event_name != 'workflow_run' || (github.event.workflow_run.event == 'push' && " +
+  "github.event.workflow_run.conclusion == 'failure' && " +
+  'github.event.workflow_run.head_repository.full_name == github.repository)';
+
+function isAuditFixPushOnly(workflowText: string): boolean {
+  const document: unknown = Bun.YAML.parse(workflowText);
+
+  const condition = findJSONField(
+    findJSONField(findJSONField(document, 'jobs'), 'audit-fix'),
+    'if',
+  );
+
+  return (
+    typeof condition === 'string' && condition.replaceAll(/\s+/gu, ' ').trim() === auditFixPushOnly
+  );
 }
 
 if (import.meta.main) {
