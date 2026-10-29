@@ -98,11 +98,11 @@ pkgs.testers.runNixOSTest {
 
 
     with subtest("it finishes the switch with no failed unit when imp-host loses its container after impd listed its images"):
+        cursor = machine.succeed("journalctl -n 1 --show-cursor -o cat").splitlines()[-1].removeprefix("-- cursor: ")
         status, out = machine.execute("/run/booted-system/specialisation/remove/bin/switch-to-configuration test 2>&1")
         machine.wait_until_succeeds("test \"$(systemctl show -p ActiveState --value agent-image-build.service)\" = inactive", timeout=120)
         build = machine.succeed("systemctl show -p Result -p ExecMainStatus agent-image-build.service").split()
-        invocation = machine.succeed("systemctl show -p InvocationID --value agent-image-build.service").strip()
-        lines = machine.succeed(f"journalctl -b _SYSTEMD_INVOCATION_ID={invocation} -o cat | grep '^agent-image-build: '").splitlines()
+        lines = machine.succeed(f"journalctl --after-cursor='{cursor}' -u agent-image-build.service -o cat | grep '^agent-image-build: '").splitlines()
 
         assert status == 0, f"switch-to-configuration exited {status}: {out}"
         assert sorted(build) == ["ExecMainStatus=0", "Result=success"], build
