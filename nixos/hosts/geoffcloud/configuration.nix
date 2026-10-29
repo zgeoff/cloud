@@ -414,7 +414,7 @@ in
       impPrefix = "harness-";
       # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
       # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
-      image = "agent-73c433c";
+      image = "agent-55e2666";
       guestATC = "/usr/local/bin/atc";
     };
     defaultTarget = "geoffcloud";
@@ -466,6 +466,8 @@ in
     principals = {
       # ChatGPT's connector, added 2026-10-04
       "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
+      # a temporary Claude Code client for the gateway smoke spawn, added 2026-10-29
+      "A0XlYU4QYnkWUgXnE20HPQAMskU1fzsX".targets = [ "geoffcloud" ];
     };
   };
 

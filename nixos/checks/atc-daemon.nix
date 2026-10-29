@@ -445,11 +445,14 @@ let
             }
           },
           "defaultTarget": "geoffcloud",
-          "principals": { "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] } },
+          "principals": {
+            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
+            "A0XlYU4QYnkWUgXnE20HPQAMskU1fzsX": { "targets": ["geoffcloud"] }
+          },
           "targets": {
             "geoffcloud": {
               "guestATC": "/usr/local/bin/atc",
-              "image": "agent-73c433c",
+              "image": "agent-55e2666",
               "impPrefix": "harness-",
               "provider": "imp",
               "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
