@@ -66,15 +66,18 @@ while read -r id name state; do
 done <<< "$imps"
 
 order=()
+declare -A ordered=()
 order_names="${IMP_STOP_ORDER:-}"
 for name in ${order_names//,/ }; do
-  if [ -n "${states[$name]+set}" ] && [[ ! " ${order[*]} " =~ " $name " ]]; then
+  if [ -n "${states[$name]+set}" ] && [ -z "${ordered[$name]+set}" ]; then
     order+=("$name")
+    ordered["$name"]=1
   fi
 done
 while read -r name; do
-  if [ -n "$name" ] && [[ ! " ${order[*]} " =~ " $name " ]]; then
+  if [ -n "$name" ] && [ -z "${ordered[$name]+set}" ]; then
     order+=("$name")
+    ordered["$name"]=1
   fi
 done < <(printf '%s\n' "${!states[@]}" | LC_ALL=C sort)
 
