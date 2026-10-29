@@ -1,6 +1,7 @@
 # Reads the settings file that geoffcloud's imp-host unit hands impd, the file the imp module writes
 # from services.imp.settings and its env script exports as IMP_SETTINGS, and checks the settings the
-# host sets there. Each case runs in a fresh directory, under test-support/shell/run-cases.sh.
+# host sets there, with the userfaultfd device that its huge pages need. Each case runs in a fresh
+# directory, under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos impd-settings
 {
   nixpkgs,
@@ -19,7 +20,28 @@ let
     lib.toList geoffcloud.config.systemd.services.imp-host.serviceConfig.ExecStartPre
   );
 
+  # imp-host's start command, where the imp module passes the container its devices
+  execStart = pkgs.writeText "imp-host-exec-start" (
+    toString geoffcloud.config.systemd.services.imp-host.serviceConfig.ExecStart
+  );
+
   cases = [
+    {
+      title = "it turns impd's huge pages on at 2M and passes imp-host the userfaultfd device";
+      script = ''
+        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
+        grep '^IMP_HUGE_PAGES=' "$settings" > actual
+        grep -o -- '--device /dev/userfaultfd' ${execStart} > device
+
+        assert_files_equal - actual <<'EOF'
+        IMP_HUGE_PAGES=2M
+        EOF
+        assert_files_equal - device <<'EOF'
+        --device /dev/userfaultfd
+        EOF
+      '';
+    }
     {
       title = "it hands impd both image eviction marks, 80 and 65 percent";
       script = ''

@@ -5,14 +5,16 @@
 # answers SSH, with k3s, imp-host, the atc daemon and the preview service stopped, and nothing
 # written into the empty mount points on the root disk.
 #
-# The VM differs from the host in two ways that are not about the pool. It reaches no network, so
+# The VM differs from the host in three ways that are not about the pool. It reaches no network, so
 # imp-host-image fails its pull and host-build-lag fails its query of GitHub; the check allows
 # those two failures by name. tailscaled-autoconnect is off: the VM's tailscaled has no node state,
 # so tailscale up would wait out its start timeout, where the host's node state on vda logs it in.
+# Its pool of 2 MiB hugetlb pages holds 64 pages, because the host's would take more than the VM's
+# memory; the check compares the host's own pool size with its literal.
 #
-# The same boot checks the hugetlb cap for imp guest memory: a mapping with Firecracker's hugetlb
-# flags gets its 2 MiB pages on demand and frees them on exit, and without the cap it dies of
-# SIGBUS, as a Firecracker guest would. It needs KVM: run `bun run test:nixos geoffcloud-no-pool`.
+# The same boot checks that pool for imp guest memory: the boot reserves it whole with no pages on
+# demand, a mapping with Firecracker's hugetlb flags draws its pages from it and gives them back on
+# exit, and a mapping one page past it dies of SIGBUS, as a Firecracker guest would. It needs KVM: run `bun run test:nixos geoffcloud-no-pool`.
 {
   nixpkgs,
   geoffcloud,
@@ -35,6 +37,7 @@ let
   # maps PAGES 2 MiB pages as Firecracker maps hugetlb guest memory (MAP_PRIVATE, MAP_ANONYMOUS,
   # MAP_NORESERVE, MAP_HUGETLB and MAP_HUGE_2MB), writes one byte to each, and prints the kernel's
   # hugetlb counts while it holds them
+  vmPoolPages = 64;
   mapHugetlb = pkgs.writeText "map-hugetlb.py" ''
     import json
     import mmap
@@ -58,6 +61,7 @@ pkgs.testers.runNixOSTest {
     virtualisation.memorySize = 2048;
     virtualisation.cores = 2;
     systemd.services.tailscaled-autoconnect.enable = false;
+    boot.kernel.sysctl."vm.nr_hugepages" = lib.mkForce vmPoolPages;
   };
 
   testScript = ''
@@ -112,25 +116,30 @@ pkgs.testers.runNixOSTest {
         assert left == [], f"the root disk holds {left}"
 
 
-    with subtest("it caps on-demand 2 MiB hugetlb pages at the imps' 20 GiB RAM budget, with none made at boot"):
-        cap = machine.succeed("sysctl -n vm.nr_overcommit_hugepages").strip()
-        total = machine.succeed("sed -n 's/^HugePages_Total: *//p' /proc/meminfo").strip()
+    with subtest("it sizes the host's pool of 2 MiB pages at the imps' 20 GiB RAM budget"):
+        host_pool = ${toString geoffcloud.config.boot.kernel.sysctl."vm.nr_hugepages"}
 
-        assert cap == "10240", f"the cap is {cap!r} pages"
-        assert total == "0", f"the boot made {total!r} hugetlb pages"
+        assert host_pool == 10240, f"the host's pool holds {host_pool} pages"
 
 
-    with subtest("it backs a Firecracker-style hugetlb mapping with on-demand pages and frees them on exit"):
-        held = machine.succeed("${pkgs.python3}/bin/python3 -I ${mapHugetlb} 64").strip()
-        total = machine.succeed("sed -n 's/^HugePages_Total: *//p' /proc/meminfo").strip()
+    with subtest("it reserves the whole pool at boot and makes no page on demand"):
+        reserved = machine.succeed("sysctl -n vm.nr_hugepages vm.nr_overcommit_hugepages").split()
+        counts = machine.succeed("grep -E '^HugePages_(Total|Free|Surp):' /proc/meminfo").split()
 
-        assert held == '{"HugePages_Free": 0, "HugePages_Rsvd": 0, "HugePages_Surp": 64, "HugePages_Total": 64}', held
-        assert total == "0", f"{total!r} hugetlb pages outlive the mapping"
+        assert reserved == ["${toString vmPoolPages}", "0"], f"the pool and the cap are {reserved}"
+        assert counts == ["HugePages_Total:", "${toString vmPoolPages}", "HugePages_Free:", "${toString vmPoolPages}", "HugePages_Surp:", "0"], counts
 
 
-    with subtest("it kills the same mapping with SIGBUS once the cap is 0"):
-        machine.succeed("sysctl -w vm.nr_overcommit_hugepages=0")
-        status, output = machine.execute("${pkgs.python3}/bin/python3 -I ${mapHugetlb} 64 2>&1")
+    with subtest("it backs a Firecracker-style hugetlb mapping from the pool and takes the pages back on exit"):
+        held = machine.succeed("${pkgs.python3}/bin/python3 -I ${mapHugetlb} ${toString vmPoolPages}").strip()
+        free = machine.succeed("sed -n 's/^HugePages_Free: *//p' /proc/meminfo").strip()
+
+        assert held == '{"HugePages_Free": 0, "HugePages_Rsvd": 0, "HugePages_Surp": 0, "HugePages_Total": ${toString vmPoolPages}}', held
+        assert free == "${toString vmPoolPages}", f"{free!r} pool pages are free after the mapping"
+
+
+    with subtest("it kills a mapping one page past the pool with SIGBUS"):
+        status, output = machine.execute("${pkgs.python3}/bin/python3 -I ${mapHugetlb} ${toString (vmPoolPages + 1)} 2>&1")
 
         assert status == 135, f"the mapping exited {status}: {output}"
   '';
