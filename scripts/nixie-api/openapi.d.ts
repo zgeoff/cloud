@@ -1946,6 +1946,11 @@ export interface operations {
                                 start: number;
                             } | null;
                             evidenceQuote: string | null;
+                            image: {
+                                position: number;
+                                sequence: number;
+                                thread: string;
+                            } | null;
                             /** @enum {string} */
                             origin: "owner" | "conversation" | "task" | "memory_writer" | "lapse";
                             proposalID: string | null;
@@ -2870,6 +2875,11 @@ export interface operations {
                                 start: number;
                             } | null;
                             evidenceQuote: string | null;
+                            image: {
+                                position: number;
+                                sequence: number;
+                                thread: string;
+                            } | null;
                             /** @enum {string} */
                             origin: "owner" | "conversation" | "task" | "memory_writer" | "lapse";
                             proposalID: string | null;
