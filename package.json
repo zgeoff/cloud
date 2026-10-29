@@ -115,7 +115,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@faker-js/faker": "10.6.0",
-    "@impz/client": "6.0.1",
+    "@impz/client": "6.0.2",
     "@mswjs/interceptors": "0.45.9",
     "@orpc/client": "1.16.0",
     "@stylistic/eslint-plugin": "5.10.0",
