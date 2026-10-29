@@ -144,7 +144,11 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
     imp boot from that image then fails with ENOENT. A database restored across a change of the
     preview image can leave such a record, as
     [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes.
-12. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+12. It fails with both counts when the host reserved fewer hugetlb pages than its system configures
+    in `vm.nr_hugepages`, because impd refuses each boot and wake that the free pool cannot hold.
+    The activation reserves a changed pool on the running host, where fragmented memory can leave it
+    short. Reboot the host, which reserves the whole pool early in boot, then run the switch again.
+13. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
     `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
     marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
     a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves

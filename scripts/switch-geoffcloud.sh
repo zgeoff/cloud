@@ -19,7 +19,9 @@
 # After the activation it waits for nixie's /health/ready to report every part ready
 # (check-nixie-ready.sh), and fails with each part that is not, since nixie needs impd to start.
 # Then it fails with each impd image record whose build folder is gone (check-impd-image-dirs.sh),
-# since every imp boot from such an image fails.
+# since every imp boot from such an image fails. Last it fails when the host reserved fewer
+# hugetlb pages than its system configures (check-hugetlb-pool.sh), since impd refuses each boot
+# and wake past them, and a reboot reserves the whole pool.
 # Once every check passes, it moves origin's deployed/host tag to the switched commit, so a change
 # that reaches the host only through a switch counts as shipped once the host runs it. A failed
 # switch leaves the tag where it was.
@@ -204,6 +206,7 @@ echo "== $host runs $current"
 ssh -o BatchMode=yes "$host" systemctl --failed --no-legend --plain
 bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$host"
 bash "$(dirname "${BASH_SOURCE[0]}")/check-impd-image-dirs.sh" "$host"
+bash "$(dirname "${BASH_SOURCE[0]}")/check-hugetlb-pool.sh" "$host"
 
 # The tag records the commit the host runs, and the last activation decides that, so the push forces
 # the tag even when an earlier switch left it on a later commit. A failed push fails the switch with

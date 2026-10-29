@@ -42,9 +42,9 @@ bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s 
   `root@geoffcloud`.
 - The script checks a clean `main` that matches `origin/main`, a green `NixOS checks` run that
   covers the commit, the atc daemon and gateway majors, the impd majors nixie accepts, the secret
-  kinds impd stores against those the atc daemon accepts, a k3s restart, and nixie's readiness and
-  impd's image folders after the switch. [Switch the host](./workflows.md#switch-the-host) explains
-  each refusal.
+  kinds impd stores against those the atc daemon accepts, a k3s restart, and nixie's readiness,
+  impd's image folders and the hugetlb pool after the switch.
+  [Switch the host](./workflows.md#switch-the-host) explains each refusal.
 - After every check passes, the script pushes the tag `deployed/host` on `origin` to the switched
   commit, so the caller needs push access to `zgeoff/cloud`.
 - Before a switch that changes imp, copy impd's database with

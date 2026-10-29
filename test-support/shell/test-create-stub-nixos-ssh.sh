@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the nine
+# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the ten
 # remote commands of a switch, fails closed on anything else, and hands a loopback call to
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
@@ -366,6 +366,42 @@ it_prints_an_empty_image_list_when_no_record_is_named() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '[]'
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+}
+
+it_prints_the_reserved_then_the_configured_hugetlb_pages() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_HUGETLB_RESERVED=300 STUB_HUGETLB_CONFIGURED=512 ssh -o BatchMode=yes root@geoffcloud \
+    "sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+300
+512
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf"]
+CALLS
+  assert_status 0 "$status"
+}
+
+it_prints_no_reserved_and_no_configured_hugetlb_pages_when_none_are_named() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '0'
   diff /dev/null "$tree/err"
   assert_status 0 "$status"
 }

@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the nine remote commands the switch runs:
+# answers the ten remote commands the switch runs:
 #
 # - the kubectl query for the atc gateway pods' images: prints STUB_GATEWAY_IMAGES (images
 #   separated by spaces, as jsonpath joins an `[*]` list) with no newline, as kubectl's jsonpath
@@ -37,6 +37,10 @@
 # - the `podman exec imp-host sh -c` loop that lists the folders under /var/lib/imp/images holding
 #   a rootfs.ext4: prints each name in STUB_IMPD_IMAGE_DIRS (names separated by spaces) on its own
 #   line, and nothing when that is unset;
+# - the hugetlb pool query of check-hugetlb-pool.sh: prints STUB_HUGETLB_RESERVED, the pages
+#   vm.nr_hugepages reads back, and `0` when that is unset, then STUB_HUGETLB_CONFIGURED, the
+#   vm.nr_hugepages line's value in /etc/sysctl.d/60-nixos.conf, on the next line, and nothing
+#   when that is unset, as for a system that sets no pool;
 # - with STUB_IMP_HOST_GONE, both podman commands fail as podman does for a container that does
 #   not exist: 'Error: no container with name or ID "imp-host" found: no such container' on
 #   stderr and exit 125, which ssh passes back.
@@ -180,6 +184,10 @@ case "${*:4}" in
       exit 125
     fi
     if [ -n "${STUB_IMPD_IMAGE_DIRS:-}" ]; then printf '%s\n' $STUB_IMPD_IMAGE_DIRS; fi
+    ;;
+  "sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf")
+    printf '%s\n' "${STUB_HUGETLB_RESERVED:-0}"
+    if [ -n "${STUB_HUGETLB_CONFIGURED:-}" ]; then printf '%s\n' "$STUB_HUGETLB_CONFIGURED"; fi
     ;;
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac
