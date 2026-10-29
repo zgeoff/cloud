@@ -86,11 +86,11 @@ function answerHostCall(state: HostState, call: StubCall, line: string) {
     };
   }
 
-  return answerDockerCall(state, line, call.stdin) ?? answerShellCall(state, line, call.stdin);
+  return answerPodmanCall(state, line, call.stdin) ?? answerShellCall(state, line, call.stdin);
 }
 
 const secretAdd = toLine([
-  'docker',
+  'podman',
   'exec',
   '-i',
   'imp-host',
@@ -109,21 +109,21 @@ const secretAdd = toLine([
   '--json',
 ]);
 
-function answerDockerCall(state: HostState, line: string, stdin: string) {
+function answerPodmanCall(state: HostState, line: string, stdin: string) {
   if (line === secretAdd) {
     return createSecret(state, stdin);
   }
 
   const reads = {
-    [toLine(['docker', 'exec', 'imp-host', 'impz', 'info', '--json'])]: [
+    [toLine(['podman', 'exec', 'imp-host', 'impz', 'info', '--json'])]: [
       'info',
       state.scenario.info,
     ],
-    [toLine(['docker', 'exec', 'imp-host', 'impz', 'secret', 'ls', '--json'])]: [
+    [toLine(['podman', 'exec', 'imp-host', 'impz', 'secret', 'ls', '--json'])]: [
       'secret-ls',
       state.scenario.secrets,
     ],
-    [toLine(['docker', 'exec', 'imp-host', 'impz', 'token', 'ls', '--json'])]: [
+    [toLine(['podman', 'exec', 'imp-host', 'impz', 'token', 'ls', '--json'])]: [
       'token-ls',
       state.scenario.tokens,
     ],
@@ -149,8 +149,9 @@ function createSecret(state: HostState, stdin: string) {
 
   const secret = {
     name: 'glm',
-    kind: 'custom',
+    kind: 'static',
     rules: [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }],
+    env: [],
     imps: [],
     createdAt: '2026-10-07T12:00:00.000Z',
   };
@@ -161,13 +162,13 @@ function createSecret(state: HostState, stdin: string) {
   return { stdout: `${JSON.stringify({ ...secret, droppedGrants: 0 }, null, 2)}\n` };
 }
 
-// docker 29.7.2's message for an exec in a stopped container, from moby's daemon/errors.go
-const stoppedError =
-  'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n';
+// imp's module runs imp-host with --rm, so a stopped imp-host leaves no container; podman's
+// message and exit code for an exec in a missing container, checked against podman 5
+const stoppedError = 'Error: no container with name or ID "imp-host" found: no such container\n';
 
 function buildReadAnswer(state: HostState, [step, value]: readonly [string, unknown]): StubAnswer {
   return state.scenario.stoppedAt === step
-    ? { exitCode: 1, stderr: stoppedError }
+    ? { exitCode: 125, stderr: stoppedError }
     : { stdout: `${JSON.stringify(value, null, 2)}\n` };
 }
 
@@ -193,7 +194,7 @@ function answerShellCall(state: HostState, line: string, stdin: string): StubAns
     [toLine(['sha256sum', gatewayToken])]: () => buildSumAnswer(state),
     [toLine(['bash', '-s', '--', directory])]: () =>
       stdin.startsWith(hostScripts.write) ? runHostScript(state, stdin) : undefined,
-    [toLine(['bash', '-s', '--', directory, 'docker', 'exec', 'imp-host', 'impz'])]: () =>
+    [toLine(['bash', '-s', '--', directory, 'podman', 'exec', 'imp-host', 'impz'])]: () =>
       stdin === hostScripts.mint ? runHostScript(state, stdin) : undefined,
     [toLine([
       'bash',
@@ -201,7 +202,7 @@ function answerShellCall(state: HostState, line: string, stdin: string): StubAns
       '--',
       directory,
       state.scenario.impdPort,
-      'docker',
+      'podman',
       'exec',
       '-e',
       'IMP_TOKEN',

@@ -50,15 +50,9 @@ export interface ImpdClient {
   ) => Promise<CommandResult>;
 }
 
-export function buildImpdClient(
-  baseURL: string,
-  token: string,
-  webSocket: typeof WebSocket = globalThis.WebSocket,
-): ImpdClient {
-  const Socket = webSocket;
-
+export function buildImpdClient(baseURL: string, token: string): ImpdClient {
   // imp's typed client, so a change to impd's contract fails the type check here
-  const client = createImpClient({ url: baseURL, token, connect: (url) => new Socket(url) });
+  const client = createImpClient({ url: baseURL, token, connect: (url) => new WebSocket(url) });
 
   return {
     createImp: (options) =>

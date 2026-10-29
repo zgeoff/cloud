@@ -10,7 +10,6 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
 import { composeFiles } from './mocks/github-state.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
@@ -52,7 +51,7 @@ async function setupTest() {
     },
     spendProxies: null,
     store,
-    impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
+    impd: buildImpdClient(impd.url, impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots,
@@ -190,7 +189,7 @@ test('it keeps both previews running when two slots fit them', async () => {
     },
     spendProxies: null,
     store: ctx.store,
-    impd: buildImpdClient(ctx.impd.url, ctx.impd.token, NativeWebSocket),
+    impd: buildImpdClient(ctx.impd.url, ctx.impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: ctx.pendingBoots,

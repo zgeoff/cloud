@@ -103,13 +103,19 @@ function findFileHoldReason(pr: BumpPullRequest, pinFiles: readonly string[]) {
 const passed = new Set(['SUCCESS', 'SKIPPED', 'NEUTRAL']);
 
 function findCheckHoldReason(pr: BumpPullRequest) {
-  const pending = pr.checkRuns.filter((run) => run.status !== 'COMPLETED');
+  // GitHub puts a label-started merge job's check run on the pull request's head, so the deciding
+  // run would wait for itself, and an earlier run's failed merge would hold every later one
+  const checkRuns = pr.checkRuns.filter(
+    (run) => run.workflow !== 'release bump merge' || run.name !== 'merge',
+  );
+
+  const pending = checkRuns.filter((run) => run.status !== 'COMPLETED');
 
   if (pending.length > 0) {
     return `waiting for ${pending.map((run) => run.name).join(', ')}`;
   }
 
-  const failed = pr.checkRuns.filter((run) => !passed.has(run.conclusion ?? ''));
+  const failed = checkRuns.filter((run) => !passed.has(run.conclusion ?? ''));
 
   return failed.length > 0
     ? `${failed.map((run) => `${run.name} (${run.conclusion ?? 'null'})`).join(', ')} did not pass`

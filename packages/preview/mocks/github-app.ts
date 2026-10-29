@@ -8,7 +8,7 @@ export const stubApp = { clientID: 'Iv23liStubPreviewApp', privateKey: keyPair.p
 export const stubAppPublicKey = keyPair.publicKey;
 
 // GitHub hands out an App's key as PKCS#1 PEM
-export const stubAppKeyPEM = keyPair.privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+export const stubAppKeyPEM = keyPair.privateKey.export({ type: 'pkcs1', format: 'pem' });
 export const stubAppSlug = 'acme-previews';
 
 // GitHub names an App's bot user after the App's slug

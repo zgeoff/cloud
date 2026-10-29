@@ -12,8 +12,7 @@
     "tags": {
       "cloud": "tag:cloud",
       "cloudDeploy": "tag:cloud-deploy",
-      "imp": "tag:imp",
-      "impE2E": "tag:imp-e2e"
+      "imp": "tag:imp"
     },
     "nodes": {
       "geoffcloud": {
@@ -36,9 +35,10 @@
     "apiPort": 6443,
     "grafanaNodePort": 30300
   },
-  "docker": {
-    "bridgeAddress": "172.17.0.1",
-    "subnet": "172.17.0.0/16"
+  "podman": {
+    "bridge": "podman0",
+    "bridgeAddress": "10.88.0.1",
+    "subnet": "10.88.0.0/16"
   },
   "atc": {
     "daemonPort": 8415,

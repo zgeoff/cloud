@@ -27,7 +27,7 @@ pkgs.testers.runNixOSTest {
       networking.hostId = "5ca71846";
       # the VM reaches nothing, and dhcpcd crashing at times would fail a unit at boot
       networking.useDHCP = false;
-      # imp-host's docker run passes --device /dev/kvm
+      # imp-host's podman run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"
         "kvm-intel"
@@ -57,12 +57,16 @@ pkgs.testers.runNixOSTest {
         path = [
           config.boot.zfs.package
           pkgs.util-linux
+          pkgs.kmod
         ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
         };
+        # zpool create enables only the features that the module lists in sysfs, which it fills in
+        # after /dev/zfs appears, so the module loads in full first
         script = ''
+          modprobe zfs
           if [ -z "$(blkid -o value -s PTTYPE /dev/vdb || true)" ]; then
             zpool create -O mountpoint=none -O compression=lz4 -O atime=off -O xattr=sa tank /dev/vdb
           fi

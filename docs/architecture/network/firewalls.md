@@ -1,48 +1,49 @@
 # Firewalls
 
 Four layers filter traffic to the host, and each covers a gap in the one before it. Onidel's cloud
-firewall, outside the VM, admits only Tailscale's port and ICMP from the internet. NixOS's own
-nftables table filters what reaches the host and what it forwards, and trusts the tailnet and the
-cluster's interfaces. A table of this repo's own narrows the ports that the trusted interfaces would
-otherwise leave open, closes the host's SSH to pods, and keeps pods away from Docker's bridge, and
-imp adds tables that keep its imps away from the cluster. [The tailnet](./tailnet.md) covers who may
-reach the host over the tailnet in the first place.
+firewall, outside the VM, admits only Tailscale's port, the TLS front's HTTPS port and ICMP from the
+internet. NixOS's own nftables table filters what reaches the host and what it forwards, and trusts
+the tailnet and the cluster's interfaces. A table of this repo's own narrows the ports that the
+trusted interfaces would otherwise leave open, closes the host's SSH to pods, and keeps pods away
+from Podman's bridge, and imp adds tables that keep its imps away from the cluster.
+[The tailnet](./tailnet.md) covers who may reach the host over the tailnet in the first place.
 
 ## The cloud firewall
 
 Onidel's cloud firewall sits outside the VM, so it holds even when the host's own rules are wrong.
-Pulumi declares it as a firewall group whose rules admit Tailscale's direct-connection port and
-ICMP. The group closes every port it does not list, but only once it is attached to the VM. The
-program attaches it when the stack config says the host answers on the tailnet, and drops the
-group's public SSH rule at the same moment, so public SSH lasts only as long as a new host needs it
-to come up on the tailnet.
+Pulumi declares it as a firewall group whose rules admit Tailscale's direct-connection port, the
+HTTPS port of the host's [TLS front](./public-ingress.md#the-hosts-tls-front) and ICMP. The group
+closes every port it does not list, but only once it is attached to the VM. The program attaches it
+when the stack config says the host answers on the tailnet, and drops the group's public SSH rule at
+the same moment, so public SSH lasts only as long as a new host needs it to come up on the tailnet.
 
 ## The host's tables
 
 The host runs nftables with several tables side by side, so NixOS never flushes the whole ruleset on
-a reload, because a flush would delete the tables that imp, k3s and Docker load:
+a reload, because a flush would delete the tables that imp, k3s and Podman's network backend load:
 
 | Table              | Loaded by    | Job                                                                              |
 | ------------------ | ------------ | -------------------------------------------------------------------------------- |
 | `inet nixos-fw`    | NixOS        | the host's input and forward firewall                                            |
-| `inet cloud_host`  | this repo    | narrows host ports, closes SSH to pods, and drops pod traffic to Docker's subnet |
+| `inet cloud_host`  | this repo    | narrows host ports, closes SSH to pods, and drops pod traffic to Podman's subnet |
 | `inet imp-forward` | imp's module | drops traffic from imp-host's bridge to the cluster's ranges                     |
 | `inet imp_egress`  | imp-host     | each imp's egress policy, inside the imp-host container                          |
 
-k3s and Docker load their own tables as well, for the cluster's networking and the containers'
-bridge.
+k3s and netavark, Podman's network backend, load their own tables as well, for the cluster's
+networking and the containers' bridge.
 
 ### NixOS's table
 
-NixOS's table admits nothing from the public interface but Tailscale's port and ICMP. ICMP stays
-open because path MTU discovery needs ICMP's fragmentation-needed and ICMPv6's packet-too-big
-messages, and ping checks that the host is reachable. OpenSSH's NixOS module opens its port on every
-interface by default, so the host turns that off, and sshd answers only through the trusted
-interfaces. It trusts the tailnet interface and the cluster's pod and overlay interfaces as sources,
-because pods reach the API server and the kubelet on the host, and the tailnet is already filtered
-by the policy. It filters forwarded traffic too, so no public packet reaches a pod or a NodePort,
-and it forwards the pods' own traffic. It does not trust Docker's bridge, so a container on it
-reaches the host only on the one port opened there, the Connect relay's.
+NixOS's table admits nothing from the public interface but Tailscale's port, the TLS front's HTTPS
+port and ICMP. ICMP stays open because path MTU discovery needs ICMP's fragmentation-needed and
+ICMPv6's packet-too-big messages, and ping checks that the host is reachable. OpenSSH's NixOS module
+opens its port on every interface by default, so the host turns that off, and sshd answers only
+through the trusted interfaces. It trusts the tailnet interface and the cluster's pod and overlay
+interfaces as sources, because pods reach the API server and the kubelet on the host, and the
+tailnet is already filtered by the policy. It filters forwarded traffic too, so no public packet
+reaches a pod or a NodePort, and it forwards the pods' own traffic. It does not trust Podman's
+bridge, so a container on it reaches the host only on the one port opened there, the Connect
+relay's.
 
 ### The narrowing table
 
@@ -56,7 +57,7 @@ The table drops the port from every other source, the rest of the tailnet and th
 included. A drop in any input chain is final, and an accept here only passes the packet on to
 NixOS's table, which trusts both interfaces.
 
-The same table admits the Connect relay's port only from Docker's subnet on Docker's bridge, so only
+The same table admits the Connect relay's port only from Podman's subnet on Podman's bridge, so only
 a container on the host reaches the relay
 ([1Password Connect](../workloads/onepassword-connect.md)). Both rules are narrower than the trust
 they sit under, and neither stops a pod on the host from reaching the daemon's port: the daemon's
@@ -68,15 +69,15 @@ needs it. Pods reach the API server, the kubelet and node-exporter, which the tr
 answers on the tailnet interface, and Tailscale SSH is the access path.
 
 The same table's forward chain drops every forwarded packet from the pod and overlay interfaces to
-Docker's subnet, so no pod reaches imp-host on any port. imp-host filters inbound traffic only from
+Podman's subnet, so no pod reaches imp-host on any port. imp-host filters inbound traffic only from
 its imps ([imp on the host](../host/imp.md#how-impd-is-reached)), so without the drop a pod would
 reach impd's plain-HTTP API and imp-host's other listeners without the tailnet grant. NixOS's
 forward chain accepts the pods' traffic, and kube-router accepts traffic that its network policies
-allow with a mark in iptables' forward chain, before Docker's isolation drop runs. The drop in this
-repo's table is final whatever those chains accept, because a drop in any base chain is final. The
-host loads it with the rest of its firewall, so it holds before kube-router programs a new pod. A
-pod that a NetworkPolicy lets use impd reaches it at its tailnet name instead, and the Connect relay
-takes traffic from Docker's bridge to the host itself, so neither path crosses the drop.
+allow with a mark in iptables' forward chain. The drop in this repo's table is final whatever those
+chains accept, because a drop in any base chain is final. The host loads it with the rest of its
+firewall, so it holds before kube-router programs a new pod. A pod that a NetworkPolicy lets use
+impd reaches it at its tailnet name instead, and the Connect relay takes traffic from Podman's
+bridge to the host itself, so neither path crosses the drop.
 
 ### imp's tables
 
@@ -98,6 +99,7 @@ so a port or a hostname cannot go public without an entry that records why. The 
 | ------------------ | ------------------------------------------------------------------------ | -------------------------------------------------------------- |
 | host port          | the host's public ports and admissions, edge rules, nixie's ingress port | the `exposure` NixOS check, against the evaluated host config  |
 | tunnel hostname    | the tunnel's routes                                                      | the Pulumi program, which refuses a hostname not listed public |
+| front route        | the host's TLS front, its DNS records                                    | the `exposure` NixOS check, against the evaluated host config  |
 | tailnet capability | nothing                                                                  | nothing                                                        |
 | Worker URL         | nothing                                                                  | nothing                                                        |
 
@@ -106,10 +108,13 @@ direction. A port open on every interface needs a public entry, and a tailnet en
 there, such as OpenSSH's default, fails the check. A port open on one interface, or narrowed by the
 narrowing table, needs a host-scope entry for that interface. An interface with a default route or a
 static address faces outside the host, so a port open there needs a public entry, and no host-scope
-entry may name it. Each port that imp's module publishes for public imps passes NixOS's input chain
-through Docker's forwarding, so it needs a public entry as well. A port range or a hand-written
-input rule cannot be matched with an entry, so the check fails on either. A tailnet capability entry
-and a Worker URL entry each record a decision that no code reads.
+entry may name it. Each port that imp's module publishes passes NixOS's input chain through Podman's
+port forwarding, so it needs a public entry as well, unless imp publishes it on the loopback address
+alone: that port needs a host-scope entry for the loopback interface instead. Each route of the
+host's TLS front needs a public front-route entry with the same hostname, upstream and paths, in
+either direction, so the front cannot pass a path that the registry does not list. A port range or a
+hand-written input rule cannot be matched with an entry, so the check fails on either. A tailnet
+capability entry and a Worker URL entry each record a decision that no code reads.
 
 Each public route, which is a public entry of any kind but a host port, names its auth layer: the
 part that authenticates each call it carries, such as the workload's own OAuth server or a webhook's

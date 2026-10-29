@@ -107,32 +107,44 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    digests, which the atc-gateway images workflow opens once it publishes them, let the
    `Deploy prod` workflow roll it out, then switch. `--build-only` skips this gate too.
 4. It refuses a commit whose impd, the imp-host image's release, is a major release that a running
-   nixie pod's imp client refuses, or that finds no nixie pod, because nixie then retries its start
-   without end while every host check passes. It reads the client's version from the `bun.lock` of
-   the pod's nixie release on GitHub: `@impz/client` from nixie 0.35.1, and `@zgeoff/imp-client`
-   before it. It accepts impd 2 beside a 1.x client from nixie 0.28.0 on, as nixie itself does. It
-   checks again before the activation. For an impd major bump, deploy a nixie release whose client
-   speaks the new major first. `--build-only` skips this gate too.
-5. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
+   nixie pod refuses, or that finds no nixie pod, because nixie then retries its start without end
+   while every host check passes. A nixie pod accepts the major of its imp client, whose version the
+   script reads from the `bun.lock` of the pod's nixie release on GitHub: `@impz/client` from nixie
+   0.35.1, and `@zgeoff/imp-client` before it. It accepts impd 2 beside a 1.x client from nixie
+   0.28.0 on. From nixie 0.42.0 it also accepts each major in the `EXTRA_IMPD_MAJORS` set of its imp
+   adapter, which the script reads from the release's source on GitHub. The script checks again
+   before the activation. For an impd major bump, deploy a nixie release that accepts the new major
+   first. `--build-only` skips this gate too.
+5. It refuses a commit whose impd stores a secret kind that the commit's atc daemon pin does not
+   accept, and names each such kind, because atc's auth binding then refuses every brokered secret
+   of that kind and every cloud spawn and adopt fails with `auth_secret_mismatch`. It reads impd's
+   kinds from the `SecretKindSchema` enum in `zgeoff/impz` at the imp-host release's tag, and atc's
+   from the `BrokerSecretKind` union in `zgeoff/atc` at the pin's tag. For an impd that adds a kind,
+   pin an atc release that accepts it first. `--build-only` skips this gate too.
+6. It builds a `git archive` snapshot of that commit with `nix build --no-link`, so untracked files
    and edits made during the run never reach the build. A failed build stops the script, and nothing
    reaches the host.
-6. It copies the built store path to the host with `nix copy`, then runs the copied system's
+7. It copies the built store path to the host with `nix copy`, then runs the copied system's
    `switch-to-configuration dry-activate`, which changes nothing and lists the units the activation
    would stop and restart. It holds the switch with exit 1 and those lines when either list holds
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
-7. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
+8. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the
    host, because the store path does not name the commit it was built from.
-8. It fails unless the host's `/run/current-system` is the built path, then prints
+9. It fails unless the host's `/run/current-system` is the built path, then prints
    `systemctl --failed`, which should list nothing.
-9. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
-   fails with each readiness or dependency part that is not ready and nixie's reason for it, since a
-   host that switches cleanly can still leave nixie unable to start. It prints each advisory part
-   that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
-   turns fail.
-10. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+10. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
+    fails with each readiness or dependency part that is not ready and nixie's reason for it, since
+    a host that switches cleanly can still leave nixie unable to start. It prints each advisory part
+    that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
+    turns fail.
+11. It fails with each image record in impd whose build folder holds no `rootfs.ext4`, because every
+    imp boot from that image then fails with ENOENT. A database restored across a change of the
+    preview image can leave such a record, as
+    [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes.
+12. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
     `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
     marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
     a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves
@@ -167,11 +179,22 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 
 ### Check the host before a switch
 
-The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
-without them, a release bump included. The `NixOS checks` workflow builds them on `main` every
-night, and skips the build when an earlier green run covers the commit. A green scheduled or
-dispatched run on `main` covers every later commit that changes no input of the checks, which the
-`nixos` gate of [`gates.yml`](../../.github/gates.yml) lists. No pull request runs the checks.
+The NixOS checks gate the switch, not the merge. The `NixOS checks` workflow runs on `main` every
+night and on each dispatch, on `main` or on a branch. It also runs on each push to a pull request
+that changes an input of the checks, a release bump included, so a break shows before the merge; the
+merge does not wait for it, and the switch never counts it. A Renovate pull request starts no run;
+the nightly run checks its bump.
+
+A run builds nothing, and passes, in two cases. A green scheduled or dispatched run on `main` covers
+every later commit that changes no input of the checks, which the `nixos` gate of
+[`gates.yml`](../../.github/gates.yml) lists. A run also skips the build when an earlier run built
+and passed the same derivations with the same workflow and build scripts, wherever that run ran; the
+skipped run's summary links it. A dispatch with `-f force=true` always builds.
+
+Runs on one commit of `main` queue, so the later one finds the earlier one's result. A newer
+dispatch on a branch cancels the branch's older run. A build substitutes the store paths it needs
+from `main`'s Actions cache of the paths that cache.nixos.org does not serve, and a build on `main`
+replaces that cache.
 
 To switch before the nightly run covers the commit:
 
@@ -197,7 +220,8 @@ To switch before the nightly run covers the commit:
 
 ## Upgrade imp
 
-imp is pinned in three places, and `scripts/pin-imp.sh` moves all three together:
+imp is pinned in three places, and the imp release pin moves all three together, in a bump pull
+request or [by hand](./release-check.md#pin-a-release-by-hand):
 
 | Pin                  | File                                                                                                                   |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -224,13 +248,16 @@ body lists them:
    [The restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) puts a copy back.
 
 3. [Switch the host](#switch-the-host). The switch restarts impd.
-4. Check: `ssh root@geoffcloud docker exec imp-host impz info` shows the new version,
+4. Check: `ssh root@geoffcloud podman exec imp-host impz info` shows the new version,
    `https://imps.geoff.cloud/health` answers 200 from the tailnet, and the `imp` dashboard in
    Grafana shows impd's logs.
 5. Rebuild the agent image on the new imp-base, as [the agent image runbook](./agent-image.md)
    describes.
 
 A merged bump that waits a day for the switch fires the `HostBehindLatestBuild` alert.
+
+The move from imp 5.0.0 on Docker to imp 6.0.0 on Podman takes more steps, which
+[the Podman switch runbook](./imp-podman-switch.md) lists.
 
 impd's database lives in `tank/imp`, which has a legacy mountpoint inside imp-host. The host's
 `/var/lib/imp` is empty.
@@ -260,8 +287,8 @@ after a change to either.
 | imp's tailnet key (`tag:imp`)                                  | `bun run up` mints a new one after expiry and writes it to `imp-tailscale-authkey`                    |
 
 A rotation of the atc daemon's gateway or imp token needs `systemctl restart atc-daemon` on the
-host. systemd's `LoadCredential` copies the token files when the service starts, so a reload rereads
-only the old copy.
+host, because the daemon reads copies of the token files made when it starts
+([the cloud daemon](../architecture/workloads/atc-gateway.md#the-cloud-daemon)).
 
 ## Reinstall the host
 

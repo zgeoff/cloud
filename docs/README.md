@@ -57,6 +57,8 @@ call, the path of a change, the topology and the data.
 - [Troubleshooting](./runbooks/troubleshooting.md): known failures, by message or symptom.
 - [Reinstall geoffcloud](./runbooks/reinstall-geoffcloud.md): reinstall the host as NixOS.
 - [tank/cloud](./runbooks/tank-cloud.md): create the encrypted datasets, and restore their key.
+- [Switch imp to Podman](./runbooks/imp-podman-switch.md): move geoffcloud from imp 5 on Docker to
+  imp 6 on Podman, and roll back.
 - [Restore geoff.cloud](./runbooks/restore-geoff-cloud.md): recover imps, impd's database, the host
   or the cluster.
 - [Recover a lost disk](./runbooks/lost-disk.md): recover from the loss of `vda`, `vdb` or both.
@@ -82,6 +84,7 @@ call, the path of a change, the topology and the data.
   auto-mode releases, when they merge on their own, and the app they run as.
 - [Previews](./runbooks/preview.md): set up the preview service, opt a repository in, check a
   preview live.
-- [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): the tailnet client for imp's end-to-end suites.
+- [imp's e2e nodes](./runbooks/imp-e2e-tailnet.md): where imp's end-to-end suites run, and how to
+  check that the production tailnet holds none of their nodes.
 
 Planned work and open choices live in Linear, not in this tree.

@@ -74,12 +74,12 @@ in
         STATE_DIR = "/var/lib/agent-image-build";
         HOME = "/var/lib/agent-image-build";
         IMP_URL = cfg.impdURL;
-        DOCKER = lib.getExe config.virtualisation.docker.package;
+        PODMAN = lib.getExe config.virtualisation.podman.package;
         BUN = lib.getExe pkgs.bun;
         # Bun's transpiler cache would write under HOME at every build
         BUN_RUNTIME_TRANSPILER_CACHE_PATH = "0";
       };
-      # root, since docker's socket is root's
+      # root, since imp-host is a container of root's Podman
       serviceConfig = {
         Type = "oneshot";
         ExecStart = lib.getExe build;

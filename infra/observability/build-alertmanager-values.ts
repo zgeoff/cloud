@@ -56,16 +56,23 @@ interface AlertmanagerValues {
 
 const checksumAnnotation = 'geoff.cloud/alert-webhook-checksum';
 
-const rootGrouping = {
-  group_by: ['namespace'],
-  group_wait: '30s',
-  group_interval: '5m',
-  repeat_interval: '12h',
-};
+interface AlertmanagerTimings {
+  readonly groupWait?: string;
+}
 
 export function buildAlertmanagerValues(
   webhook: AlertWebhookMount | undefined,
+  timings: AlertmanagerTimings = {},
 ): AlertmanagerValues {
+  const groupWait = timings.groupWait ?? '30s';
+
+  const rootGrouping = {
+    group_by: ['namespace'],
+    group_wait: groupWait,
+    group_interval: '5m',
+    repeat_interval: '12h',
+  };
+
   return {
     enabled: true,
 
@@ -87,7 +94,7 @@ export function buildAlertmanagerValues(
 
                 // a critical alert also reaches the routes below, so the discord receiver keeps it
                 { receiver: criticalReceiver, matchers: ['severity = "critical"'], continue: true },
-                buildSignInRoute(),
+                buildSignInRoute(groupWait),
 
                 // once a route has matched, an alert never falls back to the root's receiver
                 { receiver: discordReceiver, matchers: [] },
@@ -141,7 +148,7 @@ function buildNullRoute(): Route {
   return { receiver: nullReceiver, matchers: ['alertname =~ "Watchdog|InfoInhibitor"'] };
 }
 
-function buildSignInRoute(): Route {
+function buildSignInRoute(groupWait: string): Route {
   const names = buildATCSignInRules().rules.map((rule) => rule.alert);
 
   return {
@@ -150,7 +157,7 @@ function buildSignInRoute(): Route {
 
     // one message per alert name, so a flood of one category never buries another
     group_by: ['alertname'],
-    group_wait: '30s',
+    group_wait: groupWait,
     group_interval: '5m',
     repeat_interval: '1h',
   };

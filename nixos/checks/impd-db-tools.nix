@@ -1,6 +1,6 @@
 # Checks the impd database tools package (nixos/packages/impd-db-tools) in the build sandbox:
 # the argument checks copy-impd-db-host makes before it touches anything. The copy itself needs
-# Docker and the imp-host container, so the impd-restore rehearsal runs it in its VM. Each case
+# Podman and the imp-host container, so the impd-restore rehearsal runs it in its VM. Each case
 # runs on its own, in a fresh directory, with the tool under env -i and a HOME and TMPDIR of its
 # own, under test-support/shell/run-cases.sh, which reports each case and fails the check when
 # any case fails.

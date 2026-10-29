@@ -7,7 +7,7 @@ broker. It has no public route.
 ## The path
 
 A granted imp sends HTTPS to `op-connect.imp.internal`. The broker in imp-host swaps the placeholder
-bearer for the real token and forwards to `http://172.17.0.1:18081`. There the host's
+bearer for the real token and forwards to `http://10.88.0.1:18081`. There the host's
 `onepassword-connect-relay` socket starts `systemd-socket-proxyd`, which dials the Service's
 ClusterIP, `10.43.82.198:8000`, whose target is Connect's API on 8080.
 
@@ -19,7 +19,7 @@ ClusterIP, `10.43.82.198:8000`, whose target is Connect's API on 8080.
 | vault `cloud`, item `onepassword-connect-token`       | the read-only Connect token `imp-agents-ro` (vault `imp`)  |
 | vault `imp`                                           | the items imps read; granted to the Connect server only    |
 | the Connect Secret in k3s                             | the credentials file, set by Pulumi from `.env`            |
-| impd, custom secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host |
+| impd, static secret `op-connect`                      | the token, with `op-connect.imp.internal` as its only host |
 
 ## Add the token to impd
 
@@ -28,7 +28,7 @@ Send the token on stdin. Never put it on a command line.
 ```sh
 op read op://cloud/onepassword-connect-token/credential \
   | impz secret add op-connect --kind custom --hosts op-connect.imp.internal \
-      --header authorization --scheme bearer --upstream http://172.17.0.1:18081
+      --header authorization --scheme bearer --upstream http://10.88.0.1:18081
 ```
 
 Replacing an older binding (the secret bound to a different host) needs `--replace --rebind`.

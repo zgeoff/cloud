@@ -3,8 +3,8 @@
 # has services.tank-cloud with geoffcloud's own binds and requiredBy, and the host's dependency of
 # the DNS token path unit on the secrets directory. On a pool with datasets made by the commands of
 # docs/runbooks/tank-cloud.md and a throwaway key, the journey puts fake secrets in geoffcloud's
-# shapes on the datasets, starts the services, and checks the mounts, the staged secrets and the
-# daemon's credential. Then it takes an impd database copy with copy-impd-db-host, runs the install
+# shapes on the datasets, starts the services, and checks the mounts, the staged secrets, the
+# daemon's credential, and the copy of the gateway token that the daemon serves on. Then it takes an impd database copy with copy-impd-db-host, runs the install
 # scripts' host halves against the binds, and reboots. A stand-in k3s needs the rancher mount, as
 # geoffcloud's k3s does. The atc daemon is the real service module with the pinned atc release; the
 # imp-host image is the stand-in busybox one (test-utils/build-stub-imp-host-image.nix), loaded from
@@ -57,7 +57,7 @@ pkgs.testers.runNixOSTest {
       networking.hostId = "5ca71846";
       # the VM reaches nothing, and dhcpcd crashing at times would fail a unit at boot
       networking.useDHCP = false;
-      # imp-host's docker run passes --device /dev/kvm
+      # imp-host's podman run passes --device /dev/kvm
       boot.kernelModules = [
         "kvm-amd"
         "kvm-intel"
@@ -141,12 +141,16 @@ pkgs.testers.runNixOSTest {
         path = [
           config.boot.zfs.package
           pkgs.util-linux
+          pkgs.kmod
         ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
         };
+        # zpool create enables only the features that the module lists in sysfs, which it fills in
+        # after /dev/zfs appears, so the module loads in full first
         script = ''
+          modprobe zfs
           if [ -z "$(blkid -o value -s PTTYPE /dev/vdb || true)" ]; then
             zpool create -O mountpoint=none -O compression=lz4 -O atime=off -O xattr=sa tank /dev/vdb
           fi
@@ -165,6 +169,7 @@ pkgs.testers.runNixOSTest {
     path_unit = "imp-host-dns-token.path"
     dns_token = "${dnsToken}"
     gateway_token = "gateway-fixture-bearer-0123456789abcdef-0123456789abcdef"
+    staged_token = "/run/atc-daemon/gateway-token"
 
 
     def mount_unit(path):
@@ -181,6 +186,17 @@ pkgs.testers.runNixOSTest {
         from boot to boot, so a cycle fails a unit only at times: the journal names every one"""
         cycles = machine.succeed("journalctl -b -q --no-pager --grep 'ordering cycle' || true").strip()
         assert cycles == "", f"the boot has an ordering cycle: {cycles}"
+
+
+    def assert_daemon_serving(token):
+        """the atc daemon listens, which it does only after it loads its token file, on a copy of
+        the token that its own user owns with mode 0600, as atc's --token-file needs"""
+        machine.wait_for_open_port(8415, timeout=60)
+        state = machine.succeed("systemctl show -P ActiveState atc-daemon.service").strip()
+        assert state == "active", f"atc-daemon.service is {state}"
+        owner = machine.succeed(f"stat -c '%U %a' {staged_token}").strip()
+        assert owner == "atc 600", f"{staged_token} is {owner}"
+        assert machine.succeed(f"cat {staged_token}") == token + "\n"
 
 
     machine.wait_for_unit("multi-user.target")
@@ -248,15 +264,16 @@ pkgs.testers.runNixOSTest {
         machine.succeed(f"cmp /run/imp-host/tailscale-authkey {tank}/host-secrets/imp-host/tailscale-authkey")
         machine.succeed(f"cmp /run/credentials/atc-daemon.service/gateway-token {tank}/host-secrets/atc-daemon/gateway-token")
         machine.succeed(f"cmp /run/credentials/atc-daemon.service/imp-token {tank}/host-secrets/atc-daemon/imp-token")
+        assert_daemon_serving(gateway_token)
 
 
     with subtest("it takes an impd database copy onto tank/cloud"):
-        machine.succeed("docker exec imp-host mkdir -p /var/lib/imp/db")
+        machine.succeed("podman exec imp-host mkdir -p /var/lib/imp/db")
         machine.succeed(
             "sqlite3 /tmp/imp.sqlite 'CREATE TABLE kysely_migration (name TEXT PRIMARY KEY, timestamp TEXT);'"
             " \"INSERT INTO kysely_migration VALUES ('0001_init','t');\""
         )
-        machine.succeed("docker cp /tmp/imp.sqlite imp-host:/var/lib/imp/db/imp.sqlite")
+        machine.succeed("podman cp /tmp/imp.sqlite imp-host:/var/lib/imp/db/imp.sqlite")
         copied = machine.succeed("copy-impd-db-host fixture")
         copy_dir = copied.splitlines()[-1].split("copy: ")[1].split(" ")[0]
         source = machine.succeed(f"findmnt -n -o SOURCE -T {copy_dir}/imp.sqlite").strip()
@@ -280,6 +297,8 @@ pkgs.testers.runNixOSTest {
             source = machine.succeed(f"findmnt -n -o SOURCE -T {path}").strip()
             assert source == expected, f"{path} is on {source}"
         assert machine.succeed(f"cat {atc_secrets}/gateway-token") == gateway_token + "-new\n"
+        machine.succeed("systemctl restart atc-daemon.service")
+        assert_daemon_serving(gateway_token + "-new")
         machine.succeed("mkdir -p /mnt/root-disk && mount --bind / /mnt/root-disk")
         for path in [imp_secrets, atc_secrets, db_backups]:
             left = machine.succeed(f"ls -A /mnt/root-disk{path}")
@@ -305,6 +324,7 @@ pkgs.testers.runNixOSTest {
         ]
         machine.fail("journalctl -b -u imp-host.service --no-pager | grep 'is missing or empty'")
         machine.succeed(f"cmp /run/credentials/atc-daemon.service/gateway-token {atc_secrets}/gateway-token")
+        assert_daemon_serving(gateway_token + "-new")
         failed = machine.succeed("systemctl list-units --failed --plain --no-legend")
         assert failed == "", f"units failed after the reboot: {failed}"
   '';

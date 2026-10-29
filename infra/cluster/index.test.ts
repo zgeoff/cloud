@@ -31,6 +31,7 @@ test("it returns the files service's route, from its configured host to its Serv
         tokenHashes: { agent: output('a'.repeat(64)), owner: output('b'.repeat(64)) },
       },
       zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
     },
   );
 
@@ -59,6 +60,7 @@ test('it returns no files route while files is unset', async () => {
     {
       onePasswordConnect: { credentials: output('{}') },
       zoneID: output('zone'),
+      kubeconfig: output('kubeconfig-for-tests'),
     },
   );
 
@@ -78,6 +80,7 @@ test('it creates the egress deny in each namespace k3s creates, kube-system and 
   createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
     onePasswordConnect: { credentials: output('{}') },
     zoneID: output('zone'),
+    kubeconfig: output('kubeconfig-for-tests'),
   });
 
   await Promise.all(
@@ -99,7 +102,7 @@ test('it creates the egress deny in each namespace k3s creates, kube-system and 
       policyTypes: ['Egress'],
       egress: [
         {
-          to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '172.17.0.0/16'] } }],
+          to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '10.88.0.0/16'] } }],
         },
       ],
     },
@@ -119,6 +122,7 @@ test('it creates the egress deny in a namespace it creates itself', async () => 
   createCluster(createClusterProvider('k3s', { kubeconfig: output('kubeconfig-for-tests') }), {
     onePasswordConnect: { credentials: output('{}') },
     zoneID: output('zone'),
+    kubeconfig: output('kubeconfig-for-tests'),
   });
 
   await stub.whenRegistered(
@@ -136,7 +140,7 @@ test('it creates the egress deny in a namespace it creates itself', async () => 
       policyTypes: ['Egress'],
       egress: [
         {
-          to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '172.17.0.0/16'] } }],
+          to: [{ ipBlock: { cidr: '0.0.0.0/0', except: ['100.64.0.0/10', '10.88.0.0/16'] } }],
         },
       ],
     },

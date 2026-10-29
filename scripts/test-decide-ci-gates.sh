@@ -35,12 +35,98 @@ it_checks_a_cancelled_push_s_provider_change_on_a_later_docs_only_push() {
   git -C "$tree/repo" commit -qm 'add the lantern provider'
   echo '# lantern, tuned' > "$tree/repo/README.md"
   git -C "$tree/repo" commit -qam 'tune the lantern readme'
-  # the provider commit's run was cancelled, so only the first commit's run is green
-  jq -cn --arg stdout "$green
+  # the provider commit's run was cancelled, so only the first commit's run is green; no pull
+  # request run left a record of this tree on the green commit's tree
+  {
+    jq -cn --arg stdout "$green
 " '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+      "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"],
+      stdout: $stdout}'
+    jq -cn '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/artifacts", "-f", null,
+      "-f", "per_page=100", "--jq",
+      "[.artifacts[] | select(.expired == false and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].workflow_run.id // empty"]}'
+  } > "$tree/gh-responses"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
+    GITHUB_STEP_SUMMARY="$tree/summary" GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
+    EVENT=push HEAD="$(git -C "$tree/repo" rev-parse HEAD)" \
+    bash "$script" provider full) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< 'provider=true
+full=true'
+  diff /dev/null "$tree/err"
+  diff - "$tree/output" <<< 'provider=true
+full=true'
+  diff /dev/null "$tree/summary"
+  diff - "$tree/calls" << EOF
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/ci.yml/runs","-f","event=push","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"]
+["gh","api","-X","GET","repos/{owner}/{repo}/actions/artifacts","-f","name=ci-pass-$(git -C "$tree/repo" rev-parse 'HEAD^{tree}')-$(git -C "$tree/repo" rev-parse "$green^{tree}")","-f","per_page=100","--jq","[.artifacts[] | select(.expired == false and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].workflow_run.id // empty"]
+EOF
+  assert_status 0 "$status"
+}
+
+it_skips_every_check_of_a_push_whose_trees_a_green_pull_request_run_checked() {
+  local base head status=0
+  create_case_tree
+  setup_test "$tree"
+  echo '# lantern' > "$tree/repo/README.md"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern readme'
+  base="$(git -C "$tree/repo" rev-parse HEAD)"
+  mkdir "$tree/repo/provider"
+  echo 'package main' > "$tree/repo/provider/main.go"
+  git -C "$tree/repo" add -A
+  git -C "$tree/repo" commit -qm 'add the lantern provider'
+  head="$(git -C "$tree/repo" rev-parse HEAD)"
+  # GitHub's REST docs (actions/artifacts, list artifacts for a repository, read 2026-10-28): the
+  # artifact's workflow_run holds the id of the run that uploaded it
+  {
+    jq -cn --arg stdout "$base
+" '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
+      "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
+      "--jq", ".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"],
+      stdout: $stdout}'
+    jq -cn --arg name "name=ci-pass-$(git -C "$tree/repo" rev-parse "$head^{tree}")-$(git -C "$tree/repo" rev-parse "$base^{tree}")" \
+      '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/artifacts", "-f", $name,
+      "-f", "per_page=100", "--jq",
+      "[.artifacts[] | select(.expired == false and .workflow_run.head_repository_id == .workflow_run.repository_id)][0].workflow_run.id // empty"],
+      stdout: "5150\n"}'
+  } > "$tree/gh-responses"
+
+  (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
+    GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
+    GITHUB_STEP_SUMMARY="$tree/summary" GITHUB_SERVER_URL=https://github.com GITHUB_REPOSITORY=zgeoff/cloud \
+    EVENT=push HEAD="$head" \
+    bash "$script" provider full) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+provider=false
+full=false
+reused=true
+Pull request run https://github.com/zgeoff/cloud/actions/runs/5150 passed this tree on the same base tree, so the checks did not run again.
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/output" << 'EOF'
+provider=false
+full=false
+reused=true
+EOF
+  diff - "$tree/summary" <<< 'Pull request run https://github.com/zgeoff/cloud/actions/runs/5150 passed this tree on the same base tree, so the checks did not run again.'
+  assert_status 0 "$status"
+}
+
+it_asks_for_no_record_on_a_push_with_no_green_base() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+  git -C "$tree/repo" commit -q --allow-empty -m 'add the lantern service'
+  # no green main run: the --jq filter prints nothing
+  jq -cn '{argv: ["gh", "api", "-X", "GET", "repos/{owner}/{repo}/actions/workflows/ci.yml/runs",
     "-f", "event=push", "-f", "branch=main", "-f", "status=success", "-f", "per_page=100",
-    "--jq", ".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"],
-    stdout: $stdout}' > "$tree/gh-responses"
+    "--jq", ".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"]}' \
+    > "$tree/gh-responses"
 
   (cd "$tree/repo" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" \
     GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 GITHUB_OUTPUT="$tree/output" \
@@ -50,9 +136,6 @@ it_checks_a_cancelled_push_s_provider_change_on_a_later_docs_only_push() {
   diff - "$tree/out" <<< 'provider=true
 full=true'
   diff /dev/null "$tree/err"
-  diff - "$tree/output" <<< 'provider=true
-full=true'
-  diff /dev/null "$tree/summary"
   diff - "$tree/calls" <<< '["gh","api","-X","GET","repos/{owner}/{repo}/actions/workflows/ci.yml/runs","-f","event=push","-f","branch=main","-f","status=success","-f","per_page=100","--jq",".workflow_runs[] | select(.event == \"push\" and .head_branch == \"main\" and .conclusion == \"success\") | .head_sha"]'
   assert_status 0 "$status"
 }

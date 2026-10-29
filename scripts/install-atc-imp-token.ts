@@ -74,7 +74,7 @@ async function checkTokenFile(context: Readonly<ATCCredentialsContext>, file: st
   // the metadata cannot show the file is right, so the host asks impd who the saved token is
   const script = await readHostScript('check-atc-imp-token.sh');
 
-  // the script sets the two variables, and docker passes them into imp's CLI, off every argv
+  // the script sets the two variables, and podman passes them into imp's CLI, off every argv
   const cli = buildHostImpArgv([], { env: ['IMP_TOKEN', 'IMP_URL'] });
 
   const result = await runHostCheck(

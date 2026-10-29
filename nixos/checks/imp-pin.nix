@@ -42,7 +42,7 @@ let
         assert_equals ${
           lib.escapeShellArg (
             builtins.toJSON [
-              "services.imp.image pins imp-host 3.1.3, but the imp flake input is release 3.1.4: pin both with scripts/pin-imp.sh"
+              "services.imp.image pins imp-host 3.1.3, but the imp flake input is release 3.1.4: pin both with bun scripts/release/run-release-pin.ts imp <version>"
             ]
           )
         } ${

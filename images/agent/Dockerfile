@@ -11,7 +11,7 @@
 
 # imp-base, pinned to the multi-arch index digest. Check a bump with:
 #   gh attestation verify oci://ghcr.io/zgeoff/imp-base:X.Y.Z --repo zgeoff/impz
-FROM ghcr.io/zgeoff/imp-base:2.11.0@sha256:8722fed7485bfe9eb55743ccf9bdcbb58734a27aacfece2488e02bfb7f82764e
+FROM ghcr.io/zgeoff/imp-base:6.0.2@sha256:5631369252b1569e2822a45a8ab20edda94f0f53f3d0ac90071a5be5e3be55ad
 
 ARG DEBIAN_FRONTEND=noninteractive
 
@@ -55,7 +55,11 @@ RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNA
 # Every download retries. Plain --retry skips a dropped connection (curl exit 56)
 # and an HTTP/2 stream that did not close cleanly (exit 92), so it needs
 # --retry-all-errors. The fixed delay keeps a retried 404 to about 10 seconds.
-ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2"
+# A connection that does not open within 20 seconds, or a transfer that moves
+# less than 1 KiB a second for a minute, ends with exit 28 and retries, so a
+# stalled download cannot hold the build until its timeout. A slow transfer
+# that keeps moving runs on.
+ARG CURL_RETRY="--retry 5 --retry-all-errors --retry-delay 2 --connect-timeout 20 --speed-limit 1024 --speed-time 60"
 
 # Claude Code's native linux-x64 binary. The sum is the linux-x64 checksum in
 # the release's manifest.json, whose signature names Anthropic's release key
@@ -81,8 +85,8 @@ ENV DISABLE_UPDATES=1
 # own binary in. The sum is atc-linux-x64's line in the release's SHA256SUMS:
 #   gh release download "@zgeoff/atc@$VERSION" -R zgeoff/atc -p SHA256SUMS -p atc-linux-x64
 #   sha256sum -c --ignore-missing SHA256SUMS
-ARG ATC_VERSION=7.2.0
-ARG ATC_SHA256=af0ccae8107ae263000737dbec511226351bfbc5bae6dd0e4af107e469860b95
+ARG ATC_VERSION=7.5.1
+ARG ATC_SHA256=dc661496144cc96c703246f7cf80ff312033232cb4cefd6e6fb52510621cf540
 RUN curl -fsSL ${CURL_RETRY} -o /usr/local/bin/atc \
       "https://github.com/zgeoff/atc/releases/download/%40zgeoff/atc%40${ATC_VERSION}/atc-linux-x64" \
  && echo "${ATC_SHA256}  /usr/local/bin/atc" | sha256sum -c - \
@@ -137,11 +141,17 @@ RUN dir=/root/.local/share/gh/extensions/gh-stack \
 # in the release's SHASUMS256.txt.
 ARG NODE_VERSION=24.21.0
 ARG NODE_SHA256=fd8e59d5a511510f6a298afb548f18c7d2b1be404d8b4a27d94fbe49f56cb2d6
-RUN curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
+# BuildKit stamps each printed line with its time, so the echoes name the part a
+# stalled build stopped in; one RUN keeps the tarball out of the image's layers.
+RUN echo "node: downloading" \
+ && curl -fsSL ${CURL_RETRY} -o /tmp/node.tar.xz \
       "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
+ && echo "node: downloaded, checking the sum" \
  && echo "${NODE_SHA256}  /tmp/node.tar.xz" | sha256sum -c - \
+ && echo "node: extracting" \
  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 --no-same-owner \
       --exclude='*.md' --exclude=LICENSE \
+ && echo "node: extracted" \
  && rm /tmp/node.tar.xz
 
 # Bun, at each version that a zgeoff repo pins in its .bun-version, so a session
@@ -178,14 +188,29 @@ COPY sbin/install-checkout-packages /usr/local/sbin/install-checkout-packages
 COPY claude-code/managed-settings.d/install-checkout-packages.json \
      /etc/claude-code/managed-settings.d/install-checkout-packages.json
 
-# Go from go.dev. The sum is the sha256 that https://go.dev/dl/?mode=json
-# lists for the linux-amd64 tarball.
+# Go from the GitHub release of actions/go-versions, because the host's path to
+# go.dev's download CDN can run at tens of KB/s. That release repacks go.dev's
+# linux-amd64 tarball without its go/ folder and adds the Actions installer
+# setup.sh, which the build removes. The sum is the release asset's sha256
+# digest, taken after its unpacked tree matches the go.dev tarball's, whose
+# sha256 https://go.dev/dl/?mode=json lists. A bump finds the release, whose tag
+# is the version and a run id, and checks it with:
+#   gh api 'repos/actions/go-versions/releases?per_page=100' --jq '.[]
+#     | select(.tag_name | startswith("'"$VERSION"'-")) | .tag_name, (.assets[]
+#     | select(.name == "go-'"$VERSION"'-linux-x64.tar.gz") | .digest)'
+#   curl -fsSLO "https://go.dev/dl/go$VERSION.linux-amd64.tar.gz"   # check its listed sha256
+#   curl -fsSLO "https://github.com/actions/go-versions/releases/download/$TAG/go-$VERSION-linux-x64.tar.gz"
+#   mkdir dev gh && tar -xzf "go$VERSION.linux-amd64.tar.gz" -C dev && tar -xzf "go-$VERSION-linux-x64.tar.gz" -C gh
+#   rm gh/setup.sh && diff -r --no-dereference dev/go gh   # prints nothing
 ARG GO_VERSION=1.27.1
-ARG GO_SHA256=63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445
-RUN curl -fsSL ${CURL_RETRY} -o /tmp/go.tar.gz "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+ARG GO_RELEASE=1.27.1-33583469715
+ARG GO_SHA256=6f00fbc5b337fbf00581b7ced382fecdc4fa9493aef971277652a25f7aa14c6e
+RUN curl -fsSL ${CURL_RETRY} -o /tmp/go.tar.gz \
+      "https://github.com/actions/go-versions/releases/download/${GO_RELEASE}/go-${GO_VERSION}-linux-x64.tar.gz" \
  && echo "${GO_SHA256}  /tmp/go.tar.gz" | sha256sum -c - \
- && tar -xzf /tmp/go.tar.gz -C /usr/local \
- && rm /tmp/go.tar.gz
+ && mkdir /usr/local/go \
+ && tar -xzf /tmp/go.tar.gz -C /usr/local/go \
+ && rm /tmp/go.tar.gz /usr/local/go/setup.sh
 
 # uv and uvx. The sum is the release's uv-x86_64-unknown-linux-gnu.tar.gz.sha256.
 ARG UV_VERSION=0.12.23
@@ -219,8 +244,8 @@ RUN curl -fsSL ${CURL_RETRY} -o /tmp/op.zip \
 # for --plugin-dir. The sum is the tarball's. The release bump (scripts/release/) checks the
 # tarball against npm's dist.integrity, its sha512, and writes this pin:
 #   npm view auto-mode@$VERSION dist.tarball dist.integrity
-ARG AUTO_MODE_VERSION=3.0.1
-ARG AUTO_MODE_SHA256=b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a
+ARG AUTO_MODE_VERSION=3.1.5
+ARG AUTO_MODE_SHA256=c3ed8b12722ccbec4d66567eb6c69dd12f367925cc1dbf9688abd310efc9f67e
 RUN curl -fsSL ${CURL_RETRY} -o /tmp/auto-mode.tgz \
       "https://registry.npmjs.org/auto-mode/-/auto-mode-${AUTO_MODE_VERSION}.tgz" \
  && echo "${AUTO_MODE_SHA256}  /tmp/auto-mode.tgz" | sha256sum -c - \

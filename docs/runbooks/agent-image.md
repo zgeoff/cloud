@@ -104,21 +104,24 @@ build afterwards, so read `impz image ls` before a retry.
 The `agent-image-build` timer on geoffcloud fetches `main` of the public zgeoff/cloud repository
 without a credential, into a clone under `/var/lib/agent-image-build`. It takes the newest commit on
 `main` that changes `images/agent`, and runs the build script for that commit when impd holds no
-image of its name. It copies `impz` out of the imp-host container for each build, so the CLI matches
-the impd it calls. The build's token is a `manage` token with no imp patterns, so it controls every
-imp, grant and image on the host. It lives in a root-only file on the host's encrypted secrets
-dataset, and never in a GitHub secret.
+image of its name. While impd does not answer, as when a host switch recreates imp-host, a run waits
+up to 10 minutes and then leaves the build to the next run, so the unit does not fail the switch. A
+build that fails while imp-host's container changes leaves the commit for the next run as well. It
+copies `impz` out of the imp-host container for each build, so the CLI matches the impd it calls.
+The build's token is a `manage` token with no imp patterns, so it controls every imp, grant and
+image on the host. It lives in a root-only file on the host's encrypted secrets dataset, and never
+in a GitHub secret.
 
 Until the token file exists, systemd skips the unit. To stage the token, run this once from a
 machine that reaches the host:
 
 ```bash
-ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/agent-image-build && docker exec imp-host impz token new agent-image-build --scope manage | (umask 377 && cat > /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token) && test -s /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token && echo ok' < /dev/null
+ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/agent-image-build && podman exec imp-host impz token new agent-image-build --scope manage | (umask 377 && cat > /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token) && test -s /var/lib/tank-cloud/host-secrets/agent-image-build/imp-token && echo ok' < /dev/null
 ```
 
 Expect `ok`. impz prints the token on its stdout, which goes straight into the file with mode 0400,
 so the token never appears in a command line or the journal. To replace the token, remove the old
-one with `docker exec imp-host impz token rm agent-image-build` and run the command again.
+one with `podman exec imp-host impz token rm agent-image-build` and run the command again.
 
 Each run writes its decision to the unit's journal, which Alloy ships to Loki, on a line that starts
 with `agent-image-build:`. A build adds the build script's progress, and its last line repeats the
@@ -288,8 +291,8 @@ entry.
 
 1. Change the pins in `images/agent/Dockerfile`. Check each new sum with the command in the comment
    above its pin.
-2. Open a PR. CI's `checks` job runs `bun run test:agent-image` on every change to the image or its
-   check; run it locally first to find a failure sooner.
+2. Open a PR. CI's `test-agent-image` job runs `bun run test:agent-image` on every change to the
+   image or its check; run it locally first to find a failure sooner.
 3. After the PR merges, wait for the host's build line in the journal
    ([The host's build](#the-hosts-build)), and record it on the PR.
 4. Switch the `cloud` target.

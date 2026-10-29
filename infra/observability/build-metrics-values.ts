@@ -5,7 +5,7 @@ import { lokiURL } from './loki-url.ts';
 // the textfile collector reads metrics that host timers write; node-exporter sees the host root
 // at /host/root
 const nodeExporterArgs = [
-  '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)',
+  '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/containers/storage/.+|var/lib/kubelet/.+)($|/)',
   '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$',
   `--collector.textfile.directory=/host/root${topology.nodeExporter.textfileDir}`,
 ];

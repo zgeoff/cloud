@@ -30,7 +30,7 @@ async function setupTest(config: SetupConfig) {
   return { context, out, err };
 }
 
-test('it skips a glm with the expected rules', async () => {
+test('it skips a glm that impd stores as static with the expected rules', async () => {
   const tools = buildStubCredentialTools({
     op: { vaults: { cloud: {} } },
     atcKey: { installed: true, zaiKey: 'zai_fixture_key' },
@@ -40,7 +40,7 @@ test('it skips a glm with the expected rules', async () => {
   const ctx = await setupTest({ run: tools.run });
 
   await installATCGLMSecret(ctx.context, {
-    secrets: [buildMockImpSecret()],
+    secrets: [buildMockImpSecret({ kind: 'static' })],
     tokens: [],
     hasItem: false,
     hostFiles: [],
@@ -122,7 +122,7 @@ test('it adds glm with the z.ai key on imp’s stdin, never its argv', async () 
   expect(tools.calls.map((call) => [call.argv.join(' '), call.stdin])).toStrictEqual([
     ['atc-key zai', ''],
     [
-      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'docker' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
+      "ssh -o BatchMode=yes -o ConnectTimeout=15 root@geoffcloud 'podman' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
       'zai_fixture_key\n',
     ],
   ]);
@@ -145,7 +145,7 @@ test('it prints the added secret’s name, kind and rules', async () => {
   });
 
   expect(ctx.out.join('')).toBe(
-    '\n== 1/3 impd secret glm (api.z.ai, authorization: Bearer)\n{"name":"glm","kind":"custom","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}]}\n',
+    '\n== 1/3 impd secret glm (api.z.ai, authorization: Bearer)\n{"name":"glm","kind":"static","rules":[{"host":"api.z.ai","header":"authorization","scheme":"bearer"}]}\n',
   );
 });
 

@@ -4,7 +4,8 @@ nixie is the owner's assistant: a server that keeps its state in one SQLite data
 in front of it, and an imp for every model loop it runs. It runs in k3s from nixie's released
 images, and it answers on the tailnet only, at one public name that points at the host's tailnet
 address. nixie reaches impd over the tailnet with a token limited to its own imps, so the host owner
-adds nixie's images and its model credential to impd by hand before nixie starts.
+adds nixie's model credential to impd by hand before nixie starts. The prod apply adds each
+release's sandbox images to impd before nixie rolls, so the new pod finds them in place.
 [The tailnet](../network/tailnet.md) covers the grants on the route in and out, and
 [the nixie runbook](../../runbooks/nixie.md) gives the steps for a deploy, an upgrade and a
 rotation.
@@ -106,19 +107,48 @@ two grants combine. impd delivers each tool call from an imp back over nixie's o
 the pod opens no inbound port for its tools.
 
 The grant belongs to the host's node, so an egress NetworkPolicy decides which pod in nixie's
-namespace may use it. nixie's pod alone reaches impd's node, on HTTPS only. The namespace's deny
-refuses the tailnet range to every other pod there, among them the web client, the backup and
-restore jobs, and the restore test's nixie, which carries no label of nixie's own. Traefik's
-namespace holds the same deny
+namespace may use it. nixie's pod and the Job that adds its sandbox images reach impd's node, on
+HTTPS only. The namespace's deny refuses the tailnet range to every other pod there, among them the
+web client, the backup and restore jobs, and the restore test's nixie, which carries no label of
+nixie's own. Traefik's namespace holds the same deny
 ([which pod uses each grant](../network/tailnet.md#which-pod-uses-each-grant)).
 
 nixie's impd token can manage only imps whose names carry nixie's prefix, grant only nixie's model
 secret to them, and add images from nixie's registry path under names with nixie's prefix. nixie's
-start adds each sandbox image of its release under the name it derives from the image's kind and the
-head of its digest, so a release with new sandbox images deploys with no step on the host. impd
-refuses a secret add to such a token, because a secret is host-wide. The host owner therefore adds
-the model secret as root, under the name nixie derives from the model profile and a digest of its
-credential, before the first deploy and after each credential rotation.
+start adds each sandbox image of its release that impd lacks, under the name it derives from the
+image's kind and the head of its digest. impd refuses a secret add to such a token, because a secret
+is host-wide. The host owner therefore adds the model secret as root, under the name nixie derives
+from the model profile and a digest of its credential, before the first deploy and after each
+credential rotation.
+
+## Sandbox images before a roll
+
+The prod apply adds a release's sandbox images to impd before Pulumi rolls nixie's StatefulSet.
+nixie turns ready only once impd holds every image of its sandbox manifest, and a pull takes
+minutes, so an add at start would leave the new pod unready after the old one stopped. Pulumi runs a
+local command on the apply's machine, and the StatefulSet depends on that command:
+
+1. The command creates a ConfigMap that holds the add script, bundled into one file, because the
+   nixie image holds Bun but none of this repo's packages.
+2. It starts a Job in nixie's namespace from the new nixie image, and waits for the Job to finish.
+3. The Job decrypts only nixie's impd token from the secrets file, with the host's age identity that
+   nixie's Secret holds, and reads the image's sandbox manifest.
+4. The Job adds each image that impd lacks, with nixie's own token and under the names nixie
+   derives. It refuses an image that impd holds under the same name at another digest.
+5. The command prints the Job's log and removes the ConfigMap.
+
+A failed or timed-out Job fails the command, and Pulumi then leaves the StatefulSet unchanged, so
+the old nixie keeps serving. Pulumi runs the command again only when the Job it describes changes,
+which a new nixie image or a new secrets file does. The Job is no Pulumi resource: Kubernetes
+refuses a change to a Job's pod template, so Pulumi would replace it at each release, and the
+deploy's guard holds every replace. Each run starts a fresh Job, so a retry reads impd again rather
+than trust an earlier Job's result.
+
+The Job adds without a pin, because nixie's token cannot pin an image. impd never evicts an image
+used recently, and an add counts as a use, so the image stays until the new conversation imp holds
+it. Delivery pins the images afterwards, as
+[nixie's runbook](../../runbooks/nixie.md#pin-nixies-sandbox-images) describes. nixie's own add at
+start stays as the fallback for an image that impd lost between the Job and the roll.
 
 ## The route in
 

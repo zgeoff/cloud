@@ -9,6 +9,10 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 [ -f go.mod ] || exit 0
+# CI's setup-go installs go.mod's go version, and another Go compresses the embedded spec in
+# onidelapi.gen.go to other bytes, so the checks run on that version whichever Go is installed
+GOTOOLCHAIN="go$(go list -m -f '{{.GoVersion}}')"
+export GOTOOLCHAIN
 # go generate writes onidelapi.gen.go from the spec, the overlay and the config; a stale or
 # hand-edited copy fails here
 generated="$(mktemp)"

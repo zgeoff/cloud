@@ -37,10 +37,13 @@ the VM's Secure Boot blocks, so Secure Boot stays off
   only ingress. Its NodePorts bind to the tailnet's address range only, since kube-proxy routes a
   NodePort through forwarding, which the input firewall never sees. Pods resolve names through
   public resolvers, because the host resolves through MagicDNS, which a pod cannot reach.
-- **imp-host** runs impd and its microVMs in a container on the host's Docker
+- **imp-host** runs impd and its microVMs in a container under the host's rootful Podman
   ([imp on the host](./imp.md)).
 - **The atc daemon** runs as a NixOS service with its own system user, sandboxed by systemd
   ([the atc gateway](../workloads/atc-gateway.md#the-cloud-daemon)).
+- **The TLS front** is Caddy on the public HTTPS port, which passes the listed paths of imp's public
+  MCP route to impd's loopback listener
+  ([the host's TLS front](../network/public-ingress.md#the-hosts-tls-front)).
 - **The Connect relay** is a socket-activated proxy that carries imp-host's requests to 1Password
   Connect in the cluster ([1Password Connect](../workloads/onepassword-connect.md)).
 - **impd's health probe** is a timer that asks impd's loopback health endpoint and writes the result
@@ -87,8 +90,14 @@ impd, so the script's failure paths run before it ever runs on the real host. Th
 
 The checks gate the host switch rather than the merge, because no merge changes the host: only the
 switch script does, and an operator runs it by hand. CI builds the checks on `main` every night and
-on a dispatch, never on a pull request, so an automatic bump merges without them. The switch script
-refuses a commit unless a green scheduled or dispatched run on `main` covers it: the run checked
-that commit, or an ancestor with no input of the checks changed since. A nightly run skips the build
-when an earlier green run covers the commit, so a quiet night costs no VM boot.
-[The switch runbook](../../runbooks/workflows.md#check-the-host-before-a-switch) gives the commands.
+on a dispatch, and on each pull request that changes an input of the checks, so a break shows before
+the merge; the merge never waits for that run. A Renovate pull request starts none, and the nightly
+run checks its bump. The switch script refuses a commit unless a green scheduled or dispatched run
+on `main` covers it: the run checked that commit, or an ancestor with no input of the checks changed
+since.
+
+A run skips the build when an earlier green run covers the commit, or when an earlier run built and
+passed the same derivations, because Nix builds a derivation to the same result wherever it runs. So
+a quiet night costs no VM boot, and a merge whose checks a pull request's run already built costs
+none either. [The switch runbook](../../runbooks/workflows.md#check-the-host-before-a-switch) gives
+the commands.

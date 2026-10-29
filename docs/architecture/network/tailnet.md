@@ -20,14 +20,13 @@ visible change to the test as well.
 A tagged node holds only what a grant gives it, while a member's device reaches every device on any
 port except the host's k3s API.
 
-| Identity           | Holder                                        | Reaches                                                                     |
-| ------------------ | --------------------------------------------- | --------------------------------------------------------------------------- |
-| a member's device  | the owner's devices, the PC among them        | every device on any port but the host's k3s API; the host's HTTPS for nixie |
-| the PC (`home-pc`) | the owner's WSL node, where Pulumi runs       | the host's k3s API, beside a member's reach                                 |
-| `tag:cloud`        | the host's node, and through it every pod     | the PC's atc daemon; impd's node for HTTPS                                  |
-| `tag:imp`          | impd's node on the host                       | other `tag:imp` nodes' API                                                  |
-| `tag:imp-e2e`      | impz's end-to-end and dev nodes; impz owns it | other `tag:imp-e2e` nodes' API only                                         |
-| `tag:cloud-deploy` | the prod apply job's ephemeral runner node    | the host's k3s API only                                                     |
+| Identity           | Holder                                     | Reaches                                                                     |
+| ------------------ | ------------------------------------------ | --------------------------------------------------------------------------- |
+| a member's device  | the owner's devices, the PC among them     | every device on any port but the host's k3s API; the host's HTTPS for nixie |
+| the PC (`home-pc`) | the owner's WSL node, where Pulumi runs    | the host's k3s API, beside a member's reach                                 |
+| `tag:cloud`        | the host's node, and through it every pod  | the PC's atc daemon; impd's node for HTTPS                                  |
+| `tag:imp`          | impd's node on the host                    | other `tag:imp` nodes' API                                                  |
+| `tag:cloud-deploy` | the prod apply job's ephemeral runner node | the host's k3s API only                                                     |
 
 A pod has no tailnet identity of its own. Its traffic leaves through the host's node, so the tailnet
 sees the cluster as a whole as `tag:cloud`, and only the cluster's own egress policies narrow which
@@ -57,9 +56,9 @@ The host is the only `tag:cloud` node, so that grant lists member devices and th
 owner runs kubectl by hand on the host over Tailscale SSH, which needs no grant to the API port.
 
 impd's nodes reach each other's API only, which is what lets impd move an imp between hosts and
-nothing more. The end-to-end nodes reach each other and never a `tag:imp` node, so a test run can
-never touch a live impd. They join with keys from an OAuth client of their own, which can mint keys
-for that tag alone ([the imp e2e runbook](../../runbooks/imp-e2e-tailnet.md)).
+nothing more. imp's end-to-end suites run on tailnets that hold no production service, so the policy
+holds no tag and no grant for a test node, and a test run never reaches a live impd
+([imp's e2e nodes](../../runbooks/imp-e2e-tailnet.md)).
 
 The prod apply job's runner joins for one run as `tag:cloud-deploy`, through a federated identity
 that GitHub's token for the job proves, so no key for it is stored anywhere. The runner holds
@@ -75,20 +74,20 @@ and mints the host's and impd's auth keys with it.
 
 Kubernetes NetworkPolicies, which Pulumi creates beside the workloads, decide which pod on the host
 uses each `tag:cloud` grant and each port on the host's tailnet address. Every namespace holds a
-deny that refuses its pods the tailnet range and Docker's subnet, and leaves every other address
+deny that refuses its pods the tailnet range and Podman's subnet, and leaves every other address
 open, because a pod reaches the Kubernetes API on the host's public address. An allow beside each
 workload selects its pods by label and gives them back one address and port per destination.
 
-| Destination                                          | Through                    | Pods that may reach it                |
-| ---------------------------------------------------- | -------------------------- | ------------------------------------- |
-| the host's atc daemon, on the host's tailnet address | local delivery on the host | the atc gateway, the atc daemon probe |
-| the PC's atc daemon                                  | the grant to the PC        | the atc gateway, the atc daemon probe |
-| impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pod     |
-| the preview webhook, on the host's tailnet address   | local delivery on the host | cloudflared                           |
-| the preview links, on the host's tailnet address     | local delivery on the host | none                                  |
-| impd's plain API on Docker's subnet                  | the host's Docker bridge   | none                                  |
+| Destination                                          | Through                    | Pods that may reach it                                       |
+| ---------------------------------------------------- | -------------------------- | ------------------------------------------------------------ |
+| the host's atc daemon, on the host's tailnet address | local delivery on the host | the atc gateway, the atc daemon probe                        |
+| the PC's atc daemon                                  | the grant to the PC        | the atc gateway, the atc daemon probe                        |
+| impd's HTTPS on its node                             | the grants to impd's node  | the imp health probe, nixie's pod, nixie's sandbox image Job |
+| the preview webhook, on the host's tailnet address   | local delivery on the host | cloudflared                                                  |
+| the preview links, on the host's tailnet address     | local delivery on the host | none                                                         |
+| impd's plain API on Podman's subnet                  | the host's Podman bridge   | none                                                         |
 
-The host's own forward rule drops every pod's traffic to Docker's subnet beside the deny
+The host's own forward rule drops every pod's traffic to Podman's subnet beside the deny
 ([firewalls](./firewalls.md)). A pod on the host's network, such as the node exporter, sends from
 the host's own addresses, so no NetworkPolicy applies to it.
 

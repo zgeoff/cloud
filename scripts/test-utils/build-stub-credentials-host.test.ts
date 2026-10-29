@@ -68,12 +68,12 @@ test('it exits 120 for a missing saved token, as the real check script does', as
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      `'bash' '-s' '--' ${toShellArg(ctx.directory)} '7070' 'docker' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'`,
+      `'bash' '-s' '--' ${toShellArg(ctx.directory)} '7070' 'podman' 'exec' '-e' 'IMP_TOKEN' '-e' 'IMP_URL' 'imp-host' 'impz'`,
     ],
     { stdin: script },
   );
 
-  const cli = ['docker', 'exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz'];
+  const cli = ['podman', 'exec', '-e', 'IMP_TOKEN', '-e', 'IMP_URL', 'imp-host', 'impz'];
 
   const real = await runProcess(['bash', '-s', '--', ctx.directory, '7070', ...cli], {
     stdin: script,
@@ -96,7 +96,7 @@ test('it adds glm from the line on stdin and prints it with droppedGrants, as im
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      "'docker' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
+      "'podman' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
     ],
     { stdin: Buffer.from('zai_fixture_key\n') },
   );
@@ -105,8 +105,9 @@ test('it adds glm from the line on stdin and prints it with droppedGrants, as im
 
   expect(JSON.parse(result.stdout.toString())).toStrictEqual({
     name: 'glm',
-    kind: 'custom',
+    kind: 'static',
     rules: [{ host: 'api.z.ai', header: 'authorization', scheme: 'bearer' }],
+    env: [],
     imps: [],
     createdAt: '2026-10-07T12:00:00.000Z',
     droppedGrants: 0,
@@ -132,7 +133,7 @@ test('it mints atc-cloud into imp-token and impd’s tokens, with imp’s notice
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
+      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'podman' 'exec' 'imp-host' 'impz'",
     ],
     { stdin: script },
   );
@@ -177,7 +178,7 @@ test('it fails the mint as impd does, writing no file, when a secret atc-cloud m
       '-o',
       'ConnectTimeout=15',
       'root@geoffcloud',
-      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'docker' 'exec' 'imp-host' 'impz'",
+      "'bash' '-s' '--' '/var/lib/atc-daemon-secrets' 'podman' 'exec' 'imp-host' 'impz'",
     ],
     { stdin: script },
   );
@@ -188,7 +189,7 @@ test('it fails the mint as impd does, writing no file, when a secret atc-cloud m
   expect(scenario.tokens).toStrictEqual([]);
 });
 
-test('it fails docker exec as docker does when imp-host is stopped', async () => {
+test('it fails podman exec as podman does when imp-host is stopped', async () => {
   const stub = buildStubRunner(
     buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'info' })).answer,
   );
@@ -200,13 +201,13 @@ test('it fails docker exec as docker does when imp-host is stopped', async () =>
     '-o',
     'ConnectTimeout=15',
     'root@geoffcloud',
-    "'docker' 'exec' 'imp-host' 'impz' 'info' '--json'",
+    "'podman' 'exec' 'imp-host' 'impz' 'info' '--json'",
   ]);
 
-  expect(result.exitCode).toBe(1);
+  expect(result.exitCode).toBe(125);
 
   expect(result.stderr.toString()).toBe(
-    'Error response from daemon: container 4f6c0a2e9d1b7c4063034ef54c9cbfed806abcb7aee937d33c352266ea8718f6 is not running\n',
+    'Error: no container with name or ID "imp-host" found: no such container\n',
   );
 });
 

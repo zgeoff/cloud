@@ -28,7 +28,7 @@ const homePCDaemon = {
   port: topology.atc.daemonPort,
 };
 
-// every other pod in a namespace with egress deny is refused the tailnet range and Docker's subnet
+// every other pod in a namespace with egress deny is refused the tailnet range and Podman's subnet
 export const egressAllows = {
   atcGateway: {
     name: 'atc-gateway-egress',
@@ -52,6 +52,12 @@ export const egressAllows = {
     name: 'nixie-egress',
     namespace: 'nixie',
     podLabels: podLabels.nixie,
+    destinations: [impd],
+  },
+  nixieSandboxImages: {
+    name: 'nixie-sandbox-images-egress',
+    namespace: 'nixie',
+    podLabels: podLabels.nixieSandboxImages,
     destinations: [impd],
   },
   cloudflared: {

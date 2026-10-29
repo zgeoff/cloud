@@ -36,7 +36,7 @@ sops_nixie() {
     --user "$(id -u):$(id -g)" -e HOME=/tmp -e SOPS_AGE_KEY -v "$PWD/deploy/nixie:/w" -w /w --entrypoint /usr/local/bin/sops \
     "$NIXIE_IMAGE" "$@"
 }
-host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
+host_imp() { ssh root@geoffcloud podman exec -i imp-host impz "$@"; }
 ```
 
 `host_imp` sends its standard input over SSH, so a secret piped into it never reaches the host's
@@ -155,10 +155,8 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    For an upgrade, set `image` and `webImage` in the stack config `nixie` to the new release's tag
    and digest, from its release notes, in one PR. In the same PR, vendor the release's API contract
    with `bun run nixie:openapi <release_tag>`, so the type check fails on a procedure that the
-   deploy checks call and the release dropped or renamed. The type check fails on a procedure that
-   the release added, too, until you mark it as a read or a write in
-   `scripts/nixie-api/nixie-procedure-kinds.ts`. Mark it a read only when nixie's contract describes
-   it as changing nothing.
+   deploy checks call and the release dropped or renamed. A procedure that the release added and
+   that cloud does not call needs no change.
 
 2. Preview, then apply:
 
@@ -166,6 +164,13 @@ A new host key goes in `deploy/nixie/.sops.yaml`, followed by
    bun run preview -- --refresh
    bun run up
    ```
+
+   For a new nixie image, the apply first runs the Job that adds the release's sandbox images to
+   impd
+   ([sandbox images before a roll](../architecture/workloads/nixie.md#sandbox-images-before-a-roll)),
+   so the machine that applies needs `kubectl` and `bun`. Expect
+   `run-sandbox-image-job: job.batch/<job_name> added nixie's sandbox images` in the output of
+   `command:local:Command nixie-sandbox-images` before the StatefulSet updates.
 
 3. Check readiness from the host:
 
@@ -330,7 +335,7 @@ repository with a helper that runs restic in imp-host with impd's own settings:
 
 ```bash
 host_restic() {
-  ssh root@geoffcloud "docker exec imp-host sh -c 'export RESTIC_REPOSITORY=\$IMP_BACKUP_REPOSITORY RESTIC_PASSWORD_FILE=\$IMP_BACKUP_PASSWORD_FILE; restic $*'" < /dev/null
+  ssh root@geoffcloud "podman exec imp-host sh -c 'export RESTIC_REPOSITORY=\$IMP_BACKUP_REPOSITORY RESTIC_PASSWORD_FILE=\$IMP_BACKUP_PASSWORD_FILE; restic $*'" < /dev/null
 }
 host_restic snapshots --no-lock --json \
   | jq -r '.[] | select(any(.tags[]; startswith("imp=nixie-"))) | .short_id'
@@ -402,12 +407,13 @@ an apply would renew it.
 
 ## Failures
 
-| Symptom                                           | Cause                                    | Fix                                             |
-| ------------------------------------------------- | ---------------------------------------- | ----------------------------------------------- |
-| `imp_host` unready, `impd did not add the image`  | the token lacks nixie's image ref prefix | set it, as above                                |
-| `imp_host` unready, `FORBIDDEN` in logs           | the model secret is missing              | add it, as above                                |
-| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync` |
-| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe         |
-| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`     |
-| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                |
-| TLS error on the name                             | the certificate expired                  | `bun run up`                                    |
+| Symptom                                           | Cause                                    | Fix                                                                  |
+| ------------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------- |
+| `imp_host` unready, `impd did not add the image`  | the token lacks nixie's image ref prefix | set it, as above                                                     |
+| `imp_host` unready, `FORBIDDEN` in logs           | the model secret is missing              | add it, as above                                                     |
+| `definitions` unready                             | git-sync has no checkout yet             | `k3s kubectl -n nixie logs nixie-0 -c git-sync`                      |
+| `definitions` unready for minutes after a start   | nixie seeded before git-sync's checkout  | wait for nixie's next definitions probe                              |
+| the pod restarts with `sops could not decrypt`    | the host key is not a recipient          | add it to `.sops.yaml` and run `updatekeys`                          |
+| the pod restarts with `nixie refuses the secrets` | a key is missing from the file           | set it, as above                                                     |
+| TLS error on the name                             | the certificate expired                  | `bun run up`                                                         |
+| the apply fails at `nixie-sandbox-images`         | the Job did not add every sandbox image  | read the Job's log above the failure, fix its cause, and apply again |

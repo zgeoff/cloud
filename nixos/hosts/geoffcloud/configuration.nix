@@ -24,6 +24,9 @@ let
   previewLinkExposure = getHostPort "preview-link";
   previewWebhookExposure = getHostPort "preview-webhook";
   previewModelRouteExposure = getHostPort "preview-model-route";
+  impdMCPListenerExposure = getHostPort "impd-mcp-listener";
+  impdMCPRouteExposure = builtins.head (builtins.filter (entry: entry.name == "impd-mcp") exposure);
+  impdMCPListenerPort = toString impdMCPListenerExposure.port;
   # atc's daemon listens on the host's tailnet address; the gateway pod dials it there
   atcDaemonAddress = topology.tailnet.nodes.geoffcloud.address;
   atcDaemonPort = topology.atc.daemonPort;
@@ -116,7 +119,8 @@ in
   networking.usePredictableInterfaceNames = false;
 
   # Firewall: NixOS's own table (inet nixos-fw). flushRuleset must stay off:
-  # imp's module adds inet imp-forward, and k3s and Docker add their own.
+  # imp's module adds inet imp-forward, and k3s and netavark, Podman's network backend, add their
+  # own.
   networking.nftables = {
     enable = true;
     flushRuleset = false;
@@ -142,7 +146,7 @@ in
     # unless a rule allows it
     filterForward = true;
     # Pods (cni0, flannel.1) need forward too: trustedInterfaces covers input only.
-    # inet cloud_host drops their traffic to Docker's subnet first (cloudHost.forwardDrops
+    # inet cloud_host drops their traffic to Podman's subnet first (cloudHost.forwardDrops
     # below). imp's module accepts imp-host's own bridge, and drops its traffic to the k3s
     # ranges (services.imp.forwardDeny below).
     extraForwardRules = ''
@@ -191,32 +195,32 @@ in
         "flannel.1"
       ];
 
-  # No pod reaches Docker's subnet, imp-host's every port included: inside imp-host only its imps'
-  # taps are filtered, so from docker0's side impd's plain-HTTP API, sshd and the broker all
-  # answer. In iptables' FORWARD, kube-router's network-policy accept mark runs before DOCKER-USER
-  # and Docker's isolation drop, so a drop there would not hold. In nixos-fw, forward-allow accepts
-  # a DNAT'd flow before extraForwardRules, and only a new flow reaches it. A drop in inet
-  # cloud_host's forward chain is final whatever the other chains accept, and it is static, so it
-  # holds before kube-router programs a new pod.
+  # No pod reaches Podman's subnet, imp-host's every port included: inside imp-host only its imps'
+  # taps are filtered, so from podman0's side impd's plain-HTTP API, sshd and the broker all
+  # answer. In iptables' FORWARD, kube-router's network-policy accept mark would let a pod's flow
+  # past a drop there. In nixos-fw, forward-allow accepts a DNAT'd flow before extraForwardRules,
+  # and only a new flow reaches it. A drop in inet cloud_host's forward chain is final whatever the
+  # other chains accept, and it is static, so it holds before kube-router programs a new pod.
   # Every pod reaches impd at its tailnet name instead, which this drop does not match.
   networking.cloudHost.forwardDrops =
     map
       (interface: {
         inherit interface;
-        destinationCIDR = topology.docker.subnet;
+        destinationCIDR = topology.podman.subnet;
       })
       [
         "cni0"
         "flannel.1"
       ];
 
-  # 1Password Connect for imps, relayed from docker0 to the Service's pinned ClusterIP; the
-  # module admits docker0's subnet to the relay in cloud_host and opens its port on docker0
+  # 1Password Connect for imps, relayed from podman0 to the Service's pinned ClusterIP; the
+  # module admits podman0's subnet to the relay in cloud_host and opens its port on podman0
   services.onepassword-connect-relay = {
     enable = true;
-    address = topology.docker.bridgeAddress;
+    interface = topology.podman.bridge;
+    address = topology.podman.bridgeAddress;
     inherit (getHostPort "onepassword-connect-relay") port;
-    allowedSubnet = topology.docker.subnet;
+    allowedSubnet = topology.podman.subnet;
     target = "${topology.onePasswordConnect.clusterIP}:${toString topology.onePasswordConnect.port}";
   };
 
@@ -247,8 +251,8 @@ in
   };
 
   # imp: impd and Firecracker in the imp-host container, outside k3s. The module
-  # runs Docker and imports tank (vdb); the secrets are staged at install (runbook) and live on
-  # tank/cloud (services.tank-cloud.binds).
+  # runs imp-host under rootful Podman and imports tank (vdb); the secrets are staged at install
+  # (runbook) and live on tank/cloud (services.tank-cloud.binds).
   services.imp = {
     enable = true;
     zfs = {
@@ -262,13 +266,12 @@ in
     backupPasswordFile = "/var/lib/imp-host/secrets/backup-password";
     # pinned by digest: the module's default names only its release's tag, which a later push
     # could move
-    image = "ghcr.io/zgeoff/imp-host:2.11.0@sha256:116ecf51fbb2ba33aee2b11bb9e4fbc8d3ab7af4f4e2398888b89dd26a176836";
+    image = "ghcr.io/zgeoff/imp-host:6.0.2@sha256:007321150d53cf5ae3f03355b8a39d7a8a900eb99a4a98bd0af3b53e78e9f4d1";
     # the module's default ("imp") is taken in the tailnet
     settings.IMP_TAILSCALE_HOSTNAME = topology.tailnet.nodes.imp.hostname;
     # HTTPS on the tailnet only (imp#16): imps at <name>.imps.geoff.cloud, impd's API at
     # imps.geoff.cloud, a wildcard certificate by DNS-01. impd writes DNS-only A records
-    # for both names at the tailnet IP of imp's own node. imp.geoff.cloud stays free for imp's
-    # public MCP route. The token lives in dnsApiTokenFile (root-only, re-read on change, so
+    # for both names at the tailnet IP of imp's own node. The token lives in dnsApiTokenFile (root-only, re-read on change, so
     # a rotation needs no restart) and the ACME email in environmentFile, both installed by
     # scripts/install-imp-dns-token.sh. environmentFile must not also set IMP_DNS_API_TOKEN.
     settings.IMP_DOMAIN = topology.imp.domain;
@@ -286,6 +289,12 @@ in
       k3sPodCIDR
       k3sServiceCIDR
     ];
+    # impd's public MCP route (the registry's impd-mcp entry): impd opens its public listener only
+    # with this origin set, and imp-host publishes the listener on the host's loopback alone, where
+    # the TLS front below proxies the route's paths to it
+    settings.IMP_MCP_PUBLIC_URL = "https://${impdMCPRouteExposure.hostname}";
+    settings.IMP_MCP_PUBLIC_PORT = impdMCPListenerExposure.port;
+    publicPorts = [ "127.0.0.1:${impdMCPListenerPort}:${impdMCPListenerPort}" ];
   };
 
   # 2 MiB hugetlb pages for imp guest memory, made on demand up to the imps' RAM budget and freed
@@ -293,10 +302,34 @@ in
   # (docs/architecture/host/imp.md)
   boot.kernel.sysctl."vm.nr_overcommit_hugepages" = config.services.imp.ramBudgetMiB / 2;
 
-  # imps yield CPU to k3s and its pods rather than hold a cap (docs/architecture/host/imp.md). A
-  # change of daemon.json restarts docker.service, and imp-host with it.
-  virtualisation.docker.daemon.settings.cgroup-parent = "imp.slice";
-  systemd.slices.imp.sliceConfig.CPUWeight = 10;
+  # the TLS front on 443 for the registry's front routes (modules/public-front.nix). A hosted MCP
+  # client signs in and calls imp's tools through it, so each address gets a limit of its own:
+  # impd counts its limits per client and grant, never per address
+  services.public-front = {
+    enable = true;
+    routes = [ { inherit (impdMCPRouteExposure) hostname upstream paths; } ];
+    rateLimit = {
+      events = 120;
+      window = "1m";
+    };
+  };
+
+  # Podman's default network, which imp-host runs on, pinned to the topology's bridge and subnet:
+  # the Connect relay, the model route listener and the pod drops above name them
+  virtualisation.podman.defaultNetwork.settings = {
+    network_interface = topology.podman.bridge;
+    subnets = [
+      {
+        gateway = topology.podman.bridgeAddress;
+        inherit (topology.podman) subnet;
+      }
+    ];
+  };
+
+  # imps yield CPU to k3s and its pods rather than hold a cap (docs/architecture/host/imp.md).
+  # Rootful Podman puts each container's scope in machine.slice, and imp-host is the host's only
+  # container.
+  systemd.slices.machine.sliceConfig.CPUWeight = 10;
 
   # tank/cloud, the encrypted datasets on tank (modules/tank-cloud.nix, docs/runbooks/tank-cloud.md):
   # unlocked at boot from /var/lib/zfs-keys/tank.key. Each service here refuses to start while
@@ -386,7 +419,7 @@ in
       impPrefix = "harness-";
       # the agent image (docs/runbooks/agent-image.md) built from the commit that pins this
       # daemon's atc release, so hooks run the image's atc and no spawn copies the daemon's in
-      image = "agent-ebd31ff";
+      image = "agent-55e2666";
       guestATC = "/usr/local/bin/atc";
     };
     defaultTarget = "geoffcloud";
@@ -438,6 +471,8 @@ in
     principals = {
       # ChatGPT's connector, added 2026-10-04
       "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY".targets = [ "geoffcloud" ];
+      # a temporary Claude Code client for the gateway smoke spawn, added 2026-10-29
+      "A0XlYU4QYnkWUgXnE20HPQAMskU1fzsX".targets = [ "geoffcloud" ];
     };
   };
 
@@ -462,27 +497,35 @@ in
     spendCap = {
       enable = true;
       package = pkgs.callPackage ../../packages/counting-proxy.nix { };
-      address = topology.docker.bridgeAddress;
+      interface = topology.podman.bridge;
+      address = topology.podman.bridgeAddress;
       inherit (previewModelRouteExposure) port;
-      allowedSubnet = topology.docker.subnet;
+      allowedSubnet = topology.podman.subnet;
       # nixie's preview/config.yaml model profile
       model = "claude-haiku-5-5";
-      # Haiku 5.5's list prices for a prompt up to 100,000 tokens, as nixie's
-      # research/turn-tokens/report.ts gives them: a 5-minute cache write is 1.25 times the input
-      # price and a 1-hour write 2 times
+      # Haiku 5.5's list prices on Anthropic's pricing page: the base prices for a prompt up to
+      # 100,000 tokens, cache reads and writes included, and the long-prompt prices for a longer one
       prices = {
         input = 0.1;
         cache_write = 0.125;
         cache_write_1h = 0.2;
         cached_input = 0.01;
         output = 0.5;
+        long_prompt = {
+          over_tokens = 100000;
+          input = 0.5;
+          cache_write = 0.625;
+          cache_write_1h = 1;
+          cached_input = 0.05;
+          output = 2.5;
+        };
       };
     };
     # nixie's pull requests that change the Agent SDK's pin run its SDK contract suite
     contractRepos = [ "zgeoff/nixie" ];
     contractModelSecret = "preview-model";
-    # the imp-base release that images/agent/Dockerfile builds on; scripts/pin-imp.sh pins both
-    impRegistryImage = "ghcr.io/zgeoff/imp-base:2.11.0@sha256:8722fed7485bfe9eb55743ccf9bdcbb58734a27aacfece2488e02bfb7f82764e";
+    # the imp-base release that images/agent/Dockerfile builds on; the imp release pin moves both
+    impRegistryImage = "ghcr.io/zgeoff/imp-base:6.0.2@sha256:5631369252b1569e2822a45a8ab20edda94f0f53f3d0ac90071a5be5e3be55ad";
     webhookSecretFile = "/var/lib/tank-cloud/host-secrets/preview/webhook-secret";
     githubAppClientIDFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-client-id";
     githubAppKeyFile = "/var/lib/tank-cloud/host-secrets/preview/github-app-key";

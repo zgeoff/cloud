@@ -1,0 +1,20 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "adapters/sandbox-imp": {
+      "name": "@heynixie/sandbox-imp",
+      "version": "0.0.0",
+      "dependencies": {
+        "@impz/client": "catalog:",
+      },
+    },
+  },
+  "catalog": {
+    "@impz/client": "3.0.0",
+  },
+  "packages": {
+    "@impz/client": ["@impz/client@3.0.0", "", { "dependencies": { "zod": "^4.4.3" } }, "sha512-stub"],
+    "zod": ["zod@4.4.3", "", {}, "sha512-stub"],
+  }
+}

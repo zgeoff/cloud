@@ -3,5 +3,12 @@
   "compilerOptions": {
     "types": ["bun", "@zgeoff/bun-test-extended"]
   },
-  "include": ["infra/**/*.ts", "packages/**/*.ts", "*.js", "scripts/**/*.ts", "e2e/**/*.ts"]
+  "include": [
+    "infra/**/*.ts",
+    "packages/**/*.ts",
+    "*.js",
+    "scripts/**/*.ts",
+    "integration/**/*.ts",
+    "e2e/**/*.ts"
+  ]
 }

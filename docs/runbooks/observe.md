@@ -28,7 +28,6 @@ Query Loki from Grafana's Explore, with the `Loki` datasource:
 | ------------------------------ | ------------------------------------------------------------------------- |
 | impd                           | `{job="journal", unit="imp-host.service"}`                                |
 | impd errors and warnings       | `{job="journal", unit="imp-host.service"} \|~ "(?i)error\|fail\|warning"` |
-| imp's Docker API proxy         | `{job="journal", unit="imp-docker-proxy.service"}`                        |
 | k3s, tailscaled, any host unit | `{job="journal", unit="<unit>"}`                                          |
 | a pod                          | `{namespace="<namespace>", pod="<pod>"}`                                  |
 | cloudflared                    | `{namespace="ingress", container="cloudflared"}`                          |

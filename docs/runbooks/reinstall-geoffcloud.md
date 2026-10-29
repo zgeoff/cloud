@@ -52,8 +52,8 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
    chmod 400 $x/var/lib/imp-host/secrets/*
    ```
 
-   The three imp files map to `services.imp.tailscaleAuthKeyFile`, `services.imp.environmentFile` (a
-   Docker env file: `KEY=value`, no quotes) and `services.imp.backupPasswordFile`.
+   The three imp files map to `services.imp.tailscaleAuthKeyFile`, `services.imp.environmentFile`
+   (an env file: `KEY=value`, no quotes) and `services.imp.backupPasswordFile`.
 
    imp's node normally restarts from its saved state in `tank/imp`. A missing or used key only
    warns.
@@ -85,7 +85,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 4. Stop imp on the old host, and export its pool, so that NixOS imports `tank` cleanly:
 
    ```sh
-   ssh root@104.250.100.18 'docker stop imp-host && zpool export tank'
+   ssh root@104.250.100.18 'systemctl stop imp-host && zpool export tank'
    ```
 
    If the export reports the pool as busy, find the process that holds it, stop it, and export
@@ -108,7 +108,7 @@ restore the Ubuntu host. Through the API: `POST /vm/<vm-id>/snapshot?team_id=<te
 6. Remove the staged key: `rm -rf /tmp/geoffcloud-extra`.
 7. Check the host over the tailnet: `ssh root@geoffcloud`, then `zpool status`,
    `zfs get -H -o value keystatus tank/cloud` (expect `available`), `k3s kubectl get nodes`,
-   `tailscale status` and `docker exec imp-host impz info`.
+   `tailscale status` and `podman exec imp-host impz info`.
 
    **NOTE:** The installed host keeps port 22 shut on its public interface, whatever the edge
    allows, so the tailnet is its only SSH path. If the host does not join the tailnet, reach it

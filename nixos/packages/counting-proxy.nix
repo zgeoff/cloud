@@ -7,9 +7,9 @@
   fetchurl,
 }:
 let
-  version = "0.41.0";
+  version = "0.42.0";
   # sha256sum of the release's counting-proxy-linux-x64, which matches the asset's GitHub digest
-  sha256 = "0cd80058073ea0777c90e72b90dbef175f9082d9b1c347a036074f1705fa2c50";
+  sha256 = "9d699fd1eb6bfcba6a2fdd99e70667755fe29bb1b240f791cf5cc193800cf8cc";
 in
 stdenv.mkDerivation {
   pname = "counting-proxy";

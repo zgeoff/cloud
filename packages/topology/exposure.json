@@ -53,9 +53,9 @@
       "protocol": "tcp",
       "port": 18081,
       "scope": "host",
-      "interface": "docker0",
+      "interface": "podman0",
       "admission": true,
-      "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from docker0's subnet only"
+      "reason": "imp-host's containers reach 1Password Connect through the host's relay, which inet cloud_host admits from podman0's subnet only"
     },
     {
       "name": "preview-link",
@@ -81,9 +81,9 @@
       "protocol": "tcp",
       "port": 18082,
       "scope": "host",
-      "interface": "docker0",
+      "interface": "podman0",
       "admission": true,
-      "reason": "imp-host's broker sends each preview's model calls to the preview service's model route listener, which inet cloud_host admits from docker0's subnet only, so each call passes its preview's counting proxy"
+      "reason": "imp-host's broker sends each preview's model calls to the preview service's model route listener, which inet cloud_host admits from podman0's subnet only, so each call passes its preview's counting proxy"
     },
     {
       "name": "grafana",
@@ -100,6 +100,24 @@
       "port": 443,
       "scope": "tailnet",
       "reason": "nixie's Traefik ingress, which holds the host port on the host's tailnet address only: nixie.geoff.cloud points at that address"
+    },
+    {
+      "name": "public-front",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 443,
+      "scope": "public",
+      "edge": "HTTPS to the host's TLS front for its public routes",
+      "reason": "The host's TLS front, Caddy, serves each front-route entry's hostname on the public addresses. It also gets its certificates here, by TLS-ALPN-01, so port 80 stays shut"
+    },
+    {
+      "name": "impd-mcp-listener",
+      "kind": "host-port",
+      "protocol": "tcp",
+      "port": 7071,
+      "scope": "host",
+      "interface": "lo",
+      "reason": "impd's public MCP listener, which imp-host publishes on the host's loopback only, so only the TLS front reaches it"
     },
     {
       "name": "k3s-api",
@@ -134,11 +152,25 @@
       "auth": "Reads are public by an unguessable 22-character ID. Each write needs a bearer token that the service checks against hashes of the agent and owner tokens. Access stays off, because camo cannot sign in."
     },
     {
-      "name": "imp",
-      "kind": "tunnel-hostname",
+      "name": "impd-mcp",
+      "kind": "front-route",
       "hostname": "imp.geoff.cloud",
-      "scope": "reserved",
-      "reason": "Held for imp's own public MCP route: the /mcp and OAuth paths only, once imp has an OAuth boundary of its own"
+      "upstream": "127.0.0.1:7071",
+      "paths": [
+        "/mcp",
+        "/.well-known/oauth-authorization-server",
+        "/.well-known/oauth-protected-resource",
+        "/.well-known/oauth-protected-resource/mcp",
+        "/oauth2/authorize",
+        "/oauth2/token",
+        "/oauth2/revoke",
+        "/login",
+        "/consent",
+        "/error"
+      ],
+      "scope": "public",
+      "reason": "A hosted assistant signs in to imp over OAuth and calls imp's MCP tools. The front passes impd's MCP, OAuth and discovery paths only, and impd's public listener answers no other route",
+      "auth": "impd's own OAuth 2.1 server: each MCP call needs an access token from a grant that a named imp token approved, for a client that the operator added"
     },
     {
       "name": "health-check-workers-dev",

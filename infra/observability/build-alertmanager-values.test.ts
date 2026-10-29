@@ -108,3 +108,22 @@ test('it routes alerts to Discord through the mounted Secret, restarts the pod w
     },
   });
 });
+
+test("it holds a new group for the given wait at the root and on the sign-in alerts' route", () => {
+  const values = buildAlertmanagerValues(
+    {
+      secretName: 'alertmanager-discord',
+      file: '/etc/alertmanager/secrets/alertmanager-discord/webhook-url',
+      mentionTemplateFile: '/etc/alertmanager/secrets/alertmanager-discord/mention.tmpl',
+      checksum: '5d41402abc4b2a76b9719d911017c592ae0b0b6f7a4e1c3f3b8d4f5c6a7b8c9d',
+    },
+    { groupWait: '1s' },
+  );
+
+  expect(values.config.route.group_wait).toBe('1s');
+
+  expect(values.config.route.routes).toPartiallyContain({
+    receiver: 'discord-sign-in',
+    group_wait: '1s',
+  });
+});

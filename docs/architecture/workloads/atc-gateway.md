@@ -98,12 +98,13 @@ The cloud daemon is a NixOS service on the host, running an unpatched atc releas
 pins by checksum. It stays byte-identical to the release because an imp target copies the daemon's
 own binary into a guest whose image ships another atc release. It listens on the host's tailnet
 address, and systemd hands it two tokens as credentials: the bearer the gateway must present, and
-the impd token it uses itself. systemd copies both when the service starts, so a rotated token
-reaches the daemon only after a restart; a reload rereads the old copy. The bearer comes from one
-1Password item that both the gateway's Secret and the host's file take, and the daemon's file holds
-one token or two, so a rotation needs no outage: add the new token to the host's file beside the old
-one and restart the daemon, apply so the gateway rolls onto the new token, then remove the old one
-and restart again.
+the impd token it uses itself. systemd copies both when the service starts, and the service then
+copies the bearer into its runtime directory on tmpfs, owned by the daemon's user with mode 0600,
+because atc refuses a token file that another user owns. So a rotated token reaches the daemon only
+after a restart; a reload rereads the old copy. The bearer comes from one 1Password item that both
+the gateway's Secret and the host's file take, and the daemon's file holds one token or two, so a
+rotation needs no outage: add the new token to the host's file beside the old one and restart the
+daemon, apply so the gateway rolls onto the new token, then remove the old one and restart again.
 
 The daemon has one execution target, impd on the host's loopback, and names every imp it creates
 with a fixed prefix. Its impd token can create, wake and destroy only imps with that prefix, so a

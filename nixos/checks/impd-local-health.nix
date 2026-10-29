@@ -1,6 +1,6 @@
 # Checks services.impd-local-health: the units the module generates, each case evaluating its
 # own config through test-utils/build-module-system.nix, and the probe script run against a
-# stand-in impd (test-utils/run-stub-impd.py, started by test-utils/start-stub-impd.sh) in the
+# stand-in impd (test-utils/run-stub-impd.py, started by test-utils/start-stub-server.sh) in the
 # build sandbox, or, for the timeout it gives curl, with a stand-in curl that records its call
 # (test-utils/build-stub-curl.nix) and answers at once. Each case runs on its own, in a fresh
 # directory, with its own stand-in on an ephemeral port or its own call log, its own textfile
@@ -222,7 +222,7 @@ let
       title = "it reports impd up when /health answers 200 with ready true";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         before=$(date +%s)
@@ -258,7 +258,7 @@ let
       title = "it reports impd down when /health answers 200 with ready false";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":false,"warnings":[]}' "$PWD/requests"
 
         before=$(date +%s)
@@ -294,7 +294,7 @@ let
       title = "it reports impd up when /health answers 200 with ready true in JSON spaced over lines";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{ "status": "ok", "ready": true }' "$PWD/requests"
 
         status=0
@@ -309,7 +309,7 @@ let
       title = "it reports impd down when /health answers 200 with a body that names ready true but is not JSON";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'text/html;charset=utf-8' '<p>"ready":true</p>' "$PWD/requests"
 
         status=0
@@ -324,7 +324,7 @@ let
       title = "it reports impd down with the status when no route matches /health";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 404 'text/plain;charset=utf-8' NOT_FOUND "$PWD/requests"
 
         before=$(date +%s)
@@ -360,7 +360,7 @@ let
       title = "it reports impd down when /health answers 500 even with ready true";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 500 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         before=$(date +%s)
@@ -397,7 +397,7 @@ let
       script = ''
         mkdir home tmp out
         # a port that answered once and is closed now
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
         kill "$stub_pid"
         wait "$stub_pid" || true
@@ -435,7 +435,7 @@ let
       title = "it reports status 0 when impd takes the connection and never answers";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-hung-impd.py}
+        start_stub_server ${./test-utils/run-stub-hung-impd.py}
 
         before=$(date +%s)
         status=0
@@ -546,7 +546,7 @@ let
       title = "it replaces an existing file with a new one, never writing it in place";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
         printf 'impd_local_health_up 0\n' > out/impd_local_health.prom
         old_inode=$(stat -c %i out/impd_local_health.prom)
@@ -605,7 +605,7 @@ let
       title = "it fails, writing nothing, without a textfile directory";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         status=0
@@ -624,7 +624,7 @@ let
       title = "it fails, leaving no temp file, when the textfile directory does not exist";
       script = ''
         mkdir home tmp
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
 
         status=0
@@ -643,7 +643,7 @@ let
       title = "it fails, leaving the directory empty, when the textfile directory is not writable";
       script = ''
         mkdir home tmp out
-        start_stub_impd ${./test-utils/run-stub-impd.py} \
+        start_stub_server ${./test-utils/run-stub-impd.py} \
           /health 200 'application/json;charset=utf-8' '{"status":"ok","ready":true,"warnings":[]}' "$PWD/requests"
         # the build user is not root, so 0555 holds
         chmod 0555 out
@@ -684,7 +684,7 @@ pkgs.runCommand "impd-local-health-check"
     source ${testLib}/assert-files-equal.sh
     source ${testLib}/assert-between.sh
     source ${testLib}/assert-missing.sh
-    source ${./test-utils/start-stub-impd.sh}
+    source ${./test-utils/start-stub-server.sh}
     source ${pkgs.writeText "impd-local-health-cases.sh" (renderCases cases)}
     run_cases
     touch $out

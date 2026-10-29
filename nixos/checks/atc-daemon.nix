@@ -4,6 +4,8 @@
 # through test-utils/build-module-system.nix, most as buildDaemonSystem's valid config with the
 # options the case sets. Each runs on its own, in a fresh directory, under
 # test-support/shell/run-cases.sh, which reports each case and fails the check when any case fails.
+# No case starts atc, so a token file that atc refuses at start passes here: atc-daemon-vm starts
+# the daemon as the host does.
 # Run: bun run test:nixos atc-daemon
 {
   nixpkgs,
@@ -20,6 +22,10 @@ let
   collectFailedAssertions = import ./test-utils/collect-failed-assertions.nix;
 
   atc = pkgs.callPackage ../packages/atc.nix { };
+  # the first of a service's ExecStartPre: the script that links config.json
+  linkScriptOf = service: builtins.head service.serviceConfig.ExecStartPre;
+  # replaces the store paths of the link and staging scripts with LINK and STAGE
+  maskScripts = "sed -E 's|/nix/store/[a-z0-9]{32}-atc-daemon-link-config|LINK|; s|/nix/store/[a-z0-9]{32}-atc-daemon-stage-gateway-token|STAGE|'";
   # the module's system for a valid services.atc-daemon: one target, granted to one principal and
   # named as the default; a case passes, as <options>, each option its scenario sets
   buildDaemonSystem =
@@ -45,7 +51,7 @@ let
 
   cases = [
     {
-      title = "it runs atc daemon on the listen address with both tokens as credentials, hardened, restarting when config.json changes";
+      title = "it runs atc daemon on the listen address with both tokens as credentials and the gateway token staged in its runtime directory, hardened, restarting when config.json changes";
       script =
         let
           service = (buildDaemonSystem { }).config.systemd.services.atc-daemon;
@@ -67,12 +73,17 @@ let
               XDG_RUNTIME_DIR = "/run/atc-daemon";
             };
             serviceConfig = {
-              ExecStart = "${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file %d/gateway-token";
+              ExecStartPre = [
+                "LINK"
+                "STAGE"
+              ];
+              ExecStart = "${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file /run/atc-daemon/gateway-token";
               User = "atc";
               Group = "atc";
               StateDirectory = "atc-daemon";
               StateDirectoryMode = "0700";
               RuntimeDirectory = "atc-daemon";
+              RuntimeDirectoryMode = "0700";
               BindReadOnlyPaths = [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2:/lib64/ld-linux-x86-64.so.2" ];
               LoadCredential = [
                 "gateway-token:/run/fixture/gateway-token"
@@ -100,10 +111,11 @@ let
           }}
           EOF
 
-          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${service.serviceConfig.ExecStartPre})
-          # NixOS adds PATH to every service's environment; ExecStartPre is the link script, a
-          # store path the module builds, whose content case "it links a config.json ..." checks
-          jq -S . <<'EOF' | sed "s|$config|CONFIG|g" > actual
+          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${linkScriptOf service})
+          # NixOS adds PATH to every service's environment; ExecStartPre holds the link and staging
+          # scripts, store paths the module builds: case "it links a config.json ..." checks the
+          # first, and atc-daemon-vm runs the second
+          jq -S . <<'EOF' | sed "s|$config|CONFIG|g" | ${maskScripts} > actual
           ${builtins.toJSON {
             inherit (service)
               description
@@ -113,7 +125,7 @@ let
               restartTriggers
               ;
             environment = removeAttrs service.environment [ "PATH" ];
-            serviceConfig = removeAttrs service.serviceConfig [ "ExecStartPre" ];
+            inherit (service) serviceConfig;
           }}
           EOF
 
@@ -178,7 +190,7 @@ let
           }
           EOF
 
-          script=${system.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre}
+          script=${linkScriptOf system.config.systemd.services.atc-daemon}
           config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) /var/lib/atc-daemon/\.config/atc/config\.json$|\1|p' "$script")
           sed "s|$config|CONFIG|" "$script" > actual-script
           jq -S . "$config" > actual
@@ -196,12 +208,17 @@ let
         ''
           jq -S . > expected <<'EOF'
           ${builtins.toJSON {
-            ExecStart = "${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file %d/gateway-token";
+            ExecStartPre = [
+              "LINK"
+              "STAGE"
+            ];
+            ExecStart = "${atc}/bin/atc daemon --listen 100.64.0.1:8415 --token-file /run/atc-daemon/gateway-token";
             User = "atc";
             Group = "atc";
             StateDirectory = "atc-daemon";
             StateDirectoryMode = "0700";
             RuntimeDirectory = "atc-daemon";
+            RuntimeDirectoryMode = "0700";
             BindReadOnlyPaths = [ "${pkgs.glibc}/lib/ld-linux-x86-64.so.2:/lib64/ld-linux-x86-64.so.2" ];
             LoadCredential = [ "gateway-token:/run/fixture/gateway-token" ];
             Restart = "on-failure";
@@ -225,11 +242,9 @@ let
           }}
           EOF
 
-          # ExecStartPre is the link script, whose content case "it links a config.json ..." checks
-          jq -S . > actual <<'EOF'
-          ${builtins.toJSON (
-            removeAttrs system.config.systemd.services.atc-daemon.serviceConfig [ "ExecStartPre" ]
-          )}
+          # ExecStartPre holds the link and staging scripts, which the first case's comment covers
+          jq -S . <<'EOF' | ${maskScripts} > actual
+          ${builtins.toJSON system.config.systemd.services.atc-daemon.serviceConfig}
           EOF
 
           assert_files_equal expected actual
@@ -256,7 +271,7 @@ let
           }
           EOF
 
-          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${system.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre})
+          config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${linkScriptOf system.config.systemd.services.atc-daemon})
           jq -S . "$config" > actual
 
           assert_files_equal expected actual
@@ -430,11 +445,14 @@ let
             }
           },
           "defaultTarget": "geoffcloud",
-          "principals": { "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] } },
+          "principals": {
+            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
+            "A0XlYU4QYnkWUgXnE20HPQAMskU1fzsX": { "targets": ["geoffcloud"] }
+          },
           "targets": {
             "geoffcloud": {
               "guestATC": "/usr/local/bin/atc",
-              "image": "agent-ebd31ff",
+              "image": "agent-55e2666",
               "impPrefix": "harness-",
               "provider": "imp",
               "tokenFile": "/run/credentials/atc-daemon.service/imp-token",
@@ -444,7 +462,7 @@ let
         }
         EOF
 
-        config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${geoffcloud.config.systemd.services.atc-daemon.serviceConfig.ExecStartPre})
+        config=$(sed -n 's|^ln -sfn \(/nix/store/[a-z0-9]\{32\}-atc-daemon-config\.json\) .*$|\1|p' ${linkScriptOf geoffcloud.config.systemd.services.atc-daemon})
         jq -S . "$config" > actual
 
         assert_files_equal expected actual

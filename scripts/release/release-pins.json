@@ -1,44 +1,44 @@
 {
   "atc-agent": {
-    "version": "7.2.0",
-    "sum": "af0ccae8107ae263000737dbec511226351bfbc5bae6dd0e4af107e469860b95"
+    "version": "7.5.1",
+    "sum": "dc661496144cc96c703246f7cf80ff312033232cb4cefd6e6fb52510621cf540"
   },
   "atc-daemon": {
-    "version": "7.2.0",
-    "sum": "af0ccae8107ae263000737dbec511226351bfbc5bae6dd0e4af107e469860b95"
+    "version": "7.5.1",
+    "sum": "dc661496144cc96c703246f7cf80ff312033232cb4cefd6e6fb52510621cf540"
   },
   "atc-gateway": {
-    "version": "7.2.0",
-    "sum": "c4bd10714624de74d1ee5f9cc057ba690be89cc1b20e635bb864195e6a2cbec0",
-    "tag": "7.2.0"
+    "version": "7.5.1",
+    "sum": "143a1824770c9582e480605646844979d69487910e0e59a06f4ec9ca6715f073",
+    "tag": "7.5.1"
   },
   "atc-gateway-image": {
-    "version": "7.2.0",
-    "digest": "sha256:e53efb6cb0beeec07721454c47c4ba87fe94a1dd12ab47dc3b8e53bf9a3734ad"
+    "version": "7.5.0",
+    "digest": "sha256:792cfc452328c6ca55d77b1b062ed9ca01718ace6b6103f56ac207caf669aa69"
   },
   "atc-gateway-backup-image": {
     "tag": "2.24.0-r2",
     "digest": "sha256:ac47d4a0409e81be7304c46372f2d855083cd45315fe30529dc3279ccae9f377"
   },
   "imp-host": {
-    "version": "2.11.0",
-    "digest": "sha256:116ecf51fbb2ba33aee2b11bb9e4fbc8d3ab7af4f4e2398888b89dd26a176836",
-    "commit": "368efb8d"
+    "version": "6.0.2",
+    "digest": "sha256:007321150d53cf5ae3f03355b8a39d7a8a900eb99a4a98bd0af3b53e78e9f4d1",
+    "commit": "41e535a6"
   },
   "imp-base": {
-    "version": "2.11.0",
-    "digest": "sha256:8722fed7485bfe9eb55743ccf9bdcbb58734a27aacfece2488e02bfb7f82764e"
+    "version": "6.0.2",
+    "digest": "sha256:5631369252b1569e2822a45a8ab20edda94f0f53f3d0ac90071a5be5e3be55ad"
   },
   "nixie": {
-    "version": "0.41.0",
-    "digest": "sha256:7755b0f04afa21c040484770d060fe80c4dda30edd2bfb1a1323268701b8ca5a"
+    "version": "0.54.0",
+    "digest": "sha256:008d0dd79b8945bd472905998a420847160c298ba0a4fdc2b5f9dee15280c100"
   },
   "nixie-web": {
-    "version": "0.41.0",
-    "digest": "sha256:440c8354d537a9423d43aca49d46011fa5fffa33566d67414d9e20725d88ea32"
+    "version": "0.54.0",
+    "digest": "sha256:442e816c7ba3b4570fb4ff0e148ef68aabffc2cd6ba006f3dc143f32338a2deb"
   },
   "auto-mode": {
-    "version": "3.0.1",
-    "sum": "b0224e465641461e9594021f2dc7af1c09e37f93cd7947f91283cd9bee6ff07a"
+    "version": "3.1.5",
+    "sum": "c3ed8b12722ccbec4d66567eb6c69dd12f367925cc1dbf9688abd310efc9f67e"
   }
 }

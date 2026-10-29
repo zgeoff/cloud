@@ -9,8 +9,9 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
 import { composeFiles } from './mocks/github-state.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { runPreviewBoot } from './run-preview-boot.ts';
+import { processDeps } from './test-utils/process-deps.ts';
+import { runBoundedProcess } from './test-utils/run-bounded-process.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
 
@@ -55,7 +56,7 @@ async function setupTest() {
     },
     spendProxies: null,
     store,
-    impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
+    impd: buildImpdClient(impd.url, impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),
@@ -454,22 +455,16 @@ test("it writes the route into the stack's .env after the commit's own lines, so
     },
   );
 
-  const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+  const guest = await runBoundedProcess(processDeps, {
+    name: "the boot's guest script",
+    argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
     env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
-    stdout: 'pipe',
-    stderr: 'pipe',
+    timeoutMs: 2000,
   });
 
-  ctx.stack.defer(async () => {
-    guest.kill();
-
-    await guest.exited;
-  });
-
-  const exitCode = await guest.exited;
   const written = await Bun.file(join(checkout, 'preview', '.env')).text();
 
-  expect(exitCode).toBe(0);
+  expect(guest.exitCode).toBe(0);
   expect(written).toBe('NIXIE_PREVIEW_BIND=0.0.0.0\nPREVIEW_MODEL_ROUTE=pv-0a1b2c3d-17\n');
 });
 
@@ -538,22 +533,26 @@ test.skipIf(Bun.which('docker') === null)(
       },
     );
 
-    const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+    await runBoundedProcess(processDeps, {
+      name: "the boot's guest script",
+      argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
       env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
+      timeoutMs: 500,
     });
 
-    ctx.stack.defer(async () => {
-      guest.kill();
-
-      await guest.exited;
+    // `docker compose config` has taken from 0.2 s to over 3.5 s on CI runners, while the guest
+    // script's local git work takes under 0.1 s; the two bounds keep the case under its 5 s limit
+    const composeConfig = await runBoundedProcess(processDeps, {
+      name: 'docker compose config',
+      argv: ['docker', 'compose', 'config', '--format', 'json'],
+      cwd: join(checkout, 'preview'),
+      env: { PATH: process.env['PATH'] ?? '', HOME: ctx.directory },
+      timeoutMs: 4400,
     });
 
-    await guest.exited;
+    const config: unknown = JSON.parse(composeConfig.stdout);
 
-    const config: unknown = await Bun.$`docker compose config --format json`
-      .cwd(join(checkout, 'preview'))
-      .env({ PATH: process.env['PATH'] ?? '', HOME: ctx.directory })
-      .json();
+    expect(composeConfig.exitCode).toBe(0);
 
     expect(config).toMatchObject({
       services: { nixie: { environment: { NIXIE_PREVIEW_MODEL_ROUTE: 'pv-0a1b2c3d-17' } } },
@@ -610,22 +609,16 @@ test("it leaves no route in the stack's .env once the previews run without count
     },
   );
 
-  const guest = Bun.spawn([...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout], {
+  const guest = await runBoundedProcess(processDeps, {
+    name: "the boot's guest script",
+    argv: [...(ctx.impd.commands[0]?.argv.slice(3, -1) ?? []), checkout],
     env: { ...gitEnv, PATH: `${join(ctx.directory, 'bin')}:${gitEnv.PATH}`, HOME: ctx.directory },
-    stdout: 'pipe',
-    stderr: 'pipe',
+    timeoutMs: 2000,
   });
 
-  ctx.stack.defer(async () => {
-    guest.kill();
-
-    await guest.exited;
-  });
-
-  const exitCode = await guest.exited;
   const written = await Bun.file(join(checkout, 'preview', '.env')).text();
 
-  expect(exitCode).toBe(0);
+  expect(guest.exitCode).toBe(0);
   expect(written).toBe('');
 });
 

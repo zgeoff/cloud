@@ -104,7 +104,7 @@ latest green build of `main` for over a day. [Switch the host](./workflows.md#sw
 the switch. A `system` part on a host that runs `main`'s build means a switch that did not go
 through `scripts/switch-geoffcloud.sh`, such as a rollback, which leaves no switch record: the next
 switch records one. An `imp` part on a current system means imp-host runs another imp than its pin,
-or does not answer: compare `ssh root@geoffcloud docker exec imp-host impz info` with the pin, and
+or does not answer: compare `ssh root@geoffcloud podman exec imp-host impz info` with the pin, and
 check `ssh root@geoffcloud systemctl status imp-host`.
 
 `HostBuildLagStale` means the check stopped reporting, or that the host runs a build without it.

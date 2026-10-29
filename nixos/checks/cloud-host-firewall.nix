@@ -33,9 +33,9 @@ let
               networking.cloudHost.admissions = [
                 {
                   port = 18081;
-                  interface = "docker0";
-                  sourceCIDR = "172.17.0.0/16";
-                  destinationAddress = "172.17.0.1";
+                  interface = "podman0";
+                  sourceCIDR = "10.88.0.0/16";
+                  destinationAddress = "10.88.0.1";
                 }
                 {
                   port = 8415;
@@ -55,7 +55,7 @@ let
             type filter hook input priority filter - 10; policy accept;
             tcp dport 8415 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.64.0.1 accept
             tcp dport 8415 drop
-            tcp dport 18081 iifname "docker0" ip saddr 172.17.0.0/16 ip daddr 172.17.0.1 accept
+            tcp dport 18081 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
             tcp dport 18081 drop
           }
           EOF
@@ -243,7 +243,7 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "networking.cloudHost needs networking.nftables.enable: inet cloud_host is an nftables table"
-                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and Docker"
+                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark"
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
@@ -261,11 +261,11 @@ let
             networking.cloudHost.forwardDrops = [
               {
                 interface = "flannel.1";
-                destinationCIDR = "172.17.0.0/16";
+                destinationCIDR = "10.88.0.0/16";
               }
               {
                 interface = "cni0";
-                destinationCIDR = "172.17.0.0/16";
+                destinationCIDR = "10.88.0.0/16";
               }
             ];
           };
@@ -278,8 +278,8 @@ let
           assert_files_equal - actual <<'EOF'
           chain forward {
             type filter hook forward priority filter - 10; policy accept;
-            iifname "cni0" ip daddr 172.17.0.0/16 drop
-            iifname "flannel.1" ip daddr 172.17.0.0/16 drop
+            iifname "cni0" ip daddr 10.88.0.0/16 drop
+            iifname "flannel.1" ip daddr 10.88.0.0/16 drop
           }
           EOF
           assert_equals '[]' ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
@@ -339,7 +339,7 @@ let
             networking.cloudHost.forwardDrops = [
               {
                 interface = "cni0";
-                destinationCIDR = "172.17.0.0/16";
+                destinationCIDR = "10.88.0.0/16";
               }
             ];
           };
@@ -349,14 +349,14 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "networking.cloudHost needs networking.nftables.enable: inet cloud_host is an nftables table"
-                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and Docker"
+                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark"
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"
         '';
     }
     {
-      title = "it closes SSH on geoffcloud to the pod interfaces and drops their forwarded traffic to the Docker subnet, in a table nft accepts";
+      title = "it closes SSH on geoffcloud to the pod interfaces and drops their forwarded traffic to the Podman subnet, in a table nft accepts";
       script =
         let
           table = geoffcloud.config.networking.nftables.tables.cloud_host;
@@ -379,15 +379,15 @@ let
             tcp dport 8415 drop
             tcp dport 8418 iifname "cni0" ip saddr 10.42.0.0/16 ip daddr 100.69.47.33 accept
             tcp dport 8418 drop
-            tcp dport 18081 iifname "docker0" ip saddr 172.17.0.0/16 ip daddr 172.17.0.1 accept
+            tcp dport 18081 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
             tcp dport 18081 drop
-            tcp dport 18082 iifname "docker0" ip saddr 172.17.0.0/16 ip daddr 172.17.0.1 accept
+            tcp dport 18082 iifname "podman0" ip saddr 10.88.0.0/16 ip daddr 10.88.0.1 accept
             tcp dport 18082 drop
           }
           chain forward {
             type filter hook forward priority filter - 10; policy accept;
-            iifname "cni0" ip daddr 172.17.0.0/16 drop
-            iifname "flannel.1" ip daddr 172.17.0.0/16 drop
+            iifname "cni0" ip daddr 10.88.0.0/16 drop
+            iifname "flannel.1" ip daddr 10.88.0.0/16 drop
           }
           EOF
           # the build sandbox grants no netlink, so nft checks against the Linux kernel library
@@ -420,7 +420,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and Docker"
+                "networking.cloudHost needs networking.nftables.flushRuleset off: a flush drops the tables of imp, k3s and netavark"
               ]
             )
           } ${lib.escapeShellArg (builtins.toJSON (collectFailedAssertions system))} "failed assertions"

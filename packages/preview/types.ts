@@ -69,12 +69,16 @@ export interface SpendSettings {
   readonly idleMs: number;
 }
 
-export interface SpendPrices {
+interface SpendRates {
   readonly input: number;
   readonly cache_write: number;
   readonly cache_write_1h: number;
   readonly cached_input: number;
   readonly output: number;
+}
+
+export interface SpendPrices extends SpendRates {
+  readonly long_prompt?: (SpendRates & { readonly over_tokens: number }) | undefined;
 }
 
 export interface PreviewDeps {

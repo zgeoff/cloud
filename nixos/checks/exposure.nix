@@ -30,6 +30,7 @@ let
   firewallModules = {
     imports = [
       ../modules/cloud-host-firewall.nix
+      ../modules/public-front.nix
       imp.nixosModules.imp
     ];
   };
@@ -52,13 +53,13 @@ let
               flushRuleset = false;
             };
             networking.firewall.allowedUDPPorts = [ 41641 ];
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 18081 ];
             networking.cloudHost.admissions = [
               {
                 port = 18081;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "podman0";
+                sourceCIDR = "10.88.0.0/16";
+                destinationAddress = "10.88.0.1";
               }
             ];
           };
@@ -85,7 +86,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
               {
@@ -448,7 +449,7 @@ let
               flushRuleset = false;
             };
             networking.firewall.trustedInterfaces = [ "cni0" ];
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 18081 ];
             networking.cloudHost.admissions = [
               {
                 port = 8415;
@@ -463,7 +464,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "tcp 18081 is open on docker0 with no host-scope registry entry for docker0"
+                "tcp 18081 is open on podman0 with no host-scope registry entry for podman0"
                 "inet cloud_host admits tcp 8415 on cni0 with no host-scope registry entry that marks the admission"
               ]
             )
@@ -492,14 +493,14 @@ let
       script =
         let
           system = buildModuleSystem firewallModules {
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 18081 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 18081 ];
           };
         in
         ''
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's relay entry marks an admission, but inet cloud_host admits no tcp 18081 on docker0"
+                "the registry's relay entry marks an admission, but inet cloud_host admits no tcp 18081 on podman0"
                 "the registry's atc-daemon entry is host scope on cni0, but nothing opens or admits tcp 8415 there"
                 "the registry's atc-daemon entry marks an admission, but inet cloud_host admits no tcp 8415 on cni0"
               ]
@@ -518,7 +519,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
               {
@@ -580,9 +581,9 @@ let
             networking.cloudHost.admissions = [
               {
                 port = 18081;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "podman0";
+                sourceCIDR = "10.88.0.0/16";
+                destinationAddress = "10.88.0.1";
               }
             ];
           };
@@ -591,7 +592,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's relay entry is host scope on docker0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: docker0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
+                "the registry's relay entry is host scope on podman0, and inet cloud_host admits tcp 18081 there, but nixos-fw drops it: podman0 is not trusted, and nixos-fw opens tcp 18081 neither there nor on every interface"
               ]
             )
           } ${
@@ -608,7 +609,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
             ]
@@ -625,7 +626,7 @@ let
               flushRuleset = false;
             };
             networking.firewall.trustedInterfaces = [ "cni0" ];
-            networking.firewall.interfaces.docker0.allowedTCPPortRanges = [
+            networking.firewall.interfaces.podman0.allowedTCPPortRanges = [
               {
                 from = 18000;
                 to = 18099;
@@ -640,9 +641,9 @@ let
               }
               {
                 port = 18081;
-                interface = "docker0";
-                sourceCIDR = "172.17.0.0/16";
-                destinationAddress = "172.17.0.1";
+                interface = "podman0";
+                sourceCIDR = "10.88.0.0/16";
+                destinationAddress = "10.88.0.1";
               }
             ];
           };
@@ -651,7 +652,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "tcp 18000-18099 is open on docker0 as a range, which no registry entry can match"
+                "tcp 18000-18099 is open on podman0 as a range, which no registry entry can match"
               ]
             )
           } ${
@@ -677,7 +678,7 @@ let
                 protocol = "tcp";
                 port = 18081;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
                 admission = true;
               }
             ]
@@ -694,7 +695,7 @@ let
               flushRuleset = false;
             };
             networking.firewall.trustedInterfaces = [ "cni0" ];
-            networking.firewall.interfaces.docker0.allowedTCPPorts = [ 8415 ];
+            networking.firewall.interfaces.podman0.allowedTCPPorts = [ 8415 ];
             networking.cloudHost.admissions = [
               {
                 port = 8415;
@@ -709,7 +710,7 @@ let
           assert_equals ${
             lib.escapeShellArg (
               builtins.toJSON [
-                "the registry's docker-daemon entry is host scope on docker0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
+                "the registry's podman-daemon entry is host scope on podman0, and nixos-fw opens tcp 8415 there, but inet cloud_host drops it: its admissions for tcp 8415 are on cni0"
               ]
             )
           } ${
@@ -730,12 +731,12 @@ let
                 admission = true;
               }
               {
-                name = "docker-daemon";
+                name = "podman-daemon";
                 kind = "host-port";
                 protocol = "tcp";
                 port = 8415;
                 scope = "host";
-                interface = "docker0";
+                interface = "podman0";
               }
             ]
           } "mismatches"
@@ -797,7 +798,7 @@ let
         '';
     }
     {
-      title = "it reports each imp publicPorts spec without a public entry";
+      title = "it reports each imp publicPorts spec without a public entry, and a loopback one without a host-scope entry for lo";
       script =
         let
           system = buildModuleSystem firewallModules {
@@ -815,7 +816,7 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "imp's publicPorts publishes 104.250.100.18:80:7480 (tcp 80) with no public registry entry"
-                "imp's publicPorts publishes 127.0.0.1:5353:53/udp (udp 5353) with no public registry entry"
+                "imp's publicPorts publishes 127.0.0.1:5353:53/udp (udp 5353) with no host-scope registry entry for lo"
                 "imp's publicPorts publishes 8000-8001:8000-8001, whose host port the exposure check cannot read"
               ]
             )
@@ -874,6 +875,277 @@ let
         '';
     }
     {
+      title = "it accepts a port open on every interface whose public entry follows a tailnet entry for the same port";
+      script =
+        let
+          system = buildModuleSystem firewallModules { networking.firewall.allowedTCPPorts = [ 443 ]; };
+        in
+        ''
+          assert_equals '[]' ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "ingress";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "tailnet";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a host-scope entry for lo that no imp publicPorts spec publishes";
+      script =
+        let
+          system = buildModuleSystem firewallModules { };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the registry's listener entry is host scope on lo, but nothing opens or admits tcp 7071 there"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it finds no mismatch when the TLS front serves its registry route from a loopback publish";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "127.0.0.1:7071:7071" ];
+            services.public-front = {
+              enable = true;
+              routes = [
+                {
+                  hostname = "mcp.example.test";
+                  upstream = "127.0.0.1:7071";
+                  paths = [
+                    "/mcp"
+                    "/login"
+                  ];
+                }
+              ];
+              rateLimit = {
+                events = 10;
+                window = "1m";
+              };
+            };
+          };
+        in
+        ''
+          assert_equals '[]' ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+              {
+                name = "mcp";
+                kind = "front-route";
+                hostname = "mcp.example.test";
+                upstream = "127.0.0.1:7071";
+                paths = [
+                  "/login"
+                  "/mcp"
+                ];
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a TLS front route whose upstream and paths differ from those of its registry entry";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "127.0.0.1:7071:7071" ];
+            services.public-front = {
+              enable = true;
+              routes = [
+                {
+                  hostname = "mcp.example.test";
+                  upstream = "127.0.0.1:7070";
+                  paths = [
+                    "/mcp"
+                    "/login"
+                    "/rpc"
+                  ];
+                }
+              ];
+              rateLimit = {
+                events = 10;
+                window = "1m";
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the TLS front serves mcp.example.test from 127.0.0.1:7070, with no host-scope registry entry for lo"
+                "the TLS front serves mcp.example.test to 127.0.0.1:7070, but the registry's mcp entry names 127.0.0.1:7071"
+                "the TLS front serves mcp.example.test for the paths /login /mcp /rpc, but the registry's mcp entry lists /login /mcp"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+              {
+                name = "mcp";
+                kind = "front-route";
+                hostname = "mcp.example.test";
+                upstream = "127.0.0.1:7071";
+                paths = [
+                  "/mcp"
+                  "/login"
+                ];
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
+      title = "it reports a TLS front route without a registry entry, and a public front-route entry the front does not serve";
+      script =
+        let
+          system = buildModuleSystem firewallModules {
+            networking.firewall.allowedTCPPorts = [ 443 ];
+            services.imp.publicPorts = [ "127.0.0.1:7071:7071" ];
+            services.public-front = {
+              enable = true;
+              routes = [
+                {
+                  hostname = "mcp.example.test";
+                  upstream = "127.0.0.1:7071";
+                  paths = [ "/mcp" ];
+                }
+              ];
+              rateLimit = {
+                events = 10;
+                window = "1m";
+              };
+            };
+          };
+        in
+        ''
+          assert_equals ${
+            lib.escapeShellArg (
+              builtins.toJSON [
+                "the TLS front serves mcp.example.test with no public front-route registry entry"
+                "the registry's notes entry is a public front route, but the TLS front does not serve notes.example.test"
+              ]
+            )
+          } ${
+            renderMismatches system.config [
+              {
+                name = "icmp";
+                kind = "host-port";
+                protocol = "icmp";
+                scope = "public";
+              }
+              {
+                name = "front";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 443;
+                scope = "public";
+              }
+              {
+                name = "listener";
+                kind = "host-port";
+                protocol = "tcp";
+                port = 7071;
+                scope = "host";
+                interface = "lo";
+              }
+              {
+                name = "notes";
+                kind = "front-route";
+                hostname = "notes.example.test";
+                upstream = "127.0.0.1:7071";
+                paths = [ "/mcp" ];
+                scope = "public";
+              }
+            ]
+          } "mismatches"
+        '';
+    }
+    {
       title = "it reports port ranges and extraInputRules, which no entry can match";
       script =
         let
@@ -884,7 +1156,7 @@ let
                 to = 61000;
               }
             ];
-            networking.firewall.interfaces.docker0.allowedTCPPortRanges = [
+            networking.firewall.interfaces.podman0.allowedTCPPortRanges = [
               {
                 from = 8000;
                 to = 8010;
@@ -898,7 +1170,7 @@ let
             lib.escapeShellArg (
               builtins.toJSON [
                 "udp 60000-61000 is open on every interface as a range, which no registry entry can match"
-                "tcp 8000-8010 is open on docker0 as a range, which no registry entry can match"
+                "tcp 8000-8010 is open on podman0 as a range, which no registry entry can match"
                 "networking.firewall.extraInputRules is set, and the exposure check cannot read it: open the port through allowedTCPPorts or allowedUDPPorts instead"
               ]
             )

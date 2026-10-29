@@ -58,7 +58,6 @@ test('it accepts registry ports that equal their constants', () => {
             cloud: 'tag:cloud',
             cloudDeploy: 'tag:cloud-deploy',
             imp: 'tag:imp',
-            impE2E: 'tag:imp-e2e',
           },
           nodes: {
             geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -73,7 +72,7 @@ test('it accepts registry ports that equal their constants', () => {
           apiPort: 6443,
           grafanaNodePort: 30_300,
         },
-        docker: { bridgeAddress: '172.17.0.1', subnet: '172.17.0.0/16' },
+        podman: { bridge: 'podman0', bridgeAddress: '10.88.0.1', subnet: '10.88.0.0/16' },
         atc: { daemonPort: 8415, gatewayPort: 8414 },
         imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
         onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },
@@ -132,7 +131,6 @@ test('it names every registry port that differs from its constant, and a missing
             cloud: 'tag:cloud',
             cloudDeploy: 'tag:cloud-deploy',
             imp: 'tag:imp',
-            impE2E: 'tag:imp-e2e',
           },
           nodes: {
             geoffcloud: { address: '100.69.47.33', addressIPv6: 'fd7a:115c:a1e0::ca36:2f22' },
@@ -147,7 +145,7 @@ test('it names every registry port that differs from its constant, and a missing
           apiPort: 6443,
           grafanaNodePort: 30_300,
         },
-        docker: { bridgeAddress: '172.17.0.1', subnet: '172.17.0.0/16' },
+        podman: { bridge: 'podman0', bridgeAddress: '10.88.0.1', subnet: '10.88.0.0/16' },
         atc: { daemonPort: 8415, gatewayPort: 8414 },
         imp: { domain: 'imps.geoff.cloud', apiPort: 7070 },
         onePasswordConnect: { clusterIP: '10.43.82.198', port: 8000 },

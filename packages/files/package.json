@@ -7,9 +7,9 @@
     "./contract": "./files-contract.ts"
   },
   "dependencies": {
-    "@orpc/contract": "1.15.6",
-    "@orpc/openapi": "1.15.6",
-    "@orpc/server": "1.15.6",
+    "@orpc/contract": "1.16.0",
+    "@orpc/openapi": "1.16.0",
+    "@orpc/server": "1.16.0",
     "elysia": "1.4.30",
     "zod": "4.6.7"
   },

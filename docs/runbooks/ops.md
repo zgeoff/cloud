@@ -41,9 +41,10 @@ bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s 
 - Wraps `bash scripts/switch-geoffcloud.sh`, which reaches the host in `GEOFFCLOUD_HOST`, or
   `root@geoffcloud`.
 - The script checks a clean `main` that matches `origin/main`, a green `NixOS checks` run that
-  covers the commit, the atc daemon and gateway majors, nixie's imp client against impd, a k3s
-  restart, and nixie's readiness after the switch. [Switch the host](./workflows.md#switch-the-host)
-  explains each refusal.
+  covers the commit, the atc daemon and gateway majors, the impd majors nixie accepts, the secret
+  kinds impd stores against those the atc daemon accepts, a k3s restart, and nixie's readiness and
+  impd's image folders after the switch. [Switch the host](./workflows.md#switch-the-host) explains
+  each refusal.
 - After every check passes, the script pushes the tag `deployed/host` on `origin` to the switched
   commit, so the caller needs push access to `zgeoff/cloud`.
 - Before a switch that changes imp, copy impd's database with
@@ -70,9 +71,13 @@ Dispatches the `NixOS checks` workflow, on `main` by default.
 ```bash
 bun run ops:nixos-checks                    # on main, before a host switch
 bun run ops:nixos-checks -- <branch>        # on a pushed branch
+bun run ops:nixos-checks -- --force         # on main, building even a covered commit
 ```
 
-- Wraps `gh workflow run nixos-checks.yml -R zgeoff/cloud --ref <branch>`.
+- Wraps `gh workflow run nixos-checks.yml -R zgeoff/cloud --ref <branch>`, with `-f force=true` for
+  `--force`.
+- A run skips the build when an earlier run covers the commit or built the same derivations, as
+  [Check the host before a switch](./workflows.md#check-the-host-before-a-switch) describes.
 - A host switch reads only a green run on `main`. A run on a branch checks the change and gates
   nothing.
 

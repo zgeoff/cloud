@@ -37,7 +37,8 @@ nixos/             the host flake
 deploy/            the manifests and config of the workloads the cluster runs, such as nixie
 scripts/           repo tooling, run through the root package.json scripts
 test-support/      the shell suites' assertions and stand-ins
-e2e/               whole-workflow suites
+integration/       flows across several scripts, in process, against stand-ins
+e2e/               journeys that drive real containers from outside
 docs/
   architecture/    what is built
   runbooks/        operator and contributor procedures
@@ -65,8 +66,10 @@ docs/
   through its `bun run ops:<verb>` script, never the script or workflow behind it.
   [`docs/runbooks/ops.md`](docs/runbooks/ops.md) lists each verb, what it wraps and its
   preconditions.
-- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check,
-  and is CI-only: never run it locally.
+- `bun run lint` is plain oxlint. `bun run lint:full` adds the type-aware pass and the type check.
+  oxlint runs both through tsrslint (`@maschwenk/tsrslint`), a Rust port of tsgolint, in tsgolint's
+  place, because stock tsgolint runs out of memory under 2 GiB. `lint:full` is CI-only: never run it
+  locally.
 - Run `bun install` in the main checkout before you run `bun run deadcode` in a worktree. knip's
   config loader looks for a `tsconfig.json` from the directory above the worktree, so it reads the
   main checkout's, and without that checkout's `node_modules` knip exits 1 with
@@ -85,9 +88,9 @@ docs/
 - Never write to `/dev/vdb` on the host directly. It holds the ZFS pool `tank`, which holds imp's
   data. ZFS commands on `tank`, such as `zpool trim tank`, are fine.
 - The host's firewall is NixOS's table `inet nixos-fw`, plus `inet cloud_host` for the atc daemon's
-  port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and Docker add their own
-  tables. imp's `inet imp_egress` lives inside the imp-host container. Never `flush ruleset`, and
-  keep `networking.nftables.flushRuleset` off.
+  port and the Connect relay. imp's module adds `inet imp-forward`, and k3s and netavark (Podman)
+  add their own tables. imp's `inet imp_egress` lives inside the imp-host container. Never
+  `flush ruleset`, and keep `networking.nftables.flushRuleset` off.
 - Tailscale SSH logs each session's full remote command line in `tailscaled.service`'s journal, and
   Alloy ships the host journal to Loki. So never put a secret in the command line of an SSH session
   to the host, including the `kubectl` arguments and inline scripts it runs. Send the secret on
@@ -105,9 +108,11 @@ docs/
 - Never use `nixos-rebuild build`, because the repo mounts read-only. Never switch by hand after a
   failed build, and never re-evaluate the flake to switch.
 - The script refuses an atc daemon pin of another atc major than the running atc gateway's image, so
-  roll the gateway out first. It refuses an impd that the running nixie's imp client cannot speak,
-  so deploy that nixie first. It fails the switch when nixie's `/health/ready` does not report every
-  part ready afterwards.
+  roll the gateway out first. It refuses an impd major that the running nixie does not accept, so
+  deploy a nixie that accepts it first. It refuses an impd that stores a secret kind the atc daemon
+  pin does not accept, so pin an atc that accepts the kind first. It fails the switch when nixie's
+  `/health/ready` does not report every part ready afterwards, or when an impd image record's build
+  folder is gone.
 - The script holds a switch whose activation would stop or restart k3s, because nixie can stay down
   for minutes after it. Pass `--allow-k3s-restart` only in a planned k3s window that the owner
   approved.

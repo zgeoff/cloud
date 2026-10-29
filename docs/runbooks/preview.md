@@ -9,7 +9,7 @@ The steps use one helper, which runs imp's CLI in imp-host as impd's root. It se
 input over SSH, so a secret piped into it never reaches the host's journal:
 
 ```bash
-host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
+host_imp() { ssh root@geoffcloud podman exec -i imp-host impz "$@"; }
 ```
 
 ## Set the service up
@@ -21,9 +21,9 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
    host_imp secret ls < /dev/null
    ```
 
-   Expect a line for `gh` of kind `github`. Without it, add a fine-grained token with Contents
-   read-only on the opted-in repositories and no other permission:
-   `op read op://cloud/<github_item>/credential | host_imp secret add gh --kind github`.
+   Expect a line for `gh` of kind `static` with the hosts `github.com` and `api.github.com`. Without
+   it, add a fine-grained token with Contents read-only on the opted-in repositories and no other
+   permission: `op read op://cloud/<github_item>/credential | host_imp secret add gh --kind github`.
 
 2. Add the model secret that each preview imp and each SDK contract run's imp is granted,
    `preview-model`, from the model credential that nixie uses:
@@ -40,7 +40,7 @@ host_imp() { ssh root@geoffcloud docker exec -i imp-host impz "$@"; }
    `preview-model`, and write it to the host's encrypted secrets dataset without printing it:
 
    ```bash
-   ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && docker exec imp-host impz token new preview --scope manage --imps "pv-*" --grantable gh,preview-model | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
+   ssh root@geoffcloud 'install -d -m 0700 /var/lib/tank-cloud/host-secrets/preview && podman exec imp-host impz token new preview --scope manage --imps "pv-*" --grantable gh,preview-model | (umask 077 && cat > /var/lib/tank-cloud/host-secrets/preview/imp-token) && test -s /var/lib/tank-cloud/host-secrets/preview/imp-token && echo ok' < /dev/null
    ```
 
    Expect `ok`. A token minted before the contract run grants `gh` alone. Point it at both secrets
@@ -130,7 +130,7 @@ release that ships `counting-proxy-linux-x64`, which the host pins by its sha256
    ```bash
    op read op://cloud/nixie-model-credential/credential | host_imp secret add preview-model-counted \
      --kind custom --hosts api.anthropic.com --header authorization --scheme bearer \
-     --upstream http://172.17.0.1:18082
+     --upstream http://10.88.0.1:18082
    ```
 
    Expect `host_imp secret ls` to list `preview-model-counted`. The SDK contract run keeps
@@ -142,7 +142,7 @@ release that ships `counting-proxy-linux-x64`, which the host pins by its sha256
 3. In the host config, set `services.preview.impModelSecret` to `preview-model-counted` and turn on
    `services.preview.spendCap` with the pinned package, the model, its prices and the limit. Switch
    the host as step 6 of [Set the service up](#set-the-service-up) does, and expect the unit's log
-   to hold `previews: model routes on 172.17.0.1:18082`, with the limit after it.
+   to hold `previews: model routes on 10.88.0.1:18082`, with the limit after it.
 
 4. Remove each preview imp that booted before the switch:
    `host_imp rm pv-<hash>-<number> < /dev/null` for each `pv-` name that

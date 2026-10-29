@@ -21,7 +21,7 @@ test('#buildImpArgv puts imp’s CLI before the arguments', () => {
 
 test('#buildHostImpArgv runs the CLI in imp-host without -i when the call reads no stdin', () => {
   expect(buildHostImpArgv(['token', 'ls'])).toStrictEqual([
-    'docker',
+    'podman',
     'exec',
     'imp-host',
     'impz',
@@ -30,9 +30,9 @@ test('#buildHostImpArgv runs the CLI in imp-host without -i when the call reads 
   ]);
 });
 
-test('#buildHostImpArgv passes docker -i when the call reads stdin', () => {
+test('#buildHostImpArgv passes podman -i when the call reads stdin', () => {
   expect(buildHostImpArgv(['secret', 'add', 'glm'], { stdin: true })).toStrictEqual([
-    'docker',
+    'podman',
     'exec',
     '-i',
     'imp-host',
@@ -43,11 +43,11 @@ test('#buildHostImpArgv passes docker -i when the call reads stdin', () => {
   ]);
 });
 
-test('#buildHostImpArgv passes each env name to docker without a value, so docker copies its own', () => {
+test('#buildHostImpArgv passes each env name to podman without a value, so podman copies its own', () => {
   expect(
     buildHostImpArgv(['token', 'whoami', '--json'], { env: ['IMP_TOKEN', 'IMP_URL'] }),
   ).toStrictEqual([
-    'docker',
+    'podman',
     'exec',
     '-e',
     'IMP_TOKEN',
@@ -110,7 +110,7 @@ test('#loadHostImpJSON reads impd’s tokens through the CLI in imp-host over ss
         '-o',
         'ConnectTimeout=15',
         'root@geoffcloud',
-        "'docker' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'",
+        "'podman' 'exec' 'imp-host' 'impz' 'token' 'ls' '--json'",
       ],
       stdin: '',
       options: { timeoutMs: 120_000 },
@@ -118,7 +118,7 @@ test('#loadHostImpJSON reads impd’s tokens through the CLI in imp-host over ss
   ]);
 });
 
-test('#loadHostImpJSON stops with docker’s exit code when imp-host is stopped', () => {
+test('#loadHostImpJSON stops with podman’s exit code when imp-host is stopped', () => {
   const stub = buildStubRunner(
     buildStubCredentialsHost(buildMockCredentialsHostScenario({ stoppedAt: 'secret-ls' })).answer,
   );
@@ -128,7 +128,7 @@ test('#loadHostImpJSON stops with docker’s exit code when imp-host is stopped'
       'secret',
       'ls',
     ]),
-  ).rejects.toMatchObject({ exitCode: 1 });
+  ).rejects.toMatchObject({ exitCode: 125 });
 });
 
 test('#loadHostImpJSON stops when imp prints something other than JSON, naming the call without --json', () => {
@@ -142,7 +142,7 @@ test('#loadHostImpJSON stops when imp prints something other than JSON, naming t
   ).rejects.toMatchObject({ exitCode: 1, message: 'no JSON from impz secret ls' });
 });
 
-test('#loadHostImpJSON sends its stdin to the CLI through docker exec -i', async () => {
+test('#loadHostImpJSON sends its stdin to the CLI through podman exec -i', async () => {
   const host = buildStubCredentialsHost(buildMockCredentialsHostScenario({ secrets: [] }));
   const stub = buildStubRunner(host.answer);
 
@@ -175,7 +175,7 @@ test('#loadHostImpJSON sends its stdin to the CLI through docker exec -i', async
         '-o',
         'ConnectTimeout=15',
         'root@geoffcloud',
-        "'docker' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
+        "'podman' 'exec' '-i' 'imp-host' 'impz' 'secret' 'add' 'glm' '--kind' 'custom' '--hosts' 'api.z.ai' '--header' 'authorization' '--scheme' 'bearer' '--json'",
       ],
       stdin: 'zai_fixture_key\n',
       options: { timeoutMs: 120_000 },

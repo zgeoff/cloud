@@ -1,7 +1,8 @@
 # Checks services.agent-image-build: the units the module generates, and the build script run in the
-# build sandbox against a local git origin, with the stand-in docker of
-# test-utils/build-stub-imp-host-docker.nix for imp-host and the stand-in bun of
-# test-utils/build-stub-agent-image-bun.nix for the build script's run. Each case runs on its own,
+# build sandbox against a local git origin, with the stand-in podman of
+# test-utils/build-stub-imp-host-podman.nix for imp-host, the stand-in bun of
+# test-utils/build-stub-agent-image-bun.nix for the build script's run, and the stand-in sleep of
+# test-utils/build-stub-sleep.nix for its pauses, with 3 tries for impd. Each case runs on its own,
 # in a fresh directory, with its own origin, impd state, credentials and state directory, and the
 # script under env -i with a HOME and TMPDIR of its own, under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos agent-image-build
@@ -13,8 +14,9 @@ let
   testUtilsCheck = import ./test-utils-check.nix { inherit pkgs imp; };
   renderCases = import ./test-utils/render-cases.nix { inherit lib; };
   buildModuleSystem = import ./test-utils/build-module-system.nix { inherit pkgs; };
-  stubImpHostDocker = import ./test-utils/build-stub-imp-host-docker.nix { inherit pkgs; };
+  stubImpHostPodman = import ./test-utils/build-stub-imp-host-podman.nix { inherit pkgs; };
   stubAgentImageBun = import ./test-utils/build-stub-agent-image-bun.nix { inherit pkgs; };
+  stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
 
   enabled = {
     services.agent-image-build = {
@@ -45,8 +47,9 @@ let
         GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 \
         GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=maintenance.auto GIT_CONFIG_VALUE_0=false \
         REPO_URL="$PWD/origin" STATE_DIR="$PWD/state" IMP_URL=http://127.0.0.1:7070 \
-        CREDENTIALS_DIRECTORY="$PWD/credentials" DOCKER=${stubImpHostDocker} IMPD_STATE="$PWD/impd" \
-        BUN=${stubAgentImageBun} BUILD_STATE="$PWD/build" ${build} > stdout 2> stderr || status=$?
+        CREDENTIALS_DIRECTORY="$PWD/credentials" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+        BUN=${stubAgentImageBun} BUILD_STATE="$PWD/build" SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+        AGENT_IMAGE_WAIT_TRIES=3 ${build} > stdout 2> stderr || status=$?
       after=$(date +%s)
     }
   '';
@@ -75,7 +78,9 @@ let
                 STATE_DIR = "/var/lib/agent-image-build";
                 HOME = "/var/lib/agent-image-build";
                 IMP_URL = "http://127.0.0.1:7070";
-                DOCKER = "${pkgs.docker}/bin/docker";
+                # the podman module wraps pkgs.podman with the system's runtimes, so the unit runs
+                # the system's own podman
+                PODMAN = "${config.virtualisation.podman.package}/bin/podman";
                 BUN = "${pkgs.bun}/bin/bun";
                 BUN_RUNTIME_TRANSPILER_CACHE_PATH = "0";
               };
@@ -166,6 +171,7 @@ let
         jq -n --arg name "agent-$(git -C origin rev-parse --short "$older")" \
           '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
         printf '#!/bin/sh\necho stand-in impz\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
         chmod 0755 impd/container/usr/local/bin/impz
         printf 'imp_fixture_build_token' > credentials/imp-token
         echo "$image imp-build-cc check passed" > build/stdout
@@ -180,6 +186,7 @@ let
         assert_files_equal /dev/null stderr
         jq -c . > expected <<EOF
         ["exec","imp-host","impz","image","ls","--json"]
+        ["container","inspect","--format","{{.Id}}","imp-host"]
         ["cp","imp-host:/usr/local/bin/impz","$PWD/state/bin/impz"]
         EOF
         assert_files_equal expected impd/calls
@@ -209,6 +216,7 @@ let
         jq -n --arg name "agent-$(git -C origin rev-parse --short HEAD)" \
           '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
         printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
         printf 'imp_fixture_build_token' > credentials/imp-token
         run_build
         assert_equals 0 "$status" "the earlier run's exit status"
@@ -249,13 +257,13 @@ let
         assert_equals 0 "$status" "the script's exit status"
         assert_equals "agent-image-build: impd holds $image, built from $pin; nothing to build" "$(cat stdout)" "the script's stdout"
         assert_files_equal /dev/null stderr
-        assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the docker calls"
+        assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the podman calls"
         assert_missing build/calls "the build calls"
         assert_missing state/bin "the copied CLI"
       '';
     }
     {
-      title = "it builds nothing and calls no docker when no commit on main changes images/agent";
+      title = "it builds nothing and calls no podman when no commit on main changes images/agent";
       script = ''
         ${setupTest}
         mkdir -p origin/docs
@@ -269,12 +277,12 @@ let
         assert_equals 0 "$status" "the script's exit status"
         assert_equals "agent-image-build: no commit on main changes images/agent; nothing to build" "$(cat stdout)" "the script's stdout"
         assert_files_equal /dev/null stderr
-        assert_missing impd/calls "the docker calls"
+        assert_missing impd/calls "the podman calls"
         assert_missing build/calls "the build calls"
       '';
     }
     {
-      title = "it records a failed build with its time, and fails the run";
+      title = "it records a failed build with its time, and fails the run, when imp-host kept its container";
       script = ''
         ${setupTest}
         mkdir -p origin/images/agent impd/container/usr/local/bin
@@ -284,6 +292,7 @@ let
         image="agent-$(git -C origin rev-parse --short "$pin")"
         echo '[]' > impd/images.json
         printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        echo c0ffee01 > impd/container-ids
         printf 'imp_fixture_build_token' > credentials/imp-token
         echo "$image check failed; removed the image" > build/stdout
         echo 1 > build/status
@@ -296,6 +305,126 @@ let
           "$(cat stderr)" "the script's stderr"
         assert_between "$before" "$(date -u -d "$(cat "state/failed/$pin")" +%s)" "$after" "the failed build's time"
         assert_equals "$pin" "$(ls state/failed)" "the failed builds"
+      '';
+    }
+    {
+      title = "it leaves no record and passes the run when the build fails while a switch recreates imp-host";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        printf 'c0ffee01\nc0ffee02\n' > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo "$image build failed: impd closed the connection" > build/stdout
+        echo 1 > build/status
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_files_equal - stdout <<EOF
+        agent-image-build: building $image from $pin
+        agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to c0ffee02; the next run builds $image again
+        EOF
+        assert_files_equal /dev/null stderr
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it leaves no record and passes the run when the build fails while imp-host has no container";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container/usr/local/bin
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf '#!/bin/sh\n' > impd/container/usr/local/bin/impz
+        printf 'c0ffee01\n\n' > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+        echo "$image build failed: impd closed the connection" > build/stdout
+        echo 1 > build/status
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_files_equal - stdout <<EOF
+        agent-image-build: building $image from $pin
+        agent-image-build: the build of $image from $pin failed with status 1 while imp-host went from container c0ffee01 to none; the next run builds $image again
+        EOF
+        assert_files_equal /dev/null stderr
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it passes the run without a copy or a build when imp-host has no container once impd listed its images";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_equals "agent-image-build: imp-host went from the container that listed impd's images to none before the build of $image from $pin; the next run builds $image again" \
+          "$(cat stdout)" "the script's stdout"
+        assert_files_equal /dev/null stderr
+        assert_missing state/bin "the copied CLI"
+        assert_missing build/calls "the build calls"
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it passes the run without a build when the copy of the CLI fails while imp-host loses its container";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        echo '[]' > impd/images.json
+        printf 'c0ffee01\n\n' > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_equals "agent-image-build: the copy of imp's CLI failed while imp-host went from container c0ffee01 to none; the next run builds $image again" \
+          "$(cat stdout)" "the script's stdout"
+        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat stderr)" "the script's stderr"
+        assert_missing build/calls "the build calls"
+        assert_missing state/failed "the failed builds"
+      '';
+    }
+    {
+      title = "it fails the run without a record or a build when the copy of the CLI fails while imp-host keeps its container";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent impd/container
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        echo '[]' > impd/images.json
+        echo c0ffee01 > impd/container-ids
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 1 "$status" "the script's exit status"
+        assert_files_equal /dev/null stdout
+        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat stderr)" "the script's stderr"
+        assert_missing build/calls "the build calls"
+        assert_missing state/failed "the failed builds"
       '';
     }
     {
@@ -317,26 +446,62 @@ let
         assert_equals "agent-image-build: the build of $image from $pin failed at 2026-01-02T03:04:05Z; remove $PWD/state/failed/$pin to build it again" \
           "$(cat stdout)" "the script's stdout"
         assert_files_equal /dev/null stderr
-        assert_missing impd/calls "the docker calls"
+        assert_missing impd/calls "the podman calls"
         assert_missing build/calls "the build calls"
       '';
     }
     {
-      title = "it fails the run without a record or a build when imp-host does not answer";
+      title = "it waits while imp-host is missing and then while impd refuses the call, printing each new error, then checks the images";
+      script = ''
+        ${setupTest}
+        mkdir -p origin/images/agent
+        echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
+        git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
+        pin=$(git -C origin rev-parse HEAD)
+        image="agent-$(git -C origin rev-parse --short "$pin")"
+        jq -n --arg name "$image" \
+          '[{id: "img-1", name: $name, ref: "", digest: "imp-build-aa", source: "build", createdAt: "2026-01-01T00:00:00.000Z", sizeBytes: 0, pinned: true}]' > impd/images.json
+        echo 1 > impd/unreachable
+        echo 1 > impd/unauthorized
+        printf 'imp_fixture_build_token' > credentials/imp-token
+
+        run_build
+
+        assert_equals 0 "$status" "the script's exit status"
+        assert_files_equal - stdout <<EOF
+        agent-image-build: waiting for impd, try 1: Error: no container with name or ID "imp-host" found: no such container
+        agent-image-build: waiting for impd, try 2: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
+        agent-image-build: impd holds $image, built from $pin; nothing to build
+        EOF
+        assert_files_equal /dev/null stderr
+        assert_files_equal - sleep.log <<'EOF'
+        ["5"]
+        ["5"]
+        EOF
+        assert_missing build/calls "the build calls"
+      '';
+    }
+    {
+      title = "it skips the run without a record or a build when imp-host does not answer in its tries";
       script = ''
         ${setupTest}
         mkdir -p origin/images/agent
         echo 'ARG ATC_VERSION=1.0.0' > origin/images/agent/Dockerfile
         git -C origin add -A && git -C origin commit -q -m "pin atc 1.0.0"
         echo '[]' > impd/images.json
-        echo 1 > impd/unreachable
+        echo 3 > impd/unreachable
         printf 'imp_fixture_build_token' > credentials/imp-token
 
         run_build
 
-        assert_equals 1 "$status" "the script's exit status"
-        assert_files_equal /dev/null stdout
-        assert_equals "Error response from daemon: No such container: imp-host" "$(cat stderr)" "the script's stderr"
+        assert_equals 0 "$status" "the script's exit status"
+        assert_files_equal - stdout <<'EOF'
+        agent-image-build: waiting for impd, try 1: Error: no container with name or ID "imp-host" found: no such container
+        agent-image-build: impd listed no images after 3 tries: Error: no container with name or ID "imp-host" found: no such container; the next run tries again
+        EOF
+        assert_files_equal /dev/null stderr
+        assert_equals 3 "$(wc -l < impd/calls)" "the podman calls"
+        assert_equals 2 "$(wc -l < sleep.log)" "the pauses"
         assert_missing build/calls "the build calls"
         assert_missing state/failed "the failed builds"
       '';

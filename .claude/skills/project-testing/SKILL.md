@@ -21,7 +21,8 @@ provider and the NixOS checks each have a reference.
 ## Key rules
 
 - [Suites and where they run](#suites-and-where-they-run): CI calls a root package script, the
-  `nixos` job never runs on a person's PR, and every case is hermetic.
+  `nixos` job runs on a PR that changes its inputs but never gates the merge, and every case is
+  hermetic.
 - [No test reaches a real host](#no-test-reaches-a-real-host): fail-closed stand-ins for every
   remote tool, handing off to the real one only on loopback.
 - [infra (TypeScript)](#infra-typescript): units are pure builders and validators, tested with full
@@ -42,11 +43,12 @@ provider and the NixOS checks each have a reference.
 
 | Suite                                                     | Command                             | Runs in CI                                                     |
 | --------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------- |
-| TypeScript unit tests in `infra/` and `scripts/`          | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript tests in `infra/`, `scripts/` and `integration/` | `bun run test`                      | `CI` → `checks`                                                |
+| TypeScript journeys in `e2e/`                             | `bun run test:e2e`                  | `CI` → `checks`                                                |
 | The health-check Worker's tests                           | `bun run test:health-check`         | `CI` → `checks`                                                |
 | Go tests in `provider/`                                   | `bun run provider:check`            | `CI` → `checks`, if `provider/` changed                        |
 | Shell suites and `test-support/shell/` tests              | `bun run test:scripts`              | `CI` → `checks`, unless only Markdown changed                  |
-| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules`          | `CI` → `checks`                                                |
+| A probe and its alert rule in their real engines (Docker) | `bun run test:alert-rules`          | `CI` → `checks`, if its inputs changed                         |
 | Gateway image, backup and restore journey (Docker)        | `bun run test:atc-gateway-fixture`  | `CI` → `checks` on a PR, `atc-gateway images` → `fixture` on main |
 | The files service's image (Docker)                        | `bun run test:files-image`          | `CI` → `checks` on a PR, `files image` → `check` on main       |
 | The files backup script in its pinned image (Docker)      | `bun run test:files-backup-fixture` | `CI` → `checks`                                                |
@@ -54,9 +56,10 @@ provider and the NixOS checks each have a reference.
 | The agent image's gitleaks allowlist (Docker)             | `bun run test:agent-image`          | `CI` → `checks`                                                |
 | NixOS checks and the restore rehearsals (KVM)             | `bun run test:nixos [check…]`       | `NixOS checks` → `nixos`                                       |
 
-- CI's one `checks` job runs every suite above but the NixOS checks. Each Docker suite is a step
-  that runs only when its gate in [`gates.yml`](../../../.github/gates.yml) says the change touches
-  its inputs; a new input of a Docker suite extends its gate.
+- CI runs every suite above but the NixOS checks: as parallel jobs while the repository is public,
+  and as steps of its one `checks` job once it is private. Each Docker suite runs only when its gate
+  in [`gates.yml`](../../../.github/gates.yml) says the change touches its inputs; a new input of a
+  Docker suite extends its gate.
 
 - CI calls a root [`package.json`](../../../package.json) script, never a suite file directly.
 - A new shell suite needs no list entry:
@@ -67,10 +70,9 @@ provider and the NixOS checks each have a reference.
   `atc-gateway-fixture` inside
   [`with-fixture-images.sh`](../../../test-support/shell/with-fixture-images.sh), and
   `fixture-images`, which tests that wrapper, from outside it.
-- The `nixos` job gates the host switch, not the merge: it runs nightly and on a dispatch on main,
-  and never on a pull request, so run
-  `bun run test:nixos` yourself, or dispatch the workflow on your branch, when a change can break a
-  check. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
+- The `nixos` job gates the host switch, not the merge: it runs nightly, on a dispatch, and on
+  each push to a pull request that changes an input of the checks, whose result shows on the pull
+  request but gates nothing. A Renovate pull request starts no run. [`switch-geoffcloud.sh`](../../../scripts/switch-geoffcloud.sh) refuses a commit that no
   green run on main covers. The `nixos` gate of [`gates.yml`](../../../.github/gates.yml) lists
   the inputs of the checks, and a run stops covering later commits once one of them changes. A new
   input of the checks extends that list.
@@ -78,6 +80,41 @@ provider and the NixOS checks each have a reference.
   Cloudflare, the Pulumi state or the internet. The image and flake builds that run before the cases
   fetch only pinned inputs. `bun run drift` is a read-only check of a refactor, never part of a
   test.
+
+## Lanes in this repo
+
+The unit run, `bun run test`, holds `infra/`, `scripts/` and `integration/`, under the shared 5 s
+rule. `integration/` holds one flow across several scripts in process, such as
+[`deploy-prod.test.ts`](../../../integration/deploy-prod.test.ts), which runs the workflow's own
+steps against stand-ins. A check of config, such as which events start a workflow, is a script
+that `lint:actions` runs, as
+[`check-workflow-triggers.ts`](../../../scripts/check-workflow-triggers.ts) is, never a test.
+
+Each lane below needs a real system that the unit run cannot host, or tests a process from outside.
+
+| Lane | Scripts | Real system | Time limit per case |
+| -- | -- | -- | -- |
+| `e2e/` | `test:e2e` | a script started as its own process, driven from outside against stand-ins | 15 s |
+| `.nixos` | `test:nixos [check…]` | NixOS VMs under QEMU with KVM, built in the pinned Nix image | 1200 s |
+| `alert-rules` | `test:alert-rules` | the pinned blackbox exporter, promtool, Alloy, Prometheus and Alertmanager in Docker | 90 s |
+| `images` | `test:agent-image`, `test:files-image` | the agent image and the files service's image, built and run in Docker | 15 s |
+| `fixtures` | `test:atc-gateway-fixture`, `test:nixie-backup-fixture`, `test:files-backup-fixture` | the gateway, backup and restore images with restic, on Docker volumes | 15 s |
+
+- `.nixos` is no file suffix. A check is an attribute of `checks.x86_64-linux` in
+  [`nixos/flake.nix`](../../../nixos/flake.nix), with its file in `nixos/checks/`, and
+  [`run-nixos-checks.sh`](../../../scripts/run-nixos-checks.sh) builds every check, or the ones it
+  is named. A case is one check's whole VM test script.
+- A shell suite joins `alert-rules` or a fixture group through its `# shell-suite: <group>` line;
+  each `images` script builds its image first, then runs its suites.
+- A case over its lane's time limit is a defect to fix, and the limit never rises to cover it.
+- The `lanes` option of `zgeoff/max-test-timeout` and `zgeoff/test-beside-module` in
+  [`.oxlintrc.json`](../../../.oxlintrc.json) holds the same lanes and limits. It binds only a
+  TypeScript test file that takes one of these suffixes; a change to this table changes it too.
+- Nothing enforces a limit per case yet: `run_cases` has no timer, and `nix build` ignores a
+  check's `meta.timeout`. Today only the CI job's `timeout-minutes` bounds a lane: 20 for `checks`,
+  which runs the shell lanes; 15 for the `fixture` job of `atc-gateway-images.yml` and the `check`
+  job of `files-image.yml`, which run `test:atc-gateway-fixture` and `test:files-image` again; and
+  121 for `nixos`. A review compares a new case's time with its lane's limit.
 
 ## No test reaches a real host
 
@@ -152,7 +189,7 @@ without the CLI.
   out the body stream and the readers whose types differ from Bun's. Its HTTP boundary is MSW handlers in
   [`workers/health-check/mocks/`](../../../workers/health-check/mocks/) over two in-memory stores:
   the probe targets' statuses and the alerts sent. The server runs with
-  `onUnhandledRequest: 'error'`, and the preload also fails the test on any `request:unhandled`
+  unhandled requests set to error, and the preload also fails the test on any `request:unhandled`
   event, because the worker turns a failed probe into a status instead of throwing. A dead target is
   a per-test `passthrough()` to `127.0.0.1:1`, so the connection really fails.
 - Pass an `Output` input by reference (`output('…')`) and put the same object in the expected
@@ -195,7 +232,7 @@ reaches a real tool.
 
 `scripts/test-<script>.sh` tests `scripts/<script>.sh`. A test of a deploy artifact sits beside it,
 as [`test-atc-gateway-image.sh`](../../../images/atc-gateway/test-atc-gateway-image.sh) does, and a
-journey sits in `e2e/`, one file per journey. Each shared rule takes its shell form:
+journey that drives real containers sits in `e2e/`, one file per journey. Each shared rule takes its shell form:
 
 | Shared rule                  | Shell form                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -9,7 +9,6 @@ import { makeSlotLock } from './make-slot-lock.ts';
 import { githubAPIURL } from './mocks/github-api-url.ts';
 import { stubApp } from './mocks/github-app.ts';
 import { commitStatuses } from './mocks/github-state.ts';
-import { NativeWebSocket } from './mocks/native-web-socket.ts';
 import { runContractRetries } from './run-contract-retries.ts';
 import { startStubImpd } from './test-utils/start-stub-impd.ts';
 import type { PreviewDeps } from './types.ts';
@@ -52,7 +51,7 @@ async function setupTest() {
     },
     spendProxies: null,
     store,
-    impd: buildImpdClient(impd.url, impd.token, NativeWebSocket),
+    impd: buildImpdClient(impd.url, impd.token),
     github: buildGitHubClient(githubAPIURL, stubApp, () => new Date()),
     webhookSecret: 'stub-webhook-secret',
     pendingBoots: new Set(),

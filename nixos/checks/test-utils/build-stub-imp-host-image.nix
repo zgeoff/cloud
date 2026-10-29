@@ -1,30 +1,21 @@
 # A stand-in imp-host image for the impd-restore rehearsal: busybox, whose command only sleeps,
-# with an imp-docker-proxy that only opens the socket imp's module waits for, an `impz info` that
-# prints only its version line, and a /tmp, where copy-impd-db-host makes its work
-# directory. Given a tag, it returns { archive, layout, ref }: the image as a docker save archive,
-# which imp's module loads through services.imp.imageArchive in place of a pull, the image as an
-# OCI layout, and the reference geoffcloud would pin it by, ghcr.io/zgeoff/imp-host:<tag>@<digest>,
-# whose digest is the layout's manifest digest, the one a registry serves it under once skopeo
-# copies it with --preserve-digests. Reading that digest at evaluation is import from derivation.
+# with an `impz info` that prints only its version line, and a /tmp, where copy-impd-db-host makes
+# its work directory. Given a tag, it returns { archive, layout, ref, digestRef }: the image as a
+# docker save archive, which imp's module loads through services.imp.imageArchive in place of a
+# pull, the image as an OCI layout, the reference geoffcloud would pin it by,
+# ghcr.io/zgeoff/imp-host:<tag>@<digest>, whose digest is the layout's manifest digest, the one a
+# registry serves it under once skopeo copies it with --preserve-digests, and the name Podman
+# gives the image pulled by that reference, ghcr.io/zgeoff/imp-host@<digest>: Podman drops the tag
+# of a reference that also holds a digest. Reading that digest at evaluation is import from
+# derivation.
 #
 # What it assumes of the real image, which nixos/checks/test-utils-check.nix pins to the
-# flake's imp input: imp's module runs the proxy as /usr/local/bin/imp-docker-proxy in the same
-# image, and waits for the socket /run/imp-docker/docker.sock; it runs imp-host from the image's
-# own command; and `impz info` prints each line as its label padded to 12 characters, then the
-# value, with the version first. The real one prints more lines; copy-impd-db-host reads
-# only the version.
+# flake's imp input: imp's module runs imp-host from the image's own command; and `impz info`
+# prints each line as its label padded to 12 characters, then the value, with the version first.
+# The real one prints more lines; copy-impd-db-host reads only the version.
 { pkgs }:
 tag:
 let
-  proxy = pkgs.writeTextFile {
-    name = "imp-docker-proxy-standin";
-    destination = "/usr/local/bin/imp-docker-proxy";
-    executable = true;
-    text = ''
-      #!/bin/sh
-      exec ${pkgs.socat}/bin/socat UNIX-LISTEN:/run/imp-docker/docker.sock,fork EXEC:/bin/true
-    '';
-  };
   impz = pkgs.writeTextFile {
     name = "impz-standin";
     destination = "/usr/local/bin/impz";
@@ -42,7 +33,6 @@ let
       name = "imp-host-standin-root";
       paths = [
         pkgs.busybox
-        proxy
         impz
       ];
       pathsToLink = [
@@ -59,9 +49,11 @@ let
   layout = pkgs.runCommand "imp-host-${tag}-oci" { nativeBuildInputs = [ pkgs.skopeo ]; } ''
     skopeo --insecure-policy copy docker-archive:${image} oci:$out:${tag}
   '';
+  digest = (builtins.head (pkgs.lib.importJSON "${layout}/index.json").manifests).digest;
 in
 {
   archive = image;
   inherit layout;
-  ref = "ghcr.io/zgeoff/imp-host:${tag}@${(builtins.head (pkgs.lib.importJSON "${layout}/index.json").manifests).digest}";
+  ref = "ghcr.io/zgeoff/imp-host:${tag}@${digest}";
+  digestRef = "ghcr.io/zgeoff/imp-host@${digest}";
 }

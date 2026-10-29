@@ -1,6 +1,6 @@
 # Reads the settings file that geoffcloud's imp-host unit hands impd, the file the imp module writes
 # from services.imp.settings and its env script exports as IMP_SETTINGS, and checks the settings the
-# host sets there. The case runs in a fresh directory, under test-support/shell/run-cases.sh.
+# host sets there. Each case runs in a fresh directory, under test-support/shell/run-cases.sh.
 # Run: bun run test:nixos impd-settings
 {
   nixpkgs,
@@ -30,6 +30,19 @@ let
         assert_files_equal - actual <<'EOF'
         IMP_IMAGE_EVICT_HIGH_PERCENT=80
         IMP_IMAGE_EVICT_LOW_PERCENT=65
+        EOF
+      '';
+    }
+    {
+      title = "it hands impd the public MCP origin https://imp.geoff.cloud and its listener port 7071";
+      script = ''
+        assert_equals 1 ${toString (builtins.length envScripts)} "the imp-host-env steps"
+        settings=$(sed -n 's|^export IMP_SETTINGS=\(/nix/store/[a-z0-9]\{32\}-imp-host-settings\.env\)$|\1|p' ${lib.head envScripts})
+        grep '^IMP_MCP_PUBLIC_' "$settings" | sort > actual
+
+        assert_files_equal - actual <<'EOF'
+        IMP_MCP_PUBLIC_PORT=7071
+        IMP_MCP_PUBLIC_URL=https://imp.geoff.cloud
         EOF
       '';
     }

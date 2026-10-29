@@ -9,3 +9,8 @@ export const exposure = exposureSchema.parse(registry);
 requireExposureMatchesTopology(exposure, topology);
 export { type Exposure, type ExposureEntry } from './exposure-schema.ts';
 export { type Topology, topologySchema } from './topology-schema.ts';
+
+export {
+  type NixieSandboxImagesPayload,
+  nixieSandboxImagesPayloadSchema,
+} from './nixie-sandbox-images-payload-schema.ts';

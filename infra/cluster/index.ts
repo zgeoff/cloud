@@ -30,6 +30,9 @@ interface ClusterInputs {
 
   // geoff.cloud's zone, for nixie's DNS record
   readonly zoneID: Output<string>;
+
+  // k3s's admin kubeconfig, which starts the Job that adds nixie's sandbox images before it rolls
+  readonly kubeconfig: Output<string>;
 }
 
 interface ClusterOutputs {
@@ -55,7 +58,12 @@ export function createCluster(cluster: Provider, inputs: ClusterInputs): Cluster
   const connect = createOnePasswordConnect(cluster, inputs.onePasswordConnect);
 
   const nixie =
-    inputs.nixie === undefined ? undefined : createNixie(cluster, inputs.nixie, inputs.zoneID);
+    inputs.nixie === undefined
+      ? undefined
+      : createNixie(cluster, inputs.nixie, {
+          zoneID: inputs.zoneID,
+          kubeconfig: inputs.kubeconfig,
+        });
 
   const files = inputs.files === undefined ? undefined : createFiles(cluster, inputs.files);
 

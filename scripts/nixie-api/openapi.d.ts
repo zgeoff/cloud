@@ -369,6 +369,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/memory/markSensitive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.markSensitive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/memory/listProposals": {
         parameters: {
             query?: never;
@@ -427,6 +443,134 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["memory.export"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/keepMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.keepMoment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/listMoments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.listMoments"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/readMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.readMoment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/readMomentSpan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.readMomentSpan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/editMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.editMoment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/linkMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.linkMoment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/previewMomentDestroy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.previewMomentDestroy"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/memory/destroyMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["memory.destroyMoment"];
         delete?: never;
         options?: never;
         head?: never;
@@ -601,6 +745,11 @@ export interface operations {
                                 }[];
                                 text: string;
                             };
+                            moment?: {
+                                momentID: string;
+                                shortID: string;
+                                title?: string;
+                            };
                             rating?: {
                                 items: {
                                     itemID: string;
@@ -683,6 +832,11 @@ export interface operations {
                                     start: number;
                                 }[];
                                 text: string;
+                            };
+                            moment?: {
+                                momentID: string;
+                                shortID: string;
+                                title?: string;
                             };
                             rating?: {
                                 items: {
@@ -1392,6 +1546,8 @@ export interface operations {
             content: {
                 "application/json": {
                     after?: string;
+                    /** @enum {string} */
+                    kind?: "fact" | "self";
                     limit?: number;
                     /** @enum {string} */
                     state: "active" | "retired" | "forgotten";
@@ -1413,6 +1569,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -1428,6 +1585,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                         }[];
                         next: string | null;
@@ -1543,6 +1701,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -1558,6 +1717,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                             score?: number;
                             similarity?: number;
@@ -1645,6 +1805,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -1660,6 +1821,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                         }[];
                         tokens: number;
@@ -1748,6 +1910,7 @@ export interface operations {
                         createdAt: string;
                         forgottenAt: string | null;
                         isPinned: boolean;
+                        isSensitive: boolean;
                         itemID: string;
                         /** @enum {string} */
                         kind: "fact" | "self";
@@ -1763,6 +1926,7 @@ export interface operations {
                         /** @enum {string} */
                         subject: "owner" | "self" | "shared";
                         text?: string;
+                        until: string | null;
                         version: number;
                         versions: {
                             /** @enum {string} */
@@ -1782,6 +1946,11 @@ export interface operations {
                                 start: number;
                             } | null;
                             evidenceQuote: string | null;
+                            image: {
+                                position: number;
+                                sequence: number;
+                                thread: string;
+                            } | null;
                             /** @enum {string} */
                             origin: "owner" | "conversation" | "task" | "memory_writer" | "lapse";
                             proposalID: string | null;
@@ -2227,6 +2396,7 @@ export interface operations {
                                     createdAt: string;
                                     forgottenAt: string | null;
                                     isPinned: boolean;
+                                    isSensitive: boolean;
                                     itemID: string;
                                     /** @enum {string} */
                                     kind: "fact" | "self";
@@ -2242,6 +2412,7 @@ export interface operations {
                                     /** @enum {string} */
                                     subject: "owner" | "self" | "shared";
                                     text?: string;
+                                    until: string | null;
                                     version: number;
                                     /** @enum {string} */
                                     change: "created" | "edited" | "retired" | "restored" | "undone";
@@ -2668,6 +2839,7 @@ export interface operations {
                         createdAt: string;
                         forgottenAt: string | null;
                         isPinned: boolean;
+                        isSensitive: boolean;
                         itemID: string;
                         /** @enum {string} */
                         kind: "fact" | "self";
@@ -2683,6 +2855,7 @@ export interface operations {
                         /** @enum {string} */
                         subject: "owner" | "self" | "shared";
                         text?: string;
+                        until: string | null;
                         version: number;
                         versions: {
                             /** @enum {string} */
@@ -2702,6 +2875,11 @@ export interface operations {
                                 start: number;
                             } | null;
                             evidenceQuote: string | null;
+                            image: {
+                                position: number;
+                                sequence: number;
+                                thread: string;
+                            } | null;
                             /** @enum {string} */
                             origin: "owner" | "conversation" | "task" | "memory_writer" | "lapse";
                             proposalID: string | null;
@@ -3010,6 +3188,7 @@ export interface operations {
                             createdAt: string;
                             forgottenAt: string | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -3025,6 +3204,7 @@ export interface operations {
                             /** @enum {string} */
                             subject: "owner" | "self" | "shared";
                             text?: string;
+                            until: string | null;
                             version: number;
                             lost: {
                                 evidenceMessages: number;
@@ -3494,6 +3674,162 @@ export interface operations {
             };
         };
     };
+    "memory.markSensitive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    clientActionID: string;
+                    isSensitive: boolean;
+                    itemID: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        isSensitive: boolean;
+                        itemID: string;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_ITEM_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No memory item has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The memory item has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "WRONG_STATE";
+                        /** @constant */
+                        status: 409;
+                        /** @default The memory item is not in a state that change takes */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
     "memory.listProposals": {
         parameters: {
             query?: never;
@@ -3530,6 +3866,7 @@ export interface operations {
                                 thread: string;
                             } | null;
                             isPinned: boolean;
+                            isSensitive: boolean;
                             itemID: string;
                             /** @enum {string} */
                             kind: "fact" | "self";
@@ -3542,7 +3879,7 @@ export interface operations {
                             proposalID: string;
                             quote: string | null;
                             /** @enum {string} */
-                            reason: "no_quote" | "quote_not_typed" | "quote_in_quoted_block" | "invisible_character" | "token_missing" | "checker_not_asserted" | "checker_unsure" | "checker_unreachable" | "forgotten_evidence" | "ambiguous_target" | "pinned" | "other" | "self_note" | "from_photo";
+                            reason: "no_quote" | "quote_not_typed" | "quote_in_quoted_block" | "invisible_character" | "token_missing" | "checker_not_asserted" | "checker_unsure" | "checker_unreachable" | "forgotten_evidence" | "ambiguous_target" | "pinned" | "other" | "self_note" | "from_photo" | "sensitive";
                             /** @enum {string} */
                             source: "owner" | "owner_data" | "untrusted";
                             sources: {
@@ -3556,6 +3893,7 @@ export interface operations {
                             subject: "owner" | "self" | "shared";
                             targetVersion: number | null;
                             text: string;
+                            until: string | null;
                         }[];
                     };
                 };
@@ -3977,6 +4315,1224 @@ export interface operations {
             };
         };
     };
+    "memory.keepMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    clientActionID: string;
+                    firstSequence: number;
+                    lastSequence: number;
+                    thread: string;
+                    title: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        momentID: string;
+                        shortID: string;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 422 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "BAD_SPAN";
+                        /** @constant */
+                        status: 422;
+                        /** @default The span needs a first and a last record on the thread, in order */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.listMoments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    before?: number;
+                    includeRetired: boolean;
+                    query?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        moments: {
+                            editedAt: string | null;
+                            /** Format: date-time */
+                            keptAt: string;
+                            /** @enum {string} */
+                            keptBy: "owner" | "model";
+                            momentID: string;
+                            shortID: string;
+                            /** @enum {string} */
+                            state: "active" | "retired";
+                            title: string | null;
+                        }[];
+                        next: number | null;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.readMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momentID: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        editedAt: string | null;
+                        /** Format: date-time */
+                        keptAt: string;
+                        /** @enum {string} */
+                        keptBy: "owner" | "model";
+                        momentID: string;
+                        shortID: string;
+                        /** @enum {string} */
+                        state: "active" | "retired";
+                        title: string | null;
+                        firstSequence: number;
+                        lastSequence: number;
+                        links: {
+                            itemID: string;
+                            shortID: string;
+                            text: string | null;
+                        }[];
+                        note: {
+                            text: string;
+                            /** Format: date-time */
+                            writtenAt: string;
+                        } | null;
+                        reflections: {
+                            model: string;
+                            text: string | null;
+                            /** Format: date-time */
+                            writtenAt: string;
+                            reflectionID: string;
+                        }[];
+                        thread: string;
+                        /** @enum {string} */
+                        titleBy: "owner" | "model";
+                        version: number;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MOMENT_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No moment has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The moment has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.readMomentSpan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momentID: string;
+                    after?: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        records: {
+                            isGap: boolean;
+                            kind: string;
+                            /** Format: date-time */
+                            recordedAt: string;
+                            sequence: number;
+                            text: string | null;
+                            tool: string | null;
+                        }[];
+                        next: number | null;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MOMENT_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No moment has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The moment has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.editMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momentID: string;
+                    version: number;
+                    /** Format: uuid */
+                    clientActionID: string;
+                    change: {
+                        /** @constant */
+                        kind: "title";
+                        title: string;
+                    } | {
+                        /** @constant */
+                        kind: "edges";
+                        firstSequence: number;
+                        lastSequence: number;
+                    } | {
+                        /** @constant */
+                        kind: "note";
+                        note: string;
+                    } | {
+                        /** @constant */
+                        kind: "reflection_removed";
+                        reflectionID: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        momentID: string;
+                        version: number;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MOMENT_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No moment has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "REFLECTION_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default The moment has no reflection with this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The moment has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 422 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "BAD_SPAN";
+                        /** @constant */
+                        status: 422;
+                        /** @default The span needs a first and a last record on the thread, in order */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.linkMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momentID: string;
+                    version: number;
+                    /** Format: uuid */
+                    clientActionID: string;
+                    isLinked: boolean;
+                    itemID: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        momentID: string;
+                        version: number;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MOMENT_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No moment has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_ITEM_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No memory item has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The moment has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "ALREADY_LINKED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The item is already linked to the moment */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "NOT_LINKED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The item is not linked to the moment */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.previewMomentDestroy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momentID: string;
+                    version: number;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        keptAt: string;
+                        /** @enum {string} */
+                        keptBy: "owner" | "model";
+                        kept: {
+                            records: number;
+                        };
+                        lost: {
+                            links: number;
+                            texts: number;
+                        };
+                        momentID: string;
+                        note: string | null;
+                        reflections: {
+                            model: string;
+                            text: string | null;
+                            /** Format: date-time */
+                            writtenAt: string;
+                        }[];
+                        shortID: string;
+                        /** @enum {string} */
+                        state: "active" | "retired";
+                        thread: string;
+                        title: string | null;
+                        version: number;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MOMENT_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No moment has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The moment has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "memory.destroyMoment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    momentID: string;
+                    version: number;
+                    /** Format: uuid */
+                    clientActionID: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        momentID: string;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MOMENT_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No moment has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "STALE_VERSION";
+                        /** @constant */
+                        status: 409;
+                        /** @default The moment has moved past that version */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 503 */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "MEMORY_NOT_STARTED";
+                        /** @constant */
+                        status: 503;
+                        /** @default The memory store has not started yet */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
     "log.follow": {
         parameters: {
             query?: never;
@@ -4035,6 +5591,11 @@ export interface operations {
                                         start: number;
                                     }[];
                                     text: string;
+                                };
+                                moment?: {
+                                    momentID: string;
+                                    shortID: string;
+                                    title?: string;
                                 };
                                 rating?: {
                                     items: {
@@ -4190,6 +5751,11 @@ export interface operations {
                                         start: number;
                                     }[];
                                     text: string;
+                                };
+                                moment?: {
+                                    momentID: string;
+                                    shortID: string;
+                                    title?: string;
                                 };
                                 rating?: {
                                     items: {

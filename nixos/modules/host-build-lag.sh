@@ -19,7 +19,7 @@
 # A part that lags keeps "<what it runs> <since>" in $STATE_DIR/<part>-lag, so its lag counts from
 # the first check that saw it run that, and a part that catches up drops the file. Inputs: REPO
 # (owner/name), TEXTFILE_DIR, STATE_DIR, CURRENT_SYSTEM, GITHUB_API_URL and GITHUB_RAW_URL (GitHub's
-# API and raw file hosts, read anonymously), and DOCKER, the docker that reaches imp-host. A failed
+# API and raw file hosts, read anonymously), and PODMAN, the podman that reaches imp-host. A failed
 # GitHub read fails the run and leaves the metrics as they were, so their last check grows stale.
 curl_args=(-fsS --max-time 30)
 now=$(date +%s)
@@ -75,7 +75,7 @@ if [ -z "$green_imp" ]; then
   echo "host-build-lag: no imp-host image in configuration.nix at $green" >&2
   exit 1
 fi
-running_imp=$("$DOCKER" exec imp-host impz info | sed -n 's/^version  *//p') || running_imp=""
+running_imp=$("$PODMAN" exec imp-host impz info | sed -n 's/^version  *//p') || running_imp=""
 if [ -n "$running_imp" ] && [ "$running_imp" = "$green_imp" ]; then
   imp_lags=0
 else

@@ -2,9 +2,9 @@
 
 The values that geoff.cloud's host, Pulumi program, scripts and image builds share live here, in
 `constants.json`: the VM's ID and public addresses, the tailnet's range, tags and node addresses,
-k3s's ranges and ports, and the ports and addresses of atc, impd and 1Password Connect. Each value
-has one written source, so a change to one is a change to this file, and every reader picks it up
-from the same commit.
+k3s's ranges and ports, Podman's bridge that imp-host runs on, and the ports and addresses of atc,
+impd and 1Password Connect. Each value has one written source, so a change to one is a change to
+this file, and every reader picks it up from the same commit.
 
 ## Readers
 
@@ -31,7 +31,8 @@ CI and before a push.
 
 Version pins are not topology: each keeps its own pin file, which its bump tooling rewrites. Other
 data that the host, infra and the scripts all read belongs in this package as its own file beside
-`constants.json`.
+`constants.json`. So does a schema for data that infra hands to a script, such as the payload of the
+Job that adds nixie's sandbox images, so that the producer and the parser share one type.
 
 ## The exposure registry
 

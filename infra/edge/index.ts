@@ -1,8 +1,9 @@
-import { R2Bucket, ZoneSetting, getZoneOutput } from '@pulumi/cloudflare';
+import { DnsRecord, R2Bucket, ZoneSetting, getZoneOutput } from '@pulumi/cloudflare';
 import type { Output } from '@pulumi/pulumi';
-import { topology } from '@zgeoff/cloud-topology';
+import { exposure, topology } from '@zgeoff/cloud-topology';
 import { FirewallGroup, FirewallRule, Vm } from '@zgeoff/pulumi-onidel';
 import { buildEdgeRules } from './build-edge-rules.ts';
+import { buildFrontRouteRecords } from './build-front-route-records.ts';
 
 interface EdgeInputs {
   readonly accountID: string;
@@ -31,6 +32,16 @@ export function createEdge(inputs: EdgeInputs): EdgeOutputs {
   });
 
   const host = createHost(inputs.hostOnTailnet);
+  const frontRouteRecords: DnsRecord[] = [];
+
+  for (const record of buildFrontRouteRecords({
+    entries: exposure.entries,
+    zoneID: zone.zoneId,
+    ipv4: topology.vm.publicIPv4,
+    ipv6: topology.vm.publicIPv6,
+  })) {
+    frontRouteRecords.push(new DnsRecord(record.name, record.args));
+  }
 
   // Redirect plain http to https on every hostname: a misconfigured client must not send
   // a bearer token or an authorization code over http, even only as far as the edge.
