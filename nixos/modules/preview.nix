@@ -35,6 +35,7 @@ let
       pkgs.jq
       config.virtualisation.podman.package
     ];
+    runtimeEnv.PREVIEW_IMAGE_TOKEN_FACTS = ./preview-image-token-facts.sh;
     text = builtins.readFile ./preview-image.sh;
   };
 in
@@ -344,7 +345,8 @@ in
         PREVIEW_IMAGE_NAME = cfg.impImage;
         PREVIEW_IMAGE_REF = cfg.impRegistryImage;
       };
-      # each start waits about 2 min for impd, so 10 starts outlast imp-host's 15 min start timeout
+      # each start waits up to about 10 min for impd, so restarts after failed waits stay under
+      # 10 an hour, and the unit keeps trying while imp-host runs
       startLimitIntervalSec = 3600;
       startLimitBurst = 10;
       serviceConfig = {
@@ -353,8 +355,9 @@ in
         Restart = "on-failure";
         RestartSec = 10;
         ExecStart = lib.getExe addImage;
-        # impd's first add pulls its builder image before the add pulls this one
-        TimeoutStartSec = "20min";
+        # the wait for impd takes up to about 10 min, and impd's first add pulls its builder image
+        # before the add pulls this one
+        TimeoutStartSec = "30min";
         NoNewPrivileges = true;
         PrivateTmp = true;
       };

@@ -1,20 +1,23 @@
 # A stand-in podman for the preview-image script (nixos/modules/preview-image.sh), the host build
 # lag check (nixos/modules/host-build-lag.sh) and the agent image build
 # (nixos/modules/agent-image-build.sh): it answers their impd calls through
-# `podman exec imp-host impz` from a state directory, $IMPD_STATE, and records each call's argv as
-# one JSON line in $IMPD_STATE/calls.
+# `podman exec imp-host impz` and `podman exec imp-host curl` from a state directory, $IMPD_STATE,
+# and records each call's argv as one JSON line in $IMPD_STATE/calls.
 #
 #   PODMAN=<this> IMPD_STATE=/tmp/impd preview-image
 #
 # The state directory holds:
 #   - images.json, impd's images as `impz image ls --json` prints them: an array of objects;
-#   - unreachable, optional: a count of calls still to fail, each as podman fails an exec while
-#     the imp-host container does not exist, which the stand-in counts down;
+#   - unreachable, optional: a count of `exec imp-host` calls still to fail, each as podman fails
+#     an exec while the imp-host container does not exist, which the stand-in counts down;
+#   - starting, optional: a count of /health calls still to answer ready false, once unreachable
+#     has none left, which the stand-in counts down;
 #   - unauthorized, optional: a count of calls still to fail once unreachable has none left, each
 #     as impz fails a call that impd refuses with 401, which the stand-in counts down;
 #   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
 #   - version, optional: the imp version that `impz info` prints;
-#   - container, optional: a directory that stands for the imp-host container's filesystem;
+#   - container, optional: a directory that stands for the imp-host container's filesystem, which
+#     `cp` reads and `exec -i imp-host sh -s` runs against;
 #   - container-ids, optional: the imp-host container's ID at each inspect, one per line, which
 #     stands for a container that a later inspect finds recreated; an empty line stands for no
 #     container.
@@ -25,6 +28,10 @@
 # <name>` pins the image of that name and prints nothing, or fails with "impz: NOT_FOUND: image <name> not
 # found" when images.json holds none. `exec imp-host impz info`, with a version file, prints
 # the first line of `impz info`, the version, its label padded to 12 characters, and no other line.
+# `exec imp-host curl -sS --max-time 5 http://127.0.0.1:7070/health` prints impd's /health body,
+# with ready false while starting counts down and ready true after. `exec -i imp-host sh -s --
+# <path>...` runs dash, the sh of Debian and so of imp-host, on the script on stdin, with each
+# absolute path argument moved under container/, and prints what it prints.
 # `cp imp-host:<path> <dest>` copies container/<path> to <dest> with its mode and prints nothing,
 # or fails with 'Error: "<path>" could not be found on container imp-host: no such file or
 # directory' when container/<path> is not a file. `container inspect --format {{.Id}} imp-host`
@@ -33,9 +40,10 @@
 # Any other call fails with "unexpected: <argv>" and status 97. Without $IMPD_STATE it exits 2.
 #
 # What it assumes of podman and impd, from zgeoff/impz at the flake's imp input
-# (packages/cli/src/commands/image.ts, packages/cli/src/run-action.ts and
-# packages/daemon/src/images/create-image-writer.ts): `impz image ls --json` and `impz image add
-# --json` print JSON.stringify(value, null, 2) of an image list and of one image, with the fields
+# (packages/cli/src/commands/image.ts, packages/cli/src/run-action.ts,
+# packages/daemon/src/images/create-image-writer.ts and packages/daemon/src/surface/create-app.ts):
+# impd's /health answers {"status":"ok","ready":<bool>,"warnings":[...]} to a call with no token;
+# `impz image ls --json` and `impz image add --json` print JSON.stringify(value, null, 2) of an image list and of one image, with the fields
 # id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
 # `impz: <message>`, and exits 1, with the message 'unauthorized: set IMP_TOKEN to the token from
 # <IMP_DATA_DIR>/token, or run impz login <url>' for a 401 from impd; an add under a name that
@@ -52,6 +60,8 @@ pkgs.lib.getExe (
     name = "podman-answering-impz";
     runtimeInputs = [
       pkgs.coreutils
+      pkgs.gawk
+      pkgs.getconf
       pkgs.jq
     ];
     text = ''
@@ -60,13 +70,33 @@ pkgs.lib.getExe (
         exit 2
       fi
       jq -cn '$ARGS.positional' --args -- "$@" >> "$IMPD_STATE/calls"
-      if [ "$#" -ge 3 ] && [ "$1 $2 $3" = "exec imp-host impz" ] && [ -s "$IMPD_STATE/unreachable" ]; then
+      if [ "$#" -ge 3 ] && [ "$1 $2" = "exec imp-host" ] && [ -s "$IMPD_STATE/unreachable" ]; then
         left=$(cat "$IMPD_STATE/unreachable")
         if [ "$left" -gt 0 ]; then
           echo $((left - 1)) > "$IMPD_STATE/unreachable"
           echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
           exit 125
         fi
+      fi
+      if [ "$*" = "exec imp-host curl -sS --max-time 5 http://127.0.0.1:7070/health" ]; then
+        ready=true
+        if [ -s "$IMPD_STATE/starting" ] && [ "$(cat "$IMPD_STATE/starting")" -gt 0 ]; then
+          echo $(($(cat "$IMPD_STATE/starting") - 1)) > "$IMPD_STATE/starting"
+          ready=false
+        fi
+        printf '{"status":"ok","ready":%s,"warnings":[]}' "$ready"
+        exit 0
+      fi
+      if [ "$#" -ge 6 ] && [ "$1 $2 $3 $4 $5 $6" = "exec -i imp-host sh -s --" ]; then
+        shift 6
+        paths=()
+        for path in "$@"; do
+          case $path in
+            /*) paths+=("$IMPD_STATE/container$path") ;;
+            *) paths+=("$path") ;;
+          esac
+        done
+        exec ${pkgs.dash}/bin/dash -s -- "''${paths[@]}"
       fi
       if [ "$#" -ge 3 ] && [ "$1 $2 $3" = "exec imp-host impz" ] && [ -s "$IMPD_STATE/unauthorized" ]; then
         left=$(cat "$IMPD_STATE/unauthorized")

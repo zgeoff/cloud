@@ -1473,6 +1473,52 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostPodman answers /health with ready false for the calls its starting count names, once unreachable has none left, then with ready true";
+      script = ''
+        mkdir home tmp impd
+        echo 1 > impd/unreachable
+        echo 1 > impd/starting
+
+        for call in first second third; do
+          status=0
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+            ${stubImpHostPodman} exec imp-host curl -sS --max-time 5 http://127.0.0.1:7070/health > "$call.out" 2> "$call.err" || status=$?
+          echo "$status" > "$call.status"
+        done
+
+        assert_equals 125 "$(cat first.status)" "the first call's exit status"
+        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first call's error"
+        assert_equals 0 "$(cat second.status)" "the second call's exit status"
+        assert_equals '{"status":"ok","ready":false,"warnings":[]}' "$(cat second.out)" "the second call's output"
+        assert_files_equal /dev/null second.err
+        assert_equals 0 "$(cat third.status)" "the third call's exit status"
+        assert_equals '{"status":"ok","ready":true,"warnings":[]}' "$(cat third.out)" "the third call's output"
+        assert_files_equal /dev/null third.err
+      '';
+    }
+    {
+      title = "it buildStubImpHostPodman runs the script on stdin with dash, with each absolute path moved under container/, and prints its output";
+      script = ''
+        mkdir home tmp impd
+        mkdir -p impd/container/var/lib/imp
+        echo held > impd/container/var/lib/imp/marker
+
+        status=0
+        printf 'cat "$1"; echo "$2"; readlink -f /proc/$$/exe\n' |
+          env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+            ${stubImpHostPodman} exec -i imp-host sh -s -- /var/lib/imp/marker relative > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal - out <<'EOF'
+        held
+        relative
+        ${pkgs.dash}/bin/dash
+        EOF
+        assert_files_equal /dev/null err
+        assert_equals '["exec","-i","imp-host","sh","-s","--","/var/lib/imp/marker","relative"]' "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
       title = "it buildStubImpHostPodman prints the container ID of each inspect from container-ids, keeping the last";
       script = ''
         mkdir home tmp impd
