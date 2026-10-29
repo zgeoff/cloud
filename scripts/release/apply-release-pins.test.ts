@@ -32,6 +32,7 @@ async function setupTest() {
     checkout: join(import.meta.dir, '../..'),
     owner: `${process.getuid?.() ?? 0}:${process.getgid?.() ?? 0}`,
     printOut: mock<(text: string) => void>(),
+    readText: mock((path: string) => readFile(path, 'utf8')),
   };
 }
 
@@ -66,6 +67,7 @@ test('it pins the input, the lock and both images', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -118,6 +120,7 @@ test('it locks the flake in the pinned Nix image and hands the lock back to the 
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -172,6 +175,7 @@ test('it hands the github token to the lock by its environment, never in an argv
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: { NIX_GITHUB_TOKEN: 'ghs_exampletoken' },
     printOut: ctx.printOut,
   });
@@ -218,6 +222,7 @@ test('it adds the github token after the caller nix config', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: { NIX_CONFIG: 'connect-timeout = 5', NIX_GITHUB_TOKEN: 'ghs_exampletoken' },
     printOut: ctx.printOut,
   });
@@ -260,6 +265,7 @@ test('it hands the lock no nix config without a github token', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: { NIX_CONFIG: 'access-tokens = example.invalid=other' },
     printOut: ctx.printOut,
   });
@@ -297,6 +303,7 @@ test('it keeps a newer imp-base and pins the host', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -346,6 +353,7 @@ test('it runs no lock when imp-host already holds the release', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -398,6 +406,7 @@ test('it refuses a lock that names another commit', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -441,6 +450,7 @@ test('it fails with the lock error when the lock fails', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -485,6 +495,7 @@ test("it writes the record's pin table entries with its pins", async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -527,6 +538,7 @@ test('it puts the pin table back when the lock fails', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -568,6 +580,7 @@ test('it refuses the release pinned with another digest without writing', async 
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -615,6 +628,7 @@ test('it refuses imp-base pins that disagree without writing', async () => {
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -659,6 +673,7 @@ test('it pins an atc release in the real pin files and keeps every other line', 
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -717,6 +732,7 @@ test('it pins both nixie images and the contract package at the release, then lo
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: { GH_TOKEN: 'ghs_exampletoken' },
     printOut: ctx.printOut,
   });
@@ -748,6 +764,46 @@ test('it pins both nixie images and the contract package at the release, then lo
   );
 });
 
+test('it checks the bun lock through the given reader', async () => {
+  const ctx = await setupTest();
+
+  const files = {
+    'infra/Pulumi.prod.yaml': `nixie:\n    image: ghcr.io/zgeoff/nixie:0.7.0@sha256:${'a'.repeat(64)}\n    webImage: ghcr.io/zgeoff/nixie-web:0.7.0@sha256:${'b'.repeat(64)}\n`,
+    'package.json': '{\n  "devDependencies": {\n    "@heynixie/contract": "0.7.0"\n  }\n}\n',
+    'bun.lock':
+      '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.0", "", {}, "sha512-old"],\n  },\n}\n',
+    'scripts/release/release-pins.json': '{}\n',
+  };
+
+  await Promise.all(
+    Object.entries(files).map((entry: readonly [string, string]) =>
+      writeFile(join(ctx.root, entry[0]), entry[1]),
+    ),
+  );
+
+  const stub = buildStubRunner(
+    buildStubBunInstall({
+      lock: '{\n  "lockfileVersion": 1,\n  "packages": {\n    "@heynixie/contract": ["@heynixie/contract@0.7.2", "", {}, "sha512-new"],\n  },\n}\n',
+    }),
+  );
+
+  const applied = await applyReleasePins({
+    record: getReleaseRecord('nixie'),
+    version: '0.7.2',
+    values: {
+      digests: { nixie: `sha256:${'d'.repeat(64)}`, 'nixie-web': `sha256:${'e'.repeat(64)}` },
+    },
+    root: ctx.root,
+    run: stub.run,
+    readText: ctx.readText,
+    env: {},
+    printOut: ctx.printOut,
+  });
+
+  expect(applied).toBeUndefined();
+  expect(ctx.readText).toHaveBeenLastCalledWith(join(ctx.root, 'bun.lock'));
+});
+
 test('it puts the pins, the lock and the pin table back when the package fails to install', async () => {
   const ctx = await setupTest();
 
@@ -777,6 +833,7 @@ test('it puts the pins, the lock and the pin table back when the package fails t
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -821,6 +878,7 @@ test('it refuses a lock that resolves the contract package at another version', 
     },
     root: ctx.root,
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });
@@ -847,6 +905,7 @@ test('it refuses a checkout that lacks a pin file', async () => {
     values: { tarballSum: 'd'.repeat(64) },
     root: join(ctx.root, 'missing'),
     run: stub.run,
+    readText: ctx.readText,
     env: {},
     printOut: ctx.printOut,
   });

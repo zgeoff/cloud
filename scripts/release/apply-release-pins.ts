@@ -1,4 +1,4 @@
-import { chmod, readFile, rename, stat, writeFile } from 'node:fs/promises';
+import { chmod, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { match } from 'ts-pattern';
 import { findJSONField } from '../find-json-field.ts';
@@ -18,6 +18,7 @@ export interface ApplyReleasePinsOptions {
 
   readonly root: string;
   readonly run: Runner;
+  readonly readText: (path: string) => Promise<string>;
 
   // NIX_GITHUB_TOKEN, when set, is a GitHub token that the lock sends to api.github.com, so a
   // shared runner IP's anonymous rate limit cannot fail it
@@ -28,7 +29,7 @@ export interface ApplyReleasePinsOptions {
 export async function applyReleasePins(
   options: Readonly<ApplyReleasePinsOptions>,
 ): Promise<Error | undefined> {
-  const files = await loadPinFiles(options.root, options.record);
+  const files = await loadPinFiles(options, options.record);
 
   const edits = planPinEdits({
     record: options.record,
@@ -54,7 +55,7 @@ export async function applyReleasePins(
   return undefined;
 }
 
-async function loadPinFiles(root: string, record: ReleaseRecord) {
+async function loadPinFiles(options: Readonly<ApplyReleasePinsOptions>, record: ReleaseRecord) {
   const assetFiles = record.pins.flatMap((pin) =>
     pin.lines.flatMap((line) =>
       Object.values(line.parts).flatMap((part) =>
@@ -67,7 +68,7 @@ async function loadPinFiles(root: string, record: ReleaseRecord) {
 
   const entries = await Promise.all(
     [...paths].map(async (path) => {
-      const contents = await readFile(join(root, path), 'utf8').catch(() => null);
+      const contents = await options.readText(join(options.root, path)).catch(() => null);
 
       return contents === null ? [] : [[path, contents] as const];
     }),
@@ -160,10 +161,10 @@ function runLock(options: Readonly<ApplyReleasePinsOptions>, lock: PinLock) {
 
 type FlakeLock = Extract<PinLock, { readonly kind: 'nix-flake-lock' }>;
 
-const nixImageFile = new URL('../nix-image.sh', import.meta.url);
+const nixImageFile = join(import.meta.dir, '../nix-image.sh');
 
 async function runFlakeLock(options: Readonly<ApplyReleasePinsOptions>, lock: FlakeLock) {
-  const pins = await readFile(nixImageFile, 'utf8');
+  const pins = await options.readText(nixImageFile);
 
   const image = /^NIX_IMAGE='(?<image>[^']+)'$/mu.exec(pins)?.groups?.['image'];
 
@@ -206,7 +207,7 @@ async function runFlakeLock(options: Readonly<ApplyReleasePinsOptions>, lock: Fl
 }
 
 async function checkLockedCommit(options: Readonly<ApplyReleasePinsOptions>, lock: FlakeLock) {
-  const text = await readFile(join(options.root, lock.lockFile), 'utf8');
+  const text = await options.readText(join(options.root, lock.lockFile));
 
   const nodes = findJSONField(JSON.parse(text), 'nodes');
   const locked = findJSONField(findJSONField(nodes, lock.input), 'locked');
@@ -233,7 +234,7 @@ async function runBunLock(options: Readonly<ApplyReleasePinsOptions>, lock: BunL
 }
 
 async function checkLockedVersion(options: Readonly<ApplyReleasePinsOptions>, lock: BunLock) {
-  const text = await readFile(join(options.root, lock.lockFile), 'utf8');
+  const text = await options.readText(join(options.root, lock.lockFile));
 
   // bun.lock is JSON with trailing commas, which JSON.parse refuses; each package's entry starts
   // with the name and version it resolved to
