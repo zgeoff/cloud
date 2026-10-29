@@ -509,6 +509,7 @@ test('it holds a bump that changes nixos/ while the NixOS checks run after CI pa
     checkRuns: [
       { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'NixOS checks', name: 'nixos', status: 'IN_PROGRESS', conclusion: null },
+      { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
   });
 
@@ -537,6 +538,7 @@ test('it holds a bump that changes nixos/ while CI runs after the NixOS checks p
     checkRuns: [
       { workflow: 'CI', name: 'checks', status: 'IN_PROGRESS', conclusion: null },
       { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
   });
 
@@ -566,6 +568,7 @@ test('it merges a bump that changes nixos/ once both CI and the NixOS checks pas
     checkRuns: [
       { workflow: 'CI', name: 'checks', status: 'COMPLETED', conclusion: 'SUCCESS' },
       { workflow: 'NixOS checks', name: 'nixos', status: 'COMPLETED', conclusion: 'SUCCESS' },
+      { workflow: 'release bump merge', name: 'merge', status: 'IN_PROGRESS', conclusion: null },
     ],
   });
 
