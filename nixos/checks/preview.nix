@@ -785,7 +785,7 @@ let
       '';
     }
     {
-      title = "it prints each failed try whose error differs from the one before, while impd starts and then refuses the call, with what the exec sees of impd's token file and impd's start";
+      title = "it prints each failed try whose error differs from the one before, while impd starts and then refuses the call, with what the exec sees of the impd token file and the impd start";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -816,7 +816,7 @@ let
       '';
     }
     {
-      title = "it says the exec sees no token file when impd refuses the call and impz's token file is missing";
+      title = "it says the exec sees no token file when impd refuses the call and the impz token file is missing";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -845,7 +845,7 @@ let
       '';
     }
     {
-      title = "it waits for impd's /health to report ready before its first impz call, printing a changed answer once";
+      title = "it waits for the impd /health to report ready before its first impz call, printing a changed answer once";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
