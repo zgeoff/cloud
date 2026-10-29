@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stop every imp whose guest runs or sleeps on 4 KiB pages, so it boots cold on the hugetlb pool at
-# its next use. switch-geoffcloud.sh runs it after the pool check when --stop-ordinary-page-imps
-# names the pool's switch window:
+# its next use. switch-geoffcloud.sh runs it before the activation that reserves the pool when
+# --stop-ordinary-page-imps names the pool's switch window:
 #
 #   bash scripts/stop-ordinary-page-imps.sh <host>          # stop each imp on 4 KiB pages
 #   bash scripts/stop-ordinary-page-imps.sh --plan <host>   # print the stop order, stop nothing

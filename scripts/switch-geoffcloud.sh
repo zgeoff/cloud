@@ -17,14 +17,16 @@
 # After the copy it holds a switch whose activation would stop or restart k3s, which can keep
 # nixie down for minutes, unless --allow-k3s-restart names a planned k3s window
 # (check-k3s-restart.sh).
+# With --stop-ordinary-page-imps, after those checks and before the activation reserves the hugetlb
+# pool, it stops each imp whose guest is on 4 KiB pages (stop-ordinary-page-imps.sh, in the order
+# that IMP_STOP_ORDER, the names and IMP_STOP_LAST give), so each boots cold on the pool and none
+# runs on ordinary pages beside a pool that comes up short; the imps keep their disks.
 # After the activation it waits for nixie's /health/ready to report every part ready
 # (check-nixie-ready.sh), and fails with each part that is not, since nixie needs impd to start.
 # Then it fails with each impd image record whose build folder is gone (check-impd-image-dirs.sh),
 # since every imp boot from such an image fails. Last it fails when the host reserved fewer
 # hugetlb pages than its system configures (check-hugetlb-pool.sh), since impd refuses each boot
-# and wake past them, and a reboot reserves the whole pool. With --stop-ordinary-page-imps it then
-# stops each imp whose guest is on 4 KiB pages (stop-ordinary-page-imps.sh, in the order that
-# IMP_STOP_ORDER, the names and IMP_STOP_LAST give), so each boots cold on the pool; the imps keep their disks.
+# and wake past them, and a reboot reserves the whole pool.
 # Once every check passes, it moves origin's deployed/host tag to the switched commit, so a change
 # that reaches the host only through a switch counts as shipped once the host runs it. A failed
 # switch leaves the tag where it was.
@@ -195,6 +197,11 @@ require_k3s_kept
 # (nixos/modules/host-build-lag.sh) reads, because the store path does not hold the commit.
 require_gateway_major
 require_nixie_impd_major
+# before the activation reserves the pool, so a pool that comes up short leaves no guest running
+# on ordinary pages beside it
+if [ -n "$stop_ordinary_page_imps" ]; then
+  bash "$(dirname "${BASH_SOURCE[0]}")/stop-ordinary-page-imps.sh" "$host"
+fi
 echo "== switch $host"
 ssh -o BatchMode=yes "$host" "nix-env -p /nix/var/nix/profiles/system --set '$built' \
   && mkdir -p /var/lib/host-build-lag && echo '$commit $built' >> /var/lib/host-build-lag/switches \
@@ -212,9 +219,6 @@ ssh -o BatchMode=yes "$host" systemctl --failed --no-legend --plain
 bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$host"
 bash "$(dirname "${BASH_SOURCE[0]}")/check-impd-image-dirs.sh" "$host"
 bash "$(dirname "${BASH_SOURCE[0]}")/check-hugetlb-pool.sh" "$host"
-if [ -n "$stop_ordinary_page_imps" ]; then
-  bash "$(dirname "${BASH_SOURCE[0]}")/stop-ordinary-page-imps.sh" "$host"
-fi
 
 # The tag records the commit the host runs, and the last activation decides that, so the push forces
 # the tag even when an earlier switch left it on a later commit. A failed push fails the switch with
