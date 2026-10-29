@@ -16,7 +16,7 @@
         "@zgeoff/bun-test-extended": "0.2.1",
         "@zgeoff/cloud-topology": "workspace:*",
         "@zgeoff/format-codemod": "0.3.3",
-        "@zgeoff/oxlint-config": "0.7.0",
+        "@zgeoff/oxlint-config": "0.7.1",
         "@zgeoff/skill-gate": "0.2.9",
         "knip": "6.42.0",
         "lefthook": "2.2.2",
@@ -667,7 +667,7 @@
 
     "@zgeoff/format-codemod": ["@zgeoff/format-codemod@0.3.3", "", { "dependencies": { "gunshi": "1.0.0-rc.1", "oxc-parser": "0.155.0" }, "bin": { "format-codemod": "dist/cli.js" } }, "sha512-HrKdnhO0E5dR9ro3Ah5wRuf+2Bz8s+tK60+gU2r14Q47/1G21iEfoBc9KTKCE6QvuqsHGDhKl/pyE+/BjU1NFw=="],
 
-    "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.7.0", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-ECHCzGCYnINclFxlkFxp1bJSw9RKnII/sj2YMKdJIJrQezgXp1vdcM3RuxgZqN3gJOpSKpEVrD4LD3oLSuyNgA=="],
+    "@zgeoff/oxlint-config": ["@zgeoff/oxlint-config@0.7.1", "", { "dependencies": { "@stylistic/eslint-plugin": "5.10.0" }, "peerDependencies": { "oxlint": ">=1.78.0" } }, "sha512-NMzI1GD4K+3mqNATsBoghRW3EVJAnBD+wTaMF2/9IafwNewLFirZc/9bi6tCkkL5jhlfJSN33npvoANqHUbRwQ=="],
 
     "@zgeoff/pulumi-onidel": ["@zgeoff/pulumi-onidel@workspace:sdk/onidel"],
 
