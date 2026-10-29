@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Test for stop-ordinary-page-imps.sh: it stops each running or sleeping imp whose guest is on 4 KiB
-# pages, in its names' sorted order after the names IMP_STOP_ORDER puts first, and only through
+# pages, in its names' sorted order between the names IMP_STOP_ORDER puts first and those
+# IMP_STOP_LAST puts last, and only through
 # `impz stop`, so each disk stays. It leaves an imp on 2 MiB pages and an imp with no guest alone,
 # and counts an imp as on 2 MiB pages when either its snapshot's file or its VM's file says so.
 # --plan prints the order and stops nothing, and --check fails naming each imp on 4 KiB pages, or
@@ -115,6 +116,37 @@ EOF
   assert_status 0 "$status"
 }
 
+it_stops_the_imps_imp_stop_last_names_last_in_that_order() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping"},{"id":"imp_2","name":"anvil","state":"running"},{"id":"imp_3","name":"lantern","state":"sleeping"},{"id":"imp_4","name":"quill","state":"sleeping"},{"id":"imp_5","name":"barrow","state":"sleeping"}]' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K\nimp_3 2M 4K\nimp_4 4K 4K\nimp_5 4K 4K' \
+    IMP_STOP_ORDER=barrow IMP_STOP_LAST='teapot,lantern ghost anvil barrow,teapot' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+== stop order on root@geoffcloud: barrow, quill, teapot, anvil
+== stop barrow: its sleeping guest is on 4 KiB pages
+== stop quill: its sleeping guest is on 4 KiB pages
+== stop teapot: its sleeping guest is on 4 KiB pages
+== stop anvil: its running guest is on 4 KiB pages
+== stopped 4 imps; each keeps its disk and boots cold on the pool at its next use
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << EOF
+$list_call
+$pages_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop barrow"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop quill"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop teapot"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop anvil"]
+EOF
+  assert_status 0 "$status"
+}
+
 it_prints_the_stop_order_and_stops_nothing_with_plan() {
   local status=0
   create_case_tree
@@ -122,13 +154,13 @@ it_prints_the_stop_order_and_stops_nothing_with_plan() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping"},{"id":"imp_2","name":"anvil","state":"running"}]' \
-    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K' IMP_STOP_LAST=anvil \
     bash "$script" --plan root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" << 'EOF'
-== stop order on root@geoffcloud: anvil, teapot
-== would stop anvil: its running guest is on 4 KiB pages
+== stop order on root@geoffcloud: teapot, anvil
 == would stop teapot: its sleeping guest is on 4 KiB pages
+== would stop anvil: its running guest is on 4 KiB pages
 EOF
   diff /dev/null "$tree/err"
   diff - "$tree/calls" << EOF

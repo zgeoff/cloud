@@ -24,7 +24,7 @@
 # hugetlb pages than its system configures (check-hugetlb-pool.sh), since impd refuses each boot
 # and wake past them, and a reboot reserves the whole pool. With --stop-ordinary-page-imps it then
 # stops each imp whose guest is on 4 KiB pages (stop-ordinary-page-imps.sh, in the order that
-# IMP_STOP_ORDER and the names give), so each boots cold on the pool; the imps keep their disks.
+# IMP_STOP_ORDER, the names and IMP_STOP_LAST give), so each boots cold on the pool; the imps keep their disks.
 # Once every check passes, it moves origin's deployed/host tag to the switched commit, so a change
 # that reaches the host only through a switch counts as shipped once the host runs it. A failed
 # switch leaves the tag where it was.

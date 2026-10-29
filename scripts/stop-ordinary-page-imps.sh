@@ -7,9 +7,10 @@
 #   bash scripts/stop-ordinary-page-imps.sh --plan <host>   # print the stop order, stop nothing
 #   bash scripts/stop-ordinary-page-imps.sh --check <host>  # fail naming each one, stop nothing
 #
-# The stop order is the imps' names sorted, after the names in IMP_STOP_ORDER (separated by spaces
-# or commas), which go first in their own order; a name there that is on 2 MiB pages or not on the
-# host is skipped. Each mode prints the order first.
+# The stop order is the names in IMP_STOP_ORDER, then the other imps' names sorted, then the names
+# in IMP_STOP_LAST, each list separated by spaces or commas and kept in its own order. A name in
+# both lists goes first, and a name that is on 2 MiB pages or not on the host is skipped. Each mode
+# prints the order first.
 #
 # impd 6.1.0 wakes a snapshot on the pages its guest ran on (pickWakeHugePages in zgeoff/impz
 # packages/daemon/src/imps/imps/pick-wake-huge-pages.ts), and its one RAM budget never counts the
@@ -69,11 +70,19 @@ while read -r id name state; do
 done <<< "$imps"
 
 order=()
+last=()
 declare -A ordered=()
-order_names="${IMP_STOP_ORDER:-}"
-for name in ${order_names//,/ }; do
+first_names="${IMP_STOP_ORDER:-}"
+for name in ${first_names//,/ }; do
   if [ -n "${states[$name]+set}" ] && [ -z "${ordered[$name]+set}" ]; then
     order+=("$name")
+    ordered["$name"]=1
+  fi
+done
+last_names="${IMP_STOP_LAST:-}"
+for name in ${last_names//,/ }; do
+  if [ -n "${states[$name]+set}" ] && [ -z "${ordered[$name]+set}" ]; then
+    last+=("$name")
     ordered["$name"]=1
   fi
 done
@@ -83,6 +92,7 @@ while read -r name; do
     ordered["$name"]=1
   fi
 done < <(printf '%s\n' "${!states[@]}" | LC_ALL=C sort)
+order+=("${last[@]}")
 
 if [ "${#order[@]}" = 0 ]; then
   echo "== no imp on $host is on 4 KiB pages"
