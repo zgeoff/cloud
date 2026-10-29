@@ -93,6 +93,7 @@ Run the script, which builds, then switches only after the build exits 0:
 bash scripts/switch-geoffcloud.sh               # build, switch, check the host runs the build
 bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s window
+bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hugetlb pool's window
 ```
 
 1. It refuses a branch other than `main`, uncommitted changes, a `main` behind `origin/main`, or any
@@ -148,7 +149,14 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
     in `vm.nr_hugepages`, because impd refuses each boot and wake that the free pool cannot hold.
     The activation reserves a changed pool on the running host, where fragmented memory can leave it
     short. Reboot the host, which reserves the whole pool early in boot, then run the switch again.
-13. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+13. With `--stop-ordinary-page-imps`, it stops each running or sleeping imp whose guest is on 4 KiB
+    pages with `impz stop`, so the imp boots cold on the pool at its next use, because impd wakes a
+    snapshot on the pages it ran on and budgets those beside the reserved pool. Each imp keeps its
+    disk and loses its processes and sessions. The stop order is the imps' names sorted, after the
+    names in `IMP_STOP_ORDER`, which go first. `bash scripts/stop-ordinary-page-imps.sh --plan <host>`
+    prints the order and stops nothing, and `--check` fails naming each imp still on 4 KiB pages.
+    Pass the flag only in the pool's window that the owner approved.
+14. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
     `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
     marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
     a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves

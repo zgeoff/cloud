@@ -36,6 +36,7 @@ Switches geoffcloud to the NixOS system of the checked-out `main`.
 bun run ops:switch-host                               # build, then switch
 bun run ops:switch-host -- --build-only               # build and print the system path
 bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s window
+bun run ops:switch-host -- --stop-ordinary-page-imps  # switch in the hugetlb pool's window
 ```
 
 - Wraps `bash scripts/switch-geoffcloud.sh`, which reaches the host in `GEOFFCLOUD_HOST`, or
@@ -50,6 +51,8 @@ bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s 
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`.
 - Pass `--allow-k3s-restart` only in a planned k3s window that the owner approved.
+- Pass `--stop-ordinary-page-imps` only in the hugetlb pool's window that the owner approved: it
+  stops each imp on 4 KiB pages, which ends its processes and sessions and keeps its disk.
 
 ## `bun run ops:deploy-prod`
 

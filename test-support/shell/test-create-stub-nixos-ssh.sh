@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the ten
+# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the thirteen
 # remote commands of a switch, fails closed on anything else, and hands a loopback call to
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
@@ -402,6 +402,46 @@ it_prints_no_reserved_and_no_configured_hugetlb_pages_when_none_are_named() {
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '0'
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+}
+
+it_prints_the_named_imps_and_their_page_sizes_and_takes_a_stop() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"kettle","state":"sleeping"}]' STUB_IMPD_IMP_PAGES='imp_1 4K 4K' \
+    bash -c 'ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json" &&
+      ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/vm.json\" && v=2M; echo \"\$d \$s \$v\"; done'"'"'" &&
+      ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz stop kettle"' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+[{"id":"imp_1","name":"kettle","state":"sleeping"}]
+imp_1 4K 4K
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c 'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/vm.json\" && v=2M; echo \"$d $s $v\"; done'"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop kettle"]
+CALLS
+  assert_status 0 "$status"
+}
+
+it_prints_an_empty_imp_list_and_no_page_sizes_when_none_are_named() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    bash -c 'ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json" &&
+      ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/vm.json\" && v=2M; echo \"\$d \$s \$v\"; done'"'"'"' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
   assert_status 0 "$status"
 }

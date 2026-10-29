@@ -7,7 +7,8 @@
 # commit, records that commit beside the path on the host before the activation, never activates a
 # build whose dry-activate would stop or restart k3s unless --allow-k3s-restart names a planned k3s
 # window, and fails when nixie is not ready after it, when an impd image record's build folder is
-# gone, or when the host reserved fewer hugetlb pages than its system configures. Only a
+# gone, or when the host reserved fewer hugetlb pages than its system configures, and in the pool's
+# window (--stop-ordinary-page-imps) stops each imp on 4 KiB pages in its stop order. Only a
 # switch that passes every check moves origin's deployed/host tag to the switched commit, and one
 # whose push origin refuses fails with the command that moves the tag. Each case
 # that switches commits its own nixos/packages/atc.nix and imp-host pin. gh also serves the nixie
@@ -64,7 +65,11 @@ kinds_calls='["gh","api","-H","Accept: application/vnd.github.raw","repos/zgeoff
 kinds_line='== impd 3.4.0 stores the secret kinds github, anthropic, npm, custom, oauth, which atc 2.26.2 accepts'
 # the image listing check-impd-image-dirs.sh runs after nixie reports ready
 images_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz image ls --json"]'
-# the pool query check-hugetlb-pool.sh runs last, after the image check
+# the imp listing and the page-size loop stop-ordinary-page-imps.sh runs in the pool's window
+imps_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json"]'
+# shellcheck disable=SC2016 # $d, $s and $v are the remote shell's variables, as the call log records them
+pages_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/vm.json\" && v=2M; echo \"$d $s $v\"; done'"'"'"]'
+# the pool query check-hugetlb-pool.sh runs after the image check
 pool_call='["ssh","-o","BatchMode=yes","root@geoffcloud","sysctl -n vm.nr_hugepages; sed -n '"'"'s/^vm\\.nr_hugepages=//p'"'"' /etc/sysctl.d/60-nixos.conf"]'
 # the dry-activate of the built system on root@geoffcloud, which every switch that copies runs
 dry_activate_call='["ssh","-o","BatchMode=yes","root@geoffcloud","NIXOS_INSTALL_BOOTLOADER=0 systemd-run -E LOCALE_ARCHIVE     -E NIXOS_INSTALL_BOOTLOADER -E NIXOS_NO_CHECK --collect --no-ask-password --wait --pipe --quiet     --service-type=exec --unit=switch-geoffcloud-dry-activate '"'"'/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test/bin/switch-to-configuration'"'"'     dry-activate"]'
@@ -1187,6 +1192,67 @@ EOF
   assert_status 1 "$status"
 }
 
+it_stops_each_imp_on_4_kib_pages_in_its_stop_order_after_the_pool_check_in_the_pool_window() {
+  local commit status=0
+  create_case_tree
+  setup_test "$tree"
+  mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin imp 3.4.0'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_HUGETLB_RESERVED=10240 STUB_HUGETLB_CONFIGURED=10240 \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping"},{"id":"imp_2","name":"anvil","state":"sleeping"}]' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K' IMP_STOP_ORDER=teapot \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/err"
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+$kinds_line
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+== switch root@geoffcloud
+== root@geoffcloud runs /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== nixie ready: store, imp_host
+== impd holds no image
+== root@geoffcloud reserved its whole hugetlb pool: 10240 pages
+== stop order on root@geoffcloud: teapot, anvil
+== stop teapot: its sleeping guest is on 4 KiB pages
+== stop anvil: its sleeping guest is on 4 KiB pages
+== stopped 2 imps; each keeps its disk and boots cold on the pool at its next use
+== deployed/host moved to $commit
+EOF
+  tail -n 6 "$tree/calls" > "$tree/calls-last"
+  diff - "$tree/calls-last" << EOF
+$images_call
+$pool_call
+$imps_call
+$pages_call
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop teapot"]
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop anvil"]
+EOF
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$commit"
+  assert_status 0 "$status"
+}
+
 it_fails_the_switch_naming_each_part_when_nixie_is_not_ready_after_it() {
   local commit earlier status=0 unready
   create_case_tree
@@ -1352,7 +1418,7 @@ it_rejects_an_unknown_argument_with_its_usage() {
     bash scripts/switch-geoffcloud.sh --switch) > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/err" << EOF
-usage: switch-geoffcloud.sh [--build-only | --allow-k3s-restart]
+usage: switch-geoffcloud.sh [--build-only | --allow-k3s-restart | --stop-ordinary-page-imps]
 EOF
   diff /dev/null "$tree/out"
   sed -E "s|$tree/tmp/tmp\.[A-Za-z0-9]+|SNAPSHOT|" "$tree/calls" > "$tree/calls-masked"
@@ -2078,7 +2144,8 @@ setup_test() {
     "$(dirname "${BASH_SOURCE[0]}")/check-atc-gateway-skew.sh" "$(dirname "${BASH_SOURCE[0]}")/check-nixie-impd-major.sh" \
     "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$(dirname "${BASH_SOURCE[0]}")/check-k3s-restart.sh" \
     "$(dirname "${BASH_SOURCE[0]}")/check-atc-secret-kinds.sh" "$(dirname "${BASH_SOURCE[0]}")/check-impd-image-dirs.sh" \
-    "$(dirname "${BASH_SOURCE[0]}")/check-hugetlb-pool.sh" "$tree/clone/scripts/"
+    "$(dirname "${BASH_SOURCE[0]}")/check-hugetlb-pool.sh" "$(dirname "${BASH_SOURCE[0]}")/stop-ordinary-page-imps.sh" \
+    "$tree/clone/scripts/"
   # the gate filter that find-nixos-check-run.sh runs with the real bun, its modules and its manifest
   cp "$(dirname "${BASH_SOURCE[0]}")"/{run-decide-gates,load-gate-manifest,is-gate-needed,exit-error,run-or-exit,run-process,with-exit-code}.ts \
     "$tree/clone/scripts/"

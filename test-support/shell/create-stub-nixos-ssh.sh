@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # create_stub_nixos_ssh <bin>: writes <bin>/ssh, a stand-in for ssh to the NixOS host that
 # switch-geoffcloud.sh switches. It logs each call's argv as a JSON line to STUB_LOG and
-# answers the ten remote commands the switch runs:
+# answers the thirteen remote commands the switch runs:
 #
 # - the kubectl query for the atc gateway pods' images: prints STUB_GATEWAY_IMAGES (images
 #   separated by spaces, as jsonpath joins an `[*]` list) with no newline, as kubectl's jsonpath
@@ -41,8 +41,15 @@
 #   vm.nr_hugepages reads back, and `0` when that is unset, then STUB_HUGETLB_CONFIGURED, the
 #   vm.nr_hugepages line's value in /etc/sysctl.d/60-nixos.conf, on the next line, and nothing
 #   when that is unset, as for a system that sets no pool;
-# - with STUB_IMP_HOST_GONE, both podman commands fail as podman does for a container that does
-#   not exist: 'Error: no container with name or ID "imp-host" found: no such container' on
+# - `podman exec imp-host impz ls --json`: prints STUB_IMPD_IMPS, the JSON array of impd's imps,
+#   and `[]` when that is unset;
+# - the `podman exec imp-host sh -c` loop of stop-ordinary-page-imps.sh that prints
+#   `<id> <snapshot pages> <vm pages>` for each folder under /var/lib/imp/imps: prints
+#   STUB_IMPD_IMP_PAGES, those lines, and nothing when that is unset;
+# - `podman exec imp-host impz stop <name>`: prints nothing, as the script discards the stopped
+#   imp's record;
+# - with STUB_IMP_HOST_GONE, both image commands and the imp listing fail as podman does for a
+#   container that does not exist: 'Error: no container with name or ID "imp-host" found: no such container' on
 #   stderr and exit 125, which ssh passes back.
 #
 # podman's line was checked against a real podman 5: `podman exec <a container that does not
@@ -189,6 +196,17 @@ case "${*:4}" in
     printf '%s\n' "${STUB_HUGETLB_RESERVED:-0}"
     if [ -n "${STUB_HUGETLB_CONFIGURED:-}" ]; then printf '%s\n' "$STUB_HUGETLB_CONFIGURED"; fi
     ;;
+  "podman exec imp-host impz ls --json")
+    if [ -n "${STUB_IMP_HOST_GONE:-}" ]; then
+      echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
+      exit 125
+    fi
+    printf '%s\n' "${STUB_IMPD_IMPS:-[]}"
+    ;;
+  "podman exec imp-host sh -c 'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/vm.json\" && v=2M; echo \"\$d \$s \$v\"; done'")
+    if [ -n "${STUB_IMPD_IMP_PAGES:-}" ]; then printf '%s\n' "$STUB_IMPD_IMP_PAGES"; fi
+    ;;
+  "podman exec imp-host impz stop "*) ;;
   *) echo "unexpected: $*" >&2; exit 97 ;;
 esac
 STUB

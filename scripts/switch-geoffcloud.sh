@@ -5,6 +5,7 @@
 #   bash scripts/switch-geoffcloud.sh               # build, then switch
 #   bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 #   bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s window
+#   bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # the hugetlb pool's window
 #
 # A switch first needs a green NixOS checks run that covers the commit; with none, it stops
 # before the build and names the command that starts one. It also stops, before the build and
@@ -21,7 +22,9 @@
 # Then it fails with each impd image record whose build folder is gone (check-impd-image-dirs.sh),
 # since every imp boot from such an image fails. Last it fails when the host reserved fewer
 # hugetlb pages than its system configures (check-hugetlb-pool.sh), since impd refuses each boot
-# and wake past them, and a reboot reserves the whole pool.
+# and wake past them, and a reboot reserves the whole pool. With --stop-ordinary-page-imps it then
+# stops each imp whose guest is on 4 KiB pages (stop-ordinary-page-imps.sh, in the order that
+# IMP_STOP_ORDER and the names give), so each boots cold on the pool; the imps keep their disks.
 # Once every check passes, it moves origin's deployed/host tag to the switched commit, so a change
 # that reaches the host only through a switch counts as shipped once the host runs it. A failed
 # switch leaves the tag where it was.
@@ -40,14 +43,16 @@ source "$(dirname "${BASH_SOURCE[0]}")/nix-image.sh"
 
 mode=switch
 k3s_args=()
+stop_ordinary_page_imps=
 host="${GEOFFCLOUD_HOST:-root@geoffcloud}"
 
 case "${1:-switch}" in
   switch) ;;
   --build-only) mode=--build-only ;;
   --allow-k3s-restart) k3s_args=(--allow-k3s-restart) ;;
+  --stop-ordinary-page-imps) stop_ordinary_page_imps=1 ;;
   *)
-    echo "usage: switch-geoffcloud.sh [--build-only | --allow-k3s-restart]" >&2
+    echo "usage: switch-geoffcloud.sh [--build-only | --allow-k3s-restart | --stop-ordinary-page-imps]" >&2
     exit 2
     ;;
 esac
@@ -207,6 +212,9 @@ ssh -o BatchMode=yes "$host" systemctl --failed --no-legend --plain
 bash "$(dirname "${BASH_SOURCE[0]}")/check-nixie-ready.sh" "$host"
 bash "$(dirname "${BASH_SOURCE[0]}")/check-impd-image-dirs.sh" "$host"
 bash "$(dirname "${BASH_SOURCE[0]}")/check-hugetlb-pool.sh" "$host"
+if [ -n "$stop_ordinary_page_imps" ]; then
+  bash "$(dirname "${BASH_SOURCE[0]}")/stop-ordinary-page-imps.sh" "$host"
+fi
 
 # The tag records the commit the host runs, and the last activation decides that, so the push forces
 # the tag even when an earlier switch left it on a later commit. A failed push fails the switch with
