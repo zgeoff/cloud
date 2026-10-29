@@ -1,7 +1,7 @@
-# A stand-in sleep for the impd-restore rehearsals and the preview-image script: it records its
-# argv as one JSON line in $SLEEP_LOG and returns at once, as the real sleep returns once its pause
-# is over. A call with one duration, a number of seconds such as `sleep 1`, exits 0 with no
-# output, as sleep does. Any other call is recorded too, and fails with "unexpected: <argv>" and
+# A stand-in sleep for the impd-restore rehearsals, the preview-image script and the agent image
+# build: it records its argv as one JSON line in $SLEEP_LOG and returns at once, as the real sleep
+# returns once its pause is over. A call with one duration, a number of seconds such as `sleep 1`,
+# exits 0 with no output, as sleep does. Any other call is recorded too, and fails with "unexpected: <argv>" and
 # status 97. Without $SLEEP_LOG it exits 2. Each script counts its pauses rather than reading a
 # clock, so the stand-in needs no time source: the pauses it records are the wait.
 #
@@ -11,7 +11,8 @@
 # nixos/checks/test-utils-check.nix pins: sleep given one number of seconds prints nothing and
 # exits 0; the script's start loop pauses through $IMPD_START_SLEEP with `1`, once for each of
 # its IMPD_START_WAIT_SECONDS tries; preview-image (nixos/modules/preview-image.sh) pauses through
-# $SLEEP with `2` between its tries. nixos/checks/test-utils-check.nix tests it.
+# $SLEEP with `2` between its tries, and agent-image-build (nixos/modules/agent-image-build.sh)
+# with `5`. nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
 pkgs.lib.getExe (
   pkgs.writeShellApplication {

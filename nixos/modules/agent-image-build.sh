@@ -3,9 +3,12 @@
 # holds no image of that name yet. The script keeps a clone of $REPO_URL in $STATE_DIR/cloud and
 # fetches its main without a credential. The image is agent-<short sha> of that commit, as
 # scripts/build-agent-image.ts names it, and the script skips the run when impd lists that name,
-# when no commit on main changes images/agent, or when a build of that commit failed before. Each
-# failed build leaves its time in $STATE_DIR/failed/<sha>, so a broken commit is built once, not at
-# every run; removing that file builds it again at the next run.
+# when no commit on main changes images/agent, or when a build of that commit failed before. A host
+# switch can recreate imp-host while the timer fires, so the script lists impd's images until impd
+# answers, pausing 5 s between AGENT_IMAGE_WAIT_TRIES tries (default 120), prints each failed try
+# whose error differs from the one before, and skips the run when the tries run out. Each failed
+# build leaves its time in $STATE_DIR/failed/<sha>, so a broken commit is built once, not at every
+# run; removing that file builds it again at the next run.
 #
 # To build, it copies imp's CLI out of the imp-host container, so the CLI always matches the impd it
 # calls, checks out main's head, and runs that head's scripts/build-agent-image.ts for the commit,
@@ -13,10 +16,13 @@
 # IMP_TOKEN, never in an argv. The build prints its progress to stderr and its result line, such as
 # "agent-0123abc <digest> check passed", on stdout; the script prints that line after
 # "agent-image-build: ". Inputs: REPO_URL, STATE_DIR, IMP_URL (impd's API), CREDENTIALS_DIRECTORY,
-# PODMAN, the podman that reaches imp-host, and BUN, the bun that runs the build.
+# PODMAN, the podman that reaches imp-host, BUN, the bun that runs the build, and SLEEP, the sleep
+# that pauses between tries (default: the one on PATH).
 
 # imp-host's image installs the CLI here (zgeoff/impz host/Dockerfile)
 impz_in_container=/usr/local/bin/impz
+pause="${SLEEP:-sleep}"
+tries="${AGENT_IMAGE_WAIT_TRIES:-120}"
 
 clone="$STATE_DIR/cloud"
 if [ ! -d "$clone/.git" ]; then
@@ -38,7 +44,22 @@ if [ -f "$failed" ]; then
   exit 0
 fi
 
-images=$("$PODMAN" exec imp-host impz image ls --json)
+err=$(mktemp)
+trap 'rm -f "$err"' EXIT
+try=1
+last=
+until images=$("$PODMAN" exec imp-host impz image ls --json 2> "$err"); do
+  if [ "$try" -ge "$tries" ]; then
+    echo "agent-image-build: impd listed no images after $tries tries: $(cat "$err"); the next run tries again"
+    exit 0
+  fi
+  if [ "$(cat "$err")" != "$last" ]; then
+    last=$(cat "$err")
+    echo "agent-image-build: waiting for impd, try $try: $last"
+  fi
+  try=$((try + 1))
+  "$pause" 5
+done
 if jq -e --arg name "$image" 'any(.[]; .name == $name)' <<< "$images" > /dev/null; then
   echo "agent-image-build: impd holds $image, built from $sha; nothing to build"
   exit 0

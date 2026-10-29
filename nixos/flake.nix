@@ -67,7 +67,8 @@
       # a stand-in upstream, and atc-daemon-vm, which starts the atc daemon on its gateway token as
       # the host does, and onepassword-connect-relay-vm, which switches the Connect relay to another
       # bridge, and preview-image-vm, which boots the preview-image unit against a stand-in impd
-      # that refuses its first start. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
+      # that refuses its first start, and agent-image-build-switch-vm, which starts the agent image
+      # build while a switch recreates imp-host. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
       # checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
         pkgs = nixpkgs.legacyPackages.x86_64-linux;
@@ -133,6 +134,9 @@
       };
       checks.x86_64-linux.agent-image-build = import ./checks/agent-image-build.nix {
         inherit nixpkgs imp;
+      };
+      checks.x86_64-linux.agent-image-build-switch-vm = import ./checks/agent-image-build-switch-vm.nix {
+        inherit nixpkgs;
       };
       checks.x86_64-linux.host-cgroup-cpu = import ./checks/host-cgroup-cpu.nix {
         inherit nixpkgs imp;
