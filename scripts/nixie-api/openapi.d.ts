@@ -65,6 +65,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/conversation/move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["conversation.move"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["tasks.list"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/memory/readVersions": {
         parameters: {
             query?: never;
@@ -770,6 +802,11 @@ export interface operations {
                             };
                             /** Format: date-time */
                             recordedAt: string;
+                            route?: {
+                                isMove: boolean;
+                                messages: number[];
+                                taskID: string;
+                            };
                             sequence: number;
                             summary?: {
                                 contextSize?: number;
@@ -858,6 +895,11 @@ export interface operations {
                             };
                             /** Format: date-time */
                             recordedAt: string;
+                            route?: {
+                                isMove: boolean;
+                                messages: number[];
+                                taskID: string;
+                            };
                             sequence: number;
                             summary?: {
                                 contextSize?: number;
@@ -1287,6 +1329,214 @@ export interface operations {
                         /** @constant */
                         status: 409;
                         /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "conversation.move": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    clientActionID: string;
+                    sequence: number;
+                    thread: string;
+                    to: {
+                        /** @constant */
+                        kind: "task";
+                        taskID: string;
+                    } | {
+                        /** @constant */
+                        kind: "new";
+                        name: string;
+                        brief: string;
+                    };
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: date-time */
+                        movedAt: string;
+                        taskID: string;
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 404 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "RECORD_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No message of yours on this thread has this sequence */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "TASK_NOT_FOUND";
+                        /** @constant */
+                        status: 404;
+                        /** @default No open task has this ID */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+            /** @description 409 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "CLIENT_ACTION_ID_REUSED";
+                        /** @constant */
+                        status: 409;
+                        /** @default The client action ID belongs to a different action */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "TASK_TAKES_NO_MESSAGES";
+                        /** @constant */
+                        status: 409;
+                        /** @default This task runs on its own schedule and takes no message of yours */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "ALREADY_THERE";
+                        /** @constant */
+                        status: 409;
+                        /** @default The message already went to this task */
+                        message: string;
+                        data?: unknown;
+                    } | {
+                        /** @constant */
+                        defined: false;
+                        code: string;
+                        status: number;
+                        message: string;
+                        data?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    "tasks.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        tasks: {
+                            brief: string;
+                            isTakingMessages: boolean;
+                            /** Format: date-time */
+                            lastActivityAt: string;
+                            name: string;
+                            /** @enum {string} */
+                            state: "ready" | "running" | "waiting" | "done" | "failed";
+                            taskID: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description 401 */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        defined: true;
+                        /** @constant */
+                        code: "UNAUTHORIZED";
+                        /** @constant */
+                        status: 401;
+                        /** @default The device session is missing, lapsed or revoked */
                         message: string;
                         data?: unknown;
                     } | {
@@ -5617,6 +5867,11 @@ export interface operations {
                                 };
                                 /** Format: date-time */
                                 recordedAt: string;
+                                route?: {
+                                    isMove: boolean;
+                                    messages: number[];
+                                    taskID: string;
+                                };
                                 sequence: number;
                                 summary?: {
                                     contextSize?: number;
@@ -5777,6 +6032,11 @@ export interface operations {
                                 };
                                 /** Format: date-time */
                                 recordedAt: string;
+                                route?: {
+                                    isMove: boolean;
+                                    messages: number[];
+                                    taskID: string;
+                                };
                                 sequence: number;
                                 summary?: {
                                     contextSize?: number;
