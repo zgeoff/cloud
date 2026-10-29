@@ -70,6 +70,9 @@ const expectations: readonly TriggerExpectation[] = [
     triggered: false,
     violation: 'a CI run that completes on another branch starts a run',
   },
+
+  // the NixOS checks can finish after CI on a bump that changes nixos/, and no later check would
+  // start a decision
   {
     workflow: 'release-bump-merge.yml',
     event: {
@@ -78,8 +81,19 @@ const expectations: readonly TriggerExpectation[] = [
       type: 'completed',
       headBranch: 'release-check/imp',
     },
+    triggered: true,
+    violation: 'a NixOS checks run that completes on a release check branch starts no run',
+  },
+  {
+    workflow: 'release-bump-merge.yml',
+    event: {
+      name: 'workflow_run',
+      workflow: 'NixOS checks',
+      type: 'completed',
+      headBranch: 'renovate/example',
+    },
     triggered: false,
-    violation: 'a NixOS checks run that completes starts a run',
+    violation: 'a NixOS checks run that completes on another branch starts a run',
   },
 ];
 

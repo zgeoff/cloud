@@ -20,7 +20,7 @@ jobs:
 
   const releaseBumpMerge = `on:
   workflow_run:
-    workflows: [CI]
+    workflows: [CI, NixOS checks]
     types: [completed]
     branches: ['release-check/**']
 `;
@@ -127,14 +127,14 @@ jobs:
   );
 });
 
-test('it reports a release bump merge that a CI run on another branch starts', async () => {
+test('it reports a release bump merge that a CI or NixOS checks run on another branch starts', async () => {
   const ctx = setupTest();
 
   const files = new Map([
     ['/repo/.github/workflows/nixos-checks.yml', ctx.nixosChecks],
     [
       '/repo/.github/workflows/release-bump-merge.yml',
-      'on:\n  workflow_run:\n    workflows: [CI]\n    types: [completed]\n',
+      'on:\n  workflow_run:\n    workflows: [CI, NixOS checks]\n    types: [completed]\n',
     ],
   ]);
 
@@ -148,18 +148,19 @@ test('it reports a release bump merge that a CI run on another branch starts', a
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'release-bump-merge.yml: a CI run that completes on another branch starts a run\n',
+    'release-bump-merge.yml: a CI run that completes on another branch starts a run\n' +
+      'release-bump-merge.yml: a NixOS checks run that completes on another branch starts a run\n',
   );
 });
 
-test('it reports a release bump merge that a NixOS checks run starts and a CI run does not', async () => {
+test('it reports a release bump merge that a NixOS checks run on a release check branch does not start', async () => {
   const ctx = setupTest();
 
   const files = new Map([
     ['/repo/.github/workflows/nixos-checks.yml', ctx.nixosChecks],
     [
       '/repo/.github/workflows/release-bump-merge.yml',
-      "on:\n  workflow_run:\n    workflows: ['NixOS checks']\n    types: [completed]\n",
+      "on:\n  workflow_run:\n    workflows: [CI]\n    types: [completed]\n    branches: ['release-check/**']\n",
     ],
   ]);
 
@@ -173,8 +174,32 @@ test('it reports a release bump merge that a NixOS checks run starts and a CI ru
   expect(exitCode).toBe(1);
 
   expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
-    'release-bump-merge.yml: a CI run that completes on a release check branch starts no run\n' +
-      'release-bump-merge.yml: a NixOS checks run that completes starts a run\n',
+    'release-bump-merge.yml: a NixOS checks run that completes on a release check branch starts no run\n',
+  );
+});
+
+test('it reports a release bump merge that a CI run on a release check branch does not start', async () => {
+  const ctx = setupTest();
+
+  const files = new Map([
+    ['/repo/.github/workflows/nixos-checks.yml', ctx.nixosChecks],
+    [
+      '/repo/.github/workflows/release-bump-merge.yml',
+      "on:\n  workflow_run:\n    workflows: ['NixOS checks']\n    types: [completed]\n    branches: ['release-check/**']\n",
+    ],
+  ]);
+
+  const exitCode = await checkWorkflowTriggers({
+    args: ['/repo'],
+    readText: (path) => Promise.resolve(files.get(path) ?? ''),
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(1);
+
+  expect(ctx.printErr).toHaveBeenCalledExactlyOnceWith(
+    'release-bump-merge.yml: a CI run that completes on a release check branch starts no run\n',
   );
 });
 
