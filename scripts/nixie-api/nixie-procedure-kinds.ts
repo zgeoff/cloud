@@ -24,6 +24,7 @@ export const nixieProcedureKinds = {
   'memory/forgetRetired': 'write',
   'memory/readForgetStatus': 'read',
   'memory/pin': 'write',
+  'memory/markSensitive': 'write',
   'memory/keep': 'write',
   'memory/undo': 'write',
   'memory/listNotices': 'read',
