@@ -77,13 +77,13 @@ pkgs.testers.runNixOSTest {
         status, out = machine.execute("/run/current-system/specialisation/recreate/bin/switch-to-configuration test 2>&1")
         machine.wait_until_succeeds("test \"$(systemctl show -p ActiveState --value agent-image-build.service)\" = inactive", timeout=120)
         build = machine.succeed("systemctl show -p Result -p ExecMainStatus agent-image-build.service").split()
-        log = machine.succeed("journalctl -b -u agent-image-build.service -o cat | grep '^agent-image-build: '").splitlines()
+        lines = machine.succeed("journalctl -b -u agent-image-build.service -o cat | grep '^agent-image-build: '").splitlines()
 
         assert status == 0, f"switch-to-configuration exited {status}: {out}"
         assert sorted(build) == ["ExecMainStatus=0", "Result=success"], build
-        assert log == [
+        assert lines == [
             'agent-image-build: waiting for impd, try 1: Error: no container with name or ID "imp-host" found: no such container',
             f"agent-image-build: impd holds {image}, built from {pin}; nothing to build",
-        ], log
+        ], lines
   '';
 }
