@@ -53,6 +53,10 @@ test.each([
   ['nixie-backup', ['deploy/nixie/backup/backup.sh'], true],
   ['nixie-backup', ['package.json'], true],
   ['nixie-backup', ['deploy/files/backup/backup.sh', 'infra/index.ts'], false],
+  ['alert-rules', ['infra/observability/build-alert-rules.ts'], true],
+  ['alert-rules', ['packages/topology/index.ts'], true],
+  ['alert-rules', ['test-support/shell/start-alloy.sh'], true],
+  ['alert-rules', ['nixos/flake.nix', 'docs/runbooks/ops.md', 'images/agent/Dockerfile'], false],
 ])('it decides the %s gate for a change to %p as %p', async (name, paths, expected) => {
   const manifest = await loadGateManifest(join(import.meta.dir, '..', '.github', 'gates.yml'));
 
@@ -79,6 +83,7 @@ test('it holds the gates that CI, the NixOS checks and the prod apply read', asy
     'files-image',
     'files-backup',
     'nixie-backup',
+    'alert-rules',
   ]);
 });
 

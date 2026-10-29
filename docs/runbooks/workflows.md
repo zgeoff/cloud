@@ -179,11 +179,22 @@ snapshot of the working tree's tracked and unignored files. Its Nix store is the
 
 ### Check the host before a switch
 
-The NixOS checks gate the switch, not the merge, so a pull request that changes `nixos/` merges
-without them, a release bump included. The `NixOS checks` workflow builds them on `main` every
-night, and skips the build when an earlier green run covers the commit. A green scheduled or
-dispatched run on `main` covers every later commit that changes no input of the checks, which the
-`nixos` gate of [`gates.yml`](../../.github/gates.yml) lists. No pull request runs the checks.
+The NixOS checks gate the switch, not the merge. The `NixOS checks` workflow runs on `main` every
+night and on each dispatch, on `main` or on a branch. It also runs on each push to a pull request
+that changes an input of the checks, a release bump included, so a break shows before the merge; the
+merge does not wait for it, and the switch never counts it. A Renovate pull request starts no run;
+the nightly run checks its bump.
+
+A run builds nothing, and passes, in two cases. A green scheduled or dispatched run on `main` covers
+every later commit that changes no input of the checks, which the `nixos` gate of
+[`gates.yml`](../../.github/gates.yml) lists. A run also skips the build when an earlier run built
+and passed the same derivations with the same workflow and build scripts, wherever that run ran; the
+skipped run's summary links it. A dispatch with `-f force=true` always builds.
+
+Runs on one commit of `main` queue, so the later one finds the earlier one's result. A newer
+dispatch on a branch cancels the branch's older run. A build substitutes the store paths it needs
+from `main`'s Actions cache of the paths that cache.nixos.org does not serve, and a build on `main`
+replaces that cache.
 
 To switch before the nightly run covers the commit:
 

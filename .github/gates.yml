@@ -76,8 +76,8 @@ gates:
   # nixos/checks/test-utils/build-shell-lib-source.nix selects, and no other file beside them, with
   # the Discord webhook and kubectl stand-ins that the drift-check-vm check runs; the scripts that
   # run the checks, pin their image and open KVM to them; the scripts that tank-cloud-host-secrets
-  # runs in its VM; .bun-version; the workflow; and the scripts that decide
-  # when the checks run, with this file. The root package.json is no input, although its
+  # runs in its VM; .bun-version; the workflow; the scripts that keep its store cache; and the
+  # scripts that decide when the checks run, with this file. The root package.json is no input, although its
   # test:nixos script runs the checks: a change to it alone runs at the next change to an input,
   # or on a dispatch.
   nixos:
@@ -118,6 +118,9 @@ gates:
       - .bun-version
       - .github/workflows/nixos-checks.yml
       - scripts/decide-nixos-checks.sh
+      - scripts/decide-nixos-checks-build.sh
+      - scripts/write-nixos-checks-cache.sh
+      - scripts/remove-stale-nixos-checks-caches.sh
       - scripts/find-nixos-check-run.sh
       - .github/gates.yml
       - scripts/run-decide-gates.ts
@@ -198,6 +201,24 @@ gates:
       - test-support/shell/run-backup-shell.sh
       - test-support/shell/normalize-restic-output.sh
       - infra/Pulumi.prod.yaml
+      - .bun-version
+      - package.json
+      - .github/workflows/ci.yml
+
+  # The probes and alert rules in their real engines (Docker): the builders under infra/ and what
+  # they import from the shared constants and the health check's contract, the suites and their
+  # helpers, the script that runs them, the dependencies, and the CI workflow.
+  alert-rules:
+    skipped:
+      Nothing the alert rules and probes build from changed, so their engine tests did not run.
+    paths:
+      - infra/**
+      - packages/topology/**
+      - workers/health-check/**
+      - e2e/test-atc-sign-in-alert-journey.sh
+      - test-support/shell/**
+      - scripts/run-shell-suites.sh
+      - bun.lock
       - .bun-version
       - package.json
       - .github/workflows/ci.yml

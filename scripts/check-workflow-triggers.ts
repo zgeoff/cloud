@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
+import { findJSONField } from './find-json-field.ts';
 import type { ActionsTriggerEvent } from './is-workflow-triggered.ts';
 import { isWorkflowTriggered } from './is-workflow-triggered.ts';
 
@@ -21,8 +22,8 @@ interface TriggerExpectation {
 const usage = 'usage: check-workflow-triggers.ts [repo root]\n';
 
 const expectations: readonly TriggerExpectation[] = [
-  // the switch gate reads only the scheduled and dispatched runs on main, so a pull request's run
-  // would bill for a result nothing reads
+  // a pull request that changes the checks' inputs learns of a break before it merges, a release
+  // bump's included; the switch gate still reads only main's runs
   {
     workflow: 'nixos-checks.yml',
     event: {
@@ -30,8 +31,8 @@ const expectations: readonly TriggerExpectation[] = [
       baseBranch: 'main',
       files: ['nixos/flake.nix', 'nixos/flake.lock', 'packages/topology/index.ts'],
     },
-    triggered: false,
-    violation: 'a pull request that changes nixos/ starts a run',
+    triggered: true,
+    violation: 'a pull request that changes nixos/ starts no run',
   },
   {
     workflow: 'nixos-checks.yml',
@@ -114,6 +115,10 @@ export async function checkWorkflowTriggers(
     )
     .map((expectation) => `${expectation.workflow}: ${expectation.violation}`);
 
+  if (!isRenovateSkipped(texts.get('nixos-checks.yml') ?? '')) {
+    violations.push('nixos-checks.yml: a Renovate pull request starts the nixos job');
+  }
+
   if (violations.length > 0) {
     options.printErr(violations.map((violation) => `${violation}\n`).join(''));
 
@@ -126,6 +131,10 @@ export async function checkWorkflowTriggers(
 
   return 0;
 }
+
+// a Renovate bump that touches nixos/ waits for the nightly run instead; the trigger filters
+// cannot tell an author apart, so the nixos job's condition holds the rule
+const renovateSkip = "github.event.pull_request.user.login != 'zgeoff-renovate[bot]'";
 
 function parseRoot(args: readonly string[]): string | undefined {
   const positionals = tryParsePositionals(args);
@@ -145,6 +154,13 @@ function tryParsePositionals(args: readonly string[]): string[] | null {
   } catch {
     return null;
   }
+}
+
+function isRenovateSkipped(workflowText: string): boolean {
+  const document: unknown = Bun.YAML.parse(workflowText);
+  const condition = findJSONField(findJSONField(findJSONField(document, 'jobs'), 'nixos'), 'if');
+
+  return typeof condition === 'string' && condition.replaceAll(/\s+/gu, ' ').includes(renovateSkip);
 }
 
 if (import.meta.main) {
