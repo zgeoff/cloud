@@ -14,7 +14,10 @@
 #     as impz fails a call that impd refuses with 401, which the stand-in counts down;
 #   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
 #   - version, optional: the imp version that `impz info` prints;
-#   - container, optional: a directory that stands for the imp-host container's filesystem.
+#   - container, optional: a directory that stands for the imp-host container's filesystem;
+#   - container-ids, optional: the imp-host container's ID at each inspect, one per line, which
+#     stands for a container that a later inspect finds recreated; an empty line stands for no
+#     container.
 #
 # `exec imp-host impz image ls --json` prints images.json, pretty-printed. `exec imp-host impz
 # image add <ref> --name <name> --json` points <name> at <ref> in images.json, in place of any
@@ -24,7 +27,9 @@
 # the first line of `impz info`, the version, its label padded to 12 characters, and no other line.
 # `cp imp-host:<path> <dest>` copies container/<path> to <dest> with its mode and prints nothing,
 # or fails with 'Error: "<path>" could not be found on container imp-host: no such file or
-# directory' when container/<path> is not a file.
+# directory' when container/<path> is not a file. `container inspect --format {{.Id}} imp-host`
+# prints the first line of container-ids, and removes it while another line follows, or fails
+# with 'Error: no such container "imp-host"' and status 125 without the file or for an empty line.
 # Any other call fails with "unexpected: <argv>" and status 97. Without $IMPD_STATE it exits 2.
 #
 # What it assumes of podman and impd, from zgeoff/impz at the flake's imp input
@@ -34,12 +39,12 @@
 # id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
 # `impz: <message>`, and exits 1, with the message 'unauthorized: set IMP_TOKEN to the token from
 # <IMP_DATA_DIR>/token, or run impz login <url>' for a 401 from impd; an add under a name that
-# exists points the name at the new image
-# and keeps the name's pin (packages/daemon/src/platform/db/images.ts). podman prints
-# 'Error: no container with name or ID "<name>" found: no such container' and exits 125 for an
-# exec in a container that does not exist, and 'Error: "<path>" could not be found on container
-# <name>: no such file or directory' and exits 125 for a cp of a path the container lacks (checked
-# against podman 5). The id, digest, time and size the stand-in writes are its own, not impd's.
+# exists points the name at the new image and keeps the name's pin
+# (packages/daemon/src/platform/db/images.ts). podman prints 'Error: no container with name or ID
+# "<name>" found: no such container' and exits 125 for an exec in a container that does not exist,
+# 'Error: "<path>" could not be found on container <name>: no such file or directory' and exits 125
+# for a cp of a path the container lacks, and 'Error: no such container "<name>"' and exits 125
+# for an inspect of a container that does not exist (checked against podman 5). The id, digest, time and size the stand-in writes are its own, not impd's.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
 pkgs.lib.getExe (
@@ -110,6 +115,22 @@ pkgs.lib.getExe (
           exit 125
         fi
         cp --preserve=mode "$IMPD_STATE/container$path" "$3"
+        exit 0
+      fi
+      if [ "$*" = "container inspect --format {{.Id}} imp-host" ]; then
+        id=
+        if [ -f "$IMPD_STATE/container-ids" ]; then
+          id=$(head -n 1 "$IMPD_STATE/container-ids")
+          if [ "$(wc -l < "$IMPD_STATE/container-ids")" -gt 1 ]; then
+            tail -n +2 "$IMPD_STATE/container-ids" > "$IMPD_STATE/container-ids.new"
+            mv "$IMPD_STATE/container-ids.new" "$IMPD_STATE/container-ids"
+          fi
+        fi
+        if [ -z "$id" ]; then
+          echo 'Error: no such container "imp-host"' >&2
+          exit 125
+        fi
+        echo "$id"
         exit 0
       fi
       echo "unexpected: $*" >&2
