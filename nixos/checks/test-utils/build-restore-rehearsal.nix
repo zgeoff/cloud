@@ -96,12 +96,20 @@ pkgs.testers.runNixOSTest {
       systemd.services.rehearsal-pool = {
         requiredBy = [ "imp-zfs-dataset.service" ];
         before = [ "imp-zfs-dataset.service" ];
-        path = [ config.boot.zfs.package ];
+        path = [
+          config.boot.zfs.package
+          pkgs.kmod
+        ];
         serviceConfig = {
           Type = "oneshot";
           RemainAfterExit = true;
         };
-        script = "zpool list tank >/dev/null 2>&1 || zpool create -f tank /dev/vdb";
+        # zpool create enables only the features that the module lists in sysfs, which it fills in
+        # after /dev/zfs appears, so the module loads in full first
+        script = ''
+          modprobe zfs
+          zpool list tank >/dev/null 2>&1 || zpool create -f tank /dev/vdb
+        '';
       };
       services.imp = {
         enable = true;
