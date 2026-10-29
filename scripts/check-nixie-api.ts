@@ -1,7 +1,7 @@
 import type { NixieReply } from './classify-nixie-refusal.ts';
 import { classifyNixieRefusal } from './classify-nixie-refusal.ts';
 import type { NixieAPICheckCall } from './nixie-api/nixie-api-check-calls.ts';
-import type { NixieReadProcedure } from './nixie-api/nixie-procedure-kinds.ts';
+import type { NixieProcedure } from './nixie-api/nixie-rpc.ts';
 import { decodeNixieAnswer, encodeNixieRequest } from './nixie-api/nixie-rpc.ts';
 
 export interface CheckNixieAPIOptions {
@@ -41,7 +41,7 @@ async function readRefusal(
   options: Readonly<CheckNixieAPIOptions>,
   call: NixieAPICheckCall,
 ): Promise<string | null> {
-  const request = await encodeNixieRequest<NixieReadProcedure>({
+  const request = await encodeNixieRequest<NixieProcedure>({
     url: options.url,
     token: null,
     procedure: call.procedure,
