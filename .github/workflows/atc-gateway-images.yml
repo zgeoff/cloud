@@ -2,13 +2,13 @@ name: atc-gateway images
 
 # Runs the fixture test on every push to main that changes the images; CI's checks job runs it on
 # a pull request. Only main publishes to GHCR: a push to main whose images/atc-gateway/versions.env
-# pins a tag the registry lacks, or a manual run on main with push: true
-# (scripts/release/decide-gateway-publish.ts). A newer push cancels an older run's fixture and
-# decision, and its own decision still finds any tag the older run never published. The release
-# job refuses any ref but main and never cancels. After the
-# push, the release job opens the pull request that pins the new digests in infra/Pulumi.prod.yaml,
-# as the release check app, so CI runs on it; the release bump merge workflow merges it by its
-# rules, and the Deploy prod workflow applies it (docs/runbooks/release-check.md).
+# pins a tag the registry lacks or the stack config does not pin yet, or a manual run on main with
+# push: true (scripts/release/decide-gateway-publish.ts). A newer push cancels an older run's
+# fixture and decision, and its own decision still finds any tag the older run never published. The
+# release job refuses any ref but main and never cancels. After the push, the release job opens the
+# pull request that pins the new digests in infra/Pulumi.prod.yaml, as the release check app, so CI
+# runs on it; the release bump merge workflow merges it by its rules, and the Deploy prod workflow
+# applies it (docs/runbooks/release-check.md).
 on:
   push:
     branches: [main]

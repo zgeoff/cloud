@@ -1,5 +1,5 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
@@ -25,7 +25,17 @@ async function setupTest() {
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { tools, root, cacheDirectory, stub, printOut, printErr };
+  const dependencies = {
+    run: stub.run,
+    readText: (path: string) => readFile(path, 'utf8'),
+    probeFile: (path: string) => Bun.file(path).exists(),
+    removeTree: (path: string) => rm(path, { recursive: true, force: true }),
+    renameTree: (from: string, to: string) => rename(from, to),
+    printOut,
+    printErr,
+  };
+
+  return { tools, root, cacheDirectory, stub, printOut, printErr, dependencies };
 }
 
 test('it runs the lint at the tools tag that the repo-sync caller pins, in the repo', async () => {
@@ -51,9 +61,7 @@ test('it runs the lint at the tools tag that the repo-sync caller pins, in the r
     toolsURL: `file://${ctx.tools.origin}`,
     cacheDirectory: ctx.cacheDirectory,
     env: { ...ctx.tools.env, CHECKS_PROFILE: 'public' },
-    run: ctx.stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
+    ...ctx.dependencies,
   });
 
   const kept = await readdir(ctx.cacheDirectory);
@@ -83,9 +91,7 @@ test('it reuses the checkout of a tag it already holds, and runs no git', async 
     toolsURL: `file://${ctx.tools.origin}`,
     cacheDirectory: ctx.cacheDirectory,
     env: ctx.tools.env,
-    run: ctx.stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
+    ...ctx.dependencies,
   });
 
   expect(status).toBe(0);
@@ -113,9 +119,7 @@ test("it passes the lint's error status and output through", async () => {
     toolsURL: `file://${ctx.tools.origin}`,
     cacheDirectory: ctx.cacheDirectory,
     env: ctx.tools.env,
-    run: ctx.stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
+    ...ctx.dependencies,
   });
 
   expect(status).toBe(2);
@@ -135,9 +139,7 @@ test('it fails when the repo-sync caller pins no tools tag', async () => {
     toolsURL: `file://${ctx.tools.origin}`,
     cacheDirectory: ctx.cacheDirectory,
     env: ctx.tools.env,
-    run: ctx.stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
+    ...ctx.dependencies,
   });
 
   expect(status).toBe(2);
@@ -170,9 +172,7 @@ test('it fails with git s error for a tag tools lacks, and keeps no partial chec
     toolsURL: `file://${ctx.tools.origin}`,
     cacheDirectory: ctx.cacheDirectory,
     env: ctx.tools.env,
-    run: ctx.stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
+    ...ctx.dependencies,
   });
 
   const kept = await readdir(ctx.cacheDirectory);

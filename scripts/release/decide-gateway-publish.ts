@@ -4,6 +4,7 @@ export interface PinnedImage {
   readonly reference: string;
 
   readonly answer: RegistryAnswer;
+  readonly isPinnedInStack: boolean;
 }
 
 export interface GatewayPublishInput {
@@ -51,7 +52,20 @@ export function decideGatewayPublish(input: GatewayPublishInput): GatewayPublish
     'missing' in image.answer ? [image.reference] : [],
   );
 
-  return missing.length > 0
-    ? { action: 'publish', reason: `the registry lacks ${missing.join(' and ')}` }
-    : { action: 'skip', reason: 'the registry holds every pinned tag' };
+  if (missing.length > 0) {
+    return { action: 'publish', reason: `the registry lacks ${missing.join(' and ')}` };
+  }
+
+  // a release that pushed both tags and then failed to open its pin pull request still needs the
+  // release job, whose pushes skip a published tag
+  const unpinned = input.pinnedImages.flatMap((image) =>
+    image.isPinnedInStack ? [] : [image.reference],
+  );
+
+  return unpinned.length > 0
+    ? { action: 'publish', reason: `the stack config does not pin ${unpinned.join(' and ')} yet` }
+    : {
+        action: 'skip',
+        reason: 'the registry holds every pinned tag, and the stack config pins it',
+      };
 }

@@ -14,6 +14,10 @@ export interface RunWorkflowLintOptions {
 
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly run: Runner;
+  readonly readText: (path: string) => Promise<string>;
+  readonly probeFile: (path: string) => Promise<boolean>;
+  readonly removeTree: (path: string) => Promise<void>;
+  readonly renameTree: (from: string, to: string) => Promise<void>;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -22,7 +26,7 @@ const callerPath = '.github/workflows/repo-sync.yml';
 const lintPath = 'sync/pre-push/run-workflows-check.ts';
 
 export async function runWorkflowLint(options: Readonly<RunWorkflowLintOptions>): Promise<number> {
-  const caller = await readFile(join(options.root, callerPath), 'utf8');
+  const caller = await options.readText(join(options.root, callerPath));
 
   const ref = findToolsRef(caller);
 
@@ -34,7 +38,7 @@ export async function runWorkflowLint(options: Readonly<RunWorkflowLintOptions>)
 
   const checkout = join(options.cacheDirectory, ref);
 
-  const isKept = await Bun.file(join(checkout, lintPath)).exists();
+  const isKept = await options.probeFile(join(checkout, lintPath));
 
   const cloned = isKept ? undefined : await createToolsCheckout(options, ref, checkout);
 
@@ -89,7 +93,7 @@ async function createToolsCheckout(
 ): Promise<undefined | Error> {
   const partial = `${checkout}.partial-${process.pid}`;
 
-  await rm(partial, { recursive: true, force: true });
+  await options.removeTree(partial);
 
   const steps = [
     [
@@ -110,7 +114,7 @@ async function createToolsCheckout(
     const result = await options.run(argv, { env: options.env, timeoutMs: 120_000 });
 
     if (result.exitCode !== 0) {
-      await rm(partial, { recursive: true, force: true });
+      await options.removeTree(partial);
 
       return new Error(
         result.stderr.toString().trim() || `${argv.join(' ')} exited ${result.exitCode}`,
@@ -118,7 +122,7 @@ async function createToolsCheckout(
     }
   }
 
-  await rename(partial, checkout).catch(() => rm(partial, { recursive: true, force: true }));
+  await options.renameTree(partial, checkout).catch(() => options.removeTree(partial));
 
   return undefined;
 }
@@ -132,6 +136,10 @@ if (import.meta.main) {
     cacheDirectory: join(root, 'node_modules', '.cache', 'zgeoff-tools'),
     env: process.env,
     run: runProcess,
+    readText: (path) => readFile(path, 'utf8'),
+    probeFile: (path) => Bun.file(path).exists(),
+    removeTree: (path) => rm(path, { recursive: true, force: true }),
+    renameTree: (from, to) => rename(from, to),
     printOut: (text) => {
       process.stdout.write(text);
     },

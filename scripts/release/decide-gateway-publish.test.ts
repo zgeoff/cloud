@@ -13,7 +13,13 @@ test.each([
       eventName: 'push',
       ref: 'refs/heads/geo-31-gateway',
       pushInput: '',
-      pinnedImages: [{ reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0', answer: { missing: true } }],
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+      ],
     },
     { action: 'skip', reason: 'refs/heads/geo-31-gateway is not main, and only main publishes' },
   ],
@@ -34,10 +40,15 @@ test.each([
       ref: 'refs/heads/main',
       pushInput: '',
       pinnedImages: [
-        { reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0', answer: { missing: true } },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
         {
           reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
           answer: { digest: `sha256:${'3'.repeat(64)}` },
+          isPinnedInStack: true,
         },
       ],
     },
@@ -50,8 +61,16 @@ test.each([
       ref: 'refs/heads/main',
       pushInput: '',
       pinnedImages: [
-        { reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0', answer: { missing: true } },
-        { reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.25.0-r1', answer: { missing: true } },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.25.0-r1',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
       ],
     },
     {
@@ -61,7 +80,31 @@ test.each([
     },
   ],
   [
-    'a push to main whose tags the registry holds',
+    'a push to main whose tags are published but not yet pinned in the stack config',
+    {
+      eventName: 'push',
+      ref: 'refs/heads/main',
+      pushInput: '',
+      pinnedImages: [
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { digest: `sha256:${'2'.repeat(64)}` },
+          isPinnedInStack: false,
+        },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
+          answer: { digest: `sha256:${'3'.repeat(64)}` },
+          isPinnedInStack: true,
+        },
+      ],
+    },
+    {
+      action: 'publish',
+      reason: 'the stack config does not pin ghcr.io/zgeoff/atc-gateway:7.2.0 yet',
+    },
+  ],
+  [
+    'a push to main whose tags are published and pinned in the stack config',
     {
       eventName: 'push',
       ref: 'refs/heads/main',
@@ -70,14 +113,16 @@ test.each([
         {
           reference: 'ghcr.io/zgeoff/atc-gateway:7.1.0',
           answer: { digest: `sha256:${'2'.repeat(64)}` },
+          isPinnedInStack: true,
         },
         {
           reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
           answer: { digest: `sha256:${'3'.repeat(64)}` },
+          isPinnedInStack: true,
         },
       ],
     },
-    { action: 'skip', reason: 'the registry holds every pinned tag' },
+    { action: 'skip', reason: 'the registry holds every pinned tag, and the stack config pins it' },
   ],
   [
     'a push to main whose tag lookup failed',
@@ -86,10 +131,15 @@ test.each([
       ref: 'refs/heads/main',
       pushInput: '',
       pinnedImages: [
-        { reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0', answer: { missing: true } },
+        {
+          reference: 'ghcr.io/zgeoff/atc-gateway:7.2.0',
+          answer: { missing: true },
+          isPinnedInStack: false,
+        },
         {
           reference: 'ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2',
           answer: { error: 'the registry answered 503' },
+          isPinnedInStack: true,
         },
       ],
     },

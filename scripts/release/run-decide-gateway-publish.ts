@@ -1,5 +1,6 @@
 import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import type { RegistryAnswer } from '../try-read-manifest-digest.ts';
 import { tryReadManifestDigest } from '../try-read-manifest-digest.ts';
 import type { GatewayPublishInput, PinnedImage } from './decide-gateway-publish.ts';
 import { decideGatewayPublish } from './decide-gateway-publish.ts';
@@ -8,6 +9,15 @@ export interface RunDecideGatewayPublishOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
 
   readonly cwd: string;
+  readonly readText: (path: string) => Promise<string>;
+  readonly appendText: (path: string, text: string) => Promise<void>;
+
+  readonly readManifestDigest: (
+    name: string,
+    reference: string,
+    githubToken: string | undefined,
+  ) => Promise<RegistryAnswer>;
+
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -46,8 +56,8 @@ export async function runDecideGatewayPublish(
     return 1;
   }
 
-  await appendFile(output, `publish=${String(decision.action === 'publish')}\n`);
-  await appendFile(summary, text);
+  await options.appendText(output, `publish=${String(decision.action === 'publish')}\n`);
+  await options.appendText(summary, text);
 
   options.printOut(text);
 
@@ -67,43 +77,73 @@ async function readInput(
 }
 
 const versionsFile = 'images/atc-gateway/versions.env';
+const stackFile = 'infra/Pulumi.prod.yaml';
 
 const pinnedTags = [
-  { image: 'ghcr.io/zgeoff/atc-gateway', key: 'GATEWAY_IMAGE_TAG' },
-  { image: 'ghcr.io/zgeoff/atc-gateway-backup', key: 'BACKUP_IMAGE_TAG' },
+  { image: 'ghcr.io/zgeoff/atc-gateway', key: 'GATEWAY_IMAGE_TAG', stackField: 'image' },
+  {
+    image: 'ghcr.io/zgeoff/atc-gateway-backup',
+    key: 'BACKUP_IMAGE_TAG',
+    stackField: 'backupImage',
+  },
 ] as const;
 
 async function readPinnedImages(
   options: Readonly<RunDecideGatewayPublishOptions>,
 ): Promise<PinnedImage[] | Error> {
-  const text = await readFile(join(options.cwd, versionsFile), 'utf8').catch(
-    (error: unknown) => new Error(`cannot read ${versionsFile}: ${String(error)}`),
-  );
+  const versions = await readRepoText(options, versionsFile);
 
-  if (text instanceof Error) {
-    return text;
+  if (versions instanceof Error) {
+    return versions;
   }
 
-  const unset = pinnedTags.find((pin) => findTag(text, pin.key) === undefined);
+  const stack = await readRepoText(options, stackFile);
+
+  if (stack instanceof Error) {
+    return stack;
+  }
+
+  const unset = pinnedTags.find((pin) => findTag(versions, pin.key) === undefined);
 
   if (unset !== undefined) {
     return new Error(`${versionsFile} sets no ${unset.key}`);
   }
 
   const tags = pinnedTags.flatMap((pin) => {
-    const tag = findTag(text, pin.key);
+    const tag = findTag(versions, pin.key);
 
-    return tag === undefined ? [] : [{ image: pin.image, tag }];
+    return tag === undefined ? [] : [{ image: pin.image, stackField: pin.stackField, tag }];
   });
 
+  const config: unknown = Bun.YAML.parse(stack);
+  const gateway = findMember(findMember(config, 'config'), 'geoff-cloud:atcGateway');
   const githubToken = options.env['GH_TOKEN'];
 
   return Promise.all(
-    tags.map(async (pin) => ({
-      reference: `${pin.image}:${pin.tag}`,
-      answer: await tryReadManifestDigest(pin.image, pin.tag, githubToken),
-    })),
+    tags.map(async (pin) => {
+      const reference = `${pin.image}:${pin.tag}`;
+      const pinned = findMember(gateway, pin.stackField);
+
+      const answer = await options.readManifestDigest(pin.image, pin.tag, githubToken);
+
+      return {
+        reference,
+        answer,
+        isPinnedInStack: typeof pinned === 'string' && pinned.startsWith(`${reference}@`),
+      };
+    }),
   );
+}
+
+async function readRepoText(
+  options: Readonly<RunDecideGatewayPublishOptions>,
+  file: string,
+): Promise<string | Error> {
+  try {
+    return await options.readText(join(options.cwd, file));
+  } catch (error) {
+    return new Error(`cannot read ${file}: ${String(error)}`);
+  }
 }
 
 function findTag(text: string, key: string): string | undefined {
@@ -113,10 +153,19 @@ function findTag(text: string, key: string): string | undefined {
   return tag === '' ? undefined : tag;
 }
 
+function findMember(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null && Object.hasOwn(value, key)
+    ? Reflect.get(value, key)
+    : undefined;
+}
+
 if (import.meta.main) {
   process.exitCode = await runDecideGatewayPublish({
     env: process.env,
     cwd: process.cwd(),
+    readText: (path) => readFile(path, 'utf8'),
+    appendText: (path, text) => appendFile(path, text),
+    readManifestDigest: tryReadManifestDigest,
     printOut: (text) => {
       process.stdout.write(text);
     },
