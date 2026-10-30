@@ -361,9 +361,7 @@ in
         # before the add pulls this one
         TimeoutStartSec = "30min";
         NoNewPrivileges = true;
-        # No PrivateTmp, ProtectSystem or other option that gives the unit a mount namespace:
-        # Podman reads an exec's HOME from the container's /etc/passwd through the caller's mounts,
-        # and a namespace cloned before imp-host's root filesystem is mounted never sees it.
+        PrivateTmp = true;
       };
     };
 

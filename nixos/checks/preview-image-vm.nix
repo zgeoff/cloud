@@ -2,9 +2,10 @@
 # that recreates imp-host starts it: the unit starts when imp-host's unit does, before Podman has
 # created imp-host's container and mounted its root filesystem. The container is the stand-in
 # imp-host image (test-utils/build-stub-impz-host-image.nix), whose impz finds impd's token through
-# HOME as the real impz does. Podman sets an exec's HOME from the container's /etc/passwd, which
-# it reads through the root filesystem's mount as the caller sees it, so a unit with a mount
-# namespace of its own from before that mount gets no HOME, and impz no token. imp-host is a unit
+# HOME as the real impz does. Podman sets an exec's default HOME from the container's /etc/passwd,
+# which it reads through the root filesystem's mount as the caller sees it, so the unit's own mount
+# namespace, from PrivateTmp and made before that mount, gives an exec that names no HOME an empty
+# one, and impz no token. The unit names root's home on each impz exec. imp-host is a unit
 # that waits 5 s before its `podman run`, so the unit's start always comes before the mount. The
 # preview service itself never starts: its secret files do not exist.
 # It needs KVM: run `bun run test:nixos preview-image-vm`.

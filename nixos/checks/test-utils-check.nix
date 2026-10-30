@@ -1811,37 +1811,87 @@ let
       '';
     }
     {
-      title = "it buildStubImpHostPodman copies a file out of its container directory with its mode, and records the call";
+      title = "it buildStubImpHostPodman prints a file of its container directory and its mode, and records the calls";
       script = ''
-        mkdir home tmp impd impd/container impd/container/usr impd/container/usr/local impd/container/usr/local/bin
+        mkdir -p home tmp impd/container/usr/local/bin
         printf '#!/bin/sh\necho stand-in\n' > impd/container/usr/local/bin/impz
-        chmod 0755 impd/container/usr/local/bin/impz
+        chmod 0750 impd/container/usr/local/bin/impz
 
-        status=0
+        cat_status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostPodman} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+          ${stubImpHostPodman} exec imp-host cat /usr/local/bin/impz > cat.out 2> cat.err || cat_status=$?
+        stat_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} exec imp-host stat -c %a /usr/local/bin/impz > stat.out 2> stat.err || stat_status=$?
 
-        assert_equals 0 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_files_equal /dev/null err
-        assert_files_equal impd/container/usr/local/bin/impz impz
-        assert_equals 755 "$(stat -c %a impz)" "the copy's mode"
-        assert_equals "[\"cp\",\"imp-host:/usr/local/bin/impz\",\"$PWD/impz\"]" "$(cat impd/calls)" "the recorded call"
+        assert_equals 0 "$cat_status" "the cat exit status"
+        assert_files_equal impd/container/usr/local/bin/impz cat.out
+        assert_files_equal /dev/null cat.err
+        assert_equals 0 "$stat_status" "the stat exit status"
+        assert_equals 750 "$(cat stat.out)" "the printed mode"
+        assert_files_equal /dev/null stat.err
+        assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","cat","/usr/local/bin/impz"]
+        ["exec","imp-host","stat","-c","%a","/usr/local/bin/impz"]
+        EOF
       '';
     }
     {
-      title = "it buildStubImpHostPodman fails a copy of a path its container directory lacks, as podman fails it";
+      title = "it buildStubImpHostPodman fails a cat and a stat of a path its container directory lacks, as GNU coreutils fails them";
+      script = ''
+        mkdir -p home tmp impd/container
+
+        cat_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} exec imp-host cat /usr/local/bin/impz > cat.out 2> cat.err || cat_status=$?
+        stat_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} exec imp-host stat -c %a /usr/local/bin/impz > stat.out 2> stat.err || stat_status=$?
+
+        assert_equals 1 "$cat_status" "the cat exit status"
+        assert_files_equal /dev/null cat.out
+        assert_equals 'cat: /usr/local/bin/impz: No such file or directory' "$(cat cat.err)" "the cat error"
+        assert_equals 1 "$stat_status" "the stat exit status"
+        assert_files_equal /dev/null stat.out
+        assert_equals "stat: cannot statx '/usr/local/bin/impz': No such file or directory" "$(cat stat.err)" "the stat error"
+      '';
+    }
+    {
+      title = "it buildStubImpHostPodman answers an exec that names a HOME as the same exec, and records it whole";
       script = ''
         mkdir home tmp impd
+        echo '[]' > impd/images.json
 
         status=0
         env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
-          ${stubImpHostPodman} cp imp-host:/usr/local/bin/impz "$PWD/impz" > out 2> err || status=$?
+          ${stubImpHostPodman} exec -e HOME=/root imp-host impz image ls --json > out 2> err || status=$?
 
-        assert_equals 125 "$status" "the exit status"
-        assert_files_equal /dev/null out
-        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat err)" "the error"
-        assert_missing impz "the copy"
+        assert_equals 0 "$status" "the exit status"
+        assert_equals '[]' "$(cat out)" "the images"
+        assert_files_equal /dev/null err
+        assert_equals '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the recorded call"
+      '';
+    }
+    {
+      title = "it buildStubImpHostPodman refuses an impz exec that names no HOME as a 401 while its view is stale, and answers one that names it";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        touch impd/stale-view
+
+        bare_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} exec imp-host impz image ls --json > bare.out 2> bare.err || bare_status=$?
+        named_status=0
+        env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+          ${stubImpHostPodman} exec -e HOME=/root imp-host impz image ls --json > named.out 2> named.err || named_status=$?
+
+        assert_equals 1 "$bare_status" "the exit status without HOME"
+        assert_files_equal /dev/null bare.out
+        assert_equals 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>' "$(cat bare.err)" "the error without HOME"
+        assert_equals 0 "$named_status" "the exit status with HOME"
+        assert_equals '[]' "$(cat named.out)" "the images with HOME"
+        assert_files_equal /dev/null named.err
       '';
     }
     {
@@ -1937,10 +1987,10 @@ let
         podman_cmd=$(grep -cxF 'podman="''${PODMAN:-podman}"' ${../modules/preview-image.sh} || true)
         health_url=$(grep -cxF 'health_url=http://127.0.0.1:7070/health' ${../modules/preview-image.sh} || true)
         health=$(grep -cxF '  health=$("$podman" exec imp-host curl -sS --max-time 5 "$health_url" 2> "$err") || return 1' ${../modules/preview-image.sh} || true)
-        list=$(grep -cxF '  if [ -n "$ready" ] && images=$("$podman" exec imp-host impz image ls --json 2> "$err"); then' ${../modules/preview-image.sh} || true)
+        list=$(grep -cxF '  if [ -n "$ready" ] && images=$("$podman" exec -e HOME=/root imp-host impz image ls --json 2> "$err"); then' ${../modules/preview-image.sh} || true)
         facts=$(grep -cxF '    facts=$("$podman" exec -i imp-host sh -s -- /root/.config/impz/token /proc < "$token_facts" 2>&1) ||' ${../modules/preview-image.sh} || true)
-        add=$(grep -cxF '  "$podman" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
-        pin=$(grep -cxF '  "$podman" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
+        add=$(grep -cxF '  "$podman" exec -e HOME=/root imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
+        pin=$(grep -cxF '  "$podman" exec -e HOME=/root imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
         calls=$(grep -cF '"$podman"' ${../modules/preview-image.sh} || true)
         # a podman call by name, outside a comment, would pass the stand-in by
         direct=$(grep -cE '^[^#]*(^|[ ;&|($])podman ' ${../modules/preview-image.sh} || true)

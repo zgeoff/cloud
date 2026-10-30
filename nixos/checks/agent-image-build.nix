@@ -154,7 +154,7 @@ let
         '';
     }
     {
-      title = "it builds the newest commit on main that changes images/agent, with the CLI from imp-host and the token in its environment";
+      title = "it builds the newest commit on main that changes images/agent, with the CLI from imp-host and the token in its environment, even when its mounts predate the imp-host container";
       script = ''
         ${setupTest}
         mkdir -p origin/images/agent origin/docs impd/container/usr/local/bin
@@ -173,6 +173,7 @@ let
         printf '#!/bin/sh\necho stand-in impz\n' > impd/container/usr/local/bin/impz
         echo c0ffee01 > impd/container-ids
         chmod 0755 impd/container/usr/local/bin/impz
+        touch impd/stale-view
         printf 'imp_fixture_build_token' > credentials/imp-token
         echo "$image imp-build-cc check passed" > build/stdout
 
@@ -185,9 +186,10 @@ let
         EOF
         assert_files_equal /dev/null stderr
         jq -c . > expected <<EOF
-        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["container","inspect","--format","{{.Id}}","imp-host"]
-        ["cp","imp-host:/usr/local/bin/impz","$PWD/state/bin/impz"]
+        ["exec","imp-host","stat","-c","%a","/usr/local/bin/impz"]
+        ["exec","imp-host","cat","/usr/local/bin/impz"]
         EOF
         assert_files_equal expected impd/calls
         jq -S . > expected <<EOF
@@ -202,6 +204,8 @@ let
         jq -S . build/calls > actual
         assert_files_equal expected actual
         assert_files_equal impd/container/usr/local/bin/impz state/bin/impz
+        assert_equals 755 "$(stat -c %a state/bin/impz)" "the copied CLI's mode"
+        assert_equals impz "$(ls -A state/bin)" "the CLI directory"
         assert_equals "$head" "$(git -C state/cloud rev-parse HEAD)" "the commit the build runs from"
         assert_missing state/failed "the failed builds"
       '';
@@ -257,7 +261,7 @@ let
         assert_equals 0 "$status" "the script's exit status"
         assert_equals "agent-image-build: impd holds $image, built from $pin; nothing to build" "$(cat stdout)" "the script's stdout"
         assert_files_equal /dev/null stderr
-        assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the podman calls"
+        assert_equals '["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the podman calls"
         assert_missing build/calls "the build calls"
         assert_missing state/bin "the copied CLI"
       '';
@@ -402,7 +406,8 @@ let
         assert_equals 0 "$status" "the script's exit status"
         assert_equals "agent-image-build: the copy of imp's CLI failed while imp-host went from container c0ffee01 to none; the next run builds $image again" \
           "$(cat stdout)" "the script's stdout"
-        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat stderr)" "the script's stderr"
+        assert_equals "stat: cannot statx '/usr/local/bin/impz': No such file or directory" "$(cat stderr)" "the script's stderr"
+        assert_missing state/bin/impz.new "the partial copy"
         assert_missing build/calls "the build calls"
         assert_missing state/failed "the failed builds"
       '';
@@ -422,7 +427,8 @@ let
 
         assert_equals 1 "$status" "the script's exit status"
         assert_files_equal /dev/null stdout
-        assert_equals 'Error: "/usr/local/bin/impz" could not be found on container imp-host: no such file or directory' "$(cat stderr)" "the script's stderr"
+        assert_equals "stat: cannot statx '/usr/local/bin/impz': No such file or directory" "$(cat stderr)" "the script's stderr"
+        assert_missing state/bin/impz.new "the partial copy"
         assert_missing build/calls "the build calls"
         assert_missing state/failed "the failed builds"
       '';

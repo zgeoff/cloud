@@ -119,15 +119,11 @@ Every preview imp boots from one impd image, which the service names apart from 
 so that an operator who points the default elsewhere leaves previews alone. A oneshot unit on the
 host adds that image from imp's base image, pinned by digest, whenever a switch changes the pin or
 imp-host restarts, and the service starts after it. The unit waits until impd's health endpoint
-reports it ready before its first call to impd, then retries a refused call. The unit has no mount
-namespace of its own, such as one from `PrivateTmp`. Podman sets each exec's home directory from
-imp-host's `/etc/passwd`, which it reads through the container's root filesystem as the calling
-unit's mounts show it. A namespace made before imp-host's container started never shows that
-filesystem, so imp's CLI would find no token and impd would refuse every call. A start whose wait
-runs out starts again, up to the unit's start limit. A switch therefore never leaves the service
-booting from an image impd lacks. The unit pins the image's name in impd too, so impd's image
-eviction keeps the image while no preview imp runs. The release check moves that pin with the agent
-image's, so the previews and the agents run one release of imp's base image.
+reports it ready before its first call to impd, then retries a refused call. A start whose wait runs
+out starts again, up to the unit's start limit. A switch therefore never leaves the service booting
+from an image impd lacks. The unit pins the image's name in impd too, so impd's image eviction keeps
+the image while no preview imp runs. The release check moves that pin with the agent image's, so the
+previews and the agents run one release of imp's base image.
 
 1. The service reads the head commit's Compose file again, since the head may have moved, and takes
    the app's port and health path from its `x-preview` block, a top-level key that Compose ignores.

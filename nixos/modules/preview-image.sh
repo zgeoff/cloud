@@ -37,6 +37,9 @@ check_ready() {
   fi
 }
 
+# Each impz call names root's home in imp-host, where impz finds impd's token. Podman sets a
+# default HOME from the container's /etc/passwd as this unit's mounts show it, and a mount
+# namespace made before imp-host's container started shows no such file, so HOME would be empty.
 try=1
 last=
 ready=
@@ -44,7 +47,7 @@ while :; do
   if [ -z "$ready" ] && check_ready; then
     ready=1
   fi
-  if [ -n "$ready" ] && images=$("$podman" exec imp-host impz image ls --json 2> "$err"); then
+  if [ -n "$ready" ] && images=$("$podman" exec -e HOME=/root imp-host impz image ls --json 2> "$err"); then
     break
   fi
   error=$(cat "$err")
@@ -75,11 +78,11 @@ if [ "$current" != "$ref" ]; then
   else
     echo "preview-image: adding $ref to impd as $name, in place of $current"
   fi
-  "$podman" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null
+  "$podman" exec -e HOME=/root imp-host impz image add "$ref" --name "$name" --json > /dev/null
 fi
 
 if [ "$pinned" != true ]; then
   echo "preview-image: pinning $name"
-  "$podman" exec imp-host impz image pin "$name"
+  "$podman" exec -e HOME=/root imp-host impz image pin "$name"
 fi
 echo "preview-image: impd holds $name at $ref, pinned"
