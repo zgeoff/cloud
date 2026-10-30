@@ -442,7 +442,7 @@ in
         scheme = "bearer";
         env = {
           OP_CONNECT_HOST = "https://op-connect.imp.internal";
-          OP_CONNECT_TOKEN = "imp-broker-placeholder";
+          OP_CONNECT_TOKEN = "broker-placeholder";
         };
       };
     };
