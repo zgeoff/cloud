@@ -4,12 +4,12 @@ import type { Runner } from '../run-process.ts';
 import { runProcess } from '../run-process.ts';
 
 export interface RunWorkflowLintOptions {
-  // the repo whose workflows the lint reads, and whose repo-sync caller pins the tools tag
+  // the repo whose workflows the lint reads, and whose repo-sync caller pins the tools ref
   readonly root: string;
 
   readonly toolsURL: string;
 
-  // one checkout of zgeoff/tools per tag, kept between runs
+  // one checkout of zgeoff/tools per ref, kept between runs
   readonly cacheDirectory: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -31,7 +31,7 @@ export async function runWorkflowLint(options: Readonly<RunWorkflowLintOptions>)
   const ref = findToolsRef(caller);
 
   if (ref === undefined) {
-    options.printErr(`run-workflow-lint: ${callerPath} calls no zgeoff/tools workflow at a tag\n`);
+    options.printErr(`run-workflow-lint: ${callerPath} calls no zgeoff/tools workflow at a ref\n`);
 
     return 2;
   }
@@ -84,7 +84,7 @@ function findMember(value: unknown, key: string): unknown {
     : undefined;
 }
 
-// Two runs may clone the same tag at once, so each clones into its own folder and the first rename
+// Two runs may check out the same ref at once, so each checks out into its own folder and the first rename
 // wins.
 async function createToolsCheckout(
   options: Readonly<RunWorkflowLintOptions>,
@@ -96,18 +96,20 @@ async function createToolsCheckout(
   await options.removeTree(partial);
 
   const steps = [
+    ['git', 'init', '--quiet', partial],
+    ['git', '-C', partial, 'sparse-checkout', 'set', 'sync/pre-push'],
     [
       'git',
-      'clone',
+      '-C',
+      partial,
+      'fetch',
       '--quiet',
       '--depth=1',
-      `--branch=${ref}`,
       '--filter=blob:none',
-      '--sparse',
       options.toolsURL,
-      partial,
+      ref,
     ],
-    ['git', '-C', partial, 'sparse-checkout', 'set', 'sync/pre-push'],
+    ['git', '-C', partial, 'checkout', '--quiet', 'FETCH_HEAD'],
   ];
 
   for (const argv of steps) {
