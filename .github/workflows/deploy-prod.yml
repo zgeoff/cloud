@@ -76,6 +76,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: ''
           persist-credentials: false
 
       - name: Setup Bun
@@ -257,18 +258,16 @@ jobs:
       # a cancel or a timeout that stops the refresh or the apply leaves their lock on the prod
       # stack's state, and the next run then fails on "the stack is currently locked"; the runner
       # reports a job that its timeout ended as cancelled. The previews and drift checks take no
-      # such lock, and a refresh or an apply that fails releases its own. pulumi cancel ends
-      # whatever update holds the lock, so it runs only for a step of this run that the cancel
-      # stopped, and never after a failure: a refresh that fails on the lock found another update
-      # holding it, such as an apply that a person started by hand. The script also checks that
-      # the run still holds the prod lock. A runner that dies
-      # runs no step at all, and `bun run ops:cancel-prod-lock` clears what it leaves.
+      # such lock, and a refresh or an apply that fails releases its own, so the step never runs
+      # after a failure: a refresh that fails on the lock found another update holding it, such as
+      # an apply that a person started by hand. A runner that dies runs no step at all, and
+      # `bun run ops:cancel-prod-lock` clears what it leaves.
       - name: Cancel this run's Pulumi update
-        if: >-
-          cancelled() && (steps.refresh.outcome == 'cancelled' || steps.apply.outcome ==
-          'cancelled')
+        if: cancelled()
         timeout-minutes: 5
         env:
+          REFRESH_OUTCOME: ${{ steps.refresh.outcome }}
+          APPLY_OUTCOME: ${{ steps.apply.outcome }}
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           RUN_ID: ${{ github.run_id }}
           KUBECONFIG: ${{ runner.temp }}/k3s-kubeconfig

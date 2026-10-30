@@ -75,7 +75,7 @@
     "lint:sh": "bash scripts/lint.sh sh",
     "lint:nix": "bash scripts/lint.sh nix",
     "lint:py": "bash scripts/lint.sh py",
-    "lint:actions": "bash scripts/lint.sh actions && bun scripts/check-workflow-steps.ts && bun scripts/check-workflow-concurrency.ts && bun scripts/check-workflow-triggers.ts && bun scripts/check-ci-profiles.ts",
+    "lint:actions": "bash scripts/lint.sh actions && bun scripts/workflows/run-workflow-lint.ts && bun scripts/check-ci-profiles.ts",
     "check:doc-links": "bash .claude/skills/docs-writing/scripts/check-links.sh",
     "check:doc-length": "bash .claude/skills/docs-writing/scripts/check-length.sh",
     "ci:decide-prod-apply": "bash scripts/decide-prod-apply.sh",

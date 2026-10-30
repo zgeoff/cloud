@@ -63,9 +63,13 @@ after a merge. The registry record `atc-gateway-images` holds their pins in the 
 the release check never reads it. Instead, the `atc-gateway images` workflow runs on each push to
 `main` that changes `images/atc-gateway/versions.env`, such as a merged atc bump:
 
-1. Its decide job compares the push with the commit before it. A pull request skips the job, and the
-   publish job refuses any ref other than `main`, so a pull request never publishes.
-2. Its publish job builds both images at the pins, pushes each tag that GHCR lacks, and reads both
+1. Its decide job looks up both pinned tags on GHCR, and the run publishes when GHCR lacks either
+   one, or when the stack config does not pin both yet. A re-run after a release that pushed both
+   tags but failed to open its pull request runs the release job again, which skips both pushes. A
+   newer push cancels an older run's fixture and decide jobs, and its own decide job still finds a
+   tag that the older run never published. A pull request skips the job, and the release job refuses
+   any ref other than `main`, so a pull request never publishes.
+2. Its release job builds both images at the pins, pushes each tag that GHCR lacks, and reads both
    tags' digests from GHCR.
 3. As the release check app, it opens or updates `release-check/atc-gateway-images`, which pins
    those digests and the pin table.
