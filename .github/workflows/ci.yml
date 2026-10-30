@@ -56,6 +56,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: blob:none
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -96,6 +97,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: ''
 
       - name: Setup Bun
         if: needs.decide.outputs.reused != 'true'
@@ -253,11 +255,13 @@ jobs:
         if: needs.decide.outputs.full != 'false'
         run: bun run lint:py
 
-      # actionlint, then the check that every run step is setup or one bun run call, then the check
-      # that a push to main cancels main's earlier CI run and never a Deploy prod apply, the
-      # triggers check, and the check that the private checks job runs every parallel step
+      # actionlint, then the shared workflow lint at the zgeoff/tools tag that repo-sync pins, then
+      # the check that the private checks job runs every parallel step; the lint reads the profile,
+      # because one of its rules covers a private repo alone
       - name: Lint Actions
         if: needs.decide.outputs.full != 'false'
+        env:
+          CHECKS_PROFILE: public
         run: bun run lint:actions
 
       # the NixOS check that builds the provider's vendored Go modules in the pinned Nix image, so
@@ -474,6 +478,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: ''
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
@@ -603,6 +608,8 @@ jobs:
 
       - name: Lint Actions
         if: ${{ github.event.repository.private && steps.decide.outputs.full != 'false' }}
+        env:
+          CHECKS_PROFILE: private
         run: bun run lint:actions
 
       - name: Onidel vendor hash

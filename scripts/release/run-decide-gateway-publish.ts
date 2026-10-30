@@ -1,15 +1,13 @@
-import { appendFile } from 'node:fs/promises';
-import type { Runner } from '../run-process.ts';
-import { runProcess } from '../run-process.ts';
-import type { GatewayPublishInput } from './decide-gateway-publish.ts';
+import { appendFile, readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tryReadManifestDigest } from '../try-read-manifest-digest.ts';
+import type { GatewayPublishInput, PinnedImage } from './decide-gateway-publish.ts';
 import { decideGatewayPublish } from './decide-gateway-publish.ts';
-import { runChecked } from './run-checked.ts';
 
 export interface RunDecideGatewayPublishOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
 
   readonly cwd: string;
-  readonly run: Runner;
   readonly printOut: (text: string) => void;
   readonly printErr: (text: string) => void;
 }
@@ -42,6 +40,12 @@ export async function runDecideGatewayPublish(
   const decision = decideGatewayPublish(input);
   const text = `${decision.action}: ${decision.reason}\n`;
 
+  if (decision.action === 'unknown') {
+    options.printErr(text);
+
+    return 1;
+  }
+
   await appendFile(output, `publish=${String(decision.action === 'publish')}\n`);
   await appendFile(summary, text);
 
@@ -55,43 +59,64 @@ async function readInput(
 ): Promise<GatewayPublishInput | Error> {
   const env = options.env;
   const eventName = env['EVENT'] ?? '';
-  const changedFiles = eventName === 'push' ? await readChangedFiles(options) : [];
+  const pinnedImages = eventName === 'push' ? await readPinnedImages(options) : [];
 
-  return changedFiles instanceof Error
-    ? changedFiles
-    : { eventName, ref: env['REF'] ?? '', pushInput: env['PUSH_INPUT'] ?? '', changedFiles };
+  return pinnedImages instanceof Error
+    ? pinnedImages
+    : { eventName, ref: env['REF'] ?? '', pushInput: env['PUSH_INPUT'] ?? '', pinnedImages };
 }
 
-async function readChangedFiles(options: Readonly<RunDecideGatewayPublishOptions>) {
-  const before = options.env['BEFORE'] ?? '';
-  const sha = options.env['SHA'] ?? '';
+const versionsFile = 'images/atc-gateway/versions.env';
 
-  if (!/^[0-9a-f]{40}$/u.test(before) || /^0+$/u.test(before) || !/^[0-9a-f]{40}$/u.test(sha)) {
-    return new Error(`a push needs BEFORE and SHA as full commits, not '${before}' and '${sha}'`);
-  }
+const pinnedTags = [
+  { image: 'ghcr.io/zgeoff/atc-gateway', key: 'GATEWAY_IMAGE_TAG' },
+  { image: 'ghcr.io/zgeoff/atc-gateway-backup', key: 'BACKUP_IMAGE_TAG' },
+] as const;
 
-  const runOptions = { cwd: options.cwd, env: options.env };
-
-  // the shallow checkout lacks the commit before the push
-  const fetched = await runChecked(
-    options.run,
-    ['git', 'fetch', '-q', '--depth=1', 'origin', before],
-    runOptions,
+async function readPinnedImages(
+  options: Readonly<RunDecideGatewayPublishOptions>,
+): Promise<PinnedImage[] | Error> {
+  const text = await readFile(join(options.cwd, versionsFile), 'utf8').catch(
+    (error: unknown) => new Error(`cannot read ${versionsFile}: ${String(error)}`),
   );
 
-  const listed =
-    fetched instanceof Error
-      ? fetched
-      : await runChecked(options.run, ['git', 'diff', '--name-only', before, sha], runOptions);
+  if (text instanceof Error) {
+    return text;
+  }
 
-  return listed instanceof Error ? listed : listed.split('\n').filter((file) => file !== '');
+  const unset = pinnedTags.find((pin) => findTag(text, pin.key) === undefined);
+
+  if (unset !== undefined) {
+    return new Error(`${versionsFile} sets no ${unset.key}`);
+  }
+
+  const tags = pinnedTags.flatMap((pin) => {
+    const tag = findTag(text, pin.key);
+
+    return tag === undefined ? [] : [{ image: pin.image, tag }];
+  });
+
+  const githubToken = options.env['GH_TOKEN'];
+
+  return Promise.all(
+    tags.map(async (pin) => ({
+      reference: `${pin.image}:${pin.tag}`,
+      answer: await tryReadManifestDigest(pin.image, pin.tag, githubToken),
+    })),
+  );
+}
+
+function findTag(text: string, key: string): string | undefined {
+  const line = text.split('\n').find((each) => each.startsWith(`${key}=`));
+  const tag = line?.slice(key.length + 1).trim();
+
+  return tag === '' ? undefined : tag;
 }
 
 if (import.meta.main) {
   process.exitCode = await runDecideGatewayPublish({
     env: process.env,
     cwd: process.cwd(),
-    run: runProcess,
     printOut: (text) => {
       process.stdout.write(text);
     },

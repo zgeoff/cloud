@@ -74,11 +74,9 @@ pre-push:
         - run: files=$(bun run --silent files:branch --glob '**/*.py') && test -z "$files"
       run: bun run lint:py
     - name: lint:actions
-      # package.json too: the step check reads its script names
       skip:
         - run:
-            files=$(bun run --silent files:branch --glob '.github/workflows/**' --glob
-            'package.json') && test -z "$files"
+            files=$(bun run --silent files:branch --glob '.github/workflows/**') && test -z "$files"
       run: bun run lint:actions
     - name: pulumi pins
       run: bun run check:pulumi-pins

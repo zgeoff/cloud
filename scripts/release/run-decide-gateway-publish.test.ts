@@ -1,10 +1,9 @@
 import { expect, mock, onTestFinished, test } from 'bun:test';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildRealProgramHandler } from '../test-utils/build-real-program-handler.ts';
-import { buildStubRunner } from '../test-utils/build-stub-runner.ts';
-import { createCloudCheckout } from '../test-utils/create-cloud-checkout.ts';
+import { HttpResponse, http } from 'msw';
+import { server } from '../mocks/node.ts';
 import { runDecideGatewayPublish } from './run-decide-gateway-publish.ts';
 
 async function setupTest() {
@@ -12,55 +11,51 @@ async function setupTest() {
 
   onTestFinished(() => rm(directory, { recursive: true, force: true }));
 
+  const checkout = join(directory, 'checkout');
   const output = join(directory, 'output');
   const summary = join(directory, 'summary');
 
+  await mkdir(join(checkout, 'images', 'atc-gateway'), { recursive: true });
   await writeFile(output, '');
   await writeFile(summary, '');
 
   const printOut = mock<(text: string) => void>();
   const printErr = mock<(text: string) => void>();
 
-  return { output, summary, printOut, printErr };
+  return { checkout, output, summary, printOut, printErr };
 }
 
-test('it publishes for a push to main that changes the image pins', async () => {
+test('it publishes for a push to main whose gateway tag the registry lacks', async () => {
   const ctx = await setupTest();
 
-  const checkout = await createCloudCheckout({
-    'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\n',
-  });
-
-  const before = await checkout.git(['-C', checkout.seed, 'rev-parse', 'HEAD']);
-
   await writeFile(
-    join(checkout.seed, 'images/atc-gateway/versions.env'),
-    'GATEWAY_IMAGE_TAG=7.2.0\n',
+    join(ctx.checkout, 'images', 'atc-gateway', 'versions.env'),
+    'ATC_RELEASE=@zgeoff/atc@7.2.0\nGATEWAY_IMAGE_TAG=7.2.0\nBACKUP_IMAGE_TAG=2.24.0-r2\n',
   );
 
-  await checkout.git(['-C', checkout.seed, 'commit', '-qam', 'bump the gateway to 7.2.0']);
-  await checkout.git(['-C', checkout.seed, 'push', '-q', 'origin', 'main']);
-
-  const sha = await checkout.git(['-C', checkout.seed, 'rev-parse', 'HEAD']);
-
-  // the workflow's checkout holds only the pushed commit
-  await checkout.git(['-C', checkout.clone, 'fetch', '-q', '--depth=1', 'origin', sha]);
-  await checkout.git(['-C', checkout.clone, 'checkout', '-q', sha]);
-
-  const stub = buildStubRunner(buildRealProgramHandler(['git'], checkout.env));
+  server.use(
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.2.0',
+      () => new HttpResponse(null, { status: 404 }),
+    ),
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway-backup/manifests/2.24.0-r2',
+      () =>
+        new HttpResponse(null, {
+          status: 200,
+          headers: { 'docker-content-digest': `sha256:${'3'.repeat(64)}` },
+        }),
+    ),
+  );
 
   const status = await runDecideGatewayPublish({
     env: {
-      ...checkout.env,
       EVENT: 'push',
       REF: 'refs/heads/main',
-      BEFORE: before,
-      SHA: sha,
       GITHUB_OUTPUT: ctx.output,
       GITHUB_STEP_SUMMARY: ctx.summary,
     },
-    cwd: checkout.clone,
-    run: stub.run,
+    cwd: ctx.checkout,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -70,44 +65,45 @@ test('it publishes for a push to main that changes the image pins', async () => 
 
   expect(status).toBe(0);
   expect(output).toBe('publish=true\n');
-  expect(summary).toBe('publish: the push to main changes images/atc-gateway/versions.env\n');
+  expect(summary).toBe('publish: the registry lacks ghcr.io/zgeoff/atc-gateway:7.2.0\n');
   expect(ctx.printErr.mock.calls).toStrictEqual([]);
 });
 
-test('it skips a push to main that leaves the image pins as they were', async () => {
+test('it skips a push to main whose pinned tags the registry holds', async () => {
   const ctx = await setupTest();
 
-  const checkout = await createCloudCheckout({
-    'images/atc-gateway/versions.env': 'GATEWAY_IMAGE_TAG=7.1.0\n',
-    'images/atc-gateway/Dockerfile': 'FROM scratch\n',
-  });
+  await writeFile(
+    join(ctx.checkout, 'images', 'atc-gateway', 'versions.env'),
+    'GATEWAY_IMAGE_TAG=7.1.0\nBACKUP_IMAGE_TAG=2.24.0-r2\n',
+  );
 
-  const before = await checkout.git(['-C', checkout.seed, 'rev-parse', 'HEAD']);
-
-  await writeFile(join(checkout.seed, 'images/atc-gateway/Dockerfile'), 'FROM busybox\n');
-
-  await checkout.git(['-C', checkout.seed, 'commit', '-qam', 'change the base image']);
-  await checkout.git(['-C', checkout.seed, 'push', '-q', 'origin', 'main']);
-
-  const sha = await checkout.git(['-C', checkout.seed, 'rev-parse', 'HEAD']);
-
-  await checkout.git(['-C', checkout.clone, 'fetch', '-q', '--depth=1', 'origin', sha]);
-  await checkout.git(['-C', checkout.clone, 'checkout', '-q', sha]);
-
-  const stub = buildStubRunner(buildRealProgramHandler(['git'], checkout.env));
+  server.use(
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.1.0',
+      () =>
+        new HttpResponse(null, {
+          status: 200,
+          headers: { 'docker-content-digest': `sha256:${'2'.repeat(64)}` },
+        }),
+    ),
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway-backup/manifests/2.24.0-r2',
+      () =>
+        new HttpResponse(null, {
+          status: 200,
+          headers: { 'docker-content-digest': `sha256:${'3'.repeat(64)}` },
+        }),
+    ),
+  );
 
   const status = await runDecideGatewayPublish({
     env: {
-      ...checkout.env,
       EVENT: 'push',
       REF: 'refs/heads/main',
-      BEFORE: before,
-      SHA: sha,
       GITHUB_OUTPUT: ctx.output,
       GITHUB_STEP_SUMMARY: ctx.summary,
     },
-    cwd: checkout.clone,
-    run: stub.run,
+    cwd: ctx.checkout,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -116,53 +112,36 @@ test('it skips a push to main that leaves the image pins as they were', async ()
 
   expect(status).toBe(0);
   expect(output).toBe('publish=false\n');
-
-  expect(ctx.printOut.mock.calls).toStrictEqual([
-    ['skip: the push to main leaves images/atc-gateway/versions.env as it was\n'],
-  ]);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['skip: the registry holds every pinned tag\n']]);
 });
 
-test('it never publishes for a pull request, and runs no git', async () => {
+test('it fails a push when the registry cannot answer for a tag, and writes no output', async () => {
   const ctx = await setupTest();
 
-  const stub = buildStubRunner();
+  await writeFile(
+    join(ctx.checkout, 'images', 'atc-gateway', 'versions.env'),
+    'GATEWAY_IMAGE_TAG=7.2.0\nBACKUP_IMAGE_TAG=2.24.0-r2\n',
+  );
 
-  const status = await runDecideGatewayPublish({
-    env: {
-      EVENT: 'pull_request',
-      REF: 'refs/pull/412/merge',
-      GITHUB_OUTPUT: ctx.output,
-      GITHUB_STEP_SUMMARY: ctx.summary,
-    },
-    cwd: '/nonexistent',
-    run: stub.run,
-    printOut: ctx.printOut,
-    printErr: ctx.printErr,
-  });
-
-  const output = await readFile(ctx.output, 'utf8');
-
-  expect(status).toBe(0);
-  expect(output).toBe('publish=false\n');
-  expect(stub.calls).toStrictEqual([]);
-});
-
-test('it fails a push whose commit before is not a full commit, and writes no output', async () => {
-  const ctx = await setupTest();
-
-  const stub = buildStubRunner();
+  server.use(
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway/manifests/7.2.0',
+      () => new HttpResponse(null, { status: 404 }),
+    ),
+    http.head(
+      'https://ghcr.io/v2/zgeoff/atc-gateway-backup/manifests/2.24.0-r2',
+      () => new HttpResponse(null, { status: 503 }),
+    ),
+  );
 
   const status = await runDecideGatewayPublish({
     env: {
       EVENT: 'push',
       REF: 'refs/heads/main',
-      BEFORE: '0000000000000000000000000000000000000000',
-      SHA: 'c5bea94080fdde9e21e9720295c1ca727302662e',
       GITHUB_OUTPUT: ctx.output,
       GITHUB_STEP_SUMMARY: ctx.summary,
     },
-    cwd: '/nonexistent',
-    run: stub.run,
+    cwd: ctx.checkout,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });
@@ -174,20 +153,65 @@ test('it fails a push whose commit before is not a full commit, and writes no ou
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
-      "a push needs BEFORE and SHA as full commits, not '0000000000000000000000000000000000000000' and 'c5bea94080fdde9e21e9720295c1ca727302662e'\n",
+      'unknown: cannot tell whether a pinned tag is published: ghcr.io/zgeoff/atc-gateway-backup:2.24.0-r2 (the registry answered 503)\n',
     ],
   ]);
+});
+
+test('it fails a push whose pins set no backup tag', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.checkout, 'images', 'atc-gateway', 'versions.env'),
+    'GATEWAY_IMAGE_TAG=7.2.0\n',
+  );
+
+  const status = await runDecideGatewayPublish({
+    env: {
+      EVENT: 'push',
+      REF: 'refs/heads/main',
+      GITHUB_OUTPUT: ctx.output,
+      GITHUB_STEP_SUMMARY: ctx.summary,
+    },
+    cwd: ctx.checkout,
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(status).toBe(1);
+
+  expect(ctx.printErr.mock.calls).toStrictEqual([
+    ['images/atc-gateway/versions.env sets no BACKUP_IMAGE_TAG\n'],
+  ]);
+});
+
+test('it never publishes for a pull request, and reads neither the pins nor the registry', async () => {
+  const ctx = await setupTest();
+
+  const status = await runDecideGatewayPublish({
+    env: {
+      EVENT: 'pull_request',
+      REF: 'refs/pull/412/merge',
+      GITHUB_OUTPUT: ctx.output,
+      GITHUB_STEP_SUMMARY: ctx.summary,
+    },
+    cwd: '/nonexistent',
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  const output = await readFile(ctx.output, 'utf8');
+
+  expect(status).toBe(0);
+  expect(output).toBe('publish=false\n');
 });
 
 test('it fails without the runner output file', async () => {
   const ctx = await setupTest();
 
-  const stub = buildStubRunner();
-
   const status = await runDecideGatewayPublish({
     env: { EVENT: 'push', REF: 'refs/heads/main', GITHUB_STEP_SUMMARY: ctx.summary },
     cwd: '/nonexistent',
-    run: stub.run,
     printOut: ctx.printOut,
     printErr: ctx.printErr,
   });

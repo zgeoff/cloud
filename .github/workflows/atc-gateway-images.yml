@@ -1,10 +1,12 @@
 name: atc-gateway images
 
 # Runs the fixture test on every push to main that changes the images; CI's checks job runs it on
-# a pull request. Only main publishes to GHCR: a push to main that changes
-# images/atc-gateway/versions.env, or a manual run on main with push: true
-# (scripts/release/decide-gateway-publish.ts). The publish job refuses any ref but main. After the
-# push, the publish job opens the pull request that pins the new digests in infra/Pulumi.prod.yaml,
+# a pull request. Only main publishes to GHCR: a push to main whose images/atc-gateway/versions.env
+# pins a tag the registry lacks, or a manual run on main with push: true
+# (scripts/release/decide-gateway-publish.ts). A newer push cancels an older run's fixture and
+# decision, and its own decision still finds any tag the older run never published. The release
+# job refuses any ref but main and never cancels. After the
+# push, the release job opens the pull request that pins the new digests in infra/Pulumi.prod.yaml,
 # as the release check app, so CI runs on it; the release bump merge workflow merges it by its
 # rules, and the Deploy prod workflow applies it (docs/runbooks/release-check.md).
 on:
@@ -35,6 +37,9 @@ jobs:
   fixture:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    concurrency:
+      group: atc-gateway-fixture-${{ github.ref }}
+      cancel-in-progress: true
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -52,6 +57,13 @@ jobs:
   decide:
     runs-on: ubuntu-slim
     timeout-minutes: 5
+    concurrency:
+      group: atc-gateway-decide-${{ github.ref }}
+      cancel-in-progress: true
+    # packages: read looks up the pinned tags on ghcr.io
+    permissions:
+      contents: read
+      packages: read
     outputs:
       publish: ${{ steps.decide.outputs.publish }}
     steps:
@@ -69,11 +81,11 @@ jobs:
           EVENT: ${{ github.event_name }}
           REF: ${{ github.ref }}
           PUSH_INPUT: ${{ inputs.push }}
-          BEFORE: ${{ github.event.before }}
-          SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: bun run --silent ci:decide-atc-gateway-publish
 
   publish:
+    name: Release the images
     needs: [fixture, decide]
     if: github.ref == 'refs/heads/main' && needs.decide.outputs.publish == 'true'
     runs-on: ubuntu-latest
@@ -101,6 +113,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          filter: blob:none
           token: ${{ steps.app-token.outputs.token }}
 
       - name: Setup Bun
