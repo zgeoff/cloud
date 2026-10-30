@@ -649,7 +649,7 @@ let
       '';
     }
     {
-      title = "it carries in the preview-image script's closure every store path the script names";
+      title = "it carries in the preview-image script closure every store path the script names";
       script = ''
         assert_files_equal /dev/null ${buildStorePathGaps imagePackage}
       '';

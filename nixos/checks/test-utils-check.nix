@@ -1373,7 +1373,7 @@ let
         '';
     }
     {
-      title = "it buildStubImpzHostImage's impz lists the images with the token it finds under HOME, and records the call";
+      title = "it buildStubImpzHostImage impzlists the images with the token it finds under HOME, and records the call";
       script = ''
         mkdir -p home/.config/impz impd
         echo imp_fixture_root > impd/token
@@ -1401,7 +1401,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpzHostImage's impz refuses the call as a 401 when HOME is empty, so the token file path is relative and missing";
+      title = "it buildStubImpzHostImage impzrefuses the call as a 401 when HOME is empty, so the token file path is relative and missing";
       script = ''
         mkdir impd work
         echo imp_fixture_root > impd/token
@@ -1419,7 +1419,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpzHostImage's impz refuses the call as a 401 when the token it finds is not the impd one";
+      title = "it buildStubImpzHostImage impzrefuses the call as a 401 when the token it finds is not the impd one";
       script = ''
         mkdir -p home/.config/impz impd
         echo imp_fixture_root > impd/token
@@ -1437,7 +1437,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpzHostImage's impz takes IMP_TOKEN over the token file, and adds then pins an image";
+      title = "it buildStubImpzHostImage impztakes the token from the environment over the token file, and adds then pins an image";
       script = ''
         mkdir impd
         echo imp_fixture_root > impd/token
@@ -1456,7 +1456,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpzHostImage's impz fails an unknown call with status 97";
+      title = "it buildStubImpzHostImage impzfails an unknown call with status 97";
       script = ''
         mkdir impd
         echo imp_fixture_root > impd/token
@@ -1471,7 +1471,7 @@ let
       '';
     }
     {
-      title = "it buildStubImpzHostImage's curl answers impd's /health as ready, and fails any other call with status 97";
+      title = "it buildStubImpzHostImage curlanswers the impd /health as ready, and fails any other call with status 97";
       script = ''
         health_status=0
         ${stubImpzHostImage.curl} -sS --max-time 5 http://127.0.0.1:7070/health > health 2> health-err || health_status=$?
