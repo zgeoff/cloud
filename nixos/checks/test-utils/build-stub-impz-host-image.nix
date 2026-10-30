@@ -1,5 +1,6 @@
-# A stand-in imp-host image for the preview-image unit under real Podman: busybox, whose command
-# only sleeps, with a stand-in impz and curl in /usr/local/bin. It returns { archive, ref, impz, curl }:
+# A stand-in imp-host image for the preview-image unit under real Podman: busybox and getconf,
+# whose command only sleeps, with a stand-in impz and curl in /usr/local/bin. It returns
+# { archive, ref, impz, curl }:
 # the image as a docker save archive for `podman load`, the name Podman gives the loaded image,
 # and the impz and curl stand-ins themselves, which nixos/checks/test-utils-check.nix tests.
 #
@@ -94,8 +95,10 @@ let
     tag = "local";
     copyToRoot = pkgs.buildEnv {
       name = "stub-impz-host-root";
+      # getconf, which busybox lacks, for the token-facts script that preview-image runs after a 401
       paths = [
         pkgs.busybox
+        pkgs.getconf
         tools
       ];
       pathsToLink = [
