@@ -23,6 +23,8 @@ let
   stubCurl = import ./test-utils/build-stub-curl.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
   stubImpHostPodman = import ./test-utils/build-stub-imp-host-podman.nix { inherit pkgs; };
+  buildStorePathGaps = import ./test-utils/build-store-path-gaps.nix { inherit pkgs; };
+  stubImpzHostImage = import ./test-utils/build-stub-impz-host-image.nix { inherit pkgs; };
   stubAgentImageBun = import ./test-utils/build-stub-agent-image-bun.nix { inherit pkgs; };
   stubOpRead = import ./test-utils/build-stub-op-read.nix { inherit pkgs; } {
     "op://vault/item/field" = "a value with spaces";
@@ -1329,6 +1331,157 @@ let
         assert_equals 1 "$pause" "the wait's pause"
         assert_equals 1 "$pauses" "the script's pauses through SLEEP"
         assert_equals 0 "$direct" "the script's pauses by name"
+      '';
+    }
+    {
+      title = "it buildStorePathGaps lists the store path that a script names through a path value, and none it references";
+      script =
+        let
+          script = pkgs.writeShellApplication {
+            name = "names-a-stray-file";
+            runtimeInputs = [ pkgs.jq ];
+            runtimeEnv.STRAY_FILE = ./test-utils/run-stub-impd.py;
+            text = ''
+              jq . "$STRAY_FILE"
+              ${pkgs.hello}/bin/hello
+            '';
+          };
+          strayRoot = builtins.head (
+            builtins.match "(${builtins.storeDir}/[^/]+)/.*" (toString ./test-utils/run-stub-impd.py)
+          );
+        in
+        ''
+          assert_files_equal - ${buildStorePathGaps script} <<'EOF'
+          ${strayRoot}
+          EOF
+        '';
+    }
+    {
+      title = "it buildStorePathGaps lists nothing for a script that names only what it references";
+      script =
+        let
+          script = pkgs.writeShellApplication {
+            name = "names-its-own-file";
+            runtimeEnv.OWN_FILE = "${./test-utils/run-stub-impd.py}";
+            text = ''
+              cat "$OWN_FILE"
+            '';
+          };
+        in
+        ''
+          assert_files_equal /dev/null ${buildStorePathGaps script}
+        '';
+    }
+    {
+      title = "it buildStubImpzHostImage's impz lists the images with the token it finds under HOME, and records the call";
+      script = ''
+        mkdir -p home/.config/impz impd
+        echo imp_fixture_root > impd/token
+        echo imp_fixture_root > home/.config/impz/token
+        echo '[{"name":"base","ref":"ghcr.io/example/base:1.0.0","pinned":false}]' > impd/images.json
+
+        status=0
+        env -i HOME="$PWD/home" IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
+          ${stubImpzHostImage.impz} image ls --json > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_files_equal - out <<'EOF'
+        [
+          {
+            "name": "base",
+            "ref": "ghcr.io/example/base:1.0.0",
+            "pinned": false
+          }
+        ]
+        EOF
+        assert_files_equal /dev/null err
+        assert_files_equal - impd/calls <<'EOF'
+        ["image","ls","--json"]
+        EOF
+      '';
+    }
+    {
+      title = "it buildStubImpzHostImage's impz refuses the call as a 401 when HOME is empty, so the token file path is relative and missing";
+      script = ''
+        mkdir impd work
+        echo imp_fixture_root > impd/token
+        echo '[]' > impd/images.json
+
+        status=0
+        (cd work && env -i HOME= IMPD_STATE="$PWD/../impd" IMPD_TOKEN_FILE="$PWD/../impd/token" \
+          ${stubImpzHostImage.impz} image ls --json > ../out 2> ../err) || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal /dev/null out
+        assert_files_equal - err <<'EOF'
+        impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
+        EOF
+      '';
+    }
+    {
+      title = "it buildStubImpzHostImage's impz refuses the call as a 401 when the token it finds is not the impd one";
+      script = ''
+        mkdir -p home/.config/impz impd
+        echo imp_fixture_root > impd/token
+        echo imp_fixture_stale > home/.config/impz/token
+        echo '[]' > impd/images.json
+
+        status=0
+        env -i HOME="$PWD/home" IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
+          ${stubImpzHostImage.impz} image ls --json > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal - err <<'EOF'
+        impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
+        EOF
+      '';
+    }
+    {
+      title = "it buildStubImpzHostImage's impz takes IMP_TOKEN over the token file, and adds then pins an image";
+      script = ''
+        mkdir impd
+        echo imp_fixture_root > impd/token
+        echo '[]' > impd/images.json
+
+        status=0
+        env -i HOME="$PWD/home" IMP_TOKEN=imp_fixture_root IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
+          ${stubImpzHostImage.impz} image add ghcr.io/example/base:1.0.0 --name pv-base --json > out 2> err || status=$?
+        env -i HOME="$PWD/home" IMP_TOKEN=imp_fixture_root IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
+          ${stubImpzHostImage.impz} image pin pv-base >> out 2>> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals '[["pv-base","ghcr.io/example/base:1.0.0",true]]' "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
+        assert_equals '"pv-base"' "$(jq -c .name out)" "the added image's name"
+        assert_files_equal /dev/null err
+      '';
+    }
+    {
+      title = "it buildStubImpzHostImage's impz fails an unknown call with status 97";
+      script = ''
+        mkdir impd
+        echo imp_fixture_root > impd/token
+        echo '[]' > impd/images.json
+
+        status=0
+        env -i IMP_TOKEN=imp_fixture_root IMPD_STATE="$PWD/impd" IMPD_TOKEN_FILE="$PWD/impd/token" \
+          ${stubImpzHostImage.impz} info > out 2> err || status=$?
+
+        assert_equals 97 "$status" "the exit status"
+        assert_equals 'unexpected: impz info' "$(cat err)" "the error"
+      '';
+    }
+    {
+      title = "it buildStubImpzHostImage's curl answers impd's /health as ready, and fails any other call with status 97";
+      script = ''
+        health_status=0
+        ${stubImpzHostImage.curl} -sS --max-time 5 http://127.0.0.1:7070/health > health 2> health-err || health_status=$?
+        other_status=0
+        ${stubImpzHostImage.curl} -sS http://127.0.0.1:7070/v1/imps > other 2> other-err || other_status=$?
+
+        assert_equals 0 "$health_status" "the /health exit status"
+        assert_equals '{"status":"ok","ready":true,"warnings":[]}' "$(cat health)" "the /health body"
+        assert_equals 97 "$other_status" "the other call's exit status"
+        assert_equals 'unexpected: curl -sS http://127.0.0.1:7070/v1/imps' "$(cat other-err)" "the other call's error"
       '';
     }
     {

@@ -1,18 +1,26 @@
 # shellcheck shell=sh
-# Print, on one line, what an exec in imp-host sees of impd's root token: whether the file at $1
-# (impz's token file, a link to impd's) exists, with its inode and modification time, and the
-# start time of each impd process under the proc directory $2. It never prints the token.
+# Print, on one line, what an exec in imp-host sees of impd's root token: the exec's HOME, under
+# which impz looks for its token file, whether the file at $1 (impz's token file under root's
+# home, a link to impd's) exists, with its inode and modification time, and the start time of
+# each impd process under the proc directory $2. It never prints the token.
 # preview-image.sh runs it in imp-host on stdin after impd refuses an impz call with 401, so the
-# unit's log shows whether impz read a token that impd did not load. The times are UTC, to the
-# second.
+# unit's log shows whether impz looked in another home or read a token that impd did not load.
+# The times are UTC, to the second.
 token=$1
 proc=$2
 
+if [ -z "${HOME+set}" ]; then
+  facts="the exec's HOME: unset"
+elif [ -z "$HOME" ]; then
+  facts="the exec's HOME: empty"
+else
+  facts="the exec's HOME: $HOME"
+fi
 if [ -e "$token" ]; then
   modified=$(date -u -d "@$(stat -L -c %Y "$token")" +%Y-%m-%dT%H:%M:%SZ)
-  facts="impz's token file: inode $(stat -L -c %i "$token"), modified $modified"
+  facts="$facts; impz's token file: inode $(stat -L -c %i "$token"), modified $modified"
 else
-  facts="impz's token file: missing"
+  facts="$facts; impz's token file: missing"
 fi
 
 # a process's start, in clock ticks after boot, is field 22 of its stat line; the fields after the

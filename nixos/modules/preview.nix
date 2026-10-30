@@ -35,7 +35,9 @@ let
       pkgs.jq
       config.virtualisation.podman.package
     ];
-    runtimeEnv.PREVIEW_IMAGE_TOKEN_FACTS = ./preview-image-token-facts.sh;
+    # interpolated, so the file joins the script's closure: writeShellApplication turns a bare path
+    # into the text of its place in the flake source, which the switch never copies to the host
+    runtimeEnv.PREVIEW_IMAGE_TOKEN_FACTS = "${./preview-image-token-facts.sh}";
     text = builtins.readFile ./preview-image.sh;
   };
 in
@@ -359,7 +361,9 @@ in
         # before the add pulls this one
         TimeoutStartSec = "30min";
         NoNewPrivileges = true;
-        PrivateTmp = true;
+        # No PrivateTmp, ProtectSystem or other option that gives the unit a mount namespace:
+        # Podman reads an exec's HOME from the container's /etc/passwd through the caller's mounts,
+        # and a namespace cloned before imp-host's root filesystem is mounted never sees it.
       };
     };
 

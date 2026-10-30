@@ -66,8 +66,8 @@
       # unit in its own sandbox, and public-front-vm, which sends requests through the TLS front to
       # a stand-in upstream, and atc-daemon-vm, which starts the atc daemon on its gateway token as
       # the host does, and onepassword-connect-relay-vm, which switches the Connect relay to another
-      # bridge, and preview-image-vm, which boots the preview-image unit against a stand-in impd
-      # that refuses its first start, and agent-image-build-switch-vm, which starts the agent image
+      # bridge, and preview-image-vm, which starts the preview-image unit under real Podman before
+      # a stand-in imp-host container exists, and agent-image-build-switch-vm, which starts the agent image
       # build while a switch recreates imp-host. onidel-provider-vendor builds the provider's vendored Go modules, which CI's
       # checks job also runs on a Go change
       checks.x86_64-linux.geoffcloud-eval = import ./checks/geoffcloud-eval.nix {
