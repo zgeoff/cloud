@@ -588,7 +588,7 @@ let
               Restart = "on-failure";
               RestartSec = 10;
               ExecStart = imageScript;
-              TimeoutStartSec = "20min";
+              TimeoutStartSec = "30min";
               NoNewPrivileges = true;
               PrivateTmp = true;
             };
@@ -668,6 +668,7 @@ let
         EOF
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         ["exec","imp-host","impz","image","pin","pv-base"]
@@ -696,6 +697,7 @@ let
         EOF
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         EOF
@@ -719,7 +721,10 @@ let
         assert_equals 0 "$status" "the exit status"
         assert_equals "preview-image: impd holds pv-base at ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}, pinned" "$(cat out)" "the output"
         assert_files_equal /dev/null err
-        assert_equals '["exec","imp-host","impz","image","ls","--json"]' "$(cat impd/calls)" "the calls"
+        assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","impz","image","ls","--json"]
+        EOF
         assert_files_equal before.json impd/images.json
       '';
     }
@@ -742,6 +747,7 @@ let
         EOF
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","pin","pv-base"]
         EOF
@@ -769,8 +775,9 @@ let
         ["2"]
         EOF
         assert_files_equal - impd/calls <<'EOF'
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","impz","image","ls","--json"]
         ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         ["exec","imp-host","impz","image","pin","pv-base"]
@@ -778,12 +785,20 @@ let
       '';
     }
     {
-      title = "it prints each failed try whose error differs from the one before, while impd starts and then refuses the call";
+      title = "it prints each failed try whose error differs from the one before, while impd starts and then refuses the call, with what the exec sees of the impd token file and the impd start";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
         echo 2 > impd/unreachable
         echo 2 > impd/unauthorized
+        mkdir -p impd/container/var/lib/imp impd/container/root/.config/impz impd/container/proc/4242
+        printf 'imp_fixture_root\n' > impd/container/var/lib/imp/token
+        touch -d @1793300070 impd/container/var/lib/imp/token
+        ln -s ../../../var/lib/imp/token impd/container/root/.config/impz/token
+        printf 'cpu  10 0 10 1000 0 0 0 0 0 0\nbtime 1793300000\n' > impd/container/proc/stat
+        echo impd > impd/container/proc/4242/comm
+        echo '4242 (impd) S 1 4242 4242 0 -1 4194560 100 0 0 0 5 3 0 0 20 0 9 0 6000 512000 300' > impd/container/proc/4242/stat
+        inode=$(stat -c %i impd/container/var/lib/imp/token)
 
         status=0
         env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
@@ -792,11 +807,140 @@ let
           ${imageScript} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
-        assert_files_equal - err <<'EOF'
+        assert_files_equal - err <<EOF
         preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container
-        preview-image: try 3: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>
+        preview-image: try 3: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z; impd 4242 started 2026-10-29T18:54:20Z
         EOF
         assert_equals 4 "$(wc -l < sleep.log)" "the pauses"
+        assert_equals 0 "$(grep -c imp_fixture_root err)" "the token's appearances in the log"
+      '';
+    }
+    {
+      title = "it says the exec sees no token file when impd refuses the call and the impz token file is missing";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unauthorized
+        mkdir -p impd/container/root/.config/impz impd/container/proc
+        ln -s ../../../var/lib/imp/token impd/container/root/.config/impz/token
+        printf 'btime 1793300000\n' > impd/container/proc/stat
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: missing" \
+          "$(cat err)" "the error"
+        assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","-i","imp-host","sh","-s","--","/root/.config/impz/token","/proc"]
+        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","imp-host","impz","image","pin","pv-base"]
+        EOF
+      '';
+    }
+    {
+      title = "it keeps waiting when the token-file check fails after a refused call, and names the failure in the error";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unauthorized
+        echo 'Error: no container with name or ID "imp-host" found: no such container' > impd/script-error
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals 'preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the token-file check failed: Error: no container with name or ID "imp-host" found: no such container' \
+          "$(cat err)" "the error"
+        assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it leaves out an impd process whose stat line is gone or empty by the token-file check, and keeps waiting";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unauthorized
+        mkdir -p impd/container/var/lib/imp impd/container/root/.config/impz impd/container/proc/4242 impd/container/proc/4343
+        printf 'imp_fixture_root\n' > impd/container/var/lib/imp/token
+        touch -d @1793300070 impd/container/var/lib/imp/token
+        ln -s ../../../var/lib/imp/token impd/container/root/.config/impz/token
+        printf 'btime 1793300000\n' > impd/container/proc/stat
+        echo impd > impd/container/proc/4242/comm
+        echo impd > impd/container/proc/4343/comm
+        : > impd/container/proc/4343/stat
+        inode=$(stat -c %i impd/container/var/lib/imp/token)
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z" \
+          "$(cat err)" "the error"
+        assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it waits for the impd /health to report ready before its first impz call, printing a changed answer once";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 2 > impd/starting
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals 'preview-image: try 1: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}' "$(cat err)" "the error"
+        assert_files_equal - sleep.log <<'EOF'
+        ["2"]
+        ["2"]
+        EOF
+        assert_files_equal - impd/calls <<'EOF'
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
+        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","imp-host","impz","image","pin","pv-base"]
+        EOF
+      '';
+    }
+    {
+      title = "it waits about 10 min for impd by default, 300 tries, before it fails";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 300 > impd/starting
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 1 "$status" "the exit status"
+        assert_files_equal - err <<'EOF'
+        preview-image: try 1: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}
+        preview-image: impd listed no images after 300 tries: impd is not ready: /health answered {"status":"ok","ready":false,"warnings":[]}
+        EOF
+        assert_equals 299 "$(wc -l < sleep.log)" "the pauses"
+        assert_equals 300 "$(wc -l < impd/calls)" "the calls"
       '';
     }
     {
