@@ -4,15 +4,17 @@
 # imp-host starts, and at a cold start it refuses impz calls for minutes after it listens. So the
 # script first asks impd's /health, from inside imp-host, until it reports ready, then lists impd's
 # images until the list succeeds. It pauses 2 s between PREVIEW_IMAGE_WAIT_TRIES tries (default
-# 300, about 10 min), and prints each failed try whose error differs from the one before. After a
-# try that impd refuses with 401, it adds what the exec sees of impd's token file and impd's start
-# time, from $PREVIEW_IMAGE_TOKEN_FACTS (preview-image-token-facts.sh), never the token. When the
-# name already holds the reference, it adds nothing, because an add boots a builder imp and pulls
-# the image again. Otherwise it adds the reference under the name, which impd points at the new
-# image in place of any older one. It then pins the name, unless the name already holds a pin, so
-# that impd's image eviction keeps the image while no preview imp runs; an add under a name that
-# exists keeps the name's pin. PODMAN and SLEEP name the podman and sleep it runs (default: the
-# ones on PATH, the package's own), so nixos/checks/preview.nix can swap in stand-ins.
+# 300, about 10 min), and prints a failed try's error only when it differs from the one before.
+# After each try that impd refuses with 401, it adds to the try's error what the exec sees of impd's
+# token file and impd's start time, from $PREVIEW_IMAGE_TOKEN_FACTS (preview-image-token-facts.sh),
+# never the token. So a run of refusals prints one line, and another line only when the token file
+# or impd's start changes. When the name already holds the reference, it adds nothing, because an
+# add boots a builder imp and pulls the image again. Otherwise it adds the reference under the
+# name, which impd points at the new image in place of any older one. It then pins the name, unless
+# the name already holds a pin, so that impd's image eviction keeps the image while no preview imp
+# runs; an add under a name that exists keeps the name's pin. PODMAN and SLEEP name the podman and
+# sleep it runs (default: the ones on PATH, the package's own), so nixos/checks/preview.nix can
+# swap in stand-ins.
 podman="${PODMAN:-podman}"
 pause="${SLEEP:-sleep}"
 tries="${PREVIEW_IMAGE_WAIT_TRIES:-300}"
