@@ -47,7 +47,11 @@ while :; do
   fi
   error=$(cat "$err")
   if [[ $error == "impz: unauthorized: "* ]]; then
-    error="$error; $("$podman" exec -i imp-host sh -s -- /root/.config/impz/token /proc < "$token_facts" 2>&1)"
+    # a failed check, such as one that imp-host's stop cuts short, names its failure in the try's
+    # error and leaves the wait running
+    facts=$("$podman" exec -i imp-host sh -s -- /root/.config/impz/token /proc < "$token_facts" 2>&1) ||
+      facts="the token-file check failed: $facts"
+    error="$error; $facts"
   fi
   if [ "$try" -ge "$tries" ]; then
     echo "preview-image: impd listed no images after $tries tries: $error" >&2

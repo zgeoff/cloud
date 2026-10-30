@@ -1519,6 +1519,28 @@ let
       '';
     }
     {
+      title = "it buildStubImpHostPodman fails the next script run with its script-error, with status 125 and no run, then runs the script";
+      script = ''
+        mkdir home tmp impd
+        echo 'Error: no container with name or ID "imp-host" found: no such container' > impd/script-error
+
+        for call in first second; do
+          status=0
+          echo 'echo ran' |
+            env -i PATH="$PATH" HOME="$PWD/home" TMPDIR="$PWD/tmp" IMPD_STATE="$PWD/impd" \
+              ${stubImpHostPodman} exec -i imp-host sh -s -- > "$call.out" 2> "$call.err" || status=$?
+          echo "$status" > "$call.status"
+        done
+
+        assert_equals 125 "$(cat first.status)" "the first run's exit status"
+        assert_files_equal /dev/null first.out
+        assert_equals 'Error: no container with name or ID "imp-host" found: no such container' "$(cat first.err)" "the first run's error"
+        assert_equals 0 "$(cat second.status)" "the second run's exit status"
+        assert_equals ran "$(cat second.out)" "the second run's output"
+        assert_files_equal /dev/null second.err
+      '';
+    }
+    {
       title = "it buildStubImpHostPodman prints the container ID of each inspect from container-ids, keeping the last";
       script = ''
         mkdir home tmp impd
@@ -1763,7 +1785,7 @@ let
         health_url=$(grep -cxF 'health_url=http://127.0.0.1:7070/health' ${../modules/preview-image.sh} || true)
         health=$(grep -cxF '  health=$("$podman" exec imp-host curl -sS --max-time 5 "$health_url" 2> "$err") || return 1' ${../modules/preview-image.sh} || true)
         list=$(grep -cxF '  if [ -n "$ready" ] && images=$("$podman" exec imp-host impz image ls --json 2> "$err"); then' ${../modules/preview-image.sh} || true)
-        facts=$(grep -cxF '    error="$error; $("$podman" exec -i imp-host sh -s -- /root/.config/impz/token /proc < "$token_facts" 2>&1)"' ${../modules/preview-image.sh} || true)
+        facts=$(grep -cxF '    facts=$("$podman" exec -i imp-host sh -s -- /root/.config/impz/token /proc < "$token_facts" 2>&1) ||' ${../modules/preview-image.sh} || true)
         add=$(grep -cxF '  "$podman" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null' ${../modules/preview-image.sh} || true)
         pin=$(grep -cxF '  "$podman" exec imp-host impz image pin "$name"' ${../modules/preview-image.sh} || true)
         calls=$(grep -cF '"$podman"' ${../modules/preview-image.sh} || true)

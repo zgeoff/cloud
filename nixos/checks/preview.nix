@@ -845,6 +845,54 @@ let
       '';
     }
     {
+      title = "it keeps waiting when the token-file check fails after a refused call, and names the failure in the error";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unauthorized
+        echo 'Error: no container with name or ID "imp-host" found: no such container' > impd/script-error
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals 'preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the token-file check failed: Error: no container with name or ID "imp-host" found: no such container' \
+          "$(cat err)" "the error"
+        assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
+      title = "it leaves out an impd process whose stat line is gone or empty by the token-file check, and keeps waiting";
+      script = ''
+        mkdir home tmp impd
+        echo '[]' > impd/images.json
+        echo 1 > impd/unauthorized
+        mkdir -p impd/container/var/lib/imp impd/container/root/.config/impz impd/container/proc/4242 impd/container/proc/4343
+        printf 'imp_fixture_root\n' > impd/container/var/lib/imp/token
+        touch -d @1793300070 impd/container/var/lib/imp/token
+        ln -s ../../../var/lib/imp/token impd/container/root/.config/impz/token
+        printf 'btime 1793300000\n' > impd/container/proc/stat
+        echo impd > impd/container/proc/4242/comm
+        echo impd > impd/container/proc/4343/comm
+        : > impd/container/proc/4343/stat
+        inode=$(stat -c %i impd/container/var/lib/imp/token)
+
+        status=0
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+          SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
+          PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
+          ${imageScript} > out 2> err || status=$?
+
+        assert_equals 0 "$status" "the exit status"
+        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z" \
+          "$(cat err)" "the error"
+        assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
+      '';
+    }
+    {
       title = "it waits for the impd /health to report ready before its first impz call, printing a changed answer once";
       script = ''
         mkdir home tmp impd

@@ -21,9 +21,11 @@ booted=$(awk '$1 == "btime" { print $2 }' "$proc/stat")
 ticks=$(getconf CLK_TCK)
 for dir in "$proc"/[0-9]*; do
   [ "$(cat "$dir/comm" 2> /dev/null)" = impd ] || continue
-  line=$(cat "$dir/stat")
+  # a process that exits between the reads leaves no stat line, or a short one, and is skipped
+  line=$(cat "$dir/stat" 2> /dev/null) || continue
   # shellcheck disable=SC2086 # the fields split on purpose
   set -- ${line##*) }
+  [ "$#" -ge 20 ] || continue
   shift 19
   started=$(date -u -d "@$((booted + $1 / ticks))" +%Y-%m-%dT%H:%M:%SZ)
   facts="$facts; impd ${dir##*/} started $started"

@@ -15,6 +15,8 @@
 #   - unauthorized, optional: a count of calls still to fail once unreachable has none left, each
 #     as impz fails a call that impd refuses with 401, which the stand-in counts down;
 #   - add-error, optional: a message the next `image add` fails with, as impz fails a call;
+#   - script-error, optional: a message the next `exec -i imp-host sh -s` fails with, with status
+#     125, as podman fails an exec in a container that stops;
 #   - version, optional: the imp version that `impz info` prints;
 #   - container, optional: a directory that stands for the imp-host container's filesystem, which
 #     `cp` reads and `exec -i imp-host sh -s` runs against;
@@ -31,7 +33,8 @@
 # `exec imp-host curl -sS --max-time 5 http://127.0.0.1:7070/health` prints impd's /health body,
 # with ready false while starting counts down and ready true after. `exec -i imp-host sh -s --
 # <path>...` runs dash, the sh of Debian and so of imp-host, on the script on stdin, with each
-# absolute path argument moved under container/, and prints what it prints.
+# absolute path argument moved under container/, and prints what it prints, or fails with the
+# message of script-error when that file exists.
 # `cp imp-host:<path> <dest>` copies container/<path> to <dest> with its mode and prints nothing,
 # or fails with 'Error: "<path>" could not be found on container imp-host: no such file or
 # directory' when container/<path> is not a file. `container inspect --format {{.Id}} imp-host`
@@ -43,8 +46,8 @@
 # (packages/cli/src/commands/image.ts, packages/cli/src/run-action.ts,
 # packages/daemon/src/images/create-image-writer.ts and packages/daemon/src/surface/create-app.ts):
 # impd's /health answers {"status":"ok","ready":<bool>,"warnings":[...]} to a call with no token;
-# `impz image ls --json` and `impz image add --json` print JSON.stringify(value, null, 2) of an image list and of one image, with the fields
-# id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
+# `impz image ls --json` and `impz image add --json` print JSON.stringify(value, null, 2) of an
+# image list and of one image, with the fields id, name, ref, digest, source, createdAt, sizeBytes and pinned; impz prints a failure as one line,
 # `impz: <message>`, and exits 1, with the message 'unauthorized: set IMP_TOKEN to the token from
 # <IMP_DATA_DIR>/token, or run impz login <url>' for a 401 from impd; an add under a name that
 # exists points the name at the new image and keeps the name's pin
@@ -88,6 +91,11 @@ pkgs.lib.getExe (
         exit 0
       fi
       if [ "$#" -ge 6 ] && [ "$1 $2 $3 $4 $5 $6" = "exec -i imp-host sh -s --" ]; then
+        if [ -e "$IMPD_STATE/script-error" ]; then
+          cat "$IMPD_STATE/script-error" >&2
+          rm "$IMPD_STATE/script-error"
+          exit 125
+        fi
         shift 6
         paths=()
         for path in "$@"; do
