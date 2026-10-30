@@ -5,8 +5,8 @@
 # impd's /health, from inside imp-host, until it reports ready, then lists impd's images until the
 # list succeeds. It pauses 2 s between PREVIEW_IMAGE_WAIT_TRIES tries (default 300, about 10 min),
 # and prints a failed try's error only when it differs from the one before. After each try that
-# impd refuses with 401, it adds to the try's error the exec's HOME, what the exec sees of impd's
-# token file, and impd's start time, from $PREVIEW_IMAGE_TOKEN_FACTS (preview-image-token-facts.sh),
+# impd refuses with 401, it adds to the try's error what the exec sees of impd's token file and
+# impd's start time, from $PREVIEW_IMAGE_TOKEN_FACTS (preview-image-token-facts.sh),
 # never the token. So a run of refusals prints one line, and another line only when the token file
 # or impd's start changes. When the name already holds the reference, it adds nothing, because an
 # add boots a builder imp and pulls the image again. Otherwise it adds the reference under the

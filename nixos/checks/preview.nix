@@ -817,14 +817,14 @@ let
         assert_equals 0 "$status" "the exit status"
         assert_files_equal - err <<EOF
         preview-image: try 1: Error: no container with name or ID "imp-host" found: no such container
-        preview-image: try 3: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the exec's HOME: $PWD/home; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z; impd 4242 started 2026-10-29T18:54:20Z
+        preview-image: try 3: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z; impd 4242 started 2026-10-29T18:54:20Z
         EOF
         assert_equals 4 "$(wc -l < sleep.log)" "the pauses"
         assert_equals 0 "$(grep -c imp_fixture_root err)" "the token's appearances in the log"
       '';
     }
     {
-      title = "it says the exec has an empty HOME and sees no token file when impd refuses the call, the HOME is empty and the impz token file is missing";
+      title = "it says the exec sees no token file when impd refuses the call and the impz token file is missing";
       script = ''
         mkdir home tmp impd
         echo '[]' > impd/images.json
@@ -834,13 +834,13 @@ let
         printf 'btime 1793300000\n' > impd/container/proc/stat
 
         status=0
-        env -i HOME= TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
+        env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
           SLEEP=${stubSleep} SLEEP_LOG="$PWD/sleep.log" \
           PREVIEW_IMAGE_NAME=pv-base PREVIEW_IMAGE_REF=ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"} \
           ${imageScript} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
-        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the exec's HOME: empty; impz's token file: missing" \
+        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: missing" \
           "$(cat err)" "the error"
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
@@ -895,7 +895,7 @@ let
           ${imageScript} > out 2> err || status=$?
 
         assert_equals 0 "$status" "the exit status"
-        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; the exec's HOME: $PWD/home; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z" \
+        assert_equals "preview-image: try 1: impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>; impz's token file: inode $inode, modified 2026-10-29T18:54:30Z" \
           "$(cat err)" "the error"
         assert_equals '[["pv-base",true]]' "$(jq -c 'map([.name, .pinned])' impd/images.json)" "impd's images"
       '';
