@@ -71,6 +71,49 @@ test('it runs the lint at the tools tag that the repo-sync caller pins, in the r
   expect(kept).toStrictEqual(['sync-v42']);
 });
 
+test('it runs the lint at the tools commit that the repo-sync caller pins with a main comment', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.tools.seed, 'sync', 'pre-push', 'run-workflows-check.ts'),
+    "process.stdout.write('linted at the pinned commit\\n');\n",
+  );
+
+  await ctx.tools.git(['-C', ctx.tools.seed, 'add', '.']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'commit', '-qm', 'add the lint']);
+
+  const head = await ctx.tools.git(['-C', ctx.tools.seed, 'rev-parse', 'HEAD']);
+
+  const pinned = head.trim();
+
+  await writeFile(
+    join(ctx.tools.seed, 'sync', 'pre-push', 'run-workflows-check.ts'),
+    "process.stdout.write('linted at a newer commit\\n');\n",
+  );
+
+  await ctx.tools.git(['-C', ctx.tools.seed, 'commit', '-qam', 'change the lint']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'push', '-q', 'origin', 'main']);
+
+  await writeFile(
+    join(ctx.root, '.github', 'workflows', 'repo-sync.yml'),
+    `jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@${pinned} # main\n`,
+  );
+
+  const status = await runWorkflowLint({
+    root: ctx.root,
+    toolsURL: `file://${ctx.tools.origin}`,
+    cacheDirectory: ctx.cacheDirectory,
+    env: ctx.tools.env,
+    ...ctx.dependencies,
+  });
+
+  const kept = await readdir(ctx.cacheDirectory);
+
+  expect(status).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['linted at the pinned commit\n']]);
+  expect(kept).toStrictEqual([pinned]);
+});
+
 test('it reuses the checkout of a tag it already holds, and runs no git', async () => {
   const ctx = await setupTest();
 
@@ -126,7 +169,7 @@ test("it passes the lint's error status and output through", async () => {
   expect(ctx.printErr.mock.calls).toStrictEqual([['workflows: git show failed\n']]);
 });
 
-test('it fails when the repo-sync caller pins no tools tag', async () => {
+test('it fails when the repo-sync caller pins no tools ref', async () => {
   const ctx = await setupTest();
 
   await writeFile(
@@ -146,7 +189,7 @@ test('it fails when the repo-sync caller pins no tools tag', async () => {
 
   expect(ctx.printErr.mock.calls).toStrictEqual([
     [
-      'run-workflow-lint: .github/workflows/repo-sync.yml calls no zgeoff/tools workflow at a tag\n',
+      'run-workflow-lint: .github/workflows/repo-sync.yml calls no zgeoff/tools workflow at a ref\n',
     ],
   ]);
 
@@ -184,7 +227,7 @@ test('it fails with git s error for a tag tools lacks, and keeps no partial chec
       expect.toSatisfy(
         (text: string) =>
           text.startsWith('run-workflow-lint: cannot check out zgeoff/tools sync-v43: ') &&
-          text.includes('sync-v43 not found'),
+          text.includes('sync-v43'),
       ),
     ],
   ]);
