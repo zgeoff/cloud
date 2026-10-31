@@ -37,9 +37,10 @@ permissions:
   actions: read
 
 # A newer run on the same ref cancels the older one. On main, the newer run checks main's newest
-# commit, which is the one a switch takes, and a run covers each earlier commit that changes no
-# input of the checks. On a branch or pull request, the older run's head is no longer the one to
-# merge.
+# commit, which is the one a switch takes. A green run covers only its own commit and the later
+# commits that change no input of the checks, so a newer run on a later commit never covers the
+# cancelled run's commit. On a branch or pull request, the older run's head is no longer the one
+# to merge.
 concurrency:
   group: nixos-checks-${{ github.ref }}
   cancel-in-progress: true

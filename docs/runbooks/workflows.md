@@ -192,9 +192,10 @@ and passed the same derivations with the same workflow and build scripts, wherev
 skipped run's summary links it. A dispatch with `-f force=true` always builds.
 
 A newer run on the same ref cancels the older one, on `main` as on a branch or pull request. On
-`main`, the newer run checks the newest commit, which is the one a switch takes. A build substitutes
-the store paths it needs from `main`'s Actions cache of the paths that cache.nixos.org does not
-serve, and a build on `main` replaces that cache.
+`main`, the newer run checks the newest commit, which is the one a switch takes. A newer run on a
+later commit never covers the cancelled run's commit, because a run covers only its own commit and
+later ones. A build substitutes the store paths it needs from `main`'s Actions cache of the paths
+that cache.nixos.org does not serve, and a build on `main` replaces that cache.
 
 To switch before the nightly run covers the commit:
 
