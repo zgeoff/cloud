@@ -72,7 +72,7 @@
       "name": "@zgeoff/cloud-preview",
       "dependencies": {
         "@impz/client": "6.3.2",
-        "@zgeoff/std": "0.3.0",
+        "@zgeoff/std": "0.3.1",
         "ts-pattern": "5.9.2",
         "xstate": "5.33.3",
         "zod": "4.6.7",
@@ -674,7 +674,7 @@
 
     "@zgeoff/skill-gate": ["@zgeoff/skill-gate@0.2.11", "", { "dependencies": { "@zgeoff/agent-hooks": "0.1.1" } }, "sha512-IKXyJLXMFt6n1TNhpzL7sYXXz79DrnuznljnlyrnI4NlWF1OWrBpdTVvH5zbUU3cx590T/c6ccd3GQAPVXjcSQ=="],
 
-    "@zgeoff/std": ["@zgeoff/std@0.3.0", "", {}, "sha512-I9LBwkMr8uuNCAQ9/tIoObp09b8ixnNDp1f85T9Mm1Ox10nWbVrbiqoWkf+hATCt4iyYxvYIVXl4eUFLwZaU/g=="],
+    "@zgeoff/std": ["@zgeoff/std@0.3.1", "", {}, "sha512-6HLaUW2v2mbvY2gnS563TsXQ3Xtzc71nR2HmtE8cnZsnp8pvNuom+W3VMSCpX6fRfBC2OZ0/xgxt4JPgzuxyHQ=="],
 
     "abbrev": ["abbrev@4.0.0", "", {}, "sha512-a1wflyaL0tHtJSmLSOVybYhy22vRih4eduhhrkcjgrWGnRfrZtovJ2FRjxuTtkkj47O/baf0R86QU5OuYpz8fA=="],
 
