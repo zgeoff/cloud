@@ -19,7 +19,7 @@ async function setupTest() {
 
   await mkdir(join(root, '.github', 'workflows'), { recursive: true });
   await mkdir(cacheDirectory);
-  await mkdir(join(tools.seed, 'sync', 'pre-push'), { recursive: true });
+  await mkdir(join(tools.seed, 'packages', 'chex', 'src'), { recursive: true });
 
   const stub = buildStubRunner(buildRealProgramHandler(['git', process.execPath], tools.env));
   const printOut = mock<(text: string) => void>();
@@ -47,7 +47,7 @@ test('it runs the lint at the tools tag that the repo-sync caller pins, in the r
   );
 
   await writeFile(
-    join(ctx.tools.seed, 'sync', 'pre-push', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
     "process.stdout.write('linted ' + process.cwd() + ' as ' + process.env['CHECKS_PROFILE'] + '\\n');\n",
   );
 
@@ -68,14 +68,46 @@ test('it runs the lint at the tools tag that the repo-sync caller pins, in the r
 
   expect(status).toBe(0);
   expect(ctx.printOut.mock.calls).toStrictEqual([[`linted ${ctx.root} as public\n`]]);
-  expect(kept).toStrictEqual(['sync-v42']);
+  expect(kept).toStrictEqual(['chex-sync-v42']);
+});
+
+test('it checks out the lint again beside a kept checkout that holds only sync/pre-push', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.root, '.github', 'workflows', 'repo-sync.yml'),
+    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
+  );
+
+  await writeFile(
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    "process.stdout.write('linted from the chex checkout\\n');\n",
+  );
+
+  await ctx.tools.git(['-C', ctx.tools.seed, 'add', '.']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'commit', '-qm', 'add the lint']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'tag', 'sync-v42']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'push', '-q', 'origin', 'main', 'sync-v42']);
+
+  await mkdir(join(ctx.cacheDirectory, 'sync-v42', 'sync', 'pre-push'), { recursive: true });
+
+  const status = await runWorkflowLint({
+    root: ctx.root,
+    toolsURL: `file://${ctx.tools.origin}`,
+    cacheDirectory: ctx.cacheDirectory,
+    env: ctx.tools.env,
+    ...ctx.dependencies,
+  });
+
+  expect(status).toBe(0);
+  expect(ctx.printOut.mock.calls).toStrictEqual([['linted from the chex checkout\n']]);
 });
 
 test('it runs the lint at the tools commit that the repo-sync caller pins with a main comment', async () => {
   const ctx = await setupTest();
 
   await writeFile(
-    join(ctx.tools.seed, 'sync', 'pre-push', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
     "process.stdout.write('linted at the pinned commit\\n');\n",
   );
 
@@ -87,7 +119,7 @@ test('it runs the lint at the tools commit that the repo-sync caller pins with a
   const pinned = head.trim();
 
   await writeFile(
-    join(ctx.tools.seed, 'sync', 'pre-push', 'run-workflows-check.ts'),
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
     "process.stdout.write('linted at a newer commit\\n');\n",
   );
 
@@ -111,7 +143,7 @@ test('it runs the lint at the tools commit that the repo-sync caller pins with a
 
   expect(status).toBe(0);
   expect(ctx.printOut.mock.calls).toStrictEqual([['linted at the pinned commit\n']]);
-  expect(kept).toStrictEqual([pinned]);
+  expect(kept).toStrictEqual([`chex-${pinned}`]);
 });
 
 test('it reuses the checkout of a tag it already holds, and runs no git', async () => {
@@ -122,10 +154,12 @@ test('it reuses the checkout of a tag it already holds, and runs no git', async 
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
   );
 
-  await mkdir(join(ctx.cacheDirectory, 'sync-v42', 'sync', 'pre-push'), { recursive: true });
+  await mkdir(join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src'), {
+    recursive: true,
+  });
 
   await writeFile(
-    join(ctx.cacheDirectory, 'sync-v42', 'sync', 'pre-push', 'run-workflows-check.ts'),
+    join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src', 'run-workflows-check.ts'),
     "process.stdout.write('linted from the kept checkout\\n');\n",
   );
 
@@ -150,10 +184,12 @@ test("it passes the lint's error status and output through", async () => {
     'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
   );
 
-  await mkdir(join(ctx.cacheDirectory, 'sync-v42', 'sync', 'pre-push'), { recursive: true });
+  await mkdir(join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src'), {
+    recursive: true,
+  });
 
   await writeFile(
-    join(ctx.cacheDirectory, 'sync-v42', 'sync', 'pre-push', 'run-workflows-check.ts'),
+    join(ctx.cacheDirectory, 'chex-sync-v42', 'packages', 'chex', 'src', 'run-workflows-check.ts'),
     "process.stderr.write('workflows: git show failed\\n');\nprocess.exitCode = 2;\n",
   );
 

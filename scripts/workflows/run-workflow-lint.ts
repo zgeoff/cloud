@@ -21,7 +21,8 @@ export interface RunWorkflowLintOptions {
 }
 
 const callerPath = '.github/workflows/repo-sync.yml';
-const lintPath = 'sync/pre-push/run-workflows-check.ts';
+const lintFolder = 'packages/chex/src';
+const lintPath = `${lintFolder}/run-workflows-check.ts`;
 
 export async function runWorkflowLint(options: Readonly<RunWorkflowLintOptions>): Promise<number> {
   const caller = await options.readText(join(options.root, callerPath));
@@ -34,7 +35,9 @@ export async function runWorkflowLint(options: Readonly<RunWorkflowLintOptions>)
     return 2;
   }
 
-  const checkout = join(options.cacheDirectory, ref);
+  // A checkout kept from a run of an older version of this script holds only sync/pre-push, so the
+  // folder name keeps the two apart.
+  const checkout = join(options.cacheDirectory, `chex-${ref}`);
 
   const isKept = await options.probeFile(join(checkout, lintPath));
 
@@ -95,7 +98,7 @@ async function createToolsCheckout(
 
   const steps = [
     ['git', 'init', '--quiet', partial],
-    ['git', '-C', partial, 'sparse-checkout', 'set', 'sync/pre-push'],
+    ['git', '-C', partial, 'sparse-checkout', 'set', lintFolder],
     [
       'git',
       '-C',
