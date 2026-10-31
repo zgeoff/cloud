@@ -93,6 +93,7 @@ Run the script, which builds, then switches only after the build exits 0:
 bash scripts/switch-geoffcloud.sh               # build, switch, check the host runs the build
 bash scripts/switch-geoffcloud.sh --build-only  # build and print the system path
 bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s window
+bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hugetlb pool's window
 ```
 
 1. It refuses a branch other than `main`, uncommitted changes, a `main` behind `origin/main`, or any
@@ -129,22 +130,35 @@ bash scripts/switch-geoffcloud.sh --allow-k3s-restart  # switch in a planned k3s
    would stop and restart. It holds the switch with exit 1 and those lines when either list holds
    `k3s.service`, because nixie can stay down for minutes after k3s restarts. In a planned k3s
    window, run the switch again with `--allow-k3s-restart`: it prints the same lines and goes on.
-8. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
+8. With `--stop-ordinary-page-imps`, it stops each running or sleeping imp whose guest is on 4 KiB
+   pages with `impz stop`, so the imp boots cold on the pool at its next use, because impd wakes a
+   snapshot on the pages it ran on and budgets those beside the reserved pool. Each imp keeps its
+   disk and loses its processes and sessions. The stop order is the names in `IMP_STOP_ORDER`, then
+   the other imps' names sorted, then the names in `IMP_STOP_LAST`.
+   `bash scripts/stop-ordinary-page-imps.sh --plan <host>` prints the order and stops nothing, and
+   `--check` fails naming each imp still on 4 KiB pages. It stops them after the last gate and
+   before the activation reserves the pool, so a pool that comes up short leaves no guest on
+   ordinary pages beside it. Pass the flag only in the pool's window that the owner approved.
+9. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the
    host, because the store path does not name the commit it was built from.
-9. It fails unless the host's `/run/current-system` is the built path, then prints
-   `systemctl --failed`, which should list nothing.
-10. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
+10. It fails unless the host's `/run/current-system` is the built path, then prints
+    `systemctl --failed`, which should list nothing.
+11. It runs `nixie health` in nixie's pod for its readiness report, up to 30 times 10 s apart, and
     fails with each readiness or dependency part that is not ready and nixie's reason for it, since
     a host that switches cleanly can still leave nixie unable to start. It prints each advisory part
     that is not ready, such as `conversation_turns`, and passes, because nixie answers while its
     turns fail.
-11. It fails with each image record in impd whose build folder holds no `rootfs.ext4`, because every
+12. It fails with each image record in impd whose build folder holds no `rootfs.ext4`, because every
     imp boot from that image then fails with ENOENT. A database restored across a change of the
     preview image can leave such a record, as
     [the restore runbook](./restore-geoff-cloud.md#2-roll-impds-database-back) describes.
-12. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
+13. It fails with both counts when the host reserved fewer hugetlb pages than its system configures
+    in `vm.nr_hugepages`, because impd refuses each boot and wake that the free pool cannot hold.
+    The activation reserves a changed pool on the running host, where fragmented memory can leave it
+    short. Reboot the host, which reserves the whole pool early in boot, then run the switch again.
+14. It pushes the tag `deployed/host` on `origin` to the switched commit and prints
     `== deployed/host moved to <commit>`. The tag marks the commit the host runs, as `deployed/prod`
     marks the commit the `Deploy prod` workflow applied, so a change that reaches prod only through
     a switch counts as shipped once the host runs it. A switch that fails any earlier step leaves

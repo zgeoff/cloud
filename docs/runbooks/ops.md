@@ -36,20 +36,23 @@ Switches geoffcloud to the NixOS system of the checked-out `main`.
 bun run ops:switch-host                               # build, then switch
 bun run ops:switch-host -- --build-only               # build and print the system path
 bun run ops:switch-host -- --allow-k3s-restart        # switch in a planned k3s window
+bun run ops:switch-host -- --stop-ordinary-page-imps  # switch in the hugetlb pool's window
 ```
 
 - Wraps `bash scripts/switch-geoffcloud.sh`, which reaches the host in `GEOFFCLOUD_HOST`, or
   `root@geoffcloud`.
 - The script checks a clean `main` that matches `origin/main`, a green `NixOS checks` run that
   covers the commit, the atc daemon and gateway majors, the impd majors nixie accepts, the secret
-  kinds impd stores against those the atc daemon accepts, a k3s restart, and nixie's readiness and
-  impd's image folders after the switch. [Switch the host](./workflows.md#switch-the-host) explains
-  each refusal.
+  kinds impd stores against those the atc daemon accepts, a k3s restart, and nixie's readiness,
+  impd's image folders and the hugetlb pool after the switch.
+  [Switch the host](./workflows.md#switch-the-host) explains each refusal.
 - After every check passes, the script pushes the tag `deployed/host` on `origin` to the switched
   commit, so the caller needs push access to `zgeoff/cloud`.
 - Before a switch that changes imp, copy impd's database with
   `bash scripts/copy-impd-db.sh <label>`.
 - Pass `--allow-k3s-restart` only in a planned k3s window that the owner approved.
+- Pass `--stop-ordinary-page-imps` only in the hugetlb pool's window that the owner approved: it
+  stops each imp on 4 KiB pages, which ends its processes and sessions and keeps its disk.
 
 ## `bun run ops:deploy-prod`
 
