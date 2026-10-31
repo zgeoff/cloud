@@ -446,7 +446,8 @@ let
           },
           "defaultTarget": "geoffcloud",
           "principals": {
-            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] }
+            "0hpE6styFKfCcbWrvigzCp9HbZU5nVgY": { "targets": ["geoffcloud"] },
+            "chfPW3WghL98SvIYWn5wFGBWhydPg2ve": { "targets": ["geoffcloud"] }
           },
           "targets": {
             "geoffcloud": {
