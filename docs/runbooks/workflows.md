@@ -191,10 +191,10 @@ every later commit that changes no input of the checks, which the `nixos` gate o
 and passed the same derivations with the same workflow and build scripts, wherever that run ran; the
 skipped run's summary links it. A dispatch with `-f force=true` always builds.
 
-Runs on one commit of `main` queue, so the later one finds the earlier one's result. A newer
-dispatch on a branch cancels the branch's older run. A build substitutes the store paths it needs
-from `main`'s Actions cache of the paths that cache.nixos.org does not serve, and a build on `main`
-replaces that cache.
+A newer run on the same ref cancels the older one, on `main` as on a branch or pull request. On
+`main`, the newer run checks the newest commit, which is the one a switch takes. A build substitutes
+the store paths it needs from `main`'s Actions cache of the paths that cache.nixos.org does not
+serve, and a build on `main` replaces that cache.
 
 To switch before the nightly run covers the commit:
 
@@ -212,7 +212,8 @@ To switch before the nightly run covers the commit:
    ```
 
    Expect exit 0. A failed run means the commit breaks a check: fix it in a PR rather than
-   switching.
+   switching. A cancelled run means a newer run on `main`, such as the nightly run, took its place:
+   run `git pull`, then wait for the newest run that the list shows.
 
 3. Run `bash scripts/switch-geoffcloud.sh`. Expect its first line to be `== checked by <run url>`.
 
