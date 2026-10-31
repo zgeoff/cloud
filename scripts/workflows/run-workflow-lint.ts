@@ -4,12 +4,10 @@ import type { Runner } from '../run-process.ts';
 import { runProcess } from '../run-process.ts';
 
 export interface RunWorkflowLintOptions {
-  // the repo whose workflows the lint reads, and whose repo-sync caller pins the tools ref
   readonly root: string;
 
   readonly toolsURL: string;
 
-  // one checkout of zgeoff/tools per ref, kept between runs
   readonly cacheDirectory: string;
 
   readonly env: Readonly<Record<string, string | undefined>>;
