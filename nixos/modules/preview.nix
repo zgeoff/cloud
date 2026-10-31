@@ -35,7 +35,9 @@ let
       pkgs.jq
       config.virtualisation.podman.package
     ];
-    runtimeEnv.PREVIEW_IMAGE_TOKEN_FACTS = ./preview-image-token-facts.sh;
+    # interpolated, so the file joins the script's closure: writeShellApplication turns a bare path
+    # into the text of its place in the flake source, which the switch never copies to the host
+    runtimeEnv.PREVIEW_IMAGE_TOKEN_FACTS = "${./preview-image-token-facts.sh}";
     text = builtins.readFile ./preview-image.sh;
   };
 in

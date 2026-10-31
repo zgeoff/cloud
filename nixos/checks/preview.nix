@@ -17,6 +17,7 @@ let
   package = pkgs.callPackage ../packages/preview.nix { };
   stubImpHostPodman = import ./test-utils/build-stub-imp-host-podman.nix { inherit pkgs; };
   stubSleep = import ./test-utils/build-stub-sleep.nix { inherit pkgs; };
+  buildStorePathGaps = import ./test-utils/build-store-path-gaps.nix { inherit pkgs; };
   # the spendCap cases only read the proxy's path, so the binary never runs
   stubCountingProxy = pkgs.writeShellScriptBin "counting-proxy" "exit 1";
 
@@ -40,11 +41,11 @@ let
       }
       // imageSettings;
     };
-  imageScript =
-    lib.getExe
-      (buildImageSystem {
-        impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
-      }).config.services.preview.imageScript;
+  imagePackage =
+    (buildImageSystem {
+      impRegistryImage = "ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}";
+    }).config.services.preview.imageScript;
+  imageScript = lib.getExe imagePackage;
 
   cases = [
     {
@@ -649,10 +650,17 @@ let
       '';
     }
     {
-      title = "it adds the digest-pinned image under the preview image name and pins the name when impd holds no image of that name, and leaves the other impd images alone";
+      title = "it carries in the preview-image script closure every store path the script names";
+      script = ''
+        assert_files_equal /dev/null ${buildStorePathGaps imagePackage}
+      '';
+    }
+    {
+      title = "it adds the digest-pinned image under the preview image name and pins the name when impd holds no image of that name, and leaves the other impd images alone, even when its mounts predate the imp-host container";
       script = ''
         mkdir home tmp impd
         echo '[{"id":"img-1","name":"base","ref":"ghcr.io/example/imp-base:1.0.0","digest":"imp-build-aa","source":"oci","createdAt":"2026-02-03T04:05:06.000Z","sizeBytes":12}]' > impd/images.json
+        touch impd/stale-view
 
         status=0
         env -i HOME="$PWD/home" TMPDIR="$PWD/tmp" PODMAN=${stubImpHostPodman} IMPD_STATE="$PWD/impd" \
@@ -669,9 +677,9 @@ let
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
-        ["exec","imp-host","impz","image","pin","pv-base"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
         assert_equals '[["base","ghcr.io/example/imp-base:1.0.0",false],["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
           "$(jq -c 'map([.name, .ref, .pinned == true])' impd/images.json)" "impd's images"
@@ -698,8 +706,8 @@ let
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
         EOF
         assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
           "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
@@ -723,7 +731,7 @@ let
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         EOF
         assert_files_equal before.json impd/images.json
       '';
@@ -748,8 +756,8 @@ let
         assert_files_equal /dev/null err
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","pin","pv-base"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
         assert_equals '[["pv-base","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}",true]]' \
           "$(jq -c 'map([.name, .ref, .pinned])' impd/images.json)" "impd's images"
@@ -778,9 +786,9 @@ let
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
-        ["exec","imp-host","impz","image","pin","pv-base"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
       '';
     }
@@ -836,11 +844,11 @@ let
           "$(cat err)" "the error"
         assert_files_equal - impd/calls <<'EOF'
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
         ["exec","-i","imp-host","sh","-s","--","/root/.config/impz/token","/proc"]
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
-        ["exec","imp-host","impz","image","pin","pv-base"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
       '';
     }
@@ -915,9 +923,9 @@ let
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
         ["exec","imp-host","curl","-sS","--max-time","5","http://127.0.0.1:7070/health"]
-        ["exec","imp-host","impz","image","ls","--json"]
-        ["exec","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
-        ["exec","imp-host","impz","image","pin","pv-base"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","ls","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","add","ghcr.io/example/imp-base:1.2.3@sha256:${lib.strings.replicate 64 "c"}","--name","pv-base","--json"]
+        ["exec","-e","HOME=/root","imp-host","impz","image","pin","pv-base"]
         EOF
       '';
     }

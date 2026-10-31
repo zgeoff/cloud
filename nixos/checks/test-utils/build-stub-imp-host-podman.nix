@@ -1,7 +1,8 @@
 # A stand-in podman for the preview-image script (nixos/modules/preview-image.sh), the host build
 # lag check (nixos/modules/host-build-lag.sh) and the agent image build
 # (nixos/modules/agent-image-build.sh): it answers their impd calls through
-# `podman exec imp-host impz` and `podman exec imp-host curl` from a state directory, $IMPD_STATE,
+# `podman exec imp-host impz`, `podman exec imp-host curl` and the reads of the container's files
+# that the agent image build makes, from a state directory, $IMPD_STATE,
 # and records each call's argv as one JSON line in $IMPD_STATE/calls.
 #
 #   PODMAN=<this> IMPD_STATE=/tmp/impd preview-image
@@ -18,8 +19,11 @@
 #   - script-error, optional: a message the next `exec -i imp-host sh -s` fails with, with status
 #     125, as podman fails an exec in a container that stops;
 #   - version, optional: the imp version that `impz info` prints;
+#   - stale-view, optional: when it exists, every `exec imp-host impz` call that passes no
+#     `-e HOME=<home>` fails as impz fails a call that impd refuses with 401, as real Podman's exec
+#     does from a mount namespace made before the container started (preview-image-vm.nix shows it);
 #   - container, optional: a directory that stands for the imp-host container's filesystem, which
-#     `cp` reads and `exec -i imp-host sh -s` runs against;
+#     `exec imp-host cat`, `exec imp-host stat` and `exec -i imp-host sh -s` read;
 #   - container-ids, optional: the imp-host container's ID at each inspect, one per line, which
 #     stands for a container that a later inspect finds recreated; an empty line stands for no
 #     container.
@@ -34,10 +38,11 @@
 # with ready false while starting counts down and ready true after. `exec -i imp-host sh -s --
 # <path>...` runs dash, the sh of Debian and so of imp-host, on the script on stdin, with each
 # absolute path argument moved under container/, and prints what it prints, or fails with the
-# message of script-error when that file exists.
-# `cp imp-host:<path> <dest>` copies container/<path> to <dest> with its mode and prints nothing,
-# or fails with 'Error: "<path>" could not be found on container imp-host: no such file or
-# directory' when container/<path> is not a file. `container inspect --format {{.Id}} imp-host`
+# message of script-error when that file exists. An exec whose first options are `-e HOME=<home>`
+# is answered as the same exec without them. `exec imp-host cat <path>` prints container/<path>,
+# or fails with "cat: <path>: No such file or directory" and status 1 when it is not a file, and
+# `exec imp-host stat -c %a <path>` prints its mode, or fails with "stat: cannot statx '<path>': No
+# such file or directory" and status 1 when it is missing. `container inspect --format {{.Id}} imp-host`
 # prints the first line of container-ids, and removes it while another line follows, or fails
 # with 'Error: no such container "imp-host"' and status 125 without the file or for an empty line.
 # Any other call fails with "unexpected: <argv>" and status 97. Without $IMPD_STATE it exits 2.
@@ -53,9 +58,9 @@
 # exists points the name at the new image and keeps the name's pin
 # (packages/daemon/src/platform/db/images.ts). podman prints 'Error: no container with name or ID
 # "<name>" found: no such container' and exits 125 for an exec in a container that does not exist,
-# 'Error: "<path>" could not be found on container <name>: no such file or directory' and exits 125
-# for a cp of a path the container lacks, and 'Error: no such container "<name>"' and exits 125
-# for an inspect of a container that does not exist (checked against podman 5). The id, digest, time and size the stand-in writes are its own, not impd's.
+# and 'Error: no such container "<name>"' and exits 125 for an inspect of a container that does
+# not exist (checked against podman 5); an exec exits with the status of the command it runs, whose
+# messages here are GNU coreutils'. The id, digest, time and size the stand-in writes are its own, not impd's.
 # nixos/checks/test-utils-check.nix tests it.
 { pkgs }:
 pkgs.lib.getExe (
@@ -73,6 +78,12 @@ pkgs.lib.getExe (
         exit 2
       fi
       jq -cn '$ARGS.positional' --args -- "$@" >> "$IMPD_STATE/calls"
+      home_given=
+      if [ "$#" -ge 3 ] && [ "$1 $2" = "exec -e" ] && [ "''${3#HOME=}" != "$3" ]; then
+        home_given=1
+        shift 3
+        set -- exec "$@"
+      fi
       if [ "$#" -ge 3 ] && [ "$1 $2" = "exec imp-host" ] && [ -s "$IMPD_STATE/unreachable" ]; then
         left=$(cat "$IMPD_STATE/unreachable")
         if [ "$left" -gt 0 ]; then
@@ -105,6 +116,26 @@ pkgs.lib.getExe (
           esac
         done
         exec ${pkgs.dash}/bin/dash -s -- "''${paths[@]}"
+      fi
+      if [ "$#" -ge 3 ] && [ "$1 $2 $3" = "exec imp-host impz" ] && [ -e "$IMPD_STATE/stale-view" ] && [ -z "$home_given" ]; then
+        echo 'impz: unauthorized: set IMP_TOKEN to the token from <IMP_DATA_DIR>/token, or run impz login <url>' >&2
+        exit 1
+      fi
+      if [ "$#" -eq 4 ] && [ "$1 $2 $3" = "exec imp-host cat" ]; then
+        if [ ! -f "$IMPD_STATE/container$4" ]; then
+          echo "cat: $4: No such file or directory" >&2
+          exit 1
+        fi
+        cat "$IMPD_STATE/container$4"
+        exit 0
+      fi
+      if [ "$#" -eq 6 ] && [ "$1 $2 $3 $4 $5" = "exec imp-host stat -c %a" ]; then
+        if [ ! -e "$IMPD_STATE/container$6" ]; then
+          echo "stat: cannot statx '$6': No such file or directory" >&2
+          exit 1
+        fi
+        stat -c %a "$IMPD_STATE/container$6"
+        exit 0
       fi
       if [ "$#" -ge 3 ] && [ "$1 $2 $3" = "exec imp-host impz" ] && [ -s "$IMPD_STATE/unauthorized" ]; then
         left=$(cat "$IMPD_STATE/unauthorized")
@@ -144,15 +175,6 @@ pkgs.lib.getExe (
         fi
         jq --arg name "$6" 'map(if .name == $name then .pinned = true else . end)' "$IMPD_STATE/images.json" > "$IMPD_STATE/images.json.new"
         mv "$IMPD_STATE/images.json.new" "$IMPD_STATE/images.json"
-        exit 0
-      fi
-      if [ "$#" -eq 3 ] && [ "$1" = cp ] && [ "''${2#imp-host:/}" != "$2" ]; then
-        path="''${2#imp-host:}"
-        if [ ! -f "$IMPD_STATE/container$path" ]; then
-          echo "Error: \"$path\" could not be found on container imp-host: no such file or directory" >&2
-          exit 125
-        fi
-        cp --preserve=mode "$IMPD_STATE/container$path" "$3"
         exit 0
       fi
       if [ "$*" = "container inspect --format {{.Id}} imp-host" ]; then

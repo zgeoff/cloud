@@ -1,12 +1,12 @@
 # shellcheck shell=bash
 # Make impd hold the image that every preview imp boots: the image named $PREVIEW_IMAGE_NAME,
 # added from the digest-pinned registry reference $PREVIEW_IMAGE_REF. impd answers some time after
-# imp-host starts, and at a cold start it refuses impz calls for minutes after it listens. So the
-# script first asks impd's /health, from inside imp-host, until it reports ready, then lists impd's
-# images until the list succeeds. It pauses 2 s between PREVIEW_IMAGE_WAIT_TRIES tries (default
-# 300, about 10 min), and prints a failed try's error only when it differs from the one before.
-# After each try that impd refuses with 401, it adds to the try's error what the exec sees of impd's
-# token file and impd's start time, from $PREVIEW_IMAGE_TOKEN_FACTS (preview-image-token-facts.sh),
+# imp-host starts, and reports ready on /health some time after that. So the script first asks
+# impd's /health, from inside imp-host, until it reports ready, then lists impd's images until the
+# list succeeds. It pauses 2 s between PREVIEW_IMAGE_WAIT_TRIES tries (default 300, about 10 min),
+# and prints a failed try's error only when it differs from the one before. After each try that
+# impd refuses with 401, it adds to the try's error what the exec sees of impd's token file and
+# impd's start time, from $PREVIEW_IMAGE_TOKEN_FACTS (preview-image-token-facts.sh),
 # never the token. So a run of refusals prints one line, and another line only when the token file
 # or impd's start changes. When the name already holds the reference, it adds nothing, because an
 # add boots a builder imp and pulls the image again. Otherwise it adds the reference under the
@@ -37,6 +37,9 @@ check_ready() {
   fi
 }
 
+# Each impz call names root's home in imp-host, where impz finds impd's token. Podman sets a
+# default HOME from the container's /etc/passwd as this unit's mounts show it, and a mount
+# namespace made before imp-host's container started shows no such file, so HOME would be empty.
 try=1
 last=
 ready=
@@ -44,7 +47,7 @@ while :; do
   if [ -z "$ready" ] && check_ready; then
     ready=1
   fi
-  if [ -n "$ready" ] && images=$("$podman" exec imp-host impz image ls --json 2> "$err"); then
+  if [ -n "$ready" ] && images=$("$podman" exec -e HOME=/root imp-host impz image ls --json 2> "$err"); then
     break
   fi
   error=$(cat "$err")
@@ -75,11 +78,11 @@ if [ "$current" != "$ref" ]; then
   else
     echo "preview-image: adding $ref to impd as $name, in place of $current"
   fi
-  "$podman" exec imp-host impz image add "$ref" --name "$name" --json > /dev/null
+  "$podman" exec -e HOME=/root imp-host impz image add "$ref" --name "$name" --json > /dev/null
 fi
 
 if [ "$pinned" != true ]; then
   echo "preview-image: pinning $name"
-  "$podman" exec imp-host impz image pin "$name"
+  "$podman" exec -e HOME=/root imp-host impz image pin "$name"
 fi
 echo "preview-image: impd holds $name at $ref, pinned"
