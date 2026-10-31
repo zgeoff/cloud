@@ -36,13 +36,13 @@ permissions:
   contents: read
   actions: read
 
-# Runs on one commit of main queue, so a later run finds the earlier one's result and builds
-# nothing; main never cancels, since the switch gate reads every green run. A newer push or
-# dispatch on a branch or pull request cancels its older run, whose head is no longer the one to
+# A newer run on the same ref cancels the older one. On main, the newer run checks main's newest
+# commit, which is the one a switch takes, and a run covers each earlier commit that changes no
+# input of the checks. On a branch or pull request, the older run's head is no longer the one to
 # merge.
 concurrency:
-  group: nixos-checks-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  group: nixos-checks-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   nixos:
