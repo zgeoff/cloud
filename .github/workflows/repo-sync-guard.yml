@@ -19,4 +19,4 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
-    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@4501c398fd59c2c1b6218ea86a0161103246af62 # main
+    uses: zgeoff/tools/.github/workflows/repo-sync-guard.yml@103312bb34308ec9887cf88ce0fe8ef779043bb8 # main
