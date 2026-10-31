@@ -19,8 +19,8 @@ config:
       - 127.0.0.1
   geoff-cloud:discordAlerts: 'true'
   geoff-cloud:nixie:
-    image: ghcr.io/zgeoff/nixie:0.58.0@sha256:49b77f5f4636268917c77e0c5e8fd7cb890321259c1839ed02e0944e0486db62
-    webImage: ghcr.io/zgeoff/nixie-web:0.58.0@sha256:83869fc615b2c31ba85f2d707a97db4f367ded7364c8b5b8c909676f8434f8a9
+    image: ghcr.io/zgeoff/nixie:0.58.1@sha256:c1353e955ca91b585f622f89d2c9160ee05aa1203e568a199389d3784d7e9d6b
+    webImage: ghcr.io/zgeoff/nixie-web:0.58.1@sha256:3c01c97c1b870400fc9a7350db9a6533fd623c22d96572f931a9dbc3967e2f92
     hostname: nixie.geoff.cloud
   geoff-cloud:files:
     image: ghcr.io/zgeoff/cloud-files:33830cac231f4295a03516fe081d1a0cbd790452@sha256:0c3ecdf88e7a02ce1b80d17e3017757b79f49b9abc1986af7c3674e7574334f9
