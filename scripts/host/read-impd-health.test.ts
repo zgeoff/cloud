@@ -97,7 +97,7 @@ test('it keeps a proxy variable and a .curlrc off its request', async () => {
   expect(result.stdout.toString()).toBe('200\n{"ready":true}');
 });
 
-test('its control: the same .curlrc and proxy variable send a plain curl off loopback', async () => {
+test('it sends a plain curl under the same .curlrc and proxy to the dead proxy', async () => {
   const ctx = await setupTest();
 
   const impd = startStubImpd('imp_fixture_good');
