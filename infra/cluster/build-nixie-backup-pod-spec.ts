@@ -15,7 +15,9 @@ interface NixieBackupPodInputs {
 // never mounts nixie's volume.
 export function buildNixieBackupPodSpec(inputs: NixieBackupPodInputs) {
   return {
-    restartPolicy: 'OnFailure',
+    // nixie's backup command refuses a directory that exists, and a container restarted in place
+    // keeps the emptyDir that holds the failed attempt's directory, so each retry is a new pod
+    restartPolicy: 'Never',
 
     // nixie's own user, so nixie's command opens its files
     securityContext: {

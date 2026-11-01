@@ -15,7 +15,7 @@ test("it copies nixie's data with nixie's own backup command and uploads the cop
       pullSecret: 'ghcr-pull',
     }),
   ).toStrictEqual({
-    restartPolicy: 'OnFailure',
+    restartPolicy: 'Never',
     securityContext: {
       runAsNonRoot: true,
       runAsUser: 10_001,
@@ -69,4 +69,19 @@ test("it copies nixie's data with nixie's own backup command and uploads the cop
       { name: 'tmp', emptyDir: {} },
     ],
   });
+});
+
+test("it retries a failed backup in a new pod, because nixie's backup command refuses the directory a failed attempt left", () => {
+  const spec = buildNixieBackupPodSpec({
+    image: 'ghcr.io/zgeoff/atc-gateway-backup:2.0.0',
+    nixieImage: 'ghcr.io/zgeoff/nixie:2.0.0',
+    claim: 'data-nixie-0',
+    scriptConfigMap: 'nixie-backup-script',
+    configMap: 'nixie-backup-config',
+    envSecret: 'nixie-backup',
+    pullSecret: 'ghcr-pull',
+  });
+
+  expect(spec.restartPolicy).toBe('Never');
+  expect(spec.volumes).toContainEqual({ name: 'tmp', emptyDir: {} });
 });
