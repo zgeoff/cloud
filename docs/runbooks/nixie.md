@@ -74,18 +74,17 @@ its secret leaves its role's sandbox unmade, and `imp_host` unready.
 
 ### Move the model secrets to their nixie- names
 
-nixie 0.42.0 names each model secret `nixie-model-<hash>`, with the profile inside the hash, where
-earlier releases named it `model-<profile>-<hash>`. A nixie on the new names asks impd to grant
-secrets that do not exist yet, so its new sandboxes fail, and `imp_host` stays unready, until impd
-holds them. Running sandboxes keep their old grants until they are replaced. Move the secrets once,
-around the bump to that release.
+nixie 0.42.0 and later name each model secret `nixie-model-<hash>`, with the profile inside the
+hash, where earlier releases named it `model-<profile>-<hash>`. nixie asks impd to grant the
+`nixie-model-` names, so while impd holds only the `model-*` names, nixie's new sandboxes fail and
+`imp_host` stays unready. Running sandboxes keep their old grants until they are replaced. When
+`host_imp secret ls < /dev/null` lists a `model-*` name, move the secrets once.
 
 **CAUTION:** These steps change impd's live secrets and nixie's token. Run them only with the
 owner's approval, and in order: a token without the new names fails every new sandbox.
 
-1. Before the deployment moves to nixie 0.42.0, add each model secret again under its `nixie-model-`
-   name, with the same value, host and header, through the loop in
-   [Add nixie's model secret to impd](#add-nixies-model-secret-to-impd).
+1. Add each model secret again under its `nixie-model-` name, with the same value, host and header,
+   through the loop in [Add nixie's model secret to impd](#add-nixies-model-secret-to-impd).
 2. Set nixie's token `--grantable` to the old and the new names. The old names hash only the header,
    the host and the credential, and take the first 16 hex digits:
 
@@ -96,8 +95,8 @@ owner's approval, and in order: a token without the new names fails every new sa
    host_imp token set nixie --grantable "$old,$secrets" < /dev/null
    ```
 
-3. Deploy the nixie release, and check that the `imp_host` readiness part is ready and new sandboxes
-   start, as [Check a deploy](#check-a-deploy) describes.
+3. Check that the `imp_host` readiness part is ready and new sandboxes start, as
+   [Check a deploy](#check-a-deploy) describes.
 4. Remove the old `model-*` secrets, and set `--grantable` to the new names only:
 
    ```bash
