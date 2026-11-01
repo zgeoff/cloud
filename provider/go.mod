@@ -5,7 +5,7 @@ go 1.26.6
 require (
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/getkin/kin-openapi v0.151.0
-	github.com/oapi-codegen/runtime v1.7.0
+	github.com/oapi-codegen/runtime v1.8.0
 	github.com/pulumi/pulumi-go-provider v1.7.0
 	github.com/pulumi/pulumi/sdk/v3 v3.271.0
 	github.com/stretchr/testify v1.12.1
