@@ -435,6 +435,13 @@ device enrolled after the snapshot is lost. Back up first if the current data st
    Expect `nixie restored nixie.db and keys.db from /tmp/nixie-backup`. A restore that stops before
    that line leaves nixie refusing to start until a restore runs to the end, so run the Job again.
 
+   With `args: ["ls"]`, the `fetch` container prints the snapshots, so read its log in place of the
+   `restore` container's:
+
+   ```bash
+   ssh root@geoffcloud k3s kubectl -n nixie logs job/<job-name> -c fetch
+   ```
+
 3. Start nixie and check it, as step 3 of [Deploy or upgrade](#deploy-or-upgrade) describes:
 
    ```bash
