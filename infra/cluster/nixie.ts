@@ -36,6 +36,8 @@ import { createNixieBackupJob } from './create-nixie-backup-job.ts';
 import type { NixieIngressOutputs } from './create-nixie-ingress.ts';
 import { createNixieIngress } from './create-nixie-ingress.ts';
 
+const deployDir = new URL('../../deploy/nixie/', import.meta.url);
+
 interface NixieClusterShape {
   readonly zoneID: Output<string>;
   readonly kubeconfig: Output<string>;
@@ -57,6 +59,11 @@ export function createNixie(
     port: nixieAPIPort,
   });
 
+  const config = renderNixieConfig(
+    readFileSync(new URL('config.yaml', deployDir), 'utf8'),
+    buildNixieImpConfig(topology),
+  );
+
   const secrets = createSecrets(cluster, namespace, inputs);
 
   const sandboxImages = createSandboxImagesCommand({
@@ -70,6 +77,7 @@ export function createNixie(
 
   const statefulSet = createStatefulSet(cluster, namespace, {
     inputs,
+    config,
     serviceName: api.metadata.name,
     secret: secrets.metadata.name,
     sandboxImages,
@@ -97,7 +105,13 @@ export function createNixie(
   });
 
   if (inputs.backup !== undefined) {
-    createNixieBackupJob(cluster, { namespace, statefulSet, backup: inputs.backup });
+    createNixieBackupJob(cluster, {
+      namespace,
+      statefulSet,
+      nixieImage: inputs.config.image,
+      config,
+      backup: inputs.backup,
+    });
   }
 
   return ingress;
@@ -114,8 +128,6 @@ function createService(cluster: Provider, namespace: Output<string>, shape: Serv
     provider: cluster,
   });
 }
-
-const deployDir = new URL('../../deploy/nixie/', import.meta.url);
 
 function createSecrets(cluster: Provider, namespace: Output<string>, inputs: NixieInputs): Secret {
   return new Secret(
@@ -156,6 +168,7 @@ function createSandboxImagesCommand(shape: SandboxImagesShape): Command {
 
 interface StatefulSetShape {
   readonly inputs: NixieInputs;
+  readonly config: string;
   readonly serviceName: Output<string>;
   readonly secret: Output<string>;
   readonly sandboxImages: Command;
@@ -173,7 +186,7 @@ function createStatefulSet(
       spec: buildNixieSpec({
         image: shape.inputs.config.image,
         serviceName: shape.serviceName,
-        configMap: createConfig(cluster, namespace),
+        configMap: createConfig(cluster, namespace, shape.config),
         secret: shape.secret,
         definitionsSecret: createDefinitionsKey(cluster, namespace, shape.inputs),
       }),
@@ -182,16 +195,14 @@ function createStatefulSet(
   );
 }
 
-function createConfig(cluster: Provider, namespace: Output<string>): Output<string> {
-  const text = readFileSync(new URL('config.yaml', deployDir), 'utf8');
-
+function createConfig(cluster: Provider, namespace: Output<string>, text: string): Output<string> {
   const config = new ConfigMap(
     'nixie-config',
     {
       // No fixed name, as on the Secrets: Pulumi replaces each on a change, so the StatefulSet
       // rolls and nixie reads the change at its next start.
       metadata: { namespace },
-      data: { [nixieConfigKey]: renderNixieConfig(text, buildNixieImpConfig(topology)) },
+      data: { [nixieConfigKey]: text },
     },
     { provider: cluster },
   );

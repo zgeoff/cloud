@@ -1,27 +1,14 @@
 import { expect, test } from 'bun:test';
 import { buildRestoreJob } from './build-restore-job.ts';
 
-test("it runs the backup pod's restore once, without the backup's resources, in a one-off Job", () => {
+test('it runs the restore pod once, in a one-off Job that names itself for the workload', () => {
   expect(
     buildRestoreJob({
       name: 'ledger',
       namespace: 'books',
-      backupPod: {
-        restartPolicy: 'OnFailure',
-        automountServiceAccountToken: false,
-        containers: [
-          {
-            name: 'backup',
-            image:
-              'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-            command: ['/bin/sh', '/opt/ledger/backup.sh'],
-            args: ['backup'],
-            env: [{ name: 'STATE_DIR', value: '/state' }],
-            envFrom: [{ secretRef: { name: 'ledger-backup' } }],
-            resources: { limits: { memory: '256Mi' } },
-          },
-        ],
-        volumes: [{ name: 'state', persistentVolumeClaim: { claimName: 'ledger-data' } }],
+      pod: {
+        restartPolicy: 'Never',
+        containers: [{ name: 'restore', image: 'ghcr.io/zgeoff/ledger-restore:1.0.0' }],
       },
     }),
   ).toStrictEqual({
@@ -34,22 +21,7 @@ test("it runs the backup pod's restore once, without the backup's resources, in 
       template: {
         spec: {
           restartPolicy: 'Never',
-          automountServiceAccountToken: false,
-          containers: [
-            {
-              name: 'restore',
-              image:
-                'ghcr.io/zgeoff/atc-gateway-backup:1.0.0@sha256:1111111111111111111111111111111111111111111111111111111111111111',
-              command: ['/bin/sh', '/opt/ledger/backup.sh'],
-              args: ['restore'],
-              env: [
-                { name: 'STATE_DIR', value: '/state' },
-                { name: 'SNAPSHOT', value: 'latest' },
-              ],
-              envFrom: [{ secretRef: { name: 'ledger-backup' } }],
-            },
-          ],
-          volumes: [{ name: 'state', persistentVolumeClaim: { claimName: 'ledger-data' } }],
+          containers: [{ name: 'restore', image: 'ghcr.io/zgeoff/ledger-restore:1.0.0' }],
         },
       },
     },
