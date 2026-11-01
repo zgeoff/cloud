@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the nine
+# Test for create-stub-nixos-ssh.sh: the ssh stand-in logs every call, answers the thirteen
 # remote commands of a switch, fails closed on anything else, and hands a loopback call to
 # the real ssh when asked. The pass-through case pins what the switch suite assumes about
 # the real ssh: a refused connection exits 255 with "ssh: connect to host … port …:
@@ -367,6 +367,125 @@ it_prints_an_empty_image_list_when_no_record_is_named() {
 
   diff - "$tree/out" <<< '[]'
   diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+}
+
+it_prints_the_reserved_then_the_configured_hugetlb_pages() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_HUGETLB_RESERVED=300 STUB_HUGETLB_CONFIGURED=512 ssh -o BatchMode=yes root@geoffcloud \
+    "sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+300
+512
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf"]
+CALLS
+  assert_status 0 "$status"
+}
+
+it_prints_no_reserved_and_no_configured_hugetlb_pages_when_none_are_named() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    "sysctl -n vm.nr_hugepages; sed -n 's/^vm\\.nr_hugepages=//p' /etc/sysctl.d/60-nixos.conf" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '0'
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+}
+
+it_prints_the_named_imps() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"kettle","state":"sleeping"}]' \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '[{"id":"imp_1","name":"kettle","state":"sleeping"}]'
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json"]'
+  assert_status 0 "$status"
+}
+
+it_prints_an_empty_imp_list_when_no_imp_is_named() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" <<< '[]'
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+}
+
+it_prints_the_named_page_sizes_for_the_page_size_loop() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  # shellcheck disable=SC2016 # $d, $s and $v belong to the remote shell
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 2M 2M' ssh -o BatchMode=yes root@geoffcloud \
+    'podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs "\"hugePages\": \"2M\"" "$d/snapshot/meta.json" && s=2M; grep -qs "\"hugePages\": \"2M\"" "$d/vm.json" && v=2M; echo "$d $s $v"; done'"'"'' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/out" << 'EOF'
+imp_1 4K 4K
+imp_2 2M 2M
+EOF
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" << 'CALLS'
+["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c 'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/vm.json\" && v=2M; echo \"$d $s $v\"; done'"]
+CALLS
+  assert_status 0 "$status"
+}
+
+it_prints_nothing_for_the_page_size_loop_when_no_size_is_named() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  # shellcheck disable=SC2016 # $d, $s and $v belong to the remote shell
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud \
+    'podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs "\"hugePages\": \"2M\"" "$d/snapshot/meta.json" && s=2M; grep -qs "\"hugePages\": \"2M\"" "$d/vm.json" && v=2M; echo "$d $s $v"; done'"'"'' \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  assert_status 0 "$status"
+}
+
+it_takes_an_imp_stop_and_prints_nothing() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz stop kettle" \
+    > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff /dev/null "$tree/err"
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz stop kettle"]'
   assert_status 0 "$status"
 }
 
