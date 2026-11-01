@@ -114,7 +114,7 @@
   "devDependencies": {
     "@commitlint/cli": "21.2.4",
     "@faker-js/faker": "10.6.0",
-    "@heynixie/contract": "0.58.1",
+    "@heynixie/contract": "0.59.0",
     "@impz/client": "6.3.2",
     "@maschwenk/tsrslint": "0.1.6",
     "@mswjs/interceptors": "0.45.9",
