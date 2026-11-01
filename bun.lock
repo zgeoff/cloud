@@ -7,7 +7,7 @@
       "devDependencies": {
         "@commitlint/cli": "21.2.4",
         "@faker-js/faker": "10.6.0",
-        "@heynixie/contract": "0.58.1",
+        "@heynixie/contract": "0.59.0",
         "@impz/client": "6.3.2",
         "@maschwenk/tsrslint": "0.1.6",
         "@mswjs/interceptors": "0.45.9",
@@ -196,7 +196,7 @@
 
     "@grpc/proto-loader": ["@grpc/proto-loader@0.8.1", "", { "dependencies": { "lodash.camelcase": "^4.3.0", "long": "^5.0.0", "protobufjs": "^7.5.5", "yargs": "^17.7.2" }, "bin": { "proto-loader-gen-types": "build/bin/proto-loader-gen-types.js" } }, "sha512-wtF6h+DY6M3YaDBPAmvuuA6jV8Sif9MjtOI5euKFWRgCDl5PeDpPsHR9u2l6St5ceY8AZgoNDww5+HvEsXFsGg=="],
 
-    "@heynixie/contract": ["@heynixie/contract@0.58.1", "", { "dependencies": { "@orpc/client": "1.16.0", "@orpc/contract": "1.16.0", "@orpc/openapi": "1.16.0", "@orpc/tanstack-query": "1.16.0", "@orpc/zod": "1.16.0", "@tanstack/query-core": "5.104.5", "zod": "4.6.7" } }, "sha512-vitnJmTxmxj8cEEHcCjiThAoe+ZeAAkyJ4c7BDKrSUyOETOGzcUPfBZik89vYXnA7PL441OH1w5pyeKTHYzUcQ=="],
+    "@heynixie/contract": ["@heynixie/contract@0.59.0", "", { "dependencies": { "@orpc/client": "1.16.0", "@orpc/contract": "1.16.0", "@orpc/openapi": "1.16.0", "@orpc/tanstack-query": "1.16.0", "@orpc/zod": "1.16.0", "@tanstack/query-core": "5.104.5", "zod": "4.6.7" } }, "sha512-udQq45g3rVizA2iQUW8oRycmyH7+NOfvLsFSHId9vyzNab4u6IXsTz7A1y1vXAd1jDLZTDZ65zvBshhoh2sg3Q=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.2", "", { "dependencies": { "@humanfs/types": "^0.15.0" } }, "sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA=="],
 
