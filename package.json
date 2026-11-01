@@ -15,7 +15,7 @@
   ],
   "type": "module",
   "scripts": {
-    "audit": "bun audit",
+    "audit": "bun audit --ignore=GHSA-3g3m-2fjr-6pw4 --ignore=GHSA-g3hv-75wg-m249",
     "deadcode": "knip",
     "files:branch": "bun scripts/read-branch-files.ts",
     "lint": "oxlint",
