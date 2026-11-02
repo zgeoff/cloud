@@ -39,6 +39,7 @@ test('it builds the head of main from its archive, checks it on a fresh imp, rem
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
 
   await writeFile(
     join(ctx.repo.seed, 'images/agent/Dockerfile'),
@@ -115,6 +116,7 @@ test('it builds an older commit on main, and runs that commit’s bash check whe
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
 
   await writeFile(
     join(ctx.repo.seed, 'images/agent/Dockerfile'),
@@ -169,6 +171,7 @@ test('it removes the image and the imp when the check fails', async () => {
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
 
   await writeFile(
     join(ctx.repo.seed, 'images/agent/Dockerfile'),
@@ -228,6 +231,7 @@ test('it keeps the image when the check fails with --keep', async () => {
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
 
   await writeFile(
     join(ctx.repo.seed, 'images/agent/Dockerfile'),
@@ -278,6 +282,7 @@ test('it fails without an imp when the build fails', async () => {
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
   await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
 
   await writeFile(
@@ -323,6 +328,7 @@ test('it leaves the image to an interrupt from the build on, newest of the steps
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
   await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
   await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM scratch\n');
 
@@ -374,6 +380,7 @@ test('it fails when the build outlives AGENT_IMAGE_BUILD_TIMEOUT, and gives the 
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
   await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
 
   await writeFile(
@@ -420,6 +427,7 @@ test('it gives the build 45 minutes when AGENT_IMAGE_BUILD_TIMEOUT is unset', as
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
   await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), '');
 
   await writeFile(

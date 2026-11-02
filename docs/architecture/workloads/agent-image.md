@@ -17,9 +17,9 @@ moment, so a build installs the same versions after Ubuntu replaces one in its l
 fetches each package file from the live archive when it still holds that version, and from the
 snapshot archive otherwise. The build step fetches again after a wait when either archive answers
 with an error, because apt does not retry an HTTP error by itself. The tools are the coding agents,
-atc, auto-mode with its mod, GitHub's CLI, the language toolchains, 1Password's CLI and gitleaks.
-Claude Code is installed with its own updates turned off, so a session runs the version the image
-pins.
+atc, auto-mode with its mod, GitHub's CLI, the language toolchains, 1Password's CLI, gitleaks, and
+the shell and workflow linters. Claude Code is installed with its own updates turned off, so a
+session runs the version the image pins.
 
 The build runs no tool, because a tool can write state the first time it runs: a version check alone
 can create a tool's config directory. That keeps the image free of anything a session could inherit

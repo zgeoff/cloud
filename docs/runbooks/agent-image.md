@@ -48,7 +48,9 @@ the shim runs the newest version the image holds.
 
 A pin the image lacks also runs the newest version, after a note on stderr that names both versions,
 so a session keeps working. When a repo moves its `.bun-version` to a version the image lacks, add
-that version to the Dockerfile's Bun pins, then build and switch the image.
+that version to the Dockerfile's Bun pins, then build and switch the image. For cloud's own
+`.bun-version`, CI's image check fails until the image holds the pinned version, so a Renovate bump
+of that pin adds the version in the same pull request.
 
 ## Locked packages
 
@@ -146,7 +148,8 @@ The check prints one line per item and exits non-zero on any failure:
 - **Secrets**: gitleaks 8.30.1 scans each top-level folder but `/proc`, `/sys`, `/dev` and `/run`,
   with `--redact`. It skips files over 50 MB: the pinned binaries, whose sums the build checks.
 - **Versions**: each tool answers with the version the Dockerfile pins, and each Ubuntu package is
-  installed at its pinned version.
+  installed at its pinned version. Under a `.bun-version` that holds this repo's own pin, `bun`
+  prints that version with nothing on stderr.
 
 `bun run test:agent-image` runs the same check on a local Docker build, before the host build. It
 then runs `scripts/test-agent-image-gitleaks.sh`, which scans planted files with the image's

@@ -22,13 +22,14 @@ async function setupTest() {
   return { repo, work };
 }
 
-test('it builds from the commit’s archive of the image and scripts only, and returns the digest', async () => {
+test('it builds from the commit’s archive of the image, the scripts and the Bun pin only, and returns the digest', async () => {
   const ctx = await setupTest();
 
   await mkdir(join(ctx.repo.seed, 'images/agent'), { recursive: true });
   await mkdir(join(ctx.repo.seed, 'scripts'));
   await writeFile(join(ctx.repo.seed, 'images/agent/Dockerfile'), 'FROM committed\n');
   await writeFile(join(ctx.repo.seed, 'scripts/check-agent-image.ts'), 'check\n');
+  await writeFile(join(ctx.repo.seed, '.bun-version'), '1.4.9\n');
   await writeFile(join(ctx.repo.seed, 'README'), 'outside the archive\n');
 
   await ctx.repo.git(['-C', ctx.repo.seed, 'add', '-A']);
@@ -55,6 +56,7 @@ test('it builds from the commit’s archive of the image and scripts only, and r
   );
 
   const check = await readFile(join(ctx.work, 'src/scripts/check-agent-image.ts'), 'utf8');
+  const bunPin = await readFile(join(ctx.work, 'src/.bun-version'), 'utf8');
   const hasReadme = await Bun.file(join(ctx.work, 'src/README')).exists();
 
   expect(built).toStrictEqual({
@@ -64,6 +66,7 @@ test('it builds from the commit’s archive of the image and scripts only, and r
 
   expect(imp.builtDockerfiles).toStrictEqual(['FROM committed\n']);
   expect(check).toBe('check\n');
+  expect(bunPin).toBe('1.4.9\n');
   expect(hasReadme).toBe(false);
 
   expect(printErr.mock.calls).toStrictEqual([

@@ -40,6 +40,7 @@ test.each([
   ['agent-image', ['images/agent/Dockerfile'], true],
   ['agent-image', ['scripts/check-agent-image.ts'], true],
   ['agent-image', ['.github/workflows/ci.yml'], true],
+  ['agent-image', ['.bun-version'], true],
   ['agent-image', ['images/files/Dockerfile', 'infra/index.ts'], false],
   ['atc-gateway', ['images/atc-gateway/versions.env'], true],
   ['atc-gateway', ['test-support/shell/wait-for.sh'], true],

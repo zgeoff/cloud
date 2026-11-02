@@ -57,6 +57,8 @@ test('it runs the checks in a docker container with the check directory mounted,
     `FROM ubuntu:24.04\nARG GITLEAKS_VERSION=8.30.1\nARG GITLEAKS_SHA256=${sum}\nARG BUN_VERSION=1.4.2\n`,
   );
 
+  await writeFile(join(ctx.repo, '.bun-version'), '1.4.2\n');
+
   const guest = buildStubAgentImageGuest({
     guest: { exitCode: 1, stdout: 'FAIL  bun              gave 1.4.1\n', stderr: 'warn\n' },
   });
@@ -93,7 +95,7 @@ test('it runs the checks in a docker container with the check directory mounted,
   expect(mount).toEndWith('/agent-image-check:/run/agent-image-check:ro');
 
   expect(run?.stdin).toBe(
-    `GITLEAKS_VERSION='8.30.1'\nBUN_VERSION='1.4.2'\ncheck_mode='docker'\n${ctx.body}`,
+    `GITLEAKS_VERSION='8.30.1'\nBUN_VERSION='1.4.2'\nCHECKOUT_BUN_VERSION='1.4.2'\ncheck_mode='docker'\n${ctx.body}`,
   );
 
   expect(run?.options.timeoutMs).toBe(900_000);
@@ -110,6 +112,8 @@ test('it copies the check directory into the imp, then runs the checks there', a
     join(ctx.repo, 'images/agent/Dockerfile'),
     `FROM ubuntu:24.04\nARG GITLEAKS_VERSION=8.30.1\nARG GITLEAKS_SHA256=${sum}\n`,
   );
+
+  await writeFile(join(ctx.repo, '.bun-version'), '1.4.3\n');
 
   const guest = buildStubAgentImageGuest({ guest: { stdout: '== 0 failed\n' } });
   const stub = buildStubRunner(buildRealProgramHandler(['tar']), guest.handler);
@@ -132,7 +136,10 @@ test('it copies the check directory into the imp, then runs the checks there', a
     ['impz', 'exec', 'agent-check', '--', 'bash', '-s'],
   ]);
 
-  expect(stub.calls[2]?.stdin).toBe(`GITLEAKS_VERSION='8.30.1'\ncheck_mode='imp'\n${ctx.body}`);
+  expect(stub.calls[2]?.stdin).toBe(
+    `GITLEAKS_VERSION='8.30.1'\nCHECKOUT_BUN_VERSION='1.4.3'\ncheck_mode='imp'\n${ctx.body}`,
+  );
+
   expect(guest.seen).toStrictEqual([['gitleaks', 'gitleaks.toml']]);
   expect(ctx.out).toStrictEqual(['== 0 failed\n']);
 });
@@ -145,6 +152,8 @@ test('it removes its work directory and stops when the copy into the imp fails',
     join(ctx.repo, 'images/agent/Dockerfile'),
     `ARG GITLEAKS_VERSION=8.30.1\nARG GITLEAKS_SHA256=${sum}\n`,
   );
+
+  await writeFile(join(ctx.repo, '.bun-version'), '1.4.3\n');
 
   const guest = buildStubAgentImageGuest({
     guest: {},
@@ -179,6 +188,8 @@ test('it leaves its work directory to an interrupt while the checks run, and dro
     join(ctx.repo, 'images/agent/Dockerfile'),
     `ARG GITLEAKS_VERSION=8.30.1\nARG GITLEAKS_SHA256=${sum}\n`,
   );
+
+  await writeFile(join(ctx.repo, '.bun-version'), '1.4.3\n');
 
   const steps = new Set<() => unknown>();
 
