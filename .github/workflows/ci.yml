@@ -141,6 +141,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run check:image-pins
 
+      # the preview service's contract run pins a Bun tarball that the registry serves at its sha256
+      - name: Preview Bun
+        if: needs.decide.outputs.reused != 'true'
+        run: bun run check:preview-bun
+
       # each release registry pin in the checkout holds what the pin table holds
       - name: Release pins
         if: needs.decide.outputs.reused != 'true'
@@ -537,6 +542,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run check:image-pins
+
+      - name: Preview Bun
+        if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}
+        run: bun run check:preview-bun
 
       - name: Release pins
         if: ${{ github.event.repository.private && steps.decide.outputs.reused != 'true' }}

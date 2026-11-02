@@ -239,18 +239,23 @@ stops before `bun install` when either pin differs from the release the service 
 service installs one release for every repository in `services.preview.contractRepos`, so a
 repository that keeps the old pin fails its next run after the move.
 
-1. Set `bunVersion` in [`run-contract-suite.ts`](../../packages/preview/run-contract-suite.ts) to
-   `<repo_version>`.
-2. Set `bunSHA256` in the same file to the sha256 of the npm tarball that the run downloads, from
-   this command's output:
+1. Set `version` in [`bun-release.ts`](../../packages/preview/bun-release.ts) to `<repo_version>`.
+2. Set `sha256` in the same file to the sha256 of the npm tarball that the run downloads, from this
+   command's output:
 
    ```bash
    curl -fsSL https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-<repo_version>.tgz | sha256sum
    ```
 
-3. Merge the change.
-4. Switch the host with [`bun run ops:switch-host`](./ops.md#bun-run-opsswitch-host).
-5. Push a commit to the pull request whose run stopped. Expect its new head's `sdk-contract` status
+3. Check the pin against the registry. Expect no `check-preview-bun:` line. CI runs the same check.
+
+   ```bash
+   bun run check:preview-bun
+   ```
+
+4. Merge the change.
+5. Switch the host with [`bun run ops:switch-host`](./ops.md#bun-run-opsswitch-host).
+6. Push a commit to the pull request whose run stopped. Expect its new head's `sdk-contract` status
    to report the suite's counts, such as `18 pass, 0 fail`.
 
 ### Read a run that waits or fails

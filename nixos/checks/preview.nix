@@ -1009,6 +1009,8 @@ let
         ./build-imp-name.ts
         ./build-impd-client.ts
         ./build-spend-proxy-io.ts
+        ./bun-release.ts
+        ./contract-script.ts
         ./counting-proxy-config-schema.ts
         ./create-preview-store.ts
         ./create-spend-proxies.ts
