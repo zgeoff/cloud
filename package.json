@@ -118,10 +118,10 @@
     "@impz/client": "6.3.2",
     "@maschwenk/tsrslint": "0.1.6",
     "@mswjs/interceptors": "0.45.9",
-    "@orpc/client": "1.16.0",
+    "@orpc/client": "1.16.1",
     "@stylistic/eslint-plugin": "5.10.0",
     "@tsconfig/strictest": "2.0.8",
-    "@types/bun": "1.4.3",
+    "@types/bun": "1.4.4",
     "@zgeoff/bun-test-extended": "0.2.2",
     "@zgeoff/cloud-topology": "workspace:*",
     "@zgeoff/format-codemod": "0.3.4",
@@ -139,5 +139,5 @@
     "typescript": "7.0.2",
     "zod": "4.6.7"
   },
-  "packageManager": "bun@1.4.3"
+  "packageManager": "bun@1.4.4"
 }
