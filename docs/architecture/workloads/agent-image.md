@@ -13,7 +13,9 @@ on it.
 The Dockerfile pins every input. The base image is pinned by digest, and every download other than
 an Ubuntu package carries a checksum taken from its publisher's signed or attested release. Google
 publishes no checksum for Chrome for Testing, so its checksum is taken after the download matches
-the MD5 that Google's storage lists for it. apt resolves the Ubuntu packages and their dependencies
+the MD5 that Google's storage lists for it. When a connection for the Chrome download stays under 1
+MiB/s for 30 seconds, the build step opens a new one that goes on from the last byte, so a slow
+build network still finishes the download. apt resolves the Ubuntu packages and their dependencies
 against Ubuntu's snapshot archive at a fixed moment, so a build installs the same versions after
 Ubuntu replaces one in its live archive. apt fetches each package file from the live archive when it
 still holds that version, and from the snapshot archive otherwise. The build step fetches again

@@ -345,14 +345,17 @@ RUN /tmp/install-ubuntu-packages "https://snapshot.ubuntu.com/ubuntu/$UBUNTU_SNA
  && rm /tmp/install-ubuntu-packages
 # A connection to Google's storage can run at about 50 KB/s while a new one runs at several MB/s, and
 # at 50 KB/s the 200 MB zip outlasts the host build's timeout. So a transfer under 1 MiB/s for 30
-# seconds ends with exit 28 and retries on a new connection.
+# seconds ends with exit 28 and goes on from its last byte on a new connection. The build's network
+# can stay under 1 MiB/s on every connection, so each attempt keeps the bytes it fetched.
+COPY sbin/download-with-resume /tmp/download-with-resume
 RUN echo "chrome: downloading" \
- && curl -fsSL ${CURL_RETRY} --speed-limit 1048576 --speed-time 30 -o /tmp/chrome.zip \
+ && /tmp/download-with-resume /tmp/chrome.zip \
       "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-linux64.zip" \
+      --connect-timeout 20 --speed-limit 1048576 --speed-time 30 \
  && echo "${CHROME_SHA256}  /tmp/chrome.zip" | sha256sum -c - \
  && unzip -q /tmp/chrome.zip -d /tmp \
  && mv /tmp/chrome-linux64 /opt/chrome \
- && rm /tmp/chrome.zip
+ && rm /tmp/chrome.zip /tmp/download-with-resume
 
 # Bun.WebView starts Chrome through bin/chromium, which adds --no-sandbox for root. Bun reads
 # BUN_CHROME_PATH before it searches PATH.
