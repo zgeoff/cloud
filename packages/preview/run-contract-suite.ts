@@ -1,3 +1,4 @@
+import { buildBunPinCheck } from './build-bun-pin-check.ts';
 import type { ContractRun } from './create-preview-store.ts';
 import type { ContractSettings, PreviewDeps } from './types.ts';
 
@@ -66,10 +67,10 @@ async function tryRunGuestCommand(
 }
 
 // Bun's linux-x64 build from its npm package, because imp's base image has tar but no unzip for the
-// release zip. It is the version the suite's repository names as its package manager, and the
-// sha256 is the tarball's own, which matches npm's published integrity.
-const bunURL = 'https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-1.4.2.tgz';
-const bunSHA256 = '0c75e0b94e9d56cece77abb7d03e9995b47b79506df5dcca3046eeb888db5934';
+// release zip. The sha256 is the tarball's own, which matches npm's published integrity.
+const bunVersion = '1.4.4';
+const bunURL = `https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-${bunVersion}.tgz`;
+const bunSHA256 = '93ca5a2abe45f3bcac6dd55baff8bb06c4ac824b70f89650b54e5c8b80dbef18';
 
 // The guest script takes the repository and the commit as arguments, never inside its text. Each
 // run's imp is new, so the script installs Bun and the dependencies every time.
@@ -84,6 +85,7 @@ git init -q
 git remote add origin "https://github.com/$1.git"
 git fetch -q --depth 1 origin "$2"
 git checkout -q --force FETCH_HEAD
+${buildBunPinCheck(bunVersion)}
 bun install --frozen-lockfile
 NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract
 `;

@@ -33,7 +33,10 @@ export function buildContractStatus(
 
   return {
     state: 'failure',
-    description: summary ?? `The run exited ${exit} before the suite reported`,
+    description:
+      summary ??
+      findBunPinMismatch(result.output) ??
+      `The run exited ${exit} before the suite reported`,
   };
 }
 
@@ -47,4 +50,10 @@ function findTestSummary(output: string): string | null {
   }
 
   return `${pass} pass, ${fail} fail`;
+}
+
+function findBunPinMismatch(output: string): string | null {
+  const detail = /^the repository pins Bun (?<detail>.+)$/mu.exec(output)?.groups?.['detail'];
+
+  return detail === undefined ? null : `The repository pins Bun ${detail}`;
 }

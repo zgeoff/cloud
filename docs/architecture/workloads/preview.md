@@ -222,7 +222,8 @@ runs the suite once however many deliveries name it, and each push to a new head
    and the GitHub secret, and sets the status to pending.
 3. A guest command installs Bun's pinned build, checked against its sha256, since imp's base image
    lacks Bun. It fetches the head commit, installs the dependencies from the lockfile, and runs the
-   suite. impd starts the command only when the broker reaches the guest.
+   suite. impd starts the command only when the broker reaches the guest. The command stops before
+   the install when the commit's `.bun-version` or `packageManager` names another Bun release.
 4. The service records the result, removes the imp, and then sets the status to success or failure
    with the suite's pass and fail counts. A failure to start the imp sets an error status instead.
    The record keeps the result until impd removes the imp and GitHub takes the status, and the

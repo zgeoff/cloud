@@ -204,44 +204,79 @@ stack on empty volumes, so the seed runs once per build. A preview of a push bui
 
 ## Run the SDK contract suite on a pull request
 
-A repository runs its SDK contract suite on each pull request that changes the Agent SDK's pin once
-the host's `services.preview.contractRepos` lists it and the preview GitHub App is installed on it.
-The suite runs `NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract` at the head commit, so the
-repository needs that folder and a `bun.lock`. Each run's imp installs Bun's pinned build, so a
-repository that moves its package manager to another Bun release needs the pin in the service's
-contract run moved with it.
+The preview service runs a repository's SDK contract suite on each pull request that changes the
+version of `@anthropic-ai/claude-agent-sdk` in its `package.json` or `bun.lock`. The repository
+takes part once the host's `services.preview.contractRepos` lists it and the preview GitHub App is
+installed on it. The service starts an imp for each run, and the imp runs
+`NIXIE_SDK_CONTRACT=1 bun test evals/sdk-contract` at the pull request's head commit, so the
+repository needs that folder and a `bun.lock`.
+[The SDK contract run](../architecture/workloads/preview.md#the-sdk-contract-run) describes each
+step of a run.
 
-Check a run live once the setup and a host switch are done:
+### Check a run live
 
-1. Open a pull request in a contract repository that changes the SDK's version in `package.json` or
-   `bun.lock`. Expect the head commit's `sdk-contract` status to read
-   `Running the SDK contract suite` within a minute, and `host_imp ls` to show one `pv-sdk-<hash>`
-   imp.
+Do these steps after [Set the service up](#set-the-service-up) and a host switch. Run `host_imp`,
+which the top of this page defines, from a machine on the tailnet.
+
+1. Open a pull request that changes the SDK's version, in a repository that
+   `services.preview.contractRepos` lists. Expect the head commit's `sdk-contract` status to read
+   `Running the SDK contract suite` within a minute, and `host_imp ls` to show one
+   `pv-sdk-<run_hash>` imp, where `<run_hash>` is a hash of the repository and the commit.
 2. Wait for the run to end, about 5 minutes. Expect the status to turn success or failure with the
    suite's counts, such as `18 pass, 0 fail`, and `host_imp ls` to show no `pv-sdk-` imp.
-3. Push a commit that leaves the pin alone. Expect the new head to get no `sdk-contract` status.
+3. Push a commit that leaves the SDK's version alone. Expect the new head to get no `sdk-contract`
+   status.
 
-A run that waits reads `Waiting for a free preview slot`, and the service tries it again each
-minute. A try that finds a preview unused for `services.preview.contractIdleMinutes`, 5 by default,
-puts that preview to sleep and starts the run in its slot. A preview in use keeps its slot until it
-goes unused that long. The journal line `asleep to free a slot for the SDK contract run` names each
-preview a run put to sleep. The journal holds the tail of each run's output too:
+### Move the run's Bun release
+
+Each run's imp installs the Bun release that
+[`run-contract-suite.ts`](../../packages/preview/run-contract-suite.ts) pins in `bunVersion`. The
+run reads the repository's own pin from `.bun-version` and from the `packageManager` field of
+`package.json`. When either names another release, the run stops before `bun install`, and its
+status reads `The repository pins Bun <repo_version>, but the run installs Bun <service_version>`.
+
+1. Set `bunVersion` in `run-contract-suite.ts` to `<repo_version>`.
+2. Set `bunSHA256` to the sha256 of that release's tarball, from this command's output:
+
+   ```bash
+   curl -fsSL https://registry.npmjs.org/@oven/bun-linux-x64/-/bun-linux-x64-<repo_version>.tgz | sha256sum
+   ```
+
+3. Merge the change.
+4. Switch the host with [`bun run ops:switch-host`](./ops.md#bun-run-opsswitch-host).
+5. Push a commit that changes the SDK's version. Expect its `sdk-contract` status to report the
+   suite's counts, such as `18 pass, 0 fail`.
+
+### Read a run that waits or fails
+
+A run waits while every preview slot is taken: `services.preview.slots` sets the number of imps the
+service runs at once. A waiting run's status reads `Waiting for a free preview slot`, and the
+service tries the run again each minute. A try that finds a preview unused for
+`services.preview.contractIdleMinutes`, 5 by default, puts that preview to sleep and starts the run
+in its slot. A preview in use keeps its slot until it goes unused that long.
+
+The service's journal holds the tail of each run's output, and the line
+`asleep to free a slot for the SDK contract run` for each preview that a run put to sleep. Read it
+with:
 
 ```bash
 ssh root@geoffcloud journalctl -u preview -n 100 --no-pager
 ```
 
-An error status that reads `The run's imp did not start` ends with impd's refusal: a refused grant
-means the token lacks `preview-model` in its grantable list. A run that fails before the suite
-reports broke in the install or the fetch, such as a `bun.lock` that `bun install --frozen-lockfile`
-refuses.
+When the status reads `The run's imp did not start`, read impd's refusal at its end. A refused grant
+means the service's imp token lacks `preview-model` in its `--grantable` list: set the list with
+step 3 of [Set the service up](#set-the-service-up).
 
-A journal line that ends `(the App needs statuses=write)` means the preview GitHub App lacks Commit
+When the status reports an exit code and no counts, the run failed before the suite printed its
+counts. Read the run's output in the journal for the step that failed, such as the `git fetch` of
+the head commit, or a `bun.lock` that `bun install --frozen-lockfile` refuses.
+
+When a journal line ends `(the App needs statuses=write)`, the preview GitHub App lacks Commit
 statuses write, which GitHub needs for every status the service sets. Add that permission on the
-App's Permissions page, as in step 5, then accept the new permission on the installation's page. A
-run whose final status GitHub refuses this way ends at once, and the journal line that ends it holds
-the result, `the status was not posted` and the refusal. The commit's `sdk-contract` status stays as
-it was.
+App's Permissions page, as in step 5 of [Set the service up](#set-the-service-up), then accept the
+new permission on the installation's page. A run whose final status GitHub refuses this way ends at
+once. Its last journal line holds the run's result, then `the status was not posted`, then GitHub's
+refusal, and the commit's `sdk-contract` status stays as it was.
 
 ## Check a preview live
 
