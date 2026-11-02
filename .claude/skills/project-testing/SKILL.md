@@ -172,4 +172,4 @@ For stand-ins:
 - Run a Docker suite under
   [`with-fixture-images.sh`](../../../test-support/shell/with-fixture-images.sh). Put `$FIXTURE_RUN`
   in every container and volume name, and remove the containers before the volumes. Run each image
-  as production does: uid 65532, no capabilities, no privilege escalation.
+  with the user and security settings that production gives it.
