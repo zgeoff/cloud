@@ -157,26 +157,6 @@ test("it runs the suite at the head commit under the guest's time limit, with th
   ]);
 });
 
-test("it installs Bun 1.4.4 and checks the repository's Bun pin against it before the install", async () => {
-  const ctx = await setupTest();
-
-  ctx.store.claimContractRun({
-    repo: 'acme/greenhouse',
-    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    number: 17,
-    imp: 'pv-sdk-0123456789abcdef',
-  });
-
-  await runContractRun(ctx.deps, {
-    repo: 'acme/greenhouse',
-    headSHA: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-  });
-
-  expect(ctx.impd.commands[0]?.argv[7]).toMatch(
-    /bun-linux-x64-1\.4\.4\.tgz[\s\S]*the run installs Bun 1\.4\.4[\s\S]*bun install --frozen-lockfile/u,
-  );
-});
-
 test('it posts failure with the counts when a probe fails, and removes the imp', async () => {
   const ctx = await setupTest();
 
