@@ -126,7 +126,7 @@ if out=$(env -C "$bun_dir" bun --version 2> "$bun_dir/stderr") &&
   [[ "$out" == "$CHECKOUT_BUN_VERSION" && ! -s "$bun_dir/stderr" ]]; then
   pass "bun checkout" "$out with an empty stderr"
 else
-  fail "bun checkout" "a .bun-version of $CHECKOUT_BUN_VERSION gave '$out' and stderr '$(cat "$bun_dir/stderr")'"
+  fail "bun checkout" "a .bun-version of $CHECKOUT_BUN_VERSION gave '$out' and stderr '$(cat "$bun_dir/stderr")'; fix: add Bun $CHECKOUT_BUN_VERSION and its sum to the Bun pins in images/agent/Dockerfile, as docs/runbooks/agent-image.md's Bun versions section says. The sum is the bun-linux-x64.zip line of https://github.com/oven-sh/bun/releases/download/bun-v$CHECKOUT_BUN_VERSION/SHASUMS256.txt"
 fi
 rm -rf "$bun_dir"
 check_package build-essential "$BUILD_ESSENTIAL_VERSION"
