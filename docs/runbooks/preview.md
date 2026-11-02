@@ -256,10 +256,12 @@ repository that keeps the old pin fails its next run after the move.
 ### Read a run that waits or fails
 
 A run waits while every preview slot is taken: `services.preview.slots` sets the number of imps the
-service runs at once. A waiting run's status reads `Waiting for a free preview slot`, and the
-service tries the run again each minute. On each try, the service puts to sleep a preview that
-nobody used for `services.preview.contractIdleMinutes`, and starts the run in its slot.
-[Slots and sleep](../architecture/workloads/preview.md#slots-and-sleep) defines a preview's use.
+service aims to run at once. The service never puts a run's imp to sleep, so a preview that opens
+during a run starts beside it, past that number. A waiting run's status reads
+`Waiting for a free preview slot`, and the service tries the run again each minute. On each try, the
+service puts to sleep a preview that nobody used for `services.preview.contractIdleMinutes`, and
+starts the run in its slot. [Slots and sleep](../architecture/workloads/preview.md#slots-and-sleep)
+defines a preview's use.
 
 The service's journal holds the tail of each run's output, and the line
 `asleep to free a slot for the SDK contract run` for each preview that a run put to sleep. Read it
