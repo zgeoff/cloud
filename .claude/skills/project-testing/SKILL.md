@@ -20,9 +20,9 @@ metadata:
 
 ## Facts
 
-| Fact       | Where                                                                                                                                                                                                                                                                                                                          |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Lanes      | the `lanes` option of `zgeoff/max-test-timeout` in [`.oxlintrc.json`](../../../.oxlintrc.json); the `e2e/` folder, which `pathIgnorePatterns` in [`bunfig.toml`](../../../bunfig.toml) leaves out of the unit run                                                                                                              |
+| Fact       | Where                                                                                                                                                                                                                                                                                                                   |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Lanes      | the `lanes` option of `zgeoff/max-test-timeout` in [`.oxlintrc.json`](../../../.oxlintrc.json), with each lane's limit per test, `e2e` included; the `--timeout` of the `test:e2e` script; the `e2e/` folder, which `pathIgnorePatterns` in [`bunfig.toml`](../../../bunfig.toml) leaves out of the unit run            |
 | Test utils | the `test-utils/` folder of the package, such as [`infra/test-utils/`](../../../infra/test-utils/) or [`scripts/test-utils/`](../../../scripts/test-utils/); [`test-support/shell/`](../../../test-support/shell/) for a shell suite; [`nixos/checks/test-utils/`](../../../nixos/checks/test-utils/) for a NixOS check |
 
 ## Departures

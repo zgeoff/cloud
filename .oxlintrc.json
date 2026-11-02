@@ -9,15 +9,32 @@
     "zgeoff/function-verb": "error",
 
     // cloud's own lanes and their limit per case: the NixOS VMs under KVM, the alerting engines in
-    // Docker, and the images and restore fixtures in Docker; each runs Nix checks or shell suites,
-    // so the limits bind only a test file that takes one of these suffixes
+    // Docker, and the images and restore fixtures in Docker, which bind only a test file that takes
+    // one of these suffixes; and the e2e/ journeys, whose slowest case took 0.32 s in 10 local runs,
+    // so their 1 s limit is twice that, rounded up for slower CI runners
     "zgeoff/max-test-timeout": [
       "error",
-      { "lanes": { "nixos": 1200000, "alert-rules": 90000, "images": 15000, "fixtures": 15000 } }
+      {
+        "lanes": {
+          "nixos": 1200000,
+          "alert-rules": 90000,
+          "images": 15000,
+          "fixtures": 15000,
+          "e2e": 1000
+        }
+      }
     ],
     "zgeoff/test-beside-module": [
       "error",
-      { "lanes": { "nixos": 1200000, "alert-rules": 90000, "images": 15000, "fixtures": 15000 } }
+      {
+        "lanes": {
+          "nixos": 1200000,
+          "alert-rules": 90000,
+          "images": 15000,
+          "fixtures": 15000,
+          "e2e": 1000
+        }
+      }
     ],
 
     // the import boundaries: no relative import into another workspace package, and the direction
