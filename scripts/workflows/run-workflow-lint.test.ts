@@ -329,3 +329,59 @@ test("it leaves the pushing repo's HEAD and config alone when a worktree's pre-p
   expect(ctx.printOut.mock.calls).toStrictEqual([['linted the worktree\n']]);
   expect(after).toStrictEqual(before);
 });
+
+test("it runs the checkout's git without the caller's repository variables, and the lint with them", async () => {
+  const ctx = await setupTest();
+
+  const caller = join(ctx.directory, 'caller');
+
+  await writeFile(
+    join(ctx.root, '.github', 'workflows', 'repo-sync.yml'),
+    'jobs:\n  sync:\n    uses: zgeoff/tools/.github/workflows/repo-sync.yml@sync-v42\n',
+  );
+
+  await writeFile(
+    join(ctx.tools.seed, 'packages', 'chex', 'src', 'run-workflows-check.ts'),
+    "process.stdout.write('linted\\n');\n",
+  );
+
+  await ctx.tools.git(['-C', ctx.tools.seed, 'add', '.']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'commit', '-qm', 'add the lint']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'tag', 'sync-v42']);
+  await ctx.tools.git(['-C', ctx.tools.seed, 'push', '-q', 'origin', 'main', 'sync-v42']);
+
+  const gitEnv = { ...ctx.tools.env, GIT_CONFIG_PARAMETERS: "'core.abbrev'='12'" };
+
+  const callerEnv = {
+    ...gitEnv,
+    GIT_ALTERNATE_OBJECT_DIRECTORIES: join(caller, '.git', 'objects'),
+    GIT_CONFIG: join(caller, '.git', 'config'),
+    GIT_OBJECT_DIRECTORY: join(caller, '.git', 'objects'),
+    GIT_DIR: join(caller, '.git'),
+    GIT_WORK_TREE: caller,
+    GIT_IMPLICIT_WORK_TREE: '0',
+    GIT_GRAFT_FILE: join(caller, '.git', 'info', 'grafts'),
+    GIT_INDEX_FILE: join(caller, '.git', 'index'),
+    GIT_NO_REPLACE_OBJECTS: '1',
+    GIT_REPLACE_REF_BASE: 'refs/replace/',
+    GIT_PREFIX: 'scripts/',
+    GIT_SHALLOW_FILE: join(caller, '.git', 'shallow'),
+    GIT_COMMON_DIR: join(caller, '.git'),
+  };
+
+  await runWorkflowLint({
+    root: ctx.root,
+    toolsURL: `file://${ctx.tools.origin}`,
+    cacheDirectory: ctx.cacheDirectory,
+    env: callerEnv,
+    ...ctx.dependencies,
+  });
+
+  expect(ctx.stub.calls.map((call) => [call.argv[0], call.options.env])).toStrictEqual([
+    ['git', gitEnv],
+    ['git', gitEnv],
+    ['git', gitEnv],
+    ['git', gitEnv],
+    [process.execPath, callerEnv],
+  ]);
+});
