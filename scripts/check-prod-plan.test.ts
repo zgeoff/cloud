@@ -42,7 +42,51 @@ test('it allows the apply of a plan that only updates a workload, after a clean 
   expect(exitCode).toBe(0);
 
   expect(ctx.printOut.mock.calls).toStrictEqual([
-    ['apply: the plan holds no delete, replace or guarded change\n'],
+    ['apply: the plan holds no delete, held replace or guarded change\n'],
+  ]);
+
+  expect(ctx.printErr).not.toHaveBeenCalled();
+});
+
+test('it allows the apply of a plan whose one change is new data in nixie-secrets', async () => {
+  const ctx = await setupTest();
+
+  await writeFile(
+    join(ctx.directory, 'plan.json'),
+    JSON.stringify({
+      steps: [
+        { op: 'same', urn: 'urn:pulumi:prod::geoff-cloud::pulumi:pulumi:Stack::geoff-cloud-prod' },
+        {
+          op: 'replace',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:core/v1:Secret::nixie-secrets',
+          replaceReasons: ['data["secrets.yaml"]'],
+          oldState: {
+            inputs: { metadata: { name: 'nixie-secrets-4c1d09ae', namespace: 'nixie' } },
+          },
+          newState: {
+            inputs: { metadata: { name: 'nixie-secrets-e83b5f27', namespace: 'nixie' } },
+          },
+        },
+        {
+          op: 'update',
+          urn: 'urn:pulumi:prod::geoff-cloud::kubernetes:apps/v1:StatefulSet::nixie',
+          diffReasons: ['spec'],
+        },
+      ],
+      changeSummary: { same: 1, replace: 1, update: 1 },
+    }),
+  );
+
+  const exitCode = await checkProdPlan({
+    args: [join(ctx.directory, 'plan.json'), 'success'],
+    printOut: ctx.printOut,
+    printErr: ctx.printErr,
+  });
+
+  expect(exitCode).toBe(0);
+
+  expect(ctx.printOut.mock.calls).toStrictEqual([
+    ['apply: the plan holds no delete, held replace or guarded change\n'],
   ]);
 
   expect(ctx.printErr).not.toHaveBeenCalled();

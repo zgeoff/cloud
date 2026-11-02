@@ -143,8 +143,8 @@ A failed or timed-out Job fails the command, and Pulumi then leaves the Stateful
 the old nixie keeps serving. Pulumi runs the command again only when the Job it describes changes,
 which a new nixie image or a new secrets file does. The Job is no Pulumi resource: Kubernetes
 refuses a change to a Job's pod template, so Pulumi would replace it at each release, and the
-deploy's guard holds every replace. Each run starts a fresh Job, so a retry reads impd again rather
-than trust an earlier Job's result.
+deploy's guard holds a Job's replace. Each run starts a fresh Job, so a retry reads impd again
+rather than trust an earlier Job's result.
 
 The Job adds without a pin, because nixie's token cannot pin an image. impd never evicts an image
 used recently, and an add counts as a use, so the image stays until the new conversation imp holds

@@ -145,6 +145,15 @@ these:
 - a failed drift check from the deployed revision, because the plan then holds changes nobody
   reviewed.
 
+The guard passes one kind of replace. pulumi-kubernetes replaces a Secret or a ConfigMap on any
+change to its data, and the program gives most of them no fixed name so that the workload that
+mounts one rolls onto the new data. A replace of a Secret or a ConfigMap whose every reason is its
+`data`, `stringData` or `binaryData`, and whose replacement takes a new name, therefore applies:
+Kubernetes holds the new object before Pulumi deletes the old one. A merge that changes only
+`deploy/nixie/secrets.sops.yaml` or `deploy/nixie/config.yaml` applies with no dispatch. A Secret or
+a ConfigMap with a fixed name keeps its name, so Pulumi deletes it before it creates the
+replacement, and the guard holds that replace.
+
 A held run ends as held, not failed: the job succeeds, its summary names the revision to dispatch,
 Discord gets the hold, and the next push's run takes its turn. A manual dispatch of the workflow on
 `main` applies whatever its own preview plans, so the person who dispatches it has read the held
@@ -210,7 +219,7 @@ on the host ([the tailnet](./network/tailnet.md)).
 
 Two writes outside Pulumi stay with a person. The program copies each new `tag:imp` key into the
 `cloud` vault, which the job's account cannot write, but a new key replaces the old one and the
-guard holds every replace. A NixOS switch and an agent-image rollout run by hand
+guard holds that replace. A NixOS switch and an agent-image rollout run by hand
 ([workflows](../runbooks/workflows.md)).
 
 ## Guards

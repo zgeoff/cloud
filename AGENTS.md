@@ -134,7 +134,9 @@ docs/
 - The `Deploy prod` workflow applies each merged change to a Pulumi input once CI passes on `main`,
   bracketed by drift checks. `docs/runbooks/prod-apply.md` covers its runs. Its guard holds a run
   for any of these:
-  - any operation other than a create, an update or a refresh, such as a delete or a replace
+  - any operation other than a create, an update or a refresh, such as a delete or a replace. A data
+    change that replaces a Secret or a ConfigMap under a new name applies
+    ([infrastructure as code](docs/architecture/infrastructure-as-code.md#the-apply-job))
   - a change to the tailnet policy, the VM, the cloud firewall, a tunnel's routes, a DNS record or
     the gateway's Access policy
   - a failed drift check, for a manual dispatch
