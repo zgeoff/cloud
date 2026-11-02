@@ -5,8 +5,9 @@
 # `impz stop`, so each disk stays. It leaves an imp on 2 MiB pages and an imp with no guest alone,
 # and counts an imp as on 2 MiB pages when either its snapshot's file or its VM's file says so.
 # --plan prints the order and stops nothing, and --check fails naming each imp on 4 KiB pages, or
-# passes when none is left. It stops with ssh's exit code when the host refuses the connection. The
-# imps take the id, name and state fields of impd's ImpSchema (zgeoff/impz
+# passes when none is left. An image builder on 4 KiB pages fails every mode before any stop, since
+# `impz stop` does not take a builder. It stops with ssh's exit code when the host refuses the
+# connection. The imps take the id, name, state and kind fields of impd's ImpSchema (zgeoff/impz
 # packages/api/src/schemas/imp-schema.ts at v6.3.2), with invented values. ssh is the NixOS host
 # stand-in from test-support/shell, which answers the imp listing and the page-size loop from the
 # case's STUB_IMPD_IMPS and STUB_IMPD_IMP_PAGES. Each case runs the script under `env -i` and
@@ -26,7 +27,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../test-support/shell/require-remote-tool
 
 script="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stop-ordinary-page-imps.sh"
 # the two remote commands every mode runs, as the call log records them
-list_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json"]'
+list_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json --builders"]'
 # shellcheck disable=SC2016 # $d, $s and $v are the remote shell's variables, as the call log records them
 pages_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/vm.json\" && v=2M; echo \"$d $s $v\"; done'"'"'"]'
 
@@ -184,6 +185,50 @@ it_fails_naming_each_imp_on_4_kib_pages_with_check() {
   diff - "$tree/err" << 'EOF'
 imp teapot: its sleeping guest is on 4 KiB pages
 stop each with `bash scripts/stop-ordinary-page-imps.sh <host>`, so it boots cold on the pool
+EOF
+  diff - "$tree/calls" << EOF
+$list_call
+$pages_call
+EOF
+  assert_status 1 "$status"
+}
+
+it_stops_nothing_and_fails_naming_each_image_builder_on_4_kib_pages() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping","kind":"user"},{"id":"imp_2","name":"imp-build-k7m2q9xw","state":"running","kind":"builder"},{"id":"imp_3","name":"imp-build-p4t8r3zn","state":"running","kind":"builder"}]' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K\nimp_3 4K 2M' \
+    bash "$script" root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+image builder imp-build-k7m2q9xw: its running guest is on 4 KiB pages, and impz stop does not take a builder
+wait for each build to end, then run this again
+EOF
+  diff - "$tree/calls" << EOF
+$list_call
+$pages_call
+EOF
+  assert_status 1 "$status"
+}
+
+it_fails_check_naming_an_image_builder_on_4_kib_pages_when_no_other_imp_is() {
+  local status=0
+  create_case_tree
+  setup_test "$tree"
+
+  env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"running","kind":"user"},{"id":"imp_2","name":"imp-build-k7m2q9xw","state":"running","kind":"builder"}]' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 2M 2M\nimp_2 4K 4K' \
+    bash "$script" --check root@geoffcloud > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff /dev/null "$tree/out"
+  diff - "$tree/err" << 'EOF'
+image builder imp-build-k7m2q9xw: its running guest is on 4 KiB pages, and impz stop does not take a builder
+wait for each build to end, then run this again
 EOF
   diff - "$tree/calls" << EOF
 $list_call

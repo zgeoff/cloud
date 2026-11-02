@@ -66,7 +66,7 @@ kinds_line='== impd 3.4.0 stores the secret kinds github, anthropic, npm, custom
 # the image listing check-impd-image-dirs.sh runs after nixie reports ready
 images_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz image ls --json"]'
 # the imp listing and the page-size loop stop-ordinary-page-imps.sh runs in the pool's window
-imps_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json"]'
+imps_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json --builders"]'
 # shellcheck disable=SC2016 # $d, $s and $v are the remote shell's variables, as the call log records them
 pages_call='["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host sh -c '"'"'cd /var/lib/imp/imps && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"$d/vm.json\" && v=2M; echo \"$d $s $v\"; done'"'"'"]'
 # the pool query check-hugetlb-pool.sh runs after the image check
@@ -1253,6 +1253,59 @@ EOF
   git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
   diff - "$tree/deployed-host" <<< "$commit"
   assert_status 0 "$status"
+}
+
+it_never_activates_and_stops_no_imp_while_an_image_builder_runs_on_4_kib_pages_in_the_pool_window() {
+  local commit earlier status=0
+  create_case_tree
+  setup_test "$tree"
+  earlier="$(git -C "$tree/clone" rev-parse HEAD)"
+  git -C "$tree/clone" push -q origin "$earlier:refs/tags/deployed/host"
+  mkdir -p "$tree/clone/nixos/packages" "$tree/clone/nixos/hosts/geoffcloud"
+  echo '  version = "2.26.2";' > "$tree/clone/nixos/packages/atc.nix"
+  echo "$imp_host_pin" > "$tree/clone/nixos/hosts/geoffcloud/configuration.nix"
+  git -C "$tree/clone" add nixos/packages/atc.nix nixos/hosts/geoffcloud/configuration.nix
+  git -C "$tree/clone" commit -qm 'pin imp 3.4.0'
+  git -C "$tree/clone" push -q origin main
+  commit="$(git -C "$tree/clone" rev-parse HEAD)"
+  jq -c --arg runs "$commit https://github.com/zgeoff/cloud/actions/runs/1" '{argv: ., stdout: "\($runs)\n"}' \
+    <<< "$gh_runs_call" >> "$tree/gh-responses"
+
+  (cd "$tree/clone" && env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" \
+    TMPDIR="$tree/tmp" GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 STUB_LOG="$tree/calls" \
+    STUB_BUILD_SAW="$tree/build-saw" STUB_GATEWAY_IMAGES=ghcr.io/zgeoff/atc-gateway:2.27.0 \
+    STUB_NIXIE_IMAGES=ghcr.io/zgeoff/nixie:0.31.4 STUB_NIXIE_REPORTS="$nixie_ready" \
+    STUB_IMPD_IMPS='[{"id":"imp_1","name":"teapot","state":"sleeping","kind":"user"},{"id":"imp_2","name":"imp-build-k7m2q9xw","state":"running","kind":"builder"}]' \
+    STUB_IMPD_IMP_PAGES=$'imp_1 4K 4K\nimp_2 4K 4K' \
+    STUB_BUILD_OUT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    STUB_CURRENT=/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test \
+    bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps) > "$tree/out" 2> "$tree/err" || status=$?
+
+  diff - "$tree/err" << 'EOF'
+image builder imp-build-k7m2q9xw: its running guest is on 4 KiB pages, and impz stop does not take a builder
+wait for each build to end, then run this again
+EOF
+  diff - "$tree/out" << EOF
+== checked by https://github.com/zgeoff/cloud/actions/runs/1
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+$kinds_line
+== build ${commit:0:7}
+built /nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nixos-system-geoffcloud-26.05.test
+== copy to root@geoffcloud
+== atc 2.26.2 on the host, 2.27.0 in the gateway
+== impd 3.4.0 on the host, nixie 0.31.4 (imp-client 3.2.1) in the cluster
+EOF
+  # the stop step's calls, the activation and the pool query, in the order the switch made them
+  grep -E 'impz (ls|stop)|/var/lib/imp/imps|switch-to-configuration'"'"' switch|vm\.nr_hugepages' "$tree/calls" \
+    > "$tree/calls-order"
+  diff - "$tree/calls-order" << EOF
+$imps_call
+$pages_call
+EOF
+  git -C "$tree/origin.git" rev-parse refs/tags/deployed/host > "$tree/deployed-host"
+  diff - "$tree/deployed-host" <<< "$earlier"
+  assert_status 1 "$status"
 }
 
 it_stops_each_imp_on_4_kib_pages_before_the_activation_and_fails_with_a_reboot_when_the_pool_is_short() {

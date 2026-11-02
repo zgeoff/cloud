@@ -413,12 +413,12 @@ it_prints_the_named_imps() {
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
     STUB_IMPD_IMPS='[{"id":"imp_1","name":"kettle","state":"sleeping"}]' \
-    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json" \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json --builders" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '[{"id":"imp_1","name":"kettle","state":"sleeping"}]'
   diff /dev/null "$tree/err"
-  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json"]'
+  diff - "$tree/calls" <<< '["ssh","-o","BatchMode=yes","root@geoffcloud","podman exec imp-host impz ls --json --builders"]'
   assert_status 0 "$status"
 }
 
@@ -428,7 +428,7 @@ it_prints_an_empty_imp_list_when_no_imp_is_named() {
   setup_test "$tree"
 
   env -i PATH="$tree/bin:/usr/bin:/bin" HOME="$tree/home" TMPDIR="$tree/tmp" STUB_LOG="$tree/calls" \
-    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json" \
+    ssh -o BatchMode=yes root@geoffcloud "podman exec imp-host impz ls --json --builders" \
     > "$tree/out" 2> "$tree/err" || status=$?
 
   diff - "$tree/out" <<< '[]'

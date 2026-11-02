@@ -41,8 +41,8 @@
 #   vm.nr_hugepages reads back, and `0` when that is unset, then STUB_HUGETLB_CONFIGURED, the
 #   vm.nr_hugepages line's value in /etc/sysctl.d/60-nixos.conf, on the next line, and nothing
 #   when that is unset, as for a system that sets no pool;
-# - `podman exec imp-host impz ls --json`: prints STUB_IMPD_IMPS, the JSON array of impd's imps,
-#   and `[]` when that is unset;
+# - `podman exec imp-host impz ls --json --builders`: prints STUB_IMPD_IMPS, the JSON array of
+#   impd's imps and image builders, and `[]` when that is unset;
 # - the `podman exec imp-host sh -c` loop of stop-ordinary-page-imps.sh that prints
 #   `<id> <snapshot pages> <vm pages>` for each folder under /var/lib/imp/imps: prints
 #   STUB_IMPD_IMP_PAGES, those lines, and nothing when that is unset;
@@ -196,7 +196,7 @@ case "${*:4}" in
     printf '%s\n' "${STUB_HUGETLB_RESERVED:-0}"
     if [ -n "${STUB_HUGETLB_CONFIGURED:-}" ]; then printf '%s\n' "$STUB_HUGETLB_CONFIGURED"; fi
     ;;
-  "podman exec imp-host impz ls --json")
+  "podman exec imp-host impz ls --json --builders")
     if [ -n "${STUB_IMP_HOST_GONE:-}" ]; then
       echo 'Error: no container with name or ID "imp-host" found: no such container' >&2
       exit 125

@@ -139,7 +139,9 @@ bash scripts/switch-geoffcloud.sh --stop-ordinary-page-imps  # switch in the hug
    `bash scripts/stop-ordinary-page-imps.sh --plan <host>` prints the order and stops nothing, and
    `--check` fails naming each imp still on 4 KiB pages. It stops them after the last gate and
    before the activation reserves the pool, so a pool that comes up short leaves no guest on
-   ordinary pages beside it. Pass the flag only in the pool's window that the owner approved.
+   ordinary pages beside it. `impz stop` does not take an image builder, so a builder on 4 KiB pages
+   fails the switch before any stop: wait for its build to end, then switch again. Pass the flag
+   only in the pool's window that the owner approved.
 9. It sets the system profile to the built store path and runs its `switch-to-configuration switch`
    under `systemd-run`, as `nixos-rebuild` does. The flake is not evaluated again. Before the
    activation it appends the commit and the store path to `/var/lib/host-build-lag/switches` on the

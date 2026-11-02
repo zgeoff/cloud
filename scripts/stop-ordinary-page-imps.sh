@@ -25,11 +25,13 @@
 # JSON.stringify(…, null, 2)). A running or sleeping imp counts as on 2 MiB pages when either file
 # says so, because a wake between the listing and the read removes the snapshot's file; with
 # neither, it is on 4 KiB pages. An imp in another state has no guest. The script lists the imps
-# with `impz ls --json` and reads the files with one `podman exec`, both over ssh.
-# --check exits 1 when it finds an imp on 4 KiB pages, and an ssh failure stops every mode with
-# ssh's exit code. impd's names hold only lowercase letters, digits and hyphens (NameSchema in
-# packages/api/src/schemas/name-schema.ts), and the script checks each before it puts one in a
-# remote command.
+# with `impz ls --json --builders`, since a plain listing leaves out the image builders impd runs
+# for builds, and reads the files with one `podman exec`, both over ssh. `impz stop` does not take
+# a builder, so a builder on 4 KiB pages fails every mode before any stop: run the script again
+# once its build ends. --check exits 1 when it finds an imp on 4 KiB pages, and an ssh failure
+# stops every mode with ssh's exit code. impd's names hold only lowercase letters, digits and
+# hyphens (NameSchema in packages/api/src/schemas/name-schema.ts), and the script checks each
+# before it puts one in a remote command.
 set -euo pipefail
 
 mode=stop
@@ -46,15 +48,17 @@ fi
 host="$1"
 imps_dir=/var/lib/imp/imps
 
-records="$(ssh -o BatchMode=yes "$host" "podman exec imp-host impz ls --json")"
-# one `<id> <name> <state>` line per imp
-imps="$(jq -r '.[] | "\(.id) \(.name) \(.state)"' <<< "$records")"
+records="$(ssh -o BatchMode=yes "$host" "podman exec imp-host impz ls --json --builders")"
+# one `<id> <name> <state> <kind>` line per imp, its kind `user` or `builder`
+imps="$(jq -r '.[] | "\(.id) \(.name) \(.state) \(.kind // "user")"' <<< "$records")"
 # one `<id> <snapshot pages> <vm pages>` line per imp folder, each 2M or 4K
 sizes="$(ssh -o BatchMode=yes "$host" "podman exec imp-host sh -c 'cd $imps_dir && for d in *; do s=4K; v=4K; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/snapshot/meta.json\" && s=2M; grep -qs \"\\\"hugePages\\\": \\\"2M\\\"\" \"\$d/vm.json\" && v=2M; echo \"\$d \$s \$v\"; done'")"
 
 # `<name> <state>` of each imp whose guest is on 4 KiB pages
 declare -A states=()
-while read -r id name state; do
+# `<name> <state>` of each image builder whose guest is on 4 KiB pages
+builders=()
+while read -r id name state kind; do
   [ -n "${id:-}" ] || continue
   case "$state" in
     sleeping | running) ;;
@@ -69,8 +73,21 @@ while read -r id name state; do
     echo "impd's imp '$name' has a name that is not a plain impd name; stop it by hand" >&2
     exit 1
   fi
-  states["$name"]="$state"
+  if [ "$kind" = builder ]; then
+    builders+=("$name $state")
+  else
+    states["$name"]="$state"
+  fi
 done <<< "$imps"
+
+if [ "${#builders[@]}" -gt 0 ]; then
+  for builder in "${builders[@]}"; do
+    echo "image builder ${builder% *}: its ${builder#* } guest is on 4 KiB pages, and impz stop" \
+      "does not take a builder" >&2
+  done
+  echo "wait for each build to end, then run this again" >&2
+  exit 1
+fi
 
 order=()
 last=()
