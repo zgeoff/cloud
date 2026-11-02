@@ -1,79 +1,55 @@
 # NixOS checks
 
-The checks live in [`nixos/checks/`](../../../../nixos/checks/) and are wired into
-`checks.x86_64-linux`. `bun run test:nixos` builds every check the flake declares, from the repo
-root as the flake source (`path:.?dir=nixos`), because every check reads `test-support/shell/`. It
-builds in a `nixos/nix` container on the `cloud-nixos-checks-store` volume, never the switch's
-`geoffcloud-nix-store`.
+These rules add to [NixOS testing](../../testing/references/nixos.md) for the checks in
+[`nixos/checks/`](../../../../nixos/checks/). Register a new check as an attribute of
+`checks.x86_64-linux` in [`nixos/flake.nix`](../../../../nixos/flake.nix), and build it with
+`bun run test:nixos <check>`.
 
 - [Module checks](#module-checks)
 - [Restore rehearsals](#restore-rehearsals)
 
 ## Module checks
 
-- A check reads only the shell helpers that
+- When a check starts to read a file outside `nixos/`, add the file's path to the `nixos` gate of
+  [`gates.yml`](../../../../.github/gates.yml). Otherwise a change to that file starts no run of
+  the checks. For a shell helper from `test-support/shell/`, add it to
   [`build-shell-lib-source.nix`](../../../../nixos/checks/test-utils/build-shell-lib-source.nix)
-  selects, and the `nixos` gate of [`gates.yml`](../../../../.github/gates.yml) lists the same
-  files. A helper a check starts to read joins both lists. The checks read nothing else outside
-  `nixos/` but `packages/topology/` and the host scripts that `tank-cloud-host-secrets` runs in its
-  VM.
-- `geoffcloud-eval` evaluates the host's system derivation and builds nothing of the host, so a
-  change that breaks the host config fails CI instead of the switch.
-- `geoffcloud-spend-cap` runs the counting proxy that geoffcloud pins, with the model and prices
-  that geoffcloud hands the preview service, against a stand-in model API, so a price or a pin
-  that counts a reply wrong fails before the switch.
-- A module check renders its cases through
-  [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into `run_cases` calls,
-  each in its own fresh directory, with the `assert_*` helpers.
-- Shared Nix helpers and stand-ins live in
-  [`nixos/checks/test-utils/`](../../../../nixos/checks/test-utils/), one export per file, and the
-  [`test-utils`](../../../../nixos/checks/test-utils-check.nix) check tests each of them. Every
-  check that uses them depends on that check. The impd stand-ins are compared with the real Elysia
-  and Bun versions the pinned imp locks.
-- A unit or config is asserted whole: `jq -S` of the evaluated `serviceConfig`, `environment`,
-  `description`, `restartTriggers` or generated file against a literal, with store paths
-  interpolated by Nix.
-- A module assertion has a negative case that evaluates a bad config and compares the failing
-  assertion messages exactly.
+  too.
+- Render a module check's cases through
+  [`render-cases.nix`](../../../../nixos/checks/test-utils/render-cases.nix) into `run_cases` calls.
+- Put a shared Nix helper or stand-in in
+  [`nixos/checks/test-utils/`](../../../../nixos/checks/test-utils/), one export per file, with a
+  test in [`test-utils-check.nix`](../../../../nixos/checks/test-utils-check.nix). Import that check
+  in each check that uses the helper, as
+  [`impd-db-tools.nix`](../../../../nixos/checks/impd-db-tools.nix) does.
+- Assert a unit or a generated file whole. Compare `jq -S` of the evaluated `serviceConfig`,
+  `environment`, `description` and `restartTriggers` with one literal, and interpolate store paths
+  from Nix.
+- Give each module assertion a case that evaluates a bad config, and compare the failing assertion
+  messages exactly.
 
 ## Restore rehearsals
 
-- The restore rehearsals (`impd-restore`, `impd-restore-boundaries`,
-  `impd-restore-saved-failures`) share one VM definition,
-  [`build-restore-rehearsal.nix`](../../../../nixos/checks/test-utils/build-restore-rehearsal.nix),
-  and one reset, `setup_test()`. Each check boots its own VM, and each subtest supplies its own
-  scenario data. `impd-restore-reset` checks the reset itself: each subtest leaves one kind of state
-  behind, proves it is there, runs `setup_test()` and asserts the whole clean baseline. It also
-  resets after a real failed restore, after a real restore killed with SIGKILL while
-  [`build-stub-blocking-sqlite3`](../../../../nixos/checks/test-utils/build-stub-blocking-sqlite3.nix)
-  holds it, and after a reset stopped part-way, as the shared skill's rule on
-  [resetting shared infrastructure](../../testing/SKILL.md#end-to-end-suites) asks. Cleanup that
-  depends on what a subtest left lives in the reset, never in scenario flags. This is the language
-  form of the shared skill's one [`setupTest`](../../testing/SKILL.md#setuptest) per file.
-- `setup_test()` returns the generated system paths as runtime handles, like a temporary directory.
-  Each subtest names its restore generation and other scenario values in its own body.
-- Beside `setup_test()`, the rehearsal defines helpers that write a dataset or a copy from the
-  values a subtest passes, and that check what a refused restore leaves unchanged. A subtest passes
-  every value it later asserts, such as a marker or a secret, so its body still shows them.
-- In a restore rehearsal, each `with subtest("it …")` starts from `setup_test()`, which resets every
-  state a subtest can leave. It asserts `machine.execute`'s status and output exactly, masking only
-  what the shell compares may mask, plus every side effect the script promises, including the saved
-  original on each failure path. Waits use `wait_for_unit`, `wait_until_succeeds` or `wait_for`.
-- An error the script declares is reached through real VM state where real state can produce it, and
-  through the script's injectable commands (`SQLITE3`, `SYSTEMCTL`, `CMP`, the start loop's pause
-  `IMPD_START_SLEEP`, and the health probe's `CURL`) only where it cannot. The start wait is counted
-  through [`build-stub-sleep`](../../../../nixos/checks/test-utils/build-stub-sleep.nix) and the
-  probe's timeout arguments are checked through
-  [`build-stub-curl`](../../../../nixos/checks/test-utils/build-stub-curl.nix), never by waiting out
-  a deadline. Two cases wait out a real 1 s curl timeout against the
-  [hung impd stand-in](../../../../nixos/checks/test-utils/run-stub-hung-impd.py), with no
-  elapsed-time assertion: the stand-in's own test in `test-utils`, which also checks
-  `build-stub-curl` against that real curl, and one probe case in `impd-local-health`, the only
-  real-transport proof that a hung impd reads as status 0.
-- A rehearsal's first subtests assert that no unit failed at boot and that `systemd-detect-virt`
-  prints `kvm`, so a run that fell back to emulation fails.
-  [`run-nixos-checks.sh`](../../../../scripts/run-nixos-checks.sh) needs a readable and writable KVM
-  device for any `impd-restore*` check.
-- nixpkgs passes a VM test script as one environment variable, capped at 131,072 bytes. A rehearsal
-  that would pass the cap becomes a new `impd-restore-<area>` check, never a shorter rewrite of
-  existing subtests.
+The `impd-restore*` checks share one VM definition,
+[`build-restore-rehearsal.nix`](../../../../nixos/checks/test-utils/build-restore-rehearsal.nix), and
+one reset function, `setup_test()`, which returns the VM to a clean baseline.
+`impd-restore-reset` tests that function.
+
+- Start each `with subtest("it …")` from `setup_test()`. When a subtest leaves state behind, clean it
+  up in `setup_test()`, never through a flag the subtest passes.
+- Write the restore generation and every value the subtest asserts later, such as a marker or a
+  secret, in the subtest's own body.
+- Assert `machine.execute`'s status and output exactly. Assert each file the script writes or keeps
+  too, such as the saved original on each failure path.
+- Reach an error through real VM state when the VM can produce it. Otherwise set one of the script's
+  command variables on the `machine.execute` line, as in `SQLITE3=${stubSqlite3}`.
+- Count the start wait through
+  [`build-stub-sleep`](../../../../nixos/checks/test-utils/build-stub-sleep.nix), and check the
+  probe's timeout arguments through
+  [`build-stub-curl`](../../../../nixos/checks/test-utils/build-stub-curl.nix). Never wait for a real
+  deadline to pass.
+- Begin each rehearsal with subtests that assert no unit failed at boot and that
+  `systemd-detect-virt` prints `kvm`, so a run that fell back to emulation fails.
+- When a rehearsal would pass the 131,072-byte limit nixpkgs puts on a VM test script, copy an
+  existing `impd-restore-*` check into a new one named for the failure paths it covers. Never shorten
+  the existing subtests to fit.

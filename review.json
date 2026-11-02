@@ -1,6 +1,7 @@
 {
   "extends": "github:zgeoff/noslop-config",
   "rules": [
+    ".claude/skills/project-ci-design/SKILL.md",
     ".claude/skills/project-code-style/SKILL.md",
     ".claude/skills/project-testing/SKILL.md"
   ],

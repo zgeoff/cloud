@@ -1,48 +1,79 @@
 # provider (Go)
 
-The Go provider's tests take each shared rule in its Go form, and share the stand-ins in
-[`internal/onideltest`](../../../../provider/internal/onideltest/).
+Write the Go tests in `provider/` with testify, as the Departures of
+[project-testing](../SKILL.md#departures) say. These rules give each rule of
+[Go testing](../../testing/references/go.md) its testify form, and name the provider's stand-ins.
 
-| Shared rule                        | Go form                                                                                                                                                                                                                                                                                  |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `test.each` for a closed table     | a `[]struct{…}` slice of plain data (never a map, never a `func` field) ranged with `t.Run("it …", …)`; every row fits the test function's name                                                                                                                                          |
-| `setupTest()` and its dispose      | `setupTest(t)` returning one struct held as `ctx`; `t.Cleanup` on the line after each acquisition; no `defer`, `TestMain` or `init`                                                                                                                                                      |
-| `onTestFinished` for process state | `t.Setenv`, `t.Chdir`, `t.Cleanup`                                                                                                                                                                                                                                                       |
-| `toStrictEqual`                    | `assert.Equal` against a complete struct, map or slice; `assert.ElementsMatch` where order is not the contract; `EqualValues` never appears                                                                                                                                              |
-| Error strictness                   | `require.ErrorAs` plus a whole-value compare for a typed error, `require.ErrorIs` for a sentinel, `assert.EqualError` when the text is contract                                                                                                                                          |
-| Narrowing                          | `require.*` before an `assert.Empty`, `Nil`, `NotContains` or `Zero`, which pass on a missing value                                                                                                                                                                                      |
-| No sleeps; injected time           | `Client.Sleep` and `Client.VMWaitTimeout` in [`client.go`](../../../../provider/internal/client/client.go), or `onidel.NewWithOptions(Options{Sleep})` in [`provider.go`](../../../../provider/internal/onidel/provider.go); `testing/synctest` for the default sleep itself             |
-| Factories (`buildMock<Type>`)      | `BuildMock<Type>(overrides ...func(*T)) T` in [`internal/clienttest`](../../../../provider/internal/clienttest/) for the generated request types the client sends, with fixed defaults, since the tests pin the request body as exact values; a test sets each field its assertion names |
+- [Shape](#shape)
+- [Assertions](#assertions)
+- [The stub Onidel API](#the-stub-onidel-api)
+- [Time](#time)
+- [Running the tests](#running-the-tests)
 
-- Tests are black-box (`package client_test`, `package onidel_test`) and sit in the file named for
-  the source file they test. `cmd/onidel`'s tests build the real binary and run it against the stub
-  API.
-- One `assert.Equal` holds one result. Never build a `[]any` or other composite on the actual side
-  from several results; a projection of one result, such as a response's status and body, stays
-  together.
-- [`internal/onideltest`](../../../../provider/internal/onideltest/) holds the shared stand-ins,
-  each with tests that pin it to the real thing:
-  - [`StartStubOnidelAPI`](../../../../provider/internal/onideltest/start_stub_onidel_api.go) stands
-    in for the Onidel API. kin-openapi validates every request against the spec the client is
-    generated from, [`onidel.yaml`](../../../../provider/spec/onidel.yaml) with its overlay, for the
-    operations in use. It starts with no teams; a test states its team with `SetTeams`. It answers a
-    request that does not match the spec, an unhandled route, an action it does not model, or a body
-    that is not JSON with a recorded problem, and fails the test at cleanup when a problem was not
-    drained.
-  - [`BuildStubSleep`](../../../../provider/internal/onideltest/build_stub_sleep.go) records each
-    duration and returns the context's error, and
-    [`BuildStubCancelingSleep`](../../../../provider/internal/onideltest/build_stub_canceling_sleep.go)
-    ends the caller's context.
-    [`BuildStubClockSleep`](../../../../provider/internal/onideltest/build_stub_clock_sleep.go) runs
-    its own clock: each sleep returns at once and moves the clock on, stopping at the context's
-    deadline with `context.DeadlineExceeded`. Their tests compare each with the real client `Sleep`.
-  - [`BuildStubTB`](../../../../provider/internal/onideltest/build_stub_tb.go) lets a test observe a
-    helper failing a test, with `testing.T`'s cleanup order.
-  - Shape the stub's state with its setters. A deviation is `RegisterResponse`; a handler that must
-    change state mid-request, or a transport fault `RegisterResponse` cannot express (such as a body
-    shorter than its `Content-Length`), is `RegisterHandler`. Assert the requests the code sent with
-    `GetRequests()`, as a whole list.
-- Run `bun run provider:check` ([`check.sh`](../../../../provider/check.sh): `gofmt`, `go vet`,
-  golangci-lint, `deadcode -test`, then `go test -race ./...`), then
-  `go test -race -shuffle=on -count=3 ./...`. A test that touches a context or time also passes
-  `-count=200` before it lands.
+## Shape
+
+- Write black-box tests: a test of `internal/client/firewalls.go` goes in `firewalls_test.go` as
+  `package client_test`.
+- Write a table of fixed cases as a `[]struct{…}` slice of plain data, and range it with
+  `t.Run("it …", …)`. Never use a map, whose order is random, or a `func` field, which hides the
+  case's logic.
+- Build each test's state in one `setupTest(t)`, which returns a struct. Register its cleanup with
+  `t.Cleanup` inside it. Never set up or clean up with `defer`, `TestMain` or `init`.
+- Test `cmd/onidel` through the binary that `main_test.go` builds with `go build`, run against the
+  stub API.
+
+## Assertions
+
+- Compare a whole struct, map or slice with `assert.Equal`. Use `assert.ElementsMatch` when the order
+  isn't part of the contract. Never use `assert.EqualValues`, which converts types before it
+  compares.
+- Hold one result in each `assert.Equal`. Never build a `[]any` of several results to compare at
+  once.
+- Check a typed error with `require.ErrorAs`, then compare the whole value. Check a sentinel with
+  `require.ErrorIs`. Use `assert.EqualError` only when the text is the contract.
+- Before `assert.Empty`, `assert.Nil`, `assert.NotContains` or `assert.Zero`, check that the value
+  exists with a `require` call, such as `require.Len`. Those four pass on a missing value.
+- Build each request the client sends with a `BuildMock<Type>` from
+  [`internal/clienttest`](../../../../provider/internal/clienttest/). Its defaults are fixed values,
+  because the tests compare request bodies exactly. Set every field the test asserts, even when it
+  matches the default. Add a `BuildMock<Type>` there, with its test, for a new request type.
+
+## The stub Onidel API
+
+Run the client against
+[`StartStubOnidelAPI`](../../../../provider/internal/onideltest/start_stub_onidel_api.go), in
+[`internal/onideltest`](../../../../provider/internal/onideltest/). It checks each request against
+[`onidel.yaml`](../../../../provider/spec/onidel.yaml) and
+[`onidel.overlay.yaml`](../../../../provider/spec/onidel.overlay.yaml), and records each request it
+can't answer as a problem.
+
+- Call `DrainProblems` in each test that expects a problem, and compare its result. At cleanup, the
+  stub fails the test on any problem left.
+- Set the starting state with the stub's `Set*` methods. It starts with no teams, so call `SetTeams`
+  in each test that reaches a team.
+- Use `RegisterResponse` for a canned answer that differs from the stub's model. Use
+  `RegisterHandler` only for a state change during a request, or for a transport fault, such as a
+  body shorter than its `Content-Length`.
+- Compare the whole `GetRequests()` list in each test that asserts what the client sent.
+- Observe a helper that fails a test through
+  [`BuildStubTB`](../../../../provider/internal/onideltest/build_stub_tb.go).
+
+## Time
+
+Pass a stub sleep through `Client.Sleep` in
+[`client.go`](../../../../provider/internal/client/client.go) in a client test, or
+`Options{Sleep}` in [`provider.go`](../../../../provider/internal/onidel/provider.go) in a provider
+test:
+
+- [`BuildStubSleep`](../../../../provider/internal/onideltest/build_stub_sleep.go) records each wait.
+- [`BuildStubCancelingSleep`](../../../../provider/internal/onideltest/build_stub_canceling_sleep.go)
+  cancels the caller's context.
+- [`BuildStubClockSleep`](../../../../provider/internal/onideltest/build_stub_clock_sleep.go) moves
+  its own clock and returns `context.DeadlineExceeded` at the deadline. Use it with a short
+  `Client.VMWaitTimeout` to test a timeout.
+
+## Running the tests
+
+From the repo root, run `bun run provider:check`. Then, from `provider/`, run
+`go test -race -shuffle=on -count=3 ./...`. Before you push a test that touches a context or time,
+run it alone with `-race -count=200`.
