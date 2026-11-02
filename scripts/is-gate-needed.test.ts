@@ -34,6 +34,7 @@ test.each([
   ['prod-apply', ['.github/workflows/deploy-prod.yml', 'scripts/lint.sh'], false],
   ['prod-apply', ['infra/index.ts'], true],
   ['prod-apply', ['deploy/nixie/values.yaml'], true],
+  ['prod-apply', ['deploy/nixie/secrets.sops.yaml'], true],
   ['prod-apply', ['provider/main.go'], true],
   ['prod-apply', ['sdk/onidel/index.ts'], true],
   ['prod-apply', ['packages/topology/src/ports.ts'], true],

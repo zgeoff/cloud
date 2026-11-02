@@ -84,7 +84,7 @@ function printVerdict(
   ];
 
   if (holds.length === 0) {
-    options.printOut('apply: the plan holds no delete, replace or guarded change\n');
+    options.printOut('apply: the plan holds no delete, held replace or guarded change\n');
 
     return 0;
   }

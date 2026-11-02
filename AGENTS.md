@@ -138,6 +138,14 @@ docs/
   - a change to the tailnet policy, the VM, the cloud firewall, a tunnel's routes, a DNS record or
     the gateway's Access policy
   - a failed drift check, for a manual dispatch
+
+  A merge that changes only `deploy/nixie/secrets.sops.yaml` or `deploy/nixie/config.yaml` applies
+  with no manual dispatch. Its plan replaces a Secret or a ConfigMap whose name Pulumi generates,
+  because the infra code sets no `metadata.name` on it, and the guard passes a replace of such an
+  object when only its data changed. The guard holds the same change to an object whose
+  `metadata.name` the code sets.
+  [The apply job](docs/architecture/infrastructure-as-code.md#the-apply-job) gives the reason.
+
 - Never run `bun run up` while a `Deploy prod` run is in progress.
 - An apply by hand follows the same bracket, in order: `bun run drift` from a clean checkout of the
   `deployed/prod` tag, `bun run preview -- --refresh` from a clean `main` that shows only the
